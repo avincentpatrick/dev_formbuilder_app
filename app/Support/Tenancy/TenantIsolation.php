@@ -112,11 +112,7 @@ final class TenantIsolation
         self::assertIdentifier($table);
         self::assertIdentifier($userColumn);
 
-        $match = sprintf(
-            "%s = current_setting('%s', true)::uuid",
-            $userColumn,
-            self::USER_SETTING
-        );
+        $match = sprintf('%s = %s', $userColumn, self::settingUuid(self::USER_SETTING));
 
         return [
             ...self::enableAndForce($table),
@@ -140,12 +136,12 @@ final class TenantIsolation
         self::assertIdentifier($table);
 
         $using = sprintf(
-            'id = current_setting(%s, true)::uuid OR EXISTS ('
+            'id = %s OR EXISTS ('
                 .'SELECT 1 FROM tenant_users tu WHERE tu.user_id = %s.id '
-                ."AND tu.tenant_id = current_setting(%s, true)::uuid AND tu.status = 'active')",
-            self::quote(self::USER_SETTING),
+                ."AND tu.tenant_id = %s AND tu.status = 'active')",
+            self::settingUuid(self::USER_SETTING),
             $table,
-            self::quote(self::TENANT_SETTING)
+            self::settingUuid(self::TENANT_SETTING)
         );
 
         return [
@@ -210,7 +206,19 @@ final class TenantIsolation
 
     private static function tenantMatch(string $tenantColumn): string
     {
-        return sprintf('%s = current_setting(%s, true)::uuid', $tenantColumn, self::quote(self::TENANT_SETTING));
+        return sprintf('%s = %s', $tenantColumn, self::settingUuid(self::TENANT_SETTING));
+    }
+
+    /**
+     * A session setting read back as a uuid, fail-closed. The `NULLIF(..., '')` is essential, not
+     * cosmetic: a custom GUC that has been SET and then cleared within a session reads back as ''
+     * (empty string), NOT NULL — and `''::uuid` raises an error, which would turn the fail-closed
+     * default ("no rows visible") into a hard query failure. NULLIF collapses both "never set" (NULL)
+     * and "set then cleared" ('') to NULL, which the `= NULL` comparison treats as matching no row.
+     */
+    private static function settingUuid(string $setting): string
+    {
+        return sprintf("NULLIF(current_setting(%s, true), '')::uuid", self::quote($setting));
     }
 
     private static function policy(

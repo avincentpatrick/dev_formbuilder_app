@@ -21,12 +21,13 @@ it('emits ENABLE and FORCE row level security for the strict shape', function ()
         ->toContain('ALTER TABLE probes FORCE ROW LEVEL SECURITY;');
 });
 
-it('uses the fail-closed two-argument current_setting form', function (): void {
-    // The `, true` (missing_ok) argument is what makes an unset context yield NULL → zero rows,
-    // instead of raising an error. Its removal would break the entire fail-closed guarantee.
+it('uses the fail-closed NULLIF + two-argument current_setting form', function (): void {
+    // The `, true` (missing_ok) argument makes an unset context yield NULL, and NULLIF(...,'') makes
+    // a set-then-cleared context ('' — how a custom GUC reads back after reset) also become NULL.
+    // Both must map to "no rows", never an error or "all rows". Dropping either breaks fail-closed.
     $sql = joined(TenantIsolation::strictSql('probes'));
 
-    expect($sql)->toContain("current_setting('app.current_tenant_id', true)::uuid");
+    expect($sql)->toContain("NULLIF(current_setting('app.current_tenant_id', true), '')::uuid");
 });
 
 it('creates one policy per command, with WITH CHECK on writes', function (): void {
@@ -61,7 +62,7 @@ it('keys the belongs-to-user shape on the user setting, not the tenant setting',
     $sql = joined(TenantIsolation::belongsToUserSql('user_ui_preferences'));
 
     expect($sql)
-        ->toContain("current_setting('app.current_user_id', true)::uuid")
+        ->toContain("NULLIF(current_setting('app.current_user_id', true), '')::uuid")
         ->not->toContain('app.current_tenant_id');
 });
 

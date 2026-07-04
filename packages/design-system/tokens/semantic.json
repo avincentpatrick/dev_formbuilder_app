@@ -1,0 +1,30 @@
+{
+    "color": {
+        "bg": {
+            "canvas": { "value": "{neutral.50}" },
+            "surface": { "value": "{neutral.0}" }
+        },
+        "text": {
+            "primary": { "value": "{neutral.900}" },
+            "muted": { "value": "{neutral.500}" }
+        },
+        "border": {
+            "default": { "value": "{neutral.300}" }
+        },
+        "action": {
+            "primary": {
+                "bg": { "value": "{primary.600}" },
+                "bg-hover": { "value": "{primary.700}" },
+                "text": { "value": "{neutral.0}" }
+            }
+        },
+        "focus": {
+            "ring": { "value": "{primary.700}" }
+        },
+        "danger": {
+            "bg": { "value": "{danger.600}" },
+            "bg-hover": { "value": "{danger.700}" },
+            "text": { "value": "{neutral.0}" }
+        }
+    }
+}

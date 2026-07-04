@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: "8.4"
+  NODE_VERSION: "24"
+
+jobs:
+  # ── Stage 1: static analysis, style & security (fail-fast, cheapest first) ──────────────
+  static-analysis:
+    name: Static analysis, style & security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Pint (code style)
+        run: composer run lint
+
+      - name: Larastan / PHPStan (level 8)
+        run: composer run analyse
+
+      - name: Thin-controller gate (250 lines / complexity 10)
+        run: composer run controller-gate
+
+      - name: Composer audit (SCA)
+        run: composer audit
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: npm audit (SCA — high/critical blocks merge)
+        run: npm audit --audit-level=high
+
+      - name: Secret scan (gitleaks)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --no-banner --redact --exit-code 1
+
+  # ── Stage 2: unit + integration tests (real PostgreSQL, never sqlite) ───────────────────
+  tests:
+    name: Tests (Pest on PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: meridian
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: meridian
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meridian -d meridian"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: meridian
+      DB_PASSWORD: secret
+      REDIS_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Create test database
+        run: PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -c 'CREATE DATABASE meridian_testing;'
+
+      - name: Run test suite (Pest)
+        run: php artisan test
+
+  # ── Stage: frontend build + type-check + token generation ──────────────────────────────
+  frontend:
+    name: Frontend build & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Install design-system deps
+        run: npm --prefix packages/design-system ci
+      - name: Generate design tokens
+        run: npm run ds:tokens
+      - name: Type-check (vue-tsc)
+        run: npm run type-check
+      - name: Build assets (Vite)
+        run: npm run build
+
+  # ── Stage: design-system accessibility (axe on every story, WCAG 2.2 AA, merge-blocking) ─
+  design-system-a11y:
+    name: Design system a11y (axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Install design-system deps
+        run: npm --prefix packages/design-system ci
+      - name: Install Playwright (chromium)
+        run: cd packages/design-system && npx playwright install --with-deps chromium
+      - name: Build Storybook
+        run: npm run ds:storybook:build
+      - name: axe every story (WCAG 2.2 AA — merge-blocking)
+        run: |
+          npx concurrently -k -s first \
+            "npx http-server packages/design-system/storybook-static -p 6006 --silent" \
+            "npx wait-on tcp:127.0.0.1:6006 && npm run ds:test -- --url http://127.0.0.1:6006"
+
+  # ── Stage 4 (stub, present): OpenAPI contract tests — wired when /api/v1 lands (Increment E)
+  contract-tests:
+    name: Contract tests (OpenAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "OpenAPI 3.1 contract tests are wired when the /api/v1 surface lands (Phase-0 Increment E)."
+
+  # ── Stage 6 (stub, present): Playwright e2e — wired as real pages appear (Increment C+) ──
+  e2e:
+    name: E2E (Playwright + axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Playwright e2e + @axe-core on composed pages are wired as the app shell/pages land."
+
+  # ── Stage 7 (stub, present): deploy to Laravel Cloud staging (main only, after all gates) ─
+  deploy:
+    name: Deploy (staging)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [static-analysis, tests, frontend, design-system-a11y, contract-tests, e2e]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Staging deploy is Git-integrated via Laravel Cloud; migrations run before traffic. Prod promotion is a manual gate."

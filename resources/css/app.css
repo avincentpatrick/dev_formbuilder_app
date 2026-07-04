@@ -1,0 +1,16 @@
+/* Meridian admin app — base only.
+   Shared design tokens + components come from @meridian/design-system (wired in Increment C). */
+
+:root {
+    color-scheme: light dark;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}

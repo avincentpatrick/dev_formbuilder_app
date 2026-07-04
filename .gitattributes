@@ -1,0 +1,23 @@
+* text=auto eol=lf
+
+# Container entrypoints / shell scripts MUST stay LF even on Windows checkouts.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+# Binary assets — never munge EOLs.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+/.github export-ignore
+CHANGELOG.md export-ignore
+.styleci.yml export-ignore

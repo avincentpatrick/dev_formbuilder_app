@@ -1,0 +1,229 @@
+# ADR-0002: Multi-Tenancy Isolation Model — Shared Database, Shared Schema, `tenant_id` Discriminator, Reinforced with PostgreSQL Row-Level Security
+
+## Status
+
+**Accepted** — 2026-07-03
+
+- **Deciders**: Founding engineering (architecture owner), with product sign-off on the roadmap implications (Phase 4 dedicated-DB deferral).
+- **Supersedes**: N/A (greenfield decision; no prior ADR exists for this project).
+- **Related ADRs**:
+  - ADR-0001 — *Database Engine: PostgreSQL over MySQL* (prerequisite — this decision is only possible because Postgres was already selected; MySQL has no equivalent to Postgres's native Row-Level Security).
+  - ADR-0003 — *Hosting Platform Selection* (downstream — hosting choice must support Postgres RLS, session-scoped `SET LOCAL` semantics under connection pooling, and per-tenant backup granularity discussed below).
+  - A future ADR (unnumbered at time of writing) will cover *Dedicated-Database Tenancy for Enterprise Tenants*, scoped to Phase 4 — this ADR deliberately defers that decision rather than making it now (see [Consequences → Future Migration Path](#future-migration-path-out-of-scope-today-but-must-remain-possible)).
+- **Scope note**: This ADR consolidates two closely related decisions the architecture plan lists separately — the *tenancy isolation model* and *RLS adoption* — into a single ADR, because in this project they are one decision: the isolation model **is** "shared schema + RLS as backstop," not two independently-choosable things.
+
+---
+
+## Context
+
+### Why this decision exists at all
+
+This is a brand-new, greenfield multi-tenant SaaS product (a form-builder / data-collection platform, in the spirit of KoboToolbox and Fillout.com). It must support many independent customer organizations ("tenants") — NGOs, research teams, government units, and general business users — each with their own forms, submissions, users, and billing, from day one.
+
+Critically: **the legacy system this project draws feature inspiration from (`dev_pk_new`) was never actually multi-tenant.** It was built single-org, for a single government department, with no `tenant_id` concept anywhere in its schema, no tenant-scoped authorization model, and no precedent — good or bad — for how to isolate one customer's data from another's inside a shared application. Every other subsystem in this project (submission pipeline, form versioning, audit trail) had a legacy implementation to audit, learn from, and consciously improve. Multi-tenancy has none. This ADR is being written on a blank slate, which raises the bar for rigor rather than lowering it — there is no "at least it's better than what we had" fallback here, because there was no "what we had."
+
+### What is at stake
+
+Tenant data isolation is the single highest-blast-radius correctness property this system has. A bug in form validation, versioning, or the expression engine produces a bad answer, a rejected submission, or an incorrect calculated field — bounded, recoverable, and visible to at most one tenant. A bug in tenant isolation produces **Tenant A reading or writing Tenant B's health survey data, form schemas, or submission records** — a category of failure that:
+
+- Is often silent (the query "succeeds," it just returns or mutates the wrong tenant's rows),
+- Can affect every tenant simultaneously depending on where the mistake sits,
+- Is a direct breach of customer trust and, for tenants collecting health/personal data, a plausible data-protection/compliance incident (relevant given this product's DOH/M&E lineage and its planned GDPR-oriented data handling — see the plan's Documentation Artifact #12, *Data Privacy & GDPR/Compliance Doc*),
+- Cannot be meaningfully "patched around" after the fact — the only real fix is architectural discipline applied *before* the first tenant-scoped table is migrated.
+
+This ADR treats tenant isolation as a security control, not merely a data-modeling convenience, and is written accordingly: defense-in-depth over any single point of enforcement.
+
+### Constraints and inputs already fixed by the architecture plan
+
+The following were already decided in the approved architecture plan and are treated as fixed inputs to this ADR, not re-litigated here:
+
+- **Backend**: Laravel 11/12, PHP 8.3+.
+- **Database**: PostgreSQL (ADR-0001), specifically *because* it offers native Row-Level Security and JSONB+GIN, neither of which MySQL provides at parity.
+- **Multi-tenancy package**: `stancl/tenancy` v4, described in the plan as the "2026 production-standard package" for Laravel multi-tenancy, which natively supports both a single-database (shared-schema, discriminator-column) mode and a multi-database (one physical database per tenant) mode under one abstraction.
+- **RBAC**: Spatie Laravel-Permission, tenant-scoped via its "teams" feature (a separate, complementary concern to isolation — RBAC governs *what a user in Tenant A is allowed to do*; this ADR governs *whether Tenant A can touch Tenant B's rows at all*, regardless of role).
+- **Team size/stage**: a small team building toward an MVP launch, not a funded platform team standing up per-tenant infrastructure from day one. Cost and operational simplicity at this stage are real, first-class constraints, not excuses.
+- **Expected tenant profile at launch**: a modest number of tenants (low tens to low hundreds) growing over time; most tenants are expected to be cost-sensitive SMB/NGO/research customers, with a smaller number of larger, possibly compliance-driven (government/enterprise) tenants anticipated later rather than at launch. This assumption is a concrete extrapolation from the plan's phase roadmap (dedicated-DB tenancy and SSO/SAML/data-residency are explicitly Phase 4 items) rather than a number stated verbatim in the plan, and is noted here as such.
+- **Current (2026) industry guidance**, as cited in the plan: shared-database/shared-schema with a tenant discriminator is "right for ~90% of SaaS at this stage," with migration of high-value/compliance-driven tenants to isolated databases *later, only if justified* — i.e., the plan already points at a specific answer; this ADR's job is to make that answer concrete, complete, and enforceable, not to re-open it.
+
+### Options on the table
+
+Three well-established isolation models exist for multi-tenant relational data, and all three were considered:
+
+1. **Shared database, shared schema, `tenant_id` discriminator column** — all tenants' rows live in the same tables, distinguished by a column.
+2. **Shared database, schema-per-tenant** — one Postgres schema (namespace) per tenant, same physical database/instance.
+3. **Database-per-tenant** — a fully separate physical database (potentially a separate connection, credential set, and even separate server) per tenant.
+
+---
+
+## Decision
+
+**Adopt shared database, shared schema, with a `tenant_id` discriminator column on every tenant-scoped table — implemented via `stancl/tenancy` v4 in single-database mode — and reinforce it with PostgreSQL Row-Level Security (RLS) policies on every tenant-scoped table as a database-enforced backstop.** Tenant context is treated as a system-wide constraint enforced independently at every architectural layer, not solely as an application-query concern.
+
+This is a "trust, but verify" architecture: the application is expected to get tenant scoping right (global scopes, tenant-aware base models, middleware), and the database is configured to make it structurally impossible to serve cross-tenant rows even if the application layer fails to.
+
+### D1. Isolation model
+
+- Every tenant-scoped table carries a non-nullable `tenant_id` column: **UUID (v7, time-ordered)**, foreign-keyed to `tenants.id`. This is a concrete choice beyond what the plan states explicitly (the plan specifies "shared schema + `tenant_id` discriminator" but not the column's data type), made for these reasons:
+  - UUIDs avoid sequential-ID enumeration risk on any code path that might ever leak an identifier (URLs, exports, API responses, error messages) — a materially worse outcome for a `tenant_id` than for most other IDs, since guessing one gives an attacker a concrete target to probe.
+  - UUIDv7 (time-ordered) is used rather than UUIDv4 (fully random) to preserve reasonable B-tree index locality/insert performance, since `tenant_id` is the leading column of most composite indexes in this schema.
+  - UUIDs are what a future dedicated-database migration (Phase 4, see below) will need anyway to merge/export/import tenant data without collision risk — choosing them now avoids a painful retrofit later.
+- `tenant_id` is always the **first column in composite indexes** on tenant-scoped tables (e.g., `(tenant_id, form_id)`, `(tenant_id, created_at)`), since virtually every query in the system filters by tenant first.
+- Non-tenant-scoped tables are explicitly exempted and enumerated, not left ambiguous:
+  - The central `tenants` table itself (and stancl/tenancy's own bookkeeping tables — domains, tenant metadata).
+  - Genuinely global reference/lookup data intended to be identical for every tenant (e.g., the field-type catalog, if modeled as a table rather than a backed enum — per the plan, field types are native PHP backed enums, so this case mostly does not arise, but any future shared lookup table follows this same explicit-exemption rule).
+  - Platform-operational tables (queue job records prior to tenant resolution, system-wide feature flags, plan/pricing catalog rows shared across tenants — as opposed to `subscriptions`/`usage_counters`, which *are* tenant-scoped) — and the Spatie global-to-global `role_has_permissions` mapping, which has no tenant dimension at all (Multi-Tenancy & RBAC Design Doc §4).
+  - **Laravel/Fortify framework-internal plumbing** — `sessions`, `password_reset_tokens`, and equivalent tables the framework manages directly (added on review of the Multi-Tenancy & RBAC Design Doc, `docs/multi-tenancy-rbac-design.md`): these run under framework-internal sweeps/garbage-collection with no per-request tenant context established, so forcing RLS on them risks silently breaking that maintenance machinery rather than adding a meaningful isolation guarantee — the actual sensitive identity data these tables reference already lives on `users`, which does carry its own RLS policy (see the Multi-Tenancy & RBAC Design Doc §6 for that policy's shape).
+  - Every table not on this exemption list is assumed tenant-scoped by default, and CI enforces that assumption (see [D7](#d7-verification--ci-gates)).
+
+### D2. Reinforcement via Postgres Row-Level Security
+
+For every tenant-scoped table:
+
+```sql
+ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE submissions FORCE ROW LEVEL SECURITY; -- applies even to the table owner / app DB role
+
+CREATE POLICY tenant_isolation_select ON submissions
+    FOR SELECT
+    USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation_write ON submissions
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation_update ON submissions
+    FOR UPDATE
+    USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+
+CREATE POLICY tenant_isolation_delete ON submissions
+    FOR DELETE
+    USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
+```
+
+> Note: this illustrates the pattern using `submissions` (the ratified table name — Data Dictionary §7). An earlier version of this ADR used the pre-rename legacy name `form_submissions` here; that was a leftover from before the data model's renaming pass, not an intentional reference to the legacy schema.
+
+Key concrete decisions here, beyond what the plan states (the plan says "Postgres RLS...driven by a per-request session variable" without specifying the mechanism — the following is this ADR's concretization, flagged as such):
+
+- **`FORCE ROW LEVEL SECURITY` is mandatory**, not optional. Laravel's application database connection typically runs as a single Postgres role that *owns* the tables (as the migration runner). By default, Postgres RLS does not apply to a table's owner — `FORCE ROW LEVEL SECURITY` closes that gap, which would otherwise silently defeat the entire backstop.
+- The session variable is `app.current_tenant_id`, set via `SET LOCAL app.current_tenant_id = '<uuid>';` **inside the same transaction/connection-lease as the request**, not via a separate `SET` call that could leak across pooled connections. Concretely: a dedicated middleware (running immediately after stancl/tenancy's tenant-identification middleware, before any controller or model code executes) wraps tenant context establishment, and every request runs its database work inside a transaction (or, at minimum, re-issues `SET LOCAL` at the start of every pooled-connection checkout) so that connection pooling (PgBouncer or Laravel's own persistent connections) can never let one request's leftover session variable leak into the next request served on a reused connection. This connection-pooling hazard is a well-known sharp edge of session-variable-based RLS and is called out explicitly here so it is designed for from day one rather than discovered in an incident.
+- `current_setting('app.current_tenant_id', true)` uses the two-argument form (`missing_ok = true`) so that a connection with no tenant context set returns `NULL` rather than erroring — and `tenant_id = NULL` matches **zero rows**, i.e., the fail-safe default is "no tenant context ⇒ no rows visible," never "no tenant context ⇒ all rows visible." This fail-closed property is the entire point of the backstop and is treated as non-negotiable.
+- RLS policies are generated by a **reusable migration helper/trait** (e.g., a `TenantScopedMigration` base or a `withTenantIsolation($table)` helper invoked at the end of every tenant-scoped table's migration), not hand-written per table — reducing the chance any single migration author forgets a policy.
+- **Named exception — nullable-`tenant_id` "global" rows**: a reusable pattern, not a one-off. Five tables so far — `field_library`, `form_templates` (Data Dictionary #11–12), `settings` (Data Dictionary #20, added after this ADR was first written), and `roles`/`permissions` (Multi-Tenancy & RBAC Design Doc §4, `docs/multi-tenancy-rbac-design.md`, added as adopters when that doc's fixed, platform-defined role catalog was written) — use `tenant_id IS NULL` to mean "platform-provided, visible to every tenant" (e.g. the onboarding template gallery, a platform-wide setting like whether new tenant signup is open, or the closed role/permission catalog every tenant shares). The strict-equality policy above never matches `NULL`, so **any table adopting this pattern** widens its `SELECT` policy to `USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid OR tenant_id IS NULL)`; `INSERT`/`UPDATE`/`DELETE` policies stay strict (a tenant-scoped connection can never write a `NULL`-tenant row — only the elevated platform-admin/seeder role in D3 does). This is the **only** deviation from "one flat policy shape, no exceptions" anywhere in this schema. It is deliberately called out by name here (and cross-referenced from every adopting table's own Design Notes) precisely so it doesn't get silently "fixed" back to the strict form by someone applying the migration helper without reading this ADR — and so that a *future* table adopting the same nullable-`tenant_id`-means-global convention is recognized as reusing an established, reviewed pattern rather than inventing a fourth ad hoc variant. Note that `roles`/`permissions`' *own* per-tenant *assignment* rows (`model_has_roles`/`model_has_permissions`) are the opposite case — strictly tenant-scoped, not nullable — only the role/permission *definitions themselves* are global; see the RBAC doc §4 for the full distinction.
+- **A table using this pattern is not automatically exempt from other RLS considerations** — `user_ui_preferences` (Data Dictionary #19) looks superficially similar (it also lacks a populated `tenant_id`) but is a genuinely different case: it has **no `tenant_id` column at all**, because personal UI preferences belong to a user across all of that user's tenant memberships, not to any one tenant. Its RLS policy is keyed on `user_id = current_setting('app.current_user_id', true)::uuid` instead — a "belongs to me" policy, not a "belongs to my tenant, or nobody's" policy. Do not conflate the two exceptions: nullable-`tenant_id`-means-global (this bullet) is about rows every tenant can *read*; no-`tenant_id`-at-all (the next paragraph up, one level of RLS reasoning removed) is about rows scoped to a person instead of an organization. A **third, related but distinct case**: the RBAC doc's `users` table has no `tenant_id` either, but its RLS policy is neither of the above two shapes — it must be visible both to itself *and* to anyone who currently shares an active tenant membership with it, which needs a join through `tenant_users`, not a flat equality check. This is a fourth policy shape, not a variant of the two established here; see `docs/multi-tenancy-rbac-design.md` §6 for the concrete SQL, deliberately not duplicated into this ADR.
+
+### D3. Layer-by-layer enforcement
+
+Tenant context is established and/or re-validated independently at every layer the plan calls out, so that no single missed check anywhere in the stack results in a leak:
+
+| Layer | Enforcement mechanism | Notes |
+|---|---|---|
+| **Routing** | Tenant resolved from subdomain (`{tenant}.appdomain.com`) via `stancl/tenancy`'s early tenant-identification middleware, running before any route-specific middleware/controller code. | Custom-domain resolution (a Phase 3 paid-tier feature per the roadmap) uses the same middleware pipeline, just a different domain-to-tenant lookup. |
+| **Application/session context** | Immediately after tenant identification, a dedicated `EstablishTenantDatabaseContext` middleware issues `SET LOCAL app.current_tenant_id` — and, for an authenticated request, also `SET LOCAL app.current_user_id` (left unset/NULL for guest requests, which never read `users`/`user_ui_preferences`) — on the active DB connection for the remainder of the request/transaction. | This is the bridge between "the app resolved a tenant" and "the database will enforce it" — without this step, RLS has nothing to check against. The `app.current_user_id` variable is **required** by the `users` (Multi-Tenancy & RBAC Design Doc §6) and `user_ui_preferences` (D2) RLS policies, which key on it rather than on `tenant_id`; omitting it makes those tables fail closed so a logged-in user cannot read their own row or theme. |
+| **Data access (ORM)** | An Eloquent global scope (`BelongsToTenant` trait applied to every tenant-scoped model) automatically injects a `where tenant_id = ?` predicate into every query built through Eloquent. | Deliberately treated as a convenience/performance layer and a first line of defense — **never relied upon alone**, per the plan's explicit instruction. RLS is what catches the cases this layer misses (raw `DB::` queries, a forgotten trait on a new model, a report-building query that intentionally drops scopes for aggregation and gets the tenant filter wrong). |
+| **Database (backstop)** | Postgres RLS policies (D2), `FORCE ROW LEVEL SECURITY`, fail-closed on missing session variable. | The layer this ADR is centrally about. Independent of application code correctness. |
+| **Jobs / queue** | `tenant_id` is serialized into every queued job's payload (via a `TenantAware` job trait/middleware in Laravel's queue pipeline). On execution, the queue worker re-establishes tenant context (stancl/tenancy's tenant context + `SET LOCAL app.current_tenant_id`) from the job payload **before** the job's `handle()` body runs — queue workers execute outside the HTTP request lifecycle and have no ambient tenant context otherwise, exactly the silent-leak point the plan calls out. | A job that somehow lacks a `tenant_id` in its payload fails fast (explicit exception) rather than running with no tenant context (which, thanks to D2's fail-closed default, would simply see zero rows rather than the wrong tenant's rows — but failing loudly is still preferred so the bug surfaces immediately in monitoring rather than as silently-skipped work). |
+| **Object storage (S3-compatible)** | Keys namespaced `tenants/{tenant_id}/...`. Signed URLs / upload policies are generated server-side from the authenticated request's resolved tenant — **never** trusted from a client-supplied path segment or form field. | Applies to the polymorphic `attachments` table (plan §2.2) uniformly, replacing legacy's ad hoc path-column sprawl. |
+| **Cache (Redis)** | Cache keys prefixed by `tenant_id` (e.g., `tenant:{tenant_id}:dashboard:kpis`). | This is *logical* namespacing within one shared Redis instance, not physical isolation — documented as an accepted trade-off consistent with the shared-DB posture; revisit only alongside a Phase 4 dedicated-infrastructure decision, not independently. |
+| **Guest / public submission endpoints** | These bypass normal session-based auth entirely, so tenant resolution cannot come from a logged-in user's session. Instead, the form's signed share token (bound to a specific `form_version_id`, per the plan's guest-response design) is validated server-side first, the tenant is derived from the token's underlying form record, and *then* the same `SET LOCAL app.current_tenant_id` + RLS machinery is engaged before any tenant-scoped table is touched — a guest request is never allowed to reach a query with no tenant context established. | This is the layer most likely to be overlooked (it's the one authenticated-request-shaped reasoning doesn't naturally cover), which is exactly why the plan calls it out by name and why it is enumerated explicitly here rather than assumed to be "covered by routing." |
+| **Realtime (Reverb)** | Private/presence channel names are namespaced by tenant (e.g., `private-tenant.{tenant_id}.dashboard`), and channel authorization callbacks re-verify the requesting user's tenant membership server-side — a client cannot simply subscribe to another tenant's channel name by guessing it. | Not called out as a separate bullet in the plan's §2.1 list, but a direct consequence of "enforce tenant context as a system-wide constraint" applied to Reverb, which the plan elsewhere selects for live dashboards/builder presence/sync triggers. Flagged as a concrete extension made here. |
+| **Super-admin** | An explicit `is_super_admin` boolean on `users` (never a hardcoded/positional ID convention, per the plan). Legitimate cross-tenant operations (support tooling, billing reconciliation, platform analytics) go through a narrow, explicitly-audited service layer that uses a **separate, elevated Postgres role** with its own carve-out policy (`CREATE POLICY superadmin_bypass ON submissions USING (current_setting('app.is_superadmin_context', true) = 'true')`), rather than ever disabling RLS wholesale on the main application role. | Concrete mechanism decision beyond the plan's language, made because "just disable RLS for super-admins" would reintroduce exactly the single-point-of-failure risk this ADR exists to avoid. Every use of the elevated role is itself logged via the carried-forward `Auditable` trait. |
+
+### D4. `stancl/tenancy` v4 configuration specifics
+
+- Deployed in **single-database mode** (tenant identification + scoping only), not its multi-database/connection-swapping mode — the multi-database mode is explicitly reserved as the mechanism for the future Phase 4 dedicated-DB option (see below), not enabled now.
+- The **central app** (marketing site, tenant self-registration/signup, billing portal) runs outside any tenant context, on its own domain (e.g., `app.example.com` or a root marketing domain), consistent with stancl/tenancy's central/tenant app split.
+- **Tenant apps** resolve via subdomain (`{tenant}.example.com`) for MVP; custom-domain support is deferred to Phase 3 (already gated there in the roadmap as a paid-tier feature), reusing the same middleware pipeline with a domain-to-tenant lookup table instead of subdomain parsing.
+- One shared set of migrations, run once, applies to every tenant equally (no per-tenant migration runner in single-database mode) — a direct operational simplicity benefit of this model, expanded on under Consequences.
+
+### D5. Schema and query conventions (concrete, project-wide rules)
+
+- No foreign key, unique constraint, or index may span tenant boundaries. Every unique constraint that is logically "unique per tenant" (e.g., a form's `public_slug`, a section's `name` slug) is declared as a **composite unique constraint including `tenant_id`** (`unique(tenant_id, public_slug)`), never a bare global-unique constraint — both because global uniqueness across tenants is rarely the actual business rule, and because a global constraint would become a real obstacle to the future per-tenant extraction path described below.
+- Every raw/`DB::` query (reports, bulk operations, analytics) must explicitly include the tenant predicate in code and is flagged in code review as a location where the ORM global-scope convenience layer does *not* apply — RLS is the actual guarantee for these, which is precisely why RLS exists rather than treating "always use Eloquent" as sufficient policy.
+- Tenant-scoped Eloquent models extend a common base model / apply a common `BelongsToTenant` trait, so the global scope is structural (inherited), not something each new model author must remember to add manually.
+
+### D6. Verification & CI gates
+
+Given the stated stakes, verification is treated as a first-class deliverable of this decision, not an afterthought:
+
+- **Migration linter**: a CI check that fails the build if a new migration creates a table containing a `tenant_id`-shaped column without a corresponding RLS-policy migration (via the shared helper from D2), and separately fails if a new tenant-scoped table is created without appearing on either the tenant-scoped list or the explicit exemption list from D1.
+- **Automated cross-tenant fuzz test suite**: for every tenant-scoped Eloquent model, an automated test seeds two tenants with data, authenticates as Tenant A, and asserts that every standard read/write operation against Tenant B's rows fails (returns zero rows / raises a policy violation), run in CI on every change to models or migrations. This is a concrete addition beyond the plan's general language, justified directly by the plan's own framing that this is "the highest-blast-radius mistake possible."
+- **Job payload audit**: a static check (or a runtime assertion in the base job class) that every queued job class handling tenant-scoped data declares/consumes a `tenant_id`, catching the queue-layer leak point named explicitly in the plan.
+- These verification obligations are referenced from, and satisfy, Documentation Artifact #9 (*Multi-Tenancy & RBAC Design Doc*) and Documentation Artifact #21 (*Testing Strategy Doc*) in the broader documentation plan; this ADR records the decision, those documents record the full operational detail.
+
+---
+
+## Consequences
+
+### Positive
+
+- **Cheapest and fastest path at MVP/early scale.** One database to provision, migrate, back up, monitor, and tune. Onboarding a new tenant is inserting one row into `tenants` (plus seed data), not running a schema-creation or database-provisioning workflow — directly consistent with the plan's "start simple, add complexity only when justified" theme and its lean hosting posture (§1).
+- **Database-enforced backstop independent of application-code correctness.** Even if a global scope is missing on a newly added model, a raw query forgets its tenant predicate, or a future engineer unfamiliar with the convention makes a mistake, Postgres itself refuses to return or accept cross-tenant rows. This directly addresses the "no internal precedent, highest blast radius" context this ADR opened with.
+- **Matches current (2026) industry consensus** for SaaS at this stage, as cited in the plan's own research — avoids paying for isolation guarantees (physical database separation) the business does not yet need and cannot yet afford to operate.
+- **Uniform operational tooling.** One connection pool, one migration history, one backup/PITR procedure, one place to tune indexes and monitor slow queries — versus N schemas or N databases each needing their own operational attention.
+- **Efficient platform-level operations.** Billing usage aggregation, super-admin analytics, and support/debugging queries run naturally across tenants (via the audited super-admin path) without cross-database federation, replication, or a separate analytics pipeline.
+
+### Negative (with mitigations)
+
+- **Larger blast radius if RLS is misconfigured or a policy is missing.** In the worst case, a single defect (a missing policy, a forgotten `FORCE ROW LEVEL SECURITY`, a session-variable leak across a pooled connection) can in principle expose many tenants at once — a materially worse worst case than schema-per-tenant or database-per-tenant, where a comparable mistake is contained to one tenant.
+  *Mitigation*: this is precisely why the decision is "shared-schema **reinforced with RLS**" rather than shared-schema alone, and why D6's CI gates and fuzz-test suite exist as mandatory, not optional, companions to this ADR — defense-in-depth across routing, ORM scope, and RLS means no single missed check is sufficient to cause a leak.
+- **"Noisy neighbor" resource contention.** One tenant's unusually large dataset or heavy query load can affect query latency for others sharing the same database instance.
+  *Mitigation*: acceptable at anticipated MVP scale (tens to low hundreds of tenants); revisit with read replicas, per-tenant rate limiting, or connection-pool quotas before it becomes a real production problem, and ultimately via the dedicated-DB escape hatch below for any tenant whose usage genuinely warrants it.
+- **Compliance/data-residency ceiling.** Some future customers — plausibly government or enterprise customers, given this product's DOH/M&E-adjacent positioning — may contractually require physically isolated or geographically pinned storage that a shared database cannot satisfy, regardless of how well RLS is configured.
+  *Mitigation*: this is exactly the driver named in the plan's Phase 4 ("dedicated-DB tenancy option, data-residency options") — not a gap in this ADR, but a deliberately deferred decision (see below).
+- **RLS carries real query-time overhead and a real operational/cognitive cost.** Every row touched pays a policy-predicate evaluation; every engineer must understand `SET LOCAL app.current_tenant_id` and the pooled-connection hazard; every migration author must remember the policy step; every raw query must still be written with the tenant predicate in mind even though RLS would also catch a mistake there.
+  *Mitigation*: tenant-context establishment is centralized in one middleware/service (D3), never left to individual controllers or job classes to reimplement; the migration helper (D2) removes the "remember to write the policy" burden from individual authors; the overhead itself is expected to be small relative to typical query cost at this scale and is not currently a measured concern (no benchmark has been run yet — flagged here as an assumption to validate during the Phase 0 spike, not a settled fact).
+- **A single Postgres outage or corruption event affects all tenants simultaneously**, whereas database-per-tenant would contain such an event to a subset of tenants.
+  *Mitigation*: accepted as a standard shared-infrastructure trade-off at this stage; addressed operationally (not architecturally) via standard Postgres high-availability, automated backups, and point-in-time-recovery practice, to be detailed in Documentation Artifact #22 (*Deployment & Infrastructure Doc*) rather than re-litigated here.
+
+### Future migration path (out of scope today, but must remain possible)
+
+The plan explicitly reserves a **dedicated-database tenancy option** for Phase 4, alongside SSO/SAML and data-residency options, for enterprise/compliance-driven tenants. This ADR does not build that option now, but it **does** commit to not foreclosing it:
+
+- `stancl/tenancy` v4 supports both single- and multi-database modes under one abstraction specifically so that a future switch is a *configuration and data-migration* exercise (extract one tenant's rows, provision a fresh isolated database, point that tenant's record at the new connection, backfill/replay) rather than a schema or package redesign.
+- This is workable *only* because of decisions locked in now: `tenant_id` as a UUID (not an auto-increment integer that could collide across tenants once split into separate databases), no cross-tenant foreign keys or unique constraints (D5), and every tenant-scoped table already self-contained per `tenant_id` partition.
+- Building the actual extraction tooling (per-tenant export/import, connection-swapping configuration, a per-tenant migration runner for the multi-database mode) is explicitly **not** part of this decision and is deferred to a dedicated Phase 4 ADR once a specific customer or compliance driver justifies the investment — consistent with the plan's "migrate high-value tenants later, only if justified" guidance. This ADR's obligation is narrower and non-negotiable: do not design today's shared schema in a way that makes that future extraction hard.
+
+---
+
+## Alternatives Considered
+
+| Model | Isolation strength | Ops cost at MVP scale | Onboarding cost per tenant | RLS still useful? | Verdict |
+|---|---|---|---|---|---|
+| **Shared DB, shared schema, `tenant_id` + RLS** (chosen) | Strong, application-independent (database-enforced) | Lowest — one DB, one migration set | Lowest — one row insert | Yes — this *is* the backstop | **Accepted** |
+| Shared DB, schema-per-tenant | Stronger than bare shared-schema, weaker than DB-per-tenant | Moderate-high — N schemas to migrate/manage, `search_path` juggling per request | Moderate — schema-creation step per tenant | Partially — still worth it inside each schema, but adds complexity on top of complexity | Rejected for now |
+| Database-per-tenant | Strongest (physical isolation) | Highest — N databases to provision/migrate/back up/monitor, connection-pool exhaustion risk as N grows | Highest — full DB provisioning per tenant | Largely redundant — isolation is already physical | Rejected for MVP; **revisit explicitly at Phase 4** |
+| Shared DB, shared schema, **no RLS** (ORM scope only) | Weak — depends entirely on every code path (including raw queries, jobs, future engineers) applying the scope correctly, with no database-level check | Lowest | Lowest | N/A — this is the alternative *to* RLS, not a variant of it | Rejected as insufficient given the stated stakes |
+
+### Schema-per-tenant — rejected
+
+One Postgres schema per tenant, same database instance, offers meaningfully better isolation than a bare shared-schema-without-RLS approach (a query that forgets its tenant filter simply can't see another schema's tables at all, versus silently matching rows in the same table). It was seriously considered as a middle ground. It was rejected because:
+
+- Migrations must run across N schemas (either a looped migration runner or per-schema migration state tracking), which is real, ongoing operational complexity absent from the shared-schema model, and grows linearly with tenant count rather than staying flat.
+- Laravel/Eloquent's tooling has comparatively weak native support for dynamic per-request `search_path`/schema switching relative to a simple global-scope-plus-column approach — this would be swimming against the framework's grain rather than with it.
+- Postgres schema count becomes a genuine operational concern at scale (system catalog bloat, `pg_dump`/backup/vacuum overhead across thousands of schemas) — a ceiling this product would eventually hit if it succeeds, meaning schema-per-tenant would likely require *another* migration later anyway, without buying the compensating simplicity benefit that shared-schema has today.
+- It does not match `stancl/tenancy` v4's most mature, best-documented mode (single-database), nor the plan's explicit instruction ("shared database, shared schema, `tenant_id` discriminator").
+- It remains a theoretically valid option to revisit *if* a specific future compliance driver demands schema-level isolation without the full cost of database-per-tenant — but no such driver is currently anticipated, so it is not being built for speculatively.
+
+### Database-per-tenant — rejected for MVP, explicitly revisited at Phase 4
+
+The strongest isolation option: blast radius from any bug is contained to a single tenant's physical storage, backup/restore/residency/compliance guarantees are the cleanest of any option, and it is the natural foundation for a future enterprise tier. It was rejected for the current phase because:
+
+- It is by far the highest operational cost option for a small team at pre-product-market-fit stage: provisioning, migrating, monitoring, and backing up N databases instead of one, with connection-pool sizing/exhaustion risk growing as tenant count grows (each tenant potentially wanting its own pool).
+- RLS provides little additional value here, since isolation is already physical — meaning this option would forgo the specific "cheap, database-enforced backstop on top of a cheap shared model" value proposition this ADR is built around, without a compensating need for it at this stage.
+- Tenant onboarding becomes a full database-provisioning step rather than a single row insert — directly working against the plan's MVP-speed priorities and lean hosting posture (§1).
+- Cross-tenant platform-operational queries (billing usage, support debugging, platform-wide analytics) become materially harder, requiring cross-database federation or a separate analytics/ETL pipeline instead of a single audited query path.
+- This option is **not** rejected permanently — it is explicitly named in the plan's own Phase 4 roadmap ("dedicated-DB tenancy option") as the answer for future enterprise/compliance-driven tenants, once the business has revenue and specific customer requirements that justify the ops investment. The decision here is to defer it deliberately, not to foreclose it — which is why D1/D5's schema conventions (UUID tenant IDs, no cross-tenant constraints) are chosen specifically to keep that door open.
+
+### Shared schema without RLS (ORM scope alone) — rejected as insufficient
+
+Named explicitly as the alternative *to* the RLS reinforcement half of this decision, since "just use Eloquent's global scopes" is the natural lighter-weight option someone might reasonably propose. Rejected because it concentrates all of the isolation guarantee in application code — every current and future query, including raw `DB::` calls, artisan commands, queue jobs, and reporting/analytics code that may deliberately bypass ORM scopes for aggregation, must independently get the tenant filter right, with zero enforcement if any one of them doesn't. Given this ADR's opening premise — no internal precedent for multi-tenancy exists in this codebase's history, and the failure mode is the highest-blast-radius one the system has — relying solely on consistent application-code discipline was judged an unacceptable concentration of risk. The incremental cost of adding RLS (one policy set per table, one session variable, one middleware) is small relative to the reduction in worst-case blast radius it buys, which is the central trade this ADR makes.
+
+---
+
+## References
+
+- *Form-Builder SaaS — Documentation & Architecture Plan* (source of truth for this ADR): §1 (Recommended Tech Stack — Multi-tenancy row, Database row), §2.1 (Multi-Tenancy), §3 (Phase 0 and Phase 4 roadmap items), §5 (Best Practices — tenant scoping and `is_super_admin` items), Documentation Artifacts #9, #11, #21.
+- Legacy schema audit (`dev_pk_new`) — confirms the negative case directly: no `tenant_id` concept, no tenant-scoped authorization, and the specific cautionary precedent of the `users.id === 1` super-admin convention (duplicated across four code layers, silently transferable if user #1 were ever deleted and the ID reused) that this ADR's explicit `is_super_admin` boolean decision (D3) is designed to avoid repeating.
+- `stancl/tenancy` v4 documentation — single-database vs. multi-database tenancy modes (external reference; verify current package documentation at implementation time rather than treating any specific API detail above as pinned).
+- PostgreSQL documentation — `CREATE POLICY`, `ALTER TABLE ... FORCE ROW LEVEL SECURITY`, `SET LOCAL` and `current_setting()` semantics under connection pooling (external reference; verify current version-specific behavior at implementation time).

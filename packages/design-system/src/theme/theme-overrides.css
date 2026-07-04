@@ -1,0 +1,45 @@
+/*
+ * Theme + personalization layer (docs/ux/design-system-reference.md §2.9).
+ *
+ * Dark mode and accent are a RE-POINTING of the semantic layer only — components never change.
+ * The root attributes are emitted server-side from user_ui_preferences (Increment C):
+ *   <html data-theme-mode="dark" data-accent="teal">
+ * "system" = the ABSENCE of data-theme-mode: prefers-color-scheme decides (costs nothing).
+ */
+
+/* ── Dark: explicit opt-in ─────────────────────────────────────────────── */
+:root[data-theme-mode='dark'] {
+    --mds-color-bg-canvas: var(--mds-neutral-900);
+    --mds-color-bg-surface: var(--mds-neutral-800);
+    --mds-color-text-primary: var(--mds-neutral-100);
+    --mds-color-text-muted: var(--mds-neutral-400);
+    --mds-color-border-default: var(--mds-neutral-700);
+    /* Primary accent lightens on the deep drafting-blue canvas to keep contrast. */
+    --mds-color-action-primary-bg: var(--mds-primary-400);
+    --mds-color-action-primary-bg-hover: var(--mds-primary-500);
+    --mds-color-action-primary-text: var(--mds-neutral-900);
+    --mds-color-focus-ring: var(--mds-primary-400);
+}
+
+/* ── Dark: system default (absence of an explicit light/dark choice) ───── */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme-mode='light']):not([data-theme-mode='dark']) {
+        --mds-color-bg-canvas: var(--mds-neutral-900);
+        --mds-color-bg-surface: var(--mds-neutral-800);
+        --mds-color-text-primary: var(--mds-neutral-100);
+        --mds-color-text-muted: var(--mds-neutral-400);
+        --mds-color-border-default: var(--mds-neutral-700);
+        --mds-color-action-primary-bg: var(--mds-primary-400);
+        --mds-color-action-primary-bg-hover: var(--mds-primary-500);
+        --mds-color-action-primary-text: var(--mds-neutral-900);
+        --mds-color-focus-ring: var(--mds-primary-400);
+    }
+}
+
+/* ── Accent alternative (the ONLY personalization accent besides Blueprint) ─
+   Moss (success) and Brass (annotation) are deliberately excluded from this whitelist. */
+:root[data-accent='teal'] {
+    --mds-color-action-primary-bg: var(--mds-accent-teal-600);
+    --mds-color-action-primary-bg-hover: var(--mds-primary-700);
+    --mds-color-focus-ring: var(--mds-accent-teal-600);
+}

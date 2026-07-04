@@ -1,0 +1,38 @@
+{
+    "primary": {
+        "400": { "value": "#4A80AE" },
+        "500": { "value": "#2E6394" },
+        "600": { "value": "#1C4B72" },
+        "700": { "value": "#153A5A" },
+        "800": { "value": "#102C44" },
+        "900": { "value": "#0B1E30" }
+    },
+    "neutral": {
+        "0": { "value": "#FFFFFF" },
+        "50": { "value": "#F7F8FA" },
+        "100": { "value": "#EEF1F5" },
+        "200": { "value": "#DCE2EA" },
+        "300": { "value": "#C3CCD8" },
+        "400": { "value": "#94A1B2" },
+        "500": { "value": "#64748B" },
+        "700": { "value": "#33404F" },
+        "800": { "value": "#1E2733" },
+        "900": { "value": "#0F1620" }
+    },
+    "brass": {
+        "default": { "value": "#B5793A" }
+    },
+    "moss": {
+        "600": { "value": "#3F6B3A" }
+    },
+    "amber": {
+        "500": { "value": "#C8871B" }
+    },
+    "danger": {
+        "600": { "value": "#A83A2A" },
+        "700": { "value": "#8A2E20" }
+    },
+    "accent-teal": {
+        "600": { "value": "#1B5E5E" }
+    }
+}

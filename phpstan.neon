@@ -1,0 +1,14 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - app
+        - database
+        - routes
+    # Production code is analysed at level 8. The Pest test DSL (it()/expect()/$this rebinding)
+    # is intentionally excluded — Larastan mistypes $this inside Pest closures without the Pest
+    # PHPStan extension; test correctness is guarded by running the suite, not static analysis.
+    # A baseline may be generated later (`phpstan analyse --generate-baseline`) to allow
+    # tightening toward level 9 without blocking; the near-empty skeleton passes clean at 8.

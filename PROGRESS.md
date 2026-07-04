@@ -11,6 +11,29 @@
 
 **Phase 0 — Foundations. Documentation sub-phase complete; code scaffolding underway — the "walking skeleton" increment is built and green.** All 25 documentation-plan artifacts (§4 of the approved architecture plan) are written and internally cross-referenced, and the first code increment — the CI-green walking skeleton every later increment sits inside — has landed. The approved plan for this push is `C:\Users\DOH\.claude\plans\start-phase-0-polymorphic-planet.md`.
 
+## Next Session — Resume Here
+
+**State as of 2026-07-04:** repo on GitHub (`avincentpatrick/dev_formbuilder_app`), **CI green on `main`** (commit `13ad630`). Walking skeleton done; hosting decided = **self-hosted Windows Server 2016** (ADR-0005). Read this file's newest **Notes / Handoff** entries first, then pick a track:
+
+**Track A — keep building (recommended default): the remaining Phase 0 increments**, in dependency order (details in the plan file above):
+- **A — Tenancy + RLS** ← *next up.* stancl/tenancy v4; `EstablishTenantDatabaseContext` middleware setting **both** `app.current_tenant_id` **and** `app.current_user_id`; the `withTenantIsolation()` migration helper (ENABLE + **FORCE** RLS + 4 policies + variants); `BelongsToTenant` scope; a migration linter; and the **red-then-green cross-tenant fuzz pack**. Also add a **non-superuser `meridian_app` Postgres role** (RLS doesn't apply to superusers).
+- **B — Auth + RBAC** (Fortify/Sanctum + MFA; Spatie teams, the 5-role catalog, `tenant_users`/`form_collaborators`, `.any`/`.own` policies).
+- **C — Design-system app shell** (top nav, sidebar, notification bell, theme toggle; axe-gated).
+- **D — `form_versions` draft/publish model** (published-immutability RLS guard; no repeat-instance table).
+- **E — OpenAPI 3.1 scaffold.**
+- **Deferred — form-engine spike (ADR-0004):** the 8-day SurveyJS/Form.io-vs-custom evaluation, before Phase 1 field-type work.
+
+*Verification while building:* no local Docker needed — push and CI runs the Postgres/RLS tests on Linux Postgres. (Optional: set up a local Postgres — Docker or native — for a faster loop.)
+
+**Track B — stand up the production server** (needed before real deploys, not before more building): follow the runbook in `docs/deployment-infrastructure.md` §8 (PHP 8.4, PostgreSQL for Windows + the `meridian_app` role, Memurai, nginx + php-cgi via NSSM, Horizon/Reverb services, Task Scheduler, win-acme, the self-hosted GitHub Actions runner). Then set repo variables `DEPLOY_ENABLED=true` + `MERIDIAN_APP_PATH` and `deploy.yml` auto-deploys on every green `main`.
+
+**Beyond Phase 0:** the full phase roadmap (Phase 1 MVP → Phase 4 enterprise) is in the "Roadmap Phases" table below and in the approved architecture plan `C:\Users\DOH\.claude\plans\hi-lets-create-a-federated-meteor.md` §3.
+
+**Prompts to resume next session** (any of these works):
+- `Read PROGRESS.md and start Phase 0 Increment A (tenancy + RLS).`
+- `Continue Phase 0 — build the next increment.`
+- `Give me the step-by-step Windows Server setup checklist to stand up the host.`
+
 ## Status Summary
 
 **Done:**

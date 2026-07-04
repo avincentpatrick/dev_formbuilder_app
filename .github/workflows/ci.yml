@@ -41,6 +41,9 @@ jobs:
       - name: Thin-controller gate (250 lines / complexity 10)
         run: composer run controller-gate
 
+      - name: Tenant-isolation migration linter (RLS on every tenant-scoped table)
+        run: composer run migration-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 
@@ -87,8 +90,14 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
-      DB_USERNAME: meridian
+      # The app + the RLS-enforced tests connect as the NON-superuser `meridian_app` role (ADR-0002
+      # §D2) — RLS is ignored for superusers, so isolation would pass vacuously as `meridian`.
+      DB_USERNAME: meridian_app
       DB_PASSWORD: secret
+      # Elevated role used only to seed platform-global (NULL-tenant) rows the strict write policy
+      # forbids the app role from writing (the pgsql_privileged connection).
+      DB_PRIVILEGED_USERNAME: meridian
+      DB_PRIVILEGED_PASSWORD: secret
       REDIS_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
@@ -108,8 +117,16 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      - name: Create test database
-        run: PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -c 'CREATE DATABASE meridian_testing;'
+      - name: Provision RLS role and test database
+        # Mirror docker/postgres/init: create the non-superuser `meridian_app` role and a
+        # meridian_testing database it OWNS, so migrations run and tables are owned by the same role
+        # the app connects as — the setup that makes FORCE ROW LEVEL SECURITY prove out.
+        run: |
+          PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE meridian_app LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE DATABASE meridian_testing OWNER meridian_app;
+          GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          SQL
 
       - name: Run test suite (Pest)
         run: php artisan test

@@ -84,6 +84,8 @@ return [
             ]) : [],
         ],
 
+        // Default application connection — the NON-superuser `meridian_app` role, which RLS actually
+        // constrains (ADR-0002 §D2). Every request and every test that must prove isolation runs here.
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
@@ -92,6 +94,24 @@ return [
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        // Elevated connection for the rare operations that must bypass RLS: seeding platform-global
+        // (tenant_id IS NULL) rows and any super-admin platform path (ADR-0002 §D3). Same database,
+        // superuser role. Defined now, first exercised in Increment B — never used by request code.
+        'pgsql_privileged' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_PRIVILEGED_USERNAME', 'postgres'),
+            'password' => env('DB_PRIVILEGED_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,

@@ -29,7 +29,10 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Support/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -57,10 +60,12 @@
         "lint:fix": "@php vendor/bin/pint",
         "analyse": "@php vendor/bin/phpstan analyse --no-progress",
         "controller-gate": "@php scripts/controller-gate.php",
+        "migration-lint": "@php scripts/migration-lint.php",
         "quality": [
             "@lint",
             "@analyse",
-            "@controller-gate"
+            "@controller-gate",
+            "@migration-lint"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+        ]);
+
+        // Bridges resolved tenant/user → PostgreSQL RLS session variables (ADR-0002 §D3). Registered
+        // as an alias; Increment B attaches it to the authenticated subdomain tenant route group,
+        // immediately after stancl/tenancy's identification middleware.
+        $middleware->alias([
+            'tenant.context' => EstablishTenantDatabaseContext::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

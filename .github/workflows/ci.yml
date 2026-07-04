@@ -152,10 +152,11 @@ jobs:
       - name: Build Storybook
         run: npm run ds:storybook:build
       - name: axe every story (WCAG 2.2 AA — merge-blocking)
+        working-directory: packages/design-system
         run: |
           npx concurrently -k -s first \
-            "npx http-server packages/design-system/storybook-static -p 6006 --silent" \
-            "npx wait-on tcp:127.0.0.1:6006 && npm run ds:test -- --url http://127.0.0.1:6006"
+            "npx http-server storybook-static -p 6006 --silent" \
+            "npx wait-on tcp:127.0.0.1:6006 && npx test-storybook --url http://127.0.0.1:6006"
 
   # ── Stage 4 (stub, present): OpenAPI contract tests — wired when /api/v1 lands (Increment E)
   contract-tests:

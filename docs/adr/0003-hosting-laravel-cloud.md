@@ -2,7 +2,9 @@
 
 ## Status
 
-**Accepted** — 2026-07-03
+**Superseded by [ADR-0005](0005-hosting-self-hosted-windows-server.md) — 2026-07-04.** The project is now **self-hosted on the owner's Windows Server 2016** (nginx + self-managed PostgreSQL/Redis, git-driven deploys via a self-hosted GitHub Actions runner) rather than on Laravel Cloud. The analysis below is retained as the historical record of *why* Laravel Cloud was originally selected, and remains the reference if the project ever revisits a managed host — but it no longer describes the current hosting. See ADR-0005 for the decision in force.
+
+_Originally: **Accepted** — 2026-07-03._
 
 > Note on metadata: the source plan does not assign explicit ADR numbers or decision dates. This document is filed as ADR-0003 consistent with the plan's own hosting-choice item in its ADR checklist (§4, item 7: "ADRs ... hosting choice"), on the assumption that ADR-0001 and ADR-0002 cover the two decisions the plan calls out as needing to land first ("scaffold the Phase 0 repo/infra and write ADR #1 (Postgres vs. MySQL), ADR #2 (tenancy isolation model), and ADR #3 (hosting platform) first since they're foundational to everything else" — plan, "Next Steps"). The decision date is set to the date this ADR was drafted; re-date if formal sign-off happens later.
 

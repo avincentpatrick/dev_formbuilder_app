@@ -176,13 +176,6 @@ jobs:
       - name: Placeholder
         run: echo "Playwright e2e + @axe-core on composed pages are wired as the app shell/pages land."
 
-  # ── Stage 7 (stub, present): deploy to Laravel Cloud staging (main only, after all gates) ─
-  deploy:
-    name: Deploy (staging)
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: [static-analysis, tests, frontend, design-system-a11y, contract-tests, e2e]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "Staging deploy is Git-integrated via Laravel Cloud; migrations run before traffic. Prod promotion is a manual gate."
+  # ── Deployment lives in a separate workflow ──────────────────────────────────────────────
+  #    .github/workflows/deploy.yml runs on the self-hosted Windows Server runner, triggered by
+  #    a successful CI run on `main`, and executes deploy.ps1 (ADR-0005 / deployment doc §3).

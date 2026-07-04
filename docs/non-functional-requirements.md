@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0
-**Purpose:** Sets measurable performance, availability, security-baseline, accessibility, and i18n **targets** — the numbers other docs build against. `docs/adr/0003-hosting-laravel-cloud.md` explicitly defers "Postgres backup/retention schedule... those belong in the Deployment & Infrastructure Doc," which in turn needs targets to implement against — this document is where those targets are set. Doc #11 (Security & Threat Model) measures threats against this doc's security baseline; Doc #22 (Deployment & Infrastructure) implements this doc's availability/durability targets operationally; Doc #23 (Observability) instruments against this doc's SLOs.
+**Purpose:** Sets measurable performance, availability, security-baseline, accessibility, and i18n **targets** — the numbers other docs build against. `docs/adr/0005-hosting-self-hosted-windows-server.md` (self-hosted Windows Server; supersedes ADR-0003) defers the Postgres backup/retention specifics to the Deployment & Infrastructure Doc, which in turn needs targets to implement against — this document is where those targets are set. Doc #11 (Security & Threat Model) measures threats against this doc's security baseline; Doc #22 (Deployment & Infrastructure) implements this doc's availability/durability targets operationally; Doc #23 (Observability) instruments against this doc's SLOs.
 
 ---
 
@@ -31,8 +31,10 @@ Response-time targets are stated as **p50/p95**, measured server-side (excluding
 |---|---|---|
 | Uptime (monthly) | 99.5% (≈ 3.6 hours/month allowed downtime) | 99.9% once on dedicated infrastructure investment can be justified by revenue (Phase 3/4) |
 | RTO (Recovery Time Objective) | 4 hours | 1 hour |
-| RPO (Recovery Point Objective) | 15 minutes | 5 minutes (continuous WAL streaming, if the chosen hosting platform's managed Postgres supports it — verify against Laravel Cloud's actual point-in-time-recovery granularity at implementation time, consistent with ADR-0003's own "treat as indicative" posture on platform specifics) |
-| Planned-maintenance windows | Allowed, announced ≥ 24h in advance via the Settings-doc `maintenance.enabled`/`maintenance.message` mechanism (`docs/data-dictionary.md` §20) | Zero-downtime deploys targeted as the norm, not the exception, once CI/CD matures (plan §1's "zero-downtime deploys" hosting criterion) |
+| RPO (Recovery Point Objective) | 15 minutes | 5 minutes (continuous WAL streaming configured on our **self-managed PostgreSQL** per ADR-0005, so point-in-time-recovery granularity is under our own control rather than a managed platform's — Doc #22 defines the WAL-archiving/PITR mechanism) |
+| Planned-maintenance windows | Allowed, announced ≥ 24h in advance via the Settings-doc `maintenance.enabled`/`maintenance.message` mechanism (`docs/data-dictionary.md` §20) | Brief per-deploy windows (seconds — `artisan down`/`up`) are the norm on the single self-hosted Windows box; true zero-downtime is a future enhancement (atomic release-swap) or a host change — see ADR-0005 / Doc #22 §3.1 |
+
+**Availability posture**: this 99.5% Phase 1 target is now **self-managed** — the platform runs on a single self-hosted Windows Server 2016 box (ADR-0005, which supersedes ADR-0003), which is a **single point of failure**. Uptime depends on the owner's own patching, power, and network rather than a managed platform's built-in redundancy; introducing redundancy (a warm standby / second node) should be revisited before any paid-customer SLA is offered.
 
 **Degradation posture**: a partial outage (e.g., the OCR provider or the queue/worker tier is down) should degrade specific *channels* (OCR submission temporarily unavailable) rather than the whole platform — consistent with the "six channels, one pipeline" architecture already established (`docs/architecture/technical-architecture.md`), each channel's own health should be independently observable (Doc #23) and independently degradable.
 
@@ -95,7 +97,7 @@ Two genuinely distinct concerns, kept separate per `docs/domain-glossary.md`'s g
 
 | Target | Value |
 |---|---|
-| Postgres backup frequency | Continuous WAL archiving + daily full snapshot (subject to the actual hosting platform's capability — Doc #22 confirms against Laravel Cloud's specifics, per ADR-0003's own deferral). |
+| Postgres backup frequency | Continuous WAL archiving + daily full snapshot, **self-managed on our own Windows PostgreSQL** per ADR-0005 (mechanism defined in Doc #22) — no managed-platform dependency. |
 | Backup retention | 30 days rolling, minimum. |
 | Attachment (S3-compatible storage) durability | Whatever the object-storage provider's own durability SLA is (typically 99.999999999%-class for major providers) — not a number this product controls directly, stated here as an assumption to verify against the actual chosen provider in Doc #22. |
 | Soft-delete grace period (forms, submissions, attachments, etc.) | 30 days before any hard-deletion/purge job runs, consistent with the soft-delete convention already stated in `docs/data-dictionary.md`. |
@@ -111,7 +113,7 @@ Doc #23 (Observability & Incident Response) instruments against these SLOs — n
 ## 10. Out of Scope / Deferred
 
 - The full OWASP ASVS control-by-control checklist and threat-scenario analysis → Doc #11.
-- Backup/DR runbook mechanics and the specific hosting platform's actual capabilities → Doc #22.
+- Backup/DR runbook mechanics for the self-hosted Windows PostgreSQL → Doc #22 (ADR-0005).
 - Metrics, dashboards, alerting, on-call → Doc #23.
 - Plan-tier-specific quotas (submissions/month, seats, storage) → Doc #24.
 - UI-chrome translation-management workflow and RTL layout support, if/when either becomes justified by a real customer requirement (§6).

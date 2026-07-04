@@ -121,7 +121,7 @@ graph TB
 
 ## 3. C4 Container Diagram
 
-> **Decision**: the Admin/Builder application and the versioned REST API are **one Laravel deployable** (single codebase, single release train), logically separated by route-group/namespace — a modular monolith, not separate microservices. This is consistent with the plan's recommendation to avoid a second unforced architectural bet and with the Laravel Cloud/Forge deployment model (one web process group + one Horizon worker process group + one scheduler + one Reverb process, all built from the same codebase). The Public Runtime SPA/PWA is the one genuinely separate deployable, per the plan's explicit call-out that it must not be Inertia-coupled.
+> **Decision**: the Admin/Builder application and the versioned REST API are **one Laravel deployable** (single codebase, single release train), logically separated by route-group/namespace — a modular monolith, not separate microservices. This is consistent with the plan's recommendation to avoid a second unforced architectural bet and with the self-hosted deployment model (**ADR-0005**): one web process group (nginx + PHP-FPM) + one Horizon worker process group + one scheduler + one Reverb process, all built from the same codebase. The Public Runtime SPA/PWA is the one genuinely separate deployable, per the plan's explicit call-out that it must not be Inertia-coupled.
 
 ```mermaid
 graph TB
@@ -501,7 +501,7 @@ A versioned REST API (`/api/v1`) with an OpenAPI 3.1 contract is a first-class d
 | Offline client | **Vue 3 PWA (Workbox)** + **Dexie.js/IndexedDB** + Background Sync API | Targets the genuine Kobo-style "fill offline, queue, sync" model that legacy had no equivalent of (only a print-and-OCR workaround). |
 | Billing | **Laravel Cashier (Stripe)** | Subscription tiers mapped to feature flags and usage quotas; first-party integration with the rest of the Laravel stack. |
 | CI/CD & infra | **Docker Compose** + GitHub Actions with **Larastan/PHPStan + Pint + Playwright + a real deploy stage** | Legacy shipped no committed Docker (despite Sail being a dependency) and CI that ran PHPUnit only — both are explicit, named fixes here. |
-| Hosting | **Laravel Cloud** for launch (indicatively ~€80–150/mo at MVP scale — treat as a rough planning figure, reverify current pricing); Oracle Cloud Always-Free Ampere VM as a zero-cost pre-revenue validation path | Near-zero-ops managed platform (autoscaling, zero-downtime deploys, bundled Postgres/Redis/object storage) fits a small team best at launch; the free-tier path lets the product be validated before committing to managed-hosting spend. |
+| Hosting | **Self-hosted on the team's own Windows Server 2016** (nginx + PHP 8.4 FastCGI + self-managed PostgreSQL + Redis via Memurai; Horizon/Reverb as Windows services, scheduler via Task Scheduler), deployed via a **self-hosted GitHub Actions runner** (push to main → auto pull/build/migrate/restart) — see **ADR-0005** (supersedes ADR-0003). | Uses hardware the team already owns, so there is no managed-hosting bill; controlling PostgreSQL directly makes Row-Level Security and PostGIS **guaranteed available** rather than a platform capability to verify, and git-driven deploys keep releases simple. Accepted trade-offs: self-managed ops (patching, backups/WAL, pooling) and single-box availability (a single point of failure — see NFR §2). |
 | Mobile | **PWA only** for MVP; native app deferred | Revisit only if enterprise/NGO customers need background GPS/biometrics beyond PWA capability. |
 
 ---

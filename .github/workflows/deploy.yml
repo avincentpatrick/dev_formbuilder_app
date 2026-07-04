@@ -1,0 +1,31 @@
+name: Deploy (production, self-hosted)
+
+# Runs on the self-hosted Windows Server runner AFTER the CI workflow succeeds on `main`
+# (ADR-0005 / docs/deployment-infrastructure.md §3). Nothing deploys unless every gate is green.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+# Never let two production deploys overlap.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Runs only when the triggering CI run succeeded AND the self-hosted runner is live.
+    # Set the repo variable DEPLOY_ENABLED=true once the runner is installed (Doc #22 §8);
+    # until then this workflow stays dormant (skipped) — so committing it now is a no-op.
+    if: ${{ github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_ENABLED == 'true' }}
+    # The Windows Server 2016 box is the only self-hosted runner; deploy.ps1 targets the live dir.
+    runs-on: self-hosted
+    steps:
+      - name: Run deploy.ps1 against the live app directory
+        shell: powershell
+        env:
+          MERIDIAN_APP_PATH: ${{ vars.MERIDIAN_APP_PATH }}
+        run: |
+          $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
+          & "$app\deploy.ps1" -AppPath $app

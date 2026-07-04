@@ -51,7 +51,9 @@ jobs:
           cache: npm
 
       - name: Install JS dependencies
-        run: npm ci
+        # npm install (not ci): the lockfile is generated on Windows and npm can omit
+        # Linux-only transitive optional deps (e.g. @emnapi); install reconciles them.
+        run: npm install --no-audit --no-fund
 
       - name: npm audit (SCA — high/critical blocks merge)
         run: npm audit --audit-level=high
@@ -122,9 +124,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Install design-system deps
-        run: npm --prefix packages/design-system ci
+        run: npm --prefix packages/design-system install --no-audit --no-fund
       - name: Generate design tokens
         run: npm run ds:tokens
       - name: Type-check (vue-tsc)
@@ -142,9 +144,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Install design-system deps
-        run: npm --prefix packages/design-system ci
+        run: npm --prefix packages/design-system install --no-audit --no-fund
       - name: Install Playwright (chromium)
         run: cd packages/design-system && npx playwright install --with-deps chromium
       - name: Build Storybook

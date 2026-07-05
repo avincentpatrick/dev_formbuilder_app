@@ -15,7 +15,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // The fixed RBAC catalog (roles/permissions/matrix) — global rows, seeded via pgsql_privileged.
+        $this->call(RolePermissionSeeder::class);
 
         User::factory()->create([
             'name' => 'Test User',

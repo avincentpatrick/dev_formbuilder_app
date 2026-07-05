@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * The global user identity (multi-tenancy-rbac-design.md §6). One row per person across every tenant.
@@ -32,6 +33,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use HasFactory;
 
+    use HasRoles;          // Spatie RBAC — teams-mode role resolution against the active tenant (B2a)
     use HasUuidv7;
     use Notifiable;
     use SoftDeletes;

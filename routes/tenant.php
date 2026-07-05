@@ -19,9 +19,10 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 |      app.current_user_id) now that both the tenant and the authenticated user are known.
 |   4. auth — require a logged-in user (session established centrally; SESSION_DOMAIN spans subdomains).
 |
-| Spatie's setPermissionsTeamId() is added to EstablishTenantDatabaseContext in Increment B2, when
-| roles/permissions land. Real authenticated pages (dashboard, builder, inbox, settings) land inside
-| the design-system app shell in Increment C — this is a placeholder to prove the pipeline.
+| EstablishTenantDatabaseContext also sets Spatie's permissions team id to this tenant (Increment B2a),
+| so RBAC resolves roles against the same tenant RLS isolates by. Real authenticated pages (dashboard,
+| builder, inbox, settings) land inside the design-system app shell in Increment C — this is a
+| placeholder to prove the pipeline.
 */
 Route::middleware([
     'web',

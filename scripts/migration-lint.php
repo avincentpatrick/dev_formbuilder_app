@@ -41,6 +41,16 @@ const EXEMPT_TABLES = [
     'migrations',
 ];
 
+/**
+ * Spatie Laravel-Permission's team-scoped tables (multi-tenancy-rbac-design.md §4). In teams mode
+ * every one of these carries the `team_foreign_key` (our `tenant_id`) and MUST get RLS — but Spatie's
+ * *stock* published migration names both the table and the column via config variables, so the generic
+ * literal-`tenant_id` check above is BLIND to it and the pivots would silently ship with no isolation.
+ * This targeted rule closes that gap: any migration that touches the Spatie permission tables must
+ * explicitly attach isolation to each of these by literal name.
+ */
+const SPATIE_TENANT_SCOPED_TABLES = ['roles', 'model_has_roles', 'model_has_permissions'];
+
 $root = dirname(__DIR__);
 $dir = $root.'/database/migrations';
 
@@ -66,6 +76,24 @@ foreach ($iterator as $file) {
     $ast = $parser->parse($code);
     if ($ast === null) {
         continue;
+    }
+
+    // Spatie-pivot rule — runs BEFORE the literal-table early-return below, because Spatie's stock
+    // migration creates its tables via config variables (created_table_names() would see none of them).
+    if (is_spatie_permission_migration($code)) {
+        foreach (SPATIE_TENANT_SCOPED_TABLES as $spatieTable) {
+            if (! attaches_isolation_for($ast, $finder, $spatieTable)) {
+                $violations[] = sprintf(
+                    '%s: touches the Spatie permission tables but never attaches RLS to `%s` by name '
+                        .'(RBAC §4). Stock Spatie ships this team-scoped pivot with NO isolation and the '
+                        .'generic linter cannot see its config-variable `tenant_id` column. Call '
+                        ."TenantIsolation::strict('%s') (or nullableGlobal for `roles`) in this migration.",
+                    $relative,
+                    $spatieTable,
+                    $spatieTable
+                );
+            }
+        }
     }
 
     $createdTables = created_table_names($ast, $finder);
@@ -167,4 +195,54 @@ function attaches_isolation(array $ast, NodeFinder $finder): bool
     }
 
     return false;
+}
+
+/**
+ * True if this migration source touches Spatie's permission tables. Detected by the raw presence of
+ * the pivot table-name strings, which appear whether they are literal `Schema::create('model_has_roles')`
+ * calls (our customized migration) or `$tableNames['model_has_roles']` array-key accesses (Spatie's
+ * stock stub) — so the rule fires in both the maintained and the accidentally-republished case.
+ */
+function is_spatie_permission_migration(string $code): bool
+{
+    return str_contains($code, 'model_has_roles') && str_contains($code, 'model_has_permissions');
+}
+
+/**
+ * True if the migration attaches RLS to a SPECIFIC table by literal name — i.e. a
+ * `withTenantIsolation('<table>', …)` or `TenantIsolation::<method>('<table>', …)` whose first argument
+ * is the literal `$table`. Stricter than attaches_isolation(): that only asks "is ANY isolation call
+ * present", which the generic file-level rule already trusts; this pins isolation to the exact pivot.
+ *
+ * @param  array<int, Node>  $ast
+ */
+function attaches_isolation_for(array $ast, NodeFinder $finder, string $table): bool
+{
+    foreach ($finder->findInstanceOf($ast, FuncCall::class) as $call) {
+        if ($call->name instanceof Node\Name && $call->name->toString() === 'withTenantIsolation'
+            && first_arg_is($call, $table)) {
+            return true;
+        }
+    }
+
+    foreach ($finder->findInstanceOf($ast, StaticCall::class) as $call) {
+        if ($call->class instanceof Node\Name && $call->class->getLast() === 'TenantIsolation'
+            && first_arg_is($call, $table)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * True if a call's first argument is the given string literal.
+ *
+ * @param  FuncCall|StaticCall  $call
+ */
+function first_arg_is(Node $call, string $literal): bool
+{
+    $first = $call->args[0] ?? null;
+
+    return $first instanceof Node\Arg && $first->value instanceof String_ && $first->value->value === $literal;
 }

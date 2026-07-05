@@ -1,0 +1,14 @@
+{
+    "duration": {
+        "fast": { "value": "100ms" },
+        "base": { "value": "150ms" },
+        "moderate": { "value": "250ms" },
+        "slow": { "value": "400ms" },
+        "deliberate": { "value": "600ms" }
+    },
+    "ease": {
+        "standard": { "value": "cubic-bezier(0.4, 0, 0.2, 1)" },
+        "decelerate": { "value": "cubic-bezier(0, 0, 0.2, 1)" },
+        "accelerate": { "value": "cubic-bezier(0.4, 0, 1, 1)" }
+    }
+}

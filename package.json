@@ -22,6 +22,7 @@
     },
     "dependencies": {
         "@inertiajs/vue3": "^3.6.0",
+        "@meridian/design-system": "file:packages/design-system",
         "vue": "^3.5.39"
     }
 }

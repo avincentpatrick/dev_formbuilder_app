@@ -30,6 +30,12 @@ const preview: Preview = {
                 'data-theme-mode',
                 context.globals.themeMode ?? 'light',
             );
+            // Render the canvas the way the app does — body font on the themed canvas ground —
+            // so axe measures real text-on-background contrast, not black-on-white defaults.
+            document.body.style.fontFamily = 'var(--mds-font-family-body)';
+            document.body.style.color = 'var(--mds-color-text-body)';
+            document.body.style.backgroundColor = 'var(--mds-color-bg-canvas)';
+            document.body.style.padding = 'var(--mds-space-6)';
             return story();
         },
     ],

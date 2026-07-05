@@ -1,6 +1,9 @@
 <script setup lang="ts">
+// Design-system-styled two-factor challenge page (Increment C1).
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 const recovery = ref(false);
 const form = useForm({ code: '', recovery_code: '' });
@@ -11,27 +14,48 @@ function submit(): void {
 </script>
 
 <template>
-  <main>
-    <h1>Two-factor authentication</h1>
-    <form @submit.prevent="submit">
-      <template v-if="!recovery">
-        <p>
-          <label for="code">Authentication code</label>
-          <input id="code" v-model="form.code" type="text" inputmode="numeric" autocomplete="one-time-code" autofocus />
-          <span v-if="form.errors.code">{{ form.errors.code }}</span>
-        </p>
-      </template>
-      <template v-else>
-        <p>
-          <label for="recovery_code">Recovery code</label>
-          <input id="recovery_code" v-model="form.recovery_code" type="text" autocomplete="one-time-code" />
-          <span v-if="form.errors.recovery_code">{{ form.errors.recovery_code }}</span>
-        </p>
-      </template>
-      <button type="submit" :disabled="form.processing">Verify</button>
+  <AuthLayout title="Two-factor authentication">
+    <form class="auth-form" @submit.prevent="submit">
+      <MdsFormField
+        v-if="!recovery"
+        label="Authentication code"
+        help="Enter the 6-digit code from your authenticator app."
+        :error="form.errors.code"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsTextInput
+          :id="id"
+          v-model="form.code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <MdsFormField
+        v-else
+        label="Recovery code"
+        help="Enter one of your saved recovery codes."
+        :error="form.errors.recovery_code"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsTextInput
+          :id="id"
+          v-model="form.recovery_code"
+          type="text"
+          autocomplete="one-time-code"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <MdsButton type="submit" :loading="form.processing">Verify</MdsButton>
     </form>
-    <button type="button" @click="recovery = !recovery">
+
+    <MdsButton variant="tertiary" size="sm" @click="recovery = !recovery">
       {{ recovery ? 'Use an authentication code' : 'Use a recovery code' }}
-    </button>
-  </main>
+    </MdsButton>
+  </AuthLayout>
 </template>

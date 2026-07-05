@@ -2,29 +2,56 @@
     "color": {
         "bg": {
             "canvas": { "value": "{neutral.50}" },
-            "surface": { "value": "{neutral.0}" }
-        },
-        "text": {
-            "primary": { "value": "{neutral.900}" },
-            "muted": { "value": "{neutral.500}" }
+            "surface": { "value": "{neutral.0}" },
+            "surface-raised": { "value": "{neutral.0}" },
+            "sunken": { "value": "{neutral.100}" }
         },
         "border": {
-            "default": { "value": "{neutral.300}" }
+            "default": { "value": "{neutral.200}" },
+            "strong": { "value": "{neutral.300}" }
+        },
+        "text": {
+            "body": { "value": "{neutral.800}" },
+            "heading": { "value": "{neutral.900}" },
+            "secondary": { "value": "{neutral.600}" },
+            "disabled": { "value": "{neutral.400}" },
+            "on-primary": { "value": "{neutral.0}" },
+            "on-warning": { "value": "{neutral.900}" }
         },
         "action": {
             "primary": {
                 "bg": { "value": "{primary.600}" },
                 "bg-hover": { "value": "{primary.700}" },
-                "text": { "value": "{neutral.0}" }
+                "bg-active": { "value": "{primary.800}" },
+                "fg": { "value": "{primary.600}" },
+                "tint": { "value": "{primary.50}" }
+            },
+            "danger": {
+                "bg": { "value": "{danger.600}" },
+                "bg-hover": { "value": "{danger.700}" },
+                "bg-active": { "value": "{danger.800}" }
+            },
+            "disabled": {
+                "bg": { "value": "{neutral.200}" },
+                "text": { "value": "{neutral.400}" }
             }
+        },
+        "input": {
+            "bg": { "value": "{neutral.0}" },
+            "border": { "value": "{neutral.300}" },
+            "border-hover": { "value": "{neutral.400}" }
+        },
+        "danger": {
+            "text": { "value": "{danger.700}" }
         },
         "focus": {
             "ring": { "value": "{primary.700}" }
         },
-        "danger": {
-            "bg": { "value": "{danger.600}" },
-            "bg-hover": { "value": "{danger.700}" },
-            "text": { "value": "{neutral.0}" }
+        "overlay": {
+            "scrim": { "value": "rgba(14, 22, 32, 0.5)" }
         }
+    },
+    "font-family": {
+        "body": { "value": "{font-family.body-default}" }
     }
 }

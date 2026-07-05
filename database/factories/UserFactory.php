@@ -42,4 +42,14 @@ class UserFactory extends Factory
             'email_verified_at' => null,
         ]);
     }
+
+    /**
+     * A platform super-admin (RBAC §9). Global flag, never a tenant role.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_super_admin' => true,
+        ]);
+    }
 }

@@ -54,11 +54,34 @@ final class TenantIsolation
 
     /**
      * "Belongs to me" shape — a row scoped to a person, not an organization (user_ui_preferences).
-     * Keyed on app.current_user_id rather than app.current_tenant_id. Emitted now; applied in B.
+     * Keyed on app.current_user_id rather than app.current_tenant_id.
      */
     public static function belongsToUser(string $table, string $userColumn = 'user_id'): void
     {
         self::execute(self::belongsToUserSql($table, $userColumn));
+    }
+
+    /**
+     * The `users` fourth shape (RBAC §6): SELECT-only, visible to self + active co-tenant members.
+     * Pair with usersWritePolicies() — this generator emits no write policies, and FORCE RLS denies
+     * all writes without one.
+     */
+    public static function usersVisibility(string $table = 'users'): void
+    {
+        self::execute(self::usersVisibilitySql($table));
+    }
+
+    /**
+     * Write policies for `users`, and the pre-auth carve-out for the auth role. INSERT is permissive
+     * (registration/invite-placeholder run with no user context — app-layer authorizes); UPDATE/DELETE
+     * are own-row (a user modifies only their own account, while authenticated). The `pgsql_auth` role
+     * (RlsAwareUserProvider) additionally gets permissive SELECT/UPDATE so login/password-reset can
+     * resolve and write a user with no context — scoped `TO` that role only, never widening the app role.
+     */
+    public static function usersWritePolicies(string $table = 'users'): void
+    {
+        $authRole = config('database.connections.pgsql_auth.username');
+        self::execute(self::usersWritePoliciesSql($table, is_string($authRole) ? $authRole : null));
     }
 
     // ── Pure SQL generators (no database access — the unit-test surface) ─────────────────────
@@ -151,6 +174,43 @@ final class TenantIsolation
     }
 
     /**
+     * Companion write policies for the `users` visibility shape (RBAC §6: user writes are app-layer
+     * authorized, not tenant-scoped — but FORCE RLS still needs *some* write policy or all writes are
+     * denied). INSERT permissive (registration/invite-placeholder run with no user context); UPDATE
+     * and DELETE own-row (a user modifies only their own account). When $authRole is given, add
+     * `TO <authRole>` permissive SELECT/UPDATE so the pre-auth login/reset path (which runs with no
+     * context) can resolve and write a user — scoped to that role only, never the app role.
+     *
+     * @return list<string>
+     */
+    public static function usersWritePoliciesSql(string $table = 'users', ?string $authRole = null): array
+    {
+        self::assertIdentifier($table);
+
+        // Writes on the global `users` identity table are governed by APPLICATION-LAYER authorization,
+        // not tenant RLS (RBAC §6: user writes are "a user's own account", not a tenant operation).
+        // FORCE RLS still needs a policy per command, so these are permissive — the SELECT visibility
+        // policy is what enforces read isolation. Permissive writes also let central account-management
+        // (Fortify profile/password/2FA, which run with no tenant context) update the user's own row,
+        // and let the password-reset save succeed on the pre-auth connection.
+        $statements = [
+            self::policy($table, 'app_insert', 'INSERT', check: 'true'),
+            self::policy($table, 'app_update', 'UPDATE', using: 'true', check: 'true'),
+            self::policy($table, 'app_delete', 'DELETE', using: 'true'),
+        ];
+
+        if ($authRole !== null) {
+            self::assertIdentifier($authRole);
+            // The pre-auth login/reset path (RlsAwareUserProvider on the meridian_auth role) must
+            // SELECT users with no context; the join-shape visibility policy fails closed, so add a
+            // permissive SELECT scoped to that role only (writes are covered by the public policies).
+            $statements[] = self::policy($table, 'auth_select', 'SELECT', using: 'true', role: $authRole);
+        }
+
+        return $statements;
+    }
+
+    /**
      * Draft-guard: strict tenant isolation PLUS a published-immutability guard that blocks UPDATE
      * and DELETE of any row already published (form_versions, Increment D). Emitted now; applied in D.
      *
@@ -227,8 +287,15 @@ final class TenantIsolation
         string $command,
         ?string $using = null,
         ?string $check = null,
+        ?string $role = null,
     ): string {
         $sql = sprintf('CREATE POLICY %s_%s ON %s FOR %s', $table, $suffix, $table, $command);
+
+        // `TO <role>` scopes the policy to one DB role (permissive policies for one role never widen
+        // another). Must precede USING/WITH CHECK in the CREATE POLICY grammar.
+        if ($role !== null) {
+            $sql .= sprintf(' TO %s', $role);
+        }
 
         if ($using !== null) {
             $sql .= sprintf(' USING (%s)', $using);

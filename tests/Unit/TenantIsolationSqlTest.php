@@ -89,6 +89,28 @@ it('guards published rows from update and delete in the draft-guard shape', func
     expect($delete)->toContain("status <> 'published'");
 });
 
+it('makes users write policies permissive, with a pre-auth SELECT carve-out for the auth role', function (): void {
+    $statements = TenantIsolation::usersWritePoliciesSql('users', 'meridian_auth');
+    $sql = joined($statements);
+
+    // Writes are app-authorized (RBAC §6): permissive, not tenant-scoped.
+    expect($sql)
+        ->toContain('CREATE POLICY users_app_insert ON users FOR INSERT WITH CHECK (true)')
+        ->toContain('CREATE POLICY users_app_update ON users FOR UPDATE USING (true) WITH CHECK (true)')
+        ->toContain('CREATE POLICY users_app_delete ON users FOR DELETE USING (true)');
+
+    // The pre-auth role gets a permissive SELECT scoped TO it only (writes are covered by the above).
+    expect($sql)->toContain('CREATE POLICY users_auth_select ON users FOR SELECT TO meridian_auth USING (true)');
+    expect(collect($statements)->filter(
+        fn (string $s): bool => str_contains($s, 'TO meridian_auth') && ! str_contains($s, 'FOR SELECT')
+    ))->toBeEmpty();
+});
+
+it('rejects an unsafe auth role name in users write policies', function (): void {
+    expect(fn () => TenantIsolation::usersWritePoliciesSql('users', 'evil; DROP ROLE x'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('rejects unsafe identifiers rather than interpolating them into DDL', function (): void {
     expect(fn () => TenantIsolation::strictSql('probes; DROP TABLE tenants;--'))
         ->toThrow(InvalidArgumentException::class);

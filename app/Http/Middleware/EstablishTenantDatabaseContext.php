@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -54,12 +55,19 @@ class EstablishTenantDatabaseContext
     }
 
     /**
-     * The resolved tenant is bound into the container by the identification layer that runs before
-     * this middleware (stancl/tenancy's subdomain identification, wired in Increment B). Kept
-     * package-agnostic: this class only depends on a bound Tenant instance, not on how it got there.
+     * The resolved tenant is bound into the container by stancl/tenancy's identification middleware,
+     * which runs immediately before this one. stancl binds the current tenant under the
+     * Stancl\Tenancy\Contracts\Tenant key (what the `tenant()` helper reads); our App\Models\Tenant
+     * implements that contract. Returns null on the central domain, where no tenant is bound.
      */
     private function resolveTenant(Request $request): ?Tenant
     {
-        return app()->bound(Tenant::class) ? app(Tenant::class) : null;
+        if (! app()->bound(TenantContract::class)) {
+            return null;
+        }
+
+        $tenant = app(TenantContract::class);
+
+        return $tenant instanceof Tenant ? $tenant : null;
     }
 }

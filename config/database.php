@@ -101,6 +101,27 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // Pre-authentication connection (Increment B1). A dedicated NON-superuser `meridian_auth`
+        // role — NOT an owner of `users`, granted SELECT/UPDATE on `users` ONLY — used solely by
+        // App\Auth\RlsAwareUserProvider to resolve/update a user for login, password reset, and
+        // remember-me BEFORE any tenant/user context exists (when the join-shape RLS on `users` would
+        // otherwise fail closed). It has no access to any tenant-domain table, so a bug here reaches
+        // only the identity table — never tenant data.
+        'pgsql_auth' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_AUTH_USERNAME', 'meridian_auth'),
+            'password' => env('DB_AUTH_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         // Elevated connection for the rare operations that must bypass RLS: seeding platform-global
         // (tenant_id IS NULL) rows and any super-admin platform path (ADR-0002 §D3). Same database,
         // superuser role. Defined now, first exercised in Increment B — never used by request code.

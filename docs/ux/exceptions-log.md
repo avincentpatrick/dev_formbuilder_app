@@ -28,3 +28,44 @@ radius, or type). When the public form-runtime shell is built (Phase 1+), this a
 folded into a shared guest-shell primitive rather than remaining a separate app-level component.
 It lives in the app (`resources/js/Layouts/`) rather than the package for now because it is
 Inertia-specific and the public-runtime SPA that would share it does not yet exist.
+
+---
+
+## #2 — Icon system (`packages/design-system/src/components/Icon/`)
+
+**Introduced:** Phase 0 · Increment C2 (app shell).
+
+**What deviates:** The DSR references icons throughout (sidebar, bell, chevron, sun/moon/monitor,
+etc.) but defines no icon component, no named icon library, and no sizing/`aria-hidden` conventions.
+C2 needs icons for the shell, so it introduces one.
+
+**Decision (now documented in DSR "Appendix B: Icon System"):** a single `MdsIcon` component backed by
+an internal, hand-authored inline-SVG registry (`icons.ts`) — no external icon dependency, so the
+embeddable guest runtime stays request-free. Glyphs are 24×24 line-art (`fill:none`,
+`stroke:currentColor`, `stroke-width 1.5`). Sizes `sm`=16 / `md`=20 / `lg`=24. Color inherits
+`currentColor` (so an icon matches its surrounding control's text color; standalone icons set a
+color, default `--mds-neutral-500`). **A11y:** decorative by default (`aria-hidden` + `focusable="false"`);
+icon-only controls carry `aria-label` on the *control*, not the icon; a rare standalone meaningful
+icon passes `label` → `role="img"`.
+
+**Disposition:** the C2 registry ships exactly the glyphs the shell/dashboard/theme-toggle need;
+extend it as features require. Provenance: geometry is hand-authored for this project (not copied from
+a licensed set).
+
+---
+
+## #3 — Theme quick-toggle in the top nav (`resources/js/components/shell/ThemeQuickToggle.vue`)
+
+**Introduced:** Phase 0 · Increment C2 (app shell), at the user's explicit request.
+
+**What deviates:** DSR §2.9 / Feature #9 place the theme (Light/Dark/Match System) control in
+**Settings → Appearance**, and the single-server-set-root-attribute mechanism discourages a
+client-side quick flip. The top nav's specified contents (§3.4) don't include a theme toggle.
+
+**Why:** during the C1 demo the user could not easily see dark mode (guests follow the OS setting).
+A one-click toggle in the app bar directly serves that need.
+
+**Disposition:** the canonical home remains Settings → Appearance; the quick toggle is an *additional*
+surface writing the same `user_ui_preferences.theme_mode` row via the same endpoint. It applies the
+change optimistically client-side (set/remove `data-theme-mode` on `<html>`) and persists server-side,
+so the durable source of truth (the blade root-attribute emission on next full load) is unchanged.

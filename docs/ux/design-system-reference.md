@@ -647,3 +647,43 @@ The plan and PRD are the source of truth for product/design direction; the follo
 11. **Component-library semantic versioning policy** (MAJOR/MINOR/PATCH definitions, one-minor-cycle minimum deprecation window) is this document's concrete resolution of the plan's general "docs-as-code"/consistency instructions applied specifically to a versioned design-system package, which the plan does not itself specify at this level of detail (§7).
 
 None of the above contradicts or extends the plan's or PRD's product direction — each fills in a level of implementation detail the source documents intentionally left open.
+
+12. **Icon system** (Increment C2 — see Appendix B). This document references icons throughout (sidebar, bell, chevron, sun/moon/monitor, error/check glyphs) but never defined an icon component, library, sizing scale, or `aria-hidden` convention; Appendix B pins those.
+13. **Segmented-control selected-state = a solid filled chip** (`--mds-color-action-primary-bg` + `--mds-color-text-on-primary`), not the subtle `primary-50`/`primary-700` tint §3.2/§3.4 implies. The subtle tint fails AA in dark mode (the dark tint is translucent and the primary-fg text lands ~4.2:1); the filled chip reuses the verified action/on-primary pairing (≥6:1 both themes). The fill + glyph + label remain non-color signifiers.
+14. **Sidebar active-item label uses `--mds-color-text-heading`** (highest-emphasis) rather than a primary-hued text, for the same dark-mode contrast robustness; the primary hue is carried by the required left-edge accent bar (`--mds-color-action-primary-bg`) + bold weight, so the active state still has its non-color signifiers.
+15. **Theme quick-toggle in the top nav** (Increment C2, at the user's request) — a beyond-spec shortcut to the Settings → Appearance control; recorded in `exceptions-log.md` #3.
+
+---
+
+## Appendix B: Icon System
+
+The DSR references icons throughout but never specified an icon component, library, or conventions.
+Increment C2 introduces one (`packages/design-system/src/components/Icon/`); this appendix is its spec.
+The rationale is also captured in `exceptions-log.md` #2.
+
+- **Component:** a single `MdsIcon` backed by an internal, hand-authored inline-SVG registry
+  (`icons.ts`, keyed by `name`). **No external icon dependency** — so the embeddable public form
+  runtime (Feature #3) stays free of an extra request, consistent with the no-webfont typography
+  decision (§2.4). Provenance: geometry hand-authored for this project.
+- **Drawing:** `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `stroke-width: 1.5`,
+  round caps/joins — technical line-art matching the blueprint concept.
+- **Sizes:** `sm` 16px / `md` 20px (default) / `lg` 24px.
+- **Color:** inherits `currentColor`, so an icon takes the text color of whatever control it sits in
+  (nav item, button, menu item). A standalone icon sets a color explicitly; the default standalone
+  color is `--mds-color-text-secondary` / historically `--mds-neutral-500` (§2.2).
+- **Accessibility (the load-bearing convention):** icons are **decorative by default** —
+  `aria-hidden="true"` + `focusable="false"`. An **icon-only control** (a `<button>`/`<a>` with no
+  visible text) carries its accessible name via `aria-label` **on the control**, and the icon stays
+  hidden — never rely on a title-tooltip alone (§4.5). A rare standalone *meaningful* icon may pass a
+  `label` prop → renders `role="img"` + `aria-label`. Icon-only controls keep a ≥44×44px hit area
+  (§4.4) and ≥3:1 boundary contrast (§4.1).
+- **Registry growth:** add glyphs to `icons.ts` as features need them (the C2 set: dashboard, forms,
+  submissions, settings, bell, menu, close, chevron-down, sun, moon, monitor, user, logout, feedback,
+  check). Keep geometry simple/technical. Adding a glyph is a MINOR change (§7.1).
+
+**Components added in C2** (implementing existing sections, with stories + this doc updated per §7.3):
+`MdsCard` (§3.5), `MdsEmptyState` (§3.10), `MdsSpinner` (§3.9 indeterminate; determinate bar still
+deferred), and the new **`MdsSegmentedControl`** (a single-select radiogroup used for the theme
+control — native radios for arrow-key roving selection; selected-state per Appendix A #13).
+`MdsCheckbox` (§3.2), `MdsBadge`/`statusVariant` (§3.8), and `MdsSkeleton` (§3.9) remain deferred to a
+later increment (nothing in C2 exercises them).

@@ -35,3 +35,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local-only dev overrides (never committed)
+docker-compose.override.yml

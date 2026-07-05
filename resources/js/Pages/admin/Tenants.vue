@@ -9,7 +9,7 @@ defineProps<{
 
 // Business-rule failures (e.g. suspending an already-suspended tenant) come back as a shared `admin`
 // session error, not a form-field error.
-const page = usePage<{ errors: Record<string, string> }>();
+const page = usePage();
 const adminError = computed(() => page.props.errors?.admin);
 
 function suspend(id: string): void {

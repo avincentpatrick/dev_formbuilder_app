@@ -16,7 +16,7 @@ const form = useForm({ name: '', password: '' });
 
 // Business-rule failures (e.g. an expired invite) come back as a shared `membership` session error,
 // not a form-field error.
-const page = usePage<{ errors: Record<string, string> }>();
+const page = usePage();
 const membershipError = computed(() => page.props.errors?.membership);
 
 function accept(): void {

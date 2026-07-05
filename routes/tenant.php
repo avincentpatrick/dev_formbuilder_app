@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -34,6 +35,13 @@ Route::middleware([
     'auth',
 ])->group(function (): void {
     Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+
+    // Settings — the current theme reaches the page via the shared `ui.theme` prop (no controller
+    // needed for the read). The appearance write persists theme_mode to user_ui_preferences; it lives
+    // here (not central) so app.current_user_id is set and the belongs-to-user RLS write succeeds.
+    Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
+    Route::patch('/settings/appearance', [PreferencesController::class, 'updateTheme'])
+        ->name('settings.appearance.update');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).

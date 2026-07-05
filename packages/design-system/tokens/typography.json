@@ -1,0 +1,70 @@
+{
+    "font-family": {
+        "display": { "value": "\"Bahnschrift\", \"DIN Alternate\", \"Arial Narrow\", \"Segoe UI Semibold\", sans-serif" },
+        "body-default": { "value": "-apple-system, \"Segoe UI\", \"San Francisco\", \"Helvetica Neue\", Arial, sans-serif" },
+        "mono": { "value": "\"Cascadia Code\", \"SF Mono\", Consolas, \"Roboto Mono\", Menlo, monospace" }
+    },
+    "font-weight": {
+        "regular": { "value": "400" },
+        "medium": { "value": "500" },
+        "semibold": { "value": "600" },
+        "bold": { "value": "700" }
+    },
+    "type": {
+        "display": {
+            "font-size": { "value": "36px" },
+            "line-height": { "value": "44px" },
+            "font-weight": { "value": "700" }
+        },
+        "heading-1": {
+            "font-size": { "value": "30px" },
+            "line-height": { "value": "38px" },
+            "font-weight": { "value": "700" }
+        },
+        "heading-2": {
+            "font-size": { "value": "24px" },
+            "line-height": { "value": "32px" },
+            "font-weight": { "value": "600" }
+        },
+        "heading-3": {
+            "font-size": { "value": "20px" },
+            "line-height": { "value": "28px" },
+            "font-weight": { "value": "600" }
+        },
+        "heading-4": {
+            "font-size": { "value": "16px" },
+            "line-height": { "value": "24px" },
+            "font-weight": { "value": "600" }
+        },
+        "body-lg": {
+            "font-size": { "value": "16px" },
+            "line-height": { "value": "24px" },
+            "font-weight": { "value": "400" }
+        },
+        "body-md": {
+            "font-size": { "value": "14px" },
+            "line-height": { "value": "20px" },
+            "font-weight": { "value": "400" }
+        },
+        "body-sm": {
+            "font-size": { "value": "13px" },
+            "line-height": { "value": "18px" },
+            "font-weight": { "value": "400" }
+        },
+        "label": {
+            "font-size": { "value": "13px" },
+            "line-height": { "value": "18px" },
+            "font-weight": { "value": "500" }
+        },
+        "caption": {
+            "font-size": { "value": "12px" },
+            "line-height": { "value": "16px" },
+            "font-weight": { "value": "400" }
+        },
+        "code": {
+            "font-size": { "value": "13px" },
+            "line-height": { "value": "20px" },
+            "font-weight": { "value": "400" }
+        }
+    }
+}

@@ -14,7 +14,8 @@
         "resolveJsonModule": true,
         "types": ["vite/client"],
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            "@meridian/design-system": ["./packages/design-system/src/index.ts"]
         }
     },
     "include": [

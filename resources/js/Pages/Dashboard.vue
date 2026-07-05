@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Placeholder authenticated tenant page (proves the subdomain + tenant.context + auth pipeline).
-// The real dashboard inside the design-system app shell lands in Increment C.
+// The real dashboard inside the design-system app shell lands in Increment C2.
 </script>
 
 <template>

@@ -1,7 +1,12 @@
 /*
- * Theme + personalization layer (docs/ux/design-system-reference.md §2.9).
+ * Theme + personalization layer (docs/ux/design-system-reference.md §2.1, §2.2, §2.9).
  *
- * Dark mode and accent are a RE-POINTING of the semantic layer only — components never change.
+ * Dark mode is an AUTHENTIC second state of the same instrument — pale linework on a deep
+ * drafting-blue ground — not an algorithmic inversion. It is delivered by flipping the neutral
+ * *primitive* custom properties to their dark-column hexes (§2.2 Paper/Ink table); the semantic
+ * aliases, emitted as `var(--mds-neutral-*)` (outputReferences), follow automatically. A handful
+ * of semantic aliases that use a *different* step (or a fixed value) in dark are re-pointed below.
+ *
  * The root attributes are emitted server-side from user_ui_preferences (Increment C):
  *   <html data-theme-mode="dark" data-accent="teal">
  * "system" = the ABSENCE of data-theme-mode: prefers-color-scheme decides (costs nothing).
@@ -9,37 +14,94 @@
 
 /* ── Dark: explicit opt-in ─────────────────────────────────────────────── */
 :root[data-theme-mode='dark'] {
-    --mds-color-bg-canvas: var(--mds-neutral-900);
-    --mds-color-bg-surface: var(--mds-neutral-800);
-    --mds-color-text-primary: var(--mds-neutral-100);
-    --mds-color-text-muted: var(--mds-neutral-400);
-    --mds-color-border-default: var(--mds-neutral-700);
-    /* Primary accent lightens on the deep drafting-blue canvas to keep contrast. */
-    --mds-color-action-primary-bg: var(--mds-primary-400);
-    --mds-color-action-primary-bg-hover: var(--mds-primary-500);
-    --mds-color-action-primary-text: var(--mds-neutral-900);
-    --mds-color-focus-ring: var(--mds-primary-400);
+    /* Neutral ramp → deep drafting-blue ground (low steps dark, high steps pale) */
+    --mds-neutral-0: #081a29;
+    --mds-neutral-50: #0c2337;
+    --mds-neutral-100: #123350;
+    --mds-neutral-200: #1d3f57;
+    --mds-neutral-300: #2c5570;
+    --mds-neutral-400: #7591a4;
+    --mds-neutral-500: #8ca5b5;
+    --mds-neutral-600: #a9c1d1;
+    --mds-neutral-700: #c4d5e0;
+    --mds-neutral-800: #dce7ee;
+    --mds-neutral-900: #eaf1f6;
+    --mds-neutral-950: #f5f9fb;
+
+    /* Semantic aliases that shift step (or take a fixed value) on the dark ground */
+    --mds-color-bg-surface: var(--mds-neutral-100);
+    --mds-color-bg-surface-raised: var(--mds-neutral-100);
+    --mds-color-bg-sunken: var(--mds-neutral-50);
+    --mds-color-text-on-primary: #ffffff;
+    --mds-color-text-on-warning: #16212b;
+    --mds-color-action-primary-bg: var(--mds-primary-500);
+    --mds-color-action-primary-bg-hover: var(--mds-primary-400);
+    --mds-color-action-primary-bg-active: var(--mds-primary-300);
+    --mds-color-action-primary-fg: var(--mds-primary-300);
+    --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
+    --mds-color-action-danger-bg: var(--mds-danger-500);
+    --mds-color-action-danger-bg-hover: var(--mds-danger-400);
+    --mds-color-danger-text: var(--mds-danger-300);
+    --mds-color-input-border: var(--mds-neutral-400);
+    --mds-color-input-border-hover: var(--mds-neutral-500);
+    --mds-color-focus-ring: var(--mds-primary-300);
+    --mds-color-overlay-scrim: rgba(8, 13, 20, 0.6);
 }
 
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme-mode='light']):not([data-theme-mode='dark']) {
-        --mds-color-bg-canvas: var(--mds-neutral-900);
-        --mds-color-bg-surface: var(--mds-neutral-800);
-        --mds-color-text-primary: var(--mds-neutral-100);
-        --mds-color-text-muted: var(--mds-neutral-400);
-        --mds-color-border-default: var(--mds-neutral-700);
-        --mds-color-action-primary-bg: var(--mds-primary-400);
-        --mds-color-action-primary-bg-hover: var(--mds-primary-500);
-        --mds-color-action-primary-text: var(--mds-neutral-900);
-        --mds-color-focus-ring: var(--mds-primary-400);
+        --mds-neutral-0: #081a29;
+        --mds-neutral-50: #0c2337;
+        --mds-neutral-100: #123350;
+        --mds-neutral-200: #1d3f57;
+        --mds-neutral-300: #2c5570;
+        --mds-neutral-400: #7591a4;
+        --mds-neutral-500: #8ca5b5;
+        --mds-neutral-600: #a9c1d1;
+        --mds-neutral-700: #c4d5e0;
+        --mds-neutral-800: #dce7ee;
+        --mds-neutral-900: #eaf1f6;
+        --mds-neutral-950: #f5f9fb;
+
+        --mds-color-bg-surface: var(--mds-neutral-100);
+        --mds-color-bg-surface-raised: var(--mds-neutral-100);
+        --mds-color-bg-sunken: var(--mds-neutral-50);
+        --mds-color-text-on-primary: #ffffff;
+        --mds-color-text-on-warning: #16212b;
+        --mds-color-action-primary-bg: var(--mds-primary-500);
+        --mds-color-action-primary-bg-hover: var(--mds-primary-400);
+        --mds-color-action-primary-bg-active: var(--mds-primary-300);
+        --mds-color-action-primary-fg: var(--mds-primary-300);
+        --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
+        --mds-color-action-danger-bg: var(--mds-danger-500);
+        --mds-color-action-danger-bg-hover: var(--mds-danger-400);
+        --mds-color-danger-text: var(--mds-danger-300);
+        --mds-color-input-border: var(--mds-neutral-400);
+        --mds-color-input-border-hover: var(--mds-neutral-500);
+        --mds-color-focus-ring: var(--mds-primary-300);
+        --mds-color-overlay-scrim: rgba(8, 13, 20, 0.6);
     }
 }
 
 /* ── Accent alternative (the ONLY personalization accent besides Blueprint) ─
-   Moss (success) and Brass (annotation) are deliberately excluded from this whitelist. */
+   Phase-2 personalization (§2.9). Moss (success) and Brass (annotation) are
+   deliberately excluded from this whitelist. Remaps only the primary action hue. */
 :root[data-accent='teal'] {
     --mds-color-action-primary-bg: var(--mds-accent-teal-600);
     --mds-color-action-primary-bg-hover: var(--mds-primary-700);
+    --mds-color-action-primary-fg: var(--mds-accent-teal-600);
     --mds-color-focus-ring: var(--mds-accent-teal-600);
+}
+
+/* ── Reduced motion: collapse all durations centrally (§2.8) ────────────────
+   1ms (not 0) so transitionend still fires for any JS that depends on it. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --mds-duration-fast: 1ms;
+        --mds-duration-base: 1ms;
+        --mds-duration-moderate: 1ms;
+        --mds-duration-slow: 1ms;
+        --mds-duration-deliberate: 1ms;
+    }
 }

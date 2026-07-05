@@ -1,5 +1,8 @@
 <script setup lang="ts">
+// Design-system-styled password-reset request page (Increment C1).
 import { useForm } from '@inertiajs/vue3';
+import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 defineProps<{ status?: string }>();
 const form = useForm({ email: '' });
@@ -10,17 +13,31 @@ function submit(): void {
 </script>
 
 <template>
-  <main>
-    <h1>Reset your password</h1>
-    <p v-if="status">{{ status }}</p>
-    <form @submit.prevent="submit">
-      <p>
-        <label for="email">Email</label>
-        <input id="email" v-model="form.email" type="email" autocomplete="email" required />
-        <span v-if="form.errors.email">{{ form.errors.email }}</span>
-      </p>
-      <button type="submit" :disabled="form.processing">Email password reset link</button>
+  <AuthLayout title="Reset your password">
+    <p v-if="status" class="auth-alert">{{ status }}</p>
+
+    <form class="auth-form" @submit.prevent="submit">
+      <MdsFormField
+        label="Email"
+        help="We'll email you a link to reset your password."
+        :error="form.errors.email"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsTextInput
+          :id="id"
+          v-model="form.email"
+          type="email"
+          autocomplete="email"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <MdsButton type="submit" :loading="form.processing">Email password reset link</MdsButton>
     </form>
-    <p><a href="/login">Back to sign in</a></p>
-  </main>
+
+    <nav class="auth-links">
+      <a href="/login">Back to sign in</a>
+    </nav>
+  </AuthLayout>
 </template>

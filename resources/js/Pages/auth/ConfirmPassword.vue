@@ -1,5 +1,8 @@
 <script setup lang="ts">
+// Design-system-styled password-confirmation (secure-area) page (Increment C1).
 import { useForm } from '@inertiajs/vue3';
+import { MdsButton, MdsFormField, MdsPasswordInput } from '@meridian/design-system';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 const form = useForm({ password: '' });
 
@@ -9,16 +12,25 @@ function submit(): void {
 </script>
 
 <template>
-  <main>
-    <h1>Confirm password</h1>
-    <p>This is a secure area. Please confirm your password before continuing.</p>
-    <form @submit.prevent="submit">
-      <p>
-        <label for="password">Password</label>
-        <input id="password" v-model="form.password" type="password" autocomplete="current-password" required autofocus />
-        <span v-if="form.errors.password">{{ form.errors.password }}</span>
-      </p>
-      <button type="submit" :disabled="form.processing">Confirm</button>
+  <AuthLayout title="Confirm password">
+    <p class="auth-note">This is a secure area. Please confirm your password before continuing.</p>
+
+    <form class="auth-form" @submit.prevent="submit">
+      <MdsFormField
+        label="Password"
+        :error="form.errors.password"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsPasswordInput
+          :id="id"
+          v-model="form.password"
+          autocomplete="current-password"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <MdsButton type="submit" :loading="form.processing">Confirm</MdsButton>
     </form>
-  </main>
+  </AuthLayout>
 </template>

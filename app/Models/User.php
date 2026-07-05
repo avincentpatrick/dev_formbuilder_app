@@ -10,6 +10,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -56,5 +57,39 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_super_admin' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * The user's personal UI preferences (theme, etc.). Belongs to the PERSON, not a tenant —
+     * governed by the "belongs to me" RLS shape (keyed on app.current_user_id).
+     *
+     * @return HasOne<UserUiPreference, $this>
+     */
+    public function uiPreference(): HasOne
+    {
+        return $this->hasOne(UserUiPreference::class);
+    }
+
+    /**
+     * Resolved theme preference for server-side <html> attribute emission (Increment C).
+     * Fail-safe: `user_ui_preferences` is under belongs-to-user RLS; if app.current_user_id
+     * isn't set the read fails closed — degrade to "system", never throw. (accent lands in C2.)
+     *
+     * @return array{mode: string, accent: string}
+     */
+    public function uiTheme(): array
+    {
+        return rescue(
+            function (): array {
+                $mode = $this->uiPreference()->value('theme_mode');
+
+                return [
+                    'mode' => is_string($mode) ? $mode : 'system',
+                    'accent' => 'blueprint',
+                ];
+            },
+            ['mode' => 'system', 'accent' => 'blueprint'],
+            report: false,
+        );
     }
 }

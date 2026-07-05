@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Unstyled Increment-B1 auth page. The design-system-styled version lands with the app shell in
-// Increment C; this is a functional placeholder posting to Fortify's session-auth routes.
+// Design-system-styled sign-in page (Increment C1). Posts to Fortify's session-auth route.
 import { useForm } from '@inertiajs/vue3';
+import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 const form = useForm({ email: '', password: '', remember: false });
 
@@ -11,24 +12,48 @@ function submit(): void {
 </script>
 
 <template>
-  <main>
-    <h1>Sign in</h1>
-    <form @submit.prevent="submit">
-      <p>
-        <label for="email">Email</label>
-        <input id="email" v-model="form.email" type="email" autocomplete="email" required />
-        <span v-if="form.errors.email">{{ form.errors.email }}</span>
-      </p>
-      <p>
-        <label for="password">Password</label>
-        <input id="password" v-model="form.password" type="password" autocomplete="current-password" required />
-        <span v-if="form.errors.password">{{ form.errors.password }}</span>
-      </p>
-      <p>
-        <label><input v-model="form.remember" type="checkbox" /> Remember me</label>
-      </p>
-      <button type="submit" :disabled="form.processing">Sign in</button>
+  <AuthLayout title="Sign in">
+    <form class="auth-form" @submit.prevent="submit">
+      <MdsFormField
+        label="Email"
+        :error="form.errors.email"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsTextInput
+          :id="id"
+          v-model="form.email"
+          type="email"
+          autocomplete="email"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <MdsFormField
+        label="Password"
+        :error="form.errors.password"
+        v-slot="{ id, describedby, invalid }"
+      >
+        <MdsPasswordInput
+          :id="id"
+          v-model="form.password"
+          autocomplete="current-password"
+          :describedby="describedby"
+          :invalid="invalid"
+        />
+      </MdsFormField>
+
+      <label class="auth-remember">
+        <input v-model="form.remember" type="checkbox" />
+        <span>Remember me</span>
+      </label>
+
+      <MdsButton type="submit" :loading="form.processing">Sign in</MdsButton>
     </form>
-    <p><a href="/forgot-password">Forgot your password?</a> · <a href="/register">Create an account</a></p>
-  </main>
+
+    <nav class="auth-links">
+      <a href="/forgot-password">Forgot your password?</a>
+      <a href="/register">Create an account</a>
+    </nav>
+  </AuthLayout>
 </template>

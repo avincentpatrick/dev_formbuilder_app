@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// Unstyled Increment-B2b invitation accept/decline page (styled in Increment C).
+// Design-system-styled invitation accept/decline page (Increment C1).
 import { useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
+import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 const props = defineProps<{
   tenantName: string;
@@ -27,27 +29,42 @@ function decline(): void {
 </script>
 
 <template>
-  <main>
-    <h1>Join {{ props.tenantName }}</h1>
-    <p v-if="props.email">Invitation for {{ props.email }}</p>
+  <AuthLayout :title="`Join ${props.tenantName}`">
+    <p v-if="props.email" class="auth-note">Invitation for {{ props.email }}</p>
 
-    <form @submit.prevent="accept">
+    <p v-if="membershipError" class="auth-alert auth-alert--error">{{ membershipError }}</p>
+
+    <form class="auth-form" @submit.prevent="accept">
       <template v-if="props.needsRegistration">
-        <p>
-          <label for="name">Your name</label>
-          <input id="name" v-model="form.name" type="text" autocomplete="name" required />
-          <span v-if="form.errors.name">{{ form.errors.name }}</span>
-        </p>
-        <p>
-          <label for="password">Choose a password</label>
-          <input id="password" v-model="form.password" type="password" autocomplete="new-password" required />
-          <span v-if="form.errors.password">{{ form.errors.password }}</span>
-        </p>
+        <MdsFormField label="Your name" :error="form.errors.name" v-slot="{ id, describedby, invalid }">
+          <MdsTextInput
+            :id="id"
+            v-model="form.name"
+            type="text"
+            autocomplete="name"
+            :describedby="describedby"
+            :invalid="invalid"
+          />
+        </MdsFormField>
+
+        <MdsFormField
+          label="Choose a password"
+          :error="form.errors.password"
+          v-slot="{ id, describedby, invalid }"
+        >
+          <MdsPasswordInput
+            :id="id"
+            v-model="form.password"
+            autocomplete="new-password"
+            :describedby="describedby"
+            :invalid="invalid"
+          />
+        </MdsFormField>
       </template>
-      <span v-if="membershipError">{{ membershipError }}</span>
-      <button type="submit" :disabled="form.processing">Accept invitation</button>
+
+      <MdsButton type="submit" :loading="form.processing">Accept invitation</MdsButton>
     </form>
 
-    <button type="button" @click="decline">Decline</button>
-  </main>
+    <MdsButton variant="tertiary" size="sm" @click="decline">Decline</MdsButton>
+  </AuthLayout>
 </template>

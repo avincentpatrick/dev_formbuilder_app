@@ -1,0 +1,9 @@
+{
+    "radius": {
+        "none": { "value": "0" },
+        "sm": { "value": "2px" },
+        "md": { "value": "3px" },
+        "lg": { "value": "5px" },
+        "full": { "value": "9999px" }
+    }
+}

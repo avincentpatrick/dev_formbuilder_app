@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuidv7;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Per-user UI preferences (data-dictionary §19, PRD Feature #9). Belongs to a PERSON, not a tenant —
@@ -17,4 +18,12 @@ class UserUiPreference extends Model
     use HasUuidv7;
 
     protected $fillable = ['user_id', 'theme_mode'];
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

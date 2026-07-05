@@ -35,9 +35,22 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
         return [
             ...parent::share($request),
-            //
+            'auth' => [
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ] : null,
+            ],
+            // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.
+            // Guests resolve to "system", which emits no attribute (prefers-color-scheme decides).
+            'ui' => [
+                'theme' => $user?->uiTheme() ?? ['mode' => 'system', 'accent' => 'blueprint'],
+            ],
         ];
     }
 }

@@ -1,5 +1,9 @@
-/* Meridian admin app — base only.
-   Shared design tokens + components come from @meridian/design-system (wired in Increment C). */
+/* Meridian admin app global stylesheet.
+   Shared design tokens + the theme/personalization re-pointing layer come from
+   @meridian/design-system (wired in Increment C). tokens.css must load before theme.css
+   so the dark/accent overrides win the cascade. */
+@import '@meridian/design-system/tokens.css';
+@import '@meridian/design-system/theme.css';
 
 :root {
     color-scheme: light dark;
@@ -13,4 +17,9 @@
 
 body {
     margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-lg-font-size);
+    line-height: var(--mds-type-body-lg-line-height);
+    color: var(--mds-color-text-body);
+    background-color: var(--mds-color-bg-canvas);
 }

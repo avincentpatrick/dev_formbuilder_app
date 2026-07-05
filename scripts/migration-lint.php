@@ -32,6 +32,8 @@ require __DIR__.'/../vendor/autoload.php';
  */
 const EXEMPT_TABLES = [
     'tenants',              // the central discriminator table itself
+    'domains',             // stancl/tenancy subdomain->tenant lookup: read BEFORE tenant context
+    // exists (it's what resolves the tenant), so RLS-scoping it is circular
     'sessions',            // framework-internal, swept without tenant context
     'password_reset_tokens',
     'cache', 'cache_locks',

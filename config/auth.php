@@ -62,15 +62,14 @@ return [
     */
 
     'providers' => [
+        // 'rls_aware' resolves users on the least-privilege `pgsql_auth` connection so login,
+        // registration, and password reset work despite the fail-closed join-shape RLS on `users`
+        // (App\Auth\RlsAwareUserProvider, registered in FortifyServiceProvider). The password broker
+        // below inherits this provider, so reset flows resolve correctly too.
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'rls_aware',
             'model' => env('AUTH_MODEL', User::class),
         ],
-
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
     ],
 
     /*

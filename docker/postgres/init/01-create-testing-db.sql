@@ -21,6 +21,14 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'meridian_app') THEN
         CREATE ROLE meridian_app LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
     END IF;
+
+    -- Increment B1: the pre-authentication role. NON-superuser, granted access to `users` ONLY (see
+    -- the apply_users_rls migration), used by RlsAwareUserProvider to resolve/update a user during
+    -- login/password-reset before any tenant context exists. Also created by a guarded migration so
+    -- CI and existing (non-fresh-volume) databases get it too.
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'meridian_auth') THEN
+        CREATE ROLE meridian_auth LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
 END
 $$;
 

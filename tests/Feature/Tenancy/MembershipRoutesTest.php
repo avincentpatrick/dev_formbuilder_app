@@ -75,6 +75,9 @@ it('lets an Admin invite a member through the gated route', function (): void {
 });
 
 it('accepts an invitation end-to-end through the no-auth invitation route', function (): void {
+    // The GET below renders the Inertia root view; skip Vite so it doesn't need built assets (the CI
+    // tests job doesn't run `npm build`), mirroring the B1 SmokeTest.
+    $this->withoutVite();
     $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
     $tenant->domains()->create(['domain' => 'acme']);
 

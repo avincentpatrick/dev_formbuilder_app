@@ -33,6 +33,8 @@ final class TenantIsolation
 
     private const USER_SETTING = 'app.current_user_id';
 
+    private const SUPERADMIN_SETTING = 'app.is_superadmin_context';
+
     /**
      * Strict tenant equality — the default shape for virtually every tenant-scoped table.
      */
@@ -82,6 +84,24 @@ final class TenantIsolation
     {
         $authRole = config('database.connections.pgsql_auth.username');
         self::execute(self::usersWritePoliciesSql($table, is_string($authRole) ? $authRole : null));
+    }
+
+    /**
+     * Super-admin cross-tenant carve-out (ADR-0002 §D3, RBAC §9). An ADDITIVE permissive policy layered
+     * on a table that already has its base RLS shape + FORCE — scoped `TO` the elevated
+     * `meridian_superadmin` role and gated on the `app.is_superadmin_context` GUC the narrow
+     * SuperAdminService sets transaction-locally. Because RLS ORs permissive policies, this widens
+     * visibility to "all rows" only when that GUC is 'true' AND the connection is the elevated role;
+     * every ordinary connection is unaffected. Defaults to SELECT-only (the only cross-tenant need in
+     * B2c); pass more commands as future platform tables require them. The role is read from the
+     * pgsql_superadmin connection config, mirroring usersWritePolicies()'s auth-role lookup.
+     *
+     * @param  list<string>  $commands
+     */
+    public static function applySuperAdminBypass(string $table, array $commands = ['SELECT']): void
+    {
+        $role = config('database.connections.pgsql_superadmin.username');
+        self::execute(self::superAdminBypassSql($table, is_string($role) ? $role : 'meridian_superadmin', $commands));
     }
 
     // ── Pure SQL generators (no database access — the unit-test surface) ─────────────────────
@@ -205,6 +225,39 @@ final class TenantIsolation
             // SELECT users with no context; the join-shape visibility policy fails closed, so add a
             // permissive SELECT scoped to that role only (writes are covered by the public policies).
             $statements[] = self::policy($table, 'auth_select', 'SELECT', using: 'true', role: $authRole);
+        }
+
+        return $statements;
+    }
+
+    /**
+     * Super-admin cross-tenant carve-out (RBAC §9 / ADR-0002 §D3). Deliberately does NOT emit
+     * ENABLE/FORCE ROW LEVEL SECURITY — it is an ADDITIVE permissive policy layered onto a table that
+     * already carries its base shape's RLS+FORCE, never a standalone isolation shape. Each requested
+     * command gets one permissive policy, scoped `TO $superAdminRole` and gated on the
+     * app.is_superadmin_context GUC. The gate is a plain text equality, not the NULLIF(...)::uuid form:
+     * an unset GUC yields NULL, and `NULL = 'true'` is NULL (not true) ⇒ inherently fail-closed with no
+     * cast hazard. Because it is role-scoped, setting the GUC on any other connection grants nothing.
+     *
+     * @param  list<string>  $commands
+     * @return list<string>
+     */
+    public static function superAdminBypassSql(string $table, string $superAdminRole, array $commands = ['SELECT']): array
+    {
+        self::assertIdentifier($table);
+        self::assertIdentifier($superAdminRole);
+
+        $gate = sprintf("current_setting(%s, true) = 'true'", self::quote(self::SUPERADMIN_SETTING));
+
+        $statements = [];
+        foreach ($commands as $command) {
+            $statements[] = match (strtoupper($command)) {
+                'SELECT' => self::policy($table, 'superadmin_select', 'SELECT', using: $gate, role: $superAdminRole),
+                'INSERT' => self::policy($table, 'superadmin_insert', 'INSERT', check: $gate, role: $superAdminRole),
+                'UPDATE' => self::policy($table, 'superadmin_update', 'UPDATE', using: $gate, check: $gate, role: $superAdminRole),
+                'DELETE' => self::policy($table, 'superadmin_delete', 'DELETE', using: $gate, role: $superAdminRole),
+                default => throw new InvalidArgumentException("Unsupported RLS command: {$command}"),
+            };
         }
 
         return $statements;

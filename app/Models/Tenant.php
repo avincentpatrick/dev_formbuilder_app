@@ -17,6 +17,11 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  *
  * NOTE: id generation is handled by stancl's GeneratesIds (from the base) using our Uuid7Generator —
  * this model does NOT use HasUuidv7 (that would double-generate the key).
+ *
+ * @property string $name
+ * @property string $slug
+ * @property ?string $owner_user_id
+ * @property ?string $status Tenant lifecycle (App\Enums\TenantStatus); not cast (stancl virtual columns).
  */
 class Tenant extends BaseTenant
 {

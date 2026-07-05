@@ -120,7 +120,7 @@ Honestly restating, in one place, every "Residual" and "Open" verdict from the s
 3. Webhook replay protection (signed timestamp + tolerance window) and delivery-time SSRF re-validation (creation-time validation already exists) have no mitigation until Doc #15 adopts this document's recommendations (§5).
 4. File-upload MIME sniffing and quota enforcement have no mitigation until implemented (§6).
 5. Expression-engine resource limits (AST depth, evaluation-time budget) have no mitigation until implemented (§7).
-6. Super-admin MFA and network hardening have no mitigation until implemented (§8).
+6. Super-admin **MFA is now implemented** (Increment B2c: the `superadmin.mfa` middleware blocks console access for any `is_super_admin` account without confirmed 2FA). Network hardening (IP allowlist / non-discoverable admin subdomain) remains deferred (§8); the console is currently protected by the `superadmin` gate (404 non-disclosure) + mandatory MFA + the elevated-role RLS carve-out, not yet by a network boundary.
 7. The three open RBAC-doc questions (impersonation, audit visibility, staff graduation) remain unresolved and have direct security weight, not just a UX one.
 
 None of these are load-bearing blockers for Phase 0 scaffolding to begin — they are concrete, scoped implementation requirements to carry into the relevant future work (Docs #15, #24, and the actual Phase 1 build), tracked here so they aren't silently forgotten between "the doc that mentions it" and "the code that implements it."

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -23,6 +24,9 @@ use Spatie\Permission\Traits\HasRoles;
  * NOT tenant-scoped and deliberately does NOT use BelongsToTenant — visibility is governed by the
  * join-shape `users` RLS policy (self + active co-tenant membership). The connection stays the default
  * (`meridian_app`); the pre-auth read path lives entirely in App\Auth\RlsAwareUserProvider.
+ *
+ * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
+ * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]

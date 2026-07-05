@@ -137,3 +137,45 @@ it('applies the nullable-global shape to the roles catalog: readable by all, wri
     expect($select)->toContain('OR tenant_id IS NULL'); // every tenant may read the global catalog …
     expect($insert)->not->toContain('IS NULL');          // … but none may author a global role
 });
+
+// Increment B2c — the super-admin cross-tenant carve-out. An ADDITIVE, role-scoped, GUC-gated
+// permissive policy layered on a table that already has its base RLS+FORCE.
+
+it('emits a role-scoped, context-gated SELECT bypass without re-enabling FORCE', function (): void {
+    $statements = TenantIsolation::superAdminBypassSql('users', 'meridian_superadmin', ['SELECT']);
+    $sql = joined($statements);
+
+    expect($sql)->toContain(
+        'CREATE POLICY users_superadmin_select ON users FOR SELECT TO meridian_superadmin '
+        ."USING (current_setting('app.is_superadmin_context', true) = 'true');"
+    );
+
+    // It is a carve-out layered onto an already-secured table — it must NOT re-declare ENABLE/FORCE,
+    // and it must NOT touch the tenant/user uuid settings (its gate is a plain text equality).
+    expect($sql)
+        ->not->toContain('FORCE ROW LEVEL SECURITY')
+        ->not->toContain('app.current_tenant_id')
+        ->not->toContain('::uuid');
+});
+
+it('emits WITH CHECK on the write commands of the bypass shape', function (): void {
+    $statements = TenantIsolation::superAdminBypassSql('audits', 'meridian_superadmin', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
+    $sql = joined($statements);
+
+    expect($sql)
+        ->toContain('CREATE POLICY audits_superadmin_insert ON audits FOR INSERT TO meridian_superadmin WITH CHECK')
+        ->toContain('CREATE POLICY audits_superadmin_update ON audits FOR UPDATE TO meridian_superadmin USING')
+        ->toContain('CREATE POLICY audits_superadmin_delete ON audits FOR DELETE TO meridian_superadmin USING');
+});
+
+it('rejects an unsafe role name or table in the bypass shape', function (): void {
+    expect(fn () => TenantIsolation::superAdminBypassSql('users', 'evil; DROP ROLE x'))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => TenantIsolation::superAdminBypassSql('users; DROP TABLE tenants;--', 'meridian_superadmin'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('rejects an unsupported command in the bypass shape', function (): void {
+    expect(fn () => TenantIsolation::superAdminBypassSql('users', 'meridian_superadmin', ['TRUNCATE']))
+        ->toThrow(InvalidArgumentException::class);
+});

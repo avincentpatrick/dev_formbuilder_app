@@ -140,6 +140,28 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // Elevated super-admin connection (Increment B2c). A dedicated NON-superuser `meridian_superadmin`
+        // role used ONLY by App\Services\Admin\SuperAdminService for cross-tenant reads. Unlike
+        // pgsql_privileged (a superuser that bypasses RLS entirely), this role is STILL subject to RLS —
+        // it sees an RLS-protected table's rows only through the `superadmin_bypass` carve-out policy,
+        // scoped `TO meridian_superadmin` and gated on the `app.is_superadmin_context` GUC the service
+        // sets transaction-locally. Setting that GUC on any OTHER connection grants nothing (the policy
+        // is role-scoped), and with it unset this connection fails closed. Never used by request code.
+        'pgsql_superadmin' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_SUPERADMIN_USERNAME', 'meridian_superadmin'),
+            'password' => env('DB_SUPERADMIN_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

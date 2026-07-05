@@ -28,6 +28,13 @@ return [
     ],
 
     /**
+     * The single canonical central host, used to constrain the super-admin console route group
+     * (routes/admin.php, Increment B2c) so it is not served on tenant subdomains. Read from config
+     * rather than env() directly in the route file so it survives `route:cache`.
+     */
+    'central_domain' => env('CENTRAL_DOMAIN', 'meridian.test'),
+
+    /**
      * SINGLE-DATABASE MODE (ADR-0002 §D4): tenant isolation is enforced by PostgreSQL Row-Level
      * Security (Increment A), NOT by swapping to a per-tenant database. So NO bootstrappers run —
      * in particular DatabaseTenancyBootstrapper is deliberately absent (it would try to switch the

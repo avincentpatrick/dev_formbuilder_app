@@ -22,5 +22,14 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // A platform super-admin (RBAC §9) for exercising the B2c console in dev. Left WITHOUT confirmed
+        // two-factor auth so the mandatory-MFA enrollment redirect (security §8) is exercised on first
+        // console access. Seeded on the default connection — the permissive `users` INSERT policy allows
+        // it, same path as the Test User above.
+        User::factory()->superAdmin()->create([
+            'name' => 'Platform Admin',
+            'email' => 'admin@meridian.test',
+        ]);
     }
 }

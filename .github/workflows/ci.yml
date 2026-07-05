@@ -101,6 +101,10 @@ jobs:
       # Pre-auth role (Increment B1) — access to `users` only; used by RlsAwareUserProvider.
       DB_AUTH_USERNAME: meridian_auth
       DB_AUTH_PASSWORD: secret
+      # Elevated super-admin role (Increment B2c) — cross-tenant reads via the RLS `superadmin_bypass`
+      # carve-out only; used by App\Services\Admin\SuperAdminService.
+      DB_SUPERADMIN_USERNAME: meridian_superadmin
+      DB_SUPERADMIN_PASSWORD: secret
       REDIS_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
@@ -128,6 +132,7 @@ jobs:
           PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -v ON_ERROR_STOP=1 <<'SQL'
           CREATE ROLE meridian_app LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
           CREATE ROLE meridian_auth LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
           CREATE DATABASE meridian_testing OWNER meridian_app;
           GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
           SQL

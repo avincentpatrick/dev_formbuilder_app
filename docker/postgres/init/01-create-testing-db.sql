@@ -29,6 +29,14 @@ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'meridian_auth') THEN
         CREATE ROLE meridian_auth LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
     END IF;
+
+    -- Increment B2c: the elevated super-admin role. NON-superuser / NOBYPASSRLS — it is STILL subject
+    -- to RLS and reaches cross-tenant rows only via the `superadmin_bypass` carve-out policy (scoped
+    -- TO this role, gated on app.is_superadmin_context). Used only by App\Services\Admin\SuperAdminService.
+    -- Also created by a guarded migration so CI and existing (non-fresh-volume) databases get it too.
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'meridian_superadmin') THEN
+        CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
 END
 $$;
 

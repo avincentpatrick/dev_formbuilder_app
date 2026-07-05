@@ -115,3 +115,25 @@ it('rejects unsafe identifiers rather than interpolating them into DDL', functio
     expect(fn () => TenantIsolation::strictSql('probes; DROP TABLE tenants;--'))
         ->toThrow(InvalidArgumentException::class);
 });
+
+// Increment B2a — pin the shape each Spatie permission table receives. The migration reuses the
+// existing strict / nullable-global generators (no new shape), so these guard that the RIGHT shape is
+// wired to the RIGHT table: the assignment pivot is strict, the catalog is nullable-global.
+
+it('applies the strict shape to the model_has_roles assignment pivot', function (): void {
+    $sql = joined(TenantIsolation::strictSql('model_has_roles'));
+
+    expect($sql)
+        ->toContain('ALTER TABLE model_has_roles FORCE ROW LEVEL SECURITY;')
+        ->toContain('CREATE POLICY model_has_roles_tenant_insert ON model_has_roles FOR INSERT WITH CHECK')
+        ->toContain("NULLIF(current_setting('app.current_tenant_id', true), '')::uuid");
+});
+
+it('applies the nullable-global shape to the roles catalog: readable by all, writable by none', function (): void {
+    $statements = TenantIsolation::nullableGlobalSql('roles');
+    $select = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR SELECT'));
+    $insert = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR INSERT'));
+
+    expect($select)->toContain('OR tenant_id IS NULL'); // every tenant may read the global catalog …
+    expect($insert)->not->toContain('IS NULL');          // … but none may author a global role
+});

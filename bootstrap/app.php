@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\Tenancy\MembershipException;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -31,4 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+
+        // Membership business-rule violations (B2b) are user-facing, not 500s: bounce back with a
+        // validation-style error so the form (or the JSON api/* path) surfaces the reason.
+        $exceptions->render(fn (MembershipException $e) => back()->withErrors(['membership' => $e->getMessage()]));
     })->create();

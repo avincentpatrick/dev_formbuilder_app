@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Tenant\InvitationController;
+use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -32,4 +34,30 @@ Route::middleware([
     'auth',
 ])->group(function (): void {
     Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+
+    // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
+    // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
+    Route::post('/members/invitations', [MemberController::class, 'invite'])
+        ->middleware('can:tenant.members.invite')->name('members.invite');
+    Route::delete('/members/{user}', [MemberController::class, 'remove'])
+        ->middleware('can:tenant.members.remove')->name('members.remove');
+    Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
+        ->middleware('can:tenant.ownership.transfer')->name('members.ownership');
+});
+
+/*
+| Invitation accept/decline — the invitee side (B2b). Same subdomain tenant-context pipeline as above
+| but WITHOUT `auth`: the invitee is not a member yet, so requiring auth would be circular. Tenant
+| context is still established, which is exactly what makes the strict-RLS invite row visible (only
+| within its own tenant) and lets accept materialize the reserved role. Styled pages land in Increment C.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+])->group(function (): void {
+    Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
+    Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
+    Route::delete('/invitations/{token}', [InvitationController::class, 'decline'])->name('invitations.decline');
 });

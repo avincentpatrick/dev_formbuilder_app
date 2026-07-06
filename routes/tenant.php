@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Tenant\FeedbackController;
+use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\InvitationController;
@@ -80,6 +81,30 @@ Route::middleware([
         ->middleware('can:publish,form')->name('forms.publish');
     Route::post('/forms/{form}/versions/{version}/restore', [FormPublishController::class, 'restore'])
         ->middleware('can:update,form')->name('forms.restore');
+
+    // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
+    // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly
+    // (not Inertia visits, so the client keeps its undo/redo state). All gated by can:update,form; every
+    // mutation edits the form's DRAFT version only (the draft_child RLS guard is the DB backstop, and
+    // FormBuilderService adds the clean 403). Content edits carry an updated_at token → 409 on drift.
+    Route::get('/forms/{form}/builder', [FormBuilderController::class, 'show'])
+        ->middleware('can:update,form')->name('forms.builder');
+    Route::post('/forms/{form}/sections', [FormBuilderController::class, 'storeSection'])
+        ->middleware('can:update,form')->name('forms.sections.store');
+    Route::patch('/forms/{form}/sections/{section}', [FormBuilderController::class, 'updateSection'])
+        ->middleware('can:update,form')->name('forms.sections.update');
+    Route::delete('/forms/{form}/sections/{section}', [FormBuilderController::class, 'destroySection'])
+        ->middleware('can:update,form')->name('forms.sections.destroy');
+    Route::post('/forms/{form}/fields', [FormBuilderController::class, 'storeField'])
+        ->middleware('can:update,form')->name('forms.fields.store');
+    Route::patch('/forms/{form}/fields/{field}', [FormBuilderController::class, 'updateField'])
+        ->middleware('can:update,form')->name('forms.fields.update');
+    Route::delete('/forms/{form}/fields/{field}', [FormBuilderController::class, 'destroyField'])
+        ->middleware('can:update,form')->name('forms.fields.destroy');
+    Route::post('/forms/{form}/fields/{field}/duplicate', [FormBuilderController::class, 'duplicateField'])
+        ->middleware('can:update,form')->name('forms.fields.duplicate');
+    Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
+        ->middleware('can:update,form')->name('forms.reorder');
 });
 
 /*

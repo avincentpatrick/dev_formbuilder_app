@@ -7,7 +7,7 @@
  * Assembled entirely from shared design-system components (no page-local styling beyond layout).
  */
 import { reactive, ref } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     MdsBadge,
     MdsButton,
@@ -178,6 +178,12 @@ function submitRestore(): void {
         </PageHeader>
 
         <MdsDataTable :columns="columns" :rows="forms" caption="Forms" row-key="id">
+            <template #cell-title="{ row }">
+                <Link v-if="row.can.edit" :href="`/forms/${row.id}/builder`" class="forms__title-link">
+                    {{ row.title }}
+                </Link>
+                <span v-else>{{ row.title }}</span>
+            </template>
             <template #cell-status="{ value }">
                 <MdsBadge v-bind="statusVariant(String(value))" />
             </template>
@@ -335,6 +341,22 @@ function submitRestore(): void {
     display: inline-flex;
     gap: var(--mds-space-1);
     justify-content: flex-end;
+}
+
+.forms__title-link {
+    color: var(--mds-color-action-primary-fg);
+    font-weight: var(--mds-font-weight-medium);
+    text-decoration: none;
+}
+
+.forms__title-link:hover {
+    text-decoration: underline;
+}
+
+.forms__title-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 
 .forms__form {

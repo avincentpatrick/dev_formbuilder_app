@@ -50,6 +50,21 @@ export const icons = {
     mail: 'M3 6h18v12H3z M3 7l9 6 9-6',
     calendar: 'M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4',
     clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z M12 8v4l3 2',
+
+    // ── Builder — reorder / history / duplicate ────────────────────────────────
+    'chevron-up': 'M6 15l6-6 6 6',
+    copy: 'M9 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z M5 15a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1',
+    undo: 'M9 7L4 12l5 5 M4 12h11a5 5 0 0 1 5 5v1',
+    redo: 'M15 7l5 5-5 5 M20 12H9a5 5 0 0 0-5 5v1',
+
+    // ── Builder — field-type category glyphs (palette grouping) ────────────────
+    type: 'M4 6V4h16v2 M12 4v16 M9 20h6',
+    hash: 'M9 4L7 20 M17 4l-2 16 M4 9h16 M3 15h16',
+    list: 'M8 6h13 M8 12h13 M8 18h13 M3.5 6h.01 M3.5 12h.01 M3.5 18h.01',
+    'map-pin': 'M12 21c4-4.5 7-7.8 7-11a7 7 0 1 0-14 0c0 3.2 3 6.5 7 11z M9.5 10a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0',
+    image: 'M4 5h16v14H4z M8.5 11a1.5 1.5 0 1 0 0-.01 M4 16l5-4 4 3 3-2 4 3',
+    layout: 'M4 5h16v14H4z M4 9h16 M10 9v10',
+    sliders: 'M4 7h12 M4 12h8 M4 17h14 M18 5v4 M14 10v4 M8 15v4',
 } as const;
 
 export type IconName = keyof typeof icons;

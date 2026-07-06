@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests\Forms;
+
+use App\Enums\ComparisonOperator;
+use App\Enums\IndexedDataType;
+use App\Enums\RequiredMode;
+use App\Enums\ValidationRuleType;
+use App\Models\Form;
+use App\Models\FormField;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+/**
+ * A full field content edit from the config panel (Increment D4a). Validates SHAPE only — `key` format +
+ * per-version uniqueness, the config jsonb is an object, enum members, and the validation-rows'
+ * expression-XOR-rule_type invariant (a friendly mirror of the DB CHECK). Expressions are NOT semantically
+ * validated (the expression engine is deferred ADR-0004 work). Authorization is `can:update,form`; the
+ * optimistic-concurrency token (`version`) is checked in the service, not here.
+ */
+final class UpdateFieldRequest extends FormRequest
+{
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    public function rules(): array
+    {
+        /** @var Form $form */
+        $form = $this->route('form');
+        /** @var FormField $field */
+        $field = $this->route('field');
+
+        return [
+            'key' => [
+                'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
+                Rule::unique('form_fields', 'key')
+                    ->where('form_version_id', $form->draft_version_id)
+                    ->ignore($field->id),
+            ],
+            'label' => ['required', 'string', 'max:500'],
+            'hint' => ['nullable', 'string', 'max:2000'],
+            'placeholder' => ['nullable', 'string', 'max:255'],
+            'is_required' => ['required', Rule::enum(RequiredMode::class)],
+            'relevant_expression' => ['nullable', 'string', 'max:2000'],
+            'appearance' => ['nullable', 'string', 'max:60'],
+            'config' => ['present', 'array'],
+            'default_value' => ['nullable', 'string', 'max:2000'],
+            'is_pii' => ['boolean'],
+            'is_sensitive' => ['boolean'],
+            'is_queryable' => ['boolean'],
+            'indexed_data_type' => ['nullable', Rule::enum(IndexedDataType::class)],
+            'version' => ['nullable', 'string'],
+            'validations' => ['present', 'array'],
+            'validations.*.rule_type' => ['nullable', Rule::enum(ValidationRuleType::class)],
+            'validations.*.operator' => ['nullable', Rule::enum(ComparisonOperator::class)],
+            'validations.*.rule_value' => ['nullable', 'string', 'max:2000'],
+            'validations.*.expression' => ['nullable', 'string', 'max:2000'],
+            'validations.*.error_message' => ['nullable', 'string', 'max:500'],
+            'validations.*.related_field_key' => ['nullable', 'string', 'max:150'],
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            /** @var list<array<string, mixed>> $rows */
+            $rows = $this->input('validations', []);
+
+            foreach ($rows as $i => $row) {
+                $hasExpression = ($row['expression'] ?? '') !== '';
+                $hasRule = ($row['rule_type'] ?? '') !== '';
+
+                // Mirrors the form_field_validations XOR CHECK: exactly one of expression / rule_type.
+                if ($hasExpression === $hasRule) {
+                    $validator->errors()->add(
+                        "validations.{$i}",
+                        'A validation rule must be either a structured rule or an expression — not both, not neither.',
+                    );
+                }
+            }
+        });
+    }
+}

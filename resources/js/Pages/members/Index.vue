@@ -120,9 +120,9 @@ function canTransfer(row: Member): boolean {
     <div>
         <Head title="Members" />
 
-        <PageHeader title="Members">
+        <PageHeader title="Members" icon="users">
             <template #actions>
-                <MdsButton variant="primary" @click="openInvite">Invite member</MdsButton>
+                <MdsButton variant="primary" icon-left="user-plus" @click="openInvite">Invite member</MdsButton>
             </template>
         </PageHeader>
 
@@ -136,6 +136,7 @@ function canTransfer(row: Member): boolean {
                         v-if="canTransfer(row)"
                         variant="tertiary"
                         size="sm"
+                        icon-left="shield"
                         @click="transferTarget = row"
                     >
                         Make owner
@@ -144,6 +145,7 @@ function canTransfer(row: Member): boolean {
                         v-if="canRemove(row)"
                         variant="tertiary"
                         size="sm"
+                        icon-left="trash"
                         @click="removeTarget = row"
                     >
                         Remove
@@ -156,7 +158,7 @@ function canTransfer(row: Member): boolean {
                     description="Invite a teammate to collaborate in this workspace."
                 >
                     <template #action>
-                        <MdsButton variant="primary" @click="openInvite">Invite member</MdsButton>
+                        <MdsButton variant="primary" icon-left="user-plus" @click="openInvite">Invite member</MdsButton>
                     </template>
                 </MdsEmptyState>
             </template>
@@ -189,7 +191,7 @@ function canTransfer(row: Member): boolean {
 
             <template #actions>
                 <MdsButton variant="tertiary" @click="inviteOpen = false">Cancel</MdsButton>
-                <MdsButton variant="primary" :loading="invite.processing" @click="submitInvite">
+                <MdsButton variant="primary" icon-left="mail" :loading="invite.processing" @click="submitInvite">
                     Send invitation
                 </MdsButton>
             </template>
@@ -207,7 +209,7 @@ function canTransfer(row: Member): boolean {
             </p>
             <template #actions>
                 <MdsButton variant="tertiary" @click="removeTarget = null">Cancel</MdsButton>
-                <MdsButton variant="destructive" :loading="removing.busy" @click="submitRemove">
+                <MdsButton variant="destructive" icon-left="trash" :loading="removing.busy" @click="submitRemove">
                     Remove member
                 </MdsButton>
             </template>
@@ -225,7 +227,7 @@ function canTransfer(row: Member): boolean {
             </p>
             <template #actions>
                 <MdsButton variant="tertiary" @click="transferTarget = null">Cancel</MdsButton>
-                <MdsButton variant="primary" :loading="transferring.busy" @click="submitTransfer">
+                <MdsButton variant="primary" icon-left="shield" :loading="transferring.busy" @click="submitTransfer">
                     Transfer ownership
                 </MdsButton>
             </template>

@@ -5,8 +5,17 @@
  * under data-theme-mode / data-accent.
  *
  * Variants: primary (filled Blueprint), secondary (outlined Blueprint),
- * tertiary (text/ghost), destructive (filled Redline). icon-only → Increment C2.
+ * tertiary (text/ghost), destructive (filled Redline).
+ *
+ * `iconLeft`/`iconRight` render a shared MdsIcon glyph before/after the label — the standard way
+ * to make an action iconic without every page hand-rolling icon+text markup. Icons are decorative
+ * (the button's text label is the accessible name); while loading, the leading spinner replaces
+ * `iconLeft`.
  */
+import { computed } from 'vue';
+import MdsIcon from '../Icon/Icon.vue';
+import type { IconName } from '../Icon/icons';
+
 const props = withDefaults(
     defineProps<{
         variant?: 'primary' | 'secondary' | 'tertiary' | 'destructive';
@@ -14,9 +23,14 @@ const props = withDefaults(
         type?: 'button' | 'submit' | 'reset';
         disabled?: boolean;
         loading?: boolean;
+        iconLeft?: IconName;
+        iconRight?: IconName;
     }>(),
     { variant: 'primary', size: 'md', type: 'button', disabled: false, loading: false },
 );
+
+// Glyphs are sized down one step from the text so they sit optically balanced beside the label.
+const iconSize = computed(() => (props.size === 'lg' ? 'md' : 'sm'));
 
 // While loading the button stays focusable (aria-disabled, not native disabled) but must not
 // fire a second submit — guard the click. Native disabled already blocks clicks.
@@ -43,7 +57,9 @@ function onClick(event: MouseEvent) {
         @click="onClick"
     >
         <span v-if="loading" class="mds-button__spinner" aria-hidden="true" />
+        <MdsIcon v-else-if="iconLeft" :name="iconLeft" :size="iconSize" />
         <slot />
+        <MdsIcon v-if="iconRight" :name="iconRight" :size="iconSize" />
     </button>
 </template>
 

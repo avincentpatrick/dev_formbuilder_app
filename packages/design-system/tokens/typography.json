@@ -1,6 +1,6 @@
 {
     "font-family": {
-        "display": { "value": "\"Bahnschrift\", \"DIN Alternate\", \"Arial Narrow\", \"Segoe UI Semibold\", sans-serif" },
+        "display": { "value": "\"Segoe UI Variable Display\", system-ui, -apple-system, \"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif" },
         "body-default": { "value": "-apple-system, \"Segoe UI\", \"San Francisco\", \"Helvetica Neue\", Arial, sans-serif" },
         "mono": { "value": "\"Cascadia Code\", \"SF Mono\", Consolas, \"Roboto Mono\", Menlo, monospace" }
     },

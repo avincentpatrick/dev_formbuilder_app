@@ -3,24 +3,24 @@
 // Stat tiles + the "no forms yet" empty state are placeholders until form building lands (Phase 1).
 import { computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCard, MdsEmptyState } from '@meridian/design-system';
+import { MdsButton, MdsCard, MdsEmptyState, MdsIcon, type IconName } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const stats = [
-  { label: 'Forms', value: '—' },
-  { label: 'Submissions', value: '—' },
-  { label: 'Members', value: '—' },
+const stats: { label: string; value: string; icon: IconName }[] = [
+  { label: 'Forms', value: '—', icon: 'forms' },
+  { label: 'Submissions', value: '—', icon: 'submissions' },
+  { label: 'Members', value: '—', icon: 'users' },
 ];
 </script>
 
 <template>
   <div>
-    <PageHeader title="Dashboard">
+    <PageHeader title="Dashboard" icon="dashboard">
       <template #actions>
-        <MdsButton variant="primary" disabled>Create form</MdsButton>
+        <MdsButton variant="primary" icon-left="plus" disabled>Create form</MdsButton>
       </template>
     </PageHeader>
 
@@ -28,8 +28,15 @@ const stats = [
 
     <div class="dash__stats">
       <MdsCard v-for="stat in stats" :key="stat.label">
-        <p class="dash__stat-value">{{ stat.value }}</p>
-        <p class="dash__stat-label">{{ stat.label }}</p>
+        <div class="dash__stat">
+          <span class="dash__stat-badge" aria-hidden="true">
+            <MdsIcon :name="stat.icon" size="md" />
+          </span>
+          <div class="dash__stat-text">
+            <p class="dash__stat-value">{{ stat.value }}</p>
+            <p class="dash__stat-label">{{ stat.label }}</p>
+          </div>
+        </div>
       </MdsCard>
     </div>
 
@@ -39,7 +46,7 @@ const stats = [
         description="Once form building lands, the forms you create will appear here."
       >
         <template #action>
-          <MdsButton variant="primary" disabled>Create form</MdsButton>
+          <MdsButton variant="primary" icon-left="plus" disabled>Create form</MdsButton>
         </template>
       </MdsEmptyState>
     </MdsCard>
@@ -58,6 +65,28 @@ const stats = [
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--mds-space-4);
   margin-bottom: var(--mds-space-6);
+}
+
+.dash__stat {
+  display: flex;
+  align-items: center;
+  gap: var(--mds-space-4);
+}
+
+.dash__stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--mds-radius-lg);
+  background-color: var(--mds-color-action-primary-tint);
+  color: var(--mds-color-action-primary-fg);
+}
+
+.dash__stat-text {
+  min-width: 0;
 }
 
 .dash__stat-value {

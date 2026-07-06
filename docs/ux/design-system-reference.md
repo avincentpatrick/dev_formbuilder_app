@@ -234,7 +234,7 @@ Governing rule: **no component or page authors a raw pixel margin/padding value*
 ### 2.4 Typography
 
 > **Decision (ratified):** typography follows the same "field instrument / blueprint desk" concept as color (§2.2), via **three roles rather than one workhorse typeface** — consistent with the ratified visual prototype:
-> - **Display** (headings, nav labels, section eyebrows): `"Bahnschrift", "DIN Alternate", "Arial Narrow", "Segoe UI Semibold", sans-serif` — a condensed, geometric, uppercase-set grotesk evoking drafting-stencil lettering. Ships on Windows (Bahnschrift) and macOS (DIN Alternate) without a webfont download; `Segoe UI Semibold`/system-default is the final fallback so the page never silently renders in a generic serif.
+> - **Display** (headings, nav labels, section eyebrows): `"Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif` — a clean, humanist system sans set in **normal case** (not uppercase). Ships everywhere without a webfont download and degrades to the platform UI face (`system-ui`) so the page never silently renders in a generic serif. **(Revised 2026-07-06** from the earlier condensed Bahnschrift/DIN "drafting-stencil" display face, as part of the user-requested modern/icony refresh — see the §2.6 note.**)**
 > - **Body** (paragraphs, form-field values, table cells): the plain **system UI sans stack** — `-apple-system, "Segoe UI", "San Francisco", "Helvetica Neue", Arial, sans-serif` — deliberately neutral so the display face carries the personality and body text stays maximally legible/familiar across OSes and locales (relevant to Persona A's NGO/public-health field-team context, not assumed English-only).
 > - **Utility / data** (tokens, IDs, timestamps, hex codes, the expression-engine editor, XLSForm field-key display, webhook payload previews): monospace — `"Cascadia Code", "SF Mono", Consolas, "Roboto Mono", Menlo, monospace` — chosen specifically because a design-system reference and a data-heavy submissions inbox are both full of values that need to line up in a column (`font-variant-numeric: tabular-nums` is applied wherever digits appear in a column, e.g. submission counts, version numbers).
 >
@@ -258,22 +258,22 @@ Type scale (named tokens; size/line-height/weight), roughly a 1.2× modular scal
 
 Weight tokens used across the scale above: `--mds-font-weight-regular: 400`, `--mds-font-weight-medium: 500`, `--mds-font-weight-semibold: 600`, `--mds-font-weight-bold: 700`.
 
-**Font-role mapping**: `display`, `heading-1`, `heading-2`, `heading-3`, and `heading-4` render in the **Display** stack (uppercase, `letter-spacing: 0.02em`–`0.03em` scaling down as size decreases) — condensed/geometric, carrying the page's visual personality. `body-lg`, `body-md`, `body-sm`, `label`, and `caption` render in the **Body** stack — plain, maximally legible, no letter-spacing tricks. `code` renders in the **Utility/mono** stack with `font-variant-numeric: tabular-nums`. A component never mixes stacks within a single text node (e.g., a heading is never partially body-face) — the three-role split is a per-token-not-per-character decision, kept simple deliberately.
+**Font-role mapping**: `display`, `heading-1`, `heading-2`, `heading-3`, and `heading-4` render in the **Display** stack (**normal case**, a slight negative `letter-spacing` ≈ `-0.01em` on the largest sizes) — a clean humanist sans carrying the page's visual personality (the original drafting-desk concept set these uppercase; the 2026-07-06 refresh dropped the uppercase for a softer, more modern read). `body-lg`, `body-md`, `body-sm`, `label`, and `caption` render in the **Body** stack — plain, maximally legible, no letter-spacing tricks. `code` renders in the **Utility/mono** stack with `font-variant-numeric: tabular-nums`. A component never mixes stacks within a single text node (e.g., a heading is never partially body-face) — the three-role split is a per-token-not-per-character decision, kept simple deliberately.
 
 Governing rule: heading levels are **visual tokens, not semantic HTML levels** — a card titled with `--mds-type-heading-3` styling might be an `<h2>` or an `<h3>` in the DOM depending on the page's actual heading hierarchy (§4.3 covers why this distinction matters for screen readers). Never skip a token level to "make text bigger" — if `heading-3` isn't big enough, that is a signal the content belongs at `heading-2`, not that the token scale should be bent.
 
 ### 2.5 Elevation / shadow
 
-A 5-step elevation scale, used to communicate stacking order (what sits "above" the canvas) independent of color:
+A 5-step elevation scale, used to communicate stacking order (what sits "above" the canvas) independent of color. *(Softened 2026-07-06 to more diffuse, lower-opacity shadows as part of the modern/icony refresh; the ink-cast color rule below is unchanged.)*
 
 | Token | Value | Use |
 |---|---|---|
 | `--mds-shadow-0` | `none` | Flat surfaces at canvas level (default card at rest, in some contexts) |
-| `--mds-shadow-1` | `0 1px 2px 0 rgba(22, 33, 43, 0.08)` | Resting card, table row group |
-| `--mds-shadow-2` | `0 2px 6px -1px rgba(22, 33, 43, 0.12), 0 1px 2px -1px rgba(22, 33, 43, 0.07)` | Hover-raised card, dropdown trigger button |
-| `--mds-shadow-3` | `0 8px 16px -4px rgba(22, 33, 43, 0.14), 0 2px 4px -2px rgba(22, 33, 43, 0.09)` | Popovers, dropdown/select menus, tooltips |
-| `--mds-shadow-4` | `0 16px 32px -8px rgba(22, 33, 43, 0.20), 0 4px 8px -4px rgba(22, 33, 43, 0.11)` | Modals/dialogs, date-picker panels |
-| `--mds-shadow-5` | `0 20px 40px -8px rgba(22, 33, 43, 0.24), 0 8px 16px -4px rgba(22, 33, 43, 0.13)` | Toasts (must read as "above" a modal that might be open concurrently) |
+| `--mds-shadow-1` | `0 1px 3px 0 rgba(22, 33, 43, 0.05), 0 1px 2px -1px rgba(22, 33, 43, 0.04)` | Resting card, table row group |
+| `--mds-shadow-2` | `0 8px 22px -8px rgba(22, 33, 43, 0.12), 0 2px 6px -3px rgba(22, 33, 43, 0.06)` | Hover-raised card, dropdown trigger button |
+| `--mds-shadow-3` | `0 14px 30px -10px rgba(22, 33, 43, 0.14), 0 4px 10px -5px rgba(22, 33, 43, 0.08)` | Popovers, dropdown/select menus, tooltips |
+| `--mds-shadow-4` | `0 22px 44px -14px rgba(22, 33, 43, 0.18), 0 8px 16px -8px rgba(22, 33, 43, 0.10)` | Modals/dialogs, date-picker panels |
+| `--mds-shadow-5` | `0 30px 60px -18px rgba(22, 33, 43, 0.22), 0 12px 24px -10px rgba(22, 33, 43, 0.12)` | Toasts (must read as "above" a modal that might be open concurrently) |
 
 > **Decision (not pinned by the plan):** shadow color is based on the `--mds-neutral-800`/"Ink" value (`rgb(22, 33, 43)`) rather than a generic near-black, so elevation shadows carry the same faint blue-ink cast as the rest of the palette rather than a neutral grey shadow that would look slightly mismatched against the paper/blueprint ground.
 
@@ -281,14 +281,14 @@ Governing rule: shadow tokens are **strictly ordered** — a component at elevat
 
 ### 2.6 Border radius
 
-> **Decision (ratified):** the previous draft's rounded scale (8px default, up to 16px for modals) reads as generic "modern SaaS" softness and works against the ratified drafting-desk concept, which favors precise, mostly-square edges — instruments and technical drawings are not rounded. The scale below is intentionally flat: one small default radius used almost everywhere, reserved for full-round only where a shape is *supposed* to be circular/pill-shaped (avatars, toggle tracks, status pills), not as a general softening device.
+> **Decision (revised 2026-07-06):** the original drafting-desk concept used a near-flat **2–5px** radius scale for a precise, mostly-square-edged character. At the user's request the app was refreshed to feel *more modern and less "edgy" while staying compact*, so the scale was softened to **6 / 8 / 12px** — still well short of the generic 16px+ "round everything" SaaS look, and spacing/type density were left untouched so the app stays compact. Full-round (`--mds-radius-full`) remains reserved for shapes that are *supposed* to be circular/pill-shaped (avatars, toggle tracks, status pills), never as a general softening device. `--mds-radius-lg` (12px) is now also used for the tinted icon badges introduced in the same refresh (page-header + stat-tile glyphs).
 
 | Token | Value | Use |
 |---|---|---|
 | `--mds-radius-none` | 0px | Table cells, full-bleed images, the app-shell/canvas edges |
-| `--mds-radius-sm` | 2px | Checkboxes, small chips |
-| `--mds-radius-md` | 3px | **Default**: buttons, form inputs, cards, modals, popovers — one radius for nearly everything |
-| `--mds-radius-lg` | 5px | Reserved for a single larger container context if one is ever needed (not currently assigned to any component in §3) |
+| `--mds-radius-sm` | 6px | Checkboxes, small chips |
+| `--mds-radius-md` | 8px | **Default**: buttons, form inputs, cards, modals, popovers — one radius for nearly everything |
+| `--mds-radius-lg` | 12px | Larger containers + the tinted icon badges (page-header, stat tiles) introduced in the 2026-07-06 refresh |
 | `--mds-radius-full` | 9999px | Pills/badges, avatars, toggle-switch track/thumb — true circles/pills only, never a "rounded rectangle" softening |
 
 ### 2.7 Breakpoints
@@ -636,9 +636,9 @@ The plan and PRD are the source of truth for product/design direction; the follo
 2. **Style Dictionary (or an equivalent build-time token pipeline)** generates `tokens.css` + `tokens.ts` from one source of truth; neither source document names a specific token-build tool (§2.1).
 3. **The `--mds-` custom-property prefix** is chosen specifically to avoid collisions in the public runtime's third-party-embeddable context (§2.1).
 4. **The "field instrument / blueprint desk" palette** (Blueprint primary, narrow-use Brass accent, Moss/Amber/Redline semantics, Paper/Ink neutrals) is a **ratified** decision, not an open placeholder — selected against a reviewed visual prototype over a generic Inter/Indigo alternative. This supersedes an earlier version of this document that treated the palette as a swappable placeholder pending future branding work (§2.2).
-5. **Three type-role stacks (Bahnschrift/DIN-Alternate display, system-sans body, monospace utility)** replace an earlier single-typeface (Inter) decision, ratified alongside the palette for the same visual-concept reasons (§2.4).
+5. **Three type-role stacks (display, system-sans body, monospace utility)** replace an earlier single-typeface (Inter) decision, ratified alongside the palette (§2.4). *(The display role's typeface was revised 2026-07-06 from the condensed Bahnschrift/DIN "drafting-stencil" face to a clean humanist system sans as part of the modern/icony refresh.)*
 5a. **Dark mode ships from day one** as a second, authentic ("blueprint print") token mapping rather than a deferred future pass — a direct, low-cost consequence of committing to the primitive→semantic token architecture and the ratified visual concept together (§2.1, §2.2).
-5b. **Border radius is intentionally tightened to a near-flat scale** (2–5px, full-round reserved for true pills/circles) rather than the previous draft's softer 8–16px "rounded" scale, consistent with the drafting-instrument concept's precise, mostly-square-edged character (§2.6).
+5b. **Border radius** was originally tightened to a near-flat 2–5px scale for the drafting-instrument concept's mostly-square-edged character, then **revised 2026-07-06 to a softer 6/8/12px** at the user's request for a more modern, less "edgy" feel while keeping spacing/type density compact (full-round still reserved for true pills/circles) (§2.6).
 6. **The mobile-first `min-width` media-query implementation technique**, satisfying the PRD's `max-width`-stated breakpoint contract (§2.7).
 7. **`prefers-reduced-motion` support collapsing all motion tokens to 1ms centrally**, rather than left to per-component implementation (§2.8).
 8. **The specific ARIA pattern assignments** (Combobox 1.2 for cascading select, dialog focus-trap mechanics, polite-vs-assertive live-region usage) are this document's concrete resolution of the plan's general instruction to have "ARIA patterns for the custom components that need them" (§4.5).

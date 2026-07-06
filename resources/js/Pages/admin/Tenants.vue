@@ -59,7 +59,7 @@ function confirmAction(): void {
 </script>
 
 <template>
-    <AdminLayout title="Tenants">
+    <AdminLayout title="Tenants" icon="building">
         <p v-if="adminError" class="admin-tenants__alert" role="alert">{{ adminError }}</p>
 
         <MdsDataTable :columns="columns" :rows="tenants" caption="All tenants" row-key="id">

@@ -79,14 +79,53 @@ it('builds the users visibility shape as a SELECT-only membership join', functio
     expect(collect($statements)->filter(fn (string $s): bool => str_contains($s, 'FOR INSERT')))->toBeEmpty();
 });
 
-it('guards published rows from update and delete in the draft-guard shape', function (): void {
-    $statements = TenantIsolation::draftGuardSql('form_versions');
+// Increment D — the two published-immutability shapes (form-versioning-schema-migration.md §2).
+// form_versions keeps UPDATE strict (publish must flip published→superseded) but DELETE draft-only
+// (a published version is undeletable, closing the FK-CASCADE bypass to the immutable children).
+
+it('keeps form_versions UPDATE strict but DELETE draft-only in the form-version shape', function (): void {
+    $statements = TenantIsolation::formVersionGuardSql('form_versions');
 
     $update = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR UPDATE'));
     $delete = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR DELETE'));
 
-    expect($update)->toContain("status <> 'published'");
-    expect($delete)->toContain("status <> 'published'");
+    // UPDATE must NOT constrain on status — the publish transaction has to move a version
+    // draft→published and the prior version published→superseded, both via UPDATE.
+    expect($update)->not->toContain('status');
+    // DELETE only ever matches a draft, so a published/superseded version can never be deleted.
+    expect($delete)->toContain("status = 'draft'");
+});
+
+it('emits exactly one write policy per command for the form-version shape', function (): void {
+    $statements = TenantIsolation::formVersionGuardSql('form_versions');
+
+    foreach (['FOR INSERT', 'FOR UPDATE', 'FOR DELETE'] as $command) {
+        expect(collect($statements)->filter(fn (string $s): bool => str_contains($s, $command)))->toHaveCount(1);
+    }
+});
+
+it('gates child writes on an EXISTS draft parent but never gates SELECT in the draft-child shape', function (): void {
+    $statements = TenantIsolation::draftChildGuardSql('form_fields');
+    $sql = joined($statements);
+
+    $select = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR SELECT'));
+    $insert = collect($statements)->first(fn (string $s): bool => str_contains($s, 'FOR INSERT'));
+
+    // SELECT is plain strict tenant isolation — reading published/superseded content must always work.
+    expect($select)->not->toContain('EXISTS');
+    // Every write is gated on the owning form_versions row still being a draft.
+    expect($sql)->toContain(
+        "EXISTS (SELECT 1 FROM form_versions fv WHERE fv.id = form_fields.form_version_id AND fv.status = 'draft')"
+    );
+    expect($insert)->toContain('EXISTS');
+});
+
+it('emits exactly one write policy per command for the draft-child shape', function (): void {
+    $statements = TenantIsolation::draftChildGuardSql('form_sections');
+
+    foreach (['FOR INSERT', 'FOR UPDATE', 'FOR DELETE'] as $command) {
+        expect(collect($statements)->filter(fn (string $s): bool => str_contains($s, $command)))->toHaveCount(1);
+    }
 });
 
 it('makes users write policies permissive, with a pre-auth SELECT carve-out for the auth role', function (): void {

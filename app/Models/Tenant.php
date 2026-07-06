@@ -22,6 +22,7 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property string $slug
  * @property ?string $owner_user_id
  * @property ?string $status Tenant lifecycle (App\Enums\TenantStatus); not cast (stancl virtual columns).
+ * @property string $default_locale Default locale for new forms (data-dictionary §1).
  */
 class Tenant extends BaseTenant
 {
@@ -32,6 +33,8 @@ class Tenant extends BaseTenant
      */
     public static function getCustomColumns(): array
     {
-        return ['id', 'name', 'slug', 'owner_user_id', 'status'];
+        // default_locale/supported_locales are real columns (2026_07_06_000200) — list them here so
+        // stancl treats them as columns, not `data` json virtual attributes.
+        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales'];
     }
 }

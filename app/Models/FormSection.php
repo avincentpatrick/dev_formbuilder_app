@@ -31,6 +31,7 @@ class FormSection extends Model implements TenantScoped
 
     /** @use HasFactory<FormSectionFactory> */
     use HasFactory;
+
     use HasUuidv7;
 
     protected $fillable = [

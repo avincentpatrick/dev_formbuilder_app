@@ -35,6 +35,7 @@ class FormFieldValidation extends Model implements TenantScoped
 
     /** @use HasFactory<FormFieldValidationFactory> */
     use HasFactory;
+
     use HasUuidv7;
 
     protected $fillable = [

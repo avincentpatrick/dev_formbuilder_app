@@ -38,6 +38,7 @@ class Form extends Model implements TenantScoped
 
     /** @use HasFactory<FormFactory> */
     use HasFactory;
+
     use HasUuidv7;
     use SoftDeletes;
 

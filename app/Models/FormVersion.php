@@ -33,6 +33,7 @@ class FormVersion extends Model implements TenantScoped
 
     /** @use HasFactory<FormVersionFactory> */
     use HasFactory;
+
     use HasUuidv7;
 
     protected $fillable = [

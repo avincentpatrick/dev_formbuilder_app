@@ -31,6 +31,7 @@ class FormCollaborator extends Model implements TenantScoped
 
     /** @use HasFactory<FormCollaboratorFactory> */
     use HasFactory;
+
     use HasUuidv7;
 
     protected $fillable = [

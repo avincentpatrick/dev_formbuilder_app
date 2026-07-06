@@ -2,16 +2,24 @@
 /**
  * Standard page header rendered by each page as the first child of its content region (the shell
  * owns nav/chrome; the page owns only its content — DSR §3.0). Provides the single page <h1>, an
- * optional primary-action slot, and an optional breadcrumbs slot (unused until nested pages exist).
+ * optional leading icon badge, an optional primary-action slot, and an optional breadcrumbs slot
+ * (unused until nested pages exist).
  */
-defineProps<{ title: string }>();
+import { MdsIcon, type IconName } from '@meridian/design-system';
+
+defineProps<{ title: string; icon?: IconName }>();
 </script>
 
 <template>
     <header class="page-header">
         <div v-if="$slots.breadcrumbs" class="page-header__crumbs"><slot name="breadcrumbs" /></div>
         <div class="page-header__row">
-            <h1 class="page-header__title">{{ title }}</h1>
+            <div class="page-header__heading">
+                <span v-if="icon" class="page-header__badge" aria-hidden="true">
+                    <MdsIcon :name="icon" size="md" />
+                </span>
+                <h1 class="page-header__title">{{ title }}</h1>
+            </div>
             <div v-if="$slots.actions" class="page-header__actions"><slot name="actions" /></div>
         </div>
     </header>
@@ -34,14 +42,33 @@ defineProps<{ title: string }>();
     gap: var(--mds-space-4);
 }
 
+.page-header__heading {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-3);
+    min-width: 0;
+}
+
+/* Tinted rounded badge holding the page glyph — the icony page-title treatment. */
+.page-header__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--mds-radius-lg);
+    background-color: var(--mds-color-action-primary-tint);
+    color: var(--mds-color-action-primary-fg);
+}
+
 .page-header__title {
     margin: 0;
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
     color: var(--mds-color-text-heading);
 }
 

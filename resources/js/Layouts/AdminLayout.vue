@@ -8,10 +8,10 @@
  */
 import { computed, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { MdsToastHost } from '@meridian/design-system';
+import { MdsIcon, MdsToastHost, type IconName } from '@meridian/design-system';
 import { useToast } from '@/composables/useToast';
 
-defineProps<{ title: string }>();
+defineProps<{ title: string; icon?: IconName }>();
 
 const page = usePage();
 const email = computed(() => page.props.auth.user?.email ?? '');
@@ -67,7 +67,10 @@ function logout(): void {
 
         <main class="admin__content">
             <div class="admin__inner">
-                <h1 class="admin__title">{{ title }}</h1>
+                <div class="admin__heading">
+                    <span v-if="icon" class="admin__badge" aria-hidden="true"><MdsIcon :name="icon" size="md" /></span>
+                    <h1 class="admin__title">{{ title }}</h1>
+                </div>
                 <slot />
             </div>
         </main>
@@ -187,14 +190,32 @@ function logout(): void {
     padding: var(--mds-space-8) var(--mds-space-6);
 }
 
+.admin__heading {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-3);
+    margin-bottom: var(--mds-space-6);
+}
+
+.admin__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--mds-radius-lg);
+    background-color: var(--mds-color-action-primary-tint);
+    color: var(--mds-color-action-primary-fg);
+}
+
 .admin__title {
-    margin: 0 0 var(--mds-space-6);
+    margin: 0;
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
     color: var(--mds-color-text-heading);
 }
 

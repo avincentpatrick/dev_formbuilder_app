@@ -55,7 +55,7 @@ function savePassword(): void {
 
 <template>
     <div class="settings">
-        <PageHeader title="Settings" />
+        <PageHeader title="Settings" icon="settings" />
 
         <!-- Profile -->
         <MdsCard class="settings-card">

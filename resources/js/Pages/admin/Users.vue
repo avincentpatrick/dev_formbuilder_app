@@ -16,7 +16,7 @@ const columns: DataTableColumn[] = [
 </script>
 
 <template>
-    <AdminLayout title="All users">
+    <AdminLayout title="All users" icon="users">
         <MdsDataTable :columns="columns" :rows="users" caption="All users across tenants" row-key="id" />
     </AdminLayout>
 </template>

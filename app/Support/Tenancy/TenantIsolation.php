@@ -15,10 +15,12 @@ use InvalidArgumentException;
  * separates SQL *generation* (the pure `*Sql()` methods — unit-testable with no database)
  * from *execution* (the `apply*()` methods that run inside a migration).
  *
- * Four policy shapes exist across the schema; this class emits all of them (ADR-0002 §D2,
- * multi-tenancy-rbac-design.md §6). Two are exercised behaviorally in Increment A (strict,
- * nullable-global); the other three are emitted + unit-tested now and fuzz-tested when their
- * real tables land (users/user_ui_preferences → Increment B, form_versions → Increment D).
+ * Several policy shapes exist across the schema; this class emits all of them (ADR-0002 §D2,
+ * multi-tenancy-rbac-design.md §6, form-versioning-schema-migration.md §2). strict + nullable-global
+ * are exercised in Increment A; the users/belongs-to-user shapes land in Increment B; and Increment D
+ * adds the two versioning shapes — `formVersionGuard` (form_versions: strict writes, draft-only DELETE)
+ * and `draftChildGuard` (form_sections/form_fields/form_field_validations: writes only against a draft
+ * version). Each is emitted + unit-tested here and fuzz-tested when its real table lands.
  *
  * Non-negotiable invariants, encoded once here:
  *   - FORCE ROW LEVEL SECURITY: without it a table's owner (our migration/app role) bypasses
@@ -102,6 +104,42 @@ final class TenantIsolation
     {
         $role = config('database.connections.pgsql_superadmin.username');
         self::execute(self::superAdminBypassSql($table, is_string($role) ? $role : 'meridian_superadmin', $commands));
+    }
+
+    /**
+     * The `form_versions` shape (Increment D, form-versioning-schema-migration.md §2): strict tenant
+     * isolation for SELECT/INSERT/UPDATE — UPDATE stays strict so the publish transaction can perform
+     * every legitimate status transition (draft→published, published→superseded) — PLUS a DELETE
+     * carve-out that permits deleting only a `draft` version. Blocking DELETE of a published/superseded
+     * version is what closes the FK-CASCADE immutability hole: Postgres runs referential actions
+     * bypassing RLS, so if a published version were deletable its ON DELETE CASCADE would wipe the
+     * "immutable" child rows without the child guard ever firing.
+     */
+    public static function formVersionGuard(
+        string $table,
+        string $statusColumn = 'status',
+        string $draftValue = 'draft',
+        string $tenantColumn = 'tenant_id',
+    ): void {
+        self::execute(self::formVersionGuardSql($table, $statusColumn, $draftValue, $tenantColumn));
+    }
+
+    /**
+     * The published-immutability guard for the three content child tables — form_sections, form_fields,
+     * form_field_validations (form-versioning-schema-migration.md §2). Strict tenant SELECT (reading
+     * published/superseded content must always work), plus INSERT/UPDATE/DELETE gated on the owning
+     * `form_versions` row still being a `draft`. Emitted as the SOLE write policy per command so
+     * Postgres's permissive-OR composition leaves it fully restrictive.
+     */
+    public static function draftChildGuard(
+        string $table,
+        string $parentTable = 'form_versions',
+        string $fkColumn = 'form_version_id',
+        string $parentStatusColumn = 'status',
+        string $draftValue = 'draft',
+        string $tenantColumn = 'tenant_id',
+    ): void {
+        self::execute(self::draftChildGuardSql($table, $parentTable, $fkColumn, $parentStatusColumn, $draftValue, $tenantColumn));
     }
 
     // ── Pure SQL generators (no database access — the unit-test surface) ─────────────────────
@@ -264,32 +302,81 @@ final class TenantIsolation
     }
 
     /**
-     * Draft-guard: strict tenant isolation PLUS a published-immutability guard that blocks UPDATE
-     * and DELETE of any row already published (form_versions, Increment D). Emitted now; applied in D.
+     * SQL for the {@see formVersionGuard()} shape. Strict SELECT/INSERT/UPDATE (UPDATE deliberately
+     * unconstrained by status so publish can flip draft→published→superseded), plus a DELETE policy
+     * that only matches a `draft` row — a published/superseded version is undeletable, which is what
+     * keeps its ON DELETE CASCADE from reaching (and wiping) the immutable child rows.
      *
      * @return list<string>
      */
-    public static function draftGuardSql(
+    public static function formVersionGuardSql(
         string $table,
         string $statusColumn = 'status',
-        string $publishedValue = 'published',
+        string $draftValue = 'draft',
         string $tenantColumn = 'tenant_id',
     ): array {
         self::assertIdentifier($table);
         self::assertIdentifier($statusColumn);
         self::assertIdentifier($tenantColumn);
-        self::assertLiteral($publishedValue);
+        self::assertLiteral($draftValue);
 
         $match = self::tenantMatch($tenantColumn);
-        $notPublished = sprintf("%s <> '%s'", $statusColumn, $publishedValue);
+        $isDraft = sprintf('%s = %s', $statusColumn, self::quote($draftValue));
 
         return [
             ...self::enableAndForce($table),
             self::policy($table, 'tenant_select', 'SELECT', using: $match),
             self::policy($table, 'tenant_insert', 'INSERT', check: $match),
-            // A published row is immutable: it must be unpublished (USING) and stay tenant-scoped (CHECK).
-            self::policy($table, 'tenant_update', 'UPDATE', using: $match.' AND '.$notPublished, check: $match),
-            self::policy($table, 'tenant_delete', 'DELETE', using: $match.' AND '.$notPublished),
+            // UPDATE stays strict (tenant-only) so the publish transaction can transition a version's
+            // own status; the version ROW is mutable, its published CONTENT is frozen by the child guard.
+            self::policy($table, 'tenant_update', 'UPDATE', using: $match, check: $match),
+            // Only a draft version may be deleted (discarded). Blocking DELETE of a published/superseded
+            // version closes the FK-CASCADE bypass — referential actions run bypassing RLS.
+            self::policy($table, 'tenant_delete', 'DELETE', using: $match.' AND '.$isDraft),
+        ];
+    }
+
+    /**
+     * SQL for the {@see draftChildGuard()} shape. Strict tenant SELECT; INSERT/UPDATE/DELETE gated on
+     * `tenant_id = ctx AND EXISTS (a form_versions row for this child whose status = 'draft')`. Never
+     * gates SELECT — published/superseded content must stay readable. This is emitted as the ONLY
+     * write policy per command, which (given Postgres OR-combines same-command permissive policies) is
+     * what makes it fully restrictive; a child migration must therefore call ONLY this variant.
+     *
+     * @return list<string>
+     */
+    public static function draftChildGuardSql(
+        string $table,
+        string $parentTable = 'form_versions',
+        string $fkColumn = 'form_version_id',
+        string $parentStatusColumn = 'status',
+        string $draftValue = 'draft',
+        string $tenantColumn = 'tenant_id',
+    ): array {
+        self::assertIdentifier($table);
+        self::assertIdentifier($parentTable);
+        self::assertIdentifier($fkColumn);
+        self::assertIdentifier($parentStatusColumn);
+        self::assertIdentifier($tenantColumn);
+        self::assertLiteral($draftValue);
+
+        $match = self::tenantMatch($tenantColumn);
+        $parentIsDraft = sprintf(
+            'EXISTS (SELECT 1 FROM %s fv WHERE fv.id = %s.%s AND fv.%s = %s)',
+            $parentTable,
+            $table,
+            $fkColumn,
+            $parentStatusColumn,
+            self::quote($draftValue),
+        );
+        $writeGuard = $match.' AND '.$parentIsDraft;
+
+        return [
+            ...self::enableAndForce($table),
+            self::policy($table, 'tenant_select', 'SELECT', using: $match),
+            self::policy($table, 'draft_insert', 'INSERT', check: $writeGuard),
+            self::policy($table, 'draft_update', 'UPDATE', using: $writeGuard, check: $writeGuard),
+            self::policy($table, 'draft_delete', 'DELETE', using: $writeGuard),
         ];
     }
 

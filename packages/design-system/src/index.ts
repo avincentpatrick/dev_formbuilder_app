@@ -1,6 +1,7 @@
 export { default as MdsButton } from './components/Button/Button.vue';
 export { default as MdsFormField } from './components/FormField/FormField.vue';
 export { default as MdsTextInput } from './components/TextInput/TextInput.vue';
+export { default as MdsTextarea } from './components/Textarea/Textarea.vue';
 export { default as MdsPasswordInput } from './components/PasswordInput/PasswordInput.vue';
 export { default as MdsIcon } from './components/Icon/Icon.vue';
 export { default as MdsCard } from './components/Card/Card.vue';

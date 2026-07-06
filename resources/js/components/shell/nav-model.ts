@@ -15,7 +15,7 @@ export interface NavItem {
 // Primary sidebar sections (DSR §3.4 order). Forms + Submissions are Phase-1 destinations that
 // don't exist yet — shown as disabled "Soon" items so the eventual nav shape is visible now.
 export const navItems: NavItem[] = [
-    { key: 'forms', label: 'Forms', icon: 'forms', enabled: false },
+    { key: 'forms', label: 'Forms', icon: 'forms', href: '/forms', enabled: true, gate: 'manageForms' },
     { key: 'submissions', label: 'Submissions', icon: 'submissions', enabled: false },
     { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard', enabled: true },
     { key: 'members', label: 'Members', icon: 'users', href: '/members', enabled: true, gate: 'manageMembers' },

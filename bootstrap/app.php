@@ -6,12 +6,25 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\Middleware\Authorize;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -40,6 +53,29 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.context' => EstablishTenantDatabaseContext::class,
             'superadmin' => EnsureSuperAdmin::class,
             'superadmin.mfa' => EnsureSuperAdminMfa::class,
+        ]);
+
+        // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session
+        // context BEFORE SubstituteBindings runs, or a route-bound tenant-scoped model (e.g.
+        // /forms/{form}) is resolved with no tenant context and the RLS-scoped lookup 404s. The three
+        // tenancy middleware are inserted after Authenticate (so EstablishTenantDatabaseContext can read
+        // the authenticated user for app.current_user_id) and before SubstituteBindings. Priority only
+        // reorders middleware a route already has — central/non-tenant routes are unaffected.
+        $middleware->priority([
+            HandlePrecognitiveRequests::class,
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            AuthenticatesRequests::class,
+            ThrottleRequests::class,
+            ThrottleRequestsWithRedis::class,
+            AuthenticatesSessions::class,
+            InitializeTenancyBySubdomain::class,
+            PreventAccessFromCentralDomains::class,
+            EstablishTenantDatabaseContext::class,
+            SubstituteBindings::class,
+            Authorize::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

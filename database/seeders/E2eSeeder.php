@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\TenantUserStatus;
+use App\Models\Form;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +80,15 @@ class E2eSeeder extends Seeder
                     'invite_expires_at' => now()->addDays(7),
                     'invite_token' => hash('sha256', Str::random(48)),
                 ]);
+            }
+
+            // A demo form for the Forms page (Increment D3): a published v1 (via the real publish path,
+            // so version history is exercised) plus the cloned draft v2 it left behind.
+            if (Form::query()->where('title', 'Community Health Survey')->doesntExist()) {
+                $form = app(FormService::class)->create(
+                    $tenant, $owner, 'Community Health Survey', 'Monthly field data collection.'
+                );
+                app(PublishService::class)->publish($form, $owner);
             }
         });
 

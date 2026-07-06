@@ -17,6 +17,13 @@ const STATUS: Record<string, StatusDescriptor> = {
     suspended: { variant: 'warning', label: 'Suspended' },
     declined: { variant: 'neutral', label: 'Declined' },
     removed: { variant: 'neutral', label: 'Removed' },
+    // Form + form-version lifecycle (Increment D): FormStatus (draft/published/archived) and
+    // FormVersionStatus (draft/published/superseded) — the shared `draft`/`published` values
+    // intentionally resolve to one descriptor everywhere.
+    draft: { variant: 'neutral', label: 'Draft' },
+    published: { variant: 'success', label: 'Published' },
+    superseded: { variant: 'info', label: 'Superseded' },
+    archived: { variant: 'warning', label: 'Archived' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

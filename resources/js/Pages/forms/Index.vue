@@ -14,6 +14,7 @@ import {
     MdsDataTable,
     MdsEmptyState,
     MdsFormField,
+    MdsIconButton,
     MdsModal,
     MdsTextInput,
     MdsTextarea,
@@ -54,6 +55,11 @@ function versionLabel(row: FormRow): string {
     if (row.current_version !== null) return `v${row.current_version} live`;
     if (row.draft_version !== null) return `v${row.draft_version} draft`;
     return '—';
+}
+
+function formatDate(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // ── Create ──────────────────────────────────────────────────────────────
@@ -178,33 +184,35 @@ function submitRestore(): void {
             <template #cell-version="{ row }">
                 {{ versionLabel(row) }}
             </template>
+            <template #cell-updated_at="{ row }">
+                {{ formatDate(row.updated_at) }}
+            </template>
             <template #row-actions="{ row }">
                 <div class="forms__actions">
-                    <MdsButton variant="tertiary" size="sm" icon-left="clock" @click="historyTarget = row">
-                        History
-                    </MdsButton>
-                    <MdsButton v-if="row.can.edit" variant="tertiary" size="sm" icon-left="edit" @click="openEdit(row)">
-                        Rename
-                    </MdsButton>
-                    <MdsButton
-                        v-if="row.can.publish"
-                        variant="tertiary"
+                    <MdsIconButton icon="clock" label="Version history" size="sm" @click="historyTarget = row" />
+                    <MdsIconButton
+                        v-if="row.can.edit"
+                        icon="edit"
+                        label="Rename form"
                         size="sm"
-                        icon-left="check"
+                        @click="openEdit(row)"
+                    />
+                    <MdsIconButton
+                        v-if="row.can.publish"
+                        icon="check"
+                        label="Publish form"
+                        size="sm"
                         :loading="publishing.id === row.id"
                         @click="publish(row)"
-                    >
-                        Publish
-                    </MdsButton>
-                    <MdsButton
+                    />
+                    <MdsIconButton
                         v-if="row.can.delete"
-                        variant="tertiary"
+                        icon="trash"
+                        label="Archive form"
+                        variant="danger"
                         size="sm"
-                        icon-left="trash"
                         @click="archiveTarget = row"
-                    >
-                        Archive
-                    </MdsButton>
+                    />
                 </div>
             </template>
             <template #empty>

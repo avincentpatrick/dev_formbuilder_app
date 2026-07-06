@@ -38,7 +38,9 @@ for (const p of pages) {
 
             expect(
                 results.violations,
-                results.violations.map((v) => `${v.id}: ${v.help}`).join('\n'),
+                results.violations
+                    .map((v) => `${v.id}: ${v.help} → ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)
+                    .join('\n'),
             ).toEqual([]);
         });
     }

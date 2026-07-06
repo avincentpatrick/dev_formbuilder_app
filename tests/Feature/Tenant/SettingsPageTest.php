@@ -43,7 +43,8 @@ it('renders settings with the two-factor enrolment state', function (): void {
         ->get('http://acme.meridian.test/settings')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Settings/Index')
+            // false: skip the page-file-exists check — the tests job doesn't build the frontend.
+            ->component('Settings/Index', false)
             ->where('twoFactor.enabled', false)
             ->where('twoFactor.confirmed', false));
 });

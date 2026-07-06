@@ -44,7 +44,10 @@ function onKeydown(event: KeyboardEvent): void {
         <TopNav :scrolled="scrolled" @toggle-drawer="drawerOpen = !drawerOpen" />
         <div class="app-shell__body">
             <Sidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />
-            <main class="app-shell__content" @scroll="onScroll">
+            <!-- tabindex=0 so the scroll region is keyboard-operable when content overflows
+                 (WCAG 2.1.1 / axe scrollable-region-focusable) — pages with only short/disabled
+                 content would otherwise leave the scrolled area unreachable by keyboard. -->
+            <main class="app-shell__content" tabindex="0" aria-label="Main content" @scroll="onScroll">
                 <div class="app-shell__inner">
                     <slot />
                 </div>

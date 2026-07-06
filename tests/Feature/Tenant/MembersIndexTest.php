@@ -88,7 +88,9 @@ it('lists active members and pending invites with resolved identities', function
         ->get('http://acme.meridian.test/members')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('members/Index')
+            // false: skip the page-file-exists check — the tests job doesn't build the frontend
+            // (repo convention, cf. AppearancePreferenceTest's component('Dashboard', false)).
+            ->component('members/Index', false)
             ->has('members', 2)
             // Owner sorts first (is_owner, then active before invited).
             ->where('members.0.is_owner', true)

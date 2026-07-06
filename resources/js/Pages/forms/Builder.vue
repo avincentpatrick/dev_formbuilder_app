@@ -20,7 +20,7 @@ import type { BuilderPageProps } from '@/components/builder/types';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { groups, selection, saving, canUndo, canRedo, conflict } = store;
+const { selection, saving, canUndo, canRedo, conflict } = store;
 
 const readOnly = computed(() => props.draft === null);
 
@@ -105,19 +105,7 @@ function publish(): void {
                 <FieldPalette :palette="store.palette" :disabled="saving" @add="onAdd" />
             </div>
             <div class="builder__pane builder__pane--canvas">
-                <BuilderCanvas
-                    :groups="groups"
-                    :selection="selection"
-                    :field-type-labels="fieldTypeLabels"
-                    @select-field="store.select({ kind: 'field', uid: $event })"
-                    @select-section="store.select({ kind: 'section', uid: $event })"
-                    @move-field="store.moveField"
-                    @move-section="store.moveSection"
-                    @duplicate-field="store.duplicateField"
-                    @delete-field="store.deleteField"
-                    @delete-section="store.deleteSection"
-                    @add-section="store.addSection"
-                />
+                <BuilderCanvas :store="store" :field-type-labels="fieldTypeLabels" />
             </div>
             <div class="builder__pane builder__pane--config">
                 <ConfigPanel :store="store" />

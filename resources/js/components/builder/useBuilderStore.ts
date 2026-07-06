@@ -386,41 +386,103 @@ export function useBuilderStore(props: BuilderPageProps) {
         });
     }
 
-    function moveField(uid: Uid, direction: -1 | 1): Promise<void> {
-        return enqueue(async () => {
-            const field = findField(uid);
-            if (!field) return;
-            const group = fields.value
-                .filter((f) => f.form_section_id === field.form_section_id)
-                .slice()
-                .sort((a, b) => a.sequence - b.sequence);
-            const index = group.findIndex((f) => f.uid === uid);
-            const target = index + direction;
-            if (target < 0 || target >= group.length) return;
+    // ── Reorder primitives (D4b) — LOCAL, synchronous moves used by pointer drag + keyboard grab-mode.
+    // A reorder "session" wraps a run of these in beginReorder()…commitReorder() so the whole drag/grab
+    // is ONE persist + ONE undo entry; cancelReorder() restores the pre-session order (Escape).
 
-            const before = snapshotOrder();
-            const other = group[target];
-            [field.sequence, other.sequence] = [other.sequence, field.sequence];
-            const after = snapshotOrder();
-            await persistOrder();
-            pushHistory('Move field', () => applyOrderAndPersist(before), () => applyOrderAndPersist(after));
-        });
+    /** Group ids in visual order: the implicit ungrouped bucket (null) first, then sections by sequence. */
+    function orderedGroupIds(): (string | null)[] {
+        return [null, ...orderedSections().map((s) => s.id)];
     }
 
-    function moveSection(uid: Uid, direction: -1 | 1): Promise<void> {
-        return enqueue(async () => {
-            const ordered = sections.value.slice().sort((a, b) => a.sequence - b.sequence);
-            const index = ordered.findIndex((s) => s.uid === uid);
-            const target = index + direction;
-            if (index < 0 || target < 0 || target >= ordered.length) return;
+    /** Every field in visual order across all groups (ungrouped first, then each section's fields). */
+    function flattenedFields(): LocalField[] {
+        return groups.value.flatMap((g) => g.fields);
+    }
 
-            const before = snapshotOrder();
-            const section = ordered[index];
-            const other = ordered[target];
-            [section.sequence, other.sequence] = [other.sequence, section.sequence];
+    function orderedSections(): LocalSection[] {
+        return sections.value.slice().sort((a, b) => a.sequence - b.sequence);
+    }
+
+    /** Move a field into `group` at visual `index` within that group, reflowing all sequences (local). */
+    function placeField(uid: Uid, group: string | null, index: number): void {
+        const field = findField(uid);
+        if (!field) return;
+        field.form_section_id = group;
+
+        const order = orderedGroupIds();
+        const buckets = new Map<string | null, LocalField[]>();
+        order.forEach((g) => buckets.set(g, []));
+
+        for (const f of fields.value.slice().sort((a, b) => a.sequence - b.sequence)) {
+            if (f.uid === uid) continue;
+            (buckets.get(f.form_section_id) ?? buckets.get(null))?.push(f);
+        }
+
+        const bucket = buckets.get(group) ?? buckets.get(null);
+        if (bucket) {
+            bucket.splice(Math.max(0, Math.min(index, bucket.length)), 0, field);
+        }
+
+        let seq = 0;
+        for (const g of order) for (const f of buckets.get(g) ?? []) f.sequence = seq++;
+    }
+
+    /** One step up/down in the flattened visual order, crossing section boundaries (local). */
+    function stepFieldAcross(uid: Uid, direction: -1 | 1): boolean {
+        const flat = flattenedFields();
+        const i = flat.findIndex((f) => f.uid === uid);
+        const j = i + direction;
+        if (i < 0 || j < 0 || j >= flat.length) return false;
+
+        const neighbor = flat[j];
+        const targetGroup = neighbor.form_section_id;
+        const groupFields = flat.filter((f) => f.uid !== uid && f.form_section_id === targetGroup);
+        const ni = groupFields.findIndex((f) => f.uid === neighbor.uid);
+        placeField(uid, targetGroup, direction === 1 ? ni + 1 : ni);
+        return true;
+    }
+
+    /** Move a section to visual `index` among the sections, reflowing section sequences (local). */
+    function placeSection(uid: Uid, index: number): void {
+        const section = findSection(uid);
+        if (!section) return;
+        const rest = orderedSections().filter((s) => s.uid !== uid);
+        rest.splice(Math.max(0, Math.min(index, rest.length)), 0, section);
+        rest.forEach((s, idx) => (s.sequence = idx));
+    }
+
+    function stepSection(uid: Uid, direction: -1 | 1): boolean {
+        const ordered = orderedSections();
+        const i = ordered.findIndex((s) => s.uid === uid);
+        const j = i + direction;
+        if (i < 0 || j < 0 || j >= ordered.length) return false;
+        [ordered[i].sequence, ordered[j].sequence] = [ordered[j].sequence, ordered[i].sequence];
+        return true;
+    }
+
+    let reorderBefore: OrderSnapshot | null = null;
+
+    function beginReorder(): void {
+        reorderBefore = snapshotOrder();
+    }
+
+    function cancelReorder(): void {
+        if (reorderBefore) {
+            applyOrder(reorderBefore);
+            reorderBefore = null;
+        }
+    }
+
+    function commitReorder(label: string): Promise<void> {
+        return enqueue(async () => {
+            if (!reorderBefore) return;
+            const before = reorderBefore;
+            reorderBefore = null;
             const after = snapshotOrder();
+            if (JSON.stringify(before) === JSON.stringify(after)) return; // no net change → no history/persist
             await persistOrder();
-            pushHistory('Move section', () => applyOrderAndPersist(before), () => applyOrderAndPersist(after));
+            pushHistory(label, () => applyOrderAndPersist(before), () => applyOrderAndPersist(after));
         });
     }
 
@@ -624,9 +686,17 @@ export function useBuilderStore(props: BuilderPageProps) {
         duplicateField,
         addSection,
         deleteSection,
-        moveField,
-        moveSection,
         moveFieldToSection,
+        // reorder session (drag / keyboard grab)
+        flattenedFields,
+        orderedSections,
+        placeField,
+        stepFieldAcross,
+        placeSection,
+        stepSection,
+        beginReorder,
+        cancelReorder,
+        commitReorder,
         touch,
         select,
         undo,

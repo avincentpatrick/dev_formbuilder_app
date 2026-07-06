@@ -94,10 +94,19 @@ class E2eSeeder extends Seeder
                 );
                 $builder = app(FormBuilderService::class);
                 $section = $builder->addSection($form);
+                // Repeatable so the builder's section → Advanced tab renders the min/max MdsNumberInputs
+                // by default (the interaction-driven builder-axe.spec.ts scans them without a stateful toggle).
+                $section->update(['is_repeatable' => true, 'min_instances' => 1, 'max_instances' => 5]);
                 $builder->addField($form, $owner, FieldType::ShortText, $section->id);
                 $builder->addField($form, $owner, FieldType::SingleSelect, $section->id);
                 $builder->addField($form, $owner, FieldType::Integer, null);
                 app(PublishService::class)->publish($form->refresh(), $owner);
+            }
+
+            // A second form left as an empty draft — the builder's empty-canvas state must also be
+            // axe-clean (Increment D4b builder-axe.spec.ts scans it).
+            if (Form::query()->where('title', 'Blank Intake Form')->doesntExist()) {
+                app(FormService::class)->create($tenant, $owner, 'Blank Intake Form', 'An empty draft.');
             }
         });
 

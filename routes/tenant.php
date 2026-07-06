@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Tenant\FeedbackController;
+use App\Http\Controllers\Tenant\FormController;
+use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Models\Form;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
@@ -61,6 +64,22 @@ Route::middleware([
     // and the cross-tenant support console are Phase 1 (need the attachments table + elevated read).
     Route::post('/feedback', [FeedbackController::class, 'store'])
         ->middleware('can:feedback.submit')->name('feedback.store');
+
+    // Forms — the durable form record + draft/publish lifecycle (Increment D3). Authorization is the
+    // FormPolicy .any/.own composition, resolved by the `can:<ability>,<model>` middleware. The
+    // interactive section/field builder is Increment D4; D3 delivers list + metadata + publish/restore.
+    Route::get('/forms', [FormController::class, 'index'])
+        ->middleware('can:viewAny,'.Form::class)->name('forms.index');
+    Route::post('/forms', [FormController::class, 'store'])
+        ->middleware('can:create,'.Form::class)->name('forms.store');
+    Route::patch('/forms/{form}', [FormController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.update');
+    Route::post('/forms/{form}/archive', [FormController::class, 'archive'])
+        ->middleware('can:delete,form')->name('forms.archive');
+    Route::post('/forms/{form}/publish', [FormPublishController::class, 'store'])
+        ->middleware('can:publish,form')->name('forms.publish');
+    Route::post('/forms/{form}/versions/{version}/restore', [FormPublishController::class, 'restore'])
+        ->middleware('can:update,form')->name('forms.restore');
 });
 
 /*

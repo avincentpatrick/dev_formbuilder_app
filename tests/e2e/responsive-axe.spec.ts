@@ -9,6 +9,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 const pages = [
     { name: 'Dashboard', path: '/dashboard' },
+    { name: 'Forms', path: '/forms' },
     { name: 'Members', path: '/members' },
     { name: 'Settings', path: '/settings' },
 ];

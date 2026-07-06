@@ -13,6 +13,7 @@ export interface AppUser {
 export interface AppAbilities {
     manageMembers: boolean;
     transferOwnership: boolean;
+    manageForms: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

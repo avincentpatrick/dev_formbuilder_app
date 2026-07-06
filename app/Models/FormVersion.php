@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * The immutable snapshot per publish (data-dictionary §3). Append-only history (no soft-deletes); a
@@ -26,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $title
  * @property array<string, mixed> $schema_snapshot
  * @property ?string $checksum
+ * @property Carbon|null $published_at
+ * @property Carbon|null $superseded_at
  */
 class FormVersion extends Model implements TenantScoped
 {

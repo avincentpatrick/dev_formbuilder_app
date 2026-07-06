@@ -57,4 +57,48 @@ final class FormService
             return $form->refresh();
         });
     }
+
+    /**
+     * Update a form's metadata, keeping the denormalized title/description in sync on the current draft
+     * version (data-dictionary §2 — the form's copy tracks the draft's on every save).
+     */
+    public function updateMetadata(Form $form, string $title, ?string $description): Form
+    {
+        return DB::transaction(function () use ($form, $title, $description): Form {
+            $form->forceFill(['title' => $title, 'description' => $description])->save();
+
+            if ($form->draft_version_id !== null) {
+                FormVersion::query()->whereKey($form->draft_version_id)
+                    ->update(['title' => $title, 'description' => $description]);
+            }
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * Archive a form (form-versioning-schema-migration.md §9): discard the current draft (deleting the
+     * draft version cascades its sections/fields/validations away), clear draft_version_id, and mark the
+     * form archived. Published/superseded versions and current_published_version_id are untouched.
+     */
+    public function archive(Form $form): Form
+    {
+        return DB::transaction(function () use ($form): Form {
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->draft_version_id !== null) {
+                // Only a draft is deletable (form_version RLS guard) — the current draft is one by
+                // definition; the FK ON DELETE SET NULL clears the pointer and CASCADE drops its content.
+                FormVersion::query()->whereKey($locked->draft_version_id)->delete();
+            }
+
+            $locked->forceFill([
+                'status' => FormStatus::Archived,
+                'archived_at' => now(),
+                'draft_version_id' => null,
+            ])->save();
+
+            return $locked->refresh();
+        });
+    }
 }

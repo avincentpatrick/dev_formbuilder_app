@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Form;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -53,6 +54,8 @@ class HandleInertiaRequests extends Middleware
                 'can' => [
                     'manageMembers' => (bool) $user?->can('tenant.members.invite'),
                     'transferOwnership' => (bool) $user?->can('tenant.ownership.transfer'),
+                    // Gates the Forms nav item + the list page (viewAny composes forms.create/.edit.* — FormPolicy).
+                    'manageForms' => (bool) $user?->can('viewAny', Form::class),
                 ],
             ],
             // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.

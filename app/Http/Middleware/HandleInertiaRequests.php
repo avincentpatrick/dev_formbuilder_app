@@ -45,11 +45,26 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                 ] : null,
+                // Ability gates the shell/pages need (e.g. the Members nav item + its row actions).
+                // Computed FAIL-CLOSED: on tenant routes EstablishTenantDatabaseContext has set the
+                // Spatie permissions team by the time this share() renders (and resets it in
+                // terminate()), so can() resolves against the active tenant; off-tenant (central/guest)
+                // no team is set, so every ability resolves to false — exactly the gating we want.
+                'can' => [
+                    'manageMembers' => (bool) $user?->can('tenant.members.invite'),
+                    'transferOwnership' => (bool) $user?->can('tenant.ownership.transfer'),
+                ],
             ],
             // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.
             // Guests resolve to "system", which emits no attribute (prefers-color-scheme decides).
             'ui' => [
                 'theme' => $user?->uiTheme() ?? ['mode' => 'system', 'accent' => 'blueprint'],
+            ],
+            // One-shot flash → toast bridge (design-system §3.7). Controllers signal an outcome with
+            // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's
+            // ToastHost raises it once, then the session flash is gone.
+            'flash' => [
+                'toast' => $request->session()->get('toast'),
             ],
         ];
     }

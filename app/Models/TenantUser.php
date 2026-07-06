@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property TenantUserStatus $status
  * @property string|null $invited_role_id
  * @property string|null $invited_by
+ * @property Carbon|null $invited_at
  * @property Carbon|null $invite_expires_at
  * @property string|null $invite_token
  * @property Carbon|null $joined_at

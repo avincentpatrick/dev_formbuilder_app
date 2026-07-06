@@ -66,9 +66,15 @@ const revealed = ref(false);
 .mds-password__toggle {
     position: absolute;
     top: 50%;
-    right: var(--mds-space-2);
+    right: var(--mds-space-1);
     transform: translateY(-50%);
-    padding: var(--mds-space-1) var(--mds-space-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* ≥24px pointer target (WCAG 2.2 §2.5.8) — the "Show" text alone is shorter; fits the 40px input. */
+    min-height: 32px;
+    min-width: 44px;
+    padding: 0 var(--mds-space-2);
     border: none;
     border-radius: var(--mds-radius-sm);
     background-color: transparent;

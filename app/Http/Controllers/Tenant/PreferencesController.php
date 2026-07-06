@@ -10,15 +10,31 @@ use App\Models\UserUiPreference;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * Per-user appearance preferences (PRD Feature #9). Runs inside the authenticated tenant group, where
- * EstablishTenantDatabaseContext has set app.current_user_id — the belongs-to-user RLS key on
- * user_ui_preferences — so the upsert is visible and writable. No permission gate: a user edits only
- * their own row (RLS-scoped). Only theme_mode is persistable in Phase 1 (accent/font/dyslexia → Phase 2).
+ * Per-user settings (Feature #9 appearance + profile/security). Runs inside the authenticated tenant
+ * group, where EstablishTenantDatabaseContext has set app.current_user_id — the belongs-to-user RLS key
+ * on user_ui_preferences — so the theme upsert is visible and writable. No permission gate: a user edits
+ * only their own account (RLS-scoped). Profile/password/2FA are driven by Fortify's own endpoints; this
+ * only renders the page and passes the current 2FA enrolment state. accent/font/dyslexia → Phase 2.
  */
 final class PreferencesController extends Controller
 {
+    public function show(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('Settings/Index', [
+            'twoFactor' => [
+                'enabled' => $user->two_factor_secret !== null,
+                'confirmed' => $user->two_factor_confirmed_at !== null,
+            ],
+        ]);
+    }
+
     public function updateTheme(Request $request): RedirectResponse
     {
         $validated = $request->validate([

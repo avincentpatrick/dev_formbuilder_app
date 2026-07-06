@@ -5,6 +5,7 @@
  * bar + bold + tint). Disabled Phase-1 destinations render as inert "Soon" rows. Responsive: full
  * (>1024) → icon-only (≤1024) → off-canvas drawer (≤480) toggled from the top nav.
  */
+import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { MdsIcon } from '@meridian/design-system';
 import { navItems } from './nav-model';
@@ -13,6 +14,12 @@ defineProps<{ drawerOpen: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const page = usePage();
+
+// Hide permission-gated items (e.g. Members) from users who lack the ability. Gates resolve
+// fail-closed off-tenant, so central/guest chrome never shows a tenant-only destination.
+const visibleItems = computed(() =>
+    navItems.filter((item) => !item.gate || page.props.auth.can[item.gate]),
+);
 
 function isActive(href?: string): boolean {
     if (!href) return false;
@@ -26,7 +33,7 @@ function isActive(href?: string): boolean {
         <div class="sidebar-scrim" @click="emit('close')" />
         <nav class="sidebar" aria-label="Primary">
             <ul class="sidebar__list">
-                <li v-for="item in navItems" :key="item.key">
+                <li v-for="item in visibleItems" :key="item.key">
                     <Link
                         v-if="item.enabled && item.href"
                         :href="item.href"

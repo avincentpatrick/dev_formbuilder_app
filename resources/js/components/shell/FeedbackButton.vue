@@ -1,61 +1,86 @@
 <script setup lang="ts">
 /**
- * "Send Feedback" — the shell's one global non-nav entry point (Feature #11). C2 ships the trigger
- * + a styled placeholder popover; the full submit flow + the reusable Modal component land in C3
- * (there's no feedback backend yet). Popover a11y via useDismissable.
+ * "Send Feedback" — the shell's one global non-nav entry point (Feature #11). The trigger opens the
+ * shared Modal; submitting posts to the tenant feedback endpoint (route + browser info + remarks). On
+ * success the modal closes and the controller's flash surfaces a Toast. Screenshot capture is deferred
+ * (the shared attachments table is Phase 1).
  */
 import { ref } from 'vue';
-import { MdsIcon, MdsFormField, MdsButton } from '@meridian/design-system';
-import { useDismissable } from '@/composables/useDismissable';
+import { useForm } from '@inertiajs/vue3';
+import { MdsButton, MdsFormField, MdsIcon, MdsModal } from '@meridian/design-system';
 
 const open = ref(false);
-const text = ref('');
-const rootEl = ref<HTMLElement | null>(null);
-const triggerEl = ref<HTMLButtonElement | null>(null);
-useDismissable({ isOpen: open, rootEl, triggerEl });
+const form = useForm({
+    route: '',
+    remarks: '',
+    browser_info: { userAgent: '', viewport: '' },
+});
+
+function openPanel(): void {
+    form.reset();
+    form.clearErrors();
+    form.route = window.location.pathname;
+    form.browser_info = {
+        userAgent: window.navigator.userAgent,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+    };
+    open.value = true;
+}
+
+function submit(): void {
+    form.post('/feedback', {
+        preserveScroll: true,
+        onSuccess: () => {
+            open.value = false;
+        },
+    });
+}
 </script>
 
 <template>
-    <div ref="rootEl" class="fb">
+    <div class="fb">
         <button
-            ref="triggerEl"
             type="button"
             class="fb__trigger"
-            :aria-expanded="open"
             aria-haspopup="dialog"
             aria-label="Send feedback"
-            @click="open = !open"
+            @click="openPanel"
         >
             <MdsIcon name="feedback" size="md" aria-hidden="true" />
             <span class="fb__label">Feedback</span>
         </button>
 
-        <div v-if="open" class="fb__popover" role="dialog" aria-label="Send feedback">
-            <p class="fb__title">Send feedback</p>
-            <MdsFormField
-                label="What’s on your mind?"
-                help="Screenshots and delivery arrive in a later update."
-                v-slot="{ id, describedby }"
-            >
-                <textarea
-                    :id="id"
-                    v-model="text"
-                    class="fb__textarea"
-                    rows="4"
-                    :aria-describedby="describedby"
-                />
-            </MdsFormField>
-            <div class="fb__actions">
-                <MdsButton variant="primary" size="sm" disabled>Send</MdsButton>
-                <span class="fb__soon">Coming soon</span>
-            </div>
-        </div>
+        <MdsModal v-model:open="open" title="Send feedback">
+            <form class="fb__form" @submit.prevent="submit">
+                <MdsFormField
+                    label="What's on your mind?"
+                    required
+                    help="Tell us what's working, what isn't, or what you'd like to see."
+                    :error="form.errors.remarks"
+                    v-slot="{ id, describedby, invalid }"
+                >
+                    <textarea
+                        :id="id"
+                        v-model="form.remarks"
+                        class="fb__textarea"
+                        :class="{ 'fb__textarea--invalid': invalid }"
+                        rows="5"
+                        :aria-describedby="describedby"
+                        :aria-invalid="invalid || undefined"
+                    />
+                </MdsFormField>
+            </form>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="open = false">Cancel</MdsButton>
+                <MdsButton variant="primary" :loading="form.processing" @click="submit">Send feedback</MdsButton>
+            </template>
+        </MdsModal>
     </div>
 </template>
 
 <style scoped>
 .fb {
-    position: relative;
+    display: inline-flex;
 }
 
 .fb__trigger {
@@ -83,24 +108,9 @@ useDismissable({ isOpen: open, rootEl, triggerEl });
     outline-offset: 2px;
 }
 
-.fb__popover {
-    position: absolute;
-    top: calc(100% + var(--mds-space-1));
-    right: 0;
-    z-index: 30;
-    width: 320px;
-    max-width: calc(100vw - var(--mds-space-6));
-    padding: var(--mds-space-4);
-    background-color: var(--mds-color-bg-surface-raised);
-    border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
-    box-shadow: var(--mds-shadow-3);
-}
-
-.fb__title {
-    margin: 0 0 var(--mds-space-3);
-    font-weight: var(--mds-font-weight-semibold);
-    color: var(--mds-color-text-heading);
+.fb__form {
+    display: flex;
+    flex-direction: column;
 }
 
 .fb__textarea {
@@ -121,16 +131,8 @@ useDismissable({ isOpen: open, rootEl, triggerEl });
     border-color: var(--mds-color-action-primary-bg);
 }
 
-.fb__actions {
-    display: flex;
-    align-items: center;
-    gap: var(--mds-space-3);
-    margin-top: var(--mds-space-3);
-}
-
-.fb__soon {
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-secondary);
+.fb__textarea--invalid {
+    border-color: var(--mds-color-action-danger-bg);
 }
 
 @media (max-width: 480px) {

@@ -69,3 +69,27 @@ A one-click toggle in the app bar directly serves that need.
 surface writing the same `user_ui_preferences.theme_mode` row via the same endpoint. It applies the
 change optimistically client-side (set/remove `data-theme-mode` on `<html>`) and persists server-side,
 so the durable source of truth (the blade root-attribute emission on next full load) is unchanged.
+
+---
+
+## #4 — Central-domain admin console shell (`resources/js/Layouts/AdminLayout.vue`)
+
+**Introduced:** Phase 0 · Increment C3 (data + admin + settings).
+
+**What deviates:** Same clause as #1 — DSR §3.0 defines only two shells and forbids a third without a
+documented exception. The super-admin platform console (Tenants, Users, mandatory-MFA setup — RBAC §9)
+uses a distinct top-bar-only layout: a wordmark + a small admin nav (Tenants / Users) + logout, with no
+tenant sidebar.
+
+**Why:** the console is served on the **central domain** (`config('tenancy.central_domain')`), outside
+any tenant context, and its navigation targets are platform-operations pages — not the tenant-oriented
+sections (Dashboard / Forms / Submissions / Settings) the authenticated `AppLayout` sidebar lists.
+Forcing it into the tenant shell would show a sidebar of destinations that don't apply, and the shell's
+permission-aware nav + tenant theme/user props aren't meaningful on the central domain.
+
+**Disposition:** classified as a **member of the Console-shell family**, a sibling to the AuthLayout
+guest-shell (#1), not a new top-level shell. Built entirely from shared design-system tokens/components
+(it renders the shared `MdsToastHost`, uses `MdsDataTable`/`MdsBadge`/`MdsModal` in its pages, and its
+chrome is token-only — no one-off colors/spacing/radius/type). It lives in the app (Inertia-specific)
+rather than the package. If a broader internal-tooling surface emerges (Phase 1+ support/billing
+consoles), fold this into a shared console-shell primitive rather than adding a fifth layout.

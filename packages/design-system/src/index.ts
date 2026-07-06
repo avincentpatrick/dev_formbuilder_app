@@ -3,6 +3,8 @@ export { default as MdsIconButton } from './components/IconButton/IconButton.vue
 export { default as MdsFormField } from './components/FormField/FormField.vue';
 export { default as MdsTextInput } from './components/TextInput/TextInput.vue';
 export { default as MdsTextarea } from './components/Textarea/Textarea.vue';
+export { default as MdsSelect } from './components/Select/Select.vue';
+export { default as MdsNumberInput } from './components/NumberInput/NumberInput.vue';
 export { default as MdsPasswordInput } from './components/PasswordInput/PasswordInput.vue';
 export { default as MdsIcon } from './components/Icon/Icon.vue';
 export { default as MdsCard } from './components/Card/Card.vue';

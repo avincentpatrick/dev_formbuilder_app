@@ -79,8 +79,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Render framework exceptions (validation, auth, model-not-found) as JSON for the JSON API surface
+        // AND for any request that explicitly expects JSON — the builder's CSRF fetch sidecar (D4a) sends
+        // Accept: application/json and needs a 422 body, not the HTML validation redirect Inertia visits get
+        // (Inertia requests do not expectsJson(), so their redirect-with-errors flow is unaffected).
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
         // Membership business-rule violations (B2b) are user-facing, not 500s: bounce back with a

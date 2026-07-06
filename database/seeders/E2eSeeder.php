@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\FieldType;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
@@ -82,13 +84,20 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
-            // A demo form for the Forms page (Increment D3): a published v1 (via the real publish path,
-            // so version history is exercised) plus the cloned draft v2 it left behind.
+            // A demo form for the Forms page (D3) + the builder (D4a): a section + a few fields on the
+            // draft, published once (so version history is exercised) and cloned forward into the current
+            // draft the builder edits. The content makes the builder auto-select a field so the config
+            // panel actually mounts for the interaction/axe gate.
             if (Form::query()->where('title', 'Community Health Survey')->doesntExist()) {
                 $form = app(FormService::class)->create(
                     $tenant, $owner, 'Community Health Survey', 'Monthly field data collection.'
                 );
-                app(PublishService::class)->publish($form, $owner);
+                $builder = app(FormBuilderService::class);
+                $section = $builder->addSection($form);
+                $builder->addField($form, $owner, FieldType::ShortText, $section->id);
+                $builder->addField($form, $owner, FieldType::SingleSelect, $section->id);
+                $builder->addField($form, $owner, FieldType::Integer, null);
+                app(PublishService::class)->publish($form->refresh(), $owner);
             }
         });
 

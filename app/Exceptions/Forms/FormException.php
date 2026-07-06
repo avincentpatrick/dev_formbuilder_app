@@ -38,4 +38,19 @@ final class FormException extends RuntimeException
     {
         return new self('Only a published or superseded version can be restored.');
     }
+
+    /**
+     * A builder mutation targeted a section/field that is not part of the form's current draft version
+     * (i.e. it belongs to a published/superseded version). The draft_child RLS guard is the DB backstop;
+     * this is the service-level guard that returns a clean 403 instead of a silent zero-row write.
+     */
+    public static function childNotInDraft(): self
+    {
+        return new self('That item belongs to a published version and can no longer be edited.');
+    }
+
+    public static function formHasNoDraft(): self
+    {
+        return new self('This form has no editable draft. Publish or restore a version first.');
+    }
 }

@@ -77,4 +77,65 @@ enum FieldType: string
             self::Note, self::PageBreak, self::Hidden, self::Matrix => FieldCategory::Structural,
         };
     }
+
+    /** Human label for the builder palette / config panel (single source for the frontend catalog). */
+    public function label(): string
+    {
+        return match ($this) {
+            self::ShortText => 'Short text',
+            self::LongText => 'Long text',
+            self::Email => 'Email',
+            self::Phone => 'Phone',
+            self::Url => 'URL',
+            self::Integer => 'Whole number',
+            self::Decimal => 'Decimal number',
+            self::Calculated => 'Calculated',
+            self::Date => 'Date',
+            self::Time => 'Time',
+            self::Datetime => 'Date & time',
+            self::Duration => 'Duration',
+            self::SingleSelect => 'Single choice',
+            self::MultiSelect => 'Multiple choice',
+            self::Dropdown => 'Dropdown',
+            self::YesNo => 'Yes / No',
+            self::CascadingSelect => 'Cascading select',
+            self::LikertScale => 'Likert scale',
+            self::LikertMatrix => 'Likert matrix',
+            self::Geopoint => 'GPS point',
+            self::Geotrace => 'GPS line',
+            self::Geoshape => 'GPS area',
+            self::FileUpload => 'File upload',
+            self::ImageCapture => 'Photo',
+            self::AudioCapture => 'Audio',
+            self::VideoCapture => 'Video',
+            self::Signature => 'Signature',
+            self::Note => 'Note / label',
+            self::PageBreak => 'Page break',
+            self::Hidden => 'Hidden field',
+            self::Matrix => 'Matrix (grid)',
+        };
+    }
+
+    /**
+     * Advanced types get only a baseline config editor in the Phase-1 builder — their rich editors and
+     * runtime follow the form engine (ADR-0004). The builder surfaces them fully but flags the gap.
+     */
+    public function isAdvanced(): bool
+    {
+        return match ($this) {
+            self::Geopoint, self::Geotrace, self::Geoshape,
+            self::ImageCapture, self::AudioCapture, self::VideoCapture,
+            self::CascadingSelect, self::Matrix, self::LikertMatrix => true,
+            default => false,
+        };
+    }
+
+    /** Whether this type offers an author-defined option list (drives the Choices config editor). */
+    public function hasOptions(): bool
+    {
+        return match ($this) {
+            self::SingleSelect, self::MultiSelect, self::Dropdown, self::LikertScale => true,
+            default => false,
+        };
+    }
 }

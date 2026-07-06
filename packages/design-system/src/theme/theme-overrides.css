@@ -46,6 +46,19 @@
     --mds-color-input-border-hover: var(--mds-neutral-500);
     --mds-color-focus-ring: var(--mds-primary-300);
     --mds-color-overlay-scrim: rgba(8, 13, 20, 0.6);
+
+    /* Status badges (§3.8): the color primitives don't flip in dark, so re-point each status to a
+       deep tint + pale text (pale-on-dark), keeping ≥4.5:1 within the badge on the drafting ground. */
+    --mds-color-status-success-bg: var(--mds-success-800);
+    --mds-color-status-success-fg: var(--mds-success-200);
+    --mds-color-status-warning-bg: var(--mds-warning-800);
+    --mds-color-status-warning-fg: var(--mds-warning-200);
+    --mds-color-status-danger-bg: var(--mds-danger-800);
+    --mds-color-status-danger-fg: var(--mds-danger-200);
+    --mds-color-status-info-bg: var(--mds-primary-800);
+    --mds-color-status-info-fg: var(--mds-primary-200);
+    --mds-color-status-neutral-bg: var(--mds-neutral-200);
+    --mds-color-status-neutral-fg: var(--mds-neutral-800);
 }
 
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
@@ -81,6 +94,17 @@
         --mds-color-input-border-hover: var(--mds-neutral-500);
         --mds-color-focus-ring: var(--mds-primary-300);
         --mds-color-overlay-scrim: rgba(8, 13, 20, 0.6);
+
+        --mds-color-status-success-bg: var(--mds-success-800);
+        --mds-color-status-success-fg: var(--mds-success-200);
+        --mds-color-status-warning-bg: var(--mds-warning-800);
+        --mds-color-status-warning-fg: var(--mds-warning-200);
+        --mds-color-status-danger-bg: var(--mds-danger-800);
+        --mds-color-status-danger-fg: var(--mds-danger-200);
+        --mds-color-status-info-bg: var(--mds-primary-800);
+        --mds-color-status-info-fg: var(--mds-primary-200);
+        --mds-color-status-neutral-bg: var(--mds-neutral-200);
+        --mds-color-status-neutral-fg: var(--mds-neutral-800);
     }
 }
 

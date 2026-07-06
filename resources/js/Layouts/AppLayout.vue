@@ -5,12 +5,28 @@
  * state (mobile drawer open, top-nav scroll shadow) which persists across Inertia visits because the
  * layout instance persists.
  */
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import { MdsToastHost } from '@meridian/design-system';
 import TopNav from '@/components/shell/TopNav.vue';
 import Sidebar from '@/components/shell/Sidebar.vue';
+import { useToast } from '@/composables/useToast';
 
 const drawerOpen = ref(false);
 const scrolled = ref(false);
+
+const page = usePage();
+const { toasts, push, dismiss } = useToast();
+
+// Server flash → toast bridge: any controller that redirects with ->with('toast', {...}) surfaces it
+// here once. Fires on the visit that carries the flash (immediate covers a redirect-then-render).
+watch(
+    () => page.props.flash?.toast,
+    (toast) => {
+        if (toast) push(toast.type, toast.message);
+    },
+    { immediate: true },
+);
 
 function onScroll(event: Event): void {
     scrolled.value = (event.target as HTMLElement).scrollTop > 4;
@@ -34,6 +50,7 @@ function onKeydown(event: KeyboardEvent): void {
                 </div>
             </main>
         </div>
+        <MdsToastHost :toasts="toasts" @dismiss="dismiss" />
     </div>
 </template>
 

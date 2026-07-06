@@ -6,8 +6,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,14 +36,18 @@ final class TenantAdminController extends Controller
     {
         $this->superAdmin->suspendTenant($tenant);
 
-        return back()->with('status', 'tenant-suspended');
+        return back()
+            ->with('status', 'tenant-suspended')
+            ->with('toast', ['type' => 'success', 'message' => "Suspended {$tenant->name}"]);
     }
 
     public function reactivate(Tenant $tenant): RedirectResponse
     {
         $this->superAdmin->reactivateTenant($tenant);
 
-        return back()->with('status', 'tenant-reactivated');
+        return back()
+            ->with('status', 'tenant-reactivated')
+            ->with('toast', ['type' => 'success', 'message' => "Reactivated {$tenant->name}"]);
     }
 
     public function users(): Response
@@ -53,10 +59,17 @@ final class TenantAdminController extends Controller
 
     /**
      * The 2FA enrollment landing (reachable WITHOUT confirmed 2FA — it sits outside `superadmin.mfa`).
-     * It drives Fortify's own global two-factor endpoints; this only renders the page.
+     * It drives Fortify's own global two-factor endpoints; this passes the current enrolment state so the
+     * styled TwoFactorSetup component renders the right step (off / awaiting-confirmation / on).
      */
-    public function mfaSetup(): Response
+    public function mfaSetup(Request $request): Response
     {
-        return Inertia::render('admin/TwoFactorSetup');
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('admin/TwoFactorSetup', [
+            'enabled' => $user->two_factor_secret !== null,
+            'confirmed' => $user->two_factor_confirmed_at !== null,
+        ]);
     }
 }

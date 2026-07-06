@@ -24,6 +24,7 @@
 /test-results
 /playwright-report
 /.playwright
+/tests/e2e/.auth
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot

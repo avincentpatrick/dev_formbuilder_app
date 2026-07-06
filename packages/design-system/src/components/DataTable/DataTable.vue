@@ -1,0 +1,319 @@
+<script setup lang="ts" generic="Row extends Record<string, unknown>">
+/**
+ * The shared data table (DSR §3.3) — the single most-used composite (members roster, admin lists, and
+ * later the submissions inbox / webhook log / audit log). One component covers them all: a page
+ * configures WHICH columns/actions appear, never HOW the table lays out (header/cell padding, row
+ * height, hover, the loading skeleton, and the mobile card-per-row collapse are all owned here — §3.3
+ * governing rule). Consumes semantic tokens only. Generic over the row shape, so `#cell-<key>` /
+ * `#row-actions` slots receive a fully-typed `row` (no casts needed by consumers).
+ *
+ * Slots: `#cell-<key>="{ row, value }"` for custom cells (badges, links), `#row-actions="{ row }"` for
+ * a trailing per-row action cell, and `#empty` for the zero-rows state (compose `MdsEmptyState`).
+ *
+ * Loading renders a structure-preserving skeleton (not a spinner) so the layout doesn't jump (§3.9);
+ * the table advertises `aria-busy` while loading. Sortable columns toggle an internal client-side sort
+ * with `aria-sort` on the header (§4.3).
+ */
+import { computed, ref, useSlots } from 'vue';
+import Icon from '../Icon/Icon.vue';
+import Skeleton from '../Skeleton/Skeleton.vue';
+
+export interface DataTableColumn {
+    key: string;
+    header: string;
+    align?: 'start' | 'end';
+    sortable?: boolean;
+}
+
+const props = withDefaults(
+    defineProps<{
+        columns: DataTableColumn[];
+        rows: Row[];
+        rowKey?: string;
+        caption: string;
+        loading?: boolean;
+        skeletonRows?: number;
+    }>(),
+    { rowKey: 'id', loading: false, skeletonRows: 5 },
+);
+
+const slots = useSlots();
+const hasRowActions = computed(() => Boolean(slots['row-actions']));
+const columnCount = computed(() => props.columns.length + (hasRowActions.value ? 1 : 0));
+
+const sortKey = ref<string | null>(null);
+const sortDir = ref<'asc' | 'desc'>('asc');
+
+function toggleSort(key: string) {
+    if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        sortDir.value = 'asc';
+    }
+}
+
+function ariaSort(key: string): 'ascending' | 'descending' | 'none' {
+    if (sortKey.value !== key) return 'none';
+    return sortDir.value === 'asc' ? 'ascending' : 'descending';
+}
+
+const sortedRows = computed<Row[]>(() => {
+    if (!sortKey.value) return props.rows;
+    const key = sortKey.value;
+    const dir = sortDir.value === 'asc' ? 1 : -1;
+    return [...props.rows].sort((a, b) => {
+        const av = a[key];
+        const bv = b[key];
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+        return String(av).localeCompare(String(bv)) * dir;
+    });
+});
+
+function keyFor(row: Row, index: number): string {
+    const k = row[props.rowKey];
+    return k == null ? String(index) : String(k);
+}
+</script>
+
+<template>
+    <div class="mds-table__scroll">
+        <table class="mds-table" :aria-busy="loading || undefined">
+            <caption class="mds-table__caption">{{ caption }}</caption>
+            <thead>
+                <tr>
+                    <th
+                        v-for="col in columns"
+                        :key="col.key"
+                        scope="col"
+                        class="mds-table__th"
+                        :class="{ 'mds-table__cell--end': col.align === 'end' }"
+                        :aria-sort="col.sortable ? ariaSort(col.key) : undefined"
+                    >
+                        <button
+                            v-if="col.sortable"
+                            type="button"
+                            class="mds-table__sort"
+                            @click="toggleSort(col.key)"
+                        >
+                            {{ col.header }}
+                            <Icon
+                                v-if="sortKey === col.key"
+                                name="chevron-down"
+                                size="sm"
+                                class="mds-table__sort-icon"
+                                :class="{ 'mds-table__sort-icon--asc': sortDir === 'asc' }"
+                            />
+                        </button>
+                        <template v-else>{{ col.header }}</template>
+                    </th>
+                    <th v-if="hasRowActions" scope="col" class="mds-table__th mds-table__cell--end">
+                        <span class="mds-table__sr">Actions</span>
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <!-- Loading: structure-preserving skeleton rows (§3.9). -->
+                <template v-if="loading">
+                    <tr v-for="n in skeletonRows" :key="`sk-${n}`" class="mds-table__row">
+                        <td
+                            v-for="col in columns"
+                            :key="col.key"
+                            class="mds-table__td"
+                            :data-label="col.header"
+                        >
+                            <Skeleton variant="text" width="70%" />
+                        </td>
+                        <td v-if="hasRowActions" class="mds-table__td mds-table__cell--end">
+                            <Skeleton variant="text" width="48px" />
+                        </td>
+                    </tr>
+                </template>
+
+                <!-- Empty: page supplies the message via #empty (compose MdsEmptyState). -->
+                <tr v-else-if="sortedRows.length === 0">
+                    <td :colspan="columnCount" class="mds-table__empty">
+                        <slot name="empty" />
+                    </td>
+                </tr>
+
+                <!-- Data. -->
+                <template v-else>
+                    <tr
+                        v-for="(row, index) in sortedRows"
+                        :key="keyFor(row, index)"
+                        class="mds-table__row"
+                    >
+                        <td
+                            v-for="col in columns"
+                            :key="col.key"
+                            class="mds-table__td"
+                            :class="{ 'mds-table__cell--end': col.align === 'end' }"
+                            :data-label="col.header"
+                        >
+                            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
+                                {{ row[col.key] }}
+                            </slot>
+                        </td>
+                        <td
+                            v-if="hasRowActions"
+                            class="mds-table__td mds-table__cell--end mds-table__actions"
+                        >
+                            <slot name="row-actions" :row="row" />
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</template>
+
+<style scoped>
+.mds-table__scroll {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.mds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mds-font-family-body);
+    color: var(--mds-color-text-body);
+}
+
+.mds-table__caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.mds-table__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.mds-table__th {
+    padding: var(--mds-space-3) var(--mds-space-4);
+    text-align: start;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--mds-color-border-default);
+    background-color: var(--mds-color-bg-surface);
+    font-size: var(--mds-type-label-font-size);
+    line-height: var(--mds-type-label-line-height);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-secondary);
+    white-space: nowrap;
+}
+
+.mds-table__cell--end {
+    text-align: end;
+}
+
+.mds-table__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+.mds-table__sort:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+.mds-table__sort-icon {
+    transition: transform var(--mds-duration-fast) var(--mds-ease-standard);
+}
+.mds-table__sort-icon--asc {
+    transform: rotate(180deg);
+}
+
+.mds-table__td {
+    padding: var(--mds-space-3) var(--mds-space-4);
+    vertical-align: middle;
+    border-bottom: 1px solid var(--mds-color-border-default);
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+}
+
+.mds-table__row:hover .mds-table__td {
+    background-color: var(--mds-color-bg-canvas);
+}
+
+.mds-table__actions {
+    white-space: nowrap;
+}
+
+.mds-table__empty {
+    padding: 0;
+}
+
+/* Mobile (§6): the table collapses to a card-per-row — header row hidden, each cell becomes a labelled
+   key/value pair (label from the column header). Pages don't write this; the component owns it. */
+@media (max-width: 480px) {
+    .mds-table__scroll {
+        overflow-x: visible;
+    }
+    .mds-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+    .mds-table__row {
+        display: block;
+        margin-bottom: var(--mds-space-3);
+        border: 1px solid var(--mds-color-border-default);
+        border-radius: var(--mds-radius-md);
+        background-color: var(--mds-color-bg-surface);
+    }
+    .mds-table__td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--mds-space-4);
+        text-align: end;
+        border-bottom: 1px solid var(--mds-color-border-default);
+    }
+    .mds-table__row .mds-table__td:last-child {
+        border-bottom: 0;
+    }
+    .mds-table__td::before {
+        content: attr(data-label);
+        font-size: var(--mds-type-label-font-size);
+        font-weight: var(--mds-font-weight-semibold);
+        color: var(--mds-color-text-secondary);
+        text-align: start;
+    }
+    .mds-table__actions {
+        justify-content: flex-end;
+    }
+    .mds-table__actions::before {
+        content: '';
+    }
+}
+</style>

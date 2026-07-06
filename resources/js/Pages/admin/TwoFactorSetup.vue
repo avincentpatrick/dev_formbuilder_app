@@ -1,46 +1,32 @@
 <script setup lang="ts">
-// Unstyled Increment-B2c mandatory-MFA enrollment landing (styled in Increment C). Super-admins are
-// redirected here by the `superadmin.mfa` middleware until they confirm two-factor auth. It drives
-// Fortify's own global 2FA endpoints (registered on the central domain, outside the /admin group).
-import { useForm } from '@inertiajs/vue3';
+/**
+ * Super-admin mandatory-MFA enrolment landing (RBAC §9). The `superadmin.mfa` middleware redirects here
+ * until two-factor is confirmed; this page sits outside that gate. Styled with the shared design system
+ * and the reusable TwoFactorSetup component (also used in tenant Settings → Security).
+ */
+import { MdsCard } from '@meridian/design-system';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 
-// Enable 2FA (Fortify generates the secret + recovery codes). Fortify's `confirmPassword` feature may
-// interpose a password-confirmation step; that is handled by Fortify's own flow.
-const enableForm = useForm({});
-function enable(): void {
-  enableForm.post('/user/two-factor-authentication');
-}
-
-// Confirm enrollment with a TOTP code from the authenticator app.
-const confirmForm = useForm({ code: '' });
-function confirm(): void {
-  confirmForm.post('/user/confirmed-two-factor-authentication', {
-    onSuccess: () => confirmForm.reset('code'),
-  });
-}
+defineProps<{ enabled: boolean; confirmed: boolean }>();
 </script>
 
 <template>
-  <main>
-    <h1>Two-factor authentication required</h1>
-    <p>
-      Platform administrators must enable two-factor authentication before using the admin console.
-    </p>
-
-    <form @submit.prevent="enable">
-      <button type="submit" :disabled="enableForm.processing">Enable two-factor authentication</button>
-    </form>
-
-    <p>
-      After enabling, scan the QR code shown at
-      <code>/user/two-factor-qr-code</code> with your authenticator app, then confirm with a code:
-    </p>
-
-    <form @submit.prevent="confirm">
-      <label for="code">Authentication code</label>
-      <input id="code" v-model="confirmForm.code" type="text" inputmode="numeric" autocomplete="one-time-code" required />
-      <span v-if="confirmForm.errors.code">{{ confirmForm.errors.code }}</span>
-      <button type="submit" :disabled="confirmForm.processing">Confirm</button>
-    </form>
-  </main>
+    <AdminLayout title="Two-factor authentication">
+        <MdsCard>
+            <p class="admin-tfa__intro">
+                Platform administrators must enable two-factor authentication before using the admin
+                console.
+            </p>
+            <TwoFactorSetup :enabled="enabled" :confirmed="confirmed" />
+        </MdsCard>
+    </AdminLayout>
 </template>
+
+<style scoped>
+.admin-tfa__intro {
+    margin: 0 0 var(--mds-space-5);
+    font-size: var(--mds-type-body-lg-font-size);
+    color: var(--mds-color-text-body);
+}
+</style>

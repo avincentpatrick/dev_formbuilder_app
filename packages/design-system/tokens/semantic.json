@@ -44,6 +44,28 @@
         "danger": {
             "text": { "value": "{danger.700}" }
         },
+        "status": {
+            "success": {
+                "bg": { "value": "{success.50}" },
+                "fg": { "value": "{success.700}" }
+            },
+            "warning": {
+                "bg": { "value": "{warning.50}" },
+                "fg": { "value": "{warning.700}" }
+            },
+            "danger": {
+                "bg": { "value": "{danger.50}" },
+                "fg": { "value": "{danger.700}" }
+            },
+            "info": {
+                "bg": { "value": "{primary.50}" },
+                "fg": { "value": "{primary.700}" }
+            },
+            "neutral": {
+                "bg": { "value": "{neutral.100}" },
+                "fg": { "value": "{neutral.700}" }
+            }
+        },
         "focus": {
             "ring": { "value": "{primary.700}" }
         },

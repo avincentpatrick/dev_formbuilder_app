@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
@@ -39,18 +40,27 @@ Route::middleware([
     // Settings — the current theme reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists theme_mode to user_ui_preferences; it lives
     // here (not central) so app.current_user_id is set and the belongs-to-user RLS write succeeds.
-    Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
+    Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
     Route::patch('/settings/appearance', [PreferencesController::class, 'updateTheme'])
         ->name('settings.appearance.update');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
+    // The roster page is gated on the same manage ability (the 27-permission catalog is closed — there
+    // is no separate members.view — so viewing the roster is an Owner/Admin management surface).
+    Route::get('/members', [MemberController::class, 'index'])
+        ->middleware('can:tenant.members.invite')->name('members.index');
     Route::post('/members/invitations', [MemberController::class, 'invite'])
         ->middleware('can:tenant.members.invite')->name('members.invite');
     Route::delete('/members/{user}', [MemberController::class, 'remove'])
         ->middleware('can:tenant.members.remove')->name('members.remove');
     Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
         ->middleware('can:tenant.ownership.transfer')->name('members.ownership');
+
+    // In-app feedback (Feature #11) — every role may submit (can:feedback.submit). Screenshot capture
+    // and the cross-tenant support console are Phase 1 (need the attachments table + elevated read).
+    Route::post('/feedback', [FeedbackController::class, 'store'])
+        ->middleware('can:feedback.submit')->name('feedback.store');
 });
 
 /*

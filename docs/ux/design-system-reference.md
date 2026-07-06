@@ -687,3 +687,18 @@ deferred), and the new **`MdsSegmentedControl`** (a single-select radiogroup use
 control — native radios for arrow-key roving selection; selected-state per Appendix A #13).
 `MdsCheckbox` (§3.2), `MdsBadge`/`statusVariant` (§3.8), and `MdsSkeleton` (§3.9) remain deferred to a
 later increment (nothing in C2 exercises them).
+
+**Components added in C3** (data + admin + settings, with stories + this doc per §7.3): the deferred
+trio **`MdsBadge`** + the single central **`statusVariant`** enum→variant map (§3.8, with new
+`color.status.{success,warning,danger,info,neutral}.{bg,fg}` semantic tokens re-pointed for dark),
+**`MdsCheckbox`** (§3.2), and **`MdsSkeleton`** (§3.9) now ship, plus **`MdsModal`** (§3.6 — self-
+contained focus-trap + Escape + scroll-lock, top-level `<Teleport>` portal, full-screen sheet below the
+tablet breakpoint), **`MdsToast`** + **`MdsToastHost`** (§3.7 — top-level portal, per-toast
+polite/`role="alert"` live semantics; the app owns the toast store + a server-flash → toast bridge), and
+the flagship **`MdsDataTable`** (§3.3 — a generic-over-row component that owns column layout, sortable
+headers with `aria-sort`, a structure-preserving Skeleton loading state, `#cell-<key>`/`#row-actions`
+slots, and the mobile card-per-row collapse). The **determinate progress bar** (§3.9) is still deferred
+(nothing in C3 exercises it). Composed-page a11y is now gated end-to-end by a Playwright + `@axe-core`
+run at 375/834/1440px against the live tenant pages (§4.6 / decision #10); a composed "list page"
+Storybook story adds the same coverage for the DataTable/Badge page pattern under the merge-blocking
+per-story axe runner.

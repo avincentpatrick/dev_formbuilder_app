@@ -11,6 +11,8 @@ use App\Services\Tenancy\TenantMembershipService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Tenant member administration (multi-tenancy-rbac-design.md §7) — the Owner/Admin side of the
@@ -21,7 +23,23 @@ final class MemberController extends Controller
 {
     use ResolvesTenant;
 
+    /** Roles an Admin may assign (Owner is established only via ownership transfer, §5). */
+    private const ASSIGNABLE_ROLES = [
+        ['value' => 'admin', 'label' => 'Admin'],
+        ['value' => 'form_editor', 'label' => 'Form Editor'],
+        ['value' => 'reviewer', 'label' => 'Reviewer'],
+        ['value' => 'viewer', 'label' => 'Viewer'],
+    ];
+
     public function __construct(private readonly TenantMembershipService $memberships) {}
+
+    public function index(): Response
+    {
+        return Inertia::render('members/Index', [
+            'members' => $this->memberships->listMembers($this->currentTenant()),
+            'assignableRoles' => self::ASSIGNABLE_ROLES,
+        ]);
+    }
 
     public function invite(Request $request): RedirectResponse
     {
@@ -35,7 +53,9 @@ final class MemberController extends Controller
         $actor = $request->user();
         $this->memberships->invite($this->currentTenant(), $validated['email'], $validated['role'], $actor);
 
-        return back()->with('status', 'invitation-sent');
+        return back()
+            ->with('status', 'invitation-sent')
+            ->with('toast', ['type' => 'success', 'message' => "Invitation sent to {$validated['email']}"]);
     }
 
     public function remove(Request $request, User $user): RedirectResponse
@@ -44,7 +64,9 @@ final class MemberController extends Controller
         $actor = $request->user();
         $this->memberships->remove($this->currentTenant(), $user, $actor);
 
-        return back()->with('status', 'member-removed');
+        return back()
+            ->with('status', 'member-removed')
+            ->with('toast', ['type' => 'success', 'message' => 'Member removed']);
     }
 
     public function transferOwnership(Request $request): RedirectResponse
@@ -58,6 +80,8 @@ final class MemberController extends Controller
         $actor = $request->user();
         $this->memberships->transferOwnership($this->currentTenant(), $newOwner, $actor);
 
-        return back()->with('status', 'ownership-transferred');
+        return back()
+            ->with('status', 'ownership-transferred')
+            ->with('toast', ['type' => 'success', 'message' => 'Ownership transferred']);
     }
 }

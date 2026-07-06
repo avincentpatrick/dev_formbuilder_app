@@ -9,9 +9,13 @@
         "ds:install": "npm --prefix packages/design-system install",
         "ds:tokens": "npm --prefix packages/design-system run build:tokens",
         "ds:storybook:build": "npm --prefix packages/design-system run build-storybook",
-        "ds:test": "npm --prefix packages/design-system run test-storybook"
+        "ds:test": "npm --prefix packages/design-system run test-storybook",
+        "e2e": "playwright test",
+        "e2e:install": "playwright install --with-deps chromium"
     },
     "devDependencies": {
+        "@axe-core/playwright": "^4.10.1",
+        "@playwright/test": "^1.49.1",
         "@types/node": "^26.1.0",
         "@vitejs/plugin-vue": "^6.0.7",
         "concurrently": "^9.0.1",

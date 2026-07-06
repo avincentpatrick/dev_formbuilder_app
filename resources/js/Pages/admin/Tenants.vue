@@ -1,53 +1,134 @@
 <script setup lang="ts">
-// Unstyled Increment-B2c super-admin tenant console (styled in Increment C).
+/**
+ * Super-admin tenant console (RBAC §9). Lists every tenant with a status Badge and suspend/reactivate
+ * actions driven through confirm Modals. Rows come from SuperAdminService::listTenants (the RLS-exempt
+ * central table). Business-rule failures surface as the shared `errors.admin` alert; success as a Toast.
+ */
+import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import {
+    MdsBadge,
+    MdsButton,
+    MdsDataTable,
+    MdsModal,
+    statusVariant,
+    type DataTableColumn,
+} from '@meridian/design-system';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 
-defineProps<{
-  tenants: Array<{ id: string; name: string; slug: string; status: string }>;
-}>();
+type Tenant = {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+};
 
-// Business-rule failures (e.g. suspending an already-suspended tenant) come back as a shared `admin`
-// session error, not a form-field error.
+defineProps<{ tenants: Tenant[] }>();
+
 const page = usePage();
 const adminError = computed(() => page.props.errors?.admin);
 
-function suspend(id: string): void {
-  router.post(`/admin/tenants/${id}/suspend`);
-}
+const columns: DataTableColumn[] = [
+    { key: 'name', header: 'Name', sortable: true },
+    { key: 'slug', header: 'Slug', sortable: true },
+    { key: 'status', header: 'Status' },
+];
 
-function reactivate(id: string): void {
-  router.post(`/admin/tenants/${id}/reactivate`);
+// { tenant, action } pending confirmation.
+const pending = ref<{ tenant: Tenant; action: 'suspend' | 'reactivate' } | null>(null);
+const busy = ref(false);
+
+function confirmAction(): void {
+    if (!pending.value) return;
+    const { tenant, action } = pending.value;
+    busy.value = true;
+    router.post(
+        `/admin/tenants/${tenant.id}/${action}`,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                busy.value = false;
+            },
+            onSuccess: () => {
+                pending.value = null;
+            },
+        },
+    );
 }
 </script>
 
 <template>
-  <main>
-    <h1>Tenants</h1>
-    <p v-if="adminError">{{ adminError }}</p>
+    <AdminLayout title="Tenants">
+        <p v-if="adminError" class="admin-tenants__alert" role="alert">{{ adminError }}</p>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Slug</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="tenant in tenants" :key="tenant.id">
-          <td>{{ tenant.name }}</td>
-          <td>{{ tenant.slug }}</td>
-          <td>{{ tenant.status }}</td>
-          <td>
-            <button v-if="tenant.status !== 'suspended'" type="button" @click="suspend(tenant.id)">
-              Suspend
-            </button>
-            <button v-else type="button" @click="reactivate(tenant.id)">Reactivate</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </main>
+        <MdsDataTable :columns="columns" :rows="tenants" caption="All tenants" row-key="id">
+            <template #cell-status="{ value }">
+                <MdsBadge v-bind="statusVariant(String(value))" />
+            </template>
+            <template #row-actions="{ row }">
+                <MdsButton
+                    v-if="row.status !== 'suspended'"
+                    variant="tertiary"
+                    size="sm"
+                    @click="pending = { tenant: row, action: 'suspend' }"
+                >
+                    Suspend
+                </MdsButton>
+                <MdsButton
+                    v-else
+                    variant="tertiary"
+                    size="sm"
+                    @click="pending = { tenant: row, action: 'reactivate' }"
+                >
+                    Reactivate
+                </MdsButton>
+            </template>
+        </MdsDataTable>
+
+        <MdsModal
+            :open="pending !== null"
+            :title="pending?.action === 'suspend' ? 'Suspend tenant' : 'Reactivate tenant'"
+            @close="pending = null"
+        >
+            <p class="admin-tenants__prose">
+                <template v-if="pending?.action === 'suspend'">
+                    Suspend <strong>{{ pending?.tenant.name }}</strong>? Members lose access until it is
+                    reactivated. Their data is retained.
+                </template>
+                <template v-else>
+                    Reactivate <strong>{{ pending?.tenant.name }}</strong>? Members regain access
+                    immediately.
+                </template>
+            </p>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="pending = null">Cancel</MdsButton>
+                <MdsButton
+                    :variant="pending?.action === 'suspend' ? 'destructive' : 'primary'"
+                    :loading="busy"
+                    @click="confirmAction"
+                >
+                    {{ pending?.action === 'suspend' ? 'Suspend' : 'Reactivate' }}
+                </MdsButton>
+            </template>
+        </MdsModal>
+    </AdminLayout>
 </template>
+
+<style scoped>
+.admin-tenants__alert {
+    margin: 0 0 var(--mds-space-4);
+    padding: var(--mds-space-3);
+    border: 1px solid var(--mds-color-action-danger-bg);
+    border-radius: var(--mds-radius-md);
+    color: var(--mds-color-danger-text);
+    font-size: var(--mds-type-body-md-font-size);
+}
+
+.admin-tenants__prose {
+    margin: 0;
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+    color: var(--mds-color-text-body);
+}
+</style>

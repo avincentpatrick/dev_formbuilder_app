@@ -9,10 +9,19 @@ export interface AppUser {
     email: string;
 }
 
+// Ability gates the shell/pages consume (computed fail-closed in HandleInertiaRequests::share()).
+export interface AppAbilities {
+    manageMembers: boolean;
+    transferOwnership: boolean;
+}
+
+export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };
+
 declare module '@inertiajs/core' {
     interface PageProps {
-        auth: { user: AppUser | null };
+        auth: { user: AppUser | null; can: AppAbilities };
         ui: { theme: { mode: ThemeMode; accent: string } };
+        flash: { toast: FlashToast | null };
         errors: Record<string, string>;
     }
 }

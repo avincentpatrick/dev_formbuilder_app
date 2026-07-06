@@ -191,6 +191,78 @@ final class TenantMembershipService
         });
     }
 
+    /**
+     * The roster for the Members page: every active member + pending invite in the current tenant.
+     *
+     * RLS correctness: `tenant_users` is strict-RLS, so the query below returns exactly this tenant's
+     * rows — the authoritative, tenant-bounded id set. Active members' `users` rows are visible on the
+     * app connection, but pending/Invited placeholder users are hidden by the join-shape `users` policy;
+     * so identities are resolved for that already-tenant-bounded id set on the pre-auth `pgsql_auth`
+     * connection (the same cross-RLS lookup `invite()` uses) — this leaks nothing across tenants. Role:
+     * active members resolve their materialized role from `model_has_roles` (team-scoped by RLS); pending
+     * members show their reserved `invited_role_id`.
+     *
+     * @return list<array{user_id: string, name: string, email: string, status: string, role: string, is_owner: bool, joined_at: ?string, invited_at: ?string}>
+     */
+    public function listMembers(Tenant $tenant): array
+    {
+        $memberships = TenantUser::query()
+            ->whereIn('status', [TenantUserStatus::Active->value, TenantUserStatus::Invited->value])
+            ->get();
+
+        if ($memberships->isEmpty()) {
+            return [];
+        }
+
+        $userIds = $memberships->pluck('user_id')->all();
+
+        // withTrashed so every membership's user resolves (a soft-deleted account still has a row) —
+        // the FK then guarantees the keyed map contains every id below, so no null-identity branch.
+        $users = User::on('pgsql_auth')
+            ->withTrashed()
+            ->whereIn('id', $userIds)
+            ->get(['id', 'name', 'email'])
+            ->keyBy('id')
+            ->all();
+
+        $globalRoleNames = Role::query()->whereNull('tenant_id')->pluck('name', 'id');
+
+        $activeRoleByUser = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->whereIn('model_has_roles.model_id', $userIds)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->pluck('roles.name', 'model_has_roles.model_id');
+
+        $rows = [];
+        foreach ($memberships as $m) {
+            $user = $users[$m->user_id];
+
+            if ($m->status === TenantUserStatus::Active) {
+                $roleValue = $activeRoleByUser[$m->user_id] ?? null;
+            } else {
+                $roleValue = $m->invited_role_id !== null ? ($globalRoleNames[$m->invited_role_id] ?? null) : null;
+            }
+
+            $rows[] = [
+                'user_id' => (string) $m->user_id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $m->status->value,
+                'role' => $roleValue !== null ? Str::headline((string) $roleValue) : '—',
+                'is_owner' => $tenant->owner_user_id === $m->user_id,
+                'joined_at' => $m->joined_at?->toIso8601String(),
+                'invited_at' => $m->invited_at?->toIso8601String(),
+            ];
+        }
+
+        // Owner first, then active before pending, then by name — a stable, readable roster order.
+        usort($rows, fn (array $a, array $b): int => ($b['is_owner'] <=> $a['is_owner'])
+            ?: ($a['status'] <=> $b['status'])
+            ?: ($a['name'] <=> $b['name']));
+
+        return $rows;
+    }
+
     private function assertPending(TenantUser $invite): void
     {
         if ($invite->status !== TenantUserStatus::Invited) {

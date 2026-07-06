@@ -193,14 +193,114 @@ jobs:
       - name: Placeholder
         run: echo "OpenAPI 3.1 contract tests are wired when the /api/v1 surface lands (Phase-0 Increment E)."
 
-  # ── Stage 6 (stub, present): Playwright e2e — wired as real pages appear (Increment C+) ──
+  # ── Stage 6: Playwright responsive + composed-page axe gate (PRD Feature #5 / metric G6) ──
+  #    Boots the real app (artisan serve) on a subdomain, seeds a deterministic tenant, and scans the
+  #    assembled tenant pages at 375/834/1440px in light + dark for zero WCAG 2.2 AA violations and no
+  #    horizontal overflow. Central-domain admin (mandatory MFA) is covered by a Storybook story instead.
   e2e:
     name: E2E (Playwright + axe)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: meridian
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: meridian
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meridian -d meridian"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: meridian_testing
+      DB_USERNAME: meridian_app
+      DB_PASSWORD: secret
+      DB_PRIVILEGED_USERNAME: meridian
+      DB_PRIVILEGED_PASSWORD: secret
+      DB_AUTH_USERNAME: meridian_auth
+      DB_AUTH_PASSWORD: secret
+      DB_SUPERADMIN_USERNAME: meridian_superadmin
+      DB_SUPERADMIN_PASSWORD: secret
+      REDIS_HOST: 127.0.0.1
+      CENTRAL_DOMAIN: meridian.test
+      APP_ENV: local
+      APP_URL: http://acme.meridian.test:8000
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: log
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "Playwright e2e + @axe-core on composed pages are wired as the app shell/pages land."
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install design-system deps
+        run: npm --prefix packages/design-system install --no-audit --no-fund
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Provision RLS roles and database
+        run: |
+          PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE meridian_app LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE ROLE meridian_auth LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE DATABASE meridian_testing OWNER meridian_app;
+          GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          SQL
+
+      - name: Map tenant + central hosts to loopback
+        run: echo "127.0.0.1 acme.meridian.test meridian.test" | sudo tee -a /etc/hosts
+
+      - name: Build frontend (tokens + Vite manifest)
+        run: |
+          npm run ds:tokens
+          npm run build
+
+      - name: Migrate + seed the e2e fixture
+        run: |
+          php artisan migrate --force
+          php artisan db:seed --class="Database\\Seeders\\E2eSeeder" --force
+
+      - name: Install Playwright (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run responsive + axe gate
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
   # ── Deployment lives in a separate workflow ──────────────────────────────────────────────
   #    .github/workflows/deploy.yml runs on the self-hosted Windows Server runner, triggered by

@@ -52,6 +52,7 @@ export const icons = {
     clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18z M12 8v4l3 2',
 
     // ── Builder — reorder / history / duplicate ────────────────────────────────
+    grip: 'M9 6h.01 M9 12h.01 M9 18h.01 M15 6h.01 M15 12h.01 M15 18h.01',
     'chevron-up': 'M6 15l6-6 6 6',
     copy: 'M9 9h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z M5 15a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1',
     undo: 'M9 7L4 12l5 5 M4 12h11a5 5 0 0 1 5 5v1',

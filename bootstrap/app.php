@@ -167,11 +167,20 @@ return Application::configure(basePath: dirname(__DIR__))
             ? ApiErrorResponse::make(422, 'form_rule_violated', $e->getMessage())
             : null);
 
-        // Tenancy identification failure — the API surface is served on the tenant subdomain; hitting it on
-        // the central host (not a subdomain) or an unknown subdomain is a 404, not a raw 500.
-        $exceptions->render(fn (NotASubdomainException|TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(404, 'tenant_not_identified', 'No tenant could be identified for this host.')
-            : null);
+        // Tenancy identification failure — every tenant route is served on a tenant subdomain, so a request
+        // for one on the central/non-subdomain host (localhost, 127.0.0.1, the apex) or an unknown subdomain
+        // must not surface a raw 500. The /api/v1 surface answers with a 404 envelope; a browser (web) request
+        // is redirected to the central app home (e.g. a stray navigation or a post-login redirect that landed
+        // on the central host without a workspace subdomain).
+        $exceptions->render(function (NotASubdomainException|TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(404, 'tenant_not_identified', 'No tenant could be identified for this host.');
+            }
+
+            $central = config('app.url');
+
+            return redirect(is_string($central) && $central !== '' ? $central : '/');
+        });
 
         // Final fallback so NOTHING on /api/v1 escapes the envelope as a raw 500 / HTML / framework JSON:
         // e.g. a 419 CSRF TokenMismatch on the session mint routes, or any unexpected error. Registered last

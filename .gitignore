@@ -39,3 +39,6 @@ Thumbs.db
 
 # Local-only dev overrides (never committed)
 docker-compose.override.yml
+
+# OpenAPI drift-check artifact (CI-generated; the committed spec is openapi.json)
+/openapi.gen.json

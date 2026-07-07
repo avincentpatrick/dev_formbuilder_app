@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * The durable, logical form record (data-dictionary §2). Deliberately thin — almost all content lives
@@ -31,6 +32,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $default_locale
  * @property string $owner_user_id
  * @property string $created_by
+ * @property ?Carbon $published_at
+ * @property ?Carbon $archived_at
  */
 class Form extends Model implements TenantScoped
 {

@@ -184,14 +184,89 @@ jobs:
             "npx http-server storybook-static -p 6006 --silent" \
             "npx wait-on tcp:127.0.0.1:6006 && npx test-storybook --url http://127.0.0.1:6006"
 
-  # ── Stage 4 (stub, present): OpenAPI contract tests — wired when /api/v1 lands (Increment E)
+  # ── Stage 4: OpenAPI 3.1 contract — export the spec, validate it, and fail on drift (Increment E) ──
+  #    Scramble analyzes the /api/v1 routes + request/resource types; inferring the resource/paginator
+  #    response shapes introspects the Eloquent models, which needs a live (migrated) DB connection — so
+  #    the schema is provisioned + migrated here, mirroring the `tests` job. The committed openapi.json must
+  #    match a fresh export (regenerate with `php artisan scramble:export --path=openapi.json` + commit on drift).
   contract-tests:
     name: Contract tests (OpenAPI)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: meridian
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: meridian
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U meridian -d meridian"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: meridian_testing
+      DB_USERNAME: meridian_app
+      DB_PASSWORD: secret
+      DB_PRIVILEGED_USERNAME: meridian
+      DB_PRIVILEGED_PASSWORD: secret
+      DB_AUTH_USERNAME: meridian_auth
+      DB_AUTH_PASSWORD: secret
+      DB_SUPERADMIN_USERNAME: meridian_superadmin
+      DB_SUPERADMIN_PASSWORD: secret
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "OpenAPI 3.1 contract tests are wired when the /api/v1 surface lands (Phase-0 Increment E)."
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Provision RLS roles and database
+        run: |
+          PGPASSWORD=secret psql -h 127.0.0.1 -U meridian -d meridian -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE meridian_app LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE ROLE meridian_auth LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+          CREATE DATABASE meridian_testing OWNER meridian_app;
+          GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          SQL
+
+      - name: Migrate the schema (Scramble introspects the models for response shapes)
+        run: php artisan migrate --force
+
+      - name: Export a fresh OpenAPI document
+        run: php artisan scramble:export --path=openapi.gen.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate the OpenAPI document (Redocly, uses redocly.yaml)
+        run: npx --yes @redocly/cli@2 lint openapi.gen.json
+
+      - name: Fail on contract drift (fresh export vs committed openapi.json)
+        run: |
+          if ! diff -u openapi.json openapi.gen.json; then
+            echo "::error::openapi.json is out of date. Run 'php artisan scramble:export --path=openapi.json' and commit the result."
+            exit 1
+          fi
 
   # ── Stage 6: Playwright responsive + composed-page axe gate (PRD Feature #5 / metric G6) ──
   #    Boots the real app (artisan serve) on a subdomain, seeds a deterministic tenant, and scans the

@@ -2,7 +2,9 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0 — formalizes `docs/architecture/technical-architecture.md` §7.1–§7.3 (resource inventory, auth-per-caller-type, export modes) into API-specification detail: request/response schemas, pagination, error format, versioning, and rate limits. **This document does not re-derive the resource list or auth model** — those are already decided; this document fills in what wasn't yet specified at the level an actual OpenAPI 3.1 contract needs.
-**Deliverable note**: the literal, exhaustive `openapi.yaml` (every path, every schema, machine-validated) is a **Phase 0 code-adjacent deliverable**, generated from route/request-class annotations (e.g., via `dedoc/scramble` or an equivalent Laravel OpenAPI generator) rather than hand-authored in this markdown doc and then left to drift from the actual routes — consistent with this project's "docs-as-code" discipline (architecture plan §5). This document is the human-readable design spec that generation target is built against, with representative schema examples, not a substitute for the generated file.
+**Deliverable note**: the literal, exhaustive machine-validated OpenAPI document is a **Phase 0 code-adjacent deliverable**, generated from the routes + request/resource types rather than hand-authored in this markdown doc and then left to drift from the actual routes — consistent with this project's "docs-as-code" discipline (architecture plan §5). This document is the human-readable design spec that generation target is built against, with representative schema examples, not a substitute for the generated file.
+
+> **Delivered — Phase 0 Increment E (2026-07-07).** The generated contract lives at the repo root as **`openapi.json`** (OpenAPI 3.1), produced by **`dedoc/scramble`** from the `/api/v1` routes + FormRequest/JsonResource types, with the bearer security scheme + a deterministic `{tenant}`-templated server applied via `Scramble::extendOpenApi` (AppServiceProvider). The CI **`contract-tests`** job re-exports the spec, validates it with **Redocly** (`redocly.yaml`), and fails on any drift from the committed file. This first slice documents the already-built surface (auth-token issuance, Forms read, Form versions read + publish, tenant profile); the remaining §7.1 resources extend the same pattern in Phase 1.
 
 ---
 
@@ -175,7 +177,7 @@ components:
 
 ## 4. Out of Scope / Deferred
 
-- The full, generated `openapi.yaml` — a Phase 0 code-generation deliverable (§0).
+- ~~The full, generated `openapi.yaml`~~ — **delivered in Phase 0 Increment E** as `openapi.json` at the repo root (Scramble-generated, Redocly-validated, drift-checked in CI). See §0.
 - Webhook event payload schemas (the `data` shape per `event_type`) → Doc #15.
 - XLSForm import/export request/response detail beyond the endpoint's existence (already in `docs/architecture/technical-architecture.md` §7.1) → Doc #16.
 - OCR intake endpoint payload/polling detail → Doc #17.

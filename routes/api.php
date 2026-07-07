@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\Api\V1\ApiTokenController;
+use App\Http\Controllers\Api\V1\FormApiController;
+use App\Http\Controllers\Api\V1\FormVersionApiController;
+use App\Http\Controllers\Api\V1\TenantApiController;
+use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Models\Form;
+use App\Support\Api\ApiAbilities;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Support\Facades\Route;
+use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
+/*
+|--------------------------------------------------------------------------
+| API routes — the versioned REST surface /api/v1 (Increment E)
+|--------------------------------------------------------------------------
+| Loaded by bootstrap/app.php withRouting(then:). Served on the tenant subdomain
+| (acme.meridian.test/api/v1/...) — subdomain identification resolves the tenant, and RLS enforces
+| isolation, exactly like routes/tenant.php. Two groups with different auth:
+|   A. Token issuance — SESSION auth (a logged-in member mints an API key from the app).
+|   B. Token-consumed resources — Sanctum bearer-token auth (AuthenticateApiToken) + `ability:` gates,
+|      composed with the FormPolicy `can:` gate. See docs/api-specification.md.
+| The {error:{code,message,details}} envelope + the `api` rate limit + the priority slot for
+| AuthenticateApiToken all live in bootstrap/app.php / AppServiceProvider.
+*/
+
+// ── Group A: token issuance (session-authenticated; the mint/list/revoke surface) ─────────────
+Route::prefix('api/v1')
+    ->name('api.v1.')
+    ->middleware([
+        'web',
+        InitializeTenancyBySubdomain::class,
+        PreventAccessFromCentralDomains::class,
+        EstablishTenantDatabaseContext::class,
+        'auth',
+    ])
+    ->group(function (): void {
+        // A key is minted scoped to the issuer's own RBAC (requested abilities are intersected against
+        // the issuer's permissions server-side), so it can never exceed its issuer; any active member may
+        // mint one (a non-member's key trims to no abilities and its tokenable is hidden by RLS on use).
+        // The plaintext secret is returned exactly once, on create.
+        Route::post('auth/tokens', [ApiTokenController::class, 'store'])->name('tokens.store');
+        Route::get('auth/tokens', [ApiTokenController::class, 'index'])->name('tokens.index');
+        // {id} constrained to digits — personal_access_tokens.id is a bigint; a non-numeric id would
+        // otherwise reach the query and 500 on a bad cast instead of a clean 404.
+        Route::delete('auth/tokens/{id}', [ApiTokenController::class, 'destroy'])
+            ->whereNumber('id')->name('tokens.destroy');
+    });
+
+// ── Group B: token-consumed resources (Sanctum bearer auth + ability + policy) ────────────────
+Route::prefix('api/v1')
+    ->name('api.v1.')
+    ->middleware([
+        InitializeTenancyBySubdomain::class,
+        PreventAccessFromCentralDomains::class,
+        EstablishTenantDatabaseContext::class,
+        AuthenticateApiToken::class,
+        'throttle:api',
+        SubstituteBindings::class,
+    ])
+    ->group(function (): void {
+        Route::get('tenant', [TenantApiController::class, 'show'])
+            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->name('tenant.show');
+
+        Route::get('forms', [FormApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:viewAny,'.Form::class])
+            ->name('forms.index');
+
+        Route::get('forms/{form}', [FormApiController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
+            ->name('forms.show');
+
+        Route::get('forms/{form}/versions', [FormVersionApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
+            ->name('forms.versions.index');
+
+        Route::get('forms/{form}/versions/{version}', [FormVersionApiController::class, 'show'])
+            ->scopeBindings()
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
+            ->name('forms.versions.show');
+
+        // Publish the form's current draft (docs/form-versioning-schema-migration.md §3.2). The URL names
+        // the draft version; the controller rejects a non-draft {version} before delegating to PublishService.
+        Route::post('forms/{form}/versions/{version}/publish', [FormVersionApiController::class, 'publish'])
+            ->scopeBindings()
+            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:publish,form'])
+            ->name('forms.versions.publish');
+    });

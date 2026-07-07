@@ -1,0 +1,857 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Form-Builder SaaS API",
+        "version": "1.0",
+        "description": "The versioned REST API for the Meridian form-builder platform. Served per tenant on the tenant subdomain (https://{tenant}.meridian.test/api/v1) and authenticated with Sanctum personal-access-token API keys. See docs/api-specification.md."
+    },
+    "servers": [
+        {
+            "url": "https://{tenant}.meridian.test/api/v1",
+            "description": "Per-tenant API base \u2014 replace {tenant} with your workspace subdomain slug.",
+            "variables": {
+                "tenant": {
+                    "default": "acme"
+                }
+            }
+        }
+    ],
+    "security": [
+        {
+            "sanctumToken": []
+        }
+    ],
+    "paths": {
+        "/auth/tokens": {
+            "post": {
+                "operationId": "v1.tokens.store",
+                "summary": "Mint a new API key (a tenant-scoped Sanctum personal access token). Returns the secret exactly once",
+                "tags": [
+                    "ApiToken"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreApiTokenRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "abilities": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "expires_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name",
+                                        "abilities",
+                                        "token",
+                                        "expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "get": {
+                "operationId": "v1.tokens.index",
+                "summary": "List the caller's API keys for this tenant (the secret is never returned)",
+                "tags": [
+                    "ApiToken"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "abilities": {
+                                                        "type": "string"
+                                                    },
+                                                    "last_used_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "expires_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "created_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "name",
+                                                    "abilities",
+                                                    "last_used_at",
+                                                    "expires_at",
+                                                    "created_at"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/auth/tokens/{id}": {
+            "delete": {
+                "operationId": "v1.tokens.destroy",
+                "summary": "Revoke one of the caller's API keys",
+                "tags": [
+                    "ApiToken"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/forms": {
+            "get": {
+                "operationId": "v1.forms.index",
+                "summary": "Cursor-paginated list of the tenant's non-archived forms (api-specification.md \u00a72.2)",
+                "tags": [
+                    "FormApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 25
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FormResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/forms/{form}": {
+            "get": {
+                "operationId": "v1.forms.show",
+                "summary": "Fetch a single form by id",
+                "tags": [
+                    "FormApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "form",
+                        "in": "path",
+                        "required": true,
+                        "description": "The form ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`FormResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FormResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/forms/{form}/versions": {
+            "get": {
+                "operationId": "v1.forms.versions.index",
+                "summary": "Cursor-paginated version history for a form, newest version first",
+                "tags": [
+                    "FormVersionApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "form",
+                        "in": "path",
+                        "required": true,
+                        "description": "The form ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 25
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FormVersionResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/forms/{form}/versions/{version}": {
+            "get": {
+                "operationId": "v1.forms.versions.show",
+                "summary": "Fetch a single form version, including its immutable schema snapshot",
+                "tags": [
+                    "FormVersionApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "form",
+                        "in": "path",
+                        "required": true,
+                        "description": "The form ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "description": "The version ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`FormVersionResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FormVersionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/forms/{form}/versions/{version}/publish": {
+            "post": {
+                "operationId": "v1.forms.versions.publish",
+                "summary": "Publish the form's current draft. The URL names the draft version; a non-draft {version} is rejected\nbefore delegating to the 9-step publish transaction",
+                "tags": [
+                    "FormVersionApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "form",
+                        "in": "path",
+                        "required": true,
+                        "description": "The form ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "description": "The version ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublishVersionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`FormVersionResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FormVersionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/tenant": {
+            "get": {
+                "operationId": "v1.tenant.show",
+                "summary": "Fetch the current tenant profile",
+                "tags": [
+                    "TenantApi"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`TenantResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TenantResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "sanctumToken": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        },
+        "schemas": {
+            "FormResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "default_locale": {
+                        "type": "string"
+                    },
+                    "capability_flags": {
+                        "type": "object"
+                    },
+                    "current_published_version_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "draft_version_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "archived_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "status",
+                    "default_locale",
+                    "capability_flags",
+                    "current_published_version_id",
+                    "draft_version_id",
+                    "published_at",
+                    "archived_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "FormResource"
+            },
+            "FormVersionResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "form_id": {
+                        "type": "string"
+                    },
+                    "version_number": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "change_summary": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "schema_snapshot": {
+                        "type": "object"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "superseded_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "form_id",
+                    "version_number",
+                    "status",
+                    "title",
+                    "description",
+                    "change_summary",
+                    "checksum",
+                    "published_at",
+                    "superseded_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "FormVersionResource"
+            },
+            "PublishVersionRequest": {
+                "type": "object",
+                "description": "Validation for publishing a draft version through the API (Increment E). Authorization is the route's\n`ability:write:forms` + `can:publish,form` gates; this only validates the optional publisher note that\nis appended to the auto-generated change summary.",
+                "properties": {
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    }
+                },
+                "title": "PublishVersionRequest"
+            },
+            "StoreApiTokenRequest": {
+                "type": "object",
+                "description": "Validation for minting an API key (Increment E). The requested `abilities` must be members of the\ncatalog ({@see ApiAbilities}); the controller then intersects them against the issuer's RBAC, so the\nrequested set is an upper bound, never a grant. Authorization (an authenticated member) is the route's\nsession `auth` middleware.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "abilities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "read:forms",
+                                "write:forms",
+                                "read:submissions",
+                                "write:submissions",
+                                "review:submissions",
+                                "export:submissions",
+                                "manage:webhooks",
+                                "manage:settings",
+                                "read:audit_log"
+                            ]
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "name",
+                    "abilities"
+                ],
+                "title": "StoreApiTokenRequest"
+            },
+            "TenantResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "default_locale": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "default_locale",
+                    "status"
+                ],
+                "title": "TenantResource"
+            }
+        },
+        "responses": {
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthorizationException": {
+                "description": "Authorization error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ModelNotFoundException": {
+                "description": "Not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

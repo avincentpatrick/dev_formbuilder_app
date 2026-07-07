@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ | Increment E — a cheap in-suite guard on the committed OpenAPI contract (openapi.json). The CI
+ | `contract-tests` job does the full Redocly validation + drift-diff against a fresh Scramble export;
+ | this asserts the essentials inside the normal test run so a corrupted/forgotten spec fails fast. No DB.
+ */
+
+it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (): void {
+    $path = base_path('openapi.json');
+    expect(file_exists($path))->toBeTrue();
+
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($spec['openapi'])->toBe('3.1.0')
+        ->and($spec['info']['title'])->toBe('Form-Builder SaaS API')
+        ->and($spec['components']['securitySchemes'])->toHaveKey('sanctumToken')
+        ->and($spec['security'])->toBe([['sanctumToken' => []]]);
+
+    expect(array_keys($spec['paths']))->toContain(
+        '/forms',
+        '/forms/{form}',
+        '/forms/{form}/versions',
+        '/forms/{form}/versions/{version}',
+        '/forms/{form}/versions/{version}/publish',
+        '/auth/tokens',
+        '/auth/tokens/{id}',
+        '/tenant',
+    );
+});

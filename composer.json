@@ -16,6 +16,7 @@
         "stancl/tenancy": "^3.10"
     },
     "require-dev": {
+        "dedoc/scramble": "^0.13.30",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.10",
         "laravel/pail": "^1.2.5",

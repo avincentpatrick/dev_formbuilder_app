@@ -42,6 +42,15 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // The token guard for the /api/v1 surface (Increment E). Declared explicitly — Sanctum's
+        // auto-merged default has `provider => null`, which disables the tokenable `instanceof User`
+        // check. The token lookup itself uses the custom App\Models\PersonalAccessToken model, not this
+        // provider; the provider only re-enables the guard's model check and documents intent.
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*

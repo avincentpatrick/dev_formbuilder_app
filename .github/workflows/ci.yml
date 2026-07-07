@@ -184,14 +184,47 @@ jobs:
             "npx http-server storybook-static -p 6006 --silent" \
             "npx wait-on tcp:127.0.0.1:6006 && npx test-storybook --url http://127.0.0.1:6006"
 
-  # ── Stage 4 (stub, present): OpenAPI contract tests — wired when /api/v1 lands (Increment E)
+  # ── Stage 4: OpenAPI 3.1 contract — export the spec, validate it, and fail on drift (Increment E) ──
+  #    Scramble analyzes the /api/v1 routes + request/resource types statically (no DB), so no Postgres
+  #    service is needed. The committed openapi.json must match a fresh export (regenerate + commit on drift).
   contract-tests:
     name: Contract tests (OpenAPI)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "OpenAPI 3.1 contract tests are wired when the /api/v1 surface lands (Phase-0 Increment E)."
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, redis, intl, zip, bcmath, pcntl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Export a fresh OpenAPI document
+        run: php artisan scramble:export --path=openapi.gen.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate the OpenAPI document (Redocly, uses redocly.yaml)
+        run: npx --yes @redocly/cli@2 lint openapi.gen.json
+
+      - name: Fail on contract drift (fresh export vs committed openapi.json)
+        run: |
+          if ! diff -u openapi.json openapi.gen.json; then
+            echo "::error::openapi.json is out of date. Run 'php artisan scramble:export --path=openapi.json' and commit the result."
+            exit 1
+          fi
 
   # ── Stage 6: Playwright responsive + composed-page axe gate (PRD Feature #5 / metric G6) ──
   #    Boots the real app (artisan serve) on a subdomain, seeds a deterministic tenant, and scans the

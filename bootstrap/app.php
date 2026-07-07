@@ -1,11 +1,16 @@
 <?php
 
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Forms\FormException;
+use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Tenancy\MembershipException;
+use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Support\Api\ApiErrorResponse;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
@@ -15,6 +20,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -22,9 +28,18 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Laravel\Sanctum\Exceptions\MissingAbilityException;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
+use Stancl\Tenancy\Exceptions\NotASubdomainException;
+use Stancl\Tenancy\Exceptions\TenantCouldNotBeIdentifiedOnDomainException;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,8 +48,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         // The super-admin console (Increment B2c) — a central-domain-only group, not the tenant
         // subdomain group (that is mapped by TenancyServiceProvider). Loaded inside the `web` group.
+        //
+        // The /api/v1 REST surface (Increment E) is loaded here too. Each group inside routes/api.php
+        // declares its full middleware stack inline (token-consumed vs session-mint), so it is loaded
+        // without wrapping middleware — mirroring how routes/tenant.php owns its own pipeline.
         then: function (): void {
             Route::middleware('web')->group(base_path('routes/admin.php'));
+            Route::group([], base_path('routes/api.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -49,10 +69,15 @@ return Application::configure(basePath: dirname(__DIR__))
         //
         // superadmin / superadmin.mfa (B2c) gate the central-domain console: is_super_admin flag +
         // mandatory confirmed 2FA (security-threat-model §8).
+        //
+        // ability / abilities (Increment E) are Sanctum's token-ability gates for the /api/v1 surface
+        // (CheckForAnyAbility = any-of; CheckAbilities = all-of); not auto-registered by the package.
         $middleware->alias([
             'tenant.context' => EstablishTenantDatabaseContext::class,
             'superadmin' => EnsureSuperAdmin::class,
             'superadmin.mfa' => EnsureSuperAdminMfa::class,
+            'ability' => CheckForAnyAbility::class,
+            'abilities' => CheckAbilities::class,
         ]);
 
         // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session
@@ -61,6 +86,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // tenancy middleware are inserted after Authenticate (so EstablishTenantDatabaseContext can read
         // the authenticated user for app.current_user_id) and before SubstituteBindings. Priority only
         // reorders middleware a route already has — central/non-tenant routes are unaffected.
+        //
+        // AuthenticateApiToken (Increment E) sits immediately AFTER EstablishTenantDatabaseContext and
+        // before SubstituteBindings: the Sanctum token lookup must run with the tenant GUC already set
+        // (so the strict RLS on personal_access_tokens reveals only this tenant's token), and the
+        // route-bound model must resolve with the now-known user. It is deliberately NOT the
+        // `auth:sanctum` alias, which (implementing AuthenticatesRequests) would sort ahead of tenancy.
         $middleware->priority([
             HandlePrecognitiveRequests::class,
             EncryptCookies::class,
@@ -74,6 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
             InitializeTenancyBySubdomain::class,
             PreventAccessFromCentralDomains::class,
             EstablishTenantDatabaseContext::class,
+            AuthenticateApiToken::class,
             SubstituteBindings::class,
             Authorize::class,
         ]);
@@ -86,6 +118,78 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // ── /api/v1 error envelope (api-specification.md §2.3): { error: { code, message, details } } ──
+        // Each closure applies ONLY to the /api/v1 surface (returns null otherwise, so Inertia/web flows
+        // are untouched — a returned null makes the handler fall through to the next callback/default).
+        // IMPORTANT: render callbacks run AFTER Handler::prepareException, which rewrites several exceptions:
+        // AuthorizationException / MissingAbilityException → AccessDeniedHttpException (the original kept as
+        // getPrevious()), and ModelNotFoundException → NotFoundHttpException. So we match the POST-conversion
+        // types here. ValidationException / AuthenticationException / ThrottleRequestsException / the domain
+        // Form* exceptions are NOT rewritten and are matched directly.
+        $isApi = fn (Request $request): bool => $request->is('api/v1/*');
+
+        $exceptions->render(fn (ValidationException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(422, 'validation_failed', 'The given data was invalid.', ['fields' => $e->errors()])
+            : null);
+
+        $exceptions->render(function (AccessDeniedHttpException $e, Request $request) use ($isApi) {
+            if (! $isApi($request)) {
+                return null;
+            }
+
+            // A missing token ability keeps its MissingAbilityException as the previous exception.
+            $previous = $e->getPrevious();
+            if ($previous instanceof MissingAbilityException) {
+                return ApiErrorResponse::make(403, 'insufficient_ability', 'This API token lacks a required ability.', ['missing' => $previous->abilities()]);
+            }
+
+            return ApiErrorResponse::make(403, 'forbidden', 'You are not authorized to perform this action.');
+        });
+
+        $exceptions->render(fn (AuthenticationException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(401, 'unauthenticated', 'Authentication is required.')
+            : null);
+
+        $exceptions->render(fn (NotFoundHttpException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(404, 'not_found', 'The requested resource was not found.')
+            : null);
+
+        $exceptions->render(fn (ThrottleRequestsException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(429, 'rate_limited', 'Too many requests.')->withHeaders($e->getHeaders())
+            : null);
+
+        $exceptions->render(fn (PublishValidationException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(422, 'publish_invalid', $e->getMessage())
+            : null);
+
+        $exceptions->render(fn (FormException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(422, 'form_rule_violated', $e->getMessage())
+            : null);
+
+        // Tenancy identification failure — the API surface is served on the tenant subdomain; hitting it on
+        // the central host (not a subdomain) or an unknown subdomain is a 404, not a raw 500.
+        $exceptions->render(fn (NotASubdomainException|TenantCouldNotBeIdentifiedOnDomainException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(404, 'tenant_not_identified', 'No tenant could be identified for this host.')
+            : null);
+
+        // Final fallback so NOTHING on /api/v1 escapes the envelope as a raw 500 / HTML / framework JSON:
+        // e.g. a 419 CSRF TokenMismatch on the session mint routes, or any unexpected error. Registered last
+        // so the specific closures above win; the exception is still logged by the handler's report() path.
+        $exceptions->render(function (Throwable $e, Request $request) use ($isApi) {
+            if (! $isApi($request)) {
+                return null;
+            }
+
+            $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
+            [$code, $message] = match (true) {
+                $status === 419 => ['csrf_token_mismatch', 'The CSRF token is missing or invalid.'],
+                $status >= 500 => ['server_error', 'An unexpected error occurred.'],
+                default => ['request_failed', $e->getMessage() !== '' ? $e->getMessage() : 'The request could not be processed.'],
+            };
+
+            return ApiErrorResponse::make($status, $code, $message);
+        });
 
         // Membership business-rule violations (B2b) are user-facing, not 500s: bounce back with a
         // validation-style error so the form (or the JSON api/* path) surfaces the reason.

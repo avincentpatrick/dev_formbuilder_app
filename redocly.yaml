@@ -1,0 +1,12 @@
+# Redocly ruleset for the generated OpenAPI 3.1 contract (Increment E). The CI `contract-tests` job runs
+# `redocly lint openapi.json` against this config, then diffs a fresh export against the committed file to
+# catch drift. Structural validity (bad $refs, duplicate operationIds, invalid schemas) stays enforced;
+# two doc-completeness recommendations that don't fit a token-authenticated internal API are relaxed:
+#   - info-license: this is a private platform API, not a distributed package.
+#   - operation-4xx-response: errors use one global envelope (api-specification.md §2.3), not per-operation
+#     4xx declarations in the generated spec.
+extends:
+  - recommended
+rules:
+  info-license: off
+  operation-4xx-response: off

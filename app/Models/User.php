@@ -45,6 +45,19 @@ class User extends Authenticatable implements MustVerifyEmail
     use TwoFactorAuthenticatable;
 
     /**
+     * Pin Spatie's guard for this model to the RBAC catalog's guard (`web`, per RolePermissionSeeder),
+     * independent of the request's runtime default guard (Increment E). The /api/v1 token pipeline calls
+     * `Auth::shouldUse('sanctum')`, which mutates `config('auth.defaults.guard')` to `sanctum`; without
+     * this, Spatie's Guard::getDefaultName would resolve `sanctum` and every permission check would throw
+     * PermissionDoesNotExist against the `web`-guarded catalog. All of this app's roles/permissions are
+     * `web`-guarded, so this is always correct (and hardens the session path against the same drift).
+     */
+    public function guardName(): string
+    {
+        return 'web';
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

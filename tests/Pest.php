@@ -10,6 +10,10 @@ use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Expressions\ExpressionEvaluator;
+use App\Services\Expressions\ExpressionLexer;
+use App\Services\Expressions\ExpressionParser;
+use App\Services\Expressions\FunctionRegistry;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
@@ -108,4 +112,27 @@ function addFormField(FormVersion $version, User $user, string $key, FieldType $
         'sequence' => $sequence,
         'created_by' => $user->id,
     ], $extra));
+}
+
+/*
+|--------------------------------------------------------------------------
+| Shared expression-engine builders (Increment F2). Unit tests do NOT boot the container (only Feature
+| does — see the ->in('Feature') binding above), so the engine is hand-constructed here rather than
+| resolved from app(). Defined in Pest.php so a single-file Unit run resolves them too.
+|--------------------------------------------------------------------------
+*/
+
+function makeExpressionLexer(): ExpressionLexer
+{
+    return new ExpressionLexer;
+}
+
+function makeExpressionParser(): ExpressionParser
+{
+    return new ExpressionParser(new ExpressionLexer, new FunctionRegistry);
+}
+
+function makeExpressionEvaluator(): ExpressionEvaluator
+{
+    return new ExpressionEvaluator(new ExpressionParser(new ExpressionLexer, new FunctionRegistry));
 }

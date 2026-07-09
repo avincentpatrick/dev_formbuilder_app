@@ -1,9 +1,11 @@
 # Spike Plan — Form-Rendering & Builder Engine (Build vs. Buy)
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`, "Meridian")
-**Status:** Ready to run — Phase 0.
+**Status:** ✅ **Completed 2026-07-09** — decision recorded in `docs/adr/0004-form-rendering-engine-build-vs-buy.md` (**Accepted: build custom**).
 **Produces:** the decision in `docs/adr/0004-form-rendering-engine-build-vs-buy.md` (fills its scorecard).
 **Owner:** whoever runs the Phase 0 spike.
+
+> **How it was run (2026-07-09).** Executed as a **current-vendor-fact-verified desk evaluation** against the §6 rubric — web-verified July-2026 SurveyJS/Form.io licensing/feature facts (per §8's "verify vendor facts at spike time" guardrail) + architectural reasoning against the three gates — rather than the full hands-on RF-1/RF-2/offline prototype build (§4–§5). This was decisive because both buy candidates fail on *published* capabilities: **SurveyJS** has no XLSForm import/export and no PHP expression engine; **Form.io** has no XLSForm path and its server authority is Node/`@formio/core` (only a JSONLogic *subset* is PHP-portable). Both therefore fail gate **C1** (XLSForm semantics) and gate **C2** (PHP server authority), so the §7 exit criteria that required prototypes (RF-1/RF-2/offline slices, the C2 PHP-authority prototype for the leading buy) were satisfiable from documented capabilities — hands-on prototyping would only have confirmed the gate failures. Custom cleared all gates and won on total (≈98/100); partial-buy is dominated because the single buyable layer (the builder canvas) already shipped custom in Increment D4. The filled scorecard + rationale live in ADR-0004 §Decision.
 
 > A **spike** is a time-boxed, throwaway investigation. The only deliverable is a *decision plus evidence* — the prototype code is discarded. Do not let a spike drift long: a spike that overruns has already told you the answer is "harder than it looks."
 

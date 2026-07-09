@@ -60,6 +60,13 @@ npm run ds:test                # axe every story (WCAG 2.2 AA)
   on Windows checkouts.
 - **File-watch performance:** bind-mounting `C:\laragon\www\...` into Linux containers is slow for
   Vite/PHP watchers. Moving the repo into the WSL2 filesystem materially speeds this up.
+- **Blank page / Vite HMR under Docker:** the dev server binds `0.0.0.0` so the published `5173`
+  port works, but the browser can't connect to `0.0.0.0` (`net::ERR_ADDRESS_INVALID`). `vite.config.ts`
+  sets `server.hmr.host=localhost` (browser-reachable) + `server.cors=true` (the app is served from a
+  different origin, e.g. `acme.localhost:8080`) so the `public/hot` URL resolves. Don't revert those.
+- **Lockfile drift (`name: "html"`):** `package.json` has no `name` field, so `npm install` **inside the
+  container** (`/var/www/html`) rewrites `package-lock.json`'s `name` to `html` plus peer/optional-dep
+  churn. That diff is environmental noise — `git restore package-lock.json` it; don't commit it.
 - **Playwright / e2e** run in Linux (containers / CI), not against Windows-installed browsers, so
   local and CI results match.
 

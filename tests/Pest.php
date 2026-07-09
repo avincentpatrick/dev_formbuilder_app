@@ -7,6 +7,8 @@ use App\Enums\RequiredMode;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormFieldValidation;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -14,6 +16,9 @@ use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\ExpressionLexer;
 use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\FunctionRegistry;
+use App\Services\Expressions\StructuredRuleLowering;
+use App\Services\Validation\SemanticValidator;
+use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
@@ -135,4 +140,71 @@ function makeExpressionParser(): ExpressionParser
 function makeExpressionEvaluator(): ExpressionEvaluator
 {
     return new ExpressionEvaluator(new ExpressionParser(new ExpressionLexer, new FunctionRegistry));
+}
+
+/*
+|--------------------------------------------------------------------------
+| Shared semantic-validation builders (Increment F3). The validator + rule engine are hand-constructed
+| (Unit does not boot the container) and driven from UNSAVED models — casts apply without a database, so
+| the pure evaluate() path needs no Postgres. Attribute setters use magic set (enum/array casts round-trip).
+|--------------------------------------------------------------------------
+*/
+
+function makeStructuredRuleEvaluator(): StructuredRuleEvaluator
+{
+    return new StructuredRuleEvaluator(makeExpressionEvaluator(), new StructuredRuleLowering);
+}
+
+function makeSemanticValidator(): SemanticValidator
+{
+    $engine = makeExpressionEvaluator();
+
+    return new SemanticValidator($engine, new StructuredRuleEvaluator($engine, new StructuredRuleLowering));
+}
+
+/**
+ * An in-memory (unsaved) form_field_validation row.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function makeValidationRow(array $attributes): FormFieldValidation
+{
+    $row = new FormFieldValidation;
+    foreach ($attributes as $key => $value) {
+        $row->{$key} = $value;
+    }
+
+    return $row;
+}
+
+/**
+ * An in-memory (unsaved) form_field row (defaults: optional short-text).
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function makeSchemaField(array $attributes): FormField
+{
+    $field = new FormField;
+    $field->field_type = FieldType::ShortText;
+    $field->is_required = RequiredMode::Optional;
+    foreach ($attributes as $key => $value) {
+        $field->{$key} = $value;
+    }
+
+    return $field;
+}
+
+/**
+ * An in-memory (unsaved) form_section row.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function makeSchemaSection(array $attributes): FormSection
+{
+    $section = new FormSection;
+    foreach ($attributes as $key => $value) {
+        $section->{$key} = $value;
+    }
+
+    return $section;
 }

@@ -23,6 +23,7 @@ final class PublishService
 {
     public function __construct(
         private readonly StructuralValidationGate $gate,
+        private readonly ExpressionValidationGate $expressionGate,
         private readonly SchemaChangeClassifier $classifier,
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
@@ -48,8 +49,10 @@ final class PublishService
                 ? FormVersion::query()->whereKey($locked->current_published_version_id)->first()
                 : null;
 
-            // 1. Validate the draft (throws the specific §4 violation). 2. Classify the change.
+            // 1. Validate the draft (throws the specific §4 violation) — structure, then expressions (F3).
             $this->gate->assertPublishable($draft);
+            $this->expressionGate->assertExpressionsResolve($draft);
+            // 2. Classify the change.
             $classification = $this->classifier->classify($draft, $currentPublished);
 
             // 3+4. Snapshot + checksum — while the version is STILL a draft (its content is readable/writable).

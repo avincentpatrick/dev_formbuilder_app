@@ -26,7 +26,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?string $related_form_field_id
  * @property ?ValidationRuleType $rule_type
  * @property ?ComparisonOperator $operator
+ * @property ?string $rule_value
  * @property ?string $expression
+ * @property ?string $error_message
+ * @property array<string, mixed>|null $error_message_translations
  * @property ?string $logic_group
  * @property ?LogicOperator $logic_operator
  * @property int $sequence

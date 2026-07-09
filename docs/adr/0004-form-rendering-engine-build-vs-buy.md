@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed — decision deferred to the Phase 0 spike.** This ADR records the *frame* for the decision: context, options, the weighted evaluation rubric, and what each outcome would confirm or invalidate elsewhere in the architecture. It moves to **Accepted** once the timeboxed spike (`docs/spikes/form-engine-spike-plan.md`) completes and its scorecard is transcribed into §Decision below.
+**Accepted — 2026-07-09.** The Phase-0 spike (`docs/spikes/form-engine-spike-plan.md`) is complete and its scorecard is transcribed into §Decision below. **Decision: build the engine custom.** Both full-buy candidates (SurveyJS, Form.io) are disqualified by the pass/fail gates — neither speaks XLSForm (C1) and neither offers a PHP evaluator behaviorally identical to its JS engine (C2); partial-buy is dominated because the single layer worth buying, the visual builder, already shipped custom in Increment D4. This confirms the architecture's working baseline and resolves Risk **R7** (§9 of the Technical Architecture Doc).
 
 - **Deciders:** Founding engineering (architecture owner) + product.
 - **Related ADRs:** ADR-0001 (PostgreSQL), ADR-0002 (multi-tenancy + RLS). This decision depends on neither, but it **blocks** Phase 1 field-type work — which is exactly why it is a Phase 0 item.
@@ -60,25 +60,26 @@ Each candidate is scored **0–5** per criterion; weights sum to 100. Rigor + se
 
 ## Decision
 
-> **DEFERRED.** To be completed after the spike. Transcribe the filled scorecard here, state the chosen option (Custom / SurveyJS / Form.io / Partial), and give the one-paragraph rationale.
+> **CUSTOM** — build the form-rendering + builder engine ourselves (Vue 3 + TS front, PHP back), as the architecture's working baseline. Both off-the-shelf engines are **gate-disqualified**; partial-buy is dominated.
 
 | Candidate | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | Weighted total | Gate (C1–C3 ≥ 3?) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Custom | | | | | | | | | | | | |
-| SurveyJS | | | | | | | | | | | | |
-| Form.io | | | | | | | | | | | | |
-| Partial buy | | | | | | | | | | | | |
+| **Custom** | 5 | 5 | 5 | 5 | 5 | 4 | 5 | 5 | 5 | 5 | **98.4** | ✅ **PASS** |
+| SurveyJS | 2 | 2 | 4 | 4 | 5 | 3 | 5 | 4 | 4 | 4 | 69.6 | ❌ **FAIL** (C1, C2) |
+| Form.io | 1 | 2 | 3 | 4 | 4 | 2 | 4 | 2 | 3 | 4 | 54.6 | ❌ **FAIL** (C1, C2) |
+| Partial buy | 5 | 5 | 5 | 5 | 5 | 4 | 4 | 4 | 3 | 3 | 88.8 | ✅ PASS (but dominated) |
 
-**Chosen:** _TBD_ — **Rationale:** _TBD_
+**Chosen:** **Custom.** — **Rationale:** Both off-the-shelf engines fail the two non-negotiable gates. Neither speaks XLSForm — SurveyJS and Form.io each use a proprietary JSON expression model with no `.xlsx` import or lossless round-trip (C1 = 2 / 1) — and neither offers a path to a **PHP** evaluator behaviorally identical to its JavaScript engine: SurveyJS ships only JS with no PHP port (a lone, incomplete community port aside), and Form.io's authority is Node (`@formio/core` in a V8 isolate) whose built-in validators and calculated values are core JavaScript, **not** the portable JSONLogic subset a PHP authority could reuse (C2 = 2 / 2). Server-authoritative validation (plan §5) is therefore only achievable against **two evaluators we control**, kept in lockstep via golden-file vectors (§4.3) — which is *easier* to guarantee than keeping a third-party, evolving JS engine identical to a hand-ported PHP one. Custom is the only candidate that models XLSForm natively (the `docs/xlsform-interop-spec.md` mapping — 27/31 types round-tripping) **and** clears all three gates; partial-buy is dominated because the single layer worth buying — the visual builder — already shipped as a custom, axe-clean, categorized-picker + live-preview surface in **Increment D4**, while the renderer must stay custom to own the expression engine, offline rendering, and version pinning. Choosing Custom invalidates nothing in the architecture (lowest-churn outcome) and resolves Risk R7.
+
+**Method note:** the spike was executed as a current-vendor-fact-verified **desk evaluation** against the rubric (web-verified July-2026 licensing/feature facts + architectural reasoning), not the full hands-on RF-1/RF-2/offline prototype build. That is decisive here because both buys fail on *published* capabilities — no XLSForm model, no PHP authority — which hands-on prototyping would only have confirmed. Key verified facts: SurveyJS has no XLSForm import/export and no PHP expression engine; Form.io has no XLSForm path and its server authority is Node/`@formio/core` (only a JSONLogic *subset* is PHP-portable); both make the two-engine golden-file lockstep architecturally unattainable in PHP without reimplementing the vendor's evolving JS core.
 
 ---
 
-## Consequences (by outcome — to be pruned to the chosen path once decided)
+## Consequences (chosen path: **Custom**)
 
-- **If Custom:** confirms `docs/architecture/technical-architecture.md` §1.3, §4.3, and §8's "custom" baseline as-is; the two-engine evaluator + golden-file suite (§4.3, Risk R3) proceed as designed; Phase 1 field-type work builds on our own renderer.
-- **If SurveyJS or Form.io (full buy):** **invalidates** §4.3's custom-JS-engine assumption and requires a new sub-decision — how the authoritative **PHP** evaluator stays in lockstep with the library's JS logic (golden-file vectors driven from the library's model), plus a mapping layer from the library's JSON to `schema_snapshot`, and a theming/accessibility conformance pass to meet WCAG 2.2 AA. Bundle size and licensing become live constraints on the embeddable public runtime.
-- **If Partial buy:** document exactly which layer is bought and which is custom, and the seam between them (most likely: custom expression engine + data model, library renderer or builder canvas), so the boundary doesn't erode over time.
-- **In every case:** the outcome is recorded here and the three contingent sections above (§1.3, §4.3, §8) are updated in the same PR (docs-as-code discipline, plan §5), and Risk **R7** in §9 is marked resolved.
+- **Confirmed as-is:** `docs/architecture/technical-architecture.md` §1.3, §4.3, and §8's "custom" baseline stand as designed; the two-engine Expression Evaluator + golden-file suite (§4.3, Risk R3) proceed as designed; Phase 1 field-type work builds on our own renderer. The custom builder already shipped (Increment D4), the immutable-versioning data model already shipped (Increment D1–D2), and the XLSForm mapping is specified (`docs/xlsform-interop-spec.md`) — so the Custom path is not just chosen but partly de-risked already.
+- **Not chosen (recorded for the audit trail):** the SurveyJS / Form.io **full-buy** path (would have *invalidated* §4.3's custom-JS-engine assumption and required a PHP-lockstep sub-decision, a library-JSON→`schema_snapshot` mapping layer, and a theming/WCAG-2.2-AA conformance pass, with bundle size + licensing as live runtime constraints) and the **partial-buy** path (dominated — the only buyable layer, the builder canvas, already shipped custom in D4; the renderer must stay custom to own C1/C2/C3) are not taken.
+- **Done in this PR** (docs-as-code, plan §5): this ADR is **Accepted** with the filled scorecard + rationale; the three contingent sections (§1.3, §4.3, §8) are annotated with the resolved outcome; Risk **R7** in §9 and PRD §9.2 are marked resolved.
 
 ---
 

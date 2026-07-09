@@ -1,0 +1,44 @@
+[
+  {
+    "name": "expression_constraint_self_pass",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "qty", "field_type": "integer", "rules": [{"expression": ". > 0"}]}]},
+    "answers": {"qty": 5},
+    "expected": {"relevance": {"fields": {"qty": true}, "sections": {}}, "errors": [], "effective_answers": {"qty": 5}, "computed": {}}
+  },
+  {
+    "name": "expression_constraint_self_fail",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "qty", "field_type": "integer", "rules": [{"expression": ". > 0"}]}]},
+    "answers": {"qty": 0},
+    "expected": {"relevance": {"fields": {"qty": true}, "sections": {}}, "errors": [{"field": "qty", "rule": "constraint"}], "effective_answers": {"qty": 0}, "computed": {}}
+  },
+  {
+    "name": "skip_with_hides",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "na"}, {"key": "detail", "rules": [{"rule_type": "skip_with", "related": "na"}]}]},
+    "answers": {"na": "yes", "detail": "x"},
+    "expected": {"relevance": {"fields": {"na": true, "detail": false}, "sections": {}}, "errors": [], "effective_answers": {"na": "yes"}, "computed": {}}
+  },
+  {
+    "name": "constraint_group_or_pass",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "val", "field_type": "integer", "rules": [{"id": "g0", "rule_type": "min_value", "rule_value": "5", "sequence": 0, "logic_group": "g"}, {"id": "g1", "rule_type": "max_value", "rule_value": "1", "sequence": 1, "logic_operator": "or", "logic_group": "g"}]}]},
+    "answers": {"val": 0},
+    "expected": {"relevance": {"fields": {"val": true}, "sections": {}}, "errors": [], "effective_answers": {"val": 0}, "computed": {}}
+  },
+  {
+    "name": "constraint_group_or_fail",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "val", "field_type": "integer", "rules": [{"id": "g0", "rule_type": "min_value", "rule_value": "5", "sequence": 0, "logic_group": "g"}, {"id": "g1", "rule_type": "max_value", "rule_value": "1", "sequence": 1, "logic_operator": "or", "logic_group": "g"}]}]},
+    "answers": {"val": 3},
+    "expected": {"relevance": {"fields": {"val": true}, "sections": {}}, "errors": [{"field": "val", "rule": "min_value"}], "effective_answers": {"val": 3}, "computed": {}}
+  },
+  {
+    "name": "required_if_string_condition",
+    "grammar_version": "1.0",
+    "schema": {"fields": [{"key": "status"}, {"key": "reason", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "status", "rule_value": "active"}]}]},
+    "answers": {"status": "active"},
+    "expected": {"relevance": {"fields": {"status": true, "reason": true}, "sections": {}}, "errors": [{"field": "reason", "rule": "field_required"}], "effective_answers": {"status": "active"}, "computed": {}}
+  }
+]

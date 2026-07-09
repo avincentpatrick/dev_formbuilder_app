@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Expressions;
 
+use App\Enums\ComparisonOperator;
 use App\Enums\LogicOperator;
 use App\Enums\ValidationRuleType;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
@@ -56,6 +57,84 @@ final class StructuredRuleLowering
         }
 
         return $accumulator;
+    }
+
+    /**
+     * Lower a conditional-family row (required_if / required_with / skip_if / skip_with) to its CONDITION
+     * AST — the boolean the caller (F3's SemanticValidator) reads to gate requiredness or field skipping.
+     * The condition compares the RELATED field (`related_form_field_id`), not the owning field. An `_if`
+     * row always dispatches by `operator`; a `_with` row defaults to `isNotNull(related)` ("the related
+     * field is answered") when no operator is set. For F3 (F2 lowered only the two field-vs-field rules).
+     *
+     * @param  array<string, string>  $fieldKeysById  form_field id → key
+     */
+    public function lowerCondition(FormFieldValidation $row, array $fieldKeysById): Node
+    {
+        $relatedKey = $this->relatedKeyOrThrow($row, $fieldKeysById);
+        $value = (string) ($row->rule_value ?? '');
+
+        return match ($row->rule_type) {
+            ValidationRuleType::RequiredIf, ValidationRuleType::SkipIf => $this->conditionForOperator($row->operator, $relatedKey, $value, $row->id),
+            ValidationRuleType::RequiredWith, ValidationRuleType::SkipWith => $row->operator === null
+                ? AstBuilders::isNotNull($relatedKey)
+                : $this->conditionForOperator($row->operator, $relatedKey, $value, $row->id),
+            default => throw ExpressionEvaluationException::unlowerableRuleType($this->ruleTypeLabel($row)),
+        };
+    }
+
+    /**
+     * Fold a conditional `logic_group`'s rows into one condition AST — same flat, left-associative,
+     * `[sequence, id]`-ordered discipline as {@see lowerGroup()} (rows carry no parentheses).
+     *
+     * @param  list<FormFieldValidation>  $rows  one logic group's rows
+     * @param  array<string, string>  $fieldKeysById
+     */
+    public function lowerConditionGroup(array $rows, array $fieldKeysById): Node
+    {
+        if ($rows === []) {
+            throw ExpressionEvaluationException::unevaluable('empty logic group');
+        }
+
+        usort($rows, static fn (FormFieldValidation $a, FormFieldValidation $b): int => [$a->sequence, $a->id] <=> [$b->sequence, $b->id]);
+
+        $accumulator = $this->lowerCondition($rows[0], $fieldKeysById);
+
+        foreach (array_slice($rows, 1) as $row) {
+            $operator = $this->requireOperator($row->logic_operator, $row->id);
+            $accumulator = new LogicalNode($operator, $accumulator, $this->lowerCondition($row, $fieldKeysById));
+        }
+
+        return $accumulator;
+    }
+
+    /**
+     * Map a conditional row's comparison `operator` (+ related key + literal value) to the SAME AST the
+     * equivalent parsed condition would yield. Nullable so a missing operator on an `_if` row survives
+     * Larastan's non-null enum-cast inference and is caught here rather than mis-lowered.
+     */
+    private function conditionForOperator(?ComparisonOperator $operator, string $relatedKey, string $value, string $rowId): Node
+    {
+        return match ($operator) {
+            ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::Gt, ComparisonOperator::Lt => AstBuilders::comparison($operator, $relatedKey, $value),
+            ComparisonOperator::IsNull => AstBuilders::isNull($relatedKey),
+            ComparisonOperator::Contains => AstBuilders::contains($relatedKey, $value),
+            null => throw ExpressionEvaluationException::unevaluable("conditional rule {$rowId} has no operator"),
+        };
+    }
+
+    /**
+     * @param  array<string, string>  $fieldKeysById
+     */
+    private function relatedKeyOrThrow(FormFieldValidation $row, array $fieldKeysById): string
+    {
+        $relatedId = $row->related_form_field_id;
+        $relatedKey = $relatedId !== null ? ($fieldKeysById[$relatedId] ?? null) : null;
+
+        if ($relatedKey === null) {
+            throw ExpressionEvaluationException::missingRelatedField($fieldKeysById[$row->form_field_id] ?? $row->form_field_id);
+        }
+
+        return $relatedKey;
     }
 
     /**

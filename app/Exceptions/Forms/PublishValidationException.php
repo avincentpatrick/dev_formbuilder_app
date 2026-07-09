@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Forms;
 
+use App\Exceptions\Expressions\ExpressionException;
 use RuntimeException;
 
 /**
@@ -27,5 +28,22 @@ final class PublishValidationException extends RuntimeException
     public static function queryableFieldMissingType(string $fieldKey): self
     {
         return new self("The queryable field “{$fieldKey}” must declare an indexed data type before publishing.");
+    }
+
+    /**
+     * An authored `relevant`/`constraint` expression that will not parse or references an unknown field
+     * (F3's publish-time expression gate). `$detail` is the wrapped {@see ExpressionException::slug()}.
+     */
+    public static function expressionInvalid(?string $fieldKey, string $detail): self
+    {
+        $where = $fieldKey !== null ? "on “{$fieldKey}” " : '';
+
+        return new self("The expression {$where}is invalid ({$detail}).");
+    }
+
+    /** A structured rule whose `rule_value` cannot be used at submission time (bad regex / non-numeric threshold). */
+    public static function ruleValueInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The validation rule on “{$fieldKey}” is invalid ({$detail}).");
     }
 }

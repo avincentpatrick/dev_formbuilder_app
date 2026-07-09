@@ -29,8 +29,15 @@ export default defineConfig({
         exclude: ['@meridian/design-system'],
     },
     server: {
-        // Inside Docker the Vite dev server must bind 0.0.0.0 and advertise the host port for HMR.
+        // Inside Docker the Vite dev server binds 0.0.0.0 so the published port works, but it must
+        // ADVERTISE a browser-reachable host. Without hmr.host the laravel-vite-plugin writes the bind
+        // address ('0.0.0.0') into public/hot, and the browser can't connect to 0.0.0.0
+        // (net::ERR_ADDRESS_INVALID) → blank page. hmr.host wins over server.host for the hot-file URL.
         host: '0.0.0.0',
+        cors: true, // the app is served from a different origin (acme.localhost:8080); allow module loads
+        hmr: {
+            host: 'localhost',
+        },
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },

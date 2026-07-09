@@ -1,0 +1,11 @@
+[
+  {"name":"and_both_true","grammar_version":"1.0","expression":"${a} = 1 and ${b} = 2","context":{"answers":{"a":1,"b":2}},"expected":true},
+  {"name":"and_one_false","grammar_version":"1.0","expression":"${a} = 1 and ${b} = 2","context":{"answers":{"a":1,"b":3}},"expected":false},
+  {"name":"or_one_true","grammar_version":"1.0","expression":"${a} = 1 or ${b} = 2","context":{"answers":{"a":9,"b":2}},"expected":true},
+  {"name":"or_both_false","grammar_version":"1.0","expression":"${a} = 1 or ${b} = 2","context":{"answers":{"a":9,"b":9}},"expected":false},
+  {"name":"and_binds_tighter_than_or_true","grammar_version":"1.0","expression":"${a} = 1 or ${b} = 2 and ${c} = 3","context":{"answers":{"a":0,"b":2,"c":3}},"expected":true},
+  {"name":"and_binds_tighter_than_or_false","grammar_version":"1.0","expression":"${a} = 1 or ${b} = 2 and ${c} = 3","context":{"answers":{"a":0,"b":2,"c":9}},"expected":false},
+  {"name":"parens_override_precedence","grammar_version":"1.0","expression":"(${a} = 1 or ${b} = 2) and ${c} = 3","context":{"answers":{"a":1,"b":9,"c":3}},"expected":true},
+  {"name":"not_negates_comparison","grammar_version":"1.0","expression":"not(${a} = 1)","context":{"answers":{"a":2}},"expected":true},
+  {"name":"nested_and_or","grammar_version":"1.0","expression":"${a} = 1 and (${b} = 2 or ${c} = 3)","context":{"answers":{"a":1,"b":9,"c":3}},"expected":true}
+]

@@ -1,11 +1,13 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use App\Providers\ExpressionServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\TenancyServiceProvider;
 
 return [
     AppServiceProvider::class,
+    ExpressionServiceProvider::class,
     FortifyServiceProvider::class,
     TenancyServiceProvider::class,
 ];

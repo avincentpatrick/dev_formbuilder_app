@@ -1,0 +1,12 @@
+{
+  "grammar_version": "1.0",
+  "total": 109,
+  "files": {
+    "comparison": 14,
+    "emptiness": 14,
+    "selected": 9,
+    "logical": 9,
+    "coercion": 27,
+    "parse-errors": 36
+  }
+}

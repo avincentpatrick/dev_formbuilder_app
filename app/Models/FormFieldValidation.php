@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?ValidationRuleType $rule_type
  * @property ?ComparisonOperator $operator
  * @property ?string $expression
+ * @property ?string $logic_group
+ * @property ?LogicOperator $logic_operator
  * @property int $sequence
  */
 class FormFieldValidation extends Model implements TenantScoped

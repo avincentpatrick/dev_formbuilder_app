@@ -1,11 +1,14 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "dev_formbuilder_app",
     "private": true,
     "type": "module",
     "scripts": {
         "build": "vite build",
         "dev": "vite",
         "type-check": "vue-tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
         "ds:install": "npm --prefix packages/design-system install",
         "ds:tokens": "npm --prefix packages/design-system run build:tokens",
         "ds:storybook:build": "npm --prefix packages/design-system run build-storybook",
@@ -22,6 +25,7 @@
         "laravel-vite-plugin": "^3.1",
         "typescript": "^6.0.3",
         "vite": "^8.0.0",
+        "vitest": "^4.1.10",
         "vue-tsc": "^3.3.6"
     },
     "dependencies": {

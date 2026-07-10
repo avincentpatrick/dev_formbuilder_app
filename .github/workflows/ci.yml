@@ -157,6 +157,8 @@ jobs:
         run: npm run ds:tokens
       - name: Type-check (vue-tsc)
         run: npm run type-check
+      - name: Unit tests (Vitest — form-runtime engine + golden-vector drift mirror)
+        run: npm test
       - name: Build assets (Vite)
         run: npm run build
 

@@ -8,7 +8,7 @@ withDefaults(
     defineProps<{
         modelValue?: string;
         id?: string;
-        type?: 'text' | 'email' | 'password' | 'tel' | 'url';
+        type?: 'text' | 'email' | 'password' | 'tel' | 'url' | 'date' | 'time' | 'datetime-local';
         name?: string;
         autocomplete?: string;
         placeholder?: string;

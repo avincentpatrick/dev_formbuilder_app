@@ -108,6 +108,36 @@ class E2eSeeder extends Seeder
             if (Form::query()->where('title', 'Blank Intake Form')->doesntExist()) {
                 app(FormService::class)->create($tenant, $owner, 'Blank Intake Form', 'An empty draft.');
             }
+
+            // An all-scalar, repeat-free published form — the manual-encode target (Increment F4b). One of
+            // every Phase-1 encodable control (text, number, select, multi-select, yes/no, date, long text)
+            // so the encode page's responsive/axe gate scans them all. The seeded "Community Health Survey"
+            // has a repeatable section (unsupported for manual entry), so it can't be that target.
+            if (Form::query()->where('title', 'Clinic Intake')->doesntExist()) {
+                $intake = app(FormService::class)->create(
+                    $tenant, $owner, 'Clinic Intake', 'All-scalar manual-encoding demo.'
+                );
+                $b = app(FormBuilderService::class);
+                $section = $b->addSection($intake); // non-repeatable by default → its fields are encodable
+                $b->addField($intake, $owner, FieldType::ShortText, $section->id);
+                $b->addField($intake, $owner, FieldType::Integer, $section->id);
+                $b->addField($intake, $owner, FieldType::SingleSelect, $section->id)
+                    ->update(['config' => ['options' => [
+                        ['value' => 'female', 'label' => 'Female'],
+                        ['value' => 'male', 'label' => 'Male'],
+                        ['value' => 'other', 'label' => 'Other'],
+                    ]]]);
+                $b->addField($intake, $owner, FieldType::MultiSelect, $section->id)
+                    ->update(['config' => ['options' => [
+                        ['value' => 'fever', 'label' => 'Fever'],
+                        ['value' => 'cough', 'label' => 'Cough'],
+                        ['value' => 'fatigue', 'label' => 'Fatigue'],
+                    ]]]);
+                $b->addField($intake, $owner, FieldType::YesNo, $section->id);
+                $b->addField($intake, $owner, FieldType::Date, $section->id);
+                $b->addField($intake, $owner, FieldType::LongText, $section->id);
+                app(PublishService::class)->publish($intake->refresh(), $owner);
+            }
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();

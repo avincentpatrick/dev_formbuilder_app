@@ -9,8 +9,10 @@ use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
+use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Models\Form;
+use App\Models\Submission;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
@@ -105,6 +107,16 @@ Route::middleware([
         ->middleware('can:update,form')->name('forms.fields.duplicate');
     Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
         ->middleware('can:update,form')->name('forms.reorder');
+
+    // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
+    // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),
+    // resolved by `can:create,<Submission>,form`: the Authorize middleware passes the Submission class-string
+    // (which selects the policy) plus the route-bound {form} as the extra policy argument. `store` funnels
+    // the raw answers into the single SubmissionPipeline (structural → integrity → semantic → persist).
+    Route::get('/forms/{form}/submissions/create', [SubmissionController::class, 'create'])
+        ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.create');
+    Route::post('/forms/{form}/submissions', [SubmissionController::class, 'store'])
+        ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.store');
 });
 
 /*

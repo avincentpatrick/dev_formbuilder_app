@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use App\Models\Form;
 use App\Models\PersonalAccessToken;
+use App\Models\Submission;
 use App\Policies\FormPolicy;
+use App\Policies\SubmissionPolicy;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -35,6 +37,11 @@ class AppServiceProvider extends ServiceProvider
         // Per-form `.any`/`.own` authorization (Increment D2). Registered explicitly rather than relying
         // on auto-discovery so the mapping is greppable alongside the other RBAC wiring.
         Gate::policy(Form::class, FormPolicy::class);
+
+        // Manual-encoding authorization (Increment F4b): `create` is gated per-form (permission + collaborator
+        // scope + published) — the `can:create,<Submission>,form` route middleware resolves this policy from
+        // the Submission class-string and passes the bound Form as the extra argument.
+        Gate::policy(Submission::class, SubmissionPolicy::class);
 
         // The tenant-scoped API-key model (Increment E) — auto-fills tenant_id at mint so the strict RLS
         // WITH CHECK on personal_access_tokens passes, and scopes lookups to the current tenant.

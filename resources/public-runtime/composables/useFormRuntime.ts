@@ -27,6 +27,7 @@ import {
     toSemanticInput,
     type EngineSchema,
 } from '../lib/schema-mapping';
+import { randomUuid } from '../lib/uuid';
 import type { RenderField, RenderModel, SchemaResponse } from '../lib/types';
 
 const LEAD_STEP_KEY = '__lead__';
@@ -110,7 +111,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     const submitAttempted = ref(false);
     const engineFailed = ref(false);
     const locale = ref(opts.initialLocale ?? schema.form.default_locale);
-    const clientSubmissionUuid = crypto.randomUUID();
+    const clientSubmissionUuid = randomUuid();
 
     // Snapshot-degrade wrapper: a malformed published expression THROWS (it is pre-validated by the F3 gate,
     // so reaching here is a schema bug). Degrade to "everything relevant, no client errors" and let the

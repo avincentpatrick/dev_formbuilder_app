@@ -650,24 +650,9 @@
                                                             "type": "string"
                                                         },
                                                         "supported_locales": {
-                                                            "description": "The form's own locale subset for the runtime language switcher (Increment F6b, UX \u00a76).\nThe column defaults to [] (data-dictionary \u00a72); fall back to [default_locale] so the SPA\nalways has a baseline and the switcher simply hides itself when there is only one locale.",
-                                                            "anyOf": [
-                                                                {
-                                                                    "type": "array",
-                                                                    "items": {}
-                                                                },
-                                                                {
-                                                                    "type": "array",
-                                                                    "prefixItems": [
-                                                                        {
-                                                                            "type": "string"
-                                                                        }
-                                                                    ],
-                                                                    "minItems": 1,
-                                                                    "maxItems": 1,
-                                                                    "additionalItems": false
-                                                                }
-                                                            ]
+                                                            "type": "array",
+                                                            "description": "The form's own locale subset for the runtime language switcher (Increment F6b, UX \u00a76).",
+                                                            "items": {}
                                                         },
                                                         "single_page_mode": {
                                                             "type": "boolean",

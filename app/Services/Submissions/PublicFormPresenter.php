@@ -28,9 +28,7 @@ final class PublicFormPresenter
                 'description' => $form->description,
                 'default_locale' => $form->default_locale,
                 // The form's own locale subset for the runtime language switcher (Increment F6b, UX §6).
-                // The column defaults to [] (data-dictionary §2); fall back to [default_locale] so the SPA
-                // always has a baseline and the switcher simply hides itself when there is only one locale.
-                'supported_locales' => $form->supported_locales ?: [$form->default_locale],
+                'supported_locales' => $this->supportedLocales($form),
                 // Single-page vs. multi-step presentation (UX §3.1); the SPA reads it to pick its flow.
                 'single_page_mode' => $form->single_page_mode,
             ],
@@ -41,5 +39,18 @@ final class PublicFormPresenter
                 'schema' => $version->schema_snapshot,
             ],
         ];
+    }
+
+    /**
+     * The form's supported locales, falling back to just its default locale when none are configured (the
+     * column defaults to []). Typed as a plain list so the generated OpenAPI stays a simple string array.
+     *
+     * @return list<string>
+     */
+    private function supportedLocales(Form $form): array
+    {
+        $locales = $form->supported_locales === [] ? [$form->default_locale] : $form->supported_locales;
+
+        return array_values($locales);
     }
 }

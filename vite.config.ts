@@ -5,7 +5,10 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.ts'],
+            // Two independent entries: the Inertia admin app (app.ts + app.css) and the standalone
+            // public form-runtime SPA (main.ts, Increment F6b — imports its own CSS). Both share the
+            // single deduped Vue instance below.
+            input: ['resources/css/app.css', 'resources/js/app.ts', 'resources/public-runtime/main.ts'],
             refresh: true,
         }),
         vue({

@@ -1,0 +1,24 @@
+/* Public form-runtime SPA stylesheet (Increment F6b). Shares the exact design-system tokens + theme layer as
+   the admin app (tokens.css must load before theme.css so dark/accent overrides win the cascade). Guests have
+   no theme preference, so light/dark resolves via prefers-color-scheme (color-scheme below). */
+@import '@meridian/design-system/tokens.css';
+@import '@meridian/design-system/theme.css';
+
+:root {
+    color-scheme: light dark;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-lg-font-size);
+    line-height: var(--mds-type-body-lg-line-height);
+    color: var(--mds-color-text-body);
+    background-color: var(--mds-color-bg-canvas);
+}

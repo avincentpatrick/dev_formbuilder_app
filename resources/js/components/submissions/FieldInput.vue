@@ -37,8 +37,28 @@ export interface EncodeField {
 // numeric fields, "" otherwise). Kept concrete (not `unknown`) so Inertia's useForm accepts the form data.
 export type AnswerValue = string | number | boolean | string[] | null;
 
-const props = defineProps<{ field: EncodeField; modelValue: AnswerValue; error?: string }>();
+// The visual requirement marker (UX §4.4). When omitted it derives from `field.required`, preserving the
+// original manual-encode behaviour (F4b) exactly; the public runtime (F6b) passes it explicitly so an
+// `optional` field shows a muted "(optional)" suffix and a `conditional` field shows the required marker
+// only once its condition has triggered ('none' until then).
+export type RequiredMarker = 'required' | 'optional' | 'none';
+
+const props = defineProps<{
+    field: EncodeField;
+    modelValue: AnswerValue;
+    error?: string;
+    requiredMarker?: RequiredMarker;
+}>();
 const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue] }>();
+
+const marker = computed<RequiredMarker>(() => props.requiredMarker ?? (props.field.required ? 'required' : 'none'));
+const showRequiredMarker = computed<boolean>(() => marker.value === 'required');
+const showOptionalMarker = computed<boolean>(() => marker.value === 'optional');
+// MdsFormField renders its own "(required)" affordance but has no "(optional)" one, so for single controls we
+// fold the optional suffix into the label text (kept accessible — it is part of the <label>).
+const singleLabel = computed<string>(() =>
+    showOptionalMarker.value ? `${props.field.label} (optional)` : props.field.label,
+);
 
 const yesNoOptions = [
     { value: 'yes', label: 'Yes' },
@@ -94,8 +114,8 @@ function toggleOption(value: string, checked: boolean): void {
     <!-- Single-control fields: label ↔ input via MdsFormField -->
     <MdsFormField
         v-if="['text', 'textarea', 'number', 'select'].includes(control)"
-        :label="field.label"
-        :required="field.required"
+        :label="singleLabel"
+        :required="showRequiredMarker"
         :help="field.hint ?? undefined"
         :error="error"
         v-slot="{ id, describedby, invalid }"
@@ -144,7 +164,9 @@ function toggleOption(value: string, checked: boolean): void {
     <!-- Group controls: real fieldset/legend + their own aria-live error region -->
     <fieldset v-else-if="control === 'checkboxes' || control === 'yesno'" class="encode-field">
         <legend class="encode-field__legend">
-            {{ field.label }}<span v-if="field.required" class="encode-field__required"> (required)</span>
+            {{ field.label
+            }}<span v-if="showRequiredMarker" class="encode-field__required"> (required)</span
+            ><span v-else-if="showOptionalMarker" class="encode-field__required"> (optional)</span>
         </legend>
         <p v-if="field.hint" class="encode-field__help">{{ field.hint }}</p>
 

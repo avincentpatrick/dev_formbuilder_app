@@ -648,13 +648,24 @@
                                                         },
                                                         "default_locale": {
                                                             "type": "string"
+                                                        },
+                                                        "supported_locales": {
+                                                            "type": "array",
+                                                            "description": "The form's own locale subset for the runtime language switcher (Increment F6b, UX \u00a76).",
+                                                            "items": {}
+                                                        },
+                                                        "single_page_mode": {
+                                                            "type": "boolean",
+                                                            "description": "Single-page vs. multi-step presentation (UX \u00a73.1); the SPA reads it to pick its flow."
                                                         }
                                                     },
                                                     "required": [
                                                         "id",
                                                         "title",
                                                         "description",
-                                                        "default_locale"
+                                                        "default_locale",
+                                                        "supported_locales",
+                                                        "single_page_mode"
                                                     ]
                                                 },
                                                 "version": {

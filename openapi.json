@@ -486,6 +486,258 @@
                 }
             }
         },
+        "/public/f/{shareToken}/submissions": {
+            "post": {
+                "operationId": "v1.public.submissions.store",
+                "summary": "Submit a guest response for a share token through the unified submission pipeline",
+                "tags": [
+                    "GuestSubmission"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GuestSubmissionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "form_updated"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This form has been updated. Please reload and try again."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "guest_disabled"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Guest submissions are disabled for this form."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/public/f/{shareToken}": {
+            "get": {
+                "operationId": "v1.public.forms.schema",
+                "summary": "Fetch the pinned published form schema for a guest share token",
+                "tags": [
+                    "PublicFormSchema"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "form": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "title": {
+                                                            "type": "string"
+                                                        },
+                                                        "description": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "default_locale": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "title",
+                                                        "description",
+                                                        "default_locale"
+                                                    ]
+                                                },
+                                                "version": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "version_number": {
+                                                            "type": "integer"
+                                                        },
+                                                        "checksum": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "schema": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "version_number",
+                                                        "checksum",
+                                                        "schema"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "form",
+                                                "version"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "guest_disabled"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Guest submissions are disabled for this form."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/tenant": {
             "get": {
                 "operationId": "v1.tenant.show",
@@ -680,6 +932,44 @@
                     "updated_at"
                 ],
                 "title": "FormVersionResource"
+            },
+            "GuestSubmissionRequest": {
+                "type": "object",
+                "description": "The guest submit request (Increment F5). Authorization is the share-token middleware, not a policy, so\nauthorize() is true. Like the manual-encode request this asserts only the coarse shape \u2014 `answers` is a\nkey\u21d2value map; all per-field validation is the {@see SubmissionPipeline}, the single shared write path.\nThe guest-only optional inputs (contact email, an idempotency uuid, a locale) are shallow-validated here.",
+                "properties": {
+                    "answers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "guest_contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "client_submission_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "locale": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 10
+                    }
+                },
+                "required": [
+                    "answers"
+                ],
+                "title": "GuestSubmissionRequest"
             },
             "PublishVersionRequest": {
                 "type": "object",

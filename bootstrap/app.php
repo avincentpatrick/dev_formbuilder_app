@@ -5,6 +5,9 @@ use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Exceptions\Guest\ExpiredShareTokenException;
+use App\Exceptions\Guest\InvalidShareTokenException;
+use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Http\Middleware\AuthenticateApiToken;
@@ -186,6 +189,27 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return back()->withErrors($errors)->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
+
+        // Submission Pipeline STATE violation (Stage 2a — the version is not the currently published one).
+        // Reaching here on the guest channel means the form was republished between the token mint and the
+        // submit (the guest controller's own current-version check narrows the window; this is the race
+        // backstop). Mapped to 409 rather than the generic 500 the missing closure previously produced —
+        // the SPA reloads against the new version. Only the /api/v1 surface; a web (manual-encode) request
+        // is an invariant violation there (the policy requires a published form) and keeps the default.
+        $exceptions->render(fn (SubmissionException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage())
+            : null);
+
+        // Guest share-token failures (Increment F5). Thrown by EstablishGuestTenantContext BEFORE any tenant
+        // context is set, so a forged/tampered/expired link never engages RLS. Both 401 on the /api/v1 surface;
+        // the distinct codes let the guest SPA tell "invalid link" from "expired link, please request a new one".
+        $exceptions->render(fn (InvalidShareTokenException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(401, 'invalid_share_token', 'This share link is invalid.')
+            : null);
+
+        $exceptions->render(fn (ExpiredShareTokenException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(401, 'share_token_expired', 'This share link has expired.')
+            : null);
 
         // Submit-time expression failure — a defensive backstop. Published expressions are pre-validated by
         // the F3 ExpressionValidationGate at publish, so reaching here signals a server bug, not user error;

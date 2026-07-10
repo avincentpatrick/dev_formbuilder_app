@@ -29,5 +29,13 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/auth/tokens',
         '/auth/tokens/{id}',
         '/tenant',
+        // Increment F5 — the public guest runtime surface.
+        '/public/f/{shareToken}',
+        '/public/f/{shareToken}/submissions',
     );
+
+    // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global
+    // sanctumToken requirement — a Sanctum bearer must never be advertised on the public share-token routes.
+    expect($spec['paths']['/public/f/{shareToken}']['get']['security'])->toBe([])
+        ->and($spec['paths']['/public/f/{shareToken}/submissions']['post']['security'])->toBe([]);
 });

@@ -6,7 +6,10 @@ use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\TenantApiController;
+use App\Http\Controllers\Public\GuestSubmissionController;
+use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Models\Form;
 use App\Support\Api\ApiAbilities;
@@ -91,4 +94,23 @@ Route::prefix('api/v1')
             ->scopeBindings()
             ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:publish,form'])
             ->name('forms.versions.publish');
+    });
+
+// ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────
+//    share token, not a subdomain or session. No `web` (so no session/CSRF — the guest SPA is a separate
+//    cross-origin app, architecture §8) and no PreventAccessFromCentralDomains (reachable host-agnostically
+//    for embeds). EstablishGuestTenantContext verifies the token → sets the RLS tenant → stashes the decoded
+//    payload; the controllers resolve the pinned form/version from it and funnel a `source=guest` submission
+//    into the same SubmissionPipeline (Group B's ordering dance is unnecessary — {shareToken} is a plain
+//    string, not a bound model, so nothing depends on running before SubstituteBindings).
+Route::prefix('api/v1/public')
+    ->name('api.v1.public.')
+    ->middleware([
+        'throttle:guest',
+        EstablishGuestTenantContext::class,
+        SubstituteBindings::class,
+    ])
+    ->group(function (): void {
+        Route::get('f/{shareToken}', [PublicFormSchemaController::class, 'show'])->name('forms.schema');
+        Route::post('f/{shareToken}/submissions', [GuestSubmissionController::class, 'store'])->name('submissions.store');
     });

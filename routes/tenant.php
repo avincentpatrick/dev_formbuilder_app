@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
@@ -134,4 +135,23 @@ Route::middleware([
     Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('/invitations/{token}', [InvitationController::class, 'decline'])->name('invitations.decline');
+});
+
+/*
+| Guest form runtime — mint (Increment F5). The public share-link entry: resolve the form by its per-tenant
+| public_slug (RLS-scoped to the subdomain tenant), gate on guest access + a live published version, and mint
+| a stateless HMAC-signed share token. Same subdomain tenant-context pipeline as the invitation group, WITHOUT
+| `auth`: guests are not members. Tenant context is resolved from the SUBDOMAIN here (not the token) because
+| public_slug is unique only per tenant; the minted token then carries the tenant to the subdomain-less
+| /api/v1/public schema + submit endpoints (routes/api.php). Serving the guest SPA shell at this URL is
+| Increment F6 — F5 returns the token as JSON.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+])->group(function (): void {
+    Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
+        ->middleware('throttle:guest-mint')->name('guest.form.mint');
 });

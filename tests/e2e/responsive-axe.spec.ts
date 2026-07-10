@@ -66,3 +66,22 @@ for (const theme of themes) {
         await assertClean(page, 'Builder');
     });
 }
+
+// The manual-encoding page (F4b). Reached via the "New submission" row action of the all-scalar published
+// "Clinic Intake" form (no id in the URL). A CSS `tr` locator scoped by row text is used rather than
+// getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.
+// The scan covers every Phase-1 encode control (text/number/select/multi-select/yes-no/date/long-text).
+for (const theme of themes) {
+    test(`Encode (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Clinic Intake' })
+            .getByRole('button', { name: 'New submission' })
+            .click();
+        await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+        await page.getByRole('button', { name: 'Submit response' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Encode');
+    });
+}

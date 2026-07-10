@@ -39,7 +39,7 @@ type FormRow = {
     draft_version: number | null;
     updated_at: string | null;
     versions: FormVersionRow[];
-    can: { edit: boolean; publish: boolean; delete: boolean };
+    can: { edit: boolean; publish: boolean; delete: boolean; encode: boolean };
 };
 
 defineProps<{ forms: FormRow[] }>();
@@ -195,6 +195,13 @@ function submitRestore(): void {
             </template>
             <template #row-actions="{ row }">
                 <div class="forms__actions">
+                    <MdsIconButton
+                        v-if="row.can.encode"
+                        icon="submissions"
+                        label="New submission"
+                        size="sm"
+                        @click="router.visit(`/forms/${row.id}/submissions/create`)"
+                    />
                     <MdsIconButton icon="clock" label="Version history" size="sm" @click="historyTarget = row" />
                     <MdsIconButton
                         v-if="row.can.edit"

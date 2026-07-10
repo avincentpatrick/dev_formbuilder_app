@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\FormStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Models\Submission;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -57,6 +58,9 @@ final class FormPresenter
                 'edit' => $user->can('update', $form),
                 'publish' => $user->can('publish', $form),
                 'delete' => $user->can('delete', $form),
+                // Manual-encode entry point (F4b) — the SubmissionPolicy folds in "form is published",
+                // so this is false for a draft-only form and the row action stays hidden until publish.
+                'encode' => $user->can('create', [Submission::class, $form]),
             ],
         ];
     }

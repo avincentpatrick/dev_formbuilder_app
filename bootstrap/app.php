@@ -1,8 +1,11 @@
 <?php
 
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Expressions\ExpressionEvaluationException;
+use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -166,6 +169,37 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (FormException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(422, 'form_rule_violated', $e->getMessage())
             : null);
+
+        // Submission Pipeline per-field failure (Increment F4b, Stages 1 & 3). The API surface gets the
+        // structured 422 envelope; a web (manual-encode) request bounces back with the field errors keyed
+        // `answers.<field>` so the Encode form binds each message to its input, plus an error toast.
+        $exceptions->render(function (SubmissionValidationException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(422, 'submission_invalid', $e->getMessage(), ['fields' => $e->fieldErrors()]);
+            }
+
+            $errors = [];
+            foreach ($e->fieldErrors() as $fieldError) {
+                // First message per field wins (withErrors keys are unique).
+                $errors['answers.'.$fieldError['field']] ??= $fieldError['message'];
+            }
+
+            return back()->withErrors($errors)->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
+        // Submit-time expression failure — a defensive backstop. Published expressions are pre-validated by
+        // the F3 ExpressionValidationGate at publish, so reaching here signals a server bug, not user error;
+        // the handler still report()s it. Surface a generic failure rather than a raw 500 / HTML.
+        $exceptions->render(function (ExpressionSyntaxException|ExpressionEvaluationException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(422, 'expression_error', 'A form expression could not be evaluated.');
+            }
+
+            return back()->with('toast', [
+                'type' => 'error',
+                'message' => 'This form could not be processed. Please try again or contact support.',
+            ]);
+        });
 
         // Tenancy identification failure — every tenant route is served on a tenant subdomain, so a request
         // for one on the central/non-subdomain host (localhost, 127.0.0.1, the apex) or an unknown subdomain

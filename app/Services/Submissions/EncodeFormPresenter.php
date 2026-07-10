@@ -1,0 +1,150 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Submissions;
+
+use App\Enums\FieldType;
+use App\Enums\RequiredMode;
+use App\Models\Form;
+use App\Models\FormField;
+use App\Models\FormVersion;
+use Illuminate\Support\Collection;
+
+/**
+ * Read model for the manual-encoding page (Increment F4b) — turns a form's published version into the flat,
+ * render-ready schema the Encode.vue page walks. Fields are grouped into their sections (ungrouped fields
+ * lead as a section-less block), in document order.
+ *
+ * "Render-supported, mark-the-rest" (confirmed scope decision): the ~14 Phase-1 scalar field types render a
+ * real input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature, and every
+ * field inside a repeatable section) is emitted with `supported = false` so the page shows a read-only
+ * "not available for manual entry (Phase 2)" notice rather than silently dropping it. Display-only `note`
+ * fields render as static prose. `page_break`/`hidden`/`calculated` are structural/derived and are omitted
+ * from the encode surface entirely (they are never a manually-entered answer).
+ */
+final class EncodeFormPresenter
+{
+    /**
+     * The scalar field types with a Phase-1 manual-encoding input. Any other answerable type is surfaced as
+     * an explicit unsupported notice; a field inside a repeatable section is unsupported regardless of type.
+     *
+     * @var list<FieldType>
+     */
+    private const SUPPORTED = [
+        FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
+        FieldType::Integer, FieldType::Decimal,
+        FieldType::Date, FieldType::Time, FieldType::Datetime,
+        FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown, FieldType::YesNo,
+    ];
+
+    /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
+    private const OMITTED = [FieldType::PageBreak, FieldType::Hidden, FieldType::Calculated];
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function present(Form $form, FormVersion $version): array
+    {
+        $sections = $version->sections()->orderBy('sequence')->get();
+        $fields = $version->fields()->orderBy('sequence')->get()
+            ->reject(fn (FormField $f): bool => in_array($f->field_type, self::OMITTED, true));
+
+        /** @var Collection<string, Collection<int, FormField>> $bySection */
+        $bySection = $fields->groupBy(fn (FormField $f): string => $f->form_section_id ?? '');
+
+        $blocks = [];
+
+        // Ungrouped (section-less) fields lead, matching how the builder renders top-level fields.
+        $ungrouped = $bySection->get('');
+        if ($ungrouped !== null && $ungrouped->isNotEmpty()) {
+            $blocks[] = [
+                'id' => null,
+                'label' => null,
+                'description' => null,
+                'repeatable' => false,
+                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($f, false))->values()->all(),
+            ];
+        }
+
+        foreach ($sections as $section) {
+            $sectionFields = $bySection->get($section->id);
+            if ($sectionFields === null || $sectionFields->isEmpty()) {
+                continue;
+            }
+
+            $blocks[] = [
+                'id' => $section->id,
+                'label' => $section->label,
+                'description' => $section->description,
+                'repeatable' => $section->is_repeatable,
+                'fields' => $sectionFields
+                    ->map(fn (FormField $f): array => $this->field($f, $section->is_repeatable))
+                    ->values()->all(),
+            ];
+        }
+
+        return [
+            'form' => [
+                'id' => $form->id,
+                'title' => $form->title,
+                'description' => $form->description,
+            ],
+            'version' => [
+                'id' => $version->id,
+                'version_number' => $version->version_number,
+            ],
+            'blocks' => $blocks,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function field(FormField $field, bool $inRepeatable): array
+    {
+        $type = $field->field_type;
+
+        return [
+            'key' => $field->key,
+            'field_type' => $type->value,
+            'label' => $field->label,
+            'hint' => $field->hint,
+            'placeholder' => $field->placeholder,
+            'required' => $field->is_required === RequiredMode::Required,
+            'options' => $this->options($field),
+            // A repeatable section has no manual-encode renderer in Phase 1, so every field it holds is
+            // unsupported regardless of type. `note` is display-only (handled by the page), never an input.
+            'supported' => ! $inRepeatable && in_array($type, self::SUPPORTED, true),
+        ];
+    }
+
+    /**
+     * The author-defined option list for choice fields (stored in `config.options`), normalised to the
+     * `{value,label}` pairs the select/checkbox controls bind to. Empty for non-choice types.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function options(FormField $field): array
+    {
+        if (! $field->field_type->hasOptions()) {
+            return [];
+        }
+
+        $options = $field->config['options'] ?? [];
+        if (! is_array($options)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($options as $option) {
+            if (! is_array($option) || ! isset($option['value'])) {
+                continue;
+            }
+            $value = (string) $option['value'];
+            $normalized[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+        }
+
+        return $normalized;
+    }
+}

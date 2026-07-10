@@ -30,6 +30,16 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const WithValue: Story = { args: { modelValue: 'jordan@example.org' } };
+// Native date input (manual-encoding date fields, Increment F4b) — the browser control is accessible
+// out of the box; the aria-label keeps the bare (FormField-less) story axe-scannable.
+export const DateType: Story = {
+    args: { type: 'date', modelValue: '2026-07-10' },
+    render: (args) => ({
+        components: { TextInput },
+        setup: () => ({ args }),
+        template: '<TextInput v-bind="args" aria-label="Visit date" />',
+    }),
+};
 export const Invalid: Story = { args: { invalid: true, modelValue: 'not-an-email' } };
 export const Disabled: Story = { args: { disabled: true, modelValue: 'locked@example.org' } };
 export const Dark: Story = { args: { modelValue: 'jordan@example.org' }, decorators: [dark] };

@@ -7,6 +7,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\Submission;
 use App\Policies\FormPolicy;
 use App\Policies\SubmissionPolicy;
+use App\Support\Guest\GuestShareTokenService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -26,7 +27,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // The stateless guest share-token signer (Increment F5). Singleton so the derived key + configured TTL
+        // are resolved once. The signing key is derived from APP_KEY with domain separation unless an explicit
+        // GUEST_SHARE_TOKEN_KEY is set (for independent rotation); either way it is never a persisted secret.
+        $this->app->singleton(GuestShareTokenService::class, function (): GuestShareTokenService {
+            $configuredKey = config('guest.share_token.key');
+            $key = is_string($configuredKey) && $configuredKey !== ''
+                ? $configuredKey
+                : hash_hmac('sha256', 'guest-share-token.v1', (string) config('app.key'));
+
+            return new GuestShareTokenService($key, (int) config('guest.share_token.ttl'));
+        });
     }
 
     /**
@@ -55,6 +66,21 @@ class AppServiceProvider extends ServiceProvider
                 ? 'tok:'.hash('sha256', $request->bearerToken())
                 : 'ip:'.$request->ip(),
         ));
+
+        // Guest runtime limits (Increment F5). The submit/schema surface is limited per token AND per IP
+        // (technical-architecture.md §7.2), so a single leaked link and a single enumerating IP are both
+        // bounded; the mint surface is limited per IP. Keyed on the raw {shareToken} string (no verification
+        // needed — this is velocity, not authenticity — so `throttle:guest` may run before the token middleware).
+        RateLimiter::for('guest', fn (Request $request): array => [
+            Limit::perMinute((int) config('guest.rate_limit.submit_per_token'))
+                ->by('gtok:'.hash('sha256', (string) $request->route('shareToken'))),
+            Limit::perMinute((int) config('guest.rate_limit.submit_per_ip'))
+                ->by('gip:'.$request->ip()),
+        ]);
+
+        RateLimiter::for('guest-mint', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('guest.rate_limit.mint_per_ip'),
+        )->by('gmint:'.$request->ip()));
 
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum

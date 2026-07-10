@@ -21,7 +21,16 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.vue"
+        "resources/js/**/*.vue",
+        "resources/public-runtime/**/*.ts",
+        "resources/public-runtime/**/*.d.ts",
+        "resources/public-runtime/**/*.vue"
     ],
-    "exclude": ["node_modules", "public", "vendor", "packages"]
+    "exclude": [
+        "node_modules",
+        "public",
+        "vendor",
+        "packages",
+        "resources/public-runtime/**/*.test.ts"
+    ]
 }

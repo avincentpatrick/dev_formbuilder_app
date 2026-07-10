@@ -29,8 +29,10 @@ use Illuminate\Support\Carbon;
  * @property FormStatus $status
  * @property ?string $public_slug
  * @property bool $allow_guest_submissions
+ * @property bool $single_page_mode
  * @property array<string, mixed> $capability_flags
  * @property string $default_locale
+ * @property array<int, string> $supported_locales
  * @property string $owner_user_id
  * @property string $created_by
  * @property ?Carbon $published_at

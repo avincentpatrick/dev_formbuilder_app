@@ -27,6 +27,12 @@ final class PublicFormPresenter
                 'title' => $form->title,
                 'description' => $form->description,
                 'default_locale' => $form->default_locale,
+                // The form's own locale subset for the runtime language switcher (Increment F6b, UX §6).
+                // The column defaults to [] (data-dictionary §2); fall back to [default_locale] so the SPA
+                // always has a baseline and the switcher simply hides itself when there is only one locale.
+                'supported_locales' => $form->supported_locales ?: [$form->default_locale],
+                // Single-page vs. multi-step presentation (UX §3.1); the SPA reads it to pick its flow.
+                'single_page_mode' => $form->single_page_mode,
             ],
             'version' => [
                 'id' => $version->id,

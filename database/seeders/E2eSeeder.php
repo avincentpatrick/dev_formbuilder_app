@@ -137,6 +137,15 @@ class E2eSeeder extends Seeder
                 $b->addField($intake, $owner, FieldType::Date, $section->id);
                 $b->addField($intake, $owner, FieldType::LongText, $section->id);
                 app(PublishService::class)->publish($intake->refresh(), $owner);
+
+                // Guest-enable it so the public runtime SPA (Increment F6b) can be reached at
+                // /f/clinic-intake, and give it two supported locales so the language switcher renders in
+                // the public-runtime axe scan. Targeted update — leaves the publish columns untouched.
+                $intake->update([
+                    'public_slug' => 'clinic-intake',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en', 'es'],
+                ]);
             }
         });
 

@@ -173,6 +173,9 @@ class E2eSeeder extends Seeder
                     'public_slug' => 'household-roster',
                     'allow_guest_submissions' => true,
                     'supported_locales' => ['en'],
+                    // Single-page so the runtime renders the repeat section (and its Add control) on load rather
+                    // than behind a Next step — the public-runtime repeat axe scan interacts with it directly.
+                    'single_page_mode' => true,
                 ]);
             }
 

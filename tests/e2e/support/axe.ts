@@ -25,6 +25,10 @@ export async function assertClean(page: Page, label: string): Promise<void> {
 }
 
 export async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
+    // Emulate reduced motion so the design system's central duration guard collapses every transition to 1ms:
+    // otherwise axe can measure an element (e.g. a button's background-color) mid theme-flip transition and read
+    // an intermediate, failing contrast — a timing flake that surfaces on heavier composed pages.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.evaluate((t) => {
         if (t === 'dark') document.documentElement.setAttribute('data-theme-mode', 'dark');
         else document.documentElement.removeAttribute('data-theme-mode');

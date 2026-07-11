@@ -8,10 +8,17 @@
  *  3. RUNTIME — bootstrap, normalized errors, and the localStorage draft blob.
  */
 
-import type { EngineValue, RequiredMode } from '../engine';
+import type { EngineValue, InstanceAnswers, RequiredMode } from '../engine';
 
 // Re-exported so runtime/lib modules can pull the answer-value type from one place alongside the SPA types.
-export type { EngineValue } from '../engine';
+export type { EngineValue, InstanceAnswers } from '../engine';
+
+/**
+ * The runtime answer map (Increment G2). A flat field key maps to a scalar {@link EngineValue}; a repeatable
+ * section key maps to a list of per-instance answer maps ({@link InstanceAnswers}[]) — the exact nested shape
+ * the G1 pipeline persists and the F6a engine consumes.
+ */
+export type AnswerMap = Record<string, EngineValue | InstanceAnswers[]>;
 
 // ── 1. RAW (wire) ────────────────────────────────────────────────────────────────────────────
 
@@ -68,6 +75,9 @@ export interface RawSection {
     description_translations: Record<string, string> | null;
     sequence: number;
     is_repeatable: boolean;
+    /** Repeat-group instance bounds (Increment G1/G2). Null = unbounded on that side. */
+    min_instances: number | null;
+    max_instances: number | null;
     relevant_expression: string | null;
 }
 
@@ -146,6 +156,9 @@ export interface RenderSection {
     descriptionTranslations: Record<string, string> | null;
     sequence: number;
     isRepeatable: boolean;
+    /** Repeat-group instance bounds (Increment G2). Null = unbounded on that side. */
+    minInstances: number | null;
+    maxInstances: number | null;
     relevantExpression: string | null;
 }
 
@@ -191,7 +204,7 @@ export interface DraftBlob {
     checksum: string;
     locale: string;
     currentStepKey: string;
-    answers: Record<string, EngineValue>;
+    answers: AnswerMap;
     savedAt: string;
 }
 

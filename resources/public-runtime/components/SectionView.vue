@@ -7,6 +7,7 @@
  */
 import { computed } from 'vue';
 import FieldRow from './FieldRow.vue';
+import RepeatGroup from './RepeatGroup.vue';
 import { resolveOptional, resolveText } from '../lib/schema-mapping';
 import { useRuntime } from '../composables/context';
 import type { RuntimeStep } from '../composables/useFormRuntime';
@@ -43,7 +44,8 @@ const fields = computed(() =>
             <h2 class="section__title" tabindex="-1" data-section-heading>{{ title }}</h2>
             <p v-if="description" class="section__desc">{{ description }}</p>
         </header>
-        <div class="section__fields">
+        <RepeatGroup v-if="step.isRepeat && section" :section="section" />
+        <div v-else class="section__fields">
             <FieldRow v-for="field in fields" :key="field.key" :field="field" />
         </div>
     </section>

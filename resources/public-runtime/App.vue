@@ -11,7 +11,7 @@ import RuntimeSession from './components/RuntimeSession.vue';
 import { createApiClient } from './lib/api-client';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
-import type { Bootstrap, EngineValue, SchemaResponse } from './lib/types';
+import type { AnswerMap, Bootstrap, SchemaResponse } from './lib/types';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
@@ -24,7 +24,7 @@ const schema = shallowRef<SchemaResponse | null>(null);
 const errorMessage = ref('');
 const reference = ref('');
 const sessionKey = ref(0);
-const retainedAnswers = shallowRef<Record<string, EngineValue> | undefined>(undefined);
+const retainedAnswers = shallowRef<AnswerMap | undefined>(undefined);
 const driftNotice = ref<string | null>(null);
 
 const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.bootstrap.slug });
@@ -48,7 +48,7 @@ function onSubmitted(id: string): void {
     phase.value = 'confirmation';
 }
 
-function onReschema(payload: { schema: SchemaResponse; answers: Record<string, EngineValue> }): void {
+function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): void {
     schema.value = payload.schema;
     retainedAnswers.value = payload.answers;
     driftNotice.value = 'This form was updated. Your answers were kept where possible — please review and resubmit.';

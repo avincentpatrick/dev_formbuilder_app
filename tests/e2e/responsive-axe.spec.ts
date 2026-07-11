@@ -61,6 +61,24 @@ for (const theme of themes) {
     });
 }
 
+// The manual-encode REPEAT-GROUP page (Increment G2). The published "Household Roster" has a repeatable
+// section (min 1), so the encode page seeds one instance fieldset on load — its add/remove-instance loop +
+// member inputs are scanned at all three viewports in light + dark.
+for (const theme of themes) {
+    test(`Encode repeat group (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Household Roster' })
+            .getByRole('button', { name: 'New submission' })
+            .click();
+        await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+        await page.getByRole('button', { name: 'Add Household members' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Encode repeat group');
+    });
+}
+
 // The submission detail + reviewer workflow (F7). Reached from the inbox by opening the first row's "View
 // submission" action (no id in the URL). The seeded submissions render answers + a review action bar; the
 // scan covers the read-only answer blocks and the review buttons at all three viewports.

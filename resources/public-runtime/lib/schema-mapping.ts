@@ -13,7 +13,6 @@
 
 import type {
     ComparisonOperator,
-    EngineValue,
     LogicOperator,
     SchemaField,
     SchemaSection,
@@ -22,6 +21,7 @@ import type {
     ValidationRuleType,
 } from '../engine';
 import type {
+    AnswerMap,
     ControlKind,
     RawField,
     RawSection,
@@ -152,6 +152,8 @@ function toRenderSection(section: RawSection): RenderSection {
         descriptionTranslations: section.description_translations,
         sequence: section.sequence,
         isRepeatable: section.is_repeatable,
+        minInstances: section.min_instances ?? null,
+        maxInstances: section.max_instances ?? null,
         relevantExpression: section.relevant_expression,
     };
 }
@@ -182,6 +184,11 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         key: s.key,
         sequence: s.sequence,
         relevant_expression: s.relevant_expression,
+        // Repeat-group columns (Increment G2) — without these the F6a engine's G1 repeat pass is inert in
+        // the SPA (a repeatable section would fall through to the flat top-level path).
+        is_repeatable: s.is_repeatable,
+        min_instances: s.min_instances ?? null,
+        max_instances: s.max_instances ?? null,
     }));
 
     const validations: ValidationRow[] = schema.version.schema.fields.flatMap((f) =>
@@ -205,10 +212,6 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
 }
 
 /** Combine the static engine schema with the live answers + locale into a `SemanticInput`. */
-export function toSemanticInput(
-    engineSchema: EngineSchema,
-    answers: Record<string, EngineValue>,
-    locale: string,
-): SemanticInput {
+export function toSemanticInput(engineSchema: EngineSchema, answers: AnswerMap, locale: string): SemanticInput {
     return { ...engineSchema, answers, locale };
 }

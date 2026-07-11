@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import RuntimeSession from '../components/RuntimeSession.vue';
 import type { ApiClient } from '../lib/api-client';
 import type { Bootstrap } from '../lib/types';
-import { field, schemaResponse } from './fixtures';
+import { field, schemaResponse, section } from './fixtures';
 
 const SUBMISSION_ID = '0192f1a2-b3c4-7d5e-8f90-1a2b3c4d5e6f';
 
@@ -79,6 +79,68 @@ describe('RuntimeSession (component wiring)', () => {
         });
         expect(multi.findAll('select')).toHaveLength(1);
         multi.unmount();
+    });
+
+    it('renders a repeat group: adds an instance, fills it, and submits nested answers', async () => {
+        const schema = schemaResponse({
+            sections: [
+                section({ key: 'hh', label: 'Household members', is_repeatable: true, min_instances: 0, max_instances: 3 }),
+            ],
+            fields: [field({ key: 'member_name', label: 'Member name', section_key: 'hh', section_sequence: 0 })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        // No instances yet → the member input is not rendered; the Add button is.
+        expect(wrapper.find('input').exists()).toBe(false);
+        const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add Household members'))!;
+        await addButton.trigger('click');
+        await flushPromises();
+
+        // One instance now renders its member input; fill it and submit.
+        const input = wrapper.find('input');
+        expect(input.exists()).toBe(true);
+        await input.setValue('Bob');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({ answers: { hh: [{ member_name: 'Bob' }] } }),
+        );
+        wrapper.unmount();
+    });
+
+    it('binds a server 422 error onto the addressed repeat-instance field', async () => {
+        const { ApiError } = await import('../lib/error-normalizer');
+        const client = fakeClient({
+            submit: vi.fn(async () => {
+                throw new ApiError({
+                    httpStatus: 422,
+                    code: 'submission_invalid',
+                    message: 'invalid',
+                    fieldErrors: { 'hh[0].member_age': ['Age must be a number.'] },
+                    kind: 'field',
+                    retryAfterSeconds: null,
+                });
+            }),
+        });
+        const schema = schemaResponse({
+            sections: [section({ key: 'hh', label: 'People', is_repeatable: true, min_instances: 0, max_instances: 3 })],
+            fields: [
+                field({ key: 'member_age', label: 'Age', field_type: 'integer', section_key: 'hh', section_sequence: 0 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add People'))!;
+        await addButton.trigger('click');
+        await flushPromises();
+        await wrapper.find('input').setValue('40');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Age must be a number.');
+        wrapper.unmount();
     });
 
     it('maps a server 422 field error back onto the field', async () => {

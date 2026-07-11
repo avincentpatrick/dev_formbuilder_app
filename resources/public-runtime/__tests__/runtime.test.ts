@@ -192,3 +192,232 @@ describe('createFormRuntime — restored initial answers', () => {
         expect(runtime.answers.gone).toBeUndefined();
     });
 });
+
+// ── Repeat groups (Increment G2) ──────────────────────────────────────────────────────────────
+function repeatSchema(over: { min?: number | null; max?: number | null; singlePage?: boolean } = {}) {
+    return schemaResponse({
+        form: { single_page_mode: over.singlePage ?? true },
+        sections: [
+            section({
+                key: 'hh',
+                label: 'Household members',
+                sequence: 0,
+                is_repeatable: true,
+                min_instances: over.min === undefined ? 1 : over.min,
+                max_instances: over.max === undefined ? 3 : over.max,
+            }),
+        ],
+        fields: [
+            field({ key: 'member_name', section_key: 'hh', is_required: 'required', sequence: 0, section_sequence: 0 }),
+            field({
+                key: 'member_age',
+                section_key: 'hh',
+                field_type: 'integer',
+                sequence: 1,
+                section_sequence: 1,
+                validations: [validation({ rule_type: 'min_value', rule_value: '0', error_message: 'Age must be ≥ 0.' })],
+            }),
+        ],
+    });
+}
+
+describe('createFormRuntime — repeat groups: add/remove + bounds', () => {
+    it('adds and removes instances, honouring max', () => {
+        const rt = createFormRuntime(repeatSchema()); // min 1, max 3
+        expect(rt.instanceCount('hh')).toBe(0);
+
+        expect(rt.addInstance('hh')).toBe(0);
+        rt.addInstance('hh');
+        rt.addInstance('hh');
+        expect(rt.instanceCount('hh')).toBe(3);
+        expect(rt.canAddInstance('hh')).toBe(false);
+        expect(rt.addInstance('hh')).toBe(-1); // blocked at max
+
+        rt.removeInstance('hh', 1);
+        expect(rt.instanceCount('hh')).toBe(2);
+        expect(rt.canAddInstance('hh')).toBe(true);
+    });
+
+    it('sets/gets per-instance values and shifts them correctly on removal', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh');
+        rt.addInstance('hh');
+        rt.setInstanceAnswer('hh', 0, 'member_name', 'A');
+        rt.setInstanceAnswer('hh', 1, 'member_name', 'B');
+
+        rt.removeInstance('hh', 0);
+        expect(rt.instanceValue('hh', 0, 'member_name')).toBe('B');
+        expect(rt.instanceCount('hh')).toBe(1);
+    });
+
+    it('keeps touched state attached to the instance (by uid) across a middle removal', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh');
+        rt.addInstance('hh');
+        // Touch row 0's required name (still empty) → its error shows; untouched row 1 stays quiet.
+        rt.markInstanceTouched('hh', 0, 'member_name');
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBe('This field is required.');
+        expect(rt.instanceErrorFor('hh', 1, 'member_name')).toBeUndefined();
+
+        // Remove the touched row 0; old row 1 slides into index 0 and must remain untouched (uid-keyed).
+        rt.removeInstance('hh', 0);
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBeUndefined();
+    });
+});
+
+describe('createFormRuntime — repeat groups: per-instance validation + min/max', () => {
+    it('surfaces a per-instance required error only once touched, then clears on entry', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh');
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBeUndefined();
+
+        rt.markInstanceTouched('hh', 0, 'member_name');
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBe('This field is required.');
+
+        rt.setInstanceAnswer('hh', 0, 'member_name', 'Bob');
+        expect(rt.instanceValue('hh', 0, 'member_name')).toBe('Bob');
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBeUndefined();
+    });
+
+    it('evaluates a per-instance constraint independently per row', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh');
+        rt.addInstance('hh');
+        rt.setInstanceAnswer('hh', 0, 'member_age', -5);
+        rt.setInstanceAnswer('hh', 1, 'member_age', 12);
+        rt.markSubmitAttempted();
+
+        expect(rt.instanceErrorFor('hh', 0, 'member_age')).toBe('Age must be ≥ 0.');
+        expect(rt.instanceErrorFor('hh', 1, 'member_age')).toBeUndefined();
+    });
+
+    it('reports below-min and above-max as a gated section count error', () => {
+        const rt = createFormRuntime(repeatSchema()); // min 1, max 3
+        expect(rt.passed.value).toBe(false); // 0 < min
+        expect(rt.sectionCountError('hh')).toBeUndefined(); // not attempted yet
+        rt.markSubmitAttempted();
+        expect(rt.sectionCountError('hh')).toBe('Provide at least 1 entry.');
+
+        rt.addInstance('hh');
+        rt.setInstanceAnswer('hh', 0, 'member_name', 'Bob');
+        expect(rt.sectionCountError('hh')).toBeUndefined();
+        expect(rt.passed.value).toBe(true);
+    });
+
+    it('reports above-max when restored past the ceiling', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.restoreAnswers({
+            hh: [{ member_name: 'a' }, { member_name: 'b' }, { member_name: 'c' }, { member_name: 'd' }],
+        });
+        expect(rt.instanceCount('hh')).toBe(4);
+        rt.markSubmitAttempted();
+        expect(rt.sectionCountError('hh')).toBe('Provide at most 3 entries.');
+    });
+});
+
+describe('createFormRuntime — repeat groups: per-instance relevance', () => {
+    function relevanceSchema() {
+        return schemaResponse({
+            sections: [section({ key: 'hh', label: 'Members', is_repeatable: true, min_instances: 0, max_instances: 4 })],
+            fields: [
+                field({ key: 'is_dependent', section_key: 'hh', field_type: 'yes_no', sequence: 0, section_sequence: 0 }),
+                field({
+                    key: 'guardian',
+                    section_key: 'hh',
+                    is_required: 'required',
+                    relevant_expression: "${is_dependent} = 'yes'",
+                    sequence: 1,
+                    section_sequence: 1,
+                }),
+            ],
+        });
+    }
+
+    it('scopes relevance to the instance and retains a hidden value', () => {
+        const rt = createFormRuntime(relevanceSchema());
+        rt.addInstance('hh');
+        expect(rt.instanceFieldRelevant('hh', 0, 'guardian')).toBe(false);
+
+        rt.setInstanceAnswer('hh', 0, 'is_dependent', 'yes');
+        expect(rt.instanceFieldRelevant('hh', 0, 'guardian')).toBe(true);
+        rt.markSubmitAttempted();
+        expect(rt.instanceErrorFor('hh', 0, 'guardian')).toBe('This field is required.');
+
+        rt.setInstanceAnswer('hh', 0, 'guardian', 'Grandma');
+        rt.setInstanceAnswer('hh', 0, 'is_dependent', 'no');
+        expect(rt.instanceFieldRelevant('hh', 0, 'guardian')).toBe(false);
+        expect(rt.instanceErrorFor('hh', 0, 'guardian')).toBeUndefined(); // hidden → not required
+        expect(rt.instanceValue('hh', 0, 'guardian')).toBe('Grandma'); // retained
+    });
+
+    it('evaluates instance relevance independently across rows', () => {
+        const rt = createFormRuntime(relevanceSchema());
+        rt.addInstance('hh');
+        rt.addInstance('hh');
+        rt.setInstanceAnswer('hh', 0, 'is_dependent', 'yes');
+        rt.setInstanceAnswer('hh', 1, 'is_dependent', 'no');
+
+        expect(rt.instanceFieldRelevant('hh', 0, 'guardian')).toBe(true);
+        expect(rt.instanceFieldRelevant('hh', 1, 'guardian')).toBe(false);
+    });
+});
+
+describe('createFormRuntime — repeat groups: submit body + banner + steps', () => {
+    it('builds a nested effectiveAnswers submit body', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh');
+        rt.setInstanceAnswer('hh', 0, 'member_name', 'Bob');
+        rt.setInstanceAnswer('hh', 0, 'member_age', 40);
+        expect(rt.effectiveAnswers.value).toEqual({ hh: [{ member_name: 'Bob', member_age: 40 }] });
+    });
+
+    it('addresses per-instance errors in the banner items', () => {
+        const rt = createFormRuntime(repeatSchema());
+        rt.addInstance('hh'); // empty required name
+        rt.setInstanceAnswer('hh', 0, 'member_name', ''); // keep row present but blank
+        rt.markSubmitAttempted();
+        const addresses = rt.erroredItems.value.map((i) => i.address);
+        expect(addresses).toContain('hh[0].member_name');
+    });
+
+    it('restores nested instances with fresh uids', () => {
+        const rt = createFormRuntime(repeatSchema(), {
+            initialAnswers: { hh: [{ member_name: 'X' }, { member_name: 'Y' }], bogus: 'z' },
+        });
+        expect(rt.instanceCount('hh')).toBe(2);
+        expect(rt.instanceValue('hh', 0, 'member_name')).toBe('X');
+        expect(rt.instanceUidsFor('hh')).toHaveLength(2);
+        expect(rt.answers.bogus).toBeUndefined();
+    });
+
+    it('blocks a multi-step repeat step until its instances are valid', () => {
+        const schema = schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 'lead', label: 'Intro', sequence: 0 }),
+                section({ key: 'hh', label: 'Members', sequence: 1, is_repeatable: true, min_instances: 1, max_instances: 3 }),
+            ],
+            fields: [
+                field({ key: 'ref', section_key: 'lead', sequence: 0, section_sequence: 0 }),
+                field({ key: 'member_name', section_key: 'hh', is_required: 'required', sequence: 1, section_sequence: 0 }),
+            ],
+        });
+        const rt = createFormRuntime(schema);
+        expect(rt.currentStepKey.value).toBe('lead');
+        expect(rt.attemptNext().advanced).toBe(true); // lead field optional
+        expect(rt.currentStepKey.value).toBe('hh');
+
+        // 0 instances < min 1 → blocked with a count error.
+        const blocked = rt.attemptNext();
+        expect(blocked.advanced).toBe(false);
+        expect(rt.sectionCountError('hh')).toBe('Provide at least 1 entry.');
+
+        // Add an instance but leave the required name empty → still blocked, error revealed.
+        rt.addInstance('hh');
+        expect(rt.attemptNext().advanced).toBe(false);
+        expect(rt.instanceErrorFor('hh', 0, 'member_name')).toBe('This field is required.');
+
+        rt.setInstanceAnswer('hh', 0, 'member_name', 'Bob');
+        expect(rt.attemptNext().advanced).toBe(true);
+    });
+});

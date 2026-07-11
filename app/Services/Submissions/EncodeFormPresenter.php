@@ -17,17 +17,21 @@ use Illuminate\Support\Collection;
  * lead as a section-less block), in document order.
  *
  * "Render-supported, mark-the-rest" (confirmed scope decision): the ~14 Phase-1 scalar field types render a
- * real input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature, and every
- * field inside a repeatable section) is emitted with `supported = false` so the page shows a read-only
- * "not available for manual entry (Phase 2)" notice rather than silently dropping it. Display-only `note`
- * fields render as static prose. `page_break`/`hidden`/`calculated` are structural/derived and are omitted
- * from the encode surface entirely (they are never a manually-entered answer).
+ * real input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature) is emitted
+ * with `supported = false` so the page shows a read-only "not available for manual entry (Phase 2)" notice
+ * rather than silently dropping it. Display-only `note` fields render as static prose. `page_break`/`hidden`/
+ * `calculated` are structural/derived and are omitted from the encode surface entirely (they are never a
+ * manually-entered answer).
+ *
+ * Repeat groups (Increment G2): a repeatable section is now emitted with its `min_instances`/`max_instances`
+ * bounds; its member fields render exactly like any other (a scalar type is supported), and the page renders
+ * an add/remove-instance loop over them (the pipeline persists the nested per-instance answer document, G1).
  */
 final class EncodeFormPresenter
 {
     /**
      * The scalar field types with a Phase-1 manual-encoding input. Any other answerable type is surfaced as
-     * an explicit unsupported notice; a field inside a repeatable section is unsupported regardless of type.
+     * an explicit unsupported notice.
      *
      * @var list<FieldType>
      */
@@ -62,10 +66,13 @@ final class EncodeFormPresenter
         if ($ungrouped !== null && $ungrouped->isNotEmpty()) {
             $blocks[] = [
                 'id' => null,
+                'key' => null,
                 'label' => null,
                 'description' => null,
                 'repeatable' => false,
-                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($f, false))->values()->all(),
+                'min_instances' => null,
+                'max_instances' => null,
+                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($f))->values()->all(),
             ];
         }
 
@@ -77,11 +84,16 @@ final class EncodeFormPresenter
 
             $blocks[] = [
                 'id' => $section->id,
+                // The stable section KEY — a repeatable section's nested instance answers are keyed on it (G2),
+                // matching the StructuralAnswerNormalizer / schema_snapshot contract.
+                'key' => $section->key,
                 'label' => $section->label,
                 'description' => $section->description,
                 'repeatable' => $section->is_repeatable,
+                'min_instances' => $section->is_repeatable ? $section->min_instances : null,
+                'max_instances' => $section->is_repeatable ? $section->max_instances : null,
                 'fields' => $sectionFields
-                    ->map(fn (FormField $f): array => $this->field($f, $section->is_repeatable))
+                    ->map(fn (FormField $f): array => $this->field($f))
                     ->values()->all(),
             ];
         }
@@ -103,7 +115,7 @@ final class EncodeFormPresenter
     /**
      * @return array<string, mixed>
      */
-    private function field(FormField $field, bool $inRepeatable): array
+    private function field(FormField $field): array
     {
         $type = $field->field_type;
 
@@ -115,9 +127,9 @@ final class EncodeFormPresenter
             'placeholder' => $field->placeholder,
             'required' => $field->is_required === RequiredMode::Required,
             'options' => $this->options($field),
-            // A repeatable section has no manual-encode renderer in Phase 1, so every field it holds is
-            // unsupported regardless of type. `note` is display-only (handled by the page), never an input.
-            'supported' => ! $inRepeatable && in_array($type, self::SUPPORTED, true),
+            // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
+            // supported and render inside the add/remove-instance loop (Increment G2).
+            'supported' => in_array($type, self::SUPPORTED, true),
         ];
     }
 

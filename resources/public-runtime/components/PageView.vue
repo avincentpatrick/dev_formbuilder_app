@@ -18,7 +18,7 @@ const banner = ref<InstanceType<typeof SummaryBanner> | null>(null);
 const bannerVisible = ref(false);
 
 const bannerItems = computed(() =>
-    runtime.erroredFields.value.map((f) => ({ key: f.key, label: runtime.labelFor(f) })),
+    runtime.erroredItems.value.map((item) => ({ address: item.address, label: item.label })),
 );
 
 async function onSubmit(): Promise<void> {

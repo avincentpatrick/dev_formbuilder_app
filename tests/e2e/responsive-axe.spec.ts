@@ -11,6 +11,7 @@ import { assertClean, forceTheme } from './support/axe';
 const pages = [
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Forms', path: '/forms' },
+    { name: 'Submissions', path: '/submissions' },
     { name: 'Members', path: '/members' },
     { name: 'Settings', path: '/settings' },
 ];
@@ -57,5 +58,19 @@ for (const theme of themes) {
         await page.getByRole('button', { name: 'Submit response' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Encode');
+    });
+}
+
+// The submission detail + reviewer workflow (F7). Reached from the inbox by opening the first row's "View
+// submission" action (no id in the URL). The seeded submissions render answers + a review action bar; the
+// scan covers the read-only answer blocks and the review buttons at all three viewports.
+for (const theme of themes) {
+    test(`Submission detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/submissions', { waitUntil: 'networkidle' });
+        await page.getByRole('button', { name: 'View submission' }).first().click();
+        await page.waitForURL(/\/submissions\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('link', { name: 'Back to submissions' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Submission detail');
     });
 }

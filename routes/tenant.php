@@ -11,6 +11,8 @@ use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\SubmissionController;
+use App\Http\Controllers\Tenant\SubmissionInboxController;
+use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Models\Form;
 use App\Models\Submission;
@@ -118,6 +120,20 @@ Route::middleware([
         ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.create');
     Route::post('/forms/{form}/submissions', [SubmissionController::class, 'store'])
         ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.store');
+
+    // Submissions inbox (Increment F7) — the authenticated read + review + export surface over every pipeline
+    // channel. `viewAny`/`view` gate the pages (SubmissionPolicy); row-level visibility (tenant-wide for
+    // Owner/Admin/Viewer, own-forms for Editor/Reviewer) is the presenter's `visibleTo` scope. Review
+    // transitions gate on submissions.review.*; export is per-form (its columns are form-specific) and gates on
+    // submissions.export via the bound {form}. All bind under RLS context (tenancy runs before SubstituteBindings).
+    Route::get('/submissions', [SubmissionInboxController::class, 'index'])
+        ->middleware('can:viewAny,'.Submission::class)->name('submissions.index');
+    Route::get('/submissions/{submission}', [SubmissionInboxController::class, 'show'])
+        ->middleware('can:view,submission')->name('submissions.show');
+    Route::patch('/submissions/{submission}/review', [SubmissionReviewController::class, 'update'])
+        ->middleware('can:review,submission')->name('submissions.review');
+    Route::get('/forms/{form}/submissions/export', [SubmissionInboxController::class, 'export'])
+        ->middleware('can:export,'.Submission::class.',form')->name('forms.submissions.export');
 });
 
 /*

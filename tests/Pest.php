@@ -2,14 +2,21 @@
 
 declare(strict_types=1);
 use App\Enums\FieldType;
+use App\Enums\FormCollaboratorCapacity;
 use App\Enums\FormVersionStatus;
 use App\Enums\RequiredMode;
+use App\Enums\SubmissionSource;
+use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
+use App\Models\FormCollaborator;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use App\Models\Submission;
+use App\Models\SubmissionAnswer;
+use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Expressions\ExpressionEvaluator;
@@ -17,6 +24,8 @@ use App\Services\Expressions\ExpressionLexer;
 use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\FunctionRegistry;
 use App\Services\Expressions\StructuredRuleLowering;
+use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
@@ -207,4 +216,66 @@ function makeSchemaSection(array $attributes): FormSection
     }
 
     return $section;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Shared submissions-inbox test helpers (Increment F7). Require enterTenant already called.
+|--------------------------------------------------------------------------
+*/
+
+/** A tenant reachable at {slug}.meridian.test (its subdomain is the {slug} domain). */
+function inboxTenant(string $slug = 'acme'): Tenant
+{
+    $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
+    $tenant->domains()->create(['domain' => $slug]);
+
+    return $tenant;
+}
+
+/**
+ * A published form with a representative field mix (required text + single/multi choice + yes/no), so the
+ * inbox detail + export exercise option-label resolution and array joining. The creator becomes an editor
+ * collaborator (FormService::create). Returns the refreshed form (current_published_version_id set).
+ */
+function publishedInboxForm(Tenant $tenant, User $owner, string $title = 'Intake'): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, $title);
+    $version = $form->draftVersion;
+    addFormField($version, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    addFormField($version, $owner, 'color', FieldType::SingleSelect, 1, ['config' => ['options' => [
+        ['value' => 'r', 'label' => 'Red'], ['value' => 'b', 'label' => 'Blue'], ['value' => 'g', 'label' => 'Green'],
+    ]]]);
+    addFormField($version, $owner, 'hobbies', FieldType::MultiSelect, 2, ['config' => ['options' => [
+        ['value' => 'read', 'label' => 'Reading'], ['value' => 'run', 'label' => 'Running'],
+    ]]]);
+    addFormField($version, $owner, 'subscribe', FieldType::YesNo, 3);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+/**
+ * Persist a submission + its answer document against a form's current published version.
+ *
+ * @param  array<string, mixed>  $answers
+ */
+function seedInboxSubmission(Form $form, ?User $respondent, SubmissionStatus $status, array $answers, SubmissionSource $source = SubmissionSource::Manual): Submission
+{
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+    $submission = Submission::factory()->forVersion($version)->create([
+        'status' => $status,
+        'source' => $source,
+        'respondent_user_id' => $source === SubmissionSource::Guest ? null : $respondent?->id,
+        'submitted_at' => now(),
+    ]);
+    SubmissionAnswer::factory()->forSubmission($submission)->create(['answers' => $answers]);
+
+    return $submission;
+}
+
+/** Add a per-form collaborator row (editor or reviewer capacity) for `.own`-scoped access. */
+function makeCollaborator(Form $form, User $user, FormCollaboratorCapacity $capacity): void
+{
+    FormCollaborator::create(['form_id' => $form->id, 'user_id' => $user->id, 'capacity' => $capacity]);
 }

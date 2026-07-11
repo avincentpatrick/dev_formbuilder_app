@@ -56,6 +56,9 @@ class HandleInertiaRequests extends Middleware
                     'transferOwnership' => (bool) $user?->can('tenant.ownership.transfer'),
                     // Gates the Forms nav item + the list page (viewAny composes forms.create/.edit.* — FormPolicy).
                     'manageForms' => (bool) $user?->can('viewAny', Form::class),
+                    // Gates the Submissions inbox nav item + list page (F7). All five roles that hold
+                    // submissions.view; the presenter then scopes rows (tenant-wide vs own-forms).
+                    'viewSubmissions' => (bool) $user?->can('submissions.view'),
                 ],
             ],
             // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.

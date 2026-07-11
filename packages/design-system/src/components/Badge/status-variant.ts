@@ -24,6 +24,12 @@ const STATUS: Record<string, StatusDescriptor> = {
     published: { variant: 'success', label: 'Published' },
     superseded: { variant: 'info', label: 'Superseded' },
     archived: { variant: 'warning', label: 'Archived' },
+    // Submission review lifecycle (Increment F7): SubmissionStatus. `draft`/`archived` are shared with the
+    // form lifecycle above and intentionally reuse those descriptors.
+    submitted: { variant: 'info', label: 'Submitted' },
+    under_review: { variant: 'warning', label: 'Under review' },
+    approved: { variant: 'success', label: 'Approved' },
+    returned: { variant: 'danger', label: 'Returned' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

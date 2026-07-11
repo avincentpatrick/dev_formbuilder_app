@@ -18,4 +18,17 @@ enum SubmissionSource: string
     case OcrLinelist = 'ocr_linelist';
     case OfflineSync = 'offline_sync';
     case ApiImport = 'api_import';
+
+    /** Human label for the inbox source column/filter and the export metadata column (single source). */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Manual => 'Manual entry',
+            self::Guest => 'Guest link',
+            self::OcrSingle => 'OCR (single)',
+            self::OcrLinelist => 'OCR (line list)',
+            self::OfflineSync => 'Offline sync',
+            self::ApiImport => 'API import',
+        };
+    }
 }

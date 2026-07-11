@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\FieldType;
+use App\Enums\SubmissionSource;
+use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
+use App\Models\FormField;
+use App\Models\FormVersion;
 use App\Models\Role;
+use App\Models\Submission;
+use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -147,6 +153,43 @@ class E2eSeeder extends Seeder
                     'supported_locales' => ['en', 'es'],
                 ]);
             }
+
+            // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
+            // of review states (Badge variety) and the detail page has answers to render for the axe gate.
+            $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();
+            if ($intakeForm?->current_published_version_id !== null
+                && Submission::query()->where('form_id', $intakeForm->id)->doesntExist()) {
+                $version = FormVersion::findOrFail($intakeForm->current_published_version_id);
+                $answers = $this->sampleAnswers($version);
+
+                $specs = [
+                    ['status' => SubmissionStatus::Submitted, 'extra' => []],
+                    ['status' => SubmissionStatus::Approved, 'extra' => [
+                        'validated_by' => $owner->id, 'validated_at' => now(), 'finalized_at' => now(),
+                    ]],
+                    ['status' => SubmissionStatus::Returned, 'extra' => [
+                        'validated_by' => $owner->id, 'validated_at' => now(),
+                        'returned_reason' => 'Please confirm the date of birth.',
+                    ]],
+                ];
+
+                foreach ($specs as $spec) {
+                    $submission = Submission::create(array_merge([
+                        'form_id' => $intakeForm->id,
+                        'form_version_id' => $version->id,
+                        'respondent_user_id' => $owner->id,
+                        'status' => $spec['status'],
+                        'source' => SubmissionSource::Manual,
+                        'submitted_at' => now(),
+                    ], $spec['extra']));
+                    SubmissionAnswer::create([
+                        'submission_id' => $submission->id,
+                        'form_version_id' => $version->id,
+                        'answers' => $answers,
+                        'attachment_refs' => [],
+                    ]);
+                }
+            }
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
@@ -171,5 +214,39 @@ class E2eSeeder extends Seeder
     private function roleId(string $name): string
     {
         return (string) Role::query()->whereNull('tenant_id')->where('name', $name)->value('id');
+    }
+
+    /**
+     * A plausible answer document keyed by each field's `key`, for the inbox detail demo.
+     *
+     * @return array<string, mixed>
+     */
+    private function sampleAnswers(FormVersion $version): array
+    {
+        $answers = [];
+        foreach ($version->fields()->get() as $field) {
+            $value = $this->sampleValue($field);
+            if ($value !== null) {
+                $answers[$field->key] = $value;
+            }
+        }
+
+        return $answers;
+    }
+
+    private function sampleValue(FormField $field): mixed
+    {
+        $firstOption = $field->config['options'][0]['value'] ?? null;
+
+        return match ($field->field_type) {
+            FieldType::ShortText => 'Jane Doe',
+            FieldType::LongText => 'No further notes.',
+            FieldType::Integer => 34,
+            FieldType::YesNo => true,
+            FieldType::Date => '2026-06-15',
+            FieldType::SingleSelect => $firstOption,
+            FieldType::MultiSelect => $firstOption !== null ? [$firstOption] : [],
+            default => null,
+        };
     }
 }

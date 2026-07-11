@@ -7,6 +7,11 @@ import AxeBuilder from '@axe-core/playwright';
  * violations, and force the dark theme so axe measures the dark palette on the real composed page.
  */
 export async function assertClean(page: Page, label: string): Promise<void> {
+    // Park the pointer off every control so axe measures resting styles, not a `:hover` state left over from
+    // the test's last click (a parked cursor over a primary button reads its lighter hover bg and mis-flags
+    // its contrast — a test artifact, not a real violation).
+    await page.mouse.move(0, 0);
+
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );

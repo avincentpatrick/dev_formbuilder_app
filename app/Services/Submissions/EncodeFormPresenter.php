@@ -41,6 +41,8 @@ final class EncodeFormPresenter
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
     private const OMITTED = [FieldType::PageBreak, FieldType::Hidden, FieldType::Calculated];
 
+    public function __construct(private readonly SchemaValueFormatter $formatter) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -120,8 +122,8 @@ final class EncodeFormPresenter
     }
 
     /**
-     * The author-defined option list for choice fields (stored in `config.options`), normalised to the
-     * `{value,label}` pairs the select/checkbox controls bind to. Empty for non-choice types.
+     * The author-defined option list for choice fields, normalised to `{value,label}` pairs (shared with the
+     * F7 read side via {@see SchemaValueFormatter}). Empty for non-choice types.
      *
      * @return list<array{value: string, label: string}>
      */
@@ -131,20 +133,6 @@ final class EncodeFormPresenter
             return [];
         }
 
-        $options = $field->config['options'] ?? [];
-        if (! is_array($options)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($options as $option) {
-            if (! is_array($option) || ! isset($option['value'])) {
-                continue;
-            }
-            $value = (string) $option['value'];
-            $normalized[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
-        }
-
-        return $normalized;
+        return $this->formatter->options($field->config ?? []);
     }
 }

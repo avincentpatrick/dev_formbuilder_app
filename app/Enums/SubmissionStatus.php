@@ -19,4 +19,17 @@ enum SubmissionStatus: string
     case Approved = 'approved';
     case Returned = 'returned';
     case Archived = 'archived';
+
+    /** Human label for the inbox filter, detail header, and export metadata column (single source). */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Draft => 'Draft',
+            self::Submitted => 'Submitted',
+            self::UnderReview => 'Under review',
+            self::Approved => 'Approved',
+            self::Returned => 'Returned',
+            self::Archived => 'Archived',
+        };
+    }
 }

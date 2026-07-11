@@ -14,6 +14,7 @@ export interface AppAbilities {
     manageMembers: boolean;
     transferOwnership: boolean;
     manageForms: boolean;
+    viewSubmissions: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

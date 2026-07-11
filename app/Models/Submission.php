@@ -9,7 +9,9 @@ use App\Enums\SubmissionStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Policies\SubmissionPolicy;
 use Database\Factories\SubmissionFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,9 +32,17 @@ use Illuminate\Support\Carbon;
  * @property SubmissionStatus $status
  * @property SubmissionSource $source
  * @property ?string $client_submission_uuid
+ * @property ?string $locale
+ * @property ?string $validated_by
+ * @property Carbon|null $validated_at
+ * @property ?string $returned_reason
+ * @property ?string $remarks
  * @property Carbon|null $submitted_at
  * @property Carbon|null $finalized_at
  * @property Carbon|null $pii_erased_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 class Submission extends Model implements TenantScoped
 {
@@ -118,5 +128,25 @@ class Submission extends Model implements TenantScoped
     public function answerIndex(): HasMany
     {
         return $this->hasMany(SubmissionAnswerIndex::class);
+    }
+
+    /**
+     * Restrict the inbox list to what `$user` may see (F7). RLS already scopes every query to the tenant;
+     * this adds the role-level split that {@see SubmissionPolicy} enforces per-row: Owner/Admin/
+     * Viewer (who hold `dashboard.org.view`) see all tenant submissions, so no extra predicate; Form Editor/
+     * Reviewer see only forms they collaborate on. A user with no collaboration rows gets an empty set.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('dashboard.org.view')) {
+            return $query;
+        }
+
+        return $query->whereIn('form_id', FormCollaborator::query()
+            ->where('user_id', $user->id)
+            ->select('form_id'));
     }
 }

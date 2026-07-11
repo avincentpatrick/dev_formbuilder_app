@@ -55,9 +55,10 @@ final class SubmissionPipeline
         }
 
         $fields = $version->fields()->get();
+        $sections = $version->sections()->get();
 
-        // Stage 1 — structural normalisation (throws on unknown key / type mismatch).
-        $normalized = $this->normalizer->normalize($fields, $payload->answers);
+        // Stage 1 — structural normalisation (throws on unknown key / type mismatch; nests repeat groups).
+        $normalized = $this->normalizer->normalize($fields, $sections, $payload->answers);
 
         // Stage 2b — idempotency: a replayed client_submission_uuid resolves to the existing row (no-op).
         if ($payload->clientSubmissionUuid !== null) {
@@ -146,6 +147,12 @@ final class SubmissionPipeline
         }
 
         foreach ($effectiveAnswers as $key => $value) {
+            // Repeat-group instance arrays (keyed by section key) and multi-select lists are never indexed —
+            // only scalar field answers reach the typed index (data-dictionary §8/§9).
+            if (is_array($value)) {
+                continue;
+            }
+
             $field = $byKey[$key] ?? null;
             if ($field === null) {
                 continue;
@@ -178,7 +185,7 @@ final class SubmissionPipeline
     private function mapErrors(array $errors): array
     {
         return array_map(static fn (SemanticError $error): array => [
-            'field' => $error->fieldKey,
+            'field' => $error->path(),
             'rule' => $error->rule,
             'message' => $error->message,
         ], $errors);

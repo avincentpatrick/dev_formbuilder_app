@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\FieldType;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Services\Submissions\StructuralAnswerNormalizer;
 
 /**
@@ -15,16 +16,28 @@ use App\Services\Submissions\StructuralAnswerNormalizer;
 /**
  * @param  array<int, FormField>  $fields
  * @param  array<string, mixed>  $answers
+ * @param  array<int, FormSection>  $sections
  * @return array<string, mixed>
  */
-function normalizeAnswers(array $fields, array $answers): array
+function normalizeAnswers(array $fields, array $answers, array $sections = []): array
 {
-    return (new StructuralAnswerNormalizer)->normalize(collect($fields), $answers);
+    return (new StructuralAnswerNormalizer)->normalize(collect($fields), collect($sections), $answers);
 }
 
 function normalizerField(string $key, FieldType $type): FormField
 {
     return makeSchemaField(['key' => $key, 'field_type' => $type]);
+}
+
+/** A repeatable section + a member field belonging to it (member carries the section id). */
+function repeatSection(string $key): FormSection
+{
+    return makeSchemaSection(['id' => $key, 'key' => $key, 'is_repeatable' => true]);
+}
+
+function repeatMember(string $key, string $sectionId, FieldType $type = FieldType::ShortText): FormField
+{
+    return makeSchemaField(['key' => $key, 'field_type' => $type, 'form_section_id' => $sectionId]);
 }
 
 it('rejects an unknown key with a structural error', function (): void {
@@ -117,5 +130,108 @@ it('aggregates every structural error rather than throwing on the first', functi
         expect(false)->toBeTrue('expected a SubmissionValidationException');
     } catch (SubmissionValidationException $e) {
         expect($e->fieldErrors())->toHaveCount(3);
+    }
+});
+
+/*
+|--------------------------------------------------------------------------
+| Repeat groups (Increment G1) — a repeatable section's instances nest under the SECTION key.
+|--------------------------------------------------------------------------
+*/
+
+it('nests a repeatable section and coerces each instance with the same per-field rules', function (): void {
+    $section = repeatSection('hh');
+    $fields = [
+        repeatMember('name', 'hh'),
+        repeatMember('age', 'hh', FieldType::Integer),
+        repeatMember('sub', 'hh', FieldType::YesNo),
+    ];
+
+    $result = normalizeAnswers($fields, ['hh' => [
+        ['name' => 'Bob', 'age' => 40, 'sub' => 'yes'],
+        ['name' => 'Cleo', 'age' => 12, 'sub' => 'no'],
+    ]], [$section]);
+
+    expect($result)->toBe(['hh' => [
+        ['name' => 'Bob', 'age' => 40, 'sub' => true],
+        ['name' => 'Cleo', 'age' => 12, 'sub' => false],
+    ]]);
+});
+
+it('drops empty inner answers and fully-empty instances, and an empty group entirely', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('name', 'hh'), repeatMember('age', 'hh', FieldType::Integer)];
+
+    $result = normalizeAnswers($fields, [
+        'hh' => [['name' => 'Bob', 'age' => ''], ['name' => '', 'age' => '']],
+        'other' => [], // an empty repeat group is dropped whole
+    ], [$section, repeatSection('other')]);
+
+    // instance 0 keeps only name; instance 1 is fully empty → dropped; 'other' group dropped.
+    expect($result)->toBe(['hh' => [['name' => 'Bob']]]);
+});
+
+it('rejects a non-list value for a repeatable section', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('name', 'hh')];
+
+    try {
+        normalizeAnswers($fields, ['hh' => ['name' => 'Bob']], [$section]); // object, not a list
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('expected_instance_array');
+    }
+});
+
+it('rejects a non-object instance element', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('name', 'hh')];
+
+    try {
+        normalizeAnswers($fields, ['hh' => ['scalar-not-object']], [$section]);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh[0]')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('expected_instance_object');
+    }
+});
+
+it('rejects an unknown key inside an instance addressed by the instance path', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('name', 'hh')];
+
+    try {
+        normalizeAnswers($fields, ['hh' => [['name' => 'Bob', 'ghost' => 'x']]], [$section]);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh[0].ghost')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('unknown_field');
+    }
+});
+
+it('rejects a repeat-member field submitted at the top level', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('name', 'hh')];
+
+    try {
+        normalizeAnswers($fields, ['name' => 'Bob'], [$section]); // must be inside hh[]
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('name')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('misplaced_repeat_field');
+    }
+});
+
+it('propagates an inner type mismatch with the instance path', function (): void {
+    $section = repeatSection('hh');
+    $fields = [repeatMember('age', 'hh', FieldType::Integer)];
+
+    try {
+        normalizeAnswers($fields, ['hh' => [['age' => 'not-a-number']]], [$section]);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh[0].age')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('not_a_number');
     }
 });

@@ -20,7 +20,9 @@ use App\Models\FormVersion;
 final readonly class SubmissionPayload
 {
     /**
-     * @param  array<string, mixed>  $answers  raw field key => value, as the channel received it
+     * @param  array<string, mixed>  $answers  raw answers as the channel received them: field key => value, plus
+     *                                         (Increment G1) repeatable-section key => list<field key => value>
+     *                                         for repeat-group instances
      */
     public function __construct(
         public FormVersion $version,

@@ -130,7 +130,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     const result = computed(safeEvaluate);
     const fieldRelevance = computed(() => result.value.fieldRelevance);
     const sectionRelevance = computed(() => result.value.sectionRelevance);
-    const effectiveAnswers = computed(() => result.value.effectiveAnswers);
+    // The engine's effectiveAnswers may hold repeat-group instance arrays (Increment G1), but F6b does not
+    // render repeatable sections yet (that is G2), so this runtime only ever sees flat scalar answers here.
+    const effectiveAnswers = computed(() => result.value.effectiveAnswers as Record<string, EngineValue>);
     const passed = computed(() => result.value.passed());
 
     const failingFields = computed(() =>

@@ -24,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $label
  * @property int $sequence
  * @property bool $is_repeatable
+ * @property int|null $min_instances
+ * @property int|null $max_instances
+ * @property string|null $relevant_expression
  */
 class FormSection extends Model implements TenantScoped
 {

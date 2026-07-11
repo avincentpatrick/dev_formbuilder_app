@@ -40,6 +40,15 @@ function buildSemanticInput(array $schema, array $answers, string $locale): Sema
         if (isset($section['relevant'])) {
             $attributes['relevant_expression'] = $section['relevant'];
         }
+        if (isset($section['repeatable'])) {
+            $attributes['is_repeatable'] = $section['repeatable'];
+        }
+        if (isset($section['min'])) {
+            $attributes['min_instances'] = $section['min'];
+        }
+        if (isset($section['max'])) {
+            $attributes['max_instances'] = $section['max'];
+        }
         $sections[] = makeSchemaSection($attributes);
     }
 
@@ -166,9 +175,10 @@ it('matches the golden semantic vector', function (array $case): void {
     expect($result->sectionRelevance)->toEqual($expected['relevance']['sections'] ?? []);
     expect($result->effectiveAnswers)->toEqual($expected['effective_answers'] ?? []);
     expect($result->computed)->toEqual($expected['computed'] ?? []);
+    expect($result->repeatFieldRelevance)->toEqual($expected['repeat_relevance'] ?? []);
 
     $actual = array_map(
-        static fn (SemanticError $error): array => ['field' => $error->fieldKey, 'rule' => $error->rule],
+        static fn (SemanticError $error): array => ['field' => $error->path(), 'rule' => $error->rule],
         $result->errors,
     );
     expect(sortSemanticErrors($actual))->toEqual(sortSemanticErrors($expected['errors'] ?? []));

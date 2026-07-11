@@ -11,6 +11,7 @@ use App\Enums\ValidationRuleType;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormFieldValidation;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -43,6 +44,197 @@ function pipelinePublish(Tenant $tenant, User $user, Closure $build): FormVersio
 
     return app(PublishService::class)->publish($form->refresh(), $user);
 }
+
+/**
+ * Publish a form with a repeatable "hh" section; $build(draft, user, section) adds the member fields (and
+ * any top-level fields / validations). $sectionAttrs overrides the section defaults (min/max/relevant).
+ *
+ * @param  array<string, mixed>  $sectionAttrs
+ */
+function publishRepeatForm(Tenant $tenant, User $user, array $sectionAttrs, Closure $build): FormVersion
+{
+    return pipelinePublish($tenant, $user, function (FormVersion $draft, User $u) use ($sectionAttrs, $build): void {
+        $section = FormSection::create(array_merge([
+            'form_version_id' => $draft->id,
+            'key' => 'hh',
+            'label' => 'Household',
+            'sequence' => 0,
+            'is_repeatable' => true,
+        ], $sectionAttrs));
+
+        $build($draft, $u, $section);
+    });
+}
+
+it('persists repeat-group instances as a nested array and never indexes member or section keys', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'title', FieldType::ShortText, 0, ['is_queryable' => true, 'indexed_data_type' => IndexedDataType::Text]);
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 1, ['form_section_id' => $section->id]);
+        addFormField($draft, $user, 'member_age', FieldType::Integer, 2, ['form_section_id' => $section->id, 'is_queryable' => true, 'indexed_data_type' => IndexedDataType::Number]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: [
+            'title' => 'Census',
+            'hh' => [
+                ['member_name' => 'Bob', 'member_age' => '40'],
+                ['member_name' => 'Cleo', 'member_age' => '12'],
+            ],
+        ],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers)->toEqual([
+        'title' => 'Census',
+        'hh' => [
+            ['member_name' => 'Bob', 'member_age' => '40'],
+            ['member_name' => 'Cleo', 'member_age' => '12'],
+        ],
+    ]);
+
+    // Only the top-level queryable field projects; the member scalar (even though queryable) and the section
+    // key never reach the typed index (data-dictionary §8/§9).
+    $index = SubmissionAnswerIndex::query()->where('submission_id', $result->submission->id)->get();
+    expect($index)->toHaveCount(1)
+        ->and($index->first()->field_key)->toBe('title');
+});
+
+it('rejects a missing required member answer addressed by the instance path', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 0, ['form_section_id' => $section->id, 'is_required' => RequiredMode::Required]);
+        addFormField($draft, $user, 'member_age', FieldType::Integer, 1, ['form_section_id' => $section->id]);
+    });
+
+    try {
+        // Instance 1 carries an age (so it is not an empty, dropped instance) but omits the required name.
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['hh' => [['member_name' => 'Bob', 'member_age' => '40'], ['member_age' => '12']]],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->stage())->toBe('semantic')
+            ->and($e->fieldErrors()[0]['field'])->toBe('hh[1].member_name')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('field_required');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('rejects a failed member constraint addressed by the instance path', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [], function (FormVersion $draft, User $user, FormSection $section): void {
+        $age = addFormField($draft, $user, 'member_age', FieldType::Integer, 0, ['form_section_id' => $section->id]);
+        FormFieldValidation::create([
+            'form_version_id' => $draft->id,
+            'form_field_id' => $age->id,
+            'rule_type' => ValidationRuleType::MinValue,
+            'rule_value' => '18',
+            'error_message' => 'Must be at least 18.',
+            'sequence' => 0,
+        ]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['hh' => [['member_age' => '10'], ['member_age' => '40']]],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh[0].member_age')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('min_value')
+            ->and($e->fieldErrors()[0]['message'])->toBe('Must be at least 18.');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('enforces min and max instance counts on a relevant repeat section', function (): void {
+    $belowMin = publishRepeatForm($this->tenant, $this->user, ['min_instances' => 2], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 0, ['form_section_id' => $section->id]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $belowMin,
+            answers: ['hh' => [['member_name' => 'Bob']]],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('min_instances');
+    }
+
+    $aboveMax = publishRepeatForm($this->tenant, $this->user, ['max_instances' => 2], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 0, ['form_section_id' => $section->id]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $aboveMax,
+            answers: ['hh' => [['member_name' => 'A'], ['member_name' => 'B'], ['member_name' => 'C']]],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('hh')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('max_instances');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('drops a hidden repeat section entirely and enforces no instance count on it', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [
+        'min_instances' => 2,
+        'relevant_expression' => '${mode} = \'full\'',
+    ], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'mode', FieldType::ShortText, 0);
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 1, ['form_section_id' => $section->id]);
+    });
+
+    // mode != full → the section is irrelevant, so its 1-instance array (below min 2) is dropped without error.
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['mode' => 'basic', 'hh' => [['member_name' => 'Bob']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers)->toBe(['mode' => 'basic']);
+});
+
+it('treats a replayed client_submission_uuid with nested answers as an idempotent no-op', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 0, ['form_section_id' => $section->id]);
+    });
+
+    $payload = new SubmissionPayload(
+        version: $version,
+        answers: ['hh' => [['member_name' => 'Bob'], ['member_name' => 'Cleo']]],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: Str::uuid()->toString(),
+    );
+
+    $first = $this->pipeline->submit($payload);
+    $second = $this->pipeline->submit($payload);
+
+    expect($first->created)->toBeTrue()
+        ->and($second->created)->toBeFalse()
+        ->and($second->submission->id)->toBe($first->submission->id)
+        ->and(Submission::query()->count())->toBe(1);
+});
 
 it('persists a submission, its answer document, and the typed index rows', function (): void {
     $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {

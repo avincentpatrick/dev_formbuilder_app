@@ -17,7 +17,7 @@
  * field and a same-instance sibling). Instance count is enforced against min/max on the relevant section.
  */
 
-import { ABSENT, isEmpty, type EngineValue, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, toStr, type EngineValue, type MaybeAbsent } from './coercion';
 import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
@@ -34,10 +34,22 @@ export interface SemanticError {
     /** Repeat-group address (Increment G1): the owning section + 0-based instance; null on a flat error. */
     sectionKey?: string | null;
     instanceIndex?: number | null;
+    /** Sub-field address (Increment G4): a cascading level index (later a matrix cell); null on a whole-field error. */
+    cellPath?: string | null;
 }
 
-/** The stable address the surface + the 422 envelope key on: `field`, `section`, or `section[i].field`. */
+/**
+ * The stable address the surface + the 422 envelope key on: `field`, `section`, `section[i].field`, or any
+ * of those suffixed with `.cellPath` for a sub-field (composite) failure.
+ */
 export function errorPath(error: SemanticError): string {
+    const base = baseAddress(error);
+    const cellPath = error.cellPath ?? null;
+
+    return cellPath === null ? base : `${base}.${cellPath}`;
+}
+
+function baseAddress(error: SemanticError): string {
     const sectionKey = error.sectionKey ?? null;
     const instanceIndex = error.instanceIndex ?? null;
     if (sectionKey === null) {
@@ -379,6 +391,102 @@ export class SemanticValidator {
                 });
             }
         }
+
+        this.collectMembershipErrors(field, answer, errors, sectionKey, instanceIndex);
+    }
+
+    /**
+     * Choice-membership + cascading integrity for an answered, relevant choice-family field (Increment G4a) —
+     * the byte-identical mirror of PHP `SemanticValidator::collectMembershipErrors`. A single/dropdown/
+     * likert_scale/multi_select answer must be drawn from `field.options`; a cascading answer's per-level
+     * values must each be a known option at that level whose `parent` matches the previous level's choice.
+     * Enforced only when the field declares an option set (an unconfigured field checks nothing, keeping
+     * every pre-G4a golden vector byte-identical). Errors carry the repeat address + (cascading) a per-level
+     * `cellPath`.
+     */
+    private collectMembershipErrors(field: SchemaField, answer: MaybeAbsent, errors: SemanticError[], sectionKey: string | null, instanceIndex: number | null): void {
+        switch (field.field_type) {
+            case 'single_select':
+            case 'dropdown':
+            case 'likert_scale': {
+                const allowed = field.options ?? [];
+                if (allowed.length === 0 || Array.isArray(answer)) {
+                    return;
+                }
+                if (!allowed.includes(toStr(answer))) {
+                    errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'The selected option is not available.', sectionKey, instanceIndex });
+                }
+
+                return;
+            }
+
+            case 'multi_select': {
+                const allowed = field.options ?? [];
+                if (allowed.length === 0 || !Array.isArray(answer)) {
+                    return;
+                }
+                for (const element of answer) {
+                    if (!allowed.includes(toStr(element))) {
+                        errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'A selected option is not available.', sectionKey, instanceIndex });
+
+                        return; // one membership error per field is enough
+                    }
+                }
+
+                return;
+            }
+
+            case 'cascading_select':
+                this.collectCascadeErrors(field, answer, errors, sectionKey, instanceIndex);
+
+                return;
+
+            default:
+                return;
+        }
+    }
+
+    /**
+     * Cascading select (G4a) — the mirror of PHP `collectCascadeErrors`. The answer is an ordered list of one
+     * chosen value per level; each must be a known option at its positional level, and (below the root) its
+     * option's `parent` must equal the previous level's chosen value. Per-level errors are addressed by the
+     * 0-based level index (`cellPath`). Skipped when the field declares no levels/options; an interior blank
+     * level is not itself a violation.
+     */
+    private collectCascadeErrors(field: SchemaField, answer: MaybeAbsent, errors: SemanticError[], sectionKey: string | null, instanceIndex: number | null): void {
+        const cascade = field.cascade ?? null;
+        if (cascade === null || cascade.levels.length === 0 || cascade.options.length === 0 || !Array.isArray(answer)) {
+            return;
+        }
+
+        const byLevel: Record<string, Record<string, string | null>> = {};
+        for (const option of cascade.options) {
+            const level = toStr(option.level);
+            const value = toStr(option.value);
+            const parent = option.parent === null || option.parent === undefined ? null : toStr(option.parent);
+            (byLevel[level] ??= {})[value] = parent;
+        }
+
+        answer.forEach((rawValue, i) => {
+            const value = toStr(rawValue);
+            if (value === '') {
+                return;
+            }
+
+            const levelKey = cascade.levels[i] ?? null;
+            const optionsAtLevel = levelKey !== null ? (byLevel[levelKey] ?? {}) : {};
+            if (!Object.prototype.hasOwnProperty.call(optionsAtLevel, value)) {
+                errors.push({ fieldKey: field.key, rule: 'cascading_choice_invalid', message: 'This selection is not available at this level.', sectionKey, instanceIndex, cellPath: String(i) });
+
+                return;
+            }
+
+            const expectedParent = optionsAtLevel[value];
+            const previous = i > 0 ? toStr(answer[i - 1]) : null;
+            if (i > 0 && expectedParent !== null && expectedParent !== previous) {
+                errors.push({ fieldKey: field.key, rule: 'cascading_parent_mismatch', message: 'This selection does not belong under the parent choice.', sectionKey, instanceIndex, cellPath: String(i) });
+            }
+        });
     }
 
     private processRepeats(

@@ -17,7 +17,12 @@ use App\Enums\ValidationRuleType;
  * `sectionKey` + the 0-based `instanceIndex`, and `path()` renders `section[i].field`. A section-level
  * count failure carries the `sectionKey` with a null `instanceIndex`, and `path()` renders just `section`.
  * A flat (non-repeat) failure leaves both null, and `path() === fieldKey` — so pre-repeat callers and the
- * 38 pre-G1 golden vectors are unaffected.
+ * pre-G1 golden vectors are unaffected.
+ *
+ * Sub-field addressing (Increment G4): a failure inside a composite field's value — a cascading level
+ * (`cellPath = "<levelIndex>"`), and in G4b a matrix cell (`"row.col"`) or Likert-matrix row (`"row"`) —
+ * carries an optional `cellPath` appended to the base address as `.cellPath`. It composes with every prior
+ * axis and defaults null, so every existing scalar/repeat error renders exactly as before.
  */
 final readonly class SemanticError
 {
@@ -27,10 +32,21 @@ final readonly class SemanticError
         public string $message,
         public ?string $sectionKey = null,
         public ?int $instanceIndex = null,
+        public ?string $cellPath = null,
     ) {}
 
-    /** The stable address the surface + the 422 envelope key on: `field`, `section`, or `section[i].field`. */
+    /**
+     * The stable address the surface + the 422 envelope key on: `field`, `section`, `section[i].field`, or
+     * any of those suffixed with `.cellPath` for a sub-field (composite) failure.
+     */
     public function path(): string
+    {
+        $base = $this->baseAddress();
+
+        return $this->cellPath === null ? $base : "{$base}.{$this->cellPath}";
+    }
+
+    private function baseAddress(): string
     {
         if ($this->sectionKey === null) {
             return $this->fieldKey;

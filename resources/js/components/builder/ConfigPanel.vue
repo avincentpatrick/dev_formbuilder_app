@@ -16,6 +16,7 @@ import {
     MdsTextInput,
     MdsTextarea,
 } from '@meridian/design-system';
+import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
@@ -24,6 +25,16 @@ import type { BuilderValidation, EnumOption, LocalField, LocalSection } from './
 interface Choice {
     value: string;
     label: string;
+}
+interface CascadeLevel {
+    key: string;
+    label: string;
+}
+interface CascadeOption {
+    value: string;
+    label: string;
+    level: string;
+    parent: string | null;
 }
 
 const props = defineProps<{ store: BuilderStore }>();
@@ -35,10 +46,12 @@ const enums = props.store.enums;
 
 const optionTypes = new Set<string>();
 const advancedTypes = new Set<string>();
+const configEditorByType = new Map<string, string | null>();
 props.store.palette.forEach((group) =>
     group.types.forEach((type) => {
         if (type.has_options) optionTypes.add(type.value);
         if (type.advanced) advancedTypes.add(type.value);
+        configEditorByType.set(type.value, type.config_editor);
     }),
 );
 
@@ -48,10 +61,15 @@ const sectionOptions = computed<EnumOption[]>(() => [
     ...props.store.sections.value.map((s) => ({ value: s.id, label: s.label })),
 ]);
 
+const configEditor = computed<string | null>(() =>
+    field.value ? configEditorByType.get(field.value.field_type) ?? null : null,
+);
+
 const tabs = computed<{ key: string; label: string }[]>(() => {
     if (field.value) {
         const list = [{ key: 'basics', label: 'Basics' }];
         if (optionTypes.has(field.value.field_type)) list.push({ key: 'options', label: 'Options' });
+        if (configEditor.value === 'cascading') list.push({ key: 'cascading', label: 'Levels' });
         list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
         return list;
     }
@@ -97,6 +115,9 @@ const advanced = computed(() => (field.value ? advancedTypes.has(field.value.fie
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
 const calculatedFormula = computed<string>(() => (field.value?.config.calculated_formula as string | undefined) ?? '');
 const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[] | undefined) ?? []);
+// A cascading field keeps its LEVELS + parented OPTIONS under distinct config keys (Increment G4a).
+const cascadeLevels = computed<CascadeLevel[]>(() => (field.value?.config.levels as CascadeLevel[] | undefined) ?? []);
+const cascadeOptions = computed<CascadeOption[]>(() => (field.value?.config.options as CascadeOption[] | undefined) ?? []);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -161,7 +182,7 @@ function reparent(sectionId: string): void {
                 tabindex="0"
                 class="config__panel"
             >
-                <p v-if="advanced" class="config__note">
+                <p v-if="advanced && configEditor === null" class="config__note">
                     Baseline settings for this advanced field type. Its full editor and runtime arrive with the
                     form engine.
                 </p>
@@ -213,6 +234,15 @@ function reparent(sectionId: string): void {
 
                 <template v-else-if="activeTab === 'options'">
                     <ChoicesEditor :options="choices" @update:options="setConfig('options', $event)" />
+                </template>
+
+                <template v-else-if="activeTab === 'cascading'">
+                    <CascadingEditor
+                        :levels="cascadeLevels"
+                        :options="cascadeOptions"
+                        @update:levels="setConfig('levels', $event)"
+                        @update:options="setConfig('options', $event)"
+                    />
                 </template>
 
                 <template v-else-if="activeTab === 'validation'">

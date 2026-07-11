@@ -22,6 +22,18 @@ import {
 } from '@meridian/design-system';
 import { computed } from 'vue';
 
+export interface CascadeLevel {
+    key: string;
+    label: string;
+}
+
+export interface CascadeOption {
+    value: string;
+    label: string;
+    level: string;
+    parent: string | null;
+}
+
 export interface EncodeField {
     key: string;
     field_type: string;
@@ -30,6 +42,8 @@ export interface EncodeField {
     placeholder: string | null;
     required: boolean;
     options: { value: string; label: string }[];
+    // Cascading-select hierarchy (Increment G4a); labels already resolved to the active locale by the caller.
+    cascade?: { levels: CascadeLevel[]; options: CascadeOption[] } | null;
     supported: boolean;
 }
 
@@ -65,20 +79,22 @@ const yesNoOptions = [
     { value: 'no', label: 'No' },
 ];
 
-const control = computed<'text' | 'textarea' | 'number' | 'select' | 'checkboxes' | 'yesno' | 'note' | 'unsupported'>(
-    () => {
-        const t = props.field.field_type;
-        if (t === 'note') return 'note';
-        if (!props.field.supported) return 'unsupported';
-        if (['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime'].includes(t)) return 'text';
-        if (t === 'long_text') return 'textarea';
-        if (t === 'integer' || t === 'decimal') return 'number';
-        if (t === 'single_select' || t === 'dropdown') return 'select';
-        if (t === 'multi_select') return 'checkboxes';
-        if (t === 'yes_no') return 'yesno';
-        return 'unsupported';
-    },
-);
+const control = computed<
+    'text' | 'textarea' | 'number' | 'select' | 'checkboxes' | 'yesno' | 'scale' | 'cascading' | 'note' | 'unsupported'
+>(() => {
+    const t = props.field.field_type;
+    if (t === 'note') return 'note';
+    if (!props.field.supported) return 'unsupported';
+    if (['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime'].includes(t)) return 'text';
+    if (t === 'long_text') return 'textarea';
+    if (t === 'integer' || t === 'decimal') return 'number';
+    if (t === 'single_select' || t === 'dropdown') return 'select';
+    if (t === 'multi_select') return 'checkboxes';
+    if (t === 'yes_no') return 'yesno';
+    if (t === 'likert_scale') return 'scale';
+    if (t === 'cascading_select') return 'cascading';
+    return 'unsupported';
+});
 
 const textType = computed<'text' | 'email' | 'tel' | 'url' | 'date' | 'time' | 'datetime-local'>(() => {
     switch (props.field.field_type) {
@@ -107,6 +123,35 @@ const listValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (p
 function toggleOption(value: string, checked: boolean): void {
     const current = listValue.value;
     emit('update:modelValue', checked ? [...current, value] : current.filter((v) => v !== value));
+}
+
+// ── Cascading select (Increment G4a) ────────────────────────────────────────────────────────────
+// The value is an ordered string[] — one chosen value per level. Each level's select is filtered by the
+// parent level's current choice; choosing a value drops every deeper level (its parent changed).
+const cascadeLevels = computed<CascadeLevel[]>(() => props.field.cascade?.levels ?? []);
+const cascadeOptions = computed<CascadeOption[]>(() => props.field.cascade?.options ?? []);
+const cascadeValue = computed<string[]>(() => (Array.isArray(props.modelValue) ? (props.modelValue as string[]) : []));
+
+function cascadeOptionsAt(index: number): { value: string; label: string }[] {
+    const level = cascadeLevels.value[index];
+    if (!level) return [];
+    const parent = index === 0 ? null : cascadeValue.value[index - 1] ?? '';
+    if (index > 0 && (parent === '' || parent === undefined)) return []; // no parent chosen yet
+    return cascadeOptions.value
+        .filter((o) => o.level === level.key && (index === 0 ? o.parent === null : o.parent === parent))
+        .map((o) => ({ value: o.value, label: o.label }));
+}
+
+function cascadeDisabled(index: number): boolean {
+    if (index === 0) return false;
+    const parent = cascadeValue.value[index - 1];
+    return parent === '' || parent === undefined;
+}
+
+function setCascadeLevel(index: number, value: string): void {
+    const next = cascadeValue.value.slice(0, index); // keep shallower levels, drop this + deeper
+    if (value !== '') next.push(value);
+    emit('update:modelValue', next);
 }
 </script>
 
@@ -162,7 +207,10 @@ function toggleOption(value: string, checked: boolean): void {
     </MdsFormField>
 
     <!-- Group controls: real fieldset/legend + their own aria-live error region -->
-    <fieldset v-else-if="control === 'checkboxes' || control === 'yesno'" class="encode-field">
+    <fieldset
+        v-else-if="control === 'checkboxes' || control === 'yesno' || control === 'scale' || control === 'cascading'"
+        class="encode-field"
+    >
         <legend class="encode-field__legend">
             {{ field.label
             }}<span v-if="showRequiredMarker" class="encode-field__required"> (required)</span
@@ -179,6 +227,45 @@ function toggleOption(value: string, checked: boolean): void {
                 :invalid="Boolean(error)"
                 @update:model-value="toggleOption(opt.value, $event)"
             />
+        </div>
+        <!-- Likert scale: a single-choice radio group (native radios share a name, so arrow keys move within
+             the scale); wraps at narrow viewports so it never forces horizontal page overflow. -->
+        <div v-else-if="control === 'scale'" class="encode-scale">
+            <label
+                v-for="opt in field.options"
+                :key="opt.value"
+                class="encode-scale__option"
+                :class="{ 'encode-scale__option--active': stringValue === opt.value }"
+            >
+                <input
+                    type="radio"
+                    class="encode-scale__radio"
+                    :name="`scale-${field.key}`"
+                    :value="opt.value"
+                    :checked="stringValue === opt.value"
+                    @change="emit('update:modelValue', opt.value)"
+                />
+                <span class="encode-scale__label">{{ opt.label }}</span>
+            </label>
+        </div>
+        <!-- Cascading select: one dependent select per level, each filtered by the parent level's choice. -->
+        <div v-else-if="control === 'cascading'" class="encode-cascade">
+            <MdsFormField
+                v-for="(level, i) in cascadeLevels"
+                :key="level.key"
+                :label="level.label"
+                v-slot="{ id, describedby }"
+            >
+                <MdsSelect
+                    :id="id"
+                    :model-value="cascadeValue[i] ?? ''"
+                    :options="cascadeOptionsAt(i)"
+                    :disabled="cascadeDisabled(i)"
+                    placeholder="Select an option"
+                    :describedby="describedby"
+                    @update:model-value="setCascadeLevel(i, $event)"
+                />
+            </MdsFormField>
         </div>
         <MdsSegmentedControl
             v-else
@@ -248,6 +335,48 @@ function toggleOption(value: string, checked: boolean): void {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-1);
+}
+
+/* Likert scale — a wrapping row of radio chips (never overflows the page at narrow viewports). */
+.encode-scale {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    min-width: 0;
+}
+
+.encode-scale__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-1) var(--mds-space-3);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
+    cursor: pointer;
+}
+
+.encode-scale__option--active {
+    border-color: var(--mds-color-border-strong);
+    background-color: var(--mds-color-bg-sunken);
+    font-weight: var(--mds-font-weight-medium);
+}
+
+.encode-scale__radio {
+    margin: 0;
+    accent-color: var(--mds-color-action-default, currentColor);
+}
+
+/* Cascading select — one stacked select per level. */
+.encode-cascade {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-3);
+    min-width: 0;
 }
 
 .encode-field__error {

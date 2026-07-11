@@ -149,6 +149,7 @@ final class BuilderPresenter
                 'label' => $type->label(),
                 'advanced' => $type->isAdvanced(),
                 'has_options' => $type->hasOptions(),
+                'config_editor' => $type->configEditor(),
             ];
         }
 

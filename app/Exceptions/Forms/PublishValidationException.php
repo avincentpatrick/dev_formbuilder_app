@@ -46,4 +46,16 @@ final class PublishValidationException extends RuntimeException
     {
         return new self("The validation rule on “{$fieldKey}” is invalid ({$detail}).");
     }
+
+    /** A choice field (Increment G4a) with no options or duplicate option values — unanswerable / ambiguous. */
+    public static function choiceOptionsInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The choices on “{$fieldKey}” are invalid ({$detail}).");
+    }
+
+    /** A cascading-select field (Increment G4a) whose level/option hierarchy does not resolve. */
+    public static function cascadingConfigInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The cascading choices on “{$fieldKey}” are invalid ({$detail}).");
+    }
 }

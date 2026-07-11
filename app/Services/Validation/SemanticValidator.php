@@ -433,6 +433,138 @@ final class SemanticValidator
                 );
             }
         }
+
+        $this->collectMembershipErrors($field, $answer, $errors, $sectionKey, $instanceIndex);
+    }
+
+    /**
+     * Choice-membership + cascading integrity for an answered, relevant choice-family field (Increment G4a).
+     * A `single_select`/`dropdown`/`likert_scale`/`multi_select` answer must be drawn from the field's
+     * `config.options`; a `cascading_select` answer's per-level values must each be a known option at that
+     * level whose `parent` matches the previous level's choice. Enforced only when the field actually
+     * declares options (an unconfigured choice field checks nothing — this is what keeps every pre-G4a
+     * golden vector, which carries no option set, byte-identical). Errors carry the caller's repeat address,
+     * and cascading additionally carries a per-level `cellPath`. Membership runs alongside constraints, not
+     * instead of them.
+     *
+     * @param  list<SemanticError>  $errors
+     */
+    private function collectMembershipErrors(
+        FormField $field,
+        mixed $answer,
+        array &$errors,
+        ?string $sectionKey,
+        ?int $instanceIndex,
+    ): void {
+        switch ($field->field_type) {
+            case FieldType::SingleSelect:
+            case FieldType::Dropdown:
+            case FieldType::LikertScale:
+                $allowed = $this->optionValueSet($field);
+                if ($allowed === [] || is_array($answer)) {
+                    return; // no configured options → nothing to enforce; an array is a Stage-1 fault
+                }
+                if (! isset($allowed[Coercion::toStr($answer)])) {
+                    $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'The selected option is not available.', $sectionKey, $instanceIndex);
+                }
+
+                return;
+
+            case FieldType::MultiSelect:
+                $allowed = $this->optionValueSet($field);
+                if ($allowed === [] || ! is_array($answer)) {
+                    return;
+                }
+                foreach ($answer as $element) {
+                    if (! isset($allowed[Coercion::toStr($element)])) {
+                        $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'A selected option is not available.', $sectionKey, $instanceIndex);
+
+                        return; // one membership error per field is enough
+                    }
+                }
+
+                return;
+
+            case FieldType::CascadingSelect:
+                $this->collectCascadeErrors($field, $answer, $errors, $sectionKey, $instanceIndex);
+
+                return;
+
+            default:
+                return;
+        }
+    }
+
+    /**
+     * The `config.options` value set for O(1) membership; `[]` when the field declares no options.
+     *
+     * @return array<string, true>
+     */
+    private function optionValueSet(FormField $field): array
+    {
+        $set = [];
+        foreach ((array) data_get($field->config, 'options', []) as $option) {
+            if (is_array($option) && array_key_exists('value', $option) && $option['value'] !== null) {
+                $set[Coercion::toStr($option['value'])] = true;
+            }
+        }
+
+        return $set;
+    }
+
+    /**
+     * Cascading select (G4a): the answer is an ordered `list<string>` of one chosen value per level. Each
+     * element must be a known option at its positional level, and (below the root) its option's `parent`
+     * must equal the value chosen at the previous level. Per-level errors are addressed via `cellPath` (the
+     * 0-based level index). Skipped when the field declares no levels/options. An interior blank level is
+     * not itself a membership violation (a deeper non-blank level under it will mismatch its parent).
+     *
+     * @param  list<SemanticError>  $errors
+     */
+    private function collectCascadeErrors(FormField $field, mixed $answer, array &$errors, ?string $sectionKey, ?int $instanceIndex): void
+    {
+        $levels = array_values(array_map(
+            static fn (mixed $level): string => is_array($level) ? Coercion::toStr($level['key'] ?? '') : Coercion::toStr($level),
+            (array) data_get($field->config, 'levels', []),
+        ));
+
+        /** @var array<string, array<string, string|null>> $byLevel  levelKey => (value => parent) */
+        $byLevel = [];
+        foreach ((array) data_get($field->config, 'options', []) as $option) {
+            if (! is_array($option)) {
+                continue;
+            }
+            $level = Coercion::toStr($option['level'] ?? '');
+            $value = Coercion::toStr($option['value'] ?? '');
+            $parent = array_key_exists('parent', $option) && $option['parent'] !== null ? Coercion::toStr($option['parent']) : null;
+            $byLevel[$level][$value] = $parent;
+        }
+
+        if ($levels === [] || $byLevel === [] || ! is_array($answer)) {
+            return;
+        }
+
+        $values = array_values($answer);
+        foreach ($values as $i => $rawValue) {
+            $value = Coercion::toStr($rawValue);
+            if ($value === '') {
+                continue;
+            }
+
+            $levelKey = $levels[$i] ?? null;
+            $optionsAtLevel = $levelKey !== null ? ($byLevel[$levelKey] ?? []) : [];
+            if (! array_key_exists($value, $optionsAtLevel)) {
+                $errors[] = new SemanticError($field->key, 'cascading_choice_invalid', 'This selection is not available at this level.', $sectionKey, $instanceIndex, (string) $i);
+
+                continue;
+            }
+
+            $expectedParent = $optionsAtLevel[$value];
+            $previous = $i > 0 ? Coercion::toStr($values[$i - 1] ?? '') : null;
+            if ($i > 0 && $expectedParent !== null && $expectedParent !== $previous) {
+                $errors[] = new SemanticError($field->key, 'cascading_parent_mismatch', 'This selection does not belong under the parent choice.', $sectionKey, $instanceIndex, (string) $i);
+            }
+        }
     }
 
     /**

@@ -143,6 +143,74 @@ describe('RuntimeSession (component wiring)', () => {
         wrapper.unmount();
     });
 
+    it('renders a likert_scale as a radio group and submits the chosen score (G4a)', async () => {
+        const scaleConfig = {
+            options: [
+                { value: '1', label: 'Low' },
+                { value: '2', label: 'Mid' },
+                { value: '3', label: 'High' },
+            ],
+        };
+        const schema = schemaResponse({
+            fields: [field({ key: 'rating', label: 'Satisfaction', field_type: 'likert_scale', config: scaleConfig })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        const radios = wrapper.findAll('input[type="radio"]');
+        expect(radios).toHaveLength(3);
+
+        await wrapper.find('input[value="3"]').setValue();
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { rating: '3' } }));
+        wrapper.unmount();
+    });
+
+    it('renders a cascading select as dependent selects and submits the chosen path (G4a)', async () => {
+        const cascadeConfig = {
+            levels: [
+                { key: 'region', label: 'Region' },
+                { key: 'province', label: 'Province' },
+            ],
+            options: [
+                { value: 'ncr', label: 'NCR', level: 'region', parent: null },
+                { value: 'cebu', label: 'Cebu', level: 'region', parent: null },
+                { value: 'manila', label: 'Manila', level: 'province', parent: 'ncr' },
+                { value: 'cebu_city', label: 'Cebu City', level: 'province', parent: 'cebu' },
+            ],
+        };
+        const schema = schemaResponse({
+            fields: [field({ key: 'loc', label: 'Location', field_type: 'cascading_select', config: cascadeConfig })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        // Two level selects (single-locale form ⇒ no language switcher select).
+        expect(wrapper.findAll('select')).toHaveLength(2);
+        // The province select is disabled until a region is chosen.
+        expect(wrapper.findAll('select')[1].attributes('disabled')).toBeDefined();
+
+        await wrapper.findAll('select')[0].setValue('ncr');
+        await flushPromises();
+
+        // Province is now enabled and filtered to NCR's children only (manila, not cebu_city).
+        const provinceValues = wrapper
+            .findAll('select')[1]
+            .findAll('option')
+            .map((o) => (o.element as HTMLOptionElement).value)
+            .filter((v) => v !== '');
+        expect(provinceValues).toEqual(['manila']);
+
+        await wrapper.findAll('select')[1].setValue('manila');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { loc: ['ncr', 'manila'] } }));
+        wrapper.unmount();
+    });
+
     it('maps a server 422 field error back onto the field', async () => {
         const { ApiError } = await import('../lib/error-normalizer');
         const client = fakeClient({

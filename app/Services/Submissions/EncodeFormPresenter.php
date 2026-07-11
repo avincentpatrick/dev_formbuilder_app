@@ -40,6 +40,8 @@ final class EncodeFormPresenter
         FieldType::Integer, FieldType::Decimal,
         FieldType::Date, FieldType::Time, FieldType::Datetime,
         FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown, FieldType::YesNo,
+        // Increment G4a: a single-choice rating scale + an N-level dependent select.
+        FieldType::LikertScale, FieldType::CascadingSelect,
     ];
 
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
@@ -127,10 +129,51 @@ final class EncodeFormPresenter
             'placeholder' => $field->placeholder,
             'required' => $field->is_required === RequiredMode::Required,
             'options' => $this->options($field),
+            // Cascading hierarchy (Increment G4a); null for every other type so the shared FieldInput ignores it.
+            'cascade' => $this->cascade($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2).
             'supported' => in_array($type, self::SUPPORTED, true),
         ];
+    }
+
+    /**
+     * The cascading-select hierarchy (Increment G4a) — levels + parented options, normalised to the flat shape
+     * the shared FieldInput cascading control consumes. Null for every non-cascading type. The encode channel is
+     * single-locale, so labels are emitted as authored (no translation resolution — same as {@see options()}).
+     *
+     * @return array{levels: list<array{key: string, label: string}>, options: list<array{value: string, label: string, level: string, parent: string|null}>}|null
+     */
+    private function cascade(FormField $field): ?array
+    {
+        if ($field->field_type !== FieldType::CascadingSelect) {
+            return null;
+        }
+
+        $levels = [];
+        foreach ((array) data_get($field->config, 'levels', []) as $level) {
+            if (! is_array($level) || ! isset($level['key'])) {
+                continue;
+            }
+            $key = (string) $level['key'];
+            $levels[] = ['key' => $key, 'label' => (string) ($level['label'] ?? $key)];
+        }
+
+        $options = [];
+        foreach ((array) data_get($field->config, 'options', []) as $option) {
+            if (! is_array($option) || ! isset($option['value'], $option['level'])) {
+                continue;
+            }
+            $value = (string) $option['value'];
+            $options[] = [
+                'value' => $value,
+                'label' => (string) ($option['label'] ?? $value),
+                'level' => (string) $option['level'],
+                'parent' => array_key_exists('parent', $option) && $option['parent'] !== null ? (string) $option['parent'] : null,
+            ];
+        }
+
+        return ['levels' => $levels, 'options' => $options];
     }
 
     /**

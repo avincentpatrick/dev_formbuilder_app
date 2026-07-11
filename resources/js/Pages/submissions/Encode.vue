@@ -48,7 +48,8 @@ function emptyFieldValue(field: EncodeField): AnswerValue {
     if (!field.supported) {
         return null;
     }
-    if (field.field_type === 'multi_select') {
+    // A multi-select and a cascading select (Increment G4a) both hold a list of chosen values.
+    if (field.field_type === 'multi_select' || field.field_type === 'cascading_select') {
         return [];
     }
     if (field.field_type === 'integer' || field.field_type === 'decimal') {

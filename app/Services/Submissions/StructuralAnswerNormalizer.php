@@ -225,17 +225,23 @@ final class StructuralAnswerNormalizer
 
             FieldType::MultiSelect => [true, $this->toStringList($value), null],
 
-            // Scalar-valued types: reject an array, otherwise store a canonical string.
+            // Cascading select (G4a): an ordered list<string> of one selected value per level. Trailing
+            // empty levels (deeper levels left unselected) are trimmed; per-level membership + parent
+            // consistency are Stage-3 (relevance-aware) checks, not a structural fault here.
+            FieldType::CascadingSelect => $this->coerceCascade($value),
+
+            // Scalar-valued types: reject an array, otherwise store a canonical string. `likert_scale` (G4a)
+            // is a single chosen scale point, so it coerces exactly like a single_select.
             FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
-            FieldType::SingleSelect, FieldType::Dropdown,
+            FieldType::SingleSelect, FieldType::Dropdown, FieldType::LikertScale,
             FieldType::Date, FieldType::Time, FieldType::Datetime,
             FieldType::Hidden => is_array($value)
                 ? [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')]
                 : [true, Coercion::toStr($value), null],
 
-            // Advanced types (geo/media/matrix/likert/cascading/duration) have no manual-encode renderer in
-            // Phase 1 (marked unsupported in F4b); pass any value through untouched so the pipeline stays
-            // channel-agnostic and a future channel's payload is not rejected here.
+            // Remaining advanced types (geo/media/matrix/likert_matrix/duration) have no manual-encode
+            // renderer yet; pass any value through untouched so the pipeline stays channel-agnostic and a
+            // future channel's payload is not rejected here.
             default => [true, $value, null],
         };
     }
@@ -276,5 +282,24 @@ final class StructuralAnswerNormalizer
         }
 
         return [Coercion::toStr($value)];
+    }
+
+    /**
+     * Cascading select → an ordered `list<string>` of the chosen value per level. Trailing empty levels
+     * (deeper levels the respondent left unselected) are dropped so the stored list is only as deep as it
+     * was answered; an all-empty cascade normalises to nothing (not stored). Interior empties are kept and
+     * surface as a Stage-3 `cascading_parent_mismatch`/`cascading_choice_invalid`.
+     *
+     * @return array{0: bool, 1: list<string>|null, 2: null}
+     */
+    private function coerceCascade(mixed $value): array
+    {
+        $list = $this->toStringList($value);
+
+        while ($list !== [] && end($list) === '') {
+            array_pop($list);
+        }
+
+        return $list === [] ? [false, null, null] : [true, $list, null];
     }
 }

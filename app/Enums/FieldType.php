@@ -138,4 +138,19 @@ enum FieldType: string
             default => false,
         };
     }
+
+    /**
+     * The builder config editor this type needs beyond the shared Basics/Validation/Advanced tabs, or null
+     * for none. `'choices'` is the plain option-list editor (all {@see hasOptions()} types); the others are
+     * dedicated per-type editors. Single source the builder palette ships to the client so the config panel
+     * never re-lists which type wires which editor. (`matrix`/`likert_matrix` land in Increment G4b.)
+     */
+    public function configEditor(): ?string
+    {
+        return match ($this) {
+            self::SingleSelect, self::MultiSelect, self::Dropdown, self::LikertScale => 'choices',
+            self::CascadingSelect => 'cascading',
+            default => null,
+        };
+    }
 }

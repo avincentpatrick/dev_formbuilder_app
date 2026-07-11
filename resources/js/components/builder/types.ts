@@ -63,6 +63,9 @@ export interface PaletteType {
     label: string;
     advanced: boolean;
     has_options: boolean;
+    // The dedicated config editor this type needs beyond the shared tabs (G4a): 'choices' | 'cascading' |
+    // null. Mirrors FieldType::configEditor(); the config panel keys its editor tab off this.
+    config_editor: string | null;
 }
 
 export interface PaletteGroup {

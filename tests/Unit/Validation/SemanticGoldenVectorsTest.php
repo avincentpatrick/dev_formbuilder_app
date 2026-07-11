@@ -71,6 +71,18 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
         if (isset($field['calculate'])) {
             $attributes['config'] = ['calculated_formula' => $field['calculate']];
         }
+        // Choice-membership options (G4a): a vector's `options` list of value strings → config.options
+        // objects, exactly the shape the real FormField.config carries.
+        if (isset($field['options'])) {
+            $attributes['config'] = ['options' => array_map(static fn (string $v): array => ['value' => $v], $field['options'])];
+        }
+        // Cascading hierarchy (G4a): `cascade.levels` (keys) + `cascade.options` (value/level/parent).
+        if (isset($field['cascade'])) {
+            $attributes['config'] = [
+                'levels' => array_map(static fn (string $key): array => ['key' => $key], $field['cascade']['levels']),
+                'options' => $field['cascade']['options'],
+            ];
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {

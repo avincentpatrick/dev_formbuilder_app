@@ -7,6 +7,7 @@ namespace App\Services\Submissions;
 use App\Enums\FieldType;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Services\Expressions\Coercion;
 use App\Services\Validation\SemanticValidator;
 use Illuminate\Support\Collection;
@@ -25,20 +26,60 @@ use Illuminate\Support\Collection;
  * display-only (`note`/`page_break`) and server-computed (`calculated`) keys are dropped too. Coercion is
  * value-driven via the shared {@see Coercion} primitives, so a normalised answer evaluates identically in
  * the expression engine and projects cleanly into the typed answer index.
+ *
+ * Repeat groups (Increment G1): a repeatable section's answers arrive under the SECTION key as a list of
+ * per-instance field-key => value objects. Each instance's inner values are coerced with the SAME per-field
+ * rules as a flat answer (the nesting is the only difference); malformed nesting is a structural fault
+ * (`expected_instance_array`/`expected_instance_object`), an unknown inner key is `unknown_field` addressed
+ * `section[i].field`, and a repeat-member field sent at the TOP level is `misplaced_repeat_field`. Empty
+ * inner answers and fully-empty instances are dropped; an empty repeat group is dropped entirely.
  */
 final class StructuralAnswerNormalizer
 {
     /**
      * @param  Collection<int, FormField>  $fields  the version's fields
-     * @param  array<string, mixed>  $answers  raw field key => value
-     * @return array<string, mixed> the normalised, non-empty answers keyed by field key
+     * @param  Collection<int, FormSection>  $sections  the version's sections (repeat flags drive nesting)
+     * @param  array<string, mixed>  $answers  raw field key => value (+ repeatable-section key => instance list)
+     * @return array<string, mixed> the normalised, non-empty answers keyed by field/section key
      */
-    public function normalize(Collection $fields, array $answers): array
+    public function normalize(Collection $fields, Collection $sections, array $answers): array
     {
         /** @var array<string, FormField> $byKey */
         $byKey = [];
         foreach ($fields as $field) {
             $byKey[$field->key] = $field;
+        }
+
+        /** @var array<string, true> $repeatSectionIds */
+        $repeatSectionIds = [];
+        /** @var array<string, true> $repeatSectionKeys */
+        $repeatSectionKeys = [];
+        foreach ($sections as $section) {
+            if ($section->is_repeatable === true) {
+                $repeatSectionIds[$section->id] = true;
+                $repeatSectionKeys[$section->key] = true;
+            }
+        }
+
+        /** @var array<string, true> $repeatMemberKeys */
+        $repeatMemberKeys = [];
+        /** @var array<string, array<string, FormField>> $membersBySectionKey */
+        $membersBySectionKey = [];
+        foreach ($sections as $section) {
+            if ($section->is_repeatable !== true) {
+                continue;
+            }
+            $membersBySectionKey[$section->key] = [];
+        }
+        foreach ($fields as $field) {
+            $sectionId = $field->form_section_id;
+            if ($sectionId !== null && isset($repeatSectionIds[$sectionId])) {
+                $repeatMemberKeys[$field->key] = true;
+                $sectionKey = $sections->firstWhere('id', $sectionId)?->key;
+                if ($sectionKey !== null) {
+                    $membersBySectionKey[$sectionKey][$field->key] = $field;
+                }
+            }
         }
 
         /** @var array<string, mixed> $normalized */
@@ -47,9 +88,24 @@ final class StructuralAnswerNormalizer
         $errors = [];
 
         foreach ($answers as $key => $value) {
+            if (isset($repeatSectionKeys[$key])) {
+                $instances = $this->normalizeRepeatSection($key, $value, $membersBySectionKey[$key] ?? [], $errors);
+                if ($instances !== []) {
+                    $normalized[$key] = $instances;
+                }
+
+                continue;
+            }
+
             $field = $byKey[$key] ?? null;
             if ($field === null) {
                 $errors[] = ['field' => $key, 'rule' => 'unknown_field', 'message' => "Unknown field: {$key}."];
+
+                continue;
+            }
+
+            if (isset($repeatMemberKeys[$key])) {
+                $errors[] = ['field' => $key, 'rule' => 'misplaced_repeat_field', 'message' => "Field {$key} must be submitted inside its repeat group."];
 
                 continue;
             }
@@ -74,6 +130,77 @@ final class StructuralAnswerNormalizer
         }
 
         return $normalized;
+    }
+
+    /**
+     * Normalise one repeatable section's submitted instances. Each element must be an instance object
+     * (field key => value); its inner values are coerced with the identical per-field rules as a flat
+     * answer. Empty inner answers and fully-empty instances are dropped (an unfilled row does not persist
+     * and does not count toward min/max — Stage 3 counts what survives here). Faults are appended to
+     * `$errors` (addressed with the instance path) rather than thrown, so every fault surfaces at once.
+     *
+     * @param  array<string, FormField>  $members  the repeatable section's fields, keyed by field key
+     * @param  list<array{field: string, rule: string, message: string}>  $errors
+     * @return list<array<string, mixed>> the non-empty normalised instances
+     */
+    private function normalizeRepeatSection(string $sectionKey, mixed $value, array $members, array &$errors): array
+    {
+        if (Coercion::isEmpty($value)) {
+            return []; // an empty repeat group is "unanswered"
+        }
+
+        if (! is_array($value) || ! array_is_list($value)) {
+            $errors[] = ['field' => $sectionKey, 'rule' => 'expected_instance_array', 'message' => "The {$sectionKey} group must be a list of instances."];
+
+            return [];
+        }
+
+        /** @var list<array<string, mixed>> $instances */
+        $instances = [];
+
+        foreach ($value as $index => $instance) {
+            if (Coercion::isEmpty($instance)) {
+                continue; // a blank instance object ({} decodes to []) is dropped, not an error
+            }
+
+            if (! is_array($instance) || array_is_list($instance)) {
+                $errors[] = ['field' => "{$sectionKey}[{$index}]", 'rule' => 'expected_instance_object', 'message' => "Instance {$index} of {$sectionKey} must be an object of field answers."];
+
+                continue;
+            }
+
+            /** @var array<string, mixed> $normalizedInstance */
+            $normalizedInstance = [];
+            foreach ($instance as $innerKey => $innerValue) {
+                $address = "{$sectionKey}[{$index}].{$innerKey}";
+                $member = $members[$innerKey] ?? null;
+                if ($member === null) {
+                    $errors[] = ['field' => $address, 'rule' => 'unknown_field', 'message' => "Unknown field: {$address}."];
+
+                    continue;
+                }
+
+                if (Coercion::isEmpty($innerValue)) {
+                    continue;
+                }
+
+                [$store, $normalizedValue, $error] = $this->coerce($member, $innerValue);
+                if ($error !== null) {
+                    $errors[] = ['field' => $address, 'rule' => $error['rule'], 'message' => $error['message']];
+
+                    continue;
+                }
+                if ($store) {
+                    $normalizedInstance[$innerKey] = $normalizedValue;
+                }
+            }
+
+            if ($normalizedInstance !== []) {
+                $instances[] = $normalizedInstance;
+            }
+        }
+
+        return $instances;
     }
 
     /**

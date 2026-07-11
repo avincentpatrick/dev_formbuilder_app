@@ -21,7 +21,8 @@ final readonly class SemanticInput
      * @param  Collection<int, FormField>  $fields
      * @param  Collection<int, FormSection>  $sections
      * @param  Collection<int, FormFieldValidation>  $validations
-     * @param  array<string, mixed>  $answers  raw (un-pruned) answers, field key => value
+     * @param  array<string, mixed>  $answers  raw (un-pruned) answers; field key => value, plus (Increment G1)
+     *                                         repeatable-section key => list<field key => value> for repeat instances
      */
     public function __construct(
         public Collection $fields,

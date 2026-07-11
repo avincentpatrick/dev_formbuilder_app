@@ -23,7 +23,14 @@ export interface SchemaSection {
     key: string;
     sequence: number;
     relevant_expression: string | null;
+    /** Repeat groups (Increment G1). Omitted / false on a plain section — treated as non-repeatable. */
+    is_repeatable?: boolean;
+    min_instances?: number | null;
+    max_instances?: number | null;
 }
+
+/** One repeat-group instance: a field-key => value map (same frozen per-field shapes as flat answers). */
+export type InstanceAnswers = Record<string, EngineValue>;
 
 export interface ValidationRow {
     id: string;
@@ -44,6 +51,7 @@ export interface SemanticInput {
     fields: SchemaField[];
     sections: SchemaSection[];
     validations: ValidationRow[];
-    answers: Record<string, EngineValue>;
+    /** Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps. */
+    answers: Record<string, EngineValue | InstanceAnswers[]>;
     locale: string;
 }

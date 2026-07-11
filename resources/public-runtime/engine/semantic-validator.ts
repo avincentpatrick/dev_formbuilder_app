@@ -9,6 +9,11 @@
  * section's relevance, so the mask is recomputed over the shrinking effective answer set until it stops
  * changing (a field hidden upstream reads as empty downstream — XLSForm/Kobo semantics). It never throws
  * for a validation FAILURE (a false constraint is a result); only a malformed rule raises.
+ *
+ * Repeat groups (Increment G1): repeatable-section members are pulled out of the flat pass so top-level
+ * relevance/answers/errors stay exactly as pre-G1, then each instance is settled + error-checked in its own
+ * scope (the outside scope merged over that instance, so a member expression may reference an outside gate
+ * field and a same-instance sibling). Instance count is enforced against min/max on the relevant section.
  */
 
 import { ABSENT, isEmpty, type EngineValue, type MaybeAbsent } from './coercion';
@@ -16,7 +21,7 @@ import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
-import type { SchemaField, SemanticInput, ValidationRow } from './schema';
+import type { InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
 
 const DEFAULT_CONSTRAINT_MESSAGE = 'This value is not valid.';
 const DEFAULT_REQUIRED_MESSAGE = 'This field is required.';
@@ -25,27 +30,47 @@ export interface SemanticError {
     fieldKey: string;
     rule: string;
     message: string;
+    /** Repeat-group address (Increment G1): the owning section + 0-based instance; null on a flat error. */
+    sectionKey?: string | null;
+    instanceIndex?: number | null;
+}
+
+/** The stable address the surface + the 422 envelope key on: `field`, `section`, or `section[i].field`. */
+export function errorPath(error: SemanticError): string {
+    const sectionKey = error.sectionKey ?? null;
+    const instanceIndex = error.instanceIndex ?? null;
+    if (sectionKey === null) {
+        return error.fieldKey;
+    }
+    if (instanceIndex === null) {
+        return sectionKey;
+    }
+
+    return `${sectionKey}[${instanceIndex}].${error.fieldKey}`;
 }
 
 export class SemanticResult {
     readonly fieldRelevance: Record<string, boolean>;
     readonly sectionRelevance: Record<string, boolean>;
     readonly errors: SemanticError[];
-    readonly effectiveAnswers: Answers;
+    readonly effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>;
     readonly computed: Record<string, EngineValue>;
+    readonly repeatFieldRelevance: Record<string, Record<string, boolean>[]>;
 
     constructor(
         fieldRelevance: Record<string, boolean>,
         sectionRelevance: Record<string, boolean>,
         errors: SemanticError[],
-        effectiveAnswers: Answers,
+        effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>,
         computed: Record<string, EngineValue>,
+        repeatFieldRelevance: Record<string, Record<string, boolean>[]> = {},
     ) {
         this.fieldRelevance = fieldRelevance;
         this.sectionRelevance = sectionRelevance;
         this.errors = errors;
         this.effectiveAnswers = effectiveAnswers;
         this.computed = computed;
+        this.repeatFieldRelevance = repeatFieldRelevance;
     }
 
     passed(): boolean {
@@ -77,11 +102,54 @@ export class SemanticValidator {
         }
 
         const ruleSets = this.buildRuleSets(input);
-        const [fieldRelevance, sectionRelevance] = this.settleRelevance(input, ruleSets, fieldKeyById);
-        const effectiveAnswers = this.effectiveAnswers(input.answers, fieldRelevance);
-        const errors = this.collectErrors(input, ruleSets, fieldRelevance, effectiveAnswers, fieldKeyById);
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, errors, effectiveAnswers, {});
+        const [topLevelFields, repeatMembersBySectionId] = this.partitionFields(input);
+
+        const [fieldRelevance, sectionRelevance] = this.settleRelevance(input, topLevelFields, ruleSets, fieldKeyById);
+        const flatEffective = this.effectiveAnswers(input.answers, fieldRelevance);
+        const errors = this.collectErrors(topLevelFields, ruleSets, fieldRelevance, flatEffective, fieldKeyById, input.locale);
+
+        const [repeatEffective, repeatErrors, repeatRelevance] = this.processRepeats(
+            input,
+            repeatMembersBySectionId,
+            ruleSets,
+            sectionRelevance,
+            flatEffective,
+            fieldKeyById,
+        );
+
+        const effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]> = { ...flatEffective };
+        for (const [sectionKey, instances] of Object.entries(repeatEffective)) {
+            effectiveAnswers[sectionKey] = instances;
+        }
+
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors], effectiveAnswers, {}, repeatRelevance);
+    }
+
+    /**
+     * Split fields into the flat (top-level) set and the repeatable-section members grouped by section id.
+     * A field is a repeat member iff its `form_section_id` points at a repeatable section.
+     */
+    private partitionFields(input: SemanticInput): [SchemaField[], Record<string, SchemaField[]>] {
+        const repeatSectionIds: Record<string, boolean> = {};
+        for (const section of input.sections) {
+            if (section.is_repeatable === true) {
+                repeatSectionIds[section.id] = true;
+            }
+        }
+
+        const topLevel: SchemaField[] = [];
+        const membersBySectionId: Record<string, SchemaField[]> = {};
+        for (const field of input.fields) {
+            const sectionId = field.form_section_id;
+            if (sectionId !== null && repeatSectionIds[sectionId] === true) {
+                (membersBySectionId[sectionId] ??= []).push(field);
+            } else {
+                topLevel.push(field);
+            }
+        }
+
+        return [topLevel, membersBySectionId];
     }
 
     private buildRuleSets(input: SemanticInput): RuleSets {
@@ -144,13 +212,13 @@ export class SemanticValidator {
         return units;
     }
 
-    private settleRelevance(input: SemanticInput, ruleSets: RuleSets, fieldKeyById: FieldKeysById): [Record<string, boolean>, Record<string, boolean>] {
+    private settleRelevance(input: SemanticInput, fields: SchemaField[], ruleSets: RuleSets, fieldKeyById: FieldKeysById): [Record<string, boolean>, Record<string, boolean>] {
         let relevant: Record<string, boolean> = {};
-        for (const field of input.fields) {
+        for (const field of fields) {
             relevant[field.key] = true; // start optimistic; prune from here
         }
 
-        const maxIterations = input.fields.length + input.sections.length + 2;
+        const maxIterations = fields.length + input.sections.length + 2;
         let sectionRelevance: Record<string, boolean> = {};
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -165,7 +233,7 @@ export class SemanticValidator {
             }
 
             const next: Record<string, boolean> = {};
-            for (const field of input.fields) {
+            for (const field of fields) {
                 const sectionOk = field.form_section_id === null
                     ? true
                     : (sectionRelevantById[field.form_section_id] ?? true);
@@ -183,12 +251,12 @@ export class SemanticValidator {
             relevant = next;
         }
 
-        return [this.fullMask(input, relevant), sectionRelevance];
+        return [this.fullMask(fields, relevant), sectionRelevance];
     }
 
-    private fullMask(input: SemanticInput, relevant: Record<string, boolean>): Record<string, boolean> {
+    private fullMask(fields: SchemaField[], relevant: Record<string, boolean>): Record<string, boolean> {
         const mask: Record<string, boolean> = {};
-        for (const field of input.fields) {
+        for (const field of fields) {
             mask[field.key] = Object.prototype.hasOwnProperty.call(relevant, field.key);
         }
 
@@ -218,10 +286,191 @@ export class SemanticValidator {
         return false;
     }
 
-    private answersForRelevant(answers: Answers, relevant: Record<string, boolean>): Answers {
+    private answersForRelevant(answers: Record<string, EngineValue | InstanceAnswers[]>, relevant: Record<string, boolean>): Answers {
         const out: Answers = {};
         for (const [key, value] of Object.entries(answers)) {
             if (Object.prototype.hasOwnProperty.call(relevant, key)) {
+                out[key] = value as EngineValue;
+            }
+        }
+
+        return out;
+    }
+
+    private effectiveAnswers(answers: Record<string, EngineValue | InstanceAnswers[]>, fieldRelevance: Record<string, boolean>): Answers {
+        const effective: Answers = {};
+        for (const [key, value] of Object.entries(answers)) {
+            if (fieldRelevance[key] === true) {
+                effective[key] = value as EngineValue;
+            }
+        }
+
+        return effective;
+    }
+
+    private collectErrors(fields: SchemaField[], ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, fieldKeyById: FieldKeysById, locale: string): SemanticError[] {
+        const errors: SemanticError[] = [];
+
+        for (const field of fields) {
+            if (fieldRelevance[field.key] !== true) {
+                continue;
+            }
+
+            this.collectFieldErrors(field, effectiveAnswers, effectiveAnswers, ruleSets, fieldKeyById, locale, errors, null, null);
+        }
+
+        return errors;
+    }
+
+    private collectFieldErrors(
+        field: SchemaField,
+        answerScope: Answers,
+        contextAnswers: Answers,
+        ruleSets: RuleSets,
+        fieldKeyById: FieldKeysById,
+        locale: string,
+        errors: SemanticError[],
+        sectionKey: string | null,
+        instanceIndex: number | null,
+    ): void {
+        const context = new EvaluationContext(contextAnswers);
+        const answer: MaybeAbsent = Object.prototype.hasOwnProperty.call(answerScope, field.key) ? answerScope[field.key] : ABSENT;
+        const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
+
+        if (isEmpty(answer)) {
+            const [required, trigger] = this.requiredState(field, sets.required ?? [], context, fieldKeyById);
+            if (required) {
+                const message = trigger !== null
+                    ? this.resolveMessage(trigger, locale, DEFAULT_REQUIRED_MESSAGE)
+                    : DEFAULT_REQUIRED_MESSAGE;
+                errors.push({ fieldKey: field.key, rule: 'field_required', message, sectionKey, instanceIndex });
+            }
+
+            return; // an empty field's constraints are not evaluated
+        }
+
+        const selfContext = new EvaluationContext(contextAnswers, answer as EngineValue);
+        for (const unit of sets.constraint ?? []) {
+            const passes = unit.length === 1
+                ? this.rules.passesConstraint(unit[0], field.key, answer, selfContext, fieldKeyById)
+                : this.rules.passesConstraintGroup(unit, field.key, answer, selfContext, fieldKeyById);
+
+            if (!passes) {
+                const representative = this.representative(unit);
+                errors.push({
+                    fieldKey: field.key,
+                    rule: this.ruleId(representative),
+                    message: this.resolveMessage(representative, locale, DEFAULT_CONSTRAINT_MESSAGE),
+                    sectionKey,
+                    instanceIndex,
+                });
+            }
+        }
+    }
+
+    private processRepeats(
+        input: SemanticInput,
+        repeatMembersBySectionId: Record<string, SchemaField[]>,
+        ruleSets: RuleSets,
+        sectionRelevance: Record<string, boolean>,
+        baseEffective: Answers,
+        fieldKeyById: FieldKeysById,
+    ): [Record<string, InstanceAnswers[]>, SemanticError[], Record<string, Record<string, boolean>[]>] {
+        const effective: Record<string, InstanceAnswers[]> = {};
+        const errors: SemanticError[] = [];
+        const relevance: Record<string, Record<string, boolean>[]> = {};
+
+        for (const section of input.sections) {
+            if (section.is_repeatable !== true) {
+                continue;
+            }
+
+            const sectionKey = section.key;
+            if (sectionRelevance[sectionKey] !== true) {
+                continue; // hidden repeatable section: drop the whole group, enforce nothing
+            }
+
+            const members = repeatMembersBySectionId[section.id] ?? [];
+            const rawInstances = input.answers[sectionKey];
+            const instances: InstanceAnswers[] = Array.isArray(rawInstances)
+                ? (rawInstances.filter((instance) => typeof instance === 'object' && instance !== null && !Array.isArray(instance)) as InstanceAnswers[])
+                : [];
+            const count = instances.length;
+
+            const max = section.max_instances ?? null;
+            if (max !== null && count > max) {
+                errors.push({ fieldKey: sectionKey, rule: 'max_instances', message: this.maxInstancesMessage(max), sectionKey, instanceIndex: null });
+            }
+
+            const min = section.min_instances ?? null;
+            if (min !== null && min > 0 && count < min) {
+                errors.push({ fieldKey: sectionKey, rule: 'min_instances', message: this.minInstancesMessage(min), sectionKey, instanceIndex: null });
+            }
+
+            instances.forEach((instanceAnswers, index) => {
+                const [instanceRelevance, instanceEffective] = this.settleInstanceRelevance(members, ruleSets, baseEffective, instanceAnswers, fieldKeyById);
+
+                const contextAnswers: Answers = { ...baseEffective, ...instanceEffective };
+                for (const field of members) {
+                    if (instanceRelevance[field.key] !== true) {
+                        continue;
+                    }
+                    this.collectFieldErrors(field, instanceEffective, contextAnswers, ruleSets, fieldKeyById, input.locale, errors, sectionKey, index);
+                }
+
+                (effective[sectionKey] ??= []).push(instanceEffective);
+                (relevance[sectionKey] ??= []).push(instanceRelevance);
+            });
+        }
+
+        return [effective, errors, relevance];
+    }
+
+    private settleInstanceRelevance(
+        members: SchemaField[],
+        ruleSets: RuleSets,
+        baseAnswers: Answers,
+        instanceAnswers: InstanceAnswers,
+        fieldKeyById: FieldKeysById,
+    ): [Record<string, boolean>, InstanceAnswers] {
+        let relevant: Record<string, boolean> = {};
+        for (const field of members) {
+            relevant[field.key] = true; // start optimistic; prune from here
+        }
+
+        const maxIterations = members.length + 2;
+
+        for (let iteration = 0; iteration < maxIterations; iteration++) {
+            const prunedInstance = this.pickRelevant(instanceAnswers, relevant);
+            const context = new EvaluationContext({ ...baseAnswers, ...prunedInstance });
+
+            const next: Record<string, boolean> = {};
+            for (const field of members) {
+                const ownOk = this.evaluateRelevance(field.relevant_expression, context);
+                const skipped = this.anyUnitHolds(ruleSets[field.id]?.skip ?? [], context, fieldKeyById);
+                if (ownOk && !skipped) {
+                    next[field.key] = true;
+                }
+            }
+
+            if (this.sameKeySet(next, relevant)) {
+                break;
+            }
+            relevant = next;
+        }
+
+        const mask: Record<string, boolean> = {};
+        for (const field of members) {
+            mask[field.key] = Object.prototype.hasOwnProperty.call(relevant, field.key);
+        }
+
+        return [mask, this.pickRelevant(instanceAnswers, mask)];
+    }
+
+    private pickRelevant(answers: InstanceAnswers, mask: Record<string, boolean>): InstanceAnswers {
+        const out: InstanceAnswers = {};
+        for (const [key, value] of Object.entries(answers)) {
+            if (mask[key] === true) {
                 out[key] = value;
             }
         }
@@ -229,61 +478,12 @@ export class SemanticValidator {
         return out;
     }
 
-    private effectiveAnswers(answers: Answers, fieldRelevance: Record<string, boolean>): Answers {
-        const effective: Answers = {};
-        for (const [key, value] of Object.entries(answers)) {
-            if (fieldRelevance[key] === true) {
-                effective[key] = value;
-            }
-        }
-
-        return effective;
+    private minInstancesMessage(min: number): string {
+        return `Provide at least ${min} ${min === 1 ? 'entry' : 'entries'}.`;
     }
 
-    private collectErrors(input: SemanticInput, ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, fieldKeyById: FieldKeysById): SemanticError[] {
-        const errors: SemanticError[] = [];
-        const context = new EvaluationContext(effectiveAnswers);
-
-        for (const field of input.fields) {
-            if (fieldRelevance[field.key] !== true) {
-                continue;
-            }
-
-            const answer: MaybeAbsent = Object.prototype.hasOwnProperty.call(effectiveAnswers, field.key)
-                ? effectiveAnswers[field.key]
-                : ABSENT;
-            const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
-
-            if (isEmpty(answer)) {
-                const [required, trigger] = this.requiredState(field, sets.required ?? [], context, fieldKeyById);
-                if (required) {
-                    const message = trigger !== null
-                        ? this.resolveMessage(trigger, input.locale, DEFAULT_REQUIRED_MESSAGE)
-                        : DEFAULT_REQUIRED_MESSAGE;
-                    errors.push({ fieldKey: field.key, rule: 'field_required', message });
-                }
-
-                continue; // an empty field's constraints are not evaluated
-            }
-
-            const selfContext = new EvaluationContext(effectiveAnswers, answer as EngineValue);
-            for (const unit of sets.constraint ?? []) {
-                const passes = unit.length === 1
-                    ? this.rules.passesConstraint(unit[0], field.key, answer, selfContext, fieldKeyById)
-                    : this.rules.passesConstraintGroup(unit, field.key, answer, selfContext, fieldKeyById);
-
-                if (!passes) {
-                    const representative = this.representative(unit);
-                    errors.push({
-                        fieldKey: field.key,
-                        rule: this.ruleId(representative),
-                        message: this.resolveMessage(representative, input.locale, DEFAULT_CONSTRAINT_MESSAGE),
-                    });
-                }
-            }
-        }
-
-        return errors;
+    private maxInstancesMessage(max: number): string {
+        return `Provide at most ${max} ${max === 1 ? 'entry' : 'entries'}.`;
     }
 
     private requiredState(field: SchemaField, units: ValidationRow[][], context: EvaluationContext, fieldKeyById: FieldKeysById): [boolean, ValidationRow | null] {

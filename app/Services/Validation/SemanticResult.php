@@ -9,15 +9,21 @@ namespace App\Services\Validation;
  * consumed by the Submission Pipeline (F4): `!passed()` maps to `422` + the errors; on success the
  * `effectiveAnswers` (relevance-pruned) are what Stage 4 persists, and `computed` carries calculated
  * values (Phase 1: always empty — `calculate` needs the Phase-2 arithmetic grammar). Immutable.
+ *
+ * Repeat groups (Increment G1): `effectiveAnswers` may now hold a repeatable section's pruned instances as
+ * a native list under the section key (`section => [instanceMap, …]`); `repeatFieldRelevance` exposes the
+ * per-instance relevance masks (`section => [mask, …]`, index-aligned with the stored instances) for the
+ * G2 runtime. `fieldRelevance`/`sectionRelevance` stay flat (top-level fields + every section).
  */
 final readonly class SemanticResult
 {
     /**
-     * @param  array<string, bool>  $fieldRelevance  field key → visible/relevant
+     * @param  array<string, bool>  $fieldRelevance  top-level field key → visible/relevant
      * @param  array<string, bool>  $sectionRelevance  section key → visible/relevant
      * @param  list<SemanticError>  $errors
-     * @param  array<string, mixed>  $effectiveAnswers  answers of relevant fields only (what Stage 4 persists)
+     * @param  array<string, mixed>  $effectiveAnswers  relevant answers only (nested per-instance for repeats); what Stage 4 persists
      * @param  array<string, mixed>  $computed  computed `calculate` values (Phase 1: empty)
+     * @param  array<string, list<array<string, bool>>>  $repeatFieldRelevance  section key → per-instance field-relevance masks
      */
     public function __construct(
         public array $fieldRelevance,
@@ -25,6 +31,7 @@ final readonly class SemanticResult
         public array $errors,
         public array $effectiveAnswers,
         public array $computed = [],
+        public array $repeatFieldRelevance = [],
     ) {}
 
     public function passed(): bool

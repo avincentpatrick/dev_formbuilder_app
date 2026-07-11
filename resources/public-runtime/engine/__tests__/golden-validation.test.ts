@@ -14,9 +14,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { EngineValue } from '../coercion';
 import { GRAMMAR_VERSION } from '../evaluator';
-import type { SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
+import type { InstanceAnswers, SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
 import type { ComparisonOperator, LogicOperator, RequiredMode, ValidationRuleType } from '../enums';
-import { makeSemanticValidator } from '../semantic-validator';
+import { errorPath, makeSemanticValidator } from '../semantic-validator';
+
+type VectorAnswers = Record<string, EngineValue | InstanceAnswers[]>;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, '..', '..', '..', '..', 'tests', 'golden', 'validation');
@@ -44,19 +46,20 @@ type FieldFragment = {
     rules?: RuleFragment[];
 };
 
-type SectionFragment = { key: string; relevant?: string };
+type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
 
 type SemanticVector = {
     name: string;
     grammar_version: string;
     schema: { sections?: SectionFragment[]; fields: FieldFragment[] };
-    answers?: Record<string, EngineValue>;
+    answers?: VectorAnswers;
     locale?: string;
     expected: {
         relevance?: { fields?: Record<string, boolean>; sections?: Record<string, boolean> };
         errors?: { field: string; rule: string }[];
-        effective_answers?: Record<string, EngineValue>;
+        effective_answers?: VectorAnswers;
         computed?: Record<string, EngineValue>;
+        repeat_relevance?: Record<string, Record<string, boolean>[]>;
     };
 };
 
@@ -97,6 +100,9 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
         key: section.key,
         sequence: index,
         relevant_expression: section.relevant ?? null,
+        is_repeatable: section.repeatable ?? false,
+        min_instances: section.min ?? null,
+        max_instances: section.max ?? null,
     }));
 
     const fields: SchemaField[] = [];
@@ -143,8 +149,9 @@ describe('golden semantic-validation vectors (PHP ⇄ TS drift contract)', () =>
             expect(result.sectionRelevance).toEqual(expected.relevance?.sections ?? {});
             expect(result.effectiveAnswers).toEqual(expected.effective_answers ?? {});
             expect(result.computed).toEqual(expected.computed ?? {});
+            expect(result.repeatFieldRelevance).toEqual(expected.repeat_relevance ?? {});
 
-            const actual = result.errors.map((error) => ({ field: error.fieldKey, rule: error.rule }));
+            const actual = result.errors.map((error) => ({ field: errorPath(error), rule: error.rule }));
             expect(sortErrors(actual)).toEqual(sortErrors(expected.errors ?? []));
         });
     }

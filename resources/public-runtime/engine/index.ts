@@ -28,10 +28,10 @@ export { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 export { StructuredRuleLowering } from './lowering';
 export type { FieldKeysById } from './lowering';
 export { StructuredRuleEvaluator } from './structured-rule-evaluator';
-export { SemanticValidator, SemanticResult, makeSemanticValidator } from './semantic-validator';
+export { SemanticValidator, SemanticResult, makeSemanticValidator, errorPath } from './semantic-validator';
 export type { SemanticError } from './semantic-validator';
 
-export type { SchemaField, SchemaSection, ValidationRow, SemanticInput } from './schema';
+export type { SchemaField, SchemaSection, ValidationRow, SemanticInput, InstanceAnswers } from './schema';
 export type { Node } from './ast';
 export type {
     ComparisonOperator,

@@ -17,8 +17,11 @@ use RuntimeException;
  * submission fails per-field, not as one lump.
  *
  * `rule` is a stable identifier the surface can branch on: a Stage-1 slug (`unknown_field`,
- * `expected_scalar`, `not_a_number`) or a Stage-3 {@see SemanticError::$rule}
- * (a ValidationRuleType value, `constraint`, or `field_required`).
+ * `expected_scalar`, `not_a_number`, or the repeat-group slugs `expected_instance_array`,
+ * `expected_instance_object`, `misplaced_repeat_field`) or a Stage-3 {@see SemanticError::$rule}
+ * (a ValidationRuleType value, `constraint`, `field_required`, or `min_instances`/`max_instances`).
+ * For a Stage-3 failure inside a repeat instance, `field` is the addressed path `section[i].field`
+ * ({@see SemanticError::path()}).
  */
 final class SubmissionValidationException extends RuntimeException
 {

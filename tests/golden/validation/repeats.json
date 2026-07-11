@@ -1,0 +1,165 @@
+[
+  {
+    "name": "repeat_two_instances_ok",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [
+        {"key": "member_name", "section": "hh"},
+        {"key": "member_age", "field_type": "integer", "section": "hh"}
+      ]
+    },
+    "answers": {"hh": [{"member_name": "Bob", "member_age": 40}, {"member_name": "Cleo", "member_age": 12}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [],
+      "effective_answers": {"hh": [{"member_name": "Bob", "member_age": 40}, {"member_name": "Cleo", "member_age": 12}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true, "member_age": true}, {"member_name": true, "member_age": true}]}
+    }
+  },
+  {
+    "name": "repeat_per_instance_required",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [
+        {"key": "member_name", "is_required": "required", "section": "hh"},
+        {"key": "member_age", "field_type": "integer", "section": "hh"}
+      ]
+    },
+    "answers": {"hh": [{"member_name": "Bob", "member_age": 40}, {"member_age": 12}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [{"field": "hh[1].member_name", "rule": "field_required"}],
+      "effective_answers": {"hh": [{"member_name": "Bob", "member_age": 40}, {"member_age": 12}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true, "member_age": true}, {"member_name": true, "member_age": true}]}
+    }
+  },
+  {
+    "name": "repeat_per_instance_constraint",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [
+        {"key": "member_name", "section": "hh"},
+        {"key": "member_age", "field_type": "integer", "section": "hh", "rules": [{"rule_type": "min_value", "rule_value": "18"}]}
+      ]
+    },
+    "answers": {"hh": [{"member_name": "Bob", "member_age": 10}, {"member_name": "Cleo", "member_age": 40}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [{"field": "hh[0].member_age", "rule": "min_value"}],
+      "effective_answers": {"hh": [{"member_name": "Bob", "member_age": 10}, {"member_name": "Cleo", "member_age": 40}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true, "member_age": true}, {"member_name": true, "member_age": true}]}
+    }
+  },
+  {
+    "name": "repeat_per_instance_relevance_same_instance",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [
+        {"key": "member_name", "section": "hh"},
+        {"key": "member_age", "field_type": "integer", "section": "hh", "relevant": "${member_name} = 'adult'"}
+      ]
+    },
+    "answers": {"hh": [{"member_name": "adult", "member_age": 40}, {"member_name": "child", "member_age": 12}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [],
+      "effective_answers": {"hh": [{"member_name": "adult", "member_age": 40}, {"member_name": "child"}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true, "member_age": true}, {"member_name": true, "member_age": false}]}
+    }
+  },
+  {
+    "name": "repeat_instance_references_top_level_gate",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [
+        {"key": "mode"},
+        {"key": "member_name", "section": "hh"},
+        {"key": "member_age", "field_type": "integer", "section": "hh", "relevant": "${mode} = 'full'"}
+      ]
+    },
+    "answers": {"mode": "basic", "hh": [{"member_name": "Bob", "member_age": 40}]},
+    "expected": {
+      "relevance": {"fields": {"mode": true}, "sections": {"hh": true}},
+      "errors": [],
+      "effective_answers": {"mode": "basic", "hh": [{"member_name": "Bob"}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true, "member_age": false}]}
+    }
+  },
+  {
+    "name": "repeat_section_hidden_prunes_all",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true, "min": 2, "relevant": "${show_hh} = '1'"}],
+      "fields": [
+        {"key": "show_hh"},
+        {"key": "member_name", "section": "hh"}
+      ]
+    },
+    "answers": {"show_hh": "0", "hh": [{"member_name": "Bob"}]},
+    "expected": {
+      "relevance": {"fields": {"show_hh": true}, "sections": {"hh": false}},
+      "errors": [],
+      "effective_answers": {"show_hh": "0"},
+      "computed": {},
+      "repeat_relevance": {}
+    }
+  },
+  {
+    "name": "repeat_below_min_instances",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true, "min": 2}],
+      "fields": [{"key": "member_name", "section": "hh"}]
+    },
+    "answers": {"hh": [{"member_name": "Bob"}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [{"field": "hh", "rule": "min_instances"}],
+      "effective_answers": {"hh": [{"member_name": "Bob"}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true}]}
+    }
+  },
+  {
+    "name": "repeat_above_max_instances",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true, "max": 2}],
+      "fields": [{"key": "member_name", "section": "hh"}]
+    },
+    "answers": {"hh": [{"member_name": "A"}, {"member_name": "B"}, {"member_name": "C"}]},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [{"field": "hh", "rule": "max_instances"}],
+      "effective_answers": {"hh": [{"member_name": "A"}, {"member_name": "B"}, {"member_name": "C"}]},
+      "computed": {},
+      "repeat_relevance": {"hh": [{"member_name": true}, {"member_name": true}, {"member_name": true}]}
+    }
+  },
+  {
+    "name": "repeat_zero_instances_optional",
+    "grammar_version": "1.0",
+    "schema": {
+      "sections": [{"key": "hh", "repeatable": true}],
+      "fields": [{"key": "member_name", "section": "hh"}]
+    },
+    "answers": {},
+    "expected": {
+      "relevance": {"fields": {}, "sections": {"hh": true}},
+      "errors": [],
+      "effective_answers": {},
+      "computed": {},
+      "repeat_relevance": {}
+    }
+  }
+]

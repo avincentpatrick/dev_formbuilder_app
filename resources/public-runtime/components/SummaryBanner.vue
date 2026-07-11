@@ -7,12 +7,14 @@
  */
 import { ref } from 'vue';
 
-const props = defineProps<{ items: { key: string; label: string }[] }>();
+// `address` is the field/instance/section address (`field`, `section[i].field`, or `section`), matching both
+// the jump-anchor id `field-<address>` and the 422-envelope key (Increment G2).
+const props = defineProps<{ items: { address: string; label: string }[] }>();
 
 const rootEl = ref<HTMLElement | null>(null);
 
-function jumpTo(key: string): void {
-    const el = document.getElementById(`field-${key}`);
+function jumpTo(address: string): void {
+    const el = document.getElementById(`field-${address}`);
     if (el === null) {
         return;
     }
@@ -31,8 +33,8 @@ defineExpose({ focus: () => rootEl.value?.focus() });
             {{ props.items.length === 1 ? 'field needs' : 'fields need' }} your attention before continuing.
         </p>
         <ul class="summary-banner__list">
-            <li v-for="item in props.items" :key="item.key">
-                <button type="button" class="summary-banner__link" @click="jumpTo(item.key)">
+            <li v-for="item in props.items" :key="item.address">
+                <button type="button" class="summary-banner__link" @click="jumpTo(item.address)">
                     {{ item.label }}
                 </button>
             </li>

@@ -7,7 +7,7 @@
  * control never loses the answer.
  */
 import { computed, nextTick, ref, watch } from 'vue';
-import { Coercion } from '../engine';
+import { Coercion, type EngineValue } from '../engine';
 import FieldControl from './FieldControl.vue';
 import RelevanceNote from './RelevanceNote.vue';
 import { useAnnouncer, useRuntime } from '../composables/context';
@@ -40,7 +40,9 @@ watch(relevant, (isRelevant, wasRelevant) => {
         if (hadFocus) {
             void nextTick(rescueFocus);
         }
-        const hasValue = !Coercion.isEmpty(runtime.answers[props.field.key] ?? null);
+        // A FieldRow only ever renders a flat field, so its stored value is a scalar EngineValue (never a
+        // repeat-instance array — those render through RepeatGroup/InstanceField).
+        const hasValue = !Coercion.isEmpty((runtime.answers[props.field.key] ?? null) as EngineValue);
         if (hasValue && !noteShownOnce) {
             noteShownOnce = true;
             showNote.value = true;

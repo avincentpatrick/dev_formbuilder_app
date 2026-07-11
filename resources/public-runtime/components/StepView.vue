@@ -21,11 +21,10 @@ const banner = ref<InstanceType<typeof SummaryBanner> | null>(null);
 const bannerVisible = ref(false);
 
 const currentStep = computed(() => runtime.currentStep.value);
-const stepFieldKeys = computed(() => new Set(currentStep.value?.fieldKeys ?? []));
 const bannerItems = computed(() =>
-    runtime.erroredFields.value
-        .filter((f) => stepFieldKeys.value.has(f.key))
-        .map((f) => ({ key: f.key, label: runtime.labelFor(f) })),
+    runtime.erroredItems.value
+        .filter((item) => item.stepKey === currentStep.value?.key)
+        .map((item) => ({ address: item.address, label: item.label })),
 );
 
 function focusHeading(): void {

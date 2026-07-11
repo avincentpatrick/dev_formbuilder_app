@@ -7,7 +7,7 @@
  */
 
 import { ref, watch, type Ref, type WatchStopHandle } from 'vue';
-import type { DraftBlob, EngineValue } from '../lib/types';
+import type { AnswerMap, DraftBlob } from '../lib/types';
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEBOUNCE_MS = 800;
@@ -21,8 +21,8 @@ export interface AutosaveOptions {
     formId: string;
     slug: string;
     checksum: string;
-    /** The reactive answer map from the runtime store. */
-    answers: Record<string, EngineValue>;
+    /** The reactive answer map from the runtime store (flat + nested repeat-section instances, G2). */
+    answers: AnswerMap;
     locale: Ref<string>;
     currentStepKey: Ref<string>;
     storage?: Storage;

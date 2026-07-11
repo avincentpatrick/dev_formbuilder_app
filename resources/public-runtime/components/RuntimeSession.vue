@@ -24,19 +24,19 @@ import {
 } from '../composables/context';
 import { ApiError } from '../lib/error-normalizer';
 import type { ApiClient } from '../lib/api-client';
-import type { Bootstrap, EngineValue, SchemaResponse } from '../lib/types';
+import type { AnswerMap, Bootstrap, SchemaResponse } from '../lib/types';
 
 const props = defineProps<{
     schema: SchemaResponse;
     bootstrap: Bootstrap;
     client: ApiClient;
-    initialAnswers?: Record<string, EngineValue>;
+    initialAnswers?: AnswerMap;
     notice?: string | null;
 }>();
 
 const emit = defineEmits<{
     submitted: [id: string];
-    reschema: [payload: { schema: SchemaResponse; answers: Record<string, EngineValue> }];
+    reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
 }>();
 
 const runtime = createFormRuntime(props.schema, {
@@ -62,9 +62,7 @@ const autosave = createAutosave({
 if (props.initialAnswers === undefined) {
     const draft = autosave.restore();
     if (draft !== null) {
-        for (const [key, value] of Object.entries(draft.answers)) {
-            runtime.setAnswer(key, value);
-        }
+        runtime.restoreAnswers(draft.answers);
         runtime.locale.value = draft.locale;
         runtime.goToStep(draft.currentStepKey);
     }

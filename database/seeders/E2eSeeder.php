@@ -154,6 +154,28 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // A guest-enabled form with a REPEATABLE section (Increment G2) — the add/remove-instance runtime
+            // + manual-encode loop. Reached publicly at /f/household-roster and as a "New submission" encode
+            // target. Members are optional so an empty guest load is axe-clean; min 1 seeds one encode row.
+            if (Form::query()->where('title', 'Household Roster')->doesntExist()) {
+                $roster = app(FormService::class)->create(
+                    $tenant, $owner, 'Household Roster', 'Repeatable household-member roster (G2 demo).'
+                );
+                $rb = app(FormBuilderService::class);
+                $rb->addField($roster, $owner, FieldType::ShortText, null)->update(['label' => 'Prepared by']);
+                $members = $rb->addSection($roster);
+                $members->update(['label' => 'Household members', 'is_repeatable' => true, 'min_instances' => 1, 'max_instances' => 4]);
+                $rb->addField($roster, $owner, FieldType::ShortText, $members->id)->update(['label' => 'Member name']);
+                $rb->addField($roster, $owner, FieldType::YesNo, $members->id)->update(['label' => 'Is a dependent?']);
+                app(PublishService::class)->publish($roster->refresh(), $owner);
+
+                $roster->update([
+                    'public_slug' => 'household-roster',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                ]);
+            }
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();

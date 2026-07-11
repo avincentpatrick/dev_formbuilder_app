@@ -23,6 +23,25 @@ for (const theme of themes) {
     });
 }
 
+// The repeat-group runtime (Increment G2). The guest-enabled "Household Roster" (E2eSeeder) has a repeatable
+// section; adding an instance renders a fieldset of member inputs. Scan both the initial (empty) state and a
+// populated instance for WCAG 2.2 AA + no horizontal overflow, in light and dark.
+for (const theme of themes) {
+    test(`Public runtime repeat group (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/household-roster', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Household Roster', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Household Roster (empty)');
+
+        // Add an instance → a member fieldset with inputs renders; scan again.
+        await page.getByRole('button', { name: 'Add Household members' }).click();
+        await page.getByRole('textbox', { name: 'Member name' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await assertClean(page, 'Household Roster (one instance)');
+    });
+}
+
 // A full guest submit (Clinic Intake's fields are all optional) drives the F5 guest submit endpoint end-to-end
 // and lands on the post-submit confirmation, which is itself scanned for accessibility.
 test('Public runtime — submit reaches an accessible confirmation', async ({ page }) => {

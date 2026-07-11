@@ -11,10 +11,11 @@
  */
 
 import { ApiError, normalizeError } from './error-normalizer';
-import type { EngineValue, MintResponse, SchemaResponse, SubmitResult } from './types';
+import type { AnswerMap, MintResponse, SchemaResponse, SubmitResult } from './types';
 
 export interface SubmitPayload {
-    answers: Record<string, EngineValue>;
+    // A nested repeat-section value (Increment G2) serializes straight through as a JSON array of instance maps.
+    answers: AnswerMap;
     clientSubmissionUuid: string;
     locale: string;
     guestContactEmail?: string | null;

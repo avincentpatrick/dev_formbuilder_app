@@ -32,6 +32,8 @@ export function section(partial: Partial<RawSection> & { key: string }): RawSect
         description_translations: partial.description_translations ?? null,
         sequence: partial.sequence ?? 0,
         is_repeatable: partial.is_repeatable ?? false,
+        min_instances: partial.min_instances ?? null,
+        max_instances: partial.max_instances ?? null,
         relevant_expression: partial.relevant_expression ?? null,
     };
 }

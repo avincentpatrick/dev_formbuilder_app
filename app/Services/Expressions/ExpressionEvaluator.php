@@ -8,6 +8,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\LogicOperator;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
+use App\Services\Expressions\Ast\ArithmeticNode;
 use App\Services\Expressions\Ast\ComparisonNode;
 use App\Services\Expressions\Ast\FieldReferenceNode;
 use App\Services\Expressions\Ast\FunctionCallNode;
@@ -23,10 +24,14 @@ use App\Services\Expressions\Ast\SelfReferenceNode;
  * never an exception (a `constraint` returning false is a validation RESULT, not an error). No eval(), no
  * call_user_func: node dispatch is `instanceof`, operator/function dispatch is `match` over a closed set.
  * The §6 rules here are the normative contract the TypeScript client mirror reproduces byte-for-byte.
+ *
+ * Grammar v2.0 (Increment G3) adds arithmetic (`+ - * /`, NaN-propagating, division-by-zero → NaN → blank),
+ * the `>=`/`<=` numeric comparators, and the value function library (`if`, `count`, `int`, `today`, `now`).
+ * A NaN arithmetic result normalises to `null` at the value boundary (a blank computed value).
  */
 final class ExpressionEvaluator
 {
-    public const GRAMMAR_VERSION = '1.0';
+    public const GRAMMAR_VERSION = '2.0';
 
     public function __construct(
         private readonly ExpressionParser $parser,
@@ -67,7 +72,16 @@ final class ExpressionEvaluator
 
     private function normalize(mixed $value): mixed
     {
-        return $value === Marker::Absent ? null : $value;
+        if ($value === Marker::Absent) {
+            return null;
+        }
+
+        // A NaN arithmetic result (empty/non-numeric operand or division by zero) is a blank value.
+        if (is_float($value) && is_nan($value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function eval(Node $node, EvaluationContext $context): mixed
@@ -96,6 +110,10 @@ final class ExpressionEvaluator
             return $this->evalComparison($node, $context);
         }
 
+        if ($node instanceof ArithmeticNode) {
+            return $this->evalArithmetic($node, $context);
+        }
+
         if ($node instanceof FunctionCallNode) {
             return $this->evalFunction($node, $context);
         }
@@ -117,15 +135,16 @@ final class ExpressionEvaluator
         $right = $this->eval($node->right, $context);
 
         return match ($node->op) {
-            ComparisonOperator::Gt => $this->numericCompare($left, $right, true),
-            ComparisonOperator::Lt => $this->numericCompare($left, $right, false),
+            ComparisonOperator::Gt, ComparisonOperator::Lt,
+            ComparisonOperator::Gte, ComparisonOperator::Lte => $this->numericCompare($left, $right, $node->op),
             ComparisonOperator::Eq => $this->equals($node->left, $node->right, $left, $right),
             ComparisonOperator::Neq => ! $this->equals($node->left, $node->right, $left, $right),
             default => throw ExpressionEvaluationException::unevaluable('comparison operator '.$node->op->value),
         };
     }
 
-    private function numericCompare(mixed $left, mixed $right, bool $greater): bool
+    /** Numeric-only ordering: a non-numeric (or NaN) operand makes any of `> < >= <=` false. */
+    private function numericCompare(mixed $left, mixed $right, ComparisonOperator $op): bool
     {
         $a = Coercion::toNumber($left);
         $b = Coercion::toNumber($right);
@@ -134,7 +153,34 @@ final class ExpressionEvaluator
             return false;
         }
 
-        return $greater ? $a > $b : $a < $b;
+        return match ($op) {
+            ComparisonOperator::Gt => $a > $b,
+            ComparisonOperator::Lt => $a < $b,
+            ComparisonOperator::Gte => $a >= $b,
+            ComparisonOperator::Lte => $a <= $b,
+            default => false,
+        };
+    }
+
+    /**
+     * `+ - * /` over `toNumber` of each operand. A NaN operand (empty / non-numeric) or a division by zero
+     * yields NaN — a blank value at the boundary — never an exception (the interpreter stays total).
+     */
+    private function evalArithmetic(ArithmeticNode $node, EvaluationContext $context): float
+    {
+        $a = Coercion::toNumber($this->eval($node->left, $context));
+        $b = Coercion::toNumber($this->eval($node->right, $context));
+
+        if (is_nan($a) || is_nan($b)) {
+            return NAN;
+        }
+
+        return match ($node->op) {
+            ArithmeticOperator::Add => $a + $b,
+            ArithmeticOperator::Sub => $a - $b,
+            ArithmeticOperator::Mul => $a * $b,
+            ArithmeticOperator::Div => $b === 0.0 ? NAN : $a / $b,
+        };
     }
 
     private function equals(Node $leftNode, Node $rightNode, mixed $left, mixed $right): bool
@@ -172,13 +218,23 @@ final class ExpressionEvaluator
         return $node instanceof LiteralNode && $node->isStringLiteral();
     }
 
-    private function evalFunction(FunctionCallNode $node, EvaluationContext $context): bool
+    private function evalFunction(FunctionCallNode $node, EvaluationContext $context): mixed
     {
-        $target = $node->args[0] ?? throw ExpressionEvaluationException::unevaluable("{$node->name} requires two arguments");
-        $literalNode = $node->args[1] ?? throw ExpressionEvaluationException::unevaluable("{$node->name} requires two arguments");
+        return match ($node->name) {
+            'selected', 'contains' => $this->evalMembershipFunction($node, $context),
+            'if' => $this->evalIf($node, $context),
+            'count' => $this->countOf($this->eval($this->arg($node, 0), $context)),
+            'int' => $this->intCast($this->eval($this->arg($node, 0), $context)),
+            'today' => $this->today($context),
+            'now' => $context->hasNow() ? $context->now : Marker::Absent,
+            default => throw ExpressionEvaluationException::unevaluable('function '.$node->name),
+        };
+    }
 
-        $value = $this->eval($target, $context);
-        $needle = Coercion::toStr($this->eval($literalNode, $context));
+    private function evalMembershipFunction(FunctionCallNode $node, EvaluationContext $context): bool
+    {
+        $value = $this->eval($this->arg($node, 0), $context);
+        $needle = Coercion::toStr($this->eval($this->arg($node, 1), $context));
 
         return match ($node->name) {
             'selected' => $this->membership($value, $needle),
@@ -188,6 +244,43 @@ final class ExpressionEvaluator
                 : (! Coercion::isEmpty($value) && str_contains(Coercion::toStr($value), $needle)),
             default => throw ExpressionEvaluationException::unevaluable('function '.$node->name),
         };
+    }
+
+    /** `if(cond, then, else)` — short-circuit: only the taken branch is evaluated. */
+    private function evalIf(FunctionCallNode $node, EvaluationContext $context): mixed
+    {
+        return Coercion::toBool($this->eval($this->arg($node, 0), $context))
+            ? $this->eval($this->arg($node, 1), $context)
+            : $this->eval($this->arg($node, 2), $context);
+    }
+
+    /** `count(x)` — an array's length (repeat instances / multi-select), 0 for empty, 1 for a non-empty scalar. */
+    private function countOf(mixed $value): int
+    {
+        if (is_array($value)) {
+            return count($value);
+        }
+
+        return Coercion::isEmpty($value) ? 0 : 1;
+    }
+
+    /** `int(x)` — the PHP `(int)` truncation-toward-zero of x's numeric value; a non-numeric value → 0. */
+    private function intCast(mixed $value): int
+    {
+        $number = Coercion::toNumber($value);
+
+        return is_nan($number) ? 0 : (int) $number;
+    }
+
+    /** `today()` — the date portion (YYYY-MM-DD) of the injected clock; Absent when no clock is set. */
+    private function today(EvaluationContext $context): mixed
+    {
+        return $context->hasNow() ? substr((string) $context->now, 0, 10) : Marker::Absent;
+    }
+
+    private function arg(FunctionCallNode $node, int $index): Node
+    {
+        return $node->args[$index] ?? throw ExpressionEvaluationException::unevaluable("{$node->name} is missing argument ".($index + 1));
     }
 
     private function membership(mixed $value, string $needle): bool

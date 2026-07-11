@@ -177,6 +177,8 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         is_required: f.is_required,
         form_section_id: f.section_key,
         relevant_expression: f.relevant_expression,
+        // Grammar v2.0: a calculated field's formula, so the engine's compute pass can produce its value.
+        calculate: typeof f.config?.calculated_formula === 'string' ? f.config.calculated_formula : null,
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

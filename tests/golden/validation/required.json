@@ -1,56 +1,56 @@
 [
   {
     "name": "required_empty_errors",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "req", "is_required": "required"}]},
     "answers": {},
     "expected": {"relevance": {"fields": {"req": true}, "sections": {}}, "errors": [{"field": "req", "rule": "field_required"}], "effective_answers": {}, "computed": {}}
   },
   {
     "name": "optional_empty_ok",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "opt", "is_required": "optional"}]},
     "answers": {},
     "expected": {"relevance": {"fields": {"opt": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
   },
   {
     "name": "required_answered_ok",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "req", "is_required": "required"}]},
     "answers": {"req": "x"},
     "expected": {"relevance": {"fields": {"req": true}, "sections": {}}, "errors": [], "effective_answers": {"req": "x"}, "computed": {}}
   },
   {
     "name": "conditional_required_fires",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "gate"}, {"key": "cond", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "gate", "rule_value": "yes"}]}]},
     "answers": {"gate": "yes"},
     "expected": {"relevance": {"fields": {"gate": true, "cond": true}, "sections": {}}, "errors": [{"field": "cond", "rule": "field_required"}], "effective_answers": {"gate": "yes"}, "computed": {}}
   },
   {
     "name": "conditional_required_inactive",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "gate"}, {"key": "cond", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "gate", "rule_value": "yes"}]}]},
     "answers": {"gate": "no"},
     "expected": {"relevance": {"fields": {"gate": true, "cond": true}, "sections": {}}, "errors": [], "effective_answers": {"gate": "no"}, "computed": {}}
   },
   {
     "name": "required_but_irrelevant_not_enforced",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "g"}, {"key": "req", "is_required": "required", "relevant": "${g} = '1'"}]},
     "answers": {"g": "0"},
     "expected": {"relevance": {"fields": {"g": true, "req": false}, "sections": {}}, "errors": [], "effective_answers": {"g": "0"}, "computed": {}}
   },
   {
     "name": "required_with_fires",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "contact"}, {"key": "phone", "rules": [{"rule_type": "required_with", "related": "contact"}]}]},
     "answers": {"contact": "me"},
     "expected": {"relevance": {"fields": {"contact": true, "phone": true}, "sections": {}}, "errors": [{"field": "phone", "rule": "field_required"}], "effective_answers": {"contact": "me"}, "computed": {}}
   },
   {
     "name": "required_with_inactive",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "contact"}, {"key": "phone", "rules": [{"rule_type": "required_with", "related": "contact"}]}]},
     "answers": {},
     "expected": {"relevance": {"fields": {"contact": true, "phone": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}

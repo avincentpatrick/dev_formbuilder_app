@@ -1,11 +1,11 @@
 [
-  {"name":"selected_member_true","grammar_version":"1.0","expression":"selected(${langs}, 'en')","context":{"answers":{"langs":["en","fr"]}},"expected":true},
-  {"name":"selected_nonmember_false","grammar_version":"1.0","expression":"selected(${langs}, 'de')","context":{"answers":{"langs":["en","fr"]}},"expected":false},
-  {"name":"selected_empty_array_false","grammar_version":"1.0","expression":"selected(${langs}, 'en')","context":{"answers":{"langs":[]}},"expected":false},
-  {"name":"selected_absent_false","grammar_version":"1.0","expression":"selected(${langs}, 'en')","context":{"answers":{}},"expected":false},
-  {"name":"selected_single_scalar_true","grammar_version":"1.0","expression":"selected(${plan}, 'pro')","context":{"answers":{"plan":"pro"}},"expected":true},
-  {"name":"selected_single_scalar_false","grammar_version":"1.0","expression":"selected(${plan}, 'pro')","context":{"answers":{"plan":"basic"}},"expected":false},
-  {"name":"not_selected_true","grammar_version":"1.0","expression":"not(selected(${langs}, 'de'))","context":{"answers":{"langs":["en"]}},"expected":true},
-  {"name":"selected_and_comparison","grammar_version":"1.0","expression":"selected(${langs}, 'en') and ${age} > 18","context":{"answers":{"langs":["en"],"age":20}},"expected":true},
-  {"name":"selected_double_quoted_literal","grammar_version":"1.0","expression":"selected(${langs}, \"en\")","context":{"answers":{"langs":["en","fr"]}},"expected":true}
+  {"name":"selected_member_true","grammar_version":"2.0","expression":"selected(${langs}, 'en')","context":{"answers":{"langs":["en","fr"]}},"expected":true},
+  {"name":"selected_nonmember_false","grammar_version":"2.0","expression":"selected(${langs}, 'de')","context":{"answers":{"langs":["en","fr"]}},"expected":false},
+  {"name":"selected_empty_array_false","grammar_version":"2.0","expression":"selected(${langs}, 'en')","context":{"answers":{"langs":[]}},"expected":false},
+  {"name":"selected_absent_false","grammar_version":"2.0","expression":"selected(${langs}, 'en')","context":{"answers":{}},"expected":false},
+  {"name":"selected_single_scalar_true","grammar_version":"2.0","expression":"selected(${plan}, 'pro')","context":{"answers":{"plan":"pro"}},"expected":true},
+  {"name":"selected_single_scalar_false","grammar_version":"2.0","expression":"selected(${plan}, 'pro')","context":{"answers":{"plan":"basic"}},"expected":false},
+  {"name":"not_selected_true","grammar_version":"2.0","expression":"not(selected(${langs}, 'de'))","context":{"answers":{"langs":["en"]}},"expected":true},
+  {"name":"selected_and_comparison","grammar_version":"2.0","expression":"selected(${langs}, 'en') and ${age} > 18","context":{"answers":{"langs":["en"],"age":20}},"expected":true},
+  {"name":"selected_double_quoted_literal","grammar_version":"2.0","expression":"selected(${langs}, \"en\")","context":{"answers":{"langs":["en","fr"]}},"expected":true}
 ]

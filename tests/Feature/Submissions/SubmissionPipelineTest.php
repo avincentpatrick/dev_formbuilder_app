@@ -398,3 +398,73 @@ it('refuses to submit against a non-published version', function (): void {
         respondentUserId: $this->user->id,
     )))->toThrow(SubmissionException::class);
 });
+
+it('writes a calculated field back into the answer document and the typed index (Increment G3)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'quantity', FieldType::Integer, 0);
+        addFormField($draft, $user, 'unit_price', FieldType::Decimal, 1);
+        addFormField($draft, $user, 'line_total', FieldType::Calculated, 2, [
+            'config' => ['calculated_formula' => '${quantity} * ${unit_price}'],
+            'is_queryable' => true,
+            'indexed_data_type' => IndexedDataType::Number,
+        ]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['quantity' => '3', 'unit_price' => '5'], // calculated key is server-computed, never submitted
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers['line_total'])->toEqual(15);
+
+    $indexRow = SubmissionAnswerIndex::query()
+        ->where('submission_id', $result->submission->id)
+        ->where('field_key', 'line_total')
+        ->first();
+    expect($indexRow)->not->toBeNull()
+        ->and((float) $indexRow->value_number)->toBe(15.0);
+});
+
+it('computes count() over repeat-group instances into a calculated field (Increment G3)', function (): void {
+    $version = publishRepeatForm($this->tenant, $this->user, [], function (FormVersion $draft, User $user, FormSection $section): void {
+        addFormField($draft, $user, 'member_name', FieldType::ShortText, 0, ['form_section_id' => $section->id]);
+        addFormField($draft, $user, 'headcount', FieldType::Calculated, 1, [
+            'config' => ['calculated_formula' => 'count(${hh})'],
+        ]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['hh' => [['member_name' => 'Ada'], ['member_name' => 'Bob'], ['member_name' => 'Cleo']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers['headcount'])->toEqual(3);
+});
+
+it('omits a hidden calculated field from the answer document (Increment G3)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'wants_total', FieldType::YesNo, 0);
+        addFormField($draft, $user, 'a', FieldType::Integer, 1);
+        addFormField($draft, $user, 'b', FieldType::Integer, 2);
+        addFormField($draft, $user, 'total', FieldType::Calculated, 3, [
+            'config' => ['calculated_formula' => '${a} + ${b}'],
+            'relevant_expression' => '${wants_total}', // yes_no → bool; false hides the calc
+        ]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['wants_total' => 'no', 'a' => '2', 'b' => '3'],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers)->not->toHaveKey('total');
+});

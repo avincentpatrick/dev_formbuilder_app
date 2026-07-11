@@ -1,84 +1,84 @@
 [
   {
     "name": "min_value_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "age", "field_type": "integer", "rules": [{"rule_type": "min_value", "rule_value": "18"}]}]},
     "answers": {"age": 20},
     "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {"age": 20}, "computed": {}}
   },
   {
     "name": "min_value_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "age", "field_type": "integer", "rules": [{"rule_type": "min_value", "rule_value": "18"}]}]},
     "answers": {"age": 10},
     "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [{"field": "age", "rule": "min_value"}], "effective_answers": {"age": 10}, "computed": {}}
   },
   {
     "name": "min_value_boundary_inclusive",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "age", "field_type": "integer", "rules": [{"rule_type": "min_value", "rule_value": "18"}]}]},
     "answers": {"age": 18},
     "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {"age": 18}, "computed": {}}
   },
   {
     "name": "max_value_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "score", "field_type": "integer", "rules": [{"rule_type": "max_value", "rule_value": "100"}]}]},
     "answers": {"score": 150},
     "expected": {"relevance": {"fields": {"score": true}, "sections": {}}, "errors": [{"field": "score", "rule": "max_value"}], "effective_answers": {"score": 150}, "computed": {}}
   },
   {
     "name": "min_length_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "name", "rules": [{"rule_type": "min_length", "rule_value": "3"}]}]},
     "answers": {"name": "abc"},
     "expected": {"relevance": {"fields": {"name": true}, "sections": {}}, "errors": [], "effective_answers": {"name": "abc"}, "computed": {}}
   },
   {
     "name": "min_length_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "name", "rules": [{"rule_type": "min_length", "rule_value": "3"}]}]},
     "answers": {"name": "ab"},
     "expected": {"relevance": {"fields": {"name": true}, "sections": {}}, "errors": [{"field": "name", "rule": "min_length"}], "effective_answers": {"name": "ab"}, "computed": {}}
   },
   {
     "name": "min_length_astral_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "bio", "rules": [{"rule_type": "min_length", "rule_value": "2"}]}]},
     "answers": {"bio": "😀😀"},
     "expected": {"relevance": {"fields": {"bio": true}, "sections": {}}, "errors": [], "effective_answers": {"bio": "😀😀"}, "computed": {}}
   },
   {
     "name": "min_length_astral_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "bio", "rules": [{"rule_type": "min_length", "rule_value": "2"}]}]},
     "answers": {"bio": "😀"},
     "expected": {"relevance": {"fields": {"bio": true}, "sections": {}}, "errors": [{"field": "bio", "rule": "min_length"}], "effective_answers": {"bio": "😀"}, "computed": {}}
   },
   {
     "name": "max_length_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "code", "rules": [{"rule_type": "max_length", "rule_value": "5"}]}]},
     "answers": {"code": "abcdef"},
     "expected": {"relevance": {"fields": {"code": true}, "sections": {}}, "errors": [{"field": "code", "rule": "max_length"}], "effective_answers": {"code": "abcdef"}, "computed": {}}
   },
   {
     "name": "constraint_empty_skipped",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "age", "field_type": "integer", "rules": [{"rule_type": "min_value", "rule_value": "18"}]}]},
     "answers": {},
     "expected": {"relevance": {"fields": {"age": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
   },
   {
     "name": "field_vs_field_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
     "answers": {"start": 1, "end": 5},
     "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [], "effective_answers": {"start": 1, "end": 5}, "computed": {}}
   },
   {
     "name": "field_vs_field_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "start", "field_type": "integer"}, {"key": "end", "field_type": "integer", "rules": [{"rule_type": "greater_than_field", "related": "start"}]}]},
     "answers": {"start": 5, "end": 1},
     "expected": {"relevance": {"fields": {"start": true, "end": true}, "sections": {}}, "errors": [{"field": "end", "rule": "greater_than_field"}], "effective_answers": {"start": 5, "end": 1}, "computed": {}}

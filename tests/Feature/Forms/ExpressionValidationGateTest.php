@@ -98,3 +98,37 @@ it('rejects a non-numeric min_value threshold at publish', function (): void {
     expect(fn () => $this->publisher->publish($form->refresh(), $this->user))
         ->toThrow(PublishValidationException::class, 'non_numeric_threshold');
 });
+
+it('publishes a calculated field whose grammar-v2.0 formula resolves (Increment G3)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'a', FieldType::Integer, 0);
+    addFormField($draft, $this->user, 'b', FieldType::Integer, 1);
+    addFormField($draft, $this->user, 'total', FieldType::Calculated, 2, [
+        'config' => ['calculated_formula' => 'if(${a} > ${b}, ${a} + ${b}, 0)'],
+    ]);
+
+    $published = $this->publisher->publish($form->refresh(), $this->user);
+
+    expect($published->status)->toBe(FormVersionStatus::Published);
+});
+
+it('rejects a calculated formula referencing an unknown field, naming the field (Increment G3)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    addFormField($form->draftVersion, $this->user, 'total', FieldType::Calculated, 0, [
+        'config' => ['calculated_formula' => '${a} + ${ghost}'],
+    ]);
+
+    expect(fn () => $this->publisher->publish($form->refresh(), $this->user))
+        ->toThrow(PublishValidationException::class, 'total');
+});
+
+it('rejects an unparseable calculated formula at publish (Increment G3)', function (): void {
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    addFormField($form->draftVersion, $this->user, 'total', FieldType::Calculated, 0, [
+        'config' => ['calculated_formula' => '${a} + '],
+    ]);
+
+    expect(fn () => $this->publisher->publish($form->refresh(), $this->user))
+        ->toThrow(PublishValidationException::class);
+});

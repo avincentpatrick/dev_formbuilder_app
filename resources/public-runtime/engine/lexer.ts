@@ -1,10 +1,10 @@
 /**
  * Source string → Token[] — the mirror of `app/Services/Expressions/ExpressionLexer.php`
  * (technical-architecture.md §4.3 §4). Left-to-right, position-tracked, no backtracking. Enforces the
- * anti-DoS length/token budget BEFORE the parser runs. Recognises: grouping, the comparison/logical
- * punctuation, `${key}` references, single/double-quoted strings (no escapes), numbers (at most one dot;
- * no exponent/sign/bare-dot), the `.` self-reference, and lowercase words. Any unrecognised character is
- * an `unexpected_token`.
+ * anti-DoS length/token budget BEFORE the parser runs. Recognises: grouping, the comparison punctuation
+ * (`= != > < >= <=`), the arithmetic operators (`+ - * /`), `${key}` references, single/double-quoted
+ * strings (no escapes), numbers (at most one dot; no exponent/sign/bare-dot), the `.` self-reference, and
+ * lowercase words. Any unrecognised character is an `unexpected_token`.
  *
  * The `ctype_*` classifiers are ASCII-only (matching PHP's byte-wise `ctype_*`): `\s`/`\d`/`\w` regex
  * shorthands are deliberately NOT used (they would admit Unicode). The length cap is measured in UTF-8
@@ -59,11 +59,17 @@ export class ExpressionLexer {
             } else if (char === '=') {
                 token = this.single('eq', '=', state);
             } else if (char === '>') {
-                token = this.single('gt', '>', state);
+                token = this.lexRelational(source, length, state, 'gte', 'gt', '>');
             } else if (char === '<') {
-                token = this.single('lt', '<', state);
+                token = this.lexRelational(source, length, state, 'lte', 'lt', '<');
+            } else if (char === '+') {
+                token = this.single('plus', '+', state);
             } else if (char === '-') {
                 token = this.single('minus', '-', state);
+            } else if (char === '*') {
+                token = this.single('star', '*', state);
+            } else if (char === '/') {
+                token = this.single('slash', '/', state);
             } else if (char === '!') {
                 token = this.lexNeq(source, length, state);
             } else if (isDigit(char)) {
@@ -109,6 +115,18 @@ export class ExpressionLexer {
         state.i += 2;
 
         return token;
+    }
+
+    /** A `>`/`<` becomes its `>=`/`<=` form when the next character is `=` (grammar v2.0). */
+    private lexRelational(source: string, length: number, state: { i: number }, withEq: TokenType, bare: TokenType, bareLexeme: string): Token {
+        if (state.i + 1 < length && source[state.i + 1] === '=') {
+            const token: Token = { type: withEq, lexeme: `${bareLexeme}=`, position: state.i };
+            state.i += 2;
+
+            return token;
+        }
+
+        return this.single(bare, bareLexeme, state);
     }
 
     private lexNumber(source: string, length: number, state: { i: number }): Token {

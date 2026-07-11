@@ -58,8 +58,10 @@ final class Coercion
         }
 
         if (is_float($value)) {
-            // Integral floats stringify without a fractional part ("5", not "5.0"); non-integral values
-            // never arise in Phase 1 (no arithmetic) and are re-pinned when arithmetic lands (Phase 2).
+            // Integral floats stringify without a fractional part ("5", not "5.0"). Non-integral arithmetic
+            // results (grammar v2.0) fall through to PHP's default float formatting; cross-engine byte-parity
+            // for a non-integral float→string is NOT pinned (the documented checksum caveat), so such values
+            // are compared as NUMBERS in the golden `computed` block, never stringified into a vector.
             if (is_finite($value) && floor($value) === $value && abs($value) < 1e15) {
                 return (string) (int) $value;
             }
@@ -86,7 +88,11 @@ final class Coercion
         }
 
         if (self::isNumericLike($value)) {
-            return self::toNumber($value) !== 0.0;
+            $number = self::toNumber($value);
+
+            // NaN (only reachable from a grammar-v2.0 arithmetic result over empty/non-numeric operands) is
+            // falsy; every real numeric value is truthy iff non-zero.
+            return ! is_nan($number) && $number !== 0.0;
         }
 
         if (is_string($value)) {

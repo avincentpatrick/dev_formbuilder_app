@@ -4,8 +4,11 @@
  * straight onto these types with no conversion layer, exactly as PHP's `Enum::from()` does in the runner.
  */
 
-/** app/Enums/ComparisonOperator.php */
-export type ComparisonOperator = 'gt' | 'lt' | 'eq' | 'neq' | 'is_null' | 'contains';
+/** app/Enums/ComparisonOperator.php (the `gte`/`lte` cases added with grammar v2.0). */
+export type ComparisonOperator = 'gt' | 'lt' | 'gte' | 'lte' | 'eq' | 'neq' | 'is_null' | 'contains';
+
+/** app/Services/Expressions/ArithmeticOperator.php — the four binary arithmetic operators (grammar v2.0). */
+export type ArithmeticOperator = 'add' | 'sub' | 'mul' | 'div';
 
 /** app/Enums/LogicOperator.php */
 export type LogicOperator = 'and' | 'or';

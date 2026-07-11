@@ -62,8 +62,9 @@ export function toStr(value: MaybeAbsent): string {
 
     if (typeof value === 'number') {
         // Integral finite values stringify without a fractional part ("5", not "5.0"), mirroring PHP's
-        // int-cast branch; non-integral values never arise in Phase 1 (no arithmetic) and are re-pinned
-        // when arithmetic lands (Phase 2).
+        // int-cast branch. Non-integral arithmetic results (grammar v2.0) fall through to JS default
+        // formatting; cross-engine byte-parity for a non-integral float→string is NOT pinned (the
+        // documented caveat), so such values are compared as NUMBERS in the golden `computed` block.
         if (Number.isFinite(value) && Math.floor(value) === value && Math.abs(value) < 1e15) {
             return String(Math.trunc(value));
         }
@@ -89,7 +90,11 @@ export function toBool(value: MaybeAbsent): boolean {
     }
 
     if (isNumericLike(value)) {
-        return toNumber(value) !== 0;
+        const n = toNumber(value);
+
+        // NaN (only reachable from a grammar-v2.0 arithmetic result over empty/non-numeric operands) is
+        // falsy; every real numeric value is truthy iff non-zero.
+        return !Number.isNaN(n) && n !== 0;
     }
 
     if (typeof value === 'string') {

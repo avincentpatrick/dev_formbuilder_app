@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Validation;
 
+use App\Enums\FieldType;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\FormField;
@@ -13,14 +14,16 @@ use App\Services\Expressions\Coercion;
 use App\Services\Expressions\EvaluationContext;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\Marker;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
  * Stage 3 of the Submission Pipeline (technical-architecture.md §4.1 §4.3) — the reusable semantic
  * authority the whole engine converges on. Given a published version's schema + a respondent's answers it
  * produces a {@see SemanticResult}: the relevance mask, per-field constraint/required errors, the
- * relevance-pruned answers Stage 4 persists, and a (Phase-1-empty) computed-values slot. PHP is the sole
- * authority; this must stay byte-identical to the Phase-1 TypeScript mirror (the golden `validation` suite).
+ * relevance-pruned answers Stage 4 persists, and (grammar v2.0 / Increment G3) the `computed` map of every
+ * relevant calculated field's formula result. PHP is the sole authority; this must stay byte-identical to
+ * the TypeScript mirror (the golden `validation` suite).
  *
  * Relevance is settled to a bounded FIXED POINT: pruning a field's answer can change another field's or
  * section's relevance, so the mask is recomputed over the shrinking effective answer set until it stops
@@ -54,6 +57,7 @@ final class SemanticValidator
             $version->validations()->orderBy('sequence')->get(),
             $answers,
             $locale,
+            Carbon::now()->toIso8601String(), // the authoritative clock for today()/now() (Increment G3)
         ));
     }
 
@@ -74,15 +78,16 @@ final class SemanticValidator
         }
 
         $ruleSets = $this->buildRuleSets($input);
+        $now = $input->now;
 
         // Repeat-group members are pulled out of the flat pass so the top-level relevance/answers/errors
         // stay exactly as they were pre-G1 (a form with no repeatable sections partitions nothing) — each
         // instance is then evaluated in its own scope by processRepeats().
         [$topLevelFields, $repeatMembersBySectionId] = $this->partitionFields($input);
 
-        [$fieldRelevance, $sectionRelevance] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById);
+        [$fieldRelevance, $sectionRelevance] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById, $now);
         $effectiveAnswers = $this->effectiveAnswers($input->answers, $fieldRelevance);
-        $errors = $this->collectErrors($topLevelFields, $ruleSets, $fieldRelevance, $effectiveAnswers, $fieldKeyById, $input->locale);
+        $errors = $this->collectErrors($topLevelFields, $ruleSets, $fieldRelevance, $effectiveAnswers, $fieldKeyById, $input->locale, $now);
 
         [$repeatEffective, $repeatErrors, $repeatRelevance] = $this->processRepeats(
             $input,
@@ -91,18 +96,24 @@ final class SemanticValidator
             $sectionRelevance,
             $effectiveAnswers,
             $fieldKeyById,
+            $now,
         );
 
         foreach ($repeatEffective as $sectionKey => $instances) {
             $effectiveAnswers[$sectionKey] = $instances;
         }
 
+        // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
+        // instance arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result
+        // is written to `computed`. Computed values do not feed back into relevance/constraints (documented).
+        $computed = $this->computeCalculated($topLevelFields, $effectiveAnswers, $fieldRelevance, $now);
+
         return new SemanticResult(
             $fieldRelevance,
             $sectionRelevance,
             array_merge($errors, $repeatErrors),
             $effectiveAnswers,
-            [],
+            $computed,
             $repeatRelevance,
         );
     }
@@ -217,7 +228,7 @@ final class SemanticValidator
      * @param  array<string, string>  $fieldKeyById
      * @return array{0: array<string, bool>, 1: array<string, bool>}
      */
-    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById): array
+    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById, ?string $now): array
     {
         /** @var array<string, bool> $relevant */
         $relevant = [];
@@ -230,7 +241,7 @@ final class SemanticValidator
         $sectionRelevance = [];
 
         for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
-            $context = new EvaluationContext(array_intersect_key($input->answers, $relevant));
+            $context = new EvaluationContext(array_intersect_key($input->answers, $relevant), now: $now);
 
             $sectionRelevance = [];
             $sectionRelevantById = [];
@@ -342,6 +353,7 @@ final class SemanticValidator
         array $effectiveAnswers,
         array $fieldKeyById,
         string $locale,
+        ?string $now,
     ): array {
         $errors = [];
 
@@ -350,7 +362,7 @@ final class SemanticValidator
                 continue;
             }
 
-            $this->collectFieldErrors($field, $effectiveAnswers, $effectiveAnswers, $ruleSets, $fieldKeyById, $locale, $errors, null, null);
+            $this->collectFieldErrors($field, $effectiveAnswers, $effectiveAnswers, $ruleSets, $fieldKeyById, $locale, $now, $errors, null, null);
         }
 
         return $errors;
@@ -377,11 +389,18 @@ final class SemanticValidator
         array $ruleSets,
         array $fieldKeyById,
         string $locale,
+        ?string $now,
         array &$errors,
         ?string $sectionKey,
         ?int $instanceIndex,
     ): void {
-        $context = new EvaluationContext($contextAnswers);
+        // A calculated field is a server-computed OUTPUT, never a respondent input — it carries no
+        // required/constraint checks (its formula is evaluated in the compute pass instead).
+        if ($field->field_type === FieldType::Calculated) {
+            return;
+        }
+
+        $context = new EvaluationContext($contextAnswers, now: $now);
         $answer = array_key_exists($field->key, $answerScope) ? $answerScope[$field->key] : Marker::Absent;
         $sets = $ruleSets[$field->id] ?? [];
 
@@ -397,7 +416,7 @@ final class SemanticValidator
             return; // an empty field's constraints are not evaluated
         }
 
-        $selfContext = new EvaluationContext($contextAnswers, $answer);
+        $selfContext = new EvaluationContext($contextAnswers, $answer, $now);
         foreach ($sets['constraint'] ?? [] as $unit) {
             $passes = count($unit) === 1
                 ? $this->rules->passesConstraint($unit[0], $field->key, $answer, $selfContext, $fieldKeyById)
@@ -438,6 +457,7 @@ final class SemanticValidator
         array $sectionRelevance,
         array $baseEffective,
         array $fieldKeyById,
+        ?string $now,
     ): array {
         /** @var array<string, list<array<string, mixed>>> $effective */
         $effective = [];
@@ -481,6 +501,7 @@ final class SemanticValidator
                     $baseEffective,
                     $instanceAnswers,
                     $fieldKeyById,
+                    $now,
                 );
 
                 $contextAnswers = array_merge($baseEffective, $instanceEffective);
@@ -488,7 +509,7 @@ final class SemanticValidator
                     if (($instanceRelevance[$field->key] ?? false) !== true) {
                         continue;
                     }
-                    $this->collectFieldErrors($field, $instanceEffective, $contextAnswers, $ruleSets, $fieldKeyById, $input->locale, $errors, $sectionKey, $index);
+                    $this->collectFieldErrors($field, $instanceEffective, $contextAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $errors, $sectionKey, $index);
                 }
 
                 $effective[$sectionKey][] = $instanceEffective;
@@ -518,6 +539,7 @@ final class SemanticValidator
         array $baseAnswers,
         array $instanceAnswers,
         array $fieldKeyById,
+        ?string $now,
     ): array {
         /** @var array<string, bool> $relevant */
         $relevant = [];
@@ -529,7 +551,7 @@ final class SemanticValidator
 
         for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
             $prunedInstance = array_intersect_key($instanceAnswers, $relevant);
-            $context = new EvaluationContext(array_merge($baseAnswers, $prunedInstance));
+            $context = new EvaluationContext(array_merge($baseAnswers, $prunedInstance), now: $now);
 
             /** @var array<string, bool> $next */
             $next = [];
@@ -554,6 +576,53 @@ final class SemanticValidator
         }
 
         return [$mask, array_intersect_key($instanceAnswers, array_filter($mask))];
+    }
+
+    /**
+     * Evaluate every relevant top-level calculated field's formula over the full effective answers
+     * (technical-architecture.md §4.3, grammar v2.0). A calc's formula lives in `config.calculated_formula`;
+     * a hidden calc (fieldRelevance false), a non-calc field, and a blank formula contribute nothing, and a
+     * blank/NaN result (missing operands, division by zero) is omitted rather than stored as null. Calculated
+     * fields inside a repeatable section are NOT computed in G3 (they are repeat members, not top-level).
+     *
+     * @param  Collection<int, FormField>  $fields  the top-level fields
+     * @param  array<string, mixed>  $effectiveAnswers  flat effective answers + repeat instance arrays (for count())
+     * @param  array<string, bool>  $fieldRelevance
+     * @return array<string, mixed> calculated field key => computed value
+     */
+    private function computeCalculated(Collection $fields, array $effectiveAnswers, array $fieldRelevance, ?string $now): array
+    {
+        $computed = [];
+        $context = new EvaluationContext($effectiveAnswers, now: $now);
+
+        foreach ($fields as $field) {
+            if ($field->field_type !== FieldType::Calculated) {
+                continue;
+            }
+            if (($fieldRelevance[$field->key] ?? false) !== true) {
+                continue;
+            }
+
+            $formula = $this->calculateFormula($field);
+            if ($formula === null) {
+                continue;
+            }
+
+            $value = $this->evaluator->evaluate($formula, $context);
+            if ($value !== null) {
+                $computed[$field->key] = $value;
+            }
+        }
+
+        return $computed;
+    }
+
+    /** The calc formula stored on a calculated field (`config.calculated_formula`); null when blank/absent. */
+    private function calculateFormula(FormField $field): ?string
+    {
+        $formula = data_get($field->config, 'calculated_formula');
+
+        return is_string($formula) && trim($formula) !== '' ? $formula : null;
     }
 
     private function minInstancesMessage(int $min): string

@@ -35,6 +35,7 @@ export type { SchemaField, SchemaSection, ValidationRow, SemanticInput, Instance
 export type { Node } from './ast';
 export type {
     ComparisonOperator,
+    ArithmeticOperator,
     LogicOperator,
     ValidationRuleType,
     RequiredMode,

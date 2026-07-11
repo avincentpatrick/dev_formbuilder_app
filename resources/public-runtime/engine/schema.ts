@@ -16,6 +16,8 @@ export interface SchemaField {
     is_required: RequiredMode;
     form_section_id: string | null;
     relevant_expression: string | null;
+    /** Grammar v2.0: a calculated field's formula (from `config.calculated_formula`); null / omitted otherwise. */
+    calculate?: string | null;
 }
 
 export interface SchemaSection {
@@ -54,4 +56,6 @@ export interface SemanticInput {
     /** Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps. */
     answers: Record<string, EngineValue | InstanceAnswers[]>;
     locale: string;
+    /** Grammar v2.0: the injected clock (ISO-8601) that `today()`/`now()` read; null / omitted → unset. */
+    now?: string | null;
 }

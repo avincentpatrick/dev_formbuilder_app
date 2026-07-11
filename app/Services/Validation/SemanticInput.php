@@ -23,6 +23,8 @@ final readonly class SemanticInput
      * @param  Collection<int, FormFieldValidation>  $validations
      * @param  array<string, mixed>  $answers  raw (un-pruned) answers; field key => value, plus (Increment G1)
      *                                         repeatable-section key => list<field key => value> for repeat instances
+     * @param  ?string  $now  the injected clock (ISO-8601) that `today()`/`now()` read (Increment G3); the
+     *                        caller stamps it (server time in the pipeline, a fixed value in golden vectors)
      */
     public function __construct(
         public Collection $fields,
@@ -30,5 +32,6 @@ final readonly class SemanticInput
         public Collection $validations,
         public array $answers,
         public string $locale = 'en',
+        public ?string $now = null,
     ) {}
 }

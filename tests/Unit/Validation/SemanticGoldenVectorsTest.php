@@ -32,7 +32,7 @@ function semanticGoldenDir(): string
  * @param  array<string, mixed>  $schema
  * @param  array<string, mixed>  $answers
  */
-function buildSemanticInput(array $schema, array $answers, string $locale): SemanticInput
+function buildSemanticInput(array $schema, array $answers, string $locale, ?string $now = null): SemanticInput
 {
     $sections = [];
     foreach (($schema['sections'] ?? []) as $index => $section) {
@@ -68,6 +68,9 @@ function buildSemanticInput(array $schema, array $answers, string $locale): Sema
         if (isset($field['relevant'])) {
             $attributes['relevant_expression'] = $field['relevant'];
         }
+        if (isset($field['calculate'])) {
+            $attributes['config'] = ['calculated_formula' => $field['calculate']];
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {
@@ -75,7 +78,7 @@ function buildSemanticInput(array $schema, array $answers, string $locale): Sema
         }
     }
 
-    return new SemanticInput(new Collection($fields), new Collection($sections), new Collection($validations), $answers, $locale);
+    return new SemanticInput(new Collection($fields), new Collection($sections), new Collection($validations), $answers, $locale, $now);
 }
 
 /**
@@ -165,7 +168,7 @@ dataset('semantic vectors', function (): iterable {
 it('matches the golden semantic vector', function (array $case): void {
     expect($case['grammar_version'])->toBe(ExpressionEvaluator::GRAMMAR_VERSION);
 
-    $input = buildSemanticInput($case['schema'], $case['answers'] ?? [], $case['locale'] ?? 'en');
+    $input = buildSemanticInput($case['schema'], $case['answers'] ?? [], $case['locale'] ?? 'en', $case['now'] ?? null);
     $result = makeSemanticValidator()->evaluate($input);
 
     /** @var array<string, mixed> $expected */

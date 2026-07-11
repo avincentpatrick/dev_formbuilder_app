@@ -1,15 +1,16 @@
 /**
  * Recursive-descent parser: Token[] → AST — the mirror of `app/Services/Expressions/ExpressionParser.php`
- * (technical-architecture.md §4.3 §3). Precedence, lowest→highest: `or` < `and` < `not(…)` < comparison
- * (non-associative — a single comparator, no chaining) < primary. Enforces operand result-kind typing (a
- * Boolean-kind node — a nested comparison, and/or, not, or selected — is rejected as a comparison operand
- * or a `selected()` first argument, §3) and an anti-DoS parse-depth cap.
+ * (technical-architecture.md §4.3 §3). Precedence, lowest→highest (grammar v2.0 inserts arithmetic below
+ * comparison): `or` < `and` < `not(…)` < comparison (`= != > < >= <=`, non-associative) < additive
+ * (`+ -`) < multiplicative (`* /`) < unary `-` < primary. Enforces operand result-kind typing (a
+ * Boolean-kind node — a nested comparison, and/or, not, or a membership predicate — is rejected as a
+ * comparison / arithmetic operand or a `selected()` first argument, §3) and an anti-DoS parse-depth cap.
  *
  * The PHP parser keeps a bounded LRU parse memo; it is a pure cache with no behavioural effect and is
  * omitted here (the SPA re-parses cheaply per fill and the drift contract is about verdicts, not caching).
  */
 
-import type { ComparisonOperator } from './enums';
+import type { ArithmeticOperator, ComparisonOperator } from './enums';
 import { ExpressionSyntaxError } from './errors';
 import { FunctionRegistry } from './function-registry';
 import { fieldRef, kind, numberLiteral, stringLiteral, type Node } from './ast';
@@ -88,7 +89,7 @@ export class ExpressionParser {
     }
 
     private parseComparison(): Node {
-        const left = this.parseOperand();
+        const left = this.parseAdditive();
 
         const op = this.comparatorFor(this.peek().type);
 
@@ -97,7 +98,7 @@ export class ExpressionParser {
         }
 
         this.advance();
-        const right = this.parseOperand();
+        const right = this.parseAdditive();
 
         if (kind(left) !== 'value' || kind(right) !== 'value') {
             throw ExpressionSyntaxError.nonValueOperand('a comparison operand');
@@ -116,12 +117,76 @@ export class ExpressionParser {
                 return 'gt';
             case 'lt':
                 return 'lt';
+            case 'gte':
+                return 'gte';
+            case 'lte':
+                return 'lte';
             default:
                 return null;
         }
     }
 
-    private parseOperand(): Node {
+    /** `+`/`-`, left-associative; below comparison, above `*`/`/`. */
+    private parseAdditive(): Node {
+        let left = this.parseMultiplicative();
+
+        while (this.check('plus') || this.check('minus')) {
+            const op: ArithmeticOperator = this.advance().type === 'plus' ? 'add' : 'sub';
+            const right = this.parseMultiplicative();
+            left = this.arithmetic(op, left, right);
+        }
+
+        return left;
+    }
+
+    /** `*`/`/`, left-associative; above `+`/`-`, below unary minus. */
+    private parseMultiplicative(): Node {
+        let left = this.parseUnary();
+
+        while (this.check('star') || this.check('slash')) {
+            const op: ArithmeticOperator = this.advance().type === 'star' ? 'mul' : 'div';
+            const right = this.parseUnary();
+            left = this.arithmetic(op, left, right);
+        }
+
+        return left;
+    }
+
+    /**
+     * Unary minus. `-<number>` folds to a negative Number literal (byte-compatible with grammar v1.0);
+     * `-<operand>` for any other Value-kind operand lowers to `0 - operand`.
+     */
+    private parseUnary(): Node {
+        if (this.check('minus')) {
+            this.advance();
+
+            if (this.check('number')) {
+                const number = this.advance();
+
+                return numberLiteral(-1 * Number(number.lexeme));
+            }
+
+            const operand = this.parseUnary();
+
+            if (kind(operand) !== 'value') {
+                throw ExpressionSyntaxError.nonValueOperand('an arithmetic operand');
+            }
+
+            return { type: 'arithmetic', op: 'sub', left: numberLiteral(0), right: operand };
+        }
+
+        return this.parsePrimary();
+    }
+
+    private arithmetic(op: ArithmeticOperator, left: Node, right: Node): Node {
+        if (kind(left) !== 'value' || kind(right) !== 'value') {
+            throw ExpressionSyntaxError.nonValueOperand('an arithmetic operand');
+        }
+
+        return { type: 'arithmetic', op, left, right };
+    }
+
+    private parsePrimary(): Node {
         const token = this.peek();
 
         if (token.type === 'lparen') {
@@ -156,18 +221,6 @@ export class ExpressionParser {
             return numberLiteral(Number(token.lexeme));
         }
 
-        if (token.type === 'minus') {
-            this.advance();
-
-            if (!this.check('number')) {
-                throw this.unexpected();
-            }
-
-            const number = this.advance();
-
-            return numberLiteral(-1 * Number(number.lexeme));
-        }
-
         if (token.type === 'string') {
             this.advance();
 
@@ -184,11 +237,13 @@ export class ExpressionParser {
             throw this.unexpected(); // a bare word is never a valid operand
         }
 
-        if (token.lexeme !== 'selected' || !this.functions.isPublic('selected')) {
+        if (!this.functions.isPublic(token.lexeme)) {
             throw ExpressionSyntaxError.unknownFunction(token.lexeme);
         }
 
-        return this.parseSelected();
+        // `selected` keeps its bespoke shape (arg1 must be a string LITERAL); every other library function
+        // takes full-expression arguments validated generically below.
+        return token.lexeme === 'selected' ? this.parseSelected() : this.parseCall(token.lexeme);
     }
 
     private parseSelected(): Node {
@@ -196,7 +251,7 @@ export class ExpressionParser {
         this.advance(); // 'selected'
         this.advance(); // '('
 
-        const first = this.parseOperand();
+        const first = this.parseExpr();
 
         if (kind(first) !== 'value') {
             throw ExpressionSyntaxError.nonValueOperand('a selected() argument');
@@ -221,6 +276,64 @@ export class ExpressionParser {
         this.ascend();
 
         return { type: 'call', name: 'selected', args: [first, second] };
+    }
+
+    /**
+     * The general library-function call `name(arg, …)` (grammar v2.0). Each argument is a full expression;
+     * the arity is checked against the registry, then per-function operand-kind rules are applied.
+     */
+    private parseCall(name: string): Node {
+        this.descend();
+        this.advance(); // name
+        this.advance(); // '('
+
+        const args: Node[] = [];
+        if (!this.check('rparen')) {
+            args.push(this.parseExpr());
+            while (this.check('comma')) {
+                this.advance();
+                args.push(this.parseExpr());
+            }
+        }
+
+        this.expect('rparen');
+        this.ascend();
+
+        const arity = this.functions.arity(name);
+        if (arity !== null && args.length !== arity) {
+            throw ExpressionSyntaxError.arityMismatch(name, arity, args.length);
+        }
+
+        this.validateCallArgs(name, args);
+
+        return { type: 'call', name, args };
+    }
+
+    /**
+     * Per-function operand typing (§3): `if`'s condition is any kind (coerced with toBool) but its two
+     * branches must be Value-kind; `count`/`int` take one Value-kind operand; `today`/`now` take none.
+     */
+    private validateCallArgs(name: string, args: Node[]): void {
+        const requireValue = (node: Node, context: string): void => {
+            if (kind(node) !== 'value') {
+                throw ExpressionSyntaxError.nonValueOperand(context);
+            }
+        };
+
+        switch (name) {
+            case 'if':
+                requireValue(args[1], 'an if() branch');
+                requireValue(args[2], 'an if() branch');
+                break;
+            case 'count':
+                requireValue(args[0], 'a count() argument');
+                break;
+            case 'int':
+                requireValue(args[0], 'an int() argument');
+                break;
+            default:
+                break; // today/now take no args
+        }
     }
 
     private descend(): void {

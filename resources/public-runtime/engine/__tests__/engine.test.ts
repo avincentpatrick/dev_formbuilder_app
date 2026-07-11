@@ -19,7 +19,7 @@ import {
 
 describe('form-runtime engine public API', () => {
     it('pins the grammar version the drift contract is keyed on', () => {
-        expect(GRAMMAR_VERSION).toBe('1.0');
+        expect(GRAMMAR_VERSION).toBe('2.0');
     });
 
     it('evaluates relevance/skip logic through the expression evaluator', () => {
@@ -30,10 +30,21 @@ describe('form-runtime engine public API', () => {
         expect(engine.evaluate('${missing}', context)).toBeNull(); // absent → normalised to null at the boundary
     });
 
+    it('evaluates grammar-v2.0 arithmetic + the function library', () => {
+        const engine = makeExpressionEvaluator();
+        const context = new EvaluationContext({ a: 5, b: 3, roster: [{ n: 1 }, { n: 2 }] }, undefined, '2026-07-11T09:30:00+00:00');
+
+        expect(engine.evaluate('${a} + ${b} * 2', context)).toBe(11);
+        expect(engine.evaluateBoolean('${a} >= 5', context)).toBe(true);
+        expect(engine.evaluate('if(${a} > ${b}, ${a}, ${b})', context)).toBe(5);
+        expect(engine.evaluate('count(${roster})', context)).toBe(2);
+        expect(engine.evaluate('today()', context)).toBe('2026-07-11');
+    });
+
     it('surfaces a stable slug for an authoring error', () => {
         const engine = makeExpressionEvaluator();
 
-        expect(() => engine.evaluateBoolean('${age} >= 18', new EvaluationContext({}))).toThrowError(ExpressionSyntaxError);
+        expect(() => engine.evaluateBoolean('sum(1, 2)', new EvaluationContext({}))).toThrowError(ExpressionSyntaxError);
     });
 
     it('runs the semantic validator: relevance mask, effective answers, and a required error', () => {

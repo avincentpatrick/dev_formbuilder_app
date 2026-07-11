@@ -1,0 +1,124 @@
+[
+  {
+    "name": "calc_sum",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "b"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} + ${b}"}
+    ]},
+    "answers": {"a": 2, "b": 3},
+    "expected": {
+      "relevance": {"fields": {"a": true, "b": true, "total": true}},
+      "effective_answers": {"a": 2, "b": 3},
+      "computed": {"total": 5}
+    }
+  },
+  {
+    "name": "calc_count_repeat_instances",
+    "grammar_version": "2.0",
+    "schema": {
+      "sections": [{"key": "roster", "repeatable": true}],
+      "fields": [
+        {"key": "name", "section": "roster"},
+        {"key": "headcount", "field_type": "calculated", "calculate": "count(${roster})"}
+      ]
+    },
+    "answers": {"roster": [{"name": "Ada"}, {"name": "Bob"}]},
+    "expected": {
+      "relevance": {"fields": {"headcount": true}, "sections": {"roster": true}},
+      "effective_answers": {"roster": [{"name": "Ada"}, {"name": "Bob"}]},
+      "repeat_relevance": {"roster": [{"name": true}, {"name": true}]},
+      "computed": {"headcount": 2}
+    }
+  },
+  {
+    "name": "calc_if_grade",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "score"},
+      {"key": "grade", "field_type": "calculated", "calculate": "if(${score} >= 60, 'pass', 'fail')"}
+    ]},
+    "answers": {"score": 75},
+    "expected": {
+      "relevance": {"fields": {"score": true, "grade": true}},
+      "effective_answers": {"score": 75},
+      "computed": {"grade": "pass"}
+    }
+  },
+  {
+    "name": "calc_hidden_section_not_computed",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "show"},
+      {"key": "a"},
+      {"key": "b"},
+      {"key": "total", "field_type": "calculated", "relevant": "${show} = 'yes'", "calculate": "${a} + ${b}"}
+    ]},
+    "answers": {"show": "no", "a": 1, "b": 2},
+    "expected": {
+      "relevance": {"fields": {"show": true, "a": true, "b": true, "total": false}},
+      "effective_answers": {"show": "no", "a": 1, "b": 2},
+      "computed": {}
+    }
+  },
+  {
+    "name": "calc_division_by_zero_omitted",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "b"},
+      {"key": "ratio", "field_type": "calculated", "calculate": "${a} / ${b}"}
+    ]},
+    "answers": {"a": 5, "b": 0},
+    "expected": {
+      "relevance": {"fields": {"a": true, "b": true, "ratio": true}},
+      "effective_answers": {"a": 5, "b": 0},
+      "computed": {}
+    }
+  },
+  {
+    "name": "calc_missing_operand_omitted",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "b"},
+      {"key": "total", "field_type": "calculated", "calculate": "${a} + ${b}"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "b": true, "total": true}},
+      "effective_answers": {"a": 5},
+      "computed": {}
+    }
+  },
+  {
+    "name": "calc_today_from_clock",
+    "grammar_version": "2.0",
+    "now": "2026-07-11T09:30:00+00:00",
+    "schema": {"fields": [
+      {"key": "stamp", "field_type": "calculated", "calculate": "today()"}
+    ]},
+    "answers": {},
+    "expected": {
+      "relevance": {"fields": {"stamp": true}},
+      "effective_answers": {},
+      "computed": {"stamp": "2026-07-11"}
+    }
+  },
+  {
+    "name": "calc_no_chaining_between_calcs",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "a"},
+      {"key": "c1", "field_type": "calculated", "calculate": "${a} + 1"},
+      {"key": "c2", "field_type": "calculated", "calculate": "${c1} + 1"}
+    ]},
+    "answers": {"a": 5},
+    "expected": {
+      "relevance": {"fields": {"a": true, "c1": true, "c2": true}},
+      "effective_answers": {"a": 5},
+      "computed": {"c1": 6}
+    }
+  }
+]

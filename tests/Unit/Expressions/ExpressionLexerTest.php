@@ -53,7 +53,7 @@ it('gives the right slug for each malformed lexeme', function (string $source, s
     'unterminated reference' => ['${a = 1', 'malformed_reference'],
     'unterminated string' => ["'oops", 'unterminated_string'],
     'lone bang' => ['!', 'unexpected_token'],
-    'stray plus' => ['${a} + 1', 'unexpected_token'],
+    'stray percent' => ['${a} % 1', 'unexpected_token'],
     'blank source' => ['   ', 'empty_expression'],
 ]);
 

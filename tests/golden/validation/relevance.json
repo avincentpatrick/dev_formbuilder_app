@@ -1,49 +1,49 @@
 [
   {
     "name": "field_relevant_true",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "trigger"}, {"key": "dep", "relevant": "${trigger} = 'yes'"}]},
     "answers": {"trigger": "yes", "dep": "x"},
     "expected": {"relevance": {"fields": {"trigger": true, "dep": true}, "sections": {}}, "errors": [], "effective_answers": {"trigger": "yes", "dep": "x"}, "computed": {}}
   },
   {
     "name": "field_relevant_false",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "trigger"}, {"key": "dep", "relevant": "${trigger} = 'yes'"}]},
     "answers": {"trigger": "no", "dep": "x"},
     "expected": {"relevance": {"fields": {"trigger": true, "dep": false}, "sections": {}}, "errors": [], "effective_answers": {"trigger": "no"}, "computed": {}}
   },
   {
     "name": "section_cascade_hides_fields",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"sections": [{"key": "sec", "relevant": "${show} = '1'"}], "fields": [{"key": "show"}, {"key": "inside", "section": "sec"}]},
     "answers": {"show": "0", "inside": "x"},
     "expected": {"relevance": {"fields": {"show": true, "inside": false}, "sections": {"sec": false}}, "errors": [], "effective_answers": {"show": "0"}, "computed": {}}
   },
   {
     "name": "section_relevant_shows_fields",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"sections": [{"key": "sec", "relevant": "${show} = '1'"}], "fields": [{"key": "show"}, {"key": "inside", "section": "sec"}]},
     "answers": {"show": "1", "inside": "x"},
     "expected": {"relevance": {"fields": {"show": true, "inside": true}, "sections": {"sec": true}}, "errors": [], "effective_answers": {"show": "1", "inside": "x"}, "computed": {}}
   },
   {
     "name": "chained_fixed_point",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "gate"}, {"key": "a", "relevant": "${gate} = '1'"}, {"key": "b", "relevant": "${a} = ''"}]},
     "answers": {"gate": "0", "a": "something", "b": "hi"},
     "expected": {"relevance": {"fields": {"gate": true, "a": false, "b": true}, "sections": {}}, "errors": [], "effective_answers": {"gate": "0", "b": "hi"}, "computed": {}}
   },
   {
     "name": "skip_if_hides_field",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "src"}, {"key": "target", "rules": [{"rule_type": "skip_if", "operator": "eq", "related": "src", "rule_value": "skip"}]}]},
     "answers": {"src": "skip", "target": "val"},
     "expected": {"relevance": {"fields": {"src": true, "target": false}, "sections": {}}, "errors": [], "effective_answers": {"src": "skip"}, "computed": {}}
   },
   {
     "name": "skip_if_inactive_keeps_field",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "src"}, {"key": "target", "rules": [{"rule_type": "skip_if", "operator": "eq", "related": "src", "rule_value": "skip"}]}]},
     "answers": {"src": "keep", "target": "val"},
     "expected": {"relevance": {"fields": {"src": true, "target": true}, "sections": {}}, "errors": [], "effective_answers": {"src": "keep", "target": "val"}, "computed": {}}

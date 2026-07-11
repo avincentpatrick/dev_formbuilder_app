@@ -1,35 +1,35 @@
 [
   {
     "name": "pattern_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "code", "rules": [{"rule_type": "pattern", "rule_value": "[0-9]{3}"}]}]},
     "answers": {"code": "123"},
     "expected": {"relevance": {"fields": {"code": true}, "sections": {}}, "errors": [], "effective_answers": {"code": "123"}, "computed": {}}
   },
   {
     "name": "pattern_anchored_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "code", "rules": [{"rule_type": "pattern", "rule_value": "[0-9]{3}"}]}]},
     "answers": {"code": "1234"},
     "expected": {"relevance": {"fields": {"code": true}, "sections": {}}, "errors": [{"field": "code", "rule": "pattern"}], "effective_answers": {"code": "1234"}, "computed": {}}
   },
   {
     "name": "pattern_unicode_pass",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "word", "rules": [{"rule_type": "pattern", "rule_value": "\\p{L}+"}]}]},
     "answers": {"word": "café"},
     "expected": {"relevance": {"fields": {"word": true}, "sections": {}}, "errors": [], "effective_answers": {"word": "café"}, "computed": {}}
   },
   {
     "name": "pattern_unicode_fail",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "word", "rules": [{"rule_type": "pattern", "rule_value": "\\p{L}+"}]}]},
     "answers": {"word": "ab1"},
     "expected": {"relevance": {"fields": {"word": true}, "sections": {}}, "errors": [{"field": "word", "rule": "pattern"}], "effective_answers": {"word": "ab1"}, "computed": {}}
   },
   {
     "name": "pattern_with_slash",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {"fields": [{"key": "path", "rules": [{"rule_type": "pattern", "rule_value": "a/b"}]}]},
     "answers": {"path": "a/b"},
     "expected": {"relevance": {"fields": {"path": true}, "sections": {}}, "errors": [], "effective_answers": {"path": "a/b"}, "computed": {}}

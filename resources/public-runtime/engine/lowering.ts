@@ -76,6 +76,8 @@ export class StructuredRuleLowering {
             case 'neq':
             case 'gt':
             case 'lt':
+            case 'gte':
+            case 'lte':
                 return Ast.comparison(operator, relatedKey, value);
             case 'is_null':
                 return Ast.isNull(relatedKey);

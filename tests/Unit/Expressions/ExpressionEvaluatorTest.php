@@ -86,3 +86,48 @@ it('short-circuits and/or to the correct result', function (): void {
     expect($engine->evaluateBoolean('${a} = 1 and ${b} = 2', new EvaluationContext(['a' => 9])))->toBeFalse();
     expect($engine->evaluateBoolean('${a} = 1 or ${b} = 2', new EvaluationContext(['a' => 1])))->toBeTrue();
 });
+
+it('evaluates grammar-v2.0 arithmetic with precedence and NaN-to-null at the boundary', function (): void {
+    $engine = makeExpressionEvaluator();
+    $ctx = new EvaluationContext(['a' => 5, 'b' => 3]);
+
+    expect($engine->evaluate('1 + 2 * 3', $ctx))->toEqual(7);
+    expect($engine->evaluate('(1 + 2) * 3', $ctx))->toEqual(9);
+    expect($engine->evaluate('10 - 4 - 3', $ctx))->toEqual(3);      // left-associative
+    expect($engine->evaluate('${a} * ${b}', $ctx))->toEqual(15);
+    expect($engine->evaluate('-${a} + 10', $ctx))->toEqual(5);      // unary minus on a field
+    expect($engine->evaluate('${a} / 0', $ctx))->toBeNull();         // division by zero → blank
+    expect($engine->evaluate('${a} + ${missing}', $ctx))->toBeNull(); // non-numeric operand → blank
+    expect($engine->evaluateBoolean('${a} / 0', $ctx))->toBeFalse(); // NaN is falsy
+});
+
+it('evaluates the grammar-v2.0 >= and <= numeric comparators', function (): void {
+    $engine = makeExpressionEvaluator();
+
+    expect($engine->evaluateBoolean('${age} >= 18', new EvaluationContext(['age' => 18])))->toBeTrue();
+    expect($engine->evaluateBoolean('${age} >= 18', new EvaluationContext(['age' => 17])))->toBeFalse();
+    expect($engine->evaluateBoolean('${n} <= 5', new EvaluationContext(['n' => 5])))->toBeTrue();
+    expect($engine->evaluateBoolean('${x} >= 5', new EvaluationContext(['x' => ''])))->toBeFalse(); // non-numeric → false
+});
+
+it('evaluates the grammar-v2.0 function library (if/count/int) with short-circuit', function (): void {
+    $engine = makeExpressionEvaluator();
+
+    expect($engine->evaluate('if(${age} >= 18, "adult", "minor")', new EvaluationContext(['age' => 20])))->toBe('adult');
+    // The untaken branch (division by zero) is never evaluated.
+    expect($engine->evaluate('if(${a} > 0, ${a}, ${a} / 0)', new EvaluationContext(['a' => 4])))->toEqual(4);
+    expect($engine->evaluate('count(${roster})', new EvaluationContext(['roster' => [['n' => 1], ['n' => 2]]])))->toBe(2);
+    expect($engine->evaluate('count(${hobbies})', new EvaluationContext(['hobbies' => ['a', 'b', 'c']])))->toBe(3);
+    expect($engine->evaluate('count(${none})', new EvaluationContext([])))->toBe(0);
+    expect($engine->evaluate('int(${x})', new EvaluationContext(['x' => '7.8'])))->toBe(7);
+    expect($engine->evaluate('int(${x})', new EvaluationContext(['x' => 'abc'])))->toBe(0);
+});
+
+it('reads today()/now() from the injected clock (never the system clock)', function (): void {
+    $engine = makeExpressionEvaluator();
+    $ctx = new EvaluationContext([], now: '2026-07-11T09:30:00+00:00');
+
+    expect($engine->evaluate('today()', $ctx))->toBe('2026-07-11');
+    expect($engine->evaluate('now()', $ctx))->toBe('2026-07-11T09:30:00+00:00');
+    expect($engine->evaluate('today()', new EvaluationContext([])))->toBeNull(); // no clock → blank
+});

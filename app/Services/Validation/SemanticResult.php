@@ -7,8 +7,9 @@ namespace App\Services\Validation;
 /**
  * The reusable Stage-3 result (technical-architecture.md §4.1) — the whole output of semantic validation,
  * consumed by the Submission Pipeline (F4): `!passed()` maps to `422` + the errors; on success the
- * `effectiveAnswers` (relevance-pruned) are what Stage 4 persists, and `computed` carries calculated
- * values (Phase 1: always empty — `calculate` needs the Phase-2 arithmetic grammar). Immutable.
+ * `effectiveAnswers` (relevance-pruned) are what Stage 4 persists, and `computed` carries each relevant
+ * calculated field's formula result (grammar v2.0 / Increment G3) — the pipeline merges these into the
+ * persisted answer document + the typed index. Immutable.
  *
  * Repeat groups (Increment G1): `effectiveAnswers` may now hold a repeatable section's pruned instances as
  * a native list under the section key (`section => [instanceMap, …]`); `repeatFieldRelevance` exposes the
@@ -22,7 +23,7 @@ final readonly class SemanticResult
      * @param  array<string, bool>  $sectionRelevance  section key → visible/relevant
      * @param  list<SemanticError>  $errors
      * @param  array<string, mixed>  $effectiveAnswers  relevant answers only (nested per-instance for repeats); what Stage 4 persists
-     * @param  array<string, mixed>  $computed  computed `calculate` values (Phase 1: empty)
+     * @param  array<string, mixed>  $computed  calculated field key => computed value (grammar v2.0)
      * @param  array<string, list<array<string, bool>>>  $repeatFieldRelevance  section key → per-instance field-relevance masks
      */
     public function __construct(

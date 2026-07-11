@@ -1,7 +1,7 @@
 [
   {
     "name": "repeat_two_instances_ok",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [
@@ -20,7 +20,7 @@
   },
   {
     "name": "repeat_per_instance_required",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [
@@ -39,7 +39,7 @@
   },
   {
     "name": "repeat_per_instance_constraint",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [
@@ -58,7 +58,7 @@
   },
   {
     "name": "repeat_per_instance_relevance_same_instance",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [
@@ -77,7 +77,7 @@
   },
   {
     "name": "repeat_instance_references_top_level_gate",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [
@@ -97,7 +97,7 @@
   },
   {
     "name": "repeat_section_hidden_prunes_all",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true, "min": 2, "relevant": "${show_hh} = '1'"}],
       "fields": [
@@ -116,7 +116,7 @@
   },
   {
     "name": "repeat_below_min_instances",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true, "min": 2}],
       "fields": [{"key": "member_name", "section": "hh"}]
@@ -132,7 +132,7 @@
   },
   {
     "name": "repeat_above_max_instances",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true, "max": 2}],
       "fields": [{"key": "member_name", "section": "hh"}]
@@ -148,7 +148,7 @@
   },
   {
     "name": "repeat_zero_instances_optional",
-    "grammar_version": "1.0",
+    "grammar_version": "2.0",
     "schema": {
       "sections": [{"key": "hh", "repeatable": true}],
       "fields": [{"key": "member_name", "section": "hh"}]

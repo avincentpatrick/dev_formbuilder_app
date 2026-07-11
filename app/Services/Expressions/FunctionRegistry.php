@@ -10,14 +10,20 @@ namespace App\Services\Expressions;
  * INTERNAL (only constructible by F3 lowering / {@see AstBuilders}, never parseable — so `contains(…)`
  * as source is an `unknown_function`). The parser consults ONLY the public list.
  *
- * Phase-1 public surface is `selected/2` and nothing else; `count`, `today`, `now`, `if`, `int`, … are
- * absent by design and therefore rejected at parse time.
+ * Grammar v2.0 (Increment G3) opens the public surface to the function library: `selected/2` (membership),
+ * `if/3` (conditional value), `count/1` (array/instance count), `int/1` (truncating cast), `today/0` and
+ * `now/0` (the injected clock). Any other name (`sum`, `regex`, …) stays an `unknown_function`.
  */
 final class FunctionRegistry
 {
     /** @var array<string, int> function name → required arity */
     private const PUBLIC_FUNCTIONS = [
         'selected' => 2,
+        'if' => 3,
+        'count' => 1,
+        'int' => 1,
+        'today' => 0,
+        'now' => 0,
     ];
 
     /** @var array<string, int> lowering-only function name → required arity */

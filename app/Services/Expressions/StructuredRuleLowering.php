@@ -115,7 +115,9 @@ final class StructuredRuleLowering
     private function conditionForOperator(?ComparisonOperator $operator, string $relatedKey, string $value, string $rowId): Node
     {
         return match ($operator) {
-            ComparisonOperator::Eq, ComparisonOperator::Neq, ComparisonOperator::Gt, ComparisonOperator::Lt => AstBuilders::comparison($operator, $relatedKey, $value),
+            ComparisonOperator::Eq, ComparisonOperator::Neq,
+            ComparisonOperator::Gt, ComparisonOperator::Lt,
+            ComparisonOperator::Gte, ComparisonOperator::Lte => AstBuilders::comparison($operator, $relatedKey, $value),
             ComparisonOperator::IsNull => AstBuilders::isNull($relatedKey),
             ComparisonOperator::Contains => AstBuilders::contains($relatedKey, $value),
             null => throw ExpressionEvaluationException::unevaluable("conditional rule {$rowId} has no operator"),

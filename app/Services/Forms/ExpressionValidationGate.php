@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\ExpressionKind;
+use App\Enums\FieldType;
 use App\Enums\ValidationRuleType;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\PublishValidationException;
+use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Services\Expressions\Coercion;
 use App\Services\Expressions\ExpressionParser;
@@ -42,8 +44,15 @@ final class ExpressionValidationGate
             $fieldKeyById[$field->id] = $field->key;
         }
 
+        // Section keys are referenceable too (grammar v2.0): `count(${roster})` counts a repeatable section's
+        // instances. Field and section keys are globally unique per version, so there is no key collision.
+        foreach ($sections as $section) {
+            $knownKeys[$section->key] = true;
+        }
+
         foreach ($fields as $field) {
             $this->check($field->relevant_expression, $knownKeys, ExpressionKind::Relevant, $field->key);
+            $this->check($this->calculateFormula($field), $knownKeys, ExpressionKind::Calculate, $field->key);
         }
 
         foreach ($sections as $section) {
@@ -78,6 +87,18 @@ final class ExpressionValidationGate
         } catch (ExpressionSyntaxException $exception) {
             throw PublishValidationException::expressionInvalid($exception->fieldKey() ?? $ownerKey, $exception->slug());
         }
+    }
+
+    /** A calculated field's `config.calculated_formula` (grammar v2.0); null when not a calc / blank. */
+    private function calculateFormula(FormField $field): ?string
+    {
+        if ($field->field_type !== FieldType::Calculated) {
+            return null;
+        }
+
+        $formula = data_get($field->config, 'calculated_formula');
+
+        return is_string($formula) ? $formula : null;
     }
 
     private function assertRuleValue(?ValidationRuleType $ruleType, string $ruleValue, string $ownerKey): void

@@ -2,8 +2,9 @@
  * The semantic-validation authority — the mirror of `app/Services/Validation/SemanticValidator.php`
  * (technical-architecture.md §4.1 §4.3). Given a published version's schema + a respondent's answers it
  * produces a {@link SemanticResult}: the relevance mask, per-field constraint/required errors, the
- * relevance-pruned answers, and a (Phase-1-empty) computed-values slot. PHP is the sole authority at submit
- * time; this client mirror must stay byte-identical to it (the golden `validation` suite is the guard).
+ * relevance-pruned answers, and (grammar v2.0 / Increment G3) the `computed` map of every relevant
+ * calculated field's formula result. PHP is the sole authority at submit time; this client mirror must stay
+ * byte-identical to it (the golden `validation` suite is the guard).
  *
  * Relevance is settled to a bounded FIXED POINT: pruning a field's answer can change another field's or
  * section's relevance, so the mask is recomputed over the shrinking effective answer set until it stops
@@ -102,12 +103,13 @@ export class SemanticValidator {
         }
 
         const ruleSets = this.buildRuleSets(input);
+        const now = input.now ?? null;
 
         const [topLevelFields, repeatMembersBySectionId] = this.partitionFields(input);
 
-        const [fieldRelevance, sectionRelevance] = this.settleRelevance(input, topLevelFields, ruleSets, fieldKeyById);
+        const [fieldRelevance, sectionRelevance] = this.settleRelevance(input, topLevelFields, ruleSets, fieldKeyById, now);
         const flatEffective = this.effectiveAnswers(input.answers, fieldRelevance);
-        const errors = this.collectErrors(topLevelFields, ruleSets, fieldRelevance, flatEffective, fieldKeyById, input.locale);
+        const errors = this.collectErrors(topLevelFields, ruleSets, fieldRelevance, flatEffective, fieldKeyById, input.locale, now);
 
         const [repeatEffective, repeatErrors, repeatRelevance] = this.processRepeats(
             input,
@@ -116,6 +118,7 @@ export class SemanticValidator {
             sectionRelevance,
             flatEffective,
             fieldKeyById,
+            now,
         );
 
         const effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]> = { ...flatEffective };
@@ -123,7 +126,11 @@ export class SemanticValidator {
             effectiveAnswers[sectionKey] = instances;
         }
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors], effectiveAnswers, {}, repeatRelevance);
+        // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
+        // instance arrays merged above, so a calc can `count(${section})`). See computeCalculated().
+        const computed = this.computeCalculated(topLevelFields, effectiveAnswers, fieldRelevance, now);
+
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors], effectiveAnswers, computed, repeatRelevance);
     }
 
     /**
@@ -212,7 +219,7 @@ export class SemanticValidator {
         return units;
     }
 
-    private settleRelevance(input: SemanticInput, fields: SchemaField[], ruleSets: RuleSets, fieldKeyById: FieldKeysById): [Record<string, boolean>, Record<string, boolean>] {
+    private settleRelevance(input: SemanticInput, fields: SchemaField[], ruleSets: RuleSets, fieldKeyById: FieldKeysById, now: string | null): [Record<string, boolean>, Record<string, boolean>] {
         let relevant: Record<string, boolean> = {};
         for (const field of fields) {
             relevant[field.key] = true; // start optimistic; prune from here
@@ -222,7 +229,7 @@ export class SemanticValidator {
         let sectionRelevance: Record<string, boolean> = {};
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
-            const context = new EvaluationContext(this.answersForRelevant(input.answers, relevant));
+            const context = new EvaluationContext(this.answersForRelevant(input.answers, relevant), undefined, now);
 
             sectionRelevance = {};
             const sectionRelevantById: Record<string, boolean> = {};
@@ -308,7 +315,7 @@ export class SemanticValidator {
         return effective;
     }
 
-    private collectErrors(fields: SchemaField[], ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, fieldKeyById: FieldKeysById, locale: string): SemanticError[] {
+    private collectErrors(fields: SchemaField[], ruleSets: RuleSets, fieldRelevance: Record<string, boolean>, effectiveAnswers: Answers, fieldKeyById: FieldKeysById, locale: string, now: string | null): SemanticError[] {
         const errors: SemanticError[] = [];
 
         for (const field of fields) {
@@ -316,7 +323,7 @@ export class SemanticValidator {
                 continue;
             }
 
-            this.collectFieldErrors(field, effectiveAnswers, effectiveAnswers, ruleSets, fieldKeyById, locale, errors, null, null);
+            this.collectFieldErrors(field, effectiveAnswers, effectiveAnswers, ruleSets, fieldKeyById, locale, now, errors, null, null);
         }
 
         return errors;
@@ -329,11 +336,17 @@ export class SemanticValidator {
         ruleSets: RuleSets,
         fieldKeyById: FieldKeysById,
         locale: string,
+        now: string | null,
         errors: SemanticError[],
         sectionKey: string | null,
         instanceIndex: number | null,
     ): void {
-        const context = new EvaluationContext(contextAnswers);
+        // A calculated field is a server-computed OUTPUT, never a respondent input — no required/constraint.
+        if (field.field_type === 'calculated') {
+            return;
+        }
+
+        const context = new EvaluationContext(contextAnswers, undefined, now);
         const answer: MaybeAbsent = Object.prototype.hasOwnProperty.call(answerScope, field.key) ? answerScope[field.key] : ABSENT;
         const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
 
@@ -349,7 +362,7 @@ export class SemanticValidator {
             return; // an empty field's constraints are not evaluated
         }
 
-        const selfContext = new EvaluationContext(contextAnswers, answer as EngineValue);
+        const selfContext = new EvaluationContext(contextAnswers, answer as EngineValue, now);
         for (const unit of sets.constraint ?? []) {
             const passes = unit.length === 1
                 ? this.rules.passesConstraint(unit[0], field.key, answer, selfContext, fieldKeyById)
@@ -375,6 +388,7 @@ export class SemanticValidator {
         sectionRelevance: Record<string, boolean>,
         baseEffective: Answers,
         fieldKeyById: FieldKeysById,
+        now: string | null,
     ): [Record<string, InstanceAnswers[]>, SemanticError[], Record<string, Record<string, boolean>[]>] {
         const effective: Record<string, InstanceAnswers[]> = {};
         const errors: SemanticError[] = [];
@@ -408,14 +422,14 @@ export class SemanticValidator {
             }
 
             instances.forEach((instanceAnswers, index) => {
-                const [instanceRelevance, instanceEffective] = this.settleInstanceRelevance(members, ruleSets, baseEffective, instanceAnswers, fieldKeyById);
+                const [instanceRelevance, instanceEffective] = this.settleInstanceRelevance(members, ruleSets, baseEffective, instanceAnswers, fieldKeyById, now);
 
                 const contextAnswers: Answers = { ...baseEffective, ...instanceEffective };
                 for (const field of members) {
                     if (instanceRelevance[field.key] !== true) {
                         continue;
                     }
-                    this.collectFieldErrors(field, instanceEffective, contextAnswers, ruleSets, fieldKeyById, input.locale, errors, sectionKey, index);
+                    this.collectFieldErrors(field, instanceEffective, contextAnswers, ruleSets, fieldKeyById, input.locale, now, errors, sectionKey, index);
                 }
 
                 (effective[sectionKey] ??= []).push(instanceEffective);
@@ -432,6 +446,7 @@ export class SemanticValidator {
         baseAnswers: Answers,
         instanceAnswers: InstanceAnswers,
         fieldKeyById: FieldKeysById,
+        now: string | null,
     ): [Record<string, boolean>, InstanceAnswers] {
         let relevant: Record<string, boolean> = {};
         for (const field of members) {
@@ -442,7 +457,7 @@ export class SemanticValidator {
 
         for (let iteration = 0; iteration < maxIterations; iteration++) {
             const prunedInstance = this.pickRelevant(instanceAnswers, relevant);
-            const context = new EvaluationContext({ ...baseAnswers, ...prunedInstance });
+            const context = new EvaluationContext({ ...baseAnswers, ...prunedInstance }, undefined, now);
 
             const next: Record<string, boolean> = {};
             for (const field of members) {
@@ -476,6 +491,38 @@ export class SemanticValidator {
         }
 
         return out;
+    }
+
+    /**
+     * Evaluate every relevant top-level calculated field's formula over the full effective answers (flat +
+     * repeat instance arrays, so a calc can `count(${section})`). A hidden calc, a non-calc field, and a
+     * blank formula contribute nothing; a blank/NaN result is omitted rather than stored as null. Calculated
+     * fields inside a repeatable section are NOT computed in G3 (they are repeat members, not top-level).
+     */
+    private computeCalculated(fields: SchemaField[], effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>, fieldRelevance: Record<string, boolean>, now: string | null): Record<string, EngineValue> {
+        const computed: Record<string, EngineValue> = {};
+        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+
+        for (const field of fields) {
+            if (field.field_type !== 'calculated') {
+                continue;
+            }
+            if (fieldRelevance[field.key] !== true) {
+                continue;
+            }
+
+            const formula = field.calculate ?? null;
+            if (formula === null || formula.trim() === '') {
+                continue;
+            }
+
+            const value = this.evaluator.evaluate(formula, context);
+            if (value !== null) {
+                computed[field.key] = value;
+            }
+        }
+
+        return computed;
     }
 
     private minInstancesMessage(min: number): string {

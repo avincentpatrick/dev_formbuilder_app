@@ -43,6 +43,7 @@ type FieldFragment = {
     is_required?: RequiredMode;
     section?: string;
     relevant?: string;
+    calculate?: string;
     rules?: RuleFragment[];
 };
 
@@ -51,6 +52,7 @@ type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; m
 type SemanticVector = {
     name: string;
     grammar_version: string;
+    now?: string;
     schema: { sections?: SectionFragment[]; fields: FieldFragment[] };
     answers?: VectorAnswers;
     locale?: string;
@@ -117,6 +119,7 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             is_required: field.is_required ?? 'optional',
             form_section_id: field.section ?? null,
             relevant_expression: field.relevant ?? null,
+            calculate: field.calculate ?? null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {
@@ -124,7 +127,7 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
         });
     });
 
-    return { fields, sections, validations, answers: vector.answers ?? {}, locale: vector.locale ?? 'en' };
+    return { fields, sections, validations, answers: vector.answers ?? {}, locale: vector.locale ?? 'en', now: vector.now ?? null };
 }
 
 function sortErrors(errors: { field: string; rule: string }[]): { field: string; rule: string }[] {

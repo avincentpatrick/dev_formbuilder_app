@@ -94,6 +94,8 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
 }
 
 const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
+const isCalculated = computed(() => field.value?.field_type === 'calculated');
+const calculatedFormula = computed<string>(() => (field.value?.config.calculated_formula as string | undefined) ?? '');
 const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[] | undefined) ?? []);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
@@ -168,6 +170,21 @@ function reparent(sectionId: string): void {
                     <MdsFormField label="Label" v-slot="{ id }">
                         <MdsTextInput :id="id" :model-value="field.label" @update:model-value="setField('label', $event)" />
                     </MdsFormField>
+                    <MdsFormField
+                        v-if="isCalculated"
+                        label="Calculation formula"
+                        help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
+                        v-slot="{ id, describedby }"
+                    >
+                        <MdsTextarea
+                            :id="id"
+                            :describedby="describedby"
+                            :model-value="calculatedFormula"
+                            :rows="2"
+                            placeholder="e.g. ${quantity} * ${unit_price}"
+                            @update:model-value="setConfig('calculated_formula', $event || null)"
+                        />
+                    </MdsFormField>
                     <MdsFormField label="Help text" v-slot="{ id }">
                         <MdsTextarea
                             :id="id"
@@ -176,14 +193,14 @@ function reparent(sectionId: string): void {
                             @update:model-value="setField('hint', $event || null)"
                         />
                     </MdsFormField>
-                    <MdsFormField label="Placeholder" v-slot="{ id }">
+                    <MdsFormField v-if="!isCalculated" label="Placeholder" v-slot="{ id }">
                         <MdsTextInput
                             :id="id"
                             :model-value="field.placeholder ?? ''"
                             @update:model-value="setField('placeholder', $event || null)"
                         />
                     </MdsFormField>
-                    <div class="config__group">
+                    <div v-if="!isCalculated" class="config__group">
                         <span class="config__group-label">Requiredness</span>
                         <MdsSegmentedControl
                             :model-value="field.is_required"
@@ -224,7 +241,7 @@ function reparent(sectionId: string): void {
                             @update:model-value="reparent($event)"
                         />
                     </MdsFormField>
-                    <MdsFormField label="Relevant (display) expression" help="Persisted as-is; evaluated by the form engine later." v-slot="{ id, describedby }">
+                    <MdsFormField label="Relevant (display) expression" help="Shown only when this holds. Supports ${field} refs, and/or/not, = != > < >= <=, arithmetic, and selected()/count(). Checked when you publish." v-slot="{ id, describedby }">
                         <MdsTextarea
                             :id="id"
                             :describedby="describedby"
@@ -331,7 +348,7 @@ function reparent(sectionId: string): void {
                             />
                         </MdsFormField>
                     </div>
-                    <MdsFormField label="Relevant (display) expression" help="Persisted as-is; evaluated by the form engine later." v-slot="{ id, describedby }">
+                    <MdsFormField label="Relevant (display) expression" help="Shown only when this holds. Supports ${field} refs, and/or/not, = != > < >= <=, arithmetic, and selected()/count(). Checked when you publish." v-slot="{ id, describedby }">
                         <MdsTextarea
                             :id="id"
                             :describedby="describedby"

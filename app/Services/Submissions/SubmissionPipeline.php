@@ -105,6 +105,11 @@ final class SubmissionPipeline
     {
         $version = $payload->version;
 
+        // Write-back (Increment G3): a calculated field's computed value is merged into the persisted answer
+        // document alongside the respondent's answers (calc fields never collide — they are dropped in
+        // Stage 1, so they are never in effectiveAnswers), then indexed like any other scalar answer.
+        $answers = array_merge($result->effectiveAnswers, $result->computed);
+
         $submission = Submission::create([
             'form_id' => $version->form_id,
             'form_version_id' => $version->id,
@@ -123,13 +128,13 @@ final class SubmissionPipeline
         SubmissionAnswer::create([
             'submission_id' => $submission->id,
             'form_version_id' => $version->id,
-            'answers' => $result->effectiveAnswers,
+            'answers' => $answers,
             'answers_schema_checksum' => $version->checksum,
             'attachment_refs' => [],
             'last_saved_at' => now(),
         ]);
 
-        $this->projectIndex($submission, $version, $fields, $result->effectiveAnswers);
+        $this->projectIndex($submission, $version, $fields, $answers);
 
         return $submission;
     }

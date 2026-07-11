@@ -17,7 +17,12 @@ enum TokenType: string
     case Neq = 'neq';
     case Gt = 'gt';
     case Lt = 'lt';
+    case Gte = 'gte';
+    case Lte = 'lte';
+    case Plus = 'plus';
     case Minus = 'minus';
+    case Star = 'star';
+    case Slash = 'slash';
     case Number = 'number';
     case String = 'string';
     case FieldRef = 'field_ref';

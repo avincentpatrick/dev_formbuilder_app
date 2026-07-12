@@ -52,6 +52,14 @@ final class StructuralValidationGate
                 }
                 $this->assertMatrixConfigResolves($field);
             }
+            // Increment G5b1: geo carries no config to validate, but its geometry projection is one row per
+            // field per submission (top-level only), so a geo field may not sit in a repeatable section
+            // (relaxing this later — projecting per-instance geo — is non-breaking).
+            if ($field->field_type->isGeo()) {
+                if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
+                    throw PublishValidationException::geoInRepeatableSection($field->key);
+                }
+            }
         }
 
         // Every validation's owning + comparison field belongs to the same version.

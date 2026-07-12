@@ -83,4 +83,23 @@ final class PublishValidationException extends RuntimeException
     {
         return new self("The expression on “{$ownerKey}” references the grid field “{$compositeKey}”, which cannot be used in an expression.");
     }
+
+    /**
+     * A geospatial field (Increment G5b1) nested in a repeatable section — its geometry projection is one
+     * row per field per submission (top-level only), so geo-in-a-repeat is unsupported for now.
+     */
+    public static function geoInRepeatableSection(string $fieldKey): self
+    {
+        return new self("The location field “{$fieldKey}” cannot be placed inside a repeatable section.");
+    }
+
+    /**
+     * An expression references a geospatial field (Increment G5b1). Geo values are object-shaped GeoJSON
+     * envelopes and are never valid scalar operands (they would drift between the PHP and TS engines), so
+     * any reference is refused at publish rather than silently coercing to `false`.
+     */
+    public static function expressionReferencesGeo(string $ownerKey, string $geoKey): self
+    {
+        return new self("The expression on “{$ownerKey}” references the location field “{$geoKey}”, which cannot be used in an expression.");
+    }
 }

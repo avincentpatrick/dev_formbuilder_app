@@ -32,6 +32,14 @@ export type MatrixAnswer = Record<string, Record<string, EngineValue>>;
 /** Either object-valued grid answer shape — deliberately OUTSIDE `EngineValue` (never scalar-coerced). */
 export type CompositeAnswer = LikertMatrixAnswer | MatrixAnswer;
 
+/**
+ * A geospatial answer (Increment G5b1 / ADR-0006): a GeoJSON geometry envelope
+ * `{type, coordinates:[lon,lat(,alt)], accuracy?}`. Object-valued and deliberately OUTSIDE `EngineValue`
+ * (never scalar-coerced) — validated structurally by `processGeo`. `coordinates` is `unknown` because its
+ * nesting depth varies by geometry type (Point / LineString / Polygon).
+ */
+export type GeoAnswer = { type: string; coordinates: unknown; accuracy?: number };
+
 export interface SchemaField {
     id: string;
     key: string;
@@ -88,9 +96,10 @@ export interface SemanticInput {
     validations: ValidationRow[];
     /**
      * Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps, plus
-     * (Increment G4b) a composite grid field key => its object-valued answer.
+     * (Increment G4b) a composite grid field key => its object-valued answer, plus (Increment G5b1) a geo
+     * field key => its GeoJSON envelope.
      */
-    answers: Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
+    answers: Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
     locale: string;
     /** Grammar v2.0: the injected clock (ISO-8601) that `today()`/`now()` read; null / omitted → unset. */
     now?: string | null;

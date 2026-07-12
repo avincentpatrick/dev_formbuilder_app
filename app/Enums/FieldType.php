@@ -167,4 +167,16 @@ enum FieldType: string
     {
         return $this === self::Matrix || $this === self::LikertMatrix;
     }
+
+    /**
+     * The three geospatial types (Increment G5b1 / ADR-0006): `geopoint` → GeoJSON `Point`, `geotrace` →
+     * `LineString`, `geoshape` → closed `Polygon`. Their answer is an object-valued GeoJSON envelope
+     * (`{type, coordinates, accuracy?}`), so — like composites — they are handled by the dedicated
+     * `processGeo` pass (never routed through scalar coercion, where PHP `isEmpty([])` diverges from TS
+     * `isEmpty({})`) and may not be referenced in expressions or nested in a repeatable section.
+     */
+    public function isGeo(): bool
+    {
+        return $this === self::Geopoint || $this === self::Geotrace || $this === self::Geoshape;
+    }
 }

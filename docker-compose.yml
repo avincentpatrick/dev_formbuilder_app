@@ -28,7 +28,10 @@ services:
       - app
 
   postgres:
-    image: postgres:17-alpine
+    # PostGIS build (Increment G5b1, ADR-0006) — the geospatial field types need `CREATE EXTENSION
+    # postgis` + a geometry(4326) column. This is a superset of postgres:17 on the same PG major, so
+    # every existing table/role/RLS behaves identically; only the geometry capability is added.
+    image: postgis/postgis:17-3.5
     environment:
       POSTGRES_USER: meridian
       POSTGRES_PASSWORD: secret

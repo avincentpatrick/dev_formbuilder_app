@@ -45,6 +45,13 @@ final class SchemaValueFormatter
             return $this->boolLabel($answer);
         }
 
+        // Geospatial (Increment G5b1): the object-valued GeoJSON envelope must be summarised BEFORE the
+        // generic is_array join below (which would stringify its keys). geopoint → "lat, lon (±m)";
+        // geotrace/geoshape → "Line/Area — N points".
+        if ($type->isGeo()) {
+            return $this->formatGeo($type, $answer);
+        }
+
         // Choice fields resolve values to labels; cascading select does too (its `config.options` carry
         // value+label alongside level/parent, which optionLabels ignores) so an exported cascade reads as
         // "NCR; Manila", not "ncr; manila" (Increment G4a).
@@ -115,5 +122,48 @@ final class SchemaValueFormatter
     private function scalar(mixed $value): string|int|float|bool
     {
         return is_scalar($value) ? $value : (string) json_encode($value);
+    }
+
+    /**
+     * Summarise a geo answer (Increment G5b1). A geopoint shows human "lat, lon" (with the ± accuracy in
+     * metres when captured) — note the display order is lat-first, the opposite of the internal lon-first
+     * `[lon, lat]` storage. A geotrace/geoshape shows a point count. Malformed → ''.
+     */
+    private function formatGeo(FieldType $type, mixed $answer): string
+    {
+        $coordinates = is_array($answer) ? ($answer['coordinates'] ?? null) : null;
+        if (! is_array($coordinates)) {
+            return '';
+        }
+
+        if ($type === FieldType::Geopoint) {
+            $lon = $coordinates[0] ?? null;
+            $lat = $coordinates[1] ?? null;
+            if (! is_numeric($lon) || ! is_numeric($lat)) {
+                return '';
+            }
+            $text = $this->coord($lat).', '.$this->coord($lon);
+            $accuracy = $answer['accuracy'] ?? null;
+            if (is_numeric($accuracy)) {
+                $text .= ' (±'.$this->coord($accuracy).' m)';
+            }
+
+            return $text;
+        }
+
+        // geotrace = the position list; geoshape = the first (outer) ring.
+        $positions = $type === FieldType::Geoshape ? ($coordinates[0] ?? []) : $coordinates;
+        $count = is_array($positions) ? count($positions) : 0;
+        $noun = $type === FieldType::Geoshape ? 'Area' : 'Line';
+
+        return $noun.' — '.$count.' '.($count === 1 ? 'point' : 'points');
+    }
+
+    /** Format one ordinate/accuracy as a clean decimal string (trailing zeros trimmed; "-0" → "0"). */
+    private function coord(mixed $n): string
+    {
+        $s = rtrim(rtrim(sprintf('%.7f', (float) $n), '0'), '.');
+
+        return $s === '' || $s === '-0' ? '0' : $s;
     }
 }

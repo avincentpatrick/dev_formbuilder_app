@@ -17,15 +17,15 @@
  * field and a same-instance sibling). Instance count is enforced against min/max on the relevant section.
  */
 
-import { ABSENT, isEmpty, toStr, type EngineValue, type MaybeAbsent } from './coercion';
+import { ABSENT, isEmpty, toNumber, toStr, type EngineValue, type MaybeAbsent } from './coercion';
 import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
-import type { CompositeAnswer, InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
+import type { CompositeAnswer, GeoAnswer, InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
 
-/** The full effective-answers map: scalars/lists, repeat instances (G1), and composite grids (G4b). */
-type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
+/** The full effective-answers map: scalars/lists, repeat instances (G1), composite grids (G4b), geo (G5b1). */
+type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
 
 const DEFAULT_CONSTRAINT_MESSAGE = 'This value is not valid.';
 const DEFAULT_REQUIRED_MESSAGE = 'This field is required.';
@@ -146,11 +146,16 @@ export class SemanticValidator {
         // PHP isEmpty([]) === true vs TS isEmpty({}) === false). The pruned object replaces the raw answer.
         const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
 
+        // Geospatial fields (Increment G5b1) are validated in their own pass (same reason as composites: an
+        // object answer must not hit scalar isEmpty). Structural geometry checks only — no grammar change; an
+        // empty envelope is deleted so effective answers stay byte-identical across the engines ({} vs []).
+        const geoErrors = this.processGeo(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
+
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`). See computeCalculated().
         const computed = this.computeCalculated(topLevelFields, effectiveAnswers, fieldRelevance, now);
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors], effectiveAnswers, computed, repeatRelevance);
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors], effectiveAnswers, computed, repeatRelevance);
     }
 
     /**
@@ -369,6 +374,12 @@ export class SemanticValidator {
         // Composite (grid) fields (Increment G4b) hold object answers — validated by processComposites, never
         // here, where isEmpty on the whole object would diverge from the PHP authority.
         if (field.field_type === 'matrix' || field.field_type === 'likert_matrix') {
+            return;
+        }
+
+        // Geospatial fields (Increment G5b1) hold an object-valued GeoJSON envelope — validated by processGeo,
+        // never here, for the same reason (isEmpty on the object diverges from the PHP authority).
+        if (field.field_type === 'geopoint' || field.field_type === 'geotrace' || field.field_type === 'geoshape') {
             return;
         }
 
@@ -652,6 +663,135 @@ export class SemanticValidator {
         return value !== null && typeof value === 'object' && !Array.isArray(value)
             ? (value as Record<string, unknown>)
             : {};
+    }
+
+    /**
+     * Geospatial pass (Increment G5b1 / ADR-0006), the object-valued sibling of processComposites and the
+     * mirror of PHP `processGeo`. Each relevant geo field's GeoJSON envelope is validated structurally
+     * (never through scalar isEmpty): the geometry `type` must match the field, coordinates must be in
+     * range, a line needs ≥ 2 points, a polygon ring needs ≥ 4 points and must be closed. A
+     * structurally-empty envelope is a required error (if required) and is deleted so effective answers
+     * stay identical across the engines ({} in TS vs [] in PHP). Whole-field faults → no cellPath.
+     */
+    private processGeo(
+        fields: SchemaField[],
+        fieldRelevance: Record<string, boolean>,
+        effectiveAnswers: EffectiveAnswers,
+        ruleSets: RuleSets,
+        fieldKeyById: FieldKeysById,
+        locale: string,
+        now: string | null,
+    ): SemanticError[] {
+        const errors: SemanticError[] = [];
+        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+
+        for (const field of fields) {
+            if (field.field_type !== 'geopoint' && field.field_type !== 'geotrace' && field.field_type !== 'geoshape') {
+                continue;
+            }
+            if (fieldRelevance[field.key] !== true) {
+                continue; // hidden geo: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
+            const [required, trigger] = this.requiredState(field, sets.required ?? [], context, fieldKeyById);
+            const requiredMessage = trigger !== null
+                ? this.resolveMessage(trigger, locale, DEFAULT_REQUIRED_MESSAGE)
+                : DEFAULT_REQUIRED_MESSAGE;
+
+            const raw = effectiveAnswers[field.key];
+            if (!this.validateGeo(field, raw, required, requiredMessage, errors)) {
+                delete effectiveAnswers[field.key]; // empty envelope — keep engines byte-identical
+            }
+        }
+
+        return errors;
+    }
+
+    /**
+     * Validate one geo envelope; append any faults. Returns whether the answer is a non-empty envelope
+     * (kept in effective answers) vs structurally empty (the caller deletes it). `geopoint` → `Point`,
+     * `geotrace` → `LineString` (≥ 2 pts), `geoshape` → closed `Polygon` (≥ 4 pts, first == last).
+     */
+    private validateGeo(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): boolean {
+        const expectedType = field.field_type === 'geotrace' ? 'LineString' : field.field_type === 'geoshape' ? 'Polygon' : 'Point';
+
+        // Structural emptiness — decided WITHOUT scalar isEmpty (which diverges on {} across engines).
+        const envelope = this.asObjectMap(raw);
+        const coordinates = envelope.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length === 0) {
+            if (required) {
+                errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null });
+            }
+
+            return false;
+        }
+
+        if (envelope.type !== expectedType) {
+            errors.push({ fieldKey: field.key, rule: 'geo_type_mismatch', message: 'This location value has the wrong geometry type.', sectionKey: null, instanceIndex: null });
+
+            return true;
+        }
+
+        let positions: unknown[];
+        if (expectedType === 'Point') {
+            positions = [coordinates];
+        } else if (expectedType === 'LineString') {
+            positions = coordinates;
+            if (positions.length < 2) {
+                errors.push({ fieldKey: field.key, rule: 'geo_too_few_points', message: 'A line needs at least two points.', sectionKey: null, instanceIndex: null });
+            }
+        } else { // Polygon — validate the first (outer) ring
+            const ring = coordinates[0];
+            positions = Array.isArray(ring) ? ring : [];
+            if (positions.length < 4) {
+                errors.push({ fieldKey: field.key, rule: 'geo_too_few_points', message: 'An area needs at least four points to close a ring.', sectionKey: null, instanceIndex: null });
+            } else if (!this.samePosition(positions[0], positions[positions.length - 1])) {
+                errors.push({ fieldKey: field.key, rule: 'geo_not_closed', message: 'The area boundary must be closed: the first and last points must match.', sectionKey: null, instanceIndex: null });
+            }
+        }
+
+        for (const position of positions) {
+            if (!this.positionInRange(position)) {
+                errors.push({ fieldKey: field.key, rule: 'geo_out_of_range', message: 'A coordinate is out of range (longitude ±180, latitude ±90).', sectionKey: null, instanceIndex: null });
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * A `[lon, lat]` position is in range when both ordinates are numeric and within WGS84 bounds. A
+     * non-array position or a non-numeric ordinate (→ NaN via the shared Coercion primitive, identical in
+     * the PHP authority) is out of range.
+     */
+    private positionInRange(position: unknown): boolean {
+        if (!Array.isArray(position)) {
+            return false;
+        }
+
+        const lon = toNumber(position[0] as MaybeAbsent);
+        const lat = toNumber(position[1] as MaybeAbsent);
+
+        if (Number.isNaN(lon) || Number.isNaN(lat)) {
+            return false;
+        }
+
+        return lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90;
+    }
+
+    /**
+     * Two positions are equal when their numeric lon/lat coincide (NaN never equals NaN, so a malformed
+     * endpoint reads as unequal — identical to the PHP authority).
+     */
+    private samePosition(a: unknown, b: unknown): boolean {
+        if (!Array.isArray(a) || !Array.isArray(b)) {
+            return false;
+        }
+
+        return toNumber(a[0] as MaybeAbsent) === toNumber(b[0] as MaybeAbsent)
+            && toNumber(a[1] as MaybeAbsent) === toNumber(b[1] as MaybeAbsent);
     }
 
     private processRepeats(

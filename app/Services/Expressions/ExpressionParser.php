@@ -118,6 +118,51 @@ final class ExpressionParser
         }
     }
 
+    /**
+     * Every distinct `${key}` field reference in an AST, in first-seen order (Increment G4b). Used by the
+     * publish gate to reject an expression that references a composite (grid) field — a value shape that has
+     * no valid scalar use and would drift between the PHP and TS engines.
+     *
+     * @return list<string>
+     */
+    public function referencedKeys(Node $node): array
+    {
+        /** @var array<string, true> $seen */
+        $seen = [];
+        $this->collectReferences($node, $seen);
+
+        return array_keys($seen);
+    }
+
+    /** @param  array<string, true>  $seen */
+    private function collectReferences(Node $node, array &$seen): void
+    {
+        if ($node instanceof FieldReferenceNode) {
+            $seen[$node->key] = true;
+
+            return;
+        }
+
+        if ($node instanceof ComparisonNode || $node instanceof ArithmeticNode || $node instanceof LogicalNode) {
+            $this->collectReferences($node->left, $seen);
+            $this->collectReferences($node->right, $seen);
+
+            return;
+        }
+
+        if ($node instanceof NotNode) {
+            $this->collectReferences($node->operand, $seen);
+
+            return;
+        }
+
+        if ($node instanceof FunctionCallNode) {
+            foreach ($node->args as $arg) {
+                $this->collectReferences($arg, $seen);
+            }
+        }
+    }
+
     private function parseWithKey(string $memoKey, string $source): Node
     {
         if (array_key_exists($memoKey, $this->memo)) {

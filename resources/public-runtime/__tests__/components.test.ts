@@ -211,6 +211,71 @@ describe('RuntimeSession (component wiring)', () => {
         wrapper.unmount();
     });
 
+    it('renders a likert_matrix as one radio group per row and submits the object (G4b)', async () => {
+        const config = {
+            rows: [
+                { value: 'clean', label: 'Cleanliness' },
+                { value: 'staff', label: 'Staff' },
+            ],
+            columns: [
+                { value: '1', label: 'Poor' },
+                { value: '2', label: 'OK' },
+                { value: '3', label: 'Great' },
+            ],
+        };
+        const schema = schemaResponse({
+            fields: [field({ key: 'sat', label: 'Rate us', field_type: 'likert_matrix', config })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        // 2 rows × 3 columns = 6 radios, grouped by a per-row name.
+        expect(wrapper.findAll('input[type="radio"]')).toHaveLength(6);
+
+        await wrapper.find('input[name="lm-sat-clean"][value="3"]').setValue();
+        await wrapper.find('input[name="lm-sat-staff"][value="2"]').setValue();
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({ answers: { sat: { clean: '3', staff: '2' } } }),
+        );
+        wrapper.unmount();
+    });
+
+    it('renders a matrix as per-cell selects and submits the nested object (G4b)', async () => {
+        const config = {
+            rows: [{ value: 'a', label: 'Row A' }],
+            columns: [
+                { value: 'q1', label: 'Q1' },
+                { value: 'q2', label: 'Q2' },
+            ],
+            cells: [
+                { value: 'ok', label: 'OK' },
+                { value: 'no', label: 'No' },
+            ],
+        };
+        const schema = schemaResponse({
+            fields: [field({ key: 'svc', label: 'Grid', field_type: 'matrix', config })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+
+        // 1 row × 2 columns = 2 cell selects (single-locale form ⇒ no language switcher select).
+        const selects = wrapper.findAll('select');
+        expect(selects).toHaveLength(2);
+
+        await selects[0].setValue('ok');
+        await selects[1].setValue('no');
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({ answers: { svc: { a: { q1: 'ok', q2: 'no' } } } }),
+        );
+        wrapper.unmount();
+    });
+
     it('maps a server 422 field error back onto the field', async () => {
         const { ApiError } = await import('../lib/error-normalizer');
         const client = fakeClient({

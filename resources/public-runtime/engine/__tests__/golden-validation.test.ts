@@ -14,11 +14,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { EngineValue } from '../coercion';
 import { GRAMMAR_VERSION } from '../evaluator';
-import type { InstanceAnswers, SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
+import type { CompositeAnswer, InstanceAnswers, SchemaField, SchemaSection, SemanticInput, ValidationRow } from '../schema';
 import type { ComparisonOperator, LogicOperator, RequiredMode, ValidationRuleType } from '../enums';
 import { errorPath, makeSemanticValidator } from '../semantic-validator';
 
-type VectorAnswers = Record<string, EngineValue | InstanceAnswers[]>;
+type VectorAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, '..', '..', '..', '..', 'tests', 'golden', 'validation');
@@ -48,6 +48,8 @@ type FieldFragment = {
     // Choice-membership + cascading config (G4a) — mirror of the PHP builder's config injection.
     options?: string[];
     cascade?: { levels: string[]; options: { value: string; level: string; parent: string | null }[] };
+    // Composite grid config (G4b): row/column (and, for matrix, cell) VALUE keys.
+    grid?: { rows: string[]; columns: string[]; cells?: string[] };
 };
 
 type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
@@ -125,6 +127,7 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             calculate: field.calculate ?? null,
             options: field.options ?? null,
             cascade: field.cascade ?? null,
+            grid: field.grid ?? null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {

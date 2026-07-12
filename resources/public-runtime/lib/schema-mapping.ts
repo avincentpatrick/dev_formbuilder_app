@@ -14,6 +14,7 @@
 import type {
     CascadeConfig,
     ComparisonOperator,
+    GridConfig,
     LogicOperator,
     SchemaField,
     SchemaSection,
@@ -30,6 +31,7 @@ import type {
     RenderCascadeLevel,
     RenderCascadeOption,
     RenderField,
+    RenderMatrix,
     RenderModel,
     RenderOption,
     RenderSection,
@@ -46,6 +48,8 @@ const SUPPORTED = new Set<string>([
     'date', 'time', 'datetime',
     'single_select', 'multi_select', 'dropdown', 'yes_no',
     'likert_scale', 'cascading_select',
+    // Increment G4b: the object-valued grids.
+    'matrix', 'likert_matrix',
 ]);
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
@@ -84,6 +88,12 @@ export function controlFor(fieldType: string, supported: boolean): ControlKind {
     }
     if (fieldType === 'cascading_select') {
         return 'cascading';
+    }
+    if (fieldType === 'likert_matrix') {
+        return 'likert_matrix';
+    }
+    if (fieldType === 'matrix') {
+        return 'matrix';
     }
     return 'unsupported';
 }
@@ -264,6 +274,94 @@ function buildCascade(field: RawField): RenderCascade | null {
     return { levels, options };
 }
 
+/**
+ * Resolve a composite grid's row/column/cell labels into the current locale, producing the flat shape the
+ * shared `FieldInput.vue` grid controls consume (Increment G4b). Used by both the flat + repeat SPA adapters
+ * so translation resolution lives in one place. `cells` is empty for `likert_matrix`.
+ */
+export function resolveMatrix(
+    matrix: RenderMatrix | null,
+    locale: string,
+): { rows: { value: string; label: string }[]; columns: { value: string; label: string }[]; cells: { value: string; label: string }[] } | null {
+    if (matrix === null) {
+        return null;
+    }
+
+    const resolve = (options: RenderOption[]): { value: string; label: string }[] =>
+        options.map((option) => ({ value: option.value, label: resolveText(option.label, option.labelTranslations, locale) }));
+
+    return { rows: resolve(matrix.rows), columns: resolve(matrix.columns), cells: resolve(matrix.cells) };
+}
+
+/** A `config.<key>` option-value list (as strings) the engine grid membership check reads. */
+function configValueList(field: RawField, key: string): string[] {
+    const raw = field.config?.[key];
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+    const out: string[] = [];
+    for (const option of raw) {
+        if (option === null || typeof option !== 'object') {
+            continue;
+        }
+        const value = (option as { value?: unknown }).value;
+        if (value === undefined || value === null) {
+            continue;
+        }
+        out.push(String(value));
+    }
+
+    return out;
+}
+
+/** Project a composite grid field's `config.rows`/`columns`/`cells` into the engine's {@link GridConfig}. */
+function engineGridConfig(field: RawField): GridConfig {
+    return {
+        rows: configValueList(field, 'rows'),
+        columns: configValueList(field, 'columns'),
+        cells: configValueList(field, 'cells'),
+    };
+}
+
+/** A `config.<key>` option list projected to render {value,label} pairs (labels/translations kept). */
+function configOptionPairs(field: RawField, key: string): RenderOption[] {
+    const raw = field.config?.[key];
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+    const out: RenderOption[] = [];
+    for (const option of raw) {
+        if (option === null || typeof option !== 'object') {
+            continue;
+        }
+        const value = (option as { value?: unknown }).value;
+        if (value === undefined || value === null) {
+            continue;
+        }
+        const label = (option as { label?: unknown }).label;
+        out.push({
+            value: String(value),
+            label: label !== undefined && label !== null ? String(label) : String(value),
+            labelTranslations: (option as { label_translations?: Record<string, string> | null }).label_translations ?? null,
+        });
+    }
+
+    return out;
+}
+
+/** The UI-facing composite grid config (labels + translations kept for the render layer to resolve). */
+function buildMatrix(field: RawField): RenderMatrix | null {
+    if (field.field_type !== 'matrix' && field.field_type !== 'likert_matrix') {
+        return null;
+    }
+
+    return {
+        rows: configOptionPairs(field, 'rows'),
+        columns: configOptionPairs(field, 'columns'),
+        cells: field.field_type === 'matrix' ? configOptionPairs(field, 'cells') : [],
+    };
+}
+
 function toRenderField(field: RawField): RenderField {
     const supported = SUPPORTED.has(field.field_type);
     const hasConditionalRequirement =
@@ -285,6 +383,7 @@ function toRenderField(field: RawField): RenderField {
         placeholder: field.placeholder,
         options: buildOptions(field),
         cascade: buildCascade(field),
+        matrix: buildMatrix(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
@@ -330,6 +429,8 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         // of `config`, never the raw editor payload, so it stays byte-identical with the PHP authority.
         options: HAS_OPTIONS.has(f.field_type) ? engineOptionValues(f) : null,
         cascade: f.field_type === 'cascading_select' ? engineCascadeConfig(f) : null,
+        // Composite grid membership sets (Increment G4b) — row/column/cell VALUE keys only.
+        grid: f.field_type === 'matrix' || f.field_type === 'likert_matrix' ? engineGridConfig(f) : null,
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

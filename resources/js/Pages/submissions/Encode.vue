@@ -52,6 +52,10 @@ function emptyFieldValue(field: EncodeField): AnswerValue {
     if (field.field_type === 'multi_select' || field.field_type === 'cascading_select') {
         return [];
     }
+    // A matrix / likert_matrix (Increment G4b) holds an object-valued grid answer, seeded empty.
+    if (field.field_type === 'matrix' || field.field_type === 'likert_matrix') {
+        return {};
+    }
     if (field.field_type === 'integer' || field.field_type === 'decimal') {
         return null;
     }
@@ -148,7 +152,17 @@ function flatValue(fieldKey: string): AnswerValue {
 }
 
 function fieldError(fieldKey: string): string | undefined {
-    return encodeForm.errors[`answers.${fieldKey}`];
+    // Inertia's typed errors bag has no string index signature; a `path`-keyed lookup is dynamic here.
+    const errors = encodeForm.errors as Record<string, string | undefined>;
+    const exact = errors[`answers.${fieldKey}`];
+    if (exact !== undefined) {
+        return exact;
+    }
+    // A composite grid (Increment G4b) reports cell errors at `answers.<field>.<row>[.<col>]`; surface the
+    // first as the whole-field error so the grid's aria-live region shows it.
+    const prefix = `answers.${fieldKey}.`;
+    const cellKey = Object.keys(errors).find((key) => key.startsWith(prefix));
+    return cellKey !== undefined ? errors[cellKey] : undefined;
 }
 
 function instanceError(block: Block, index: number, fieldKey: string): string | undefined {

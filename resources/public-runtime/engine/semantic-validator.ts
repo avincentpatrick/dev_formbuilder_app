@@ -22,7 +22,10 @@ import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
-import type { InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
+import type { CompositeAnswer, InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
+
+/** The full effective-answers map: scalars/lists, repeat instances (G1), and composite grids (G4b). */
+type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
 
 const DEFAULT_CONSTRAINT_MESSAGE = 'This value is not valid.';
 const DEFAULT_REQUIRED_MESSAGE = 'This field is required.';
@@ -66,7 +69,7 @@ export class SemanticResult {
     readonly fieldRelevance: Record<string, boolean>;
     readonly sectionRelevance: Record<string, boolean>;
     readonly errors: SemanticError[];
-    readonly effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>;
+    readonly effectiveAnswers: EffectiveAnswers;
     readonly computed: Record<string, EngineValue>;
     readonly repeatFieldRelevance: Record<string, Record<string, boolean>[]>;
 
@@ -74,7 +77,7 @@ export class SemanticResult {
         fieldRelevance: Record<string, boolean>,
         sectionRelevance: Record<string, boolean>,
         errors: SemanticError[],
-        effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>,
+        effectiveAnswers: EffectiveAnswers,
         computed: Record<string, EngineValue>,
         repeatFieldRelevance: Record<string, Record<string, boolean>[]> = {},
     ) {
@@ -133,16 +136,21 @@ export class SemanticValidator {
             now,
         );
 
-        const effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]> = { ...flatEffective };
+        const effectiveAnswers: EffectiveAnswers = { ...flatEffective };
         for (const [sectionKey, instances] of Object.entries(repeatEffective)) {
             effectiveAnswers[sectionKey] = instances;
         }
+
+        // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
+        // through the scalar collectFieldErrors path (isEmpty diverges on an empty object between the engines:
+        // PHP isEmpty([]) === true vs TS isEmpty({}) === false). The pruned object replaces the raw answer.
+        const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
 
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`). See computeCalculated().
         const computed = this.computeCalculated(topLevelFields, effectiveAnswers, fieldRelevance, now);
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors], effectiveAnswers, computed, repeatRelevance);
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors], effectiveAnswers, computed, repeatRelevance);
     }
 
     /**
@@ -305,7 +313,7 @@ export class SemanticValidator {
         return false;
     }
 
-    private answersForRelevant(answers: Record<string, EngineValue | InstanceAnswers[]>, relevant: Record<string, boolean>): Answers {
+    private answersForRelevant(answers: EffectiveAnswers, relevant: Record<string, boolean>): Answers {
         const out: Answers = {};
         for (const [key, value] of Object.entries(answers)) {
             if (Object.prototype.hasOwnProperty.call(relevant, key)) {
@@ -316,7 +324,7 @@ export class SemanticValidator {
         return out;
     }
 
-    private effectiveAnswers(answers: Record<string, EngineValue | InstanceAnswers[]>, fieldRelevance: Record<string, boolean>): Answers {
+    private effectiveAnswers(answers: EffectiveAnswers, fieldRelevance: Record<string, boolean>): Answers {
         const effective: Answers = {};
         for (const [key, value] of Object.entries(answers)) {
             if (fieldRelevance[key] === true) {
@@ -355,6 +363,12 @@ export class SemanticValidator {
     ): void {
         // A calculated field is a server-computed OUTPUT, never a respondent input — no required/constraint.
         if (field.field_type === 'calculated') {
+            return;
+        }
+
+        // Composite (grid) fields (Increment G4b) hold object answers — validated by processComposites, never
+        // here, where isEmpty on the whole object would diverge from the PHP authority.
+        if (field.field_type === 'matrix' || field.field_type === 'likert_matrix') {
             return;
         }
 
@@ -489,6 +503,157 @@ export class SemanticValidator {
         });
     }
 
+    /**
+     * Validate every relevant top-level composite (grid) field (Increment G4b) — the byte-identical mirror of
+     * PHP `SemanticValidator::processComposites`. `matrix` holds `{row:{col:cell}}`, `likert_matrix` holds
+     * `{row:score}`. The object is NEVER routed through the scalar path (`isEmpty` diverges on an empty
+     * object between the engines). Instead this reads the field's declared rows/columns/cells, prunes the
+     * submitted object to the KNOWN cells (dropping empties, coercing each surviving scalar) IN CONFIG ORDER
+     * — so both engines emit identical key ordering — and applies required-completeness (a required grid
+     * demands every row (likert) / every row×column cell (matrix) be answered → per-cell `field_required`
+     * addressed by `cellPath`) + cell-membership (`choice_not_in_options`). The pruned object replaces the
+     * field's raw effective answer, or the key is deleted when nothing survives. Object-emptiness is decided
+     * by counting surviving cells, never by `isEmpty(object)`.
+     */
+    private processComposites(
+        fields: SchemaField[],
+        fieldRelevance: Record<string, boolean>,
+        effectiveAnswers: EffectiveAnswers,
+        ruleSets: RuleSets,
+        fieldKeyById: FieldKeysById,
+        locale: string,
+        now: string | null,
+    ): SemanticError[] {
+        const errors: SemanticError[] = [];
+        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+
+        for (const field of fields) {
+            if (field.field_type !== 'matrix' && field.field_type !== 'likert_matrix') {
+                continue;
+            }
+            if (fieldRelevance[field.key] !== true) {
+                continue; // hidden composite: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
+            const [required, trigger] = this.requiredState(field, sets.required ?? [], context, fieldKeyById);
+            const requiredMessage = trigger !== null
+                ? this.resolveMessage(trigger, locale, DEFAULT_REQUIRED_MESSAGE)
+                : DEFAULT_REQUIRED_MESSAGE;
+
+            const raw = effectiveAnswers[field.key];
+            const pruned = field.field_type === 'matrix'
+                ? this.processMatrix(field, raw, required, requiredMessage, errors)
+                : this.processLikertMatrix(field, raw, required, requiredMessage, errors);
+
+            if (Object.keys(pruned).length === 0) {
+                delete effectiveAnswers[field.key];
+            } else {
+                effectiveAnswers[field.key] = pruned;
+            }
+        }
+
+        return errors;
+    }
+
+    /**
+     * Likert-matrix (`{row:score}`): each declared row must carry a score drawn from the column scale.
+     * Returns the pruned `{row:score}` (empty when nothing survives). `cellPath = "<rowKey>"`.
+     */
+    private processLikertMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): Record<string, EngineValue> {
+        const rowKeys = this.compositeValues(field, 'rows');
+        const scoreSet = new Set(this.compositeValues(field, 'columns'));
+        const rawMap = this.asObjectMap(raw);
+
+        const pruned: Record<string, EngineValue> = {};
+        for (const rowKey of rowKeys) {
+            const has = Object.prototype.hasOwnProperty.call(rawMap, rowKey);
+            const score = (has ? rawMap[rowKey] : ABSENT) as MaybeAbsent;
+            if (!has || isEmpty(score)) {
+                if (required) {
+                    errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null, cellPath: rowKey });
+                }
+
+                continue;
+            }
+
+            const value = toStr(score);
+            pruned[rowKey] = value;
+            if (scoreSet.size > 0 && !scoreSet.has(value)) {
+                errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'The selected option is not available.', sectionKey: null, instanceIndex: null, cellPath: rowKey });
+            }
+        }
+
+        return pruned;
+    }
+
+    /**
+     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value drawn from the shared cell
+     * choice pool. Returns the pruned `{row:{col:cell}}` (rows with no surviving cell dropped).
+     * `cellPath = "<rowKey>.<colKey>"`.
+     */
+    private processMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): Record<string, Record<string, EngineValue>> {
+        const rowKeys = this.compositeValues(field, 'rows');
+        const colKeys = this.compositeValues(field, 'columns');
+        const cellSet = new Set(this.compositeValues(field, 'cells'));
+        const rawMap = this.asObjectMap(raw);
+
+        const pruned: Record<string, Record<string, EngineValue>> = {};
+        for (const rowKey of rowKeys) {
+            const rowMap = this.asObjectMap(rawMap[rowKey]);
+            const prunedRow: Record<string, EngineValue> = {};
+            for (const colKey of colKeys) {
+                const has = Object.prototype.hasOwnProperty.call(rowMap, colKey);
+                const cell = (has ? rowMap[colKey] : ABSENT) as MaybeAbsent;
+                if (!has || isEmpty(cell)) {
+                    if (required) {
+                        errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null, cellPath: `${rowKey}.${colKey}` });
+                    }
+
+                    continue;
+                }
+
+                const value = toStr(cell);
+                prunedRow[colKey] = value;
+                if (cellSet.size > 0 && !cellSet.has(value)) {
+                    errors.push({ fieldKey: field.key, rule: 'choice_not_in_options', message: 'The selected option is not available.', sectionKey: null, instanceIndex: null, cellPath: `${rowKey}.${colKey}` });
+                }
+            }
+
+            if (Object.keys(prunedRow).length > 0) {
+                pruned[rowKey] = prunedRow;
+            }
+        }
+
+        return pruned;
+    }
+
+    /**
+     * The ordered `grid.<key>` value list (rows/columns/cells) for a composite field, de-duplicated + empties
+     * dropped — the mirror of PHP `compositeValues` (which reads `config.<key>[].value`). Drives both the
+     * config-ordered prune and the membership sets.
+     */
+    private compositeValues(field: SchemaField, key: 'rows' | 'columns' | 'cells'): string[] {
+        const list = field.grid?.[key] ?? [];
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const value of list) {
+            if (value !== '' && !seen.has(value)) {
+                seen.add(value);
+                out.push(value);
+            }
+        }
+
+        return out;
+    }
+
+    /** Coerce a raw answer to an object map, mirror-safe: a non-object / list / null becomes `{}` (empty). */
+    private asObjectMap(value: unknown): Record<string, unknown> {
+        return value !== null && typeof value === 'object' && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : {};
+    }
+
     private processRepeats(
         input: SemanticInput,
         repeatMembersBySectionId: Record<string, SchemaField[]>,
@@ -607,7 +772,7 @@ export class SemanticValidator {
      * blank formula contribute nothing; a blank/NaN result is omitted rather than stored as null. Calculated
      * fields inside a repeatable section are NOT computed in G3 (they are repeat members, not top-level).
      */
-    private computeCalculated(fields: SchemaField[], effectiveAnswers: Record<string, EngineValue | InstanceAnswers[]>, fieldRelevance: Record<string, boolean>, now: string | null): Record<string, EngineValue> {
+    private computeCalculated(fields: SchemaField[], effectiveAnswers: EffectiveAnswers, fieldRelevance: Record<string, boolean>, now: string | null): Record<string, EngineValue> {
         const computed: Record<string, EngineValue> = {};
         const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
 

@@ -58,4 +58,29 @@ final class PublishValidationException extends RuntimeException
     {
         return new self("The cascading choices on “{$fieldKey}” are invalid ({$detail}).");
     }
+
+    /** A composite grid field (Increment G4b: matrix / likert_matrix) whose row/column/cell config is invalid. */
+    public static function matrixConfigInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The grid on “{$fieldKey}” is invalid ({$detail}).");
+    }
+
+    /**
+     * A composite grid field (Increment G4b) nested in a repeatable section — unsupported, and a value-shape
+     * drift hazard (a grid inside a repeat instance is never routed through the composite pass).
+     */
+    public static function compositeInRepeatableSection(string $fieldKey): self
+    {
+        return new self("The grid field “{$fieldKey}” cannot be placed inside a repeatable section.");
+    }
+
+    /**
+     * An expression references a composite grid field (Increment G4b). Grid values are object-shaped and
+     * are never valid scalar operands (they would drift between the PHP and TS engines), so any reference is
+     * refused at publish rather than silently coercing to `false`.
+     */
+    public static function expressionReferencesComposite(string $ownerKey, string $compositeKey): self
+    {
+        return new self("The expression on “{$ownerKey}” references the grid field “{$compositeKey}”, which cannot be used in an expression.");
+    }
 }

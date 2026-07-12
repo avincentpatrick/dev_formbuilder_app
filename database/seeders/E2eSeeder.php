@@ -179,12 +179,14 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
-            // A guest-enabled form showcasing the Increment G4a controls — a Likert rating scale (radio group)
-            // + an N-level cascading (dependent) select. Both optional so an empty guest load is axe-clean.
-            // Reached at /f/field-types; the public-runtime axe scan renders both new controls in light + dark.
+            // A guest-enabled form showcasing the Increment G4a/G4b controls — a Likert rating scale (radio
+            // group), an N-level cascading (dependent) select, a Likert matrix (radiogroup per row), and a
+            // matrix (per-cell select). All optional so an empty guest load is axe-clean. Reached at
+            // /f/field-types; the public-runtime axe scan renders every control in light + dark at all widths
+            // (the grids must reflow with no horizontal scroll — the merge-blocking G4b a11y requirement).
             if (Form::query()->where('title', 'Field Types Showcase')->doesntExist()) {
                 $showcase = app(FormService::class)->create(
-                    $tenant, $owner, 'Field Types Showcase', 'Likert scale + cascading select (G4a demo).'
+                    $tenant, $owner, 'Field Types Showcase', 'Likert scale, cascading select, and grids (G4a/G4b demo).'
                 );
                 $sb = app(FormBuilderService::class);
                 $showSection = $sb->addSection($showcase);
@@ -214,6 +216,43 @@ class E2eSeeder extends Seeder
                         ],
                     ],
                 ]);
+                // Likert matrix (Increment G4b): one radio group per row over a shared 1–5 scale.
+                $sb->addField($showcase, $owner, FieldType::LikertMatrix, $showSection->id)->update([
+                    'label' => 'Rate each aspect of your visit',
+                    'config' => [
+                        'rows' => [
+                            ['value' => 'cleanliness', 'label' => 'Cleanliness'],
+                            ['value' => 'staff', 'label' => 'Staff friendliness'],
+                            ['value' => 'wait_time', 'label' => 'Wait time'],
+                        ],
+                        'columns' => [
+                            ['value' => '1', 'label' => 'Poor'],
+                            ['value' => '2', 'label' => 'Fair'],
+                            ['value' => '3', 'label' => 'Good'],
+                            ['value' => '4', 'label' => 'Very good'],
+                            ['value' => '5', 'label' => 'Excellent'],
+                        ],
+                    ],
+                ]);
+                // Matrix (Increment G4b): a per-cell single-select over a shared choice pool.
+                $sb->addField($showcase, $owner, FieldType::Matrix, $showSection->id)->update([
+                    'label' => 'Availability by service and day',
+                    'config' => [
+                        'rows' => [
+                            ['value' => 'consult', 'label' => 'Consultation'],
+                            ['value' => 'lab', 'label' => 'Lab work'],
+                        ],
+                        'columns' => [
+                            ['value' => 'morning', 'label' => 'Morning'],
+                            ['value' => 'afternoon', 'label' => 'Afternoon'],
+                        ],
+                        'cells' => [
+                            ['value' => 'available', 'label' => 'Available'],
+                            ['value' => 'limited', 'label' => 'Limited'],
+                            ['value' => 'closed', 'label' => 'Closed'],
+                        ],
+                    ],
+                ]);
                 app(PublishService::class)->publish($showcase->refresh(), $owner);
 
                 $showcase->update([
@@ -222,6 +261,30 @@ class E2eSeeder extends Seeder
                     'supported_locales' => ['en'],
                     'single_page_mode' => true,
                 ]);
+            }
+
+            // A DRAFT form whose first field is a matrix (Increment G4b), so the builder auto-selects it on
+            // load and the builder-axe tab-walk mounts + scans the MatrixEditor's Grid tab (rows/columns/cells)
+            // — the composite config editors — at all viewports in light + dark, with no palette interaction.
+            if (Form::query()->where('title', 'Grid Builder Demo')->doesntExist()) {
+                $gridDemo = app(FormService::class)->create($tenant, $owner, 'Grid Builder Demo', 'Composite grid config editors (G4b).');
+                $gsb = app(FormBuilderService::class);
+                $gsb->addField($gridDemo, $owner, FieldType::Matrix, null)->update([
+                    'label' => 'Coverage matrix',
+                    'config' => [
+                        'rows' => [['value' => 'a', 'label' => 'Row A'], ['value' => 'b', 'label' => 'Row B']],
+                        'columns' => [['value' => 'q1', 'label' => 'Column 1'], ['value' => 'q2', 'label' => 'Column 2']],
+                        'cells' => [['value' => 'yes', 'label' => 'Yes'], ['value' => 'no', 'label' => 'No']],
+                    ],
+                ]);
+                $gsb->addField($gridDemo, $owner, FieldType::LikertMatrix, null)->update([
+                    'label' => 'Rating grid',
+                    'config' => [
+                        'rows' => [['value' => 'speed', 'label' => 'Speed'], ['value' => 'quality', 'label' => 'Quality']],
+                        'columns' => [['value' => '1', 'label' => 'Low'], ['value' => '2', 'label' => 'Mid'], ['value' => '3', 'label' => 'High']],
+                    ],
+                ]);
+                // Left as a DRAFT (not published) so it opens straight into the builder.
             }
 
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread

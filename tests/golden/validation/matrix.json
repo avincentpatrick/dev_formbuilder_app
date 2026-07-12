@@ -1,0 +1,96 @@
+[
+  {
+    "name": "matrix all cells answered passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a", "b"], "columns": ["q1", "q2"], "cells": ["poor", "ok", "good"] } } ] },
+    "answers": { "svc": { "a": { "q1": "ok", "q2": "good" }, "b": { "q1": "poor", "q2": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "q1": "ok", "q2": "good" }, "b": { "q1": "poor", "q2": "ok" } } }
+    }
+  },
+  {
+    "name": "matrix cell not in cells fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["q1"], "cells": ["poor", "ok"] } } ] },
+    "answers": { "svc": { "a": { "q1": "zzz" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.q1", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "svc": { "a": { "q1": "zzz" } } }
+    }
+  },
+  {
+    "name": "matrix optional partial fill passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a", "b"], "columns": ["q1", "q2"], "cells": ["ok"] } } ] },
+    "answers": { "svc": { "a": { "q1": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "q1": "ok" } } }
+    }
+  },
+  {
+    "name": "matrix required demands every cell",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a"], "columns": ["q1", "q2"], "cells": ["ok"] } } ] },
+    "answers": { "svc": { "a": { "q1": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [ { "field": "svc.a.q2", "rule": "field_required" } ],
+      "effective_answers": { "svc": { "a": { "q1": "ok" } } }
+    }
+  },
+  {
+    "name": "matrix required all missing errors every cell",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a", "b"], "columns": ["q1"], "cells": ["ok"] } } ] },
+    "answers": {},
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [
+        { "field": "svc.a.q1", "rule": "field_required" },
+        { "field": "svc.b.q1", "rule": "field_required" }
+      ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "matrix hidden is not checked",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "relevant": "${gate} = 'go'", "grid": { "rows": ["a"], "columns": ["q1"], "cells": ["ok"] } }
+    ] },
+    "answers": { "gate": "stop", "svc": { "a": { "q1": "bad" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": false } },
+      "errors": [],
+      "effective_answers": { "gate": "stop" }
+    }
+  },
+  {
+    "name": "matrix empty object is dropped when optional",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["q1"], "cells": ["ok"] } } ] },
+    "answers": { "svc": {} },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "matrix row with only empty cells is dropped",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a", "b"], "columns": ["q1", "q2"], "cells": ["ok"] } } ] },
+    "answers": { "svc": { "a": { "q1": "ok" }, "b": { "q1": "", "q2": "" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "q1": "ok" } } }
+    }
+  }
+]

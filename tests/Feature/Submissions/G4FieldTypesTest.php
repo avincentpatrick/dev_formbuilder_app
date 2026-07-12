@@ -9,6 +9,7 @@ use App\Enums\SubmissionSource;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\Form;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -254,4 +255,251 @@ it('marks likert_scale + cascading fields supported and emits the cascade payloa
         ->and($fields['loc']['supported'])->toBeTrue()
         ->and($fields['loc']['cascade']['levels'])->toHaveCount(2)
         ->and($fields['loc']['cascade']['options'][2])->toMatchArray(['value' => 'manila', 'level' => 'province', 'parent' => 'ncr']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment G4b — matrix + likert_matrix (the object-valued grids) end-to-end.
+| PHP⇄TS parity is proven by matrix.json / likert_matrix.json; these exercise
+| the DB-backed pipeline (object persist, cellPath-addressed 422s, never
+| indexed) + the publish gates (config integrity, composite in a repeatable
+| section, expression-referencing-a-grid).
+|--------------------------------------------------------------------------
+*/
+
+/** rows (clean/staff) × a shared 1–5 score scale. */
+function likertMatrixConfig(): array
+{
+    return [
+        'rows' => [['value' => 'clean', 'label' => 'Cleanliness'], ['value' => 'staff', 'label' => 'Staff']],
+        'columns' => array_map(static fn (string $v): array => ['value' => $v, 'label' => "Score {$v}"], ['1', '2', '3', '4', '5']),
+    ];
+}
+
+/** rows (a/b) × columns (q1/q2), each cell a single-select over the shared poor/ok/good pool. */
+function matrixConfig(): array
+{
+    return [
+        'rows' => [['value' => 'a', 'label' => 'Service A'], ['value' => 'b', 'label' => 'Service B']],
+        'columns' => [['value' => 'q1', 'label' => 'Q1'], ['value' => 'q2', 'label' => 'Q2']],
+        'cells' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'ok', 'label' => 'OK'], ['value' => 'good', 'label' => 'Good']],
+    ];
+}
+
+it('stores a likert_matrix answer as an object and never indexes it', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'sat', FieldType::LikertMatrix, 0, [
+            'config' => likertMatrixConfig(),
+            // Even if the author marks it queryable, an object answer never reaches the scalar index.
+            'is_queryable' => true,
+            'indexed_data_type' => IndexedDataType::Text,
+        ]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['sat' => ['clean' => '4', 'staff' => '5']],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers)->toEqual(['sat' => ['clean' => '4', 'staff' => '5']]);
+
+    expect(SubmissionAnswerIndex::query()->where('submission_id', $result->submission->id)->count())->toBe(0);
+});
+
+it('stores a matrix answer as a nested object', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'svc', FieldType::Matrix, 0, ['config' => matrixConfig()]);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['svc' => ['a' => ['q1' => 'ok', 'q2' => 'good'], 'b' => ['q1' => 'poor', 'q2' => 'ok']]],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+    ));
+
+    $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($answerDoc->answers)->toEqual(['svc' => ['a' => ['q1' => 'ok', 'q2' => 'good'], 'b' => ['q1' => 'poor', 'q2' => 'ok']]]);
+
+    expect(SubmissionAnswerIndex::query()->where('submission_id', $result->submission->id)->count())->toBe(0);
+});
+
+it('rejects a likert_matrix score outside the scale addressed by its row', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'sat', FieldType::LikertMatrix, 0, ['config' => likertMatrixConfig()]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['sat' => ['clean' => '9']],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('sat.clean')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('choice_not_in_options');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('rejects a matrix cell outside the choice pool addressed by row.col', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'svc', FieldType::Matrix, 0, ['config' => matrixConfig()]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['svc' => ['a' => ['q1' => 'zzz']]],
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('svc.a.q1')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('choice_not_in_options');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('requires every row of a required likert_matrix, addressed by the missing row', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'sat', FieldType::LikertMatrix, 0, [
+            'config' => likertMatrixConfig(),
+            'is_required' => RequiredMode::Required,
+        ]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['sat' => ['clean' => '4']], // staff missing
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors())->toHaveCount(1)
+            ->and($e->fieldErrors()[0]['field'])->toBe('sat.staff')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('field_required');
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('requires every row×column cell of a required matrix, addressed by row.col', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'svc', FieldType::Matrix, 0, [
+            'config' => matrixConfig(),
+            'is_required' => RequiredMode::Required,
+        ]);
+    });
+
+    try {
+        $this->pipeline->submit(new SubmissionPayload(
+            version: $version,
+            answers: ['svc' => ['a' => ['q1' => 'ok']]], // a.q2, b.q1, b.q2 missing
+            source: SubmissionSource::Manual,
+            respondentUserId: $this->user->id,
+        ));
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        $fields = collect($e->fieldErrors())->pluck('field')->all();
+        expect($fields)->toEqualCanonicalizing(['svc.a.q2', 'svc.b.q1', 'svc.b.q2'])
+            ->and(collect($e->fieldErrors())->pluck('rule')->unique()->all())->toBe(['field_required']);
+    }
+
+    expect(Submission::query()->count())->toBe(0);
+});
+
+it('refuses to publish a matrix with no cell choices', function (): void {
+    try {
+        g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+            addFormField($draft, $user, 'svc', FieldType::Matrix, 0, ['config' => [
+                'rows' => [['value' => 'a']],
+                'columns' => [['value' => 'q1']],
+                'cells' => [],
+            ]]);
+        });
+        expect(false)->toBeTrue('expected a PublishValidationException');
+    } catch (PublishValidationException $e) {
+        expect($e->getMessage())->toContain('svc');
+    }
+});
+
+it('refuses to publish a likert_matrix with duplicate scale values', function (): void {
+    try {
+        g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+            addFormField($draft, $user, 'sat', FieldType::LikertMatrix, 0, ['config' => [
+                'rows' => [['value' => 'clean']],
+                'columns' => [['value' => '1'], ['value' => '1']],
+            ]]);
+        });
+        expect(false)->toBeTrue('expected a PublishValidationException');
+    } catch (PublishValidationException $e) {
+        expect($e->getMessage())->toContain('sat');
+    }
+});
+
+it('refuses to publish a grid field placed inside a repeatable section', function (): void {
+    try {
+        g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+            $section = FormSection::create([
+                'form_version_id' => $draft->id,
+                'key' => 'roster',
+                'label' => 'Roster',
+                'sequence' => 0,
+                'is_repeatable' => true,
+            ]);
+            addFormField($draft, $user, 'svc', FieldType::Matrix, 0, [
+                'config' => matrixConfig(),
+                'form_section_id' => $section->id,
+            ]);
+        });
+        expect(false)->toBeTrue('expected a PublishValidationException');
+    } catch (PublishValidationException $e) {
+        expect($e->getMessage())->toContain('svc');
+    }
+});
+
+it('refuses to publish an expression that references a grid field', function (): void {
+    try {
+        g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+            addFormField($draft, $user, 'svc', FieldType::Matrix, 0, ['config' => matrixConfig()]);
+            addFormField($draft, $user, 'note1', FieldType::ShortText, 1, [
+                'relevant_expression' => "\${svc} = 'x'",
+            ]);
+        });
+        expect(false)->toBeTrue('expected a PublishValidationException');
+    } catch (PublishValidationException $e) {
+        expect($e->getMessage())->toContain('svc');
+    }
+});
+
+it('marks matrix + likert_matrix supported and emits the grid payload to the encode UI', function (): void {
+    $version = g4Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'sat', FieldType::LikertMatrix, 0, ['config' => likertMatrixConfig()]);
+        addFormField($draft, $user, 'svc', FieldType::Matrix, 1, ['config' => matrixConfig()]);
+    });
+
+    /** @var Form $form */
+    $form = Form::query()->findOrFail($version->form_id);
+    $presented = app(EncodeFormPresenter::class)->present($form, $version);
+
+    $fields = collect($presented['blocks'])->flatMap(fn (array $b): array => $b['fields'])->keyBy('key');
+
+    expect($fields['sat']['supported'])->toBeTrue()
+        ->and($fields['sat']['matrix']['rows'])->toHaveCount(2)
+        ->and($fields['sat']['matrix']['columns'])->toHaveCount(5)
+        ->and($fields['sat']['matrix']['cells'])->toHaveCount(0)
+        ->and($fields['svc']['supported'])->toBeTrue()
+        ->and($fields['svc']['matrix']['cells'])->toHaveCount(3)
+        ->and($fields['svc']['matrix']['columns'][0])->toMatchArray(['value' => 'q1', 'label' => 'Q1']);
 });

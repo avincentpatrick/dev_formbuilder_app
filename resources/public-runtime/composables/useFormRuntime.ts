@@ -23,6 +23,7 @@ import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
 import {
     makeSemanticValidator,
     SemanticResult,
+    type CompositeAnswer,
     type EngineValue,
     type InstanceAnswers,
     type RequiredMode,
@@ -92,7 +93,7 @@ export interface FormRuntime {
     readonly isFirstStep: ComputedRef<boolean>;
     readonly isLastStep: ComputedRef<boolean>;
 
-    setAnswer(key: string, value: EngineValue | null): void;
+    setAnswer(key: string, value: EngineValue | CompositeAnswer | null): void;
     restoreAnswers(map: AnswerMap): void;
     markTouched(key: string): void;
     markManyTouched(keys: string[]): void;
@@ -203,12 +204,26 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     function snapshotAnswers(): AnswerMap {
         const out: AnswerMap = {};
         for (const [key, value] of Object.entries(answers)) {
-            // Only a repeatable-section key holds an instance array; a field key holding an array is a flat
-            // multi-select `string[]` and must be copied by reference, never spread element-by-element.
-            out[key] =
-                repeatSectionKeys.has(key) && Array.isArray(value)
-                    ? (value as InstanceAnswers[]).map((instance) => ({ ...instance }))
-                    : value;
+            if (repeatSectionKeys.has(key) && Array.isArray(value)) {
+                // A repeatable-section key holds an instance array — shallow-clone each instance so `result`
+                // takes a reactive dependency on deep instance edits.
+                out[key] = (value as InstanceAnswers[]).map((instance) => ({ ...instance }));
+            } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                // A composite grid object (Increment G4b: matrix/likert_matrix). Deep-read + clone each row so
+                // the `result` computed depends on nested cell edits and the engine gets an independent copy
+                // it can freely prune. (A flat multi-select `string[]` is an Array — handled by the else.)
+                const clone: Record<string, EngineValue | Record<string, EngineValue>> = {};
+                for (const [rowKey, rowVal] of Object.entries(value as Record<string, unknown>)) {
+                    clone[rowKey] =
+                        rowVal !== null && typeof rowVal === 'object' && !Array.isArray(rowVal)
+                            ? { ...(rowVal as Record<string, EngineValue>) }
+                            : (rowVal as EngineValue);
+                }
+                out[key] = clone as CompositeAnswer;
+            } else {
+                // A scalar or a flat multi-select `string[]` — copied by reference (the engine never mutates it).
+                out[key] = value;
+            }
         }
         return out;
     }
@@ -310,7 +325,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     );
 
     // ── Flat interaction ───────────────────────────────────────────────────────────────────────
-    function setAnswer(key: string, value: EngineValue | null): void {
+    function setAnswer(key: string, value: EngineValue | CompositeAnswer | null): void {
         if (value === null) {
             delete answers[key];
         } else {

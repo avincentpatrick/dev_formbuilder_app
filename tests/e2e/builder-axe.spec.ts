@@ -83,4 +83,24 @@ for (const theme of themes) {
         await forceTheme(page, theme);
         await scan(page, 'builder empty');
     });
+
+    // The composite grid config editors (Increment G4b). The seeded "Grid Builder Demo" draft has a matrix
+    // field FIRST, so the builder auto-selects it and its config tabs include "Grid" — mounting MatrixEditor
+    // (rows/columns/cells lists). Walk the tabs (scanning the grid editor) with no palette interaction.
+    test(`Builder — grid config editor (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Grid Builder Demo');
+        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+
+        // The auto-selected matrix field exposes a "Grid" tab → MatrixEditor (rows + columns + cell choices).
+        await page.getByRole('tab', { name: 'Grid' }).click();
+        await expect(page.getByRole('heading', { name: 'Cell choices' })).toBeVisible({ timeout: 10_000 });
+        await scan(page, 'matrix config editor');
+
+        const fieldTabs = page.locator('[role="tab"]');
+        for (let i = 0; i < (await fieldTabs.count()); i++) {
+            await fieldTabs.nth(i).click();
+            await scan(page, `grid demo tab ${i}`);
+        }
+    });
 }

@@ -31,7 +31,18 @@ export { StructuredRuleEvaluator } from './structured-rule-evaluator';
 export { SemanticValidator, SemanticResult, makeSemanticValidator, errorPath } from './semantic-validator';
 export type { SemanticError } from './semantic-validator';
 
-export type { SchemaField, SchemaSection, ValidationRow, SemanticInput, InstanceAnswers, CascadeConfig } from './schema';
+export type {
+    SchemaField,
+    SchemaSection,
+    ValidationRow,
+    SemanticInput,
+    InstanceAnswers,
+    CascadeConfig,
+    GridConfig,
+    CompositeAnswer,
+    LikertMatrixAnswer,
+    MatrixAnswer,
+} from './schema';
 export type { Node } from './ast';
 export type {
     ComparisonOperator,

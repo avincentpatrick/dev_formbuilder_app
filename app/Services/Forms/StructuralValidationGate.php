@@ -20,7 +20,9 @@ final class StructuralValidationGate
     public function assertPublishable(FormVersion $version): void
     {
         $fields = $version->fields()->get();
-        $sectionIds = $version->sections()->get()->pluck('id')->flip();
+        $sections = $version->sections()->get();
+        $sectionIds = $sections->pluck('id')->flip();
+        $repeatableSectionIds = $sections->where('is_repeatable', true)->pluck('id')->flip();
         $validations = $version->validations()->get();
 
         $fieldIds = $fields->pluck('id')->flip();
@@ -41,6 +43,14 @@ final class StructuralValidationGate
             }
             if ($field->field_type === FieldType::CascadingSelect) {
                 $this->assertCascadingResolves($field);
+            }
+            // Increment G4b: composite grid config must resolve, and a grid may not sit in a repeatable
+            // section (its object value is never routed through the composite pass inside a repeat instance).
+            if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
+                if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
+                    throw PublishValidationException::compositeInRepeatableSection($field->key);
+                }
+                $this->assertMatrixConfigResolves($field);
             }
         }
 
@@ -140,6 +150,43 @@ final class StructuralValidationGate
             if ($parent === null || ! isset($valuesByLevelIndex[$option['level'] - 1][$parent])) {
                 throw PublishValidationException::cascadingConfigInvalid($field->key, "option “{$option['value']}” has no valid parent");
             }
+        }
+    }
+
+    /**
+     * A composite grid (Increment G4b) must be publishably answerable: `rows` + `columns` non-empty with
+     * distinct, present values, and — for `matrix`, whose cells are single-selects — a non-empty `cells`
+     * choice pool. (`likert_matrix` reuses `columns` as the score scale and has no `cells`.)
+     */
+    private function assertMatrixConfigResolves(FormField $field): void
+    {
+        $this->assertOptionListResolves($field, 'rows', 'rows');
+        $this->assertOptionListResolves($field, 'columns', 'columns');
+
+        if ($field->field_type === FieldType::Matrix) {
+            $this->assertOptionListResolves($field, 'cells', 'cells');
+        }
+    }
+
+    /**
+     * Assert a `config.<key>` option list ({value,label}[]) is non-empty, every option carries a non-empty
+     * `value`, and the values are distinct — the shared shape check behind the grid rows/columns/cells.
+     */
+    private function assertOptionListResolves(FormField $field, string $configKey, string $label): void
+    {
+        $values = [];
+        foreach ((array) data_get($field->config, $configKey, []) as $option) {
+            if (! is_array($option) || ! array_key_exists('value', $option) || $option['value'] === null || $option['value'] === '') {
+                throw PublishValidationException::matrixConfigInvalid($field->key, "a {$label} entry is missing its value");
+            }
+            $values[] = (string) $option['value'];
+        }
+
+        if ($values === []) {
+            throw PublishValidationException::matrixConfigInvalid($field->key, "no {$label} defined");
+        }
+        if (count($values) !== count(array_unique($values))) {
+            throw PublishValidationException::matrixConfigInvalid($field->key, "duplicate {$label} values");
         }
     }
 }

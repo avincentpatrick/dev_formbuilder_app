@@ -103,6 +103,11 @@ final class SemanticValidator
             $effectiveAnswers[$sectionKey] = $instances;
         }
 
+        // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
+        // through the scalar collectFieldErrors path (Coercion::isEmpty diverges on an empty object between
+        // the PHP and TS engines). Their relevance-pruned object replaces the raw effective answer.
+        $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
+
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result
         // is written to `computed`. Computed values do not feed back into relevance/constraints (documented).
@@ -111,7 +116,7 @@ final class SemanticValidator
         return new SemanticResult(
             $fieldRelevance,
             $sectionRelevance,
-            array_merge($errors, $repeatErrors),
+            array_merge($errors, $repeatErrors, $compositeErrors),
             $effectiveAnswers,
             $computed,
             $repeatRelevance,
@@ -400,6 +405,13 @@ final class SemanticValidator
             return;
         }
 
+        // Composite (grid) fields (Increment G4b) hold object-valued answers and are validated by the
+        // dedicated processComposites pass — never here, where Coercion::isEmpty on the whole object would
+        // diverge from the TS mirror (PHP isEmpty([]) === true vs TS isEmpty({}) === false).
+        if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
+            return;
+        }
+
         $context = new EvaluationContext($contextAnswers, now: $now);
         $answer = array_key_exists($field->key, $answerScope) ? $answerScope[$field->key] : Marker::Absent;
         $sets = $ruleSets[$field->id] ?? [];
@@ -565,6 +577,170 @@ final class SemanticValidator
                 $errors[] = new SemanticError($field->key, 'cascading_parent_mismatch', 'This selection does not belong under the parent choice.', $sectionKey, $instanceIndex, (string) $i);
             }
         }
+    }
+
+    /**
+     * Validate every relevant top-level composite (grid) field (Increment G4b): `matrix` holds
+     * `{row:{col:cell}}` and `likert_matrix` holds `{row:score}`. These object shapes must NEVER be routed
+     * through the scalar {@see collectFieldErrors} path — `Coercion::isEmpty` on an empty object diverges
+     * between the engines (PHP `isEmpty([]) === true` vs TS `isEmpty({}) === false`). Instead this pass
+     * reads the field's declared rows/columns/cells, prunes the submitted object to the KNOWN cells
+     * (dropping empties, coercing each surviving scalar cell) IN CONFIG ORDER — so both engines emit
+     * identical key ordering — and applies required-completeness (a required grid demands every row (likert)
+     * / every row×column cell (matrix) be answered → per-cell `field_required` addressed by `cellPath`) plus
+     * cell-membership (a surviving cell must be a declared option → `choice_not_in_options`). The pruned
+     * object replaces the field's raw effective answer, or the key is dropped when nothing survives.
+     * Object-emptiness is decided by counting surviving cells, never by `isEmpty(object)`.
+     *
+     * @param  Collection<int, FormField>  $fields  the top-level fields (only composites are handled)
+     * @param  array<string, bool>  $fieldRelevance
+     * @param  array<string, mixed>  $effectiveAnswers  MUTATED: each composite key set to its pruned object / unset
+     * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
+     * @param  array<string, string>  $fieldKeyById
+     * @return list<SemanticError>
+     */
+    private function processComposites(
+        Collection $fields,
+        array $fieldRelevance,
+        array &$effectiveAnswers,
+        array $ruleSets,
+        array $fieldKeyById,
+        string $locale,
+        ?string $now,
+    ): array {
+        /** @var list<SemanticError> $errors */
+        $errors = [];
+        $context = new EvaluationContext($effectiveAnswers, now: $now);
+
+        foreach ($fields as $field) {
+            if ($field->field_type !== FieldType::Matrix && $field->field_type !== FieldType::LikertMatrix) {
+                continue;
+            }
+            if (($fieldRelevance[$field->key] ?? false) !== true) {
+                continue; // hidden composite: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            $sets = $ruleSets[$field->id] ?? [];
+            [$required, $trigger] = $this->requiredState($field, $sets['required'] ?? [], $context, $fieldKeyById);
+            $requiredMessage = $trigger !== null
+                ? $this->resolveMessage($trigger, $locale, self::DEFAULT_REQUIRED_MESSAGE)
+                : self::DEFAULT_REQUIRED_MESSAGE;
+
+            $raw = $effectiveAnswers[$field->key] ?? null;
+            $pruned = $field->field_type === FieldType::Matrix
+                ? $this->processMatrix($field, $raw, $required, $requiredMessage, $errors)
+                : $this->processLikertMatrix($field, $raw, $required, $requiredMessage, $errors);
+
+            if ($pruned === []) {
+                unset($effectiveAnswers[$field->key]);
+            } else {
+                $effectiveAnswers[$field->key] = $pruned;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Likert-matrix (`{row:score}`): each declared row must carry a score drawn from the shared column scale.
+     * Returns the pruned `{row:score}` (empty when nothing survives). `cellPath = "<rowKey>"`.
+     *
+     * @param  list<SemanticError>  $errors
+     * @return array<string, string>
+     */
+    private function processLikertMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): array
+    {
+        $rowKeys = $this->compositeValues($field, 'rows');
+        $scoreSet = array_flip($this->compositeValues($field, 'columns'));
+        $rawMap = is_array($raw) && ! array_is_list($raw) ? $raw : [];
+
+        /** @var array<string, string> $pruned */
+        $pruned = [];
+        foreach ($rowKeys as $rowKey) {
+            $score = $rawMap[$rowKey] ?? null;
+            if (! array_key_exists($rowKey, $rawMap) || Coercion::isEmpty($score)) {
+                if ($required) {
+                    $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage, null, null, $rowKey);
+                }
+
+                continue;
+            }
+
+            $value = Coercion::toStr($score);
+            $pruned[$rowKey] = $value;
+            if ($scoreSet !== [] && ! isset($scoreSet[$value])) {
+                $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'The selected option is not available.', null, null, $rowKey);
+            }
+        }
+
+        return $pruned;
+    }
+
+    /**
+     * Matrix (`{row:{col:cell}}`): each declared row×column cell may carry a value drawn from the shared cell
+     * choice pool. Returns the pruned `{row:{col:cell}}` (rows with no surviving cell dropped).
+     * `cellPath = "<rowKey>.<colKey>"`.
+     *
+     * @param  list<SemanticError>  $errors
+     * @return array<string, array<string, string>>
+     */
+    private function processMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): array
+    {
+        $rowKeys = $this->compositeValues($field, 'rows');
+        $colKeys = $this->compositeValues($field, 'columns');
+        $cellSet = array_flip($this->compositeValues($field, 'cells'));
+        $rawMap = is_array($raw) && ! array_is_list($raw) ? $raw : [];
+
+        /** @var array<string, array<string, string>> $pruned */
+        $pruned = [];
+        foreach ($rowKeys as $rowKey) {
+            $rowRaw = $rawMap[$rowKey] ?? null;
+            $rowMap = is_array($rowRaw) && ! array_is_list($rowRaw) ? $rowRaw : [];
+
+            /** @var array<string, string> $prunedRow */
+            $prunedRow = [];
+            foreach ($colKeys as $colKey) {
+                $cell = $rowMap[$colKey] ?? null;
+                if (! array_key_exists($colKey, $rowMap) || Coercion::isEmpty($cell)) {
+                    if ($required) {
+                        $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage, null, null, "{$rowKey}.{$colKey}");
+                    }
+
+                    continue;
+                }
+
+                $value = Coercion::toStr($cell);
+                $prunedRow[$colKey] = $value;
+                if ($cellSet !== [] && ! isset($cellSet[$value])) {
+                    $errors[] = new SemanticError($field->key, 'choice_not_in_options', 'The selected option is not available.', null, null, "{$rowKey}.{$colKey}");
+                }
+            }
+
+            if ($prunedRow !== []) {
+                $pruned[$rowKey] = $prunedRow;
+            }
+        }
+
+        return $pruned;
+    }
+
+    /**
+     * The ordered `config.<key>` option-value list (rows/columns/cells) for a composite field, in author
+     * order, de-duplicated. Drives both the config-ordered prune and the membership sets.
+     *
+     * @return list<string>
+     */
+    private function compositeValues(FormField $field, string $configKey): array
+    {
+        $values = [];
+        foreach ((array) data_get($field->config, $configKey, []) as $option) {
+            $value = is_array($option) ? Coercion::toStr($option['value'] ?? '') : Coercion::toStr($option);
+            if ($value !== '') {
+                $values[] = $value;
+            }
+        }
+
+        return array_values(array_unique($values));
     }
 
     /**

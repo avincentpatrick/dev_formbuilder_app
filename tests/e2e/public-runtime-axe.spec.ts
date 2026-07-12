@@ -42,10 +42,11 @@ for (const theme of themes) {
     });
 }
 
-// The G4a field-type controls (Increment G4a). The guest-enabled "Field Types Showcase" (E2eSeeder) renders
-// a Likert rating scale (a radio group) + an N-level cascading (dependent) select. Scan the initial state,
-// then choose a region — which enables + repopulates the dependent province select — and scan again, in
-// light and dark at all three viewports (WCAG 2.2 AA + no horizontal overflow; wide grids/rows are the risk).
+// The G4a/G4b field-type controls. The guest-enabled "Field Types Showcase" (E2eSeeder) renders a Likert
+// rating scale (radio group), an N-level cascading (dependent) select, a Likert MATRIX (a radio group per
+// row over a shared scale), and a MATRIX (a per-cell single-select). Scan the initial state (the grids are
+// the reflow risk — they must NOT force horizontal scroll at 375px), then interact with the cascade + both
+// grids and scan again, in light and dark at all three viewports (WCAG 2.2 AA + no horizontal overflow).
 for (const theme of themes) {
     test(`Public runtime field types (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/f/field-types', { waitUntil: 'networkidle' });
@@ -55,9 +56,18 @@ for (const theme of themes) {
         await forceTheme(page, theme);
         await assertClean(page, 'Field Types Showcase (initial)');
 
-        // Choose a region → the dependent province select enables + lists NCR's children; scan again.
+        // Choose a region → the dependent province select enables + lists NCR's children.
         await page.getByRole('combobox', { name: 'Region' }).selectOption('ncr');
-        await assertClean(page, 'Field Types Showcase (cascade parent chosen)');
+
+        // Likert matrix: pick a score in one row (each row is a group named by its legend).
+        await page.getByRole('group', { name: 'Cleanliness' }).getByRole('radio', { name: 'Good' }).check();
+        // Matrix: pick a cell value in one row×column (row group + column-labelled select).
+        await page
+            .getByRole('group', { name: 'Consultation' })
+            .getByRole('combobox', { name: 'Morning' })
+            .selectOption('available');
+
+        await assertClean(page, 'Field Types Showcase (cascade + grids interacted)');
     });
 }
 

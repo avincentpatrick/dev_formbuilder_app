@@ -14,6 +14,24 @@ export interface CascadeConfig {
     options: { value: string; level: string; parent: string | null }[];
 }
 
+/**
+ * Composite grid membership sets (Increment G4b): the declared row/column (and, for `matrix`, cell) VALUE
+ * keys — the engine reads only these to prune + membership-check the object answer. `cells` is absent for
+ * `likert_matrix` (its per-row score is drawn from `columns`). Absent ⇒ no composite check (byte-identical).
+ */
+export interface GridConfig {
+    rows: string[];
+    columns: string[];
+    cells?: string[];
+}
+
+/** A likert_matrix answer `{row: score}` (Increment G4b). */
+export type LikertMatrixAnswer = Record<string, EngineValue>;
+/** A matrix answer `{row: {col: cell}}` (Increment G4b). */
+export type MatrixAnswer = Record<string, Record<string, EngineValue>>;
+/** Either object-valued grid answer shape — deliberately OUTSIDE `EngineValue` (never scalar-coerced). */
+export type CompositeAnswer = LikertMatrixAnswer | MatrixAnswer;
+
 export interface SchemaField {
     id: string;
     key: string;
@@ -31,6 +49,8 @@ export interface SchemaField {
     options?: string[] | null;
     /** Cascading-select hierarchy (Increment G4a): drives per-level membership + parent-consistency. */
     cascade?: CascadeConfig | null;
+    /** Composite grid config (Increment G4b: matrix / likert_matrix). Absent ⇒ no composite check. */
+    grid?: GridConfig | null;
 }
 
 export interface SchemaSection {
@@ -66,8 +86,11 @@ export interface SemanticInput {
     fields: SchemaField[];
     sections: SchemaSection[];
     validations: ValidationRow[];
-    /** Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps. */
-    answers: Record<string, EngineValue | InstanceAnswers[]>;
+    /**
+     * Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps, plus
+     * (Increment G4b) a composite grid field key => its object-valued answer.
+     */
+    answers: Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
     locale: string;
     /** Grammar v2.0: the injected clock (ISO-8601) that `today()`/`now()` read; null / omitted → unset. */
     now?: string | null;

@@ -286,6 +286,8 @@ final class FormBuilderService
     {
         return match (true) {
             $type === FieldType::CascadingSelect => ['levels' => [], 'options' => []],
+            $type === FieldType::Matrix => ['rows' => [], 'columns' => [], 'cells' => []],
+            $type === FieldType::LikertMatrix => ['rows' => [], 'columns' => []],
             $type->hasOptions() => ['options' => []],
             default => [],
         };

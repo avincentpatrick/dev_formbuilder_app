@@ -83,6 +83,19 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
                 'options' => $field['cascade']['options'],
             ];
         }
+        // Composite grid config (G4b): a vector's `grid.rows`/`columns`/`cells` value lists → config option
+        // objects (`{value}`), the shape the real FormField.config carries + the PHP engine reads. The TS
+        // mirror consumes the same `grid` fragment directly (its SchemaField.grid is the value lists).
+        if (isset($field['grid'])) {
+            $gridConfig = [
+                'rows' => array_map(static fn (string $v): array => ['value' => $v], $field['grid']['rows'] ?? []),
+                'columns' => array_map(static fn (string $v): array => ['value' => $v], $field['grid']['columns'] ?? []),
+            ];
+            if (isset($field['grid']['cells'])) {
+                $gridConfig['cells'] = array_map(static fn (string $v): array => ['value' => $v], $field['grid']['cells']);
+            }
+            $attributes['config'] = $gridConfig;
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {

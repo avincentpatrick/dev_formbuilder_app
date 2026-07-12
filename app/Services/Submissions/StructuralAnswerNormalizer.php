@@ -230,6 +230,14 @@ final class StructuralAnswerNormalizer
             // consistency are Stage-3 (relevance-aware) checks, not a structural fault here.
             FieldType::CascadingSelect => $this->coerceCascade($value),
 
+            // Object-valued grids (Increment G4b): matrix = {row:{col:cell}}, likert_matrix = {row:score}.
+            // Only STRUCTURAL faults are raised here (an object is required; every row/column key must be
+            // declared in config) — cell-value membership is the relevance-aware Stage-3 check, mirroring
+            // cascading. The whole object is NEVER routed through scalar isEmpty/coercion (which diverges on
+            // an empty object across the PHP/TS engines); each surviving leaf cell is coerced individually.
+            FieldType::Matrix => $this->coerceMatrix($field, $value),
+            FieldType::LikertMatrix => $this->coerceLikertMatrix($field, $value),
+
             // Scalar-valued types: reject an array, otherwise store a canonical string. `likert_scale` (G4a)
             // is a single chosen scale point, so it coerces exactly like a single_select.
             FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
@@ -301,5 +309,114 @@ final class StructuralAnswerNormalizer
         }
 
         return $list === [] ? [false, null, null] : [true, $list, null];
+    }
+
+    /**
+     * Matrix (Increment G4b) → the object shape `{row:{col:cell}}`. Structural, relevance-unaware faults
+     * only: the value must be an object (not a list/scalar → `expected_object`); every row key must be a
+     * declared `config.rows` value (`unknown_row`); each row's value must itself be an object; every column
+     * key must be a declared `config.columns` value (`unknown_column`). Each surviving leaf cell is coerced
+     * to a canonical string; empty cells and empty rows are dropped; an all-empty grid normalises to
+     * not-stored. Cell-value membership (`cell ∈ config.cells`) is the relevance-aware Stage-3 check.
+     *
+     * @return array{0: bool, 1: array<string, array<string, string>>|null, 2: array{field: string, rule: string, message: string}|null}
+     */
+    private function coerceMatrix(FormField $field, mixed $value): array
+    {
+        if (! is_array($value) || array_is_list($value)) {
+            return [false, null, $this->mismatch($field->key, 'expected_object', 'This field must be a grid of answers.')];
+        }
+
+        $rows = $this->configValueSet($field, 'rows');
+        $columns = $this->configValueSet($field, 'columns');
+
+        /** @var array<string, array<string, string>> $normalized */
+        $normalized = [];
+        foreach ($value as $rawRowKey => $rowValue) {
+            $rowKey = (string) $rawRowKey;
+            if (! isset($rows[$rowKey])) {
+                return [false, null, $this->mismatch("{$field->key}.{$rowKey}", 'unknown_row', "Unknown row: {$rowKey}.")];
+            }
+            if (Coercion::isEmpty($rowValue)) {
+                continue;
+            }
+            if (! is_array($rowValue) || array_is_list($rowValue)) {
+                return [false, null, $this->mismatch("{$field->key}.{$rowKey}", 'expected_object', "Row {$rowKey} must be an object of column answers.")];
+            }
+
+            /** @var array<string, string> $normalizedRow */
+            $normalizedRow = [];
+            foreach ($rowValue as $rawColKey => $cell) {
+                $colKey = (string) $rawColKey;
+                if (! isset($columns[$colKey])) {
+                    return [false, null, $this->mismatch("{$field->key}.{$rowKey}.{$colKey}", 'unknown_column', "Unknown column: {$colKey}.")];
+                }
+                if (Coercion::isEmpty($cell)) {
+                    continue;
+                }
+                if (is_array($cell)) {
+                    return [false, null, $this->mismatch("{$field->key}.{$rowKey}.{$colKey}", 'expected_scalar', 'A grid cell must be a single value.')];
+                }
+                $normalizedRow[$colKey] = Coercion::toStr($cell);
+            }
+
+            if ($normalizedRow !== []) {
+                $normalized[$rowKey] = $normalizedRow;
+            }
+        }
+
+        return $normalized === [] ? [false, null, null] : [true, $normalized, null];
+    }
+
+    /**
+     * Likert-matrix (Increment G4b) → the flat object `{row:score}`. Structural faults only (an object is
+     * required → `expected_object`; every row key must be a declared `config.rows` value → `unknown_row`);
+     * the row's score-membership (`score ∈ config.columns`) is the relevance-aware Stage-3 check. Surviving
+     * scores are coerced to strings; empty rows dropped; an all-empty grid normalises to not-stored.
+     *
+     * @return array{0: bool, 1: array<string, string>|null, 2: array{field: string, rule: string, message: string}|null}
+     */
+    private function coerceLikertMatrix(FormField $field, mixed $value): array
+    {
+        if (! is_array($value) || array_is_list($value)) {
+            return [false, null, $this->mismatch($field->key, 'expected_object', 'This field must be a grid of answers.')];
+        }
+
+        $rows = $this->configValueSet($field, 'rows');
+
+        /** @var array<string, string> $normalized */
+        $normalized = [];
+        foreach ($value as $rawRowKey => $score) {
+            $rowKey = (string) $rawRowKey;
+            if (! isset($rows[$rowKey])) {
+                return [false, null, $this->mismatch("{$field->key}.{$rowKey}", 'unknown_row', "Unknown row: {$rowKey}.")];
+            }
+            if (Coercion::isEmpty($score)) {
+                continue;
+            }
+            if (is_array($score)) {
+                return [false, null, $this->mismatch("{$field->key}.{$rowKey}", 'expected_scalar', 'A grid row answer must be a single value.')];
+            }
+            $normalized[$rowKey] = Coercion::toStr($score);
+        }
+
+        return $normalized === [] ? [false, null, null] : [true, $normalized, null];
+    }
+
+    /**
+     * The declared `config.<key>` (rows/columns/cells) value set for O(1) membership, keyed by option value.
+     *
+     * @return array<string, true>
+     */
+    private function configValueSet(FormField $field, string $configKey): array
+    {
+        $set = [];
+        foreach ((array) data_get($field->config, $configKey, []) as $option) {
+            if (is_array($option) && array_key_exists('value', $option) && $option['value'] !== null && $option['value'] !== '') {
+                $set[Coercion::toStr($option['value'])] = true;
+            }
+        }
+
+        return $set;
     }
 }

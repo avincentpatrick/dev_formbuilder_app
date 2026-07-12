@@ -74,7 +74,9 @@ function rescueFocus(): void {
 }
 
 function onUpdate(next: AnswerValue): void {
-    runtime.setInstanceAnswer(props.sectionKey, props.index, props.field.key, next);
+    // A composite grid is never a repeat member (publish gate), so an instance answer is always a scalar/list
+    // EngineValue — the cast narrows the shared AnswerValue union to what setInstanceAnswer stores.
+    runtime.setInstanceAnswer(props.sectionKey, props.index, props.field.key, next as Exclude<AnswerValue, Record<string, string> | Record<string, Record<string, string>>>);
 }
 
 function onFocusout(): void {

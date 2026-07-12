@@ -21,6 +21,7 @@ import {
     MdsTextInput,
 } from '@meridian/design-system';
 import { computed } from 'vue';
+import MatrixGrid from './MatrixGrid.vue';
 
 export interface CascadeLevel {
     key: string;
@@ -34,6 +35,17 @@ export interface CascadeOption {
     parent: string | null;
 }
 
+export interface MatrixOption {
+    value: string;
+    label: string;
+}
+
+export interface MatrixConfig {
+    rows: MatrixOption[];
+    columns: MatrixOption[];
+    cells: MatrixOption[];
+}
+
 export interface EncodeField {
     key: string;
     field_type: string;
@@ -44,12 +56,23 @@ export interface EncodeField {
     options: { value: string; label: string }[];
     // Cascading-select hierarchy (Increment G4a); labels already resolved to the active locale by the caller.
     cascade?: { levels: CascadeLevel[]; options: CascadeOption[] } | null;
+    // Composite grid config (Increment G4b: matrix / likert_matrix); labels already resolved by the caller.
+    matrix?: MatrixConfig | null;
     supported: boolean;
 }
 
-// The value shapes an answer slot can hold across the encode controls (list for multi-select, number for
-// numeric fields, "" otherwise). Kept concrete (not `unknown`) so Inertia's useForm accepts the form data.
-export type AnswerValue = string | number | boolean | string[] | null;
+// The value shapes an answer slot can hold across the encode controls (list for multi-select, an object for
+// the G4b grids, number for numeric fields, "" otherwise). Kept concrete (not `unknown`) so Inertia's useForm
+// accepts the form data. `Record<string,string>` = a likert_matrix `{row:score}`; the nested record = a
+// matrix `{row:{col:cell}}`.
+export type AnswerValue =
+    | string
+    | number
+    | boolean
+    | string[]
+    | Record<string, string>
+    | Record<string, Record<string, string>>
+    | null;
 
 // The visual requirement marker (UX §4.4). When omitted it derives from `field.required`, preserving the
 // original manual-encode behaviour (F4b) exactly; the public runtime (F6b) passes it explicitly so an
@@ -80,7 +103,18 @@ const yesNoOptions = [
 ];
 
 const control = computed<
-    'text' | 'textarea' | 'number' | 'select' | 'checkboxes' | 'yesno' | 'scale' | 'cascading' | 'note' | 'unsupported'
+    | 'text'
+    | 'textarea'
+    | 'number'
+    | 'select'
+    | 'checkboxes'
+    | 'yesno'
+    | 'scale'
+    | 'cascading'
+    | 'matrix'
+    | 'likert-matrix'
+    | 'note'
+    | 'unsupported'
 >(() => {
     const t = props.field.field_type;
     if (t === 'note') return 'note';
@@ -93,6 +127,8 @@ const control = computed<
     if (t === 'yes_no') return 'yesno';
     if (t === 'likert_scale') return 'scale';
     if (t === 'cascading_select') return 'cascading';
+    if (t === 'likert_matrix') return 'likert-matrix';
+    if (t === 'matrix') return 'matrix';
     return 'unsupported';
 });
 
@@ -287,6 +323,17 @@ function setCascadeLevel(index: number, value: string): void {
             </template>
         </div>
     </fieldset>
+
+    <!-- Composite grids (Increment G4b): matrix (per-cell select) + likert_matrix (radiogroup per row) -->
+    <MatrixGrid
+        v-else-if="control === 'matrix' || control === 'likert-matrix'"
+        :field="field"
+        :kind="control"
+        :model-value="props.modelValue"
+        :error="error"
+        :required-marker="marker"
+        @update:model-value="emit('update:modelValue', $event)"
+    />
 
     <!-- Display-only note -->
     <p v-else-if="control === 'note'" class="encode-note">{{ field.label }}</p>

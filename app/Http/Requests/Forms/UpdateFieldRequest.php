@@ -22,12 +22,13 @@ use Illuminate\Validation\Rule;
  * validated (the expression engine is deferred ADR-0004 work). Authorization is `can:update,form`; the
  * optimistic-concurrency token (`version`) is checked in the service, not here.
  *
- * Per-type `config` shape (Increment G4a): the choice-editor types (`config.options` = `[{value,label}]`)
- * and `cascading_select` (`config.levels`/`config.options` with `level`/`parent`) get type/shape rules
- * here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that transiently
- * clears an option value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading
- * hierarchy integrity are enforced at PUBLISH (StructuralValidationGate / assertCascadingResolves), the
- * same "persist unvalidated config, validate at publish" posture as a calculated field's formula.
+ * Per-type `config` shape (Increment G4a/G4b): the choice-editor types (`config.options` = `[{value,label}]`),
+ * `cascading_select` (`config.levels`/`config.options` with `level`/`parent`), and the object-valued grids
+ * `matrix` (`config.rows`/`columns`/`cells`) + `likert_matrix` (`config.rows`/`columns`) get type/shape
+ * rules here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that transiently
+ * clears an option value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading /
+ * grid integrity are enforced at PUBLISH (StructuralValidationGate), the same "persist unvalidated config,
+ * validate at publish" posture as a calculated field's formula.
  */
 final class UpdateFieldRequest extends FormRequest
 {
@@ -91,6 +92,31 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
                 'config.options.*.level' => ['nullable', 'string', 'max:150'],
                 'config.options.*.parent' => ['nullable', 'string', 'max:255'],
+            ];
+        }
+
+        if ($type === FieldType::Matrix) {
+            return [
+                'config.rows' => ['sometimes', 'array'],
+                'config.rows.*.value' => ['nullable', 'string', 'max:255'],
+                'config.rows.*.label' => ['nullable', 'string', 'max:500'],
+                'config.columns' => ['sometimes', 'array'],
+                'config.columns.*.value' => ['nullable', 'string', 'max:255'],
+                'config.columns.*.label' => ['nullable', 'string', 'max:500'],
+                'config.cells' => ['sometimes', 'array'],
+                'config.cells.*.value' => ['nullable', 'string', 'max:255'],
+                'config.cells.*.label' => ['nullable', 'string', 'max:500'],
+            ];
+        }
+
+        if ($type === FieldType::LikertMatrix) {
+            return [
+                'config.rows' => ['sometimes', 'array'],
+                'config.rows.*.value' => ['nullable', 'string', 'max:255'],
+                'config.rows.*.label' => ['nullable', 'string', 'max:500'],
+                'config.columns' => ['sometimes', 'array'],
+                'config.columns.*.value' => ['nullable', 'string', 'max:255'],
+                'config.columns.*.label' => ['nullable', 'string', 'max:500'],
             ];
         }
 

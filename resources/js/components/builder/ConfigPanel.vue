@@ -18,6 +18,8 @@ import {
 } from '@meridian/design-system';
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
+import LikertMatrixEditor from './LikertMatrixEditor.vue';
+import MatrixEditor from './MatrixEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, EnumOption, LocalField, LocalSection } from './types';
@@ -70,6 +72,7 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         const list = [{ key: 'basics', label: 'Basics' }];
         if (optionTypes.has(field.value.field_type)) list.push({ key: 'options', label: 'Options' });
         if (configEditor.value === 'cascading') list.push({ key: 'cascading', label: 'Levels' });
+        if (configEditor.value === 'matrix' || configEditor.value === 'likert_matrix') list.push({ key: 'grid', label: 'Grid' });
         list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
         return list;
     }
@@ -118,6 +121,10 @@ const choices = computed<Choice[]>(() => (field.value?.config.options as Choice[
 // A cascading field keeps its LEVELS + parented OPTIONS under distinct config keys (Increment G4a).
 const cascadeLevels = computed<CascadeLevel[]>(() => (field.value?.config.levels as CascadeLevel[] | undefined) ?? []);
 const cascadeOptions = computed<CascadeOption[]>(() => (field.value?.config.options as CascadeOption[] | undefined) ?? []);
+// A composite grid (Increment G4b) keeps its ROWS/COLUMNS (+ matrix CELLS) under distinct config keys.
+const gridRows = computed<Choice[]>(() => (field.value?.config.rows as Choice[] | undefined) ?? []);
+const gridColumns = computed<Choice[]>(() => (field.value?.config.columns as Choice[] | undefined) ?? []);
+const gridCells = computed<Choice[]>(() => (field.value?.config.cells as Choice[] | undefined) ?? []);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -242,6 +249,26 @@ function reparent(sectionId: string): void {
                         :options="cascadeOptions"
                         @update:levels="setConfig('levels', $event)"
                         @update:options="setConfig('options', $event)"
+                    />
+                </template>
+
+                <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
+                    <MatrixEditor
+                        :rows="gridRows"
+                        :columns="gridColumns"
+                        :cells="gridCells"
+                        @update:rows="setConfig('rows', $event)"
+                        @update:columns="setConfig('columns', $event)"
+                        @update:cells="setConfig('cells', $event)"
+                    />
+                </template>
+
+                <template v-else-if="activeTab === 'grid'">
+                    <LikertMatrixEditor
+                        :rows="gridRows"
+                        :columns="gridColumns"
+                        @update:rows="setConfig('rows', $event)"
+                        @update:columns="setConfig('columns', $event)"
                     />
                 </template>
 

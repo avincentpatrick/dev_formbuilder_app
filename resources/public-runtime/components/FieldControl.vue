@@ -7,7 +7,7 @@
  */
 import { computed } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
-import { resolveCascade, resolveOptional, resolveText } from '../lib/schema-mapping';
+import { resolveCascade, resolveMatrix, resolveOptional, resolveText } from '../lib/schema-mapping';
 import { useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -28,6 +28,7 @@ const encodeField = computed<EncodeField>(() => ({
         label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
     })),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
+    matrix: resolveMatrix(props.field.matrix, runtime.locale.value),
     supported: props.field.supported,
 }));
 
@@ -38,6 +39,10 @@ const value = computed<AnswerValue>(() => {
     }
     if (Array.isArray(current)) {
         return current.map(String);
+    }
+    // A composite grid (Increment G4b) is an object; pass it through untouched (cells are already strings).
+    if (typeof current === 'object') {
+        return current as Record<string, string> | Record<string, Record<string, string>>;
     }
     return current;
 });

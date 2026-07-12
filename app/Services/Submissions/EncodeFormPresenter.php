@@ -42,6 +42,8 @@ final class EncodeFormPresenter
         FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown, FieldType::YesNo,
         // Increment G4a: a single-choice rating scale + an N-level dependent select.
         FieldType::LikertScale, FieldType::CascadingSelect,
+        // Increment G4b: the object-valued grids (matrix = per-cell single-select, likert_matrix = per-row scale).
+        FieldType::Matrix, FieldType::LikertMatrix,
     ];
 
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
@@ -131,6 +133,8 @@ final class EncodeFormPresenter
             'options' => $this->options($field),
             // Cascading hierarchy (Increment G4a); null for every other type so the shared FieldInput ignores it.
             'cascade' => $this->cascade($field),
+            // Composite grid config (Increment G4b: matrix / likert_matrix); null for every other type.
+            'matrix' => $this->matrix($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2).
             'supported' => in_array($type, self::SUPPORTED, true),
@@ -174,6 +178,48 @@ final class EncodeFormPresenter
         }
 
         return ['levels' => $levels, 'options' => $options];
+    }
+
+    /**
+     * The composite grid config (Increment G4b) — `rows`/`columns` for both grid types plus `cells` (the
+     * shared per-cell choice pool) for `matrix`. Normalised to `{value,label}` pairs the shared FieldInput
+     * grid controls consume; null for every non-grid type. Single-locale (labels as authored), like
+     * {@see cascade()}/{@see options()}.
+     *
+     * @return array{rows: list<array{value: string, label: string}>, columns: list<array{value: string, label: string}>, cells: list<array{value: string, label: string}>}|null
+     */
+    private function matrix(FormField $field): ?array
+    {
+        $type = $field->field_type;
+        if ($type !== FieldType::Matrix && $type !== FieldType::LikertMatrix) {
+            return null;
+        }
+
+        return [
+            'rows' => $this->optionPairs($field, 'rows'),
+            'columns' => $this->optionPairs($field, 'columns'),
+            'cells' => $type === FieldType::Matrix ? $this->optionPairs($field, 'cells') : [],
+        ];
+    }
+
+    /**
+     * A `config.<key>` option list ({value,label}[]) normalised to `{value,label}` pairs, skipping entries
+     * with no value and defaulting a blank label to the value.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function optionPairs(FormField $field, string $configKey): array
+    {
+        $pairs = [];
+        foreach ((array) data_get($field->config, $configKey, []) as $option) {
+            if (! is_array($option) || ! isset($option['value']) || $option['value'] === '') {
+                continue;
+            }
+            $value = (string) $option['value'];
+            $pairs[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+        }
+
+        return $pairs;
     }
 
     /**

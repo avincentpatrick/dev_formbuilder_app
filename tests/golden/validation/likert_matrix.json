@@ -1,0 +1,96 @@
+[
+  {
+    "name": "likert_matrix all rows answered passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "grid": { "rows": ["clean", "staff"], "columns": ["1", "2", "3", "4", "5"] } } ] },
+    "answers": { "sat": { "clean": "4", "staff": "5" } },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [],
+      "effective_answers": { "sat": { "clean": "4", "staff": "5" } }
+    }
+  },
+  {
+    "name": "likert_matrix score not in scale fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "grid": { "rows": ["clean"], "columns": ["1", "2", "3"] } } ] },
+    "answers": { "sat": { "clean": "9" } },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [ { "field": "sat.clean", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "sat": { "clean": "9" } }
+    }
+  },
+  {
+    "name": "likert_matrix optional partial fill passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "grid": { "rows": ["clean", "staff"], "columns": ["1", "2"] } } ] },
+    "answers": { "sat": { "clean": "1" } },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [],
+      "effective_answers": { "sat": { "clean": "1" } }
+    }
+  },
+  {
+    "name": "likert_matrix required demands every row",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "is_required": "required", "grid": { "rows": ["clean", "staff"], "columns": ["1", "2"] } } ] },
+    "answers": { "sat": { "clean": "1" } },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [ { "field": "sat.staff", "rule": "field_required" } ],
+      "effective_answers": { "sat": { "clean": "1" } }
+    }
+  },
+  {
+    "name": "likert_matrix required all missing errors every row",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "is_required": "required", "grid": { "rows": ["clean", "staff"], "columns": ["1", "2"] } } ] },
+    "answers": {},
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [
+        { "field": "sat.clean", "rule": "field_required" },
+        { "field": "sat.staff", "rule": "field_required" }
+      ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "likert_matrix hidden is not checked",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "sat", "field_type": "likert_matrix", "is_required": "required", "relevant": "${gate} = 'go'", "grid": { "rows": ["clean"], "columns": ["1", "2"] } }
+    ] },
+    "answers": { "gate": "stop", "sat": { "clean": "9" } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "sat": false } },
+      "errors": [],
+      "effective_answers": { "gate": "stop" }
+    }
+  },
+  {
+    "name": "likert_matrix empty object is dropped when optional",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "grid": { "rows": ["clean"], "columns": ["1"] } } ] },
+    "answers": { "sat": {} },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "likert_matrix with no scale skips membership",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "sat", "field_type": "likert_matrix", "grid": { "rows": ["clean"], "columns": [] } } ] },
+    "answers": { "sat": { "clean": "anything" } },
+    "expected": {
+      "relevance": { "fields": { "sat": true } },
+      "errors": [],
+      "effective_answers": { "sat": { "clean": "anything" } }
+    }
+  }
+]

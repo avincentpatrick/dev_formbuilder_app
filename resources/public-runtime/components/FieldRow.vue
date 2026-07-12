@@ -40,9 +40,14 @@ watch(relevant, (isRelevant, wasRelevant) => {
         if (hadFocus) {
             void nextTick(rescueFocus);
         }
-        // A FieldRow only ever renders a flat field, so its stored value is a scalar EngineValue (never a
-        // repeat-instance array — those render through RepeatGroup/InstanceField).
-        const hasValue = !Coercion.isEmpty((runtime.answers[props.field.key] ?? null) as EngineValue);
+        // A FieldRow renders a flat field: a scalar EngineValue, or (Increment G4b) a composite grid object
+        // (matrix/likert_matrix). Coercion.isEmpty is object-blind (isEmpty({}) === false), so a grid's
+        // emptiness is decided by counting keys; a scalar falls back to the shared primitive.
+        const raw = runtime.answers[props.field.key] ?? null;
+        const hasValue =
+            raw !== null && typeof raw === 'object' && !Array.isArray(raw)
+                ? Object.keys(raw).length > 0
+                : !Coercion.isEmpty(raw as EngineValue);
         if (hasValue && !noteShownOnce) {
             noteShownOnce = true;
             showNote.value = true;

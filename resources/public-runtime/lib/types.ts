@@ -8,17 +8,18 @@
  *  3. RUNTIME — bootstrap, normalized errors, and the localStorage draft blob.
  */
 
-import type { EngineValue, InstanceAnswers, RequiredMode } from '../engine';
+import type { CompositeAnswer, EngineValue, InstanceAnswers, RequiredMode } from '../engine';
 
 // Re-exported so runtime/lib modules can pull the answer-value type from one place alongside the SPA types.
-export type { EngineValue, InstanceAnswers } from '../engine';
+export type { EngineValue, InstanceAnswers, CompositeAnswer } from '../engine';
 
 /**
- * The runtime answer map (Increment G2). A flat field key maps to a scalar {@link EngineValue}; a repeatable
- * section key maps to a list of per-instance answer maps ({@link InstanceAnswers}[]) — the exact nested shape
- * the G1 pipeline persists and the F6a engine consumes.
+ * The runtime answer map (Increment G2/G4b). A flat field key maps to a scalar {@link EngineValue}; a
+ * repeatable section key maps to a list of per-instance answer maps ({@link InstanceAnswers}[]); a composite
+ * grid field key (matrix/likert_matrix) maps to its object-valued answer ({@link CompositeAnswer}) — the
+ * exact nested shapes the G1/G4b pipeline persists and the F6a engine consumes.
  */
-export type AnswerMap = Record<string, EngineValue | InstanceAnswers[]>;
+export type AnswerMap = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
 
 // ── 1. RAW (wire) ────────────────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,9 @@ export type ControlKind =
     // Increment G4a: a single-choice rating scale (radio group) + an N-level dependent select.
     | 'scale'
     | 'cascading'
+    // Increment G4b: the object-valued grids — a likert grid (radio-group per row) + a full matrix (per-cell select).
+    | 'likert_matrix'
+    | 'matrix'
     | 'note'
     | 'unsupported';
 
@@ -153,6 +157,17 @@ export interface RenderCascade {
     options: RenderCascadeOption[];
 }
 
+/**
+ * Composite grid render config (Increment G4b): the rows + columns (and, for `matrix`, the shared per-cell
+ * choice pool `cells`); translations resolved by the render layer. `cells` is empty for `likert_matrix`
+ * (its per-row choice IS the column scale). Reuses {@link RenderOption} for each value/label entry.
+ */
+export interface RenderMatrix {
+    rows: RenderOption[];
+    columns: RenderOption[];
+    cells: RenderOption[];
+}
+
 export interface RenderField {
     key: string;
     sectionKey: string | null;
@@ -170,6 +185,8 @@ export interface RenderField {
     options: RenderOption[];
     /** Cascading-select hierarchy (Increment G4a); null for every other field type. */
     cascade: RenderCascade | null;
+    /** Composite grid config (Increment G4b: matrix / likert_matrix); null for every other field type. */
+    matrix: RenderMatrix | null;
     sequence: number;
     sectionSequence: number | null;
 }

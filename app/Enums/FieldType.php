@@ -143,14 +143,28 @@ enum FieldType: string
      * The builder config editor this type needs beyond the shared Basics/Validation/Advanced tabs, or null
      * for none. `'choices'` is the plain option-list editor (all {@see hasOptions()} types); the others are
      * dedicated per-type editors. Single source the builder palette ships to the client so the config panel
-     * never re-lists which type wires which editor. (`matrix`/`likert_matrix` land in Increment G4b.)
+     * never re-lists which type wires which editor. `matrix`/`likert_matrix` (Increment G4b) are the
+     * object-valued grids and use their own row/column/cell editors.
      */
     public function configEditor(): ?string
     {
         return match ($this) {
             self::SingleSelect, self::MultiSelect, self::Dropdown, self::LikertScale => 'choices',
             self::CascadingSelect => 'cascading',
+            self::Matrix => 'matrix',
+            self::LikertMatrix => 'likert_matrix',
             default => null,
         };
+    }
+
+    /**
+     * The two object-valued grid types (Increment G4b): `matrix` persists `{row:{col:cell}}` and
+     * `likert_matrix` persists `{row:score}`. They are handled by the dedicated `processComposites` pass
+     * (never routed through scalar coercion) and may not be referenced in expressions or nested in a
+     * repeatable section (enforced at publish).
+     */
+    public function isComposite(): bool
+    {
+        return $this === self::Matrix || $this === self::LikertMatrix;
     }
 }

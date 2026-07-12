@@ -59,12 +59,13 @@ for (const theme of themes) {
         // Choose a region → the dependent province select enables + lists NCR's children.
         await page.getByRole('combobox', { name: 'Region' }).selectOption('ncr');
 
-        // Likert matrix: pick a score in one row (each row is a group named by its legend).
-        await page.getByRole('group', { name: 'Cleanliness' }).getByRole('radio', { name: 'Good' }).check();
+        // Likert matrix: pick a score in one row (each row is a group named by its legend). `exact` avoids the
+        // "Good" ⊂ "Very good" substring ambiguity across the scale radios.
+        await page.getByRole('group', { name: 'Cleanliness' }).getByRole('radio', { name: 'Good', exact: true }).check();
         // Matrix: pick a cell value in one row×column (row group + column-labelled select).
         await page
             .getByRole('group', { name: 'Consultation' })
-            .getByRole('combobox', { name: 'Morning' })
+            .getByRole('combobox', { name: 'Morning', exact: true })
             .selectOption('available');
 
         await assertClean(page, 'Field Types Showcase (cascade + grids interacted)');

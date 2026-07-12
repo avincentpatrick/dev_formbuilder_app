@@ -20,8 +20,12 @@ import {
     MdsTextarea,
     MdsTextInput,
 } from '@meridian/design-system';
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import MatrixGrid from './MatrixGrid.vue';
+
+// Geospatial capture (Increment G5b2) is lazy-loaded so its Leaflet dependency + CSS only ship in the chunk a
+// geo-bearing form actually mounts — geo-free forms pay zero bundle cost.
+const GeoInput = defineAsyncComponent(() => import('./GeoInput.vue'));
 
 export interface CascadeLevel {
     key: string;
@@ -46,6 +50,24 @@ export interface MatrixConfig {
     cells: MatrixOption[];
 }
 
+// A GeoJSON geometry envelope (Increment G5b2): coordinates in [lon, lat(, alt)] order (the frozen G5b1
+// contract). `coordinates` nesting varies by geometry: Point number[], LineString number[][], Polygon
+// number[][][]. Concrete (not `unknown`) so Inertia's useForm accepts it as form data.
+export interface GeoEnvelope {
+    type: string;
+    coordinates: number[] | number[][] | number[][][];
+    accuracy?: number;
+}
+
+// Author config for a geo field (Increment G5b2); labels-free, so it needs no translation resolution. The
+// backend emits it (EncodeFormPresenter::geo / schema-mapping buildGeo); the GeoInput control reads it.
+export interface GeoFieldConfig {
+    captureAltitude: boolean;
+    accuracyThreshold: number | null;
+    defaultCenter: { lat: number; lon: number } | null;
+    defaultZoom: number | null;
+}
+
 export interface EncodeField {
     key: string;
     field_type: string;
@@ -58,6 +80,8 @@ export interface EncodeField {
     cascade?: { levels: CascadeLevel[]; options: CascadeOption[] } | null;
     // Composite grid config (Increment G4b: matrix / likert_matrix); labels already resolved by the caller.
     matrix?: MatrixConfig | null;
+    // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
+    geo?: GeoFieldConfig | null;
     supported: boolean;
 }
 
@@ -72,6 +96,8 @@ export type AnswerValue =
     | string[]
     | Record<string, string>
     | Record<string, Record<string, string>>
+    // A geospatial answer envelope (Increment G5b2).
+    | GeoEnvelope
     | null;
 
 // The visual requirement marker (UX §4.4). When omitted it derives from `field.required`, preserving the
@@ -113,6 +139,7 @@ const control = computed<
     | 'cascading'
     | 'matrix'
     | 'likert-matrix'
+    | 'geo'
     | 'note'
     | 'unsupported'
 >(() => {
@@ -129,6 +156,7 @@ const control = computed<
     if (t === 'cascading_select') return 'cascading';
     if (t === 'likert_matrix') return 'likert-matrix';
     if (t === 'matrix') return 'matrix';
+    if (t === 'geopoint' || t === 'geotrace' || t === 'geoshape') return 'geo';
     return 'unsupported';
 });
 
@@ -329,6 +357,16 @@ function setCascadeLevel(index: number, value: string): void {
         v-else-if="control === 'matrix' || control === 'likert-matrix'"
         :field="field"
         :kind="control"
+        :model-value="props.modelValue"
+        :error="error"
+        :required-marker="marker"
+        @update:model-value="emit('update:modelValue', $event)"
+    />
+
+    <!-- Geospatial capture (Increment G5b2): geopoint / geotrace / geoshape (lazy Leaflet + a11y baseline) -->
+    <GeoInput
+        v-else-if="control === 'geo'"
+        :field="field"
         :model-value="props.modelValue"
         :error="error"
         :required-marker="marker"

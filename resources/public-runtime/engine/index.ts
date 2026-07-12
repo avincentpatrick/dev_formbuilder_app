@@ -42,6 +42,7 @@ export type {
     CompositeAnswer,
     LikertMatrixAnswer,
     MatrixAnswer,
+    GeoAnswer,
 } from './schema';
 export type { Node } from './ast';
 export type {

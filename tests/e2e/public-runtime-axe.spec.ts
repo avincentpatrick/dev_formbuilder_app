@@ -42,13 +42,18 @@ for (const theme of themes) {
     });
 }
 
-// The G4a/G4b field-type controls. The guest-enabled "Field Types Showcase" (E2eSeeder) renders a Likert
+// The G4a/G4b/G5b2 field-type controls. The guest-enabled "Field Types Showcase" (E2eSeeder) renders a Likert
 // rating scale (radio group), an N-level cascading (dependent) select, a Likert MATRIX (a radio group per
-// row over a shared scale), and a MATRIX (a per-cell single-select). Scan the initial state (the grids are
-// the reflow risk — they must NOT force horizontal scroll at 375px), then interact with the cascade + both
-// grids and scan again, in light and dark at all three viewports (WCAG 2.2 AA + no horizontal overflow).
+// row over a shared scale), a MATRIX (a per-cell single-select), and the geo controls (geopoint/geotrace/
+// geoshape — labelled coordinate inputs + a progressive-enhancement Leaflet map). Scan the initial state (the
+// grids + the map are the reflow risk — none may force horizontal scroll at 375px), then interact with the
+// cascade + both grids + a geo point and scan again, in light and dark at all three viewports.
 for (const theme of themes) {
     test(`Public runtime field types (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        // Block the OSM tile network so the map degrades deterministically (no flaky external fetch); the
+        // always-present manual coordinate inputs are the a11y baseline the scan asserts on regardless.
+        await page.route('**/*.tile.openstreetmap.org/**', (route) => route.abort());
+
         await page.goto('/f/field-types', { waitUntil: 'networkidle' });
         await page
             .getByRole('heading', { name: 'Field Types Showcase', level: 1 })
@@ -68,7 +73,12 @@ for (const theme of themes) {
             .getByRole('combobox', { name: 'Morning', exact: true })
             .selectOption('available');
 
-        await assertClean(page, 'Field Types Showcase (cascade + grids interacted)');
+        // Geo (G5b2): type a coordinate into the geopoint's manual inputs, and add a geotrace vertex — the
+        // interactive vertex list + accuracy readout must stay axe-clean.
+        await page.getByRole('group', { name: 'Pin your location' }).getByRole('spinbutton', { name: 'Latitude' }).fill('14.6');
+        await page.getByRole('group', { name: 'Trace your route' }).getByRole('button', { name: 'Add point' }).click();
+
+        await assertClean(page, 'Field Types Showcase (cascade + grids + geo interacted)');
     });
 }
 

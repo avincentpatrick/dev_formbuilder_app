@@ -32,6 +32,19 @@ beforeEach(() => {
     window.localStorage.clear();
 });
 
+// The GeoInput chunk is lazy (defineAsyncComponent) — its dynamic import settles on a macrotask, so a
+// microtask flushPromises() never advances it; poll with real timers until the `.geo` root has mounted.
+async function waitForGeoInput(wrapper: { find: (s: string) => { exists: () => boolean } }): Promise<void> {
+    await vi.waitFor(
+        () => {
+            if (!wrapper.find('.geo').exists()) {
+                throw new Error('GeoInput not mounted yet');
+            }
+        },
+        { timeout: 3000, interval: 20 },
+    );
+}
+
 describe('RuntimeSession (component wiring)', () => {
     it('renders fields via the shared FieldInput and submits effective answers', async () => {
         const schema = schemaResponse({
@@ -272,6 +285,99 @@ describe('RuntimeSession (component wiring)', () => {
 
         expect(client.submit).toHaveBeenCalledWith(
             expect.objectContaining({ answers: { svc: { a: { q1: 'ok', q2: 'no' } } } }),
+        );
+        wrapper.unmount();
+    });
+
+    it('renders a geopoint as lat/lon inputs and submits a lon-first Point envelope (G5b2)', async () => {
+        const schema = schemaResponse({
+            fields: [field({ key: 'loc', label: 'Location', field_type: 'geopoint' })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+        await waitForGeoInput(wrapper); // the GeoInput chunk is lazy (defineAsyncComponent)
+
+        // The a11y baseline is two labelled number inputs — Latitude then Longitude. The Leaflet map is a
+        // progressive enhancement that stays absent under happy-dom (no layout); the inputs alone drive the value.
+        const inputs = wrapper.findAll('input[type="number"]');
+        expect(inputs.length).toBeGreaterThanOrEqual(2);
+        await inputs[0].setValue('14.5995'); // latitude
+        await inputs[1].setValue('120.9842'); // longitude
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        // Stored envelope is lon-first (GeoJSON/PostGIS), display was lat-first.
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({ answers: { loc: { type: 'Point', coordinates: [120.9842, 14.5995] } } }),
+        );
+        wrapper.unmount();
+    });
+
+    it('builds a geotrace LineString (≥2 vertices, lon-first) (G5b2)', async () => {
+        const schema = schemaResponse({
+            fields: [field({ key: 'path', label: 'Route', field_type: 'geotrace' })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+        await waitForGeoInput(wrapper); // the GeoInput chunk is lazy (defineAsyncComponent)
+
+        const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add point'));
+        expect(addButton).toBeDefined();
+        await addButton!.trigger('click');
+        await addButton!.trigger('click');
+
+        const inputs = wrapper.findAll('input[type="number"]'); // 2 vertices × (lat, lon)
+        expect(inputs).toHaveLength(4);
+        await inputs[0].setValue('1'); // v0 lat
+        await inputs[1].setValue('2'); // v0 lon
+        await inputs[2].setValue('3'); // v1 lat
+        await inputs[3].setValue('4'); // v1 lon
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                answers: { path: { type: 'LineString', coordinates: [[2, 1], [4, 3]] } },
+            }),
+        );
+        wrapper.unmount();
+    });
+
+    it('builds a geoshape Polygon with an auto-closed ring (G5b2)', async () => {
+        const schema = schemaResponse({
+            fields: [field({ key: 'area', label: 'Boundary', field_type: 'geoshape' })],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+        await waitForGeoInput(wrapper); // the GeoInput chunk is lazy (defineAsyncComponent)
+
+        const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add point'));
+        expect(addButton).toBeDefined();
+        await addButton!.trigger('click');
+        await addButton!.trigger('click');
+        await addButton!.trigger('click');
+
+        const inputs = wrapper.findAll('input[type="number"]'); // 3 vertices × (lat, lon)
+        expect(inputs).toHaveLength(6);
+        await inputs[0].setValue('0'); // v0 lat
+        await inputs[1].setValue('0'); // v0 lon
+        await inputs[2].setValue('0'); // v1 lat
+        await inputs[3].setValue('1'); // v1 lon
+        await inputs[4].setValue('1'); // v2 lat
+        await inputs[5].setValue('0'); // v2 lon
+
+        await wrapper.find('form').trigger('submit');
+        await flushPromises();
+
+        // The UI edits the OPEN ring; the emitted Polygon closes it (first == last), lon-first.
+        expect(client.submit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                answers: {
+                    area: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [0, 1], [0, 0]]] },
+                },
+            }),
         );
         wrapper.unmount();
     });

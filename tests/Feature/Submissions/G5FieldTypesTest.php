@@ -252,9 +252,15 @@ it('isolates submission_geo_index rows by tenant (RLS)', function (): void {
     expect($ownCount())->toBe(1);
 });
 
-it('keeps geo unsupported in the encode presenter (no renderer in G5b1)', function (): void {
+it('presents geo as supported with a normalized geo config block (G5b2)', function (): void {
     $version = g5Publish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
-        addFormField($draft, $user, 'loc', FieldType::Geopoint, 0);
+        addFormField($draft, $user, 'loc', FieldType::Geopoint, 0, ['config' => [
+            'capture_altitude' => true,
+            'accuracy_threshold' => 25,
+            'default_center' => ['lat' => 14.6, 'lon' => 121.0],
+            'default_zoom' => 12,
+        ]]);
+        addFormField($draft, $user, 'trace', FieldType::Geotrace, 1);
     });
 
     /** @var Form $form */
@@ -262,7 +268,22 @@ it('keeps geo unsupported in the encode presenter (no renderer in G5b1)', functi
     $presented = app(EncodeFormPresenter::class)->present($form, $version);
     $fields = collect($presented['blocks'])->flatMap(fn (array $b): array => $b['fields'])->keyBy('key');
 
-    expect($fields['loc']['supported'])->toBeFalse();
+    // G5b2 flips geo to supported (the renderer landed) + emits the camelCase geo config the FieldInput reads.
+    expect($fields['loc']['supported'])->toBeTrue()
+        ->and($fields['loc']['geo'])->toBe([
+            'captureAltitude' => true,
+            'accuracyThreshold' => 25.0,
+            'defaultCenter' => ['lat' => 14.6, 'lon' => 121.0],
+            'defaultZoom' => 12,
+        ])
+        // A geo field with no author config still resolves to a complete, defaulted geo block.
+        ->and($fields['trace']['supported'])->toBeTrue()
+        ->and($fields['trace']['geo'])->toBe([
+            'captureAltitude' => false,
+            'accuracyThreshold' => null,
+            'defaultCenter' => null,
+            'defaultZoom' => null,
+        ]);
 });
 
 it('summarises geo answers for the inbox / export', function (): void {

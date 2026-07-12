@@ -8,18 +8,19 @@
  *  3. RUNTIME — bootstrap, normalized errors, and the localStorage draft blob.
  */
 
-import type { CompositeAnswer, EngineValue, InstanceAnswers, RequiredMode } from '../engine';
+import type { CompositeAnswer, EngineValue, GeoAnswer, InstanceAnswers, RequiredMode } from '../engine';
 
 // Re-exported so runtime/lib modules can pull the answer-value type from one place alongside the SPA types.
-export type { EngineValue, InstanceAnswers, CompositeAnswer } from '../engine';
+export type { EngineValue, InstanceAnswers, CompositeAnswer, GeoAnswer } from '../engine';
 
 /**
- * The runtime answer map (Increment G2/G4b). A flat field key maps to a scalar {@link EngineValue}; a
+ * The runtime answer map (Increment G2/G4b/G5b2). A flat field key maps to a scalar {@link EngineValue}; a
  * repeatable section key maps to a list of per-instance answer maps ({@link InstanceAnswers}[]); a composite
- * grid field key (matrix/likert_matrix) maps to its object-valued answer ({@link CompositeAnswer}) — the
- * exact nested shapes the G1/G4b pipeline persists and the F6a engine consumes.
+ * grid field key (matrix/likert_matrix) maps to its object-valued answer ({@link CompositeAnswer}); a geo
+ * field key maps to its GeoJSON envelope ({@link GeoAnswer}) — the exact nested shapes the G1/G4b/G5b1
+ * pipeline persists and the F6a engine consumes.
  */
-export type AnswerMap = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer>;
+export type AnswerMap = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
 
 // ── 1. RAW (wire) ────────────────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,8 @@ export type ControlKind =
     // Increment G4b: the object-valued grids — a likert grid (radio-group per row) + a full matrix (per-cell select).
     | 'likert_matrix'
     | 'matrix'
+    // Increment G5b2: geospatial capture (geopoint / geotrace / geoshape) — a coordinate/vertex control + map.
+    | 'geo'
     | 'note'
     | 'unsupported';
 
@@ -168,6 +171,17 @@ export interface RenderMatrix {
     cells: RenderOption[];
 }
 
+/**
+ * Geo capture config (Increment G5b2): author options for the geopoint/geotrace/geoshape control. Labels-free
+ * (no translation resolution). Mirrors the `GeoFieldConfig` the shared `FieldInput.vue` control reads.
+ */
+export interface RenderGeo {
+    captureAltitude: boolean;
+    accuracyThreshold: number | null;
+    defaultCenter: { lat: number; lon: number } | null;
+    defaultZoom: number | null;
+}
+
 export interface RenderField {
     key: string;
     sectionKey: string | null;
@@ -187,6 +201,8 @@ export interface RenderField {
     cascade: RenderCascade | null;
     /** Composite grid config (Increment G4b: matrix / likert_matrix); null for every other field type. */
     matrix: RenderMatrix | null;
+    /** Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other field type. */
+    geo: RenderGeo | null;
     sequence: number;
     sectionSequence: number | null;
 }

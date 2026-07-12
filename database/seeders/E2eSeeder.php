@@ -253,6 +253,24 @@ class E2eSeeder extends Seeder
                         ],
                     ],
                 ]);
+                // Geo (Increment G5b2): a point (with altitude + accuracy target), a trace, and a shape. All
+                // optional so an empty guest load stays axe-clean; the Leaflet map is a progressive enhancement
+                // over the always-present manual coordinate inputs + keyboard vertex list.
+                $sb->addField($showcase, $owner, FieldType::Geopoint, $showSection->id)->update([
+                    'label' => 'Pin your location',
+                    'config' => [
+                        'capture_altitude' => true,
+                        'accuracy_threshold' => 20,
+                        'default_center' => ['lat' => 14.5995, 'lon' => 120.9842],
+                        'default_zoom' => 11,
+                    ],
+                ]);
+                $sb->addField($showcase, $owner, FieldType::Geotrace, $showSection->id)->update([
+                    'label' => 'Trace your route',
+                ]);
+                $sb->addField($showcase, $owner, FieldType::Geoshape, $showSection->id)->update([
+                    'label' => 'Outline the area',
+                ]);
                 app(PublishService::class)->publish($showcase->refresh(), $owner);
 
                 $showcase->update([

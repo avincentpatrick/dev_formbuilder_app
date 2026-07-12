@@ -19,6 +19,7 @@
     "devDependencies": {
         "@axe-core/playwright": "^4.10.1",
         "@playwright/test": "^1.49.1",
+        "@types/leaflet": "^1.9.21",
         "@types/node": "^26.1.0",
         "@vitejs/plugin-vue": "^6.0.7",
         "@vue/test-utils": "^2.4.6",
@@ -33,6 +34,7 @@
     "dependencies": {
         "@inertiajs/vue3": "^3.6.0",
         "@meridian/design-system": "file:packages/design-system",
+        "leaflet": "^1.9.4",
         "vue": "^3.5.39"
     }
 }

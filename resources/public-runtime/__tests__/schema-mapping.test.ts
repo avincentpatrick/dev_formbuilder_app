@@ -61,6 +61,12 @@ describe('controlFor', () => {
         expect(controlFor('single_select', true)).toBe('select');
         expect(controlFor('multi_select', true)).toBe('checkboxes');
         expect(controlFor('yes_no', true)).toBe('yesno');
+        expect(controlFor('likert_matrix', true)).toBe('likert_matrix');
+        expect(controlFor('matrix', true)).toBe('matrix');
+        // Increment G5b2: all three geo types share the one 'geo' control kind.
+        expect(controlFor('geopoint', true)).toBe('geo');
+        expect(controlFor('geotrace', true)).toBe('geo');
+        expect(controlFor('geoshape', true)).toBe('geo');
         expect(controlFor('note', false)).toBe('note');
         expect(controlFor('signature', false)).toBe('unsupported');
     });
@@ -91,6 +97,45 @@ describe('buildRenderModel', () => {
             { value: 'm', label: 'm', labelTranslations: null },
         ]);
         expect(model.fields.find((f) => f.key === 'sig')!.supported).toBe(false);
+    });
+
+    it('marks geo types supported and normalizes their config snake_case → camelCase (G5b2)', () => {
+        const schema = schemaResponse({
+            fields: [
+                field({
+                    key: 'loc',
+                    field_type: 'geopoint',
+                    config: {
+                        capture_altitude: true,
+                        accuracy_threshold: 25,
+                        default_center: { lat: 14.6, lon: 121 },
+                        default_zoom: 12,
+                    },
+                }),
+                field({ key: 'route', field_type: 'geotrace' }),
+            ],
+        });
+        const model = buildRenderModel(schema);
+
+        const loc = model.fields.find((f) => f.key === 'loc')!;
+        expect(loc.control).toBe('geo');
+        expect(loc.supported).toBe(true);
+        expect(loc.geo).toEqual({
+            captureAltitude: true,
+            accuracyThreshold: 25,
+            defaultCenter: { lat: 14.6, lon: 121 },
+            defaultZoom: 12,
+        });
+
+        // A geo field with no author config still resolves to a complete, defaulted RenderGeo.
+        const route = model.fields.find((f) => f.key === 'route')!;
+        expect(route.control).toBe('geo');
+        expect(route.geo).toEqual({
+            captureAltitude: false,
+            accuracyThreshold: null,
+            defaultCenter: null,
+            defaultZoom: null,
+        });
     });
 
     it('sorts sections and fields by sequence', () => {

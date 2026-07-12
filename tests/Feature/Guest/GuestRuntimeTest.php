@@ -151,7 +151,10 @@ it('401s a tampered token before any tenant context is set', function (): void {
     enterTenant($tenant->id, $owner->id);
     $form = guestForm($tenant, $owner);
     $token = shareTokenFor($form);
-    $tampered = substr($token, 0, -1).($token[-1] === 'A' ? 'B' : 'A');
+    // Flip the FIRST char (a guaranteed-significant payload byte). Flipping the LAST base64 char was flaky:
+    // its low bits are unused when the encoded length isn't a multiple of 3, so it can decode to the same
+    // signature bytes → the tamper slips through and the endpoint returns 200 instead of 401.
+    $tampered = ($token[0] === 'A' ? 'B' : 'A').substr($token, 1);
 
     $this->getJson("http://acme.meridian.test/api/v1/public/f/{$tampered}")
         ->assertUnauthorized()

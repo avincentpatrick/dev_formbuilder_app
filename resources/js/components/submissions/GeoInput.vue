@@ -47,7 +47,6 @@ const showRequiredMarker = computed<boolean>(() => marker.value === 'required');
 const showOptionalMarker = computed<boolean>(() => marker.value === 'optional');
 
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '© OpenStreetMap contributors';
 
 // ── Local editing state (a controlled control needs a local mirror: a vertex may be half-entered, and the
 //    list needs stable keys the derived envelope cannot provide). Coordinates are stored lat/lon for the UI;
@@ -316,8 +315,10 @@ async function initMap(): Promise<void> {
 
         const center = props.field.geo?.defaultCenter ?? null;
         const zoom = props.field.geo?.defaultZoom ?? null;
-        map = leaflet.map(mapEl.value).setView([center?.lat ?? 0, center?.lon ?? 0], zoom ?? 2);
-        leaflet.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: 19 }).addTo(map);
+        // Disable Leaflet's built-in attribution control — its links fail WCAG (no underline + low contrast).
+        // The OSM credit is rendered as accessible, AA-contrast, underlined text below the map instead.
+        map = leaflet.map(mapEl.value, { attributionControl: false }).setView([center?.lat ?? 0, center?.lon ?? 0], zoom ?? 2);
+        leaflet.tileLayer(TILE_URL, { maxZoom: 19 }).addTo(map);
         map.on('click', (event) => onMapClick(event.latlng.lat, event.latlng.lng));
         syncMap();
         fitMap();
@@ -549,6 +550,19 @@ function fitMap(): void {
              its own keys; the labelled inputs above are the accessible, always-present alternative. -->
         <div ref="mapEl" class="geo__map" role="application" :aria-label="mapAriaLabel"></div>
 
+        <!-- OSM attribution (Leaflet's own control is disabled — its links fail WCAG). Underlined + AA contrast. -->
+        <p class="geo__attribution">
+            Map data ©
+            <a
+                class="geo__attribution-link"
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noopener noreferrer"
+                >OpenStreetMap</a
+            >
+            contributors
+        </p>
+
         <p class="geo__live" aria-live="polite">{{ announce }}</p>
 
         <div class="geo__error" aria-live="polite">
@@ -683,6 +697,25 @@ function fitMap(): void {
     border-radius: var(--mds-radius-md);
     background-color: var(--mds-color-bg-sunken);
     z-index: 0;
+}
+
+.geo__attribution {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    color: var(--mds-color-text-secondary);
+}
+
+.geo__attribution-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: underline;
+}
+
+.geo__attribution-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 
 /* Empty until an action is announced; a screen-reader-only live region (kept out of the visual flow). */

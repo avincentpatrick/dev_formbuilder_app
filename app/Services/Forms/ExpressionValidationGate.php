@@ -39,13 +39,18 @@ final class ExpressionValidationGate
         $knownKeys = [];
         /** @var array<string, string> $fieldKeyById */
         $fieldKeyById = [];
-        /** @var array<string, bool> $compositeKeys */
-        $compositeKeys = [];
+        // Object-valued field keys forbidden as expression operands: grids (G4b) and geo (G5b1). Both are
+        // object-shaped with no valid scalar use — a reference would silently coerce to false and drift
+        // between the engines. Value = the kind, so the right PublishValidationException is thrown.
+        /** @var array<string, 'grid'|'geo'> $objectValuedKeys */
+        $objectValuedKeys = [];
         foreach ($fields as $field) {
             $knownKeys[$field->key] = true;
             $fieldKeyById[$field->id] = $field->key;
-            if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
-                $compositeKeys[$field->key] = true;
+            if ($field->field_type->isComposite()) {
+                $objectValuedKeys[$field->key] = 'grid';
+            } elseif ($field->field_type->isGeo()) {
+                $objectValuedKeys[$field->key] = 'geo';
             }
         }
 
@@ -56,19 +61,19 @@ final class ExpressionValidationGate
         }
 
         foreach ($fields as $field) {
-            $this->check($field->relevant_expression, $knownKeys, $compositeKeys, ExpressionKind::Relevant, $field->key);
-            $this->check($this->calculateFormula($field), $knownKeys, $compositeKeys, ExpressionKind::Calculate, $field->key);
+            $this->check($field->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $field->key);
+            $this->check($this->calculateFormula($field), $knownKeys, $objectValuedKeys, ExpressionKind::Calculate, $field->key);
         }
 
         foreach ($sections as $section) {
-            $this->check($section->relevant_expression, $knownKeys, $compositeKeys, ExpressionKind::Relevant, $section->key);
+            $this->check($section->relevant_expression, $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $section->key);
         }
 
         foreach ($validations as $validation) {
             $ownerKey = $fieldKeyById[$validation->form_field_id] ?? '(unknown)';
 
             if ($validation->expression !== null) {
-                $this->check($validation->expression, $knownKeys, $compositeKeys, ExpressionKind::Constraint, $ownerKey);
+                $this->check($validation->expression, $knownKeys, $objectValuedKeys, ExpressionKind::Constraint, $ownerKey);
 
                 continue;
             }
@@ -79,9 +84,9 @@ final class ExpressionValidationGate
 
     /**
      * @param  array<string, bool>  $knownKeys
-     * @param  array<string, bool>  $compositeKeys  field keys whose type is a composite grid (G4b) — forbidden as operands
+     * @param  array<string, 'grid'|'geo'>  $objectValuedKeys  object-valued field keys forbidden as operands (grid G4b / geo G5b1)
      */
-    private function check(?string $expression, array $knownKeys, array $compositeKeys, ExpressionKind $kind, string $ownerKey): void
+    private function check(?string $expression, array $knownKeys, array $objectValuedKeys, ExpressionKind $kind, string $ownerKey): void
     {
         if ($expression === null || trim($expression) === '') {
             return; // blank = no expression
@@ -94,11 +99,15 @@ final class ExpressionValidationGate
             throw PublishValidationException::expressionInvalid($exception->fieldKey() ?? $ownerKey, $exception->slug());
         }
 
-        // Increment G4b: a grid (matrix/likert_matrix) value is object-shaped and has no valid scalar use —
-        // reject any reference rather than let it silently coerce to false (and drift between the engines).
-        if ($compositeKeys !== []) {
+        // A grid (G4b) or geo (G5b1) value is object-shaped and has no valid scalar use — reject any
+        // reference rather than let it silently coerce to false (and drift between the engines).
+        if ($objectValuedKeys !== []) {
             foreach ($this->parser->referencedKeys($ast) as $key) {
-                if (isset($compositeKeys[$key])) {
+                $kindOfKey = $objectValuedKeys[$key] ?? null;
+                if ($kindOfKey === 'geo') {
+                    throw PublishValidationException::expressionReferencesGeo($ownerKey, $key);
+                }
+                if ($kindOfKey === 'grid') {
                     throw PublishValidationException::expressionReferencesComposite($ownerKey, $key);
                 }
             }

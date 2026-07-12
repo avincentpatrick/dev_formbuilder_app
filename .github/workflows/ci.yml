@@ -73,7 +73,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
+        # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
+        image: postgis/postgis:17-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret
@@ -135,6 +137,12 @@ jobs:
           CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
           CREATE DATABASE meridian_testing OWNER meridian_app;
           GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          -- Increment G5b1 / ADR-0006: PostGIS is per-database and must be enabled as a superuser
+          -- (the NOSUPERUSER app role is denied). Enable in both meridian and meridian_testing; the
+          -- guarded pgsql_privileged migration re-asserts it so migrate:fresh stays self-contained.
+          CREATE EXTENSION IF NOT EXISTS postgis;
+          \connect meridian_testing
+          CREATE EXTENSION IF NOT EXISTS postgis;
           SQL
 
       - name: Run test suite (Pest)
@@ -196,7 +204,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
+        # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
+        image: postgis/postgis:17-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret
@@ -247,6 +257,12 @@ jobs:
           CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
           CREATE DATABASE meridian_testing OWNER meridian_app;
           GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          -- Increment G5b1 / ADR-0006: PostGIS is per-database and must be enabled as a superuser
+          -- (the NOSUPERUSER app role is denied). Enable in both meridian and meridian_testing; the
+          -- guarded pgsql_privileged migration re-asserts it so migrate:fresh stays self-contained.
+          CREATE EXTENSION IF NOT EXISTS postgis;
+          \connect meridian_testing
+          CREATE EXTENSION IF NOT EXISTS postgis;
           SQL
 
       - name: Migrate the schema (Scramble introspects the models for response shapes)
@@ -279,7 +295,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        # PostGIS build (Increment G5b1, ADR-0006) — superset of postgres:17 on the same PG major, so
+        # every existing role/RLS/table behaves identically; adds the geometry capability geo needs.
+        image: postgis/postgis:17-3.5
         env:
           POSTGRES_USER: meridian
           POSTGRES_PASSWORD: secret
@@ -350,6 +368,12 @@ jobs:
           CREATE ROLE meridian_superadmin LOGIN PASSWORD 'secret' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
           CREATE DATABASE meridian_testing OWNER meridian_app;
           GRANT ALL PRIVILEGES ON DATABASE meridian_testing TO meridian_app;
+          -- Increment G5b1 / ADR-0006: PostGIS is per-database and must be enabled as a superuser
+          -- (the NOSUPERUSER app role is denied). Enable in both meridian and meridian_testing; the
+          -- guarded pgsql_privileged migration re-asserts it so migrate:fresh stays self-contained.
+          CREATE EXTENSION IF NOT EXISTS postgis;
+          \connect meridian_testing
+          CREATE EXTENSION IF NOT EXISTS postgis;
           SQL
 
       - name: Map tenant + central hosts to loopback

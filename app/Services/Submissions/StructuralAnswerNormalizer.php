@@ -238,6 +238,12 @@ final class StructuralAnswerNormalizer
             FieldType::Matrix => $this->coerceMatrix($field, $value),
             FieldType::LikertMatrix => $this->coerceLikertMatrix($field, $value),
 
+            // Geospatial (Increment G5b1 / ADR-0006): the object-valued GeoJSON envelope
+            // {type, coordinates, accuracy?}. Only STRUCTURAL faults here (an object with a string `type`
+            // and an array `coordinates`); coordinate range / ring closure / min-points / type-match are
+            // the relevance-aware Stage-3 checks (so they also run in the client engine, golden lockstep).
+            FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape => $this->coerceGeo($field, $value),
+
             // Scalar-valued types: reject an array, otherwise store a canonical string. `likert_scale` (G4a)
             // is a single chosen scale point, so it coerces exactly like a single_select.
             FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
@@ -247,9 +253,9 @@ final class StructuralAnswerNormalizer
                 ? [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')]
                 : [true, Coercion::toStr($value), null],
 
-            // Remaining advanced types (geo/media/matrix/likert_matrix/duration) have no manual-encode
-            // renderer yet; pass any value through untouched so the pipeline stays channel-agnostic and a
-            // future channel's payload is not rejected here.
+            // Remaining advanced types (media/duration) have no manual-encode renderer yet; pass any value
+            // through untouched so the pipeline stays channel-agnostic and a future channel's payload is
+            // not rejected here.
             default => [true, $value, null],
         };
     }
@@ -309,6 +315,61 @@ final class StructuralAnswerNormalizer
         }
 
         return $list === [] ? [false, null, null] : [true, $list, null];
+    }
+
+    /**
+     * Geospatial (Increment G5b1 / ADR-0006) → the canonical GeoJSON envelope `{type, coordinates,
+     * accuracy?}`. Structural faults only: the value must be an object (not a list/scalar →
+     * `expected_object`) carrying a string `type` and an array `coordinates` (else `geo_malformed`).
+     * Numeric-string ordinates are coerced to floats so the stored envelope feeds `ST_GeomFromGeoJSON`
+     * cleanly; coordinate range, ring closure, min-points and type-match are the relevance-aware Stage-3
+     * checks (processGeo), so they also run in the client TS engine and stay in golden lockstep. An empty
+     * `{}` never reaches here — it is dropped as unanswered by the isEmpty guard in normalize().
+     *
+     * @return array{0: bool, 1: array<string, mixed>|null, 2: array{field: string, rule: string, message: string}|null}
+     */
+    private function coerceGeo(FormField $field, mixed $value): array
+    {
+        if (! is_array($value) || array_is_list($value)) {
+            return [false, null, $this->mismatch($field->key, 'expected_object', 'This field must be a location value.')];
+        }
+
+        $type = $value['type'] ?? null;
+        $coordinates = $value['coordinates'] ?? null;
+        if (! is_string($type) || $type === '' || ! is_array($coordinates)) {
+            return [false, null, $this->mismatch($field->key, 'geo_malformed', 'This location value is malformed.')];
+        }
+
+        $envelope = [
+            'type' => $type,
+            'coordinates' => $this->coerceOrdinates($coordinates),
+        ];
+
+        $accuracy = $value['accuracy'] ?? null;
+        if (Coercion::isNumericLike($accuracy)) {
+            $envelope['accuracy'] = Coercion::toNumber($accuracy);
+        }
+
+        return [true, $envelope, null];
+    }
+
+    /**
+     * Recursively coerce numeric-string ordinates to numbers, preserving the array nesting (Point =
+     * flat `[lon,lat]`; LineString = `[[lon,lat],…]`; Polygon = `[[[lon,lat],…]]`). Non-numeric leaves
+     * are left as-is for Stage-3 processGeo to flag (`geo_out_of_range`).
+     *
+     * @param  array<int|string, mixed>  $coordinates
+     * @return array<int|string, mixed>
+     */
+    private function coerceOrdinates(array $coordinates): array
+    {
+        return array_map(function (mixed $element): mixed {
+            if (is_array($element)) {
+                return $this->coerceOrdinates($element);
+            }
+
+            return Coercion::isNumericLike($element) ? Coercion::toNumber($element) : $element;
+        }, $coordinates);
     }
 
     /**

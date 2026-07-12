@@ -108,6 +108,12 @@ final class SemanticValidator
         // the PHP and TS engines). Their relevance-pruned object replaces the raw effective answer.
         $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
 
+        // Geospatial fields (Increment G5b1) are validated in their own pass for the same reason as
+        // composites (an object answer must not hit scalar isEmpty). Structural geometry checks (type,
+        // coordinate range, ring closure, min-points) — no grammar change. An empty envelope is unset so
+        // effective answers stay byte-identical across the PHP/TS engines ({} vs []).
+        $geoErrors = $this->processGeo($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
+
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result
         // is written to `computed`. Computed values do not feed back into relevance/constraints (documented).
@@ -116,7 +122,7 @@ final class SemanticValidator
         return new SemanticResult(
             $fieldRelevance,
             $sectionRelevance,
-            array_merge($errors, $repeatErrors, $compositeErrors),
+            array_merge($errors, $repeatErrors, $compositeErrors, $geoErrors),
             $effectiveAnswers,
             $computed,
             $repeatRelevance,
@@ -409,6 +415,13 @@ final class SemanticValidator
         // dedicated processComposites pass — never here, where Coercion::isEmpty on the whole object would
         // diverge from the TS mirror (PHP isEmpty([]) === true vs TS isEmpty({}) === false).
         if ($field->field_type === FieldType::Matrix || $field->field_type === FieldType::LikertMatrix) {
+            return;
+        }
+
+        // Geospatial fields (Increment G5b1) hold an object-valued GeoJSON envelope and are validated by
+        // the dedicated processGeo pass — never here, for the same reason as composites (Coercion::isEmpty
+        // on the whole object diverges: PHP isEmpty([]) === true vs TS isEmpty({}) === false).
+        if ($field->field_type->isGeo()) {
             return;
         }
 
@@ -741,6 +754,151 @@ final class SemanticValidator
         }
 
         return array_values(array_unique($values));
+    }
+
+    /**
+     * Geospatial pass (Increment G5b1 / ADR-0006), the object-valued sibling of processComposites. Each
+     * relevant geo field's GeoJSON envelope is validated structurally (never through scalar isEmpty): the
+     * geometry `type` must match the field, coordinates must be in range, a line needs ≥ 2 points, a
+     * polygon ring needs ≥ 4 points and must be closed. A structurally-empty envelope (no coordinates)
+     * is a required error (if required) and is unset so effective answers stay identical across engines
+     * ({} in TS vs [] in PHP). Whole-field faults → no cellPath. Runs identically in the TS mirror.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  array<string, bool>  $fieldRelevance
+     * @param  array<string, mixed>  $effectiveAnswers
+     * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
+     * @param  array<string, string>  $fieldKeyById
+     * @return list<SemanticError>
+     */
+    private function processGeo(
+        Collection $fields,
+        array $fieldRelevance,
+        array &$effectiveAnswers,
+        array $ruleSets,
+        array $fieldKeyById,
+        string $locale,
+        ?string $now,
+    ): array {
+        /** @var list<SemanticError> $errors */
+        $errors = [];
+        $context = new EvaluationContext($effectiveAnswers, now: $now);
+
+        foreach ($fields as $field) {
+            if (! $field->field_type->isGeo()) {
+                continue;
+            }
+            if (($fieldRelevance[$field->key] ?? false) !== true) {
+                continue; // hidden geo: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            $sets = $ruleSets[$field->id] ?? [];
+            [$required, $trigger] = $this->requiredState($field, $sets['required'] ?? [], $context, $fieldKeyById);
+            $requiredMessage = $trigger !== null
+                ? $this->resolveMessage($trigger, $locale, self::DEFAULT_REQUIRED_MESSAGE)
+                : self::DEFAULT_REQUIRED_MESSAGE;
+
+            $raw = $effectiveAnswers[$field->key] ?? null;
+            if (! $this->validateGeo($field, $raw, $required, $requiredMessage, $errors)) {
+                unset($effectiveAnswers[$field->key]); // empty envelope — keep engines byte-identical
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Validate one geo envelope; append any faults. Returns whether the answer is a non-empty envelope
+     * (kept in effective answers) vs structurally empty (the caller unsets it). `geopoint` → `Point`,
+     * `geotrace` → `LineString` (≥ 2 pts), `geoshape` → closed `Polygon` (≥ 4 pts, first == last).
+     *
+     * @param  list<SemanticError>  $errors
+     */
+    private function validateGeo(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): bool
+    {
+        $expectedType = match ($field->field_type) {
+            FieldType::Geotrace => 'LineString',
+            FieldType::Geoshape => 'Polygon',
+            default => 'Point',
+        };
+
+        // Structural emptiness — decided WITHOUT scalar isEmpty (which diverges on {} across engines).
+        $coordinates = is_array($raw) ? ($raw['coordinates'] ?? null) : null;
+        if (! is_array($coordinates) || $coordinates === []) {
+            if ($required) {
+                $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage);
+            }
+
+            return false;
+        }
+
+        // $raw is a non-empty array here (else the emptiness guard above returned false).
+        if (($raw['type'] ?? null) !== $expectedType) {
+            $errors[] = new SemanticError($field->key, 'geo_type_mismatch', 'This location value has the wrong geometry type.');
+
+            return true;
+        }
+
+        if ($expectedType === 'Point') {
+            $positions = [$coordinates];
+        } elseif ($expectedType === 'LineString') {
+            $positions = $coordinates;
+            if (count($positions) < 2) {
+                $errors[] = new SemanticError($field->key, 'geo_too_few_points', 'A line needs at least two points.');
+            }
+        } else { // Polygon — validate the first (outer) ring
+            $ring = $coordinates[0] ?? null;
+            $positions = is_array($ring) ? $ring : [];
+            if (count($positions) < 4) {
+                $errors[] = new SemanticError($field->key, 'geo_too_few_points', 'An area needs at least four points to close a ring.');
+            } elseif (! $this->samePosition($positions[0], $positions[count($positions) - 1])) {
+                $errors[] = new SemanticError($field->key, 'geo_not_closed', 'The area boundary must be closed: the first and last points must match.');
+            }
+        }
+
+        foreach ($positions as $position) {
+            if (! $this->positionInRange($position)) {
+                $errors[] = new SemanticError($field->key, 'geo_out_of_range', 'A coordinate is out of range (longitude ±180, latitude ±90).');
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * A `[lon, lat]` position is in range when both ordinates are numeric and within WGS84 bounds. A
+     * non-array position or a non-numeric ordinate (→ NaN via the shared Coercion primitive, identical in
+     * the TS mirror) is out of range.
+     */
+    private function positionInRange(mixed $position): bool
+    {
+        if (! is_array($position)) {
+            return false;
+        }
+
+        $lon = Coercion::toNumber($position[0] ?? null);
+        $lat = Coercion::toNumber($position[1] ?? null);
+
+        if (is_nan($lon) || is_nan($lat)) {
+            return false;
+        }
+
+        return $lon >= -180.0 && $lon <= 180.0 && $lat >= -90.0 && $lat <= 90.0;
+    }
+
+    /**
+     * Two positions are equal when their numeric lon/lat coincide (NaN never equals NaN, so a malformed
+     * endpoint reads as unequal — identical to the TS mirror).
+     */
+    private function samePosition(mixed $a, mixed $b): bool
+    {
+        if (! is_array($a) || ! is_array($b)) {
+            return false;
+        }
+
+        return Coercion::toNumber($a[0] ?? null) === Coercion::toNumber($b[0] ?? null)
+            && Coercion::toNumber($a[1] ?? null) === Coercion::toNumber($b[1] ?? null);
     }
 
     /**

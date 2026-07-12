@@ -1,0 +1,137 @@
+[
+  {
+    "name": "geopoint valid in range passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint" } ] },
+    "answers": { "loc": { "type": "Point", "coordinates": [121.05, 14.6] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": { "type": "Point", "coordinates": [121.05, 14.6] } }
+    }
+  },
+  {
+    "name": "geotrace valid two points passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geotrace" } ] },
+    "answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6], [121.1, 14.7]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6], [121.1, 14.7]] } }
+    }
+  },
+  {
+    "name": "geoshape valid closed ring passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geoshape" } ] },
+    "answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.1, 14.7], [121.0, 14.6]]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.1, 14.7], [121.0, 14.6]]] } }
+    }
+  },
+  {
+    "name": "geopoint longitude out of range fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint" } ] },
+    "answers": { "loc": { "type": "Point", "coordinates": [200.0, 14.6] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_out_of_range" } ],
+      "effective_answers": { "loc": { "type": "Point", "coordinates": [200.0, 14.6] } }
+    }
+  },
+  {
+    "name": "geopoint latitude out of range fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint" } ] },
+    "answers": { "loc": { "type": "Point", "coordinates": [121.0, 95.0] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_out_of_range" } ],
+      "effective_answers": { "loc": { "type": "Point", "coordinates": [121.0, 95.0] } }
+    }
+  },
+  {
+    "name": "geotrace with one point is too few",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geotrace" } ] },
+    "answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_too_few_points" } ],
+      "effective_answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6]] } }
+    }
+  },
+  {
+    "name": "geoshape unclosed ring fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geoshape" } ] },
+    "answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.1, 14.7], [121.2, 14.8]]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_not_closed" } ],
+      "effective_answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.1, 14.7], [121.2, 14.8]]] } }
+    }
+  },
+  {
+    "name": "geoshape ring with three points is too few",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geoshape" } ] },
+    "answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.0, 14.6]]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_too_few_points" } ],
+      "effective_answers": { "loc": { "type": "Polygon", "coordinates": [[[121.0, 14.6], [121.1, 14.6], [121.0, 14.6]]] } }
+    }
+  },
+  {
+    "name": "geopoint given a linestring is a type mismatch",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint" } ] },
+    "answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6], [121.1, 14.7]] } },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "geo_type_mismatch" } ],
+      "effective_answers": { "loc": { "type": "LineString", "coordinates": [[121.0, 14.6], [121.1, 14.7]] } }
+    }
+  },
+  {
+    "name": "geopoint empty object optional is dropped",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint" } ] },
+    "answers": { "loc": {} },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "geopoint empty object required errors and is dropped",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "geopoint", "is_required": "required" } ] },
+    "answers": { "loc": {} },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "field_required" } ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "geopoint hidden by relevance is not checked",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "loc", "field_type": "geopoint", "is_required": "required", "relevant": "${gate} = 'go'" }
+    ] },
+    "answers": { "gate": "stop", "loc": { "type": "Point", "coordinates": [200.0, 14.6] } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "loc": false } },
+      "errors": [],
+      "effective_answers": { "gate": "stop" }
+    }
+  }
+]

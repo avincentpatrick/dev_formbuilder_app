@@ -17,6 +17,7 @@ use App\Models\SubmissionAnswerIndex;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,8 @@ use Illuminate\Support\Facades\DB;
  *   2. Integrity   — the version is published; a replayed `client_submission_uuid` is an idempotent no-op.
  *   3. Semantic    — {@see SemanticValidator}: relevance settle + required + constraints (F3).
  *   4. Persist     — one transaction: `submissions` + `submission_answers` (relevance-pruned JSONB) + the
- *                    typed `submission_answer_index` projection; `SubmissionCreated` dispatched post-commit.
+ *                    typed `submission_answer_index` projection + the `submission_geo_index` PostGIS
+ *                    projection (ADR-0006); `SubmissionCreated` dispatched post-commit.
  *
  * Registered as a singleton so it shares the memoised singleton expression parser/evaluator (via the
  * validator). Attachments and audit records — the architecture's other Stage-4 inserts — are deferred:
@@ -43,6 +45,7 @@ final class SubmissionPipeline
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
         private readonly AnswerIndexProjector $projector,
+        private readonly GeoIndexProjector $geoProjector,
     ) {}
 
     public function submit(SubmissionPayload $payload): SubmissionResult
@@ -135,6 +138,7 @@ final class SubmissionPipeline
         ]);
 
         $this->projectIndex($submission, $version, $fields, $answers);
+        $this->projectGeo($submission, $version, $fields, $answers);
 
         return $submission;
     }
@@ -175,6 +179,58 @@ final class SubmissionPipeline
                 'field_key' => $field->key,
                 $projection['column'] => $projection['value'],
             ]);
+        }
+    }
+
+    /**
+     * The PostGIS geometry projection (ADR-0006 D1) — the object-valued sibling of {@see projectIndex},
+     * acting on exactly the top-level geo answers that projectIndex skips (arrays/objects are never
+     * scalar-indexed). Written inside the same persist transaction as the JSONB, so the geometry can
+     * never drift from the source-of-truth envelope (Risk R1). Uses a bound raw insert because the
+     * geometry is built by `ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)` (Blueprint/Eloquent cannot express
+     * a PostGIS function call); `tenant_id` comes from the request GUC the table's FORCE-RLS WITH CHECK
+     * matches. Geo inside a repeatable section is banned at publish, so top-level iteration suffices.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  array<string, mixed>  $effectiveAnswers
+     */
+    private function projectGeo(Submission $submission, FormVersion $version, Collection $fields, array $effectiveAnswers): void
+    {
+        /** @var array<string, FormField> $byKey */
+        $byKey = [];
+        foreach ($fields as $field) {
+            $byKey[$field->key] = $field;
+        }
+
+        $tenantId = TenantContext::currentTenantId();
+
+        foreach ($effectiveAnswers as $key => $value) {
+            $field = $byKey[$key] ?? null;
+            if ($field === null || ! $field->field_type->isGeo()) {
+                continue;
+            }
+
+            $projection = $this->geoProjector->project($field, $value);
+            if ($projection === null) {
+                continue;
+            }
+
+            DB::insert(
+                'INSERT INTO submission_geo_index '
+                .'(tenant_id, submission_id, form_version_id, form_field_id, field_key, '
+                .'geometry_type, captured_accuracy, geom, created_at, updated_at) '
+                .'VALUES (?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), now(), now())',
+                [
+                    $tenantId,
+                    $submission->id,
+                    $version->id,
+                    $field->id,
+                    $field->key,
+                    $projection['geometry_type'],
+                    $projection['captured_accuracy'],
+                    $projection['geojson'],
+                ],
+            );
         }
     }
 

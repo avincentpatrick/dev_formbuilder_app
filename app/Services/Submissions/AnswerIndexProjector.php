@@ -33,7 +33,7 @@ final class AnswerIndexProjector
         }
 
         if (Coercion::isEmpty($answer) || is_array($answer)) {
-            return null; // scalar, non-repeated values only (§9)
+            return null; // scalar, non-repeated values only (§9); object-valued geo → {@see GeoIndexProjector}
         }
 
         return match ($field->indexed_data_type) {

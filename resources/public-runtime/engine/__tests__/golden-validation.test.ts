@@ -45,6 +45,9 @@ type FieldFragment = {
     relevant?: string;
     calculate?: string;
     rules?: RuleFragment[];
+    // Choice-membership + cascading config (G4a) — mirror of the PHP builder's config injection.
+    options?: string[];
+    cascade?: { levels: string[]; options: { value: string; level: string; parent: string | null }[] };
 };
 
 type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
@@ -120,6 +123,8 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             form_section_id: field.section ?? null,
             relevant_expression: field.relevant ?? null,
             calculate: field.calculate ?? null,
+            options: field.options ?? null,
+            cascade: field.cascade ?? null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Forms;
 
 use App\Enums\ComparisonOperator;
+use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
@@ -20,6 +21,13 @@ use Illuminate\Validation\Rule;
  * expression-XOR-rule_type invariant (a friendly mirror of the DB CHECK). Expressions are NOT semantically
  * validated (the expression engine is deferred ADR-0004 work). Authorization is `can:update,form`; the
  * optimistic-concurrency token (`version`) is checked in the service, not here.
+ *
+ * Per-type `config` shape (Increment G4a): the choice-editor types (`config.options` = `[{value,label}]`)
+ * and `cascading_select` (`config.levels`/`config.options` with `level`/`parent`) get type/shape rules
+ * here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that transiently
+ * clears an option value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading
+ * hierarchy integrity are enforced at PUBLISH (StructuralValidationGate / assertCascadingResolves), the
+ * same "persist unvalidated config, validate at publish" posture as a calculated field's formula.
  */
 final class UpdateFieldRequest extends FormRequest
 {
@@ -34,6 +42,7 @@ final class UpdateFieldRequest extends FormRequest
         $field = $this->route('field');
 
         return [
+            ...$this->configRules($field->field_type),
             'key' => [
                 'required', 'string', 'max:150', 'regex:/^[a-z][a-z0-9_]*$/',
                 Rule::unique('form_fields', 'key')
@@ -61,6 +70,39 @@ final class UpdateFieldRequest extends FormRequest
             'validations.*.error_message' => ['nullable', 'string', 'max:500'],
             'validations.*.related_field_key' => ['nullable', 'string', 'max:150'],
         ];
+    }
+
+    /**
+     * The per-type `config` shape rules (lenient — type/structure only; see the class docblock). A choice
+     * type validates its `options` list; `cascading_select` validates its `levels` + parented `options`.
+     * All values are `nullable` so a transient mid-edit state never rejects the optimistic PATCH.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function configRules(FieldType $type): array
+    {
+        if ($type === FieldType::CascadingSelect) {
+            return [
+                'config.levels' => ['sometimes', 'array'],
+                'config.levels.*.key' => ['nullable', 'string', 'max:150'],
+                'config.levels.*.label' => ['nullable', 'string', 'max:255'],
+                'config.options' => ['sometimes', 'array'],
+                'config.options.*.value' => ['nullable', 'string', 'max:255'],
+                'config.options.*.label' => ['nullable', 'string', 'max:500'],
+                'config.options.*.level' => ['nullable', 'string', 'max:150'],
+                'config.options.*.parent' => ['nullable', 'string', 'max:255'],
+            ];
+        }
+
+        if ($type->configEditor() === 'choices') {
+            return [
+                'config.options' => ['sometimes', 'array'],
+                'config.options.*.value' => ['nullable', 'string', 'max:255'],
+                'config.options.*.label' => ['nullable', 'string', 'max:500'],
+            ];
+        }
+
+        return [];
     }
 
     public function withValidator(Validator $validator): void

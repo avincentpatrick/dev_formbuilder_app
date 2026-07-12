@@ -19,7 +19,11 @@ function update(index: number, patch: Partial<Choice>): void {
     emit('update:options', next);
 }
 function add(): void {
-    const n = props.options.length + 1;
+    // Pick a value not already in use — publish requires distinct option values (G4a), so a naive
+    // length+1 (which can collide after a remove) must not reintroduce a duplicate.
+    const existing = new Set(props.options.map((o) => o.value));
+    let n = props.options.length + 1;
+    while (existing.has(`option_${n}`)) n++;
     emit('update:options', [...props.options, { value: `option_${n}`, label: `Option ${n}` }]);
 }
 function remove(index: number): void {

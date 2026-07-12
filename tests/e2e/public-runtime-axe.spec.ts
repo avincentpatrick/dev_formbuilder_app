@@ -42,6 +42,25 @@ for (const theme of themes) {
     });
 }
 
+// The G4a field-type controls (Increment G4a). The guest-enabled "Field Types Showcase" (E2eSeeder) renders
+// a Likert rating scale (a radio group) + an N-level cascading (dependent) select. Scan the initial state,
+// then choose a region — which enables + repopulates the dependent province select — and scan again, in
+// light and dark at all three viewports (WCAG 2.2 AA + no horizontal overflow; wide grids/rows are the risk).
+for (const theme of themes) {
+    test(`Public runtime field types (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/field-types', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Field Types Showcase', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Field Types Showcase (initial)');
+
+        // Choose a region → the dependent province select enables + lists NCR's children; scan again.
+        await page.getByRole('combobox', { name: 'Region' }).selectOption('ncr');
+        await assertClean(page, 'Field Types Showcase (cascade parent chosen)');
+    });
+}
+
 // A full guest submit (Clinic Intake's fields are all optional) drives the F5 guest submit endpoint end-to-end
 // and lands on the post-submit confirmation, which is itself scanned for accessibility.
 test('Public runtime — submit reaches an accessible confirmation', async ({ page }) => {

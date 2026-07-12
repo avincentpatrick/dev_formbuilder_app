@@ -120,6 +120,9 @@ export type ControlKind =
     | 'select'
     | 'checkboxes'
     | 'yesno'
+    // Increment G4a: a single-choice rating scale (radio group) + an N-level dependent select.
+    | 'scale'
+    | 'cascading'
     | 'note'
     | 'unsupported';
 
@@ -127,6 +130,27 @@ export interface RenderOption {
     value: string;
     label: string;
     labelTranslations: Record<string, string> | null;
+}
+
+/** One cascading-select level's label (Increment G4a); translations resolved by the render layer. */
+export interface RenderCascadeLevel {
+    key: string;
+    label: string;
+    labelTranslations: Record<string, string> | null;
+}
+
+/** One cascading-select option, tagged with its owning level + parent value (Increment G4a). */
+export interface RenderCascadeOption {
+    value: string;
+    label: string;
+    labelTranslations: Record<string, string> | null;
+    level: string;
+    parent: string | null;
+}
+
+export interface RenderCascade {
+    levels: RenderCascadeLevel[];
+    options: RenderCascadeOption[];
 }
 
 export interface RenderField {
@@ -144,6 +168,8 @@ export interface RenderField {
     hintTranslations: Record<string, string> | null;
     placeholder: string | null;
     options: RenderOption[];
+    /** Cascading-select hierarchy (Increment G4a); null for every other field type. */
+    cascade: RenderCascade | null;
     sequence: number;
     sectionSequence: number | null;
 }

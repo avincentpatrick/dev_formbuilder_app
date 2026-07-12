@@ -179,6 +179,51 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // A guest-enabled form showcasing the Increment G4a controls — a Likert rating scale (radio group)
+            // + an N-level cascading (dependent) select. Both optional so an empty guest load is axe-clean.
+            // Reached at /f/field-types; the public-runtime axe scan renders both new controls in light + dark.
+            if (Form::query()->where('title', 'Field Types Showcase')->doesntExist()) {
+                $showcase = app(FormService::class)->create(
+                    $tenant, $owner, 'Field Types Showcase', 'Likert scale + cascading select (G4a demo).'
+                );
+                $sb = app(FormBuilderService::class);
+                $showSection = $sb->addSection($showcase);
+                $sb->addField($showcase, $owner, FieldType::LikertScale, $showSection->id)->update([
+                    'label' => 'How satisfied were you?',
+                    'config' => ['options' => [
+                        ['value' => '1', 'label' => 'Very dissatisfied'],
+                        ['value' => '2', 'label' => 'Dissatisfied'],
+                        ['value' => '3', 'label' => 'Neutral'],
+                        ['value' => '4', 'label' => 'Satisfied'],
+                        ['value' => '5', 'label' => 'Very satisfied'],
+                    ]],
+                ]);
+                $sb->addField($showcase, $owner, FieldType::CascadingSelect, $showSection->id)->update([
+                    'label' => 'Where are you located?',
+                    'config' => [
+                        'levels' => [
+                            ['key' => 'region', 'label' => 'Region'],
+                            ['key' => 'province', 'label' => 'Province'],
+                        ],
+                        'options' => [
+                            ['value' => 'ncr', 'label' => 'NCR', 'level' => 'region', 'parent' => null],
+                            ['value' => 'central_visayas', 'label' => 'Central Visayas', 'level' => 'region', 'parent' => null],
+                            ['value' => 'manila', 'label' => 'Manila', 'level' => 'province', 'parent' => 'ncr'],
+                            ['value' => 'quezon_city', 'label' => 'Quezon City', 'level' => 'province', 'parent' => 'ncr'],
+                            ['value' => 'cebu', 'label' => 'Cebu', 'level' => 'province', 'parent' => 'central_visayas'],
+                        ],
+                    ],
+                ]);
+                app(PublishService::class)->publish($showcase->refresh(), $owner);
+
+                $showcase->update([
+                    'public_slug' => 'field-types',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => true,
+                ]);
+            }
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();

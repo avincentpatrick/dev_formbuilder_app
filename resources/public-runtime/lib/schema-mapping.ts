@@ -12,6 +12,7 @@
  */
 
 import type {
+    CascadeConfig,
     ComparisonOperator,
     LogicOperator,
     SchemaField,
@@ -25,6 +26,9 @@ import type {
     ControlKind,
     RawField,
     RawSection,
+    RenderCascade,
+    RenderCascadeLevel,
+    RenderCascadeOption,
     RenderField,
     RenderModel,
     RenderOption,
@@ -34,13 +38,14 @@ import type {
 
 export type EngineSchema = Pick<SemanticInput, 'fields' | 'sections' | 'validations'>;
 
-// The 14 Phase-1 scalar types with a real renderer (mirror of EncodeFormPresenter::SUPPORTED). Everything
-// else is surfaced as an "unsupported" notice rather than silently dropped.
+// The types with a real renderer (mirror of EncodeFormPresenter::SUPPORTED). Everything else is surfaced as
+// an "unsupported" notice rather than silently dropped. Increment G4a adds likert_scale + cascading_select.
 const SUPPORTED = new Set<string>([
     'short_text', 'long_text', 'email', 'phone', 'url',
     'integer', 'decimal',
     'date', 'time', 'datetime',
     'single_select', 'multi_select', 'dropdown', 'yes_no',
+    'likert_scale', 'cascading_select',
 ]);
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
@@ -74,6 +79,12 @@ export function controlFor(fieldType: string, supported: boolean): ControlKind {
     if (fieldType === 'yes_no') {
         return 'yesno';
     }
+    if (fieldType === 'likert_scale') {
+        return 'scale';
+    }
+    if (fieldType === 'cascading_select') {
+        return 'cascading';
+    }
     return 'unsupported';
 }
 
@@ -93,6 +104,30 @@ export function resolveOptional(
         return value !== undefined && value !== '' ? value : null;
     }
     return resolveText(base, translations, locale);
+}
+
+/**
+ * Resolve a cascading hierarchy's level + option labels into the current locale, producing the flat shape the
+ * shared `FieldInput.vue` cascading control consumes (Increment G4a). Used by both the flat + repeat SPA
+ * adapters so translation resolution lives in one place.
+ */
+export function resolveCascade(
+    cascade: RenderCascade | null,
+    locale: string,
+): { levels: { key: string; label: string }[]; options: { value: string; label: string; level: string; parent: string | null }[] } | null {
+    if (cascade === null) {
+        return null;
+    }
+
+    return {
+        levels: cascade.levels.map((level) => ({ key: level.key, label: resolveText(level.label, level.labelTranslations, locale) })),
+        options: cascade.options.map((option) => ({
+            value: option.value,
+            label: resolveText(option.label, option.labelTranslations, locale),
+            level: option.level,
+            parent: option.parent,
+        })),
+    };
 }
 
 function buildOptions(field: RawField): RenderOption[] {
@@ -118,6 +153,117 @@ function buildOptions(field: RawField): RenderOption[] {
     return out;
 }
 
+/** The `config.options[].value` set (as strings) the engine membership check reads. Mirror of PHP's optionValueSet. */
+function engineOptionValues(field: RawField): string[] {
+    const raw = field.config?.options;
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+    const out: string[] = [];
+    for (const option of raw) {
+        if (option === null || typeof option !== 'object') {
+            continue;
+        }
+        const value = (option as { value?: unknown }).value;
+        if (value === undefined || value === null) {
+            continue;
+        }
+        out.push(String(value));
+    }
+
+    return out;
+}
+
+/** Project a cascading field's `config.levels`/`config.options` into the engine's {@link CascadeConfig}. */
+function engineCascadeConfig(field: RawField): CascadeConfig {
+    const levelsRaw = field.config?.levels;
+    const optionsRaw = field.config?.options;
+
+    const levels = Array.isArray(levelsRaw)
+        ? levelsRaw.map((level) =>
+              level !== null && typeof level === 'object' ? String((level as { key?: unknown }).key ?? '') : String(level),
+          )
+        : [];
+
+    const options = Array.isArray(optionsRaw)
+        ? optionsRaw.flatMap((option) => {
+              if (option === null || typeof option !== 'object') {
+                  return [];
+              }
+              const value = (option as { value?: unknown }).value;
+              const level = (option as { level?: unknown }).level;
+              if (value === undefined || value === null || level === undefined || level === null) {
+                  return [];
+              }
+              const parent = (option as { parent?: unknown }).parent;
+
+              return [
+                  {
+                      value: String(value),
+                      level: String(level),
+                      parent: parent === undefined || parent === null ? null : String(parent),
+                  },
+              ];
+          })
+        : [];
+
+    return { levels, options };
+}
+
+/** The UI-facing cascading hierarchy (labels + translations kept for the render layer to resolve). */
+function buildCascade(field: RawField): RenderCascade | null {
+    if (field.field_type !== 'cascading_select') {
+        return null;
+    }
+
+    const levelsRaw = field.config?.levels;
+    const optionsRaw = field.config?.options;
+
+    const levels: RenderCascadeLevel[] = Array.isArray(levelsRaw)
+        ? levelsRaw.flatMap((level) => {
+              if (level === null || typeof level !== 'object') {
+                  return [];
+              }
+              const key = (level as { key?: unknown }).key;
+              if (key === undefined || key === null) {
+                  return [];
+              }
+              const label = (level as { label?: unknown }).label;
+              const labelTranslations = (level as { label_translations?: Record<string, string> | null }).label_translations ?? null;
+
+              return [{ key: String(key), label: label !== undefined && label !== null ? String(label) : String(key), labelTranslations }];
+          })
+        : [];
+
+    const options: RenderCascadeOption[] = Array.isArray(optionsRaw)
+        ? optionsRaw.flatMap((option) => {
+              if (option === null || typeof option !== 'object') {
+                  return [];
+              }
+              const value = (option as { value?: unknown }).value;
+              const level = (option as { level?: unknown }).level;
+              if (value === undefined || value === null || level === undefined || level === null) {
+                  return [];
+              }
+              const label = (option as { label?: unknown }).label;
+              const labelTranslations = (option as { label_translations?: Record<string, string> | null }).label_translations ?? null;
+              const parent = (option as { parent?: unknown }).parent;
+
+              return [
+                  {
+                      value: String(value),
+                      label: label !== undefined && label !== null ? String(label) : String(value),
+                      labelTranslations,
+                      level: String(level),
+                      parent: parent === undefined || parent === null ? null : String(parent),
+                  },
+              ];
+          })
+        : [];
+
+    return { levels, options };
+}
+
 function toRenderField(field: RawField): RenderField {
     const supported = SUPPORTED.has(field.field_type);
     const hasConditionalRequirement =
@@ -138,6 +284,7 @@ function toRenderField(field: RawField): RenderField {
         hintTranslations: field.hint_translations,
         placeholder: field.placeholder,
         options: buildOptions(field),
+        cascade: buildCascade(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
@@ -179,6 +326,10 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         relevant_expression: f.relevant_expression,
         // Grammar v2.0: a calculated field's formula, so the engine's compute pass can produce its value.
         calculate: typeof f.config?.calculated_formula === 'string' ? f.config.calculated_formula : null,
+        // Choice-membership + cascading integrity (Increment G4a) — the engine reads only these projections
+        // of `config`, never the raw editor payload, so it stays byte-identical with the PHP authority.
+        options: HAS_OPTIONS.has(f.field_type) ? engineOptionValues(f) : null,
+        cascade: f.field_type === 'cascading_select' ? engineCascadeConfig(f) : null,
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

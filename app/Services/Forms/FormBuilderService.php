@@ -284,7 +284,11 @@ final class FormBuilderService
     /** @return array<string, mixed> */
     private function defaultConfig(FieldType $type): array
     {
-        return $type->hasOptions() ? ['options' => []] : [];
+        return match (true) {
+            $type === FieldType::CascadingSelect => ['levels' => [], 'options' => []],
+            $type->hasOptions() => ['options' => []],
+            default => [],
+        };
     }
 
     private function nextFieldSequence(FormVersion $draft): int

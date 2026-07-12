@@ -45,7 +45,10 @@ final class SchemaValueFormatter
             return $this->boolLabel($answer);
         }
 
-        $labels = $type->hasOptions() ? $this->optionLabels($config) : [];
+        // Choice fields resolve values to labels; cascading select does too (its `config.options` carry
+        // value+label alongside level/parent, which optionLabels ignores) so an exported cascade reads as
+        // "NCR; Manila", not "ncr; manila" (Increment G4a).
+        $labels = ($type->hasOptions() || $type === FieldType::CascadingSelect) ? $this->optionLabels($config) : [];
 
         if (is_array($answer)) {
             $parts = array_map(

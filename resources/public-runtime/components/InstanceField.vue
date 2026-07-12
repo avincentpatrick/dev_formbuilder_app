@@ -11,7 +11,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
-import { resolveOptional, resolveText } from '../lib/schema-mapping';
+import { resolveCascade, resolveOptional, resolveText } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -38,6 +38,7 @@ const encodeField = computed<EncodeField>(() => ({
         value: o.value,
         label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
     })),
+    cascade: resolveCascade(props.field.cascade, runtime.locale.value),
     supported: props.field.supported,
 }));
 

@@ -1,0 +1,104 @@
+[
+  {
+    "name": "likert_scale value in options passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "rating", "field_type": "likert_scale", "options": ["1", "2", "3", "4", "5"] } ] },
+    "answers": { "rating": "3" },
+    "expected": {
+      "relevance": { "fields": { "rating": true } },
+      "errors": [],
+      "effective_answers": { "rating": "3" }
+    }
+  },
+  {
+    "name": "likert_scale value not in options fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "rating", "field_type": "likert_scale", "options": ["1", "2", "3", "4", "5"] } ] },
+    "answers": { "rating": "9" },
+    "expected": {
+      "relevance": { "fields": { "rating": true } },
+      "errors": [ { "field": "rating", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "rating": "9" }
+    }
+  },
+  {
+    "name": "single_select value in options passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "color", "field_type": "single_select", "options": ["red", "green", "blue"] } ] },
+    "answers": { "color": "green" },
+    "expected": {
+      "relevance": { "fields": { "color": true } },
+      "errors": [],
+      "effective_answers": { "color": "green" }
+    }
+  },
+  {
+    "name": "single_select value not in options fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "color", "field_type": "single_select", "options": ["red", "green", "blue"] } ] },
+    "answers": { "color": "purple" },
+    "expected": {
+      "relevance": { "fields": { "color": true } },
+      "errors": [ { "field": "color", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "color": "purple" }
+    }
+  },
+  {
+    "name": "dropdown value not in options fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "country", "field_type": "dropdown", "options": ["ph", "us"] } ] },
+    "answers": { "country": "zz" },
+    "expected": {
+      "relevance": { "fields": { "country": true } },
+      "errors": [ { "field": "country", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "country": "zz" }
+    }
+  },
+  {
+    "name": "multi_select all values in options passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "toppings", "field_type": "multi_select", "options": ["cheese", "ham", "olives"] } ] },
+    "answers": { "toppings": ["cheese", "olives"] },
+    "expected": {
+      "relevance": { "fields": { "toppings": true } },
+      "errors": [],
+      "effective_answers": { "toppings": ["cheese", "olives"] }
+    }
+  },
+  {
+    "name": "multi_select with an unknown value fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "toppings", "field_type": "multi_select", "options": ["cheese", "ham", "olives"] } ] },
+    "answers": { "toppings": ["cheese", "pineapple"] },
+    "expected": {
+      "relevance": { "fields": { "toppings": true } },
+      "errors": [ { "field": "toppings", "rule": "choice_not_in_options" } ],
+      "effective_answers": { "toppings": ["cheese", "pineapple"] }
+    }
+  },
+  {
+    "name": "choice field with no options skips membership",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "color", "field_type": "single_select" } ] },
+    "answers": { "color": "anything" },
+    "expected": {
+      "relevance": { "fields": { "color": true } },
+      "errors": [],
+      "effective_answers": { "color": "anything" }
+    }
+  },
+  {
+    "name": "hidden choice field is not membership-checked",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "choice", "field_type": "single_select", "options": ["a", "b"], "relevant": "${gate} = 'go'" }
+    ] },
+    "answers": { "gate": "stop", "choice": "z" },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "choice": false } },
+      "errors": [],
+      "effective_answers": { "gate": "stop" }
+    }
+  }
+]

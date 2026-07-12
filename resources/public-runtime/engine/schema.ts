@@ -8,6 +8,12 @@
 import type { EngineValue } from './coercion';
 import type { ComparisonOperator, LogicOperator, RequiredMode, ValidationRuleType } from './enums';
 
+/** One cascading-select level's option pool (Increment G4a): a flat list keyed by level + parent. */
+export interface CascadeConfig {
+    levels: string[];
+    options: { value: string; level: string; parent: string | null }[];
+}
+
 export interface SchemaField {
     id: string;
     key: string;
@@ -18,6 +24,13 @@ export interface SchemaField {
     relevant_expression: string | null;
     /** Grammar v2.0: a calculated field's formula (from `config.calculated_formula`); null / omitted otherwise. */
     calculate?: string | null;
+    /**
+     * Choice-membership option values (Increment G4a): the `config.options[].value` set for single/multi/
+     * dropdown/likert_scale. Absent / empty ⇒ no membership check (keeps pre-G4a vectors byte-identical).
+     */
+    options?: string[] | null;
+    /** Cascading-select hierarchy (Increment G4a): drives per-level membership + parent-consistency. */
+    cascade?: CascadeConfig | null;
 }
 
 export interface SchemaSection {

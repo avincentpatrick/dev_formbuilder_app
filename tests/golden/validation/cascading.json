@@ -1,0 +1,133 @@
+[
+  {
+    "name": "cascading valid two-level chain passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "cascade": {
+      "levels": ["region", "province"],
+      "options": [
+        { "value": "ncr", "level": "region", "parent": null },
+        { "value": "cebu", "level": "region", "parent": null },
+        { "value": "manila", "level": "province", "parent": "ncr" },
+        { "value": "cebu_city", "level": "province", "parent": "cebu" }
+      ]
+    } } ] },
+    "answers": { "loc": ["ncr", "manila"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": ["ncr", "manila"] }
+    }
+  },
+  {
+    "name": "cascading invalid child value fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "cascade": {
+      "levels": ["region", "province"],
+      "options": [
+        { "value": "ncr", "level": "region", "parent": null },
+        { "value": "manila", "level": "province", "parent": "ncr" }
+      ]
+    } } ] },
+    "answers": { "loc": ["ncr", "bogus"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc.1", "rule": "cascading_choice_invalid" } ],
+      "effective_answers": { "loc": ["ncr", "bogus"] }
+    }
+  },
+  {
+    "name": "cascading parent mismatch fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "cascade": {
+      "levels": ["region", "province"],
+      "options": [
+        { "value": "ncr", "level": "region", "parent": null },
+        { "value": "cebu", "level": "region", "parent": null },
+        { "value": "manila", "level": "province", "parent": "ncr" },
+        { "value": "cebu_city", "level": "province", "parent": "cebu" }
+      ]
+    } } ] },
+    "answers": { "loc": ["ncr", "cebu_city"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc.1", "rule": "cascading_parent_mismatch" } ],
+      "effective_answers": { "loc": ["ncr", "cebu_city"] }
+    }
+  },
+  {
+    "name": "cascading invalid root value fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "cascade": {
+      "levels": ["region", "province"],
+      "options": [
+        { "value": "ncr", "level": "region", "parent": null },
+        { "value": "manila", "level": "province", "parent": "ncr" }
+      ]
+    } } ] },
+    "answers": { "loc": ["bogus"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc.0", "rule": "cascading_choice_invalid" } ],
+      "effective_answers": { "loc": ["bogus"] }
+    }
+  },
+  {
+    "name": "cascading partial chain root only passes",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "cascade": {
+      "levels": ["region", "province"],
+      "options": [
+        { "value": "ncr", "level": "region", "parent": null },
+        { "value": "manila", "level": "province", "parent": "ncr" }
+      ]
+    } } ] },
+    "answers": { "loc": ["ncr"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": ["ncr"] }
+    }
+  },
+  {
+    "name": "cascading required empty fails",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select", "is_required": "required", "cascade": {
+      "levels": ["region"],
+      "options": [ { "value": "ncr", "level": "region", "parent": null } ]
+    } } ] },
+    "answers": {},
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [ { "field": "loc", "rule": "field_required" } ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "cascading with no hierarchy skips membership",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "loc", "field_type": "cascading_select" } ] },
+    "answers": { "loc": ["a", "b"] },
+    "expected": {
+      "relevance": { "fields": { "loc": true } },
+      "errors": [],
+      "effective_answers": { "loc": ["a", "b"] }
+    }
+  },
+  {
+    "name": "cascading hidden field is not checked",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "loc", "field_type": "cascading_select", "relevant": "${gate} = 'go'", "cascade": {
+        "levels": ["region"],
+        "options": [ { "value": "ncr", "level": "region", "parent": null } ]
+      } }
+    ] },
+    "answers": { "gate": "stop", "loc": ["bogus"] },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "loc": false } },
+      "errors": [],
+      "effective_answers": { "gate": "stop" }
+    }
+  }
+]

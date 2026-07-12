@@ -29,6 +29,8 @@ const encodeField = computed<EncodeField>(() => ({
     })),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
     matrix: resolveMatrix(props.field.matrix, runtime.locale.value),
+    // Geo capture config (Increment G5b2) is labels-free, so it passes straight through with no resolution.
+    geo: props.field.geo,
     supported: props.field.supported,
 }));
 
@@ -40,9 +42,10 @@ const value = computed<AnswerValue>(() => {
     if (Array.isArray(current)) {
         return current.map(String);
     }
-    // A composite grid (Increment G4b) is an object; pass it through untouched (cells are already strings).
+    // A composite grid (Increment G4b) or a geo envelope (Increment G5b2) is an object; pass it through
+    // untouched (grid cells are already strings; a geo envelope is the frozen GeoJSON shape).
     if (typeof current === 'object') {
-        return current as Record<string, string> | Record<string, Record<string, string>>;
+        return current as AnswerValue;
     }
     return current;
 });

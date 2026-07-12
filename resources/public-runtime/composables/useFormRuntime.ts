@@ -25,6 +25,7 @@ import {
     SemanticResult,
     type CompositeAnswer,
     type EngineValue,
+    type GeoAnswer,
     type InstanceAnswers,
     type RequiredMode,
     type SemanticError,
@@ -93,7 +94,7 @@ export interface FormRuntime {
     readonly isFirstStep: ComputedRef<boolean>;
     readonly isLastStep: ComputedRef<boolean>;
 
-    setAnswer(key: string, value: EngineValue | CompositeAnswer | null): void;
+    setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | null): void;
     restoreAnswers(map: AnswerMap): void;
     markTouched(key: string): void;
     markManyTouched(keys: string[]): void;
@@ -325,7 +326,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     );
 
     // ── Flat interaction ───────────────────────────────────────────────────────────────────────
-    function setAnswer(key: string, value: EngineValue | CompositeAnswer | null): void {
+    function setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | null): void {
         if (value === null) {
             delete answers[key];
         } else {

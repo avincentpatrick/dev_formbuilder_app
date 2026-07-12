@@ -14,6 +14,7 @@ use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Form;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Route;
@@ -117,7 +118,10 @@ Route::middleware([
     // (which selects the policy) plus the route-bound {form} as the extra policy argument. `store` funnels
     // the raw answers into the single SubmissionPipeline (structural → integrity → semantic → persist).
     Route::get('/forms/{form}/submissions/create', [SubmissionController::class, 'create'])
-        ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.create');
+        // The encode page renders the G5b2 geo control's Leaflet map → scope the OSM tile-origin CSP here
+        // (ADR-0006 D3). Only the GET page needs it; the POST store returns a redirect/JSON.
+        ->middleware(['can:create,'.Submission::class.',form', PublicRuntimeSecurityHeaders::class])
+        ->name('forms.submissions.create');
     Route::post('/forms/{form}/submissions', [SubmissionController::class, 'store'])
         ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.store');
 
@@ -167,6 +171,8 @@ Route::middleware([
     InitializeTenancyBySubdomain::class,
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
+    // The guest SPA shell hosts the G5b2 geo control's Leaflet map → allow the OSM tile origin (ADR-0006 D3).
+    PublicRuntimeSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
         ->middleware('throttle:guest-mint')->name('guest.form.mint');

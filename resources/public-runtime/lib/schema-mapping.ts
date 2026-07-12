@@ -31,6 +31,7 @@ import type {
     RenderCascadeLevel,
     RenderCascadeOption,
     RenderField,
+    RenderGeo,
     RenderMatrix,
     RenderModel,
     RenderOption,
@@ -50,6 +51,8 @@ const SUPPORTED = new Set<string>([
     'likert_scale', 'cascading_select',
     // Increment G4b: the object-valued grids.
     'matrix', 'likert_matrix',
+    // Increment G5b2: geospatial capture.
+    'geopoint', 'geotrace', 'geoshape',
 ]);
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
@@ -94,6 +97,9 @@ export function controlFor(fieldType: string, supported: boolean): ControlKind {
     }
     if (fieldType === 'matrix') {
         return 'matrix';
+    }
+    if (fieldType === 'geopoint' || fieldType === 'geotrace' || fieldType === 'geoshape') {
+        return 'geo';
     }
     return 'unsupported';
 }
@@ -362,6 +368,40 @@ function buildMatrix(field: RawField): RenderMatrix | null {
     };
 }
 
+/** Read a `config.<key>` value coerced to a finite number, or null. */
+function configNumber(field: RawField, key: string): number | null {
+    const raw = field.config?.[key];
+    if (raw === null || raw === undefined || raw === '') {
+        return null;
+    }
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+}
+
+/** The UI-facing geo capture config (Increment G5b2), normalised snake_case config → camelCase RenderGeo. */
+function buildGeo(field: RawField): RenderGeo | null {
+    if (field.field_type !== 'geopoint' && field.field_type !== 'geotrace' && field.field_type !== 'geoshape') {
+        return null;
+    }
+
+    const center = field.config?.default_center;
+    let defaultCenter: { lat: number; lon: number } | null = null;
+    if (center !== null && typeof center === 'object' && !Array.isArray(center)) {
+        const lat = Number((center as { lat?: unknown }).lat);
+        const lon = Number((center as { lon?: unknown }).lon);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            defaultCenter = { lat, lon };
+        }
+    }
+
+    return {
+        captureAltitude: field.config?.capture_altitude === true,
+        accuracyThreshold: configNumber(field, 'accuracy_threshold'),
+        defaultCenter,
+        defaultZoom: configNumber(field, 'default_zoom'),
+    };
+}
+
 function toRenderField(field: RawField): RenderField {
     const supported = SUPPORTED.has(field.field_type);
     const hasConditionalRequirement =
@@ -384,6 +424,7 @@ function toRenderField(field: RawField): RenderField {
         options: buildOptions(field),
         cascade: buildCascade(field),
         matrix: buildMatrix(field),
+        geo: buildGeo(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };

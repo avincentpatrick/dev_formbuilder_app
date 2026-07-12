@@ -56,6 +56,10 @@ function emptyFieldValue(field: EncodeField): AnswerValue {
     if (field.field_type === 'matrix' || field.field_type === 'likert_matrix') {
         return {};
     }
+    // A geo field (Increment G5b2) holds a GeoJSON envelope; seed null (an empty geo answer is null, never {}).
+    if (field.field_type === 'geopoint' || field.field_type === 'geotrace' || field.field_type === 'geoshape') {
+        return null;
+    }
     if (field.field_type === 'integer' || field.field_type === 'decimal') {
         return null;
     }

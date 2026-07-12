@@ -44,6 +44,8 @@ final class EncodeFormPresenter
         FieldType::LikertScale, FieldType::CascadingSelect,
         // Increment G4b: the object-valued grids (matrix = per-cell single-select, likert_matrix = per-row scale).
         FieldType::Matrix, FieldType::LikertMatrix,
+        // Increment G5b2: geospatial capture (coordinate/vertex control + progressive-enhancement Leaflet map).
+        FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape,
     ];
 
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
@@ -135,6 +137,8 @@ final class EncodeFormPresenter
             'cascade' => $this->cascade($field),
             // Composite grid config (Increment G4b: matrix / likert_matrix); null for every other type.
             'matrix' => $this->matrix($field),
+            // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
+            'geo' => $this->geo($field),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2).
             'supported' => in_array($type, self::SUPPORTED, true),
@@ -199,6 +203,40 @@ final class EncodeFormPresenter
             'rows' => $this->optionPairs($field, 'rows'),
             'columns' => $this->optionPairs($field, 'columns'),
             'cells' => $type === FieldType::Matrix ? $this->optionPairs($field, 'cells') : [],
+        ];
+    }
+
+    /**
+     * The geo capture config (Increment G5b2) — author options for the geopoint/geotrace/geoshape control,
+     * normalised from the stored snake_case config into the camelCase shape the shared FieldInput geo control
+     * consumes (mirrors schema-mapping.ts buildGeo). Null for every non-geo type. Labels-free (no translation).
+     *
+     * @return array{captureAltitude: bool, accuracyThreshold: float|null, defaultCenter: array{lat: float, lon: float}|null, defaultZoom: int|null}|null
+     */
+    private function geo(FormField $field): ?array
+    {
+        if (! $field->field_type->isGeo()) {
+            return null;
+        }
+
+        $center = data_get($field->config, 'default_center');
+        $defaultCenter = null;
+        if (is_array($center)
+            && isset($center['lat'], $center['lon'])
+            && is_numeric($center['lat'])
+            && is_numeric($center['lon'])
+        ) {
+            $defaultCenter = ['lat' => (float) $center['lat'], 'lon' => (float) $center['lon']];
+        }
+
+        $threshold = data_get($field->config, 'accuracy_threshold');
+        $zoom = data_get($field->config, 'default_zoom');
+
+        return [
+            'captureAltitude' => data_get($field->config, 'capture_altitude') === true,
+            'accuracyThreshold' => is_numeric($threshold) ? (float) $threshold : null,
+            'defaultCenter' => $defaultCenter,
+            'defaultZoom' => is_numeric($zoom) ? (int) $zoom : null,
         ];
     }
 

@@ -72,6 +72,21 @@ XLSForm is a real external standard (not this product's invention): a `.xlsx` wo
 
 **Honest summary**: 27 of 31 field types round-trip with full fidelity; `duration`, `likert_matrix`, `page_break`, and `matrix` have documented, one-directional export-only or lossy behavior, because the underlying XLSForm/ODK ecosystem itself has no universal native representation for them — this is a limitation of the target format, not a gap this product's mapping introduces, and it is stated plainly here rather than glossed over.
 
+### 3.1 Geospatial value serialization (`geopoint` / `geotrace` / `geoshape`)
+
+The "Full" fidelity claim for the three geo rows above depends on a value-serialization mapping the §3 table's `type`-column mapping does not itself define. That mapping is pinned by **ADR-0006 §D2** and repeated here for the import/export implementation (Increment G7):
+
+- **This product's stored shape** (`submission_answers.answers`, ADR-0006 §D2) is a **GeoJSON geometry envelope** in **`[longitude, latitude, (altitude)]` position order** — `geopoint` → `Point`, `geotrace` → `LineString` (≥ 2 positions), `geoshape` → `Polygon` (one **closed** linear ring, first == last, ≥ 4 positions) — with an optional foreign member `accuracy` (metres) on a `geopoint`.
+- **The XLSForm/ODK wire form** is a **space-delimited string in `"latitude longitude altitude accuracy"` order** (latitude first) for a `geopoint`; `geotrace`/`geoshape` are a **`;`-delimited list** of such point strings (a `geoshape` list repeats the first point at the end to close the ring).
+
+| Type | XLSForm/ODK string | Meridian stored envelope |
+|---|---|---|
+| `geopoint` | `"14.6 121.0 32 4.2"` | `{ "type":"Point", "coordinates":[121.0, 14.6, 32], "accuracy":4.2 }` |
+| `geotrace` | `"14.6 121.0 0 0; 14.7 121.1 0 0"` | `{ "type":"LineString", "coordinates":[[121.0,14.6],[121.1,14.7]] }` |
+| `geoshape` | `"14.6 121.0 0 0; 14.6 121.1 0 0; 14.7 121.1 0 0; 14.6 121.0 0 0"` | `{ "type":"Polygon", "coordinates":[[[121.0,14.6],[121.1,14.6],[121.1,14.7],[121.0,14.6]]] }` |
+
+**The load-bearing detail — the lat/lon order flips between the two conventions** (ODK is latitude-first; GeoJSON/PostGIS are longitude-first). This is the single most likely source of a silent import/export bug, so the swap is confined to exactly one place — the geo converter in the XLSForm import/export path — plus, cosmetically, the manual-entry UI (which shows a human "Lat, then Lon" and swaps on assembly). Everything internal (JSONB, the PHP + TS engines, the PostGIS `geometry(4326)` projection) is longitude-first. Round-trip fidelity is therefore full **provided the converter honors this order flip and the geoshape ring-closure convention**; the converter must be unit-tested in both directions (import string → envelope → export string) to keep the "Full" claim honest.
+
 ---
 
 ## 4. Choices & Settings Sheets

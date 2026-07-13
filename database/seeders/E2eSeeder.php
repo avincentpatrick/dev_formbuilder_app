@@ -305,6 +305,27 @@ class E2eSeeder extends Seeder
                 // Left as a DRAFT (not published) so it opens straight into the builder.
             }
 
+            // A DRAFT form whose first field is a geopoint (Increment G5b2b), so the builder auto-selects it on
+            // load and the builder-axe tab-walk mounts + scans the GeoEditor's "Map" tab (capture options +
+            // default map view) — the geospatial config editor — at all viewports in light + dark, with no
+            // palette interaction. A trace + a shape follow so all three geo types exist in one demo.
+            if (Form::query()->where('title', 'Geo Builder Demo')->doesntExist()) {
+                $geoDemo = app(FormService::class)->create($tenant, $owner, 'Geo Builder Demo', 'Geospatial map config editor (G5b2b).');
+                $gsb = app(FormBuilderService::class);
+                $gsb->addField($geoDemo, $owner, FieldType::Geopoint, null)->update([
+                    'label' => 'Pin the site',
+                    'config' => [
+                        'capture_altitude' => true,
+                        'accuracy_threshold' => 20,
+                        'default_center' => ['lat' => 14.5995, 'lon' => 120.9842],
+                        'default_zoom' => 11,
+                    ],
+                ]);
+                $gsb->addField($geoDemo, $owner, FieldType::Geotrace, null)->update(['label' => 'Trace the path']);
+                $gsb->addField($geoDemo, $owner, FieldType::Geoshape, null)->update(['label' => 'Outline the plot']);
+                // Left as a DRAFT (not published) so it opens straight into the builder.
+            }
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();

@@ -18,6 +18,7 @@ import {
 } from '@meridian/design-system';
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
+import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
@@ -73,6 +74,7 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         if (optionTypes.has(field.value.field_type)) list.push({ key: 'options', label: 'Options' });
         if (configEditor.value === 'cascading') list.push({ key: 'cascading', label: 'Levels' });
         if (configEditor.value === 'matrix' || configEditor.value === 'likert_matrix') list.push({ key: 'grid', label: 'Grid' });
+        if (configEditor.value === 'geo') list.push({ key: 'geo', label: 'Map' });
         list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
         return list;
     }
@@ -125,6 +127,11 @@ const cascadeOptions = computed<CascadeOption[]>(() => (field.value?.config.opti
 const gridRows = computed<Choice[]>(() => (field.value?.config.rows as Choice[] | undefined) ?? []);
 const gridColumns = computed<Choice[]>(() => (field.value?.config.columns as Choice[] | undefined) ?? []);
 const gridCells = computed<Choice[]>(() => (field.value?.config.cells as Choice[] | undefined) ?? []);
+// A geospatial field (Increment G5b2b) carries capture + default-map-view options (all optional).
+const geoCaptureAltitude = computed<boolean>(() => (field.value?.config.capture_altitude as boolean | undefined) ?? false);
+const geoAccuracyThreshold = computed<number | null>(() => (field.value?.config.accuracy_threshold as number | undefined) ?? null);
+const geoDefaultCenter = computed<{ lat: number; lon: number } | null>(() => (field.value?.config.default_center as { lat: number; lon: number } | undefined) ?? null);
+const geoDefaultZoom = computed<number | null>(() => (field.value?.config.default_zoom as number | undefined) ?? null);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -269,6 +276,20 @@ function reparent(sectionId: string): void {
                         :columns="gridColumns"
                         @update:rows="setConfig('rows', $event)"
                         @update:columns="setConfig('columns', $event)"
+                    />
+                </template>
+
+                <template v-else-if="activeTab === 'geo'">
+                    <GeoEditor
+                        :field-type="field.field_type"
+                        :capture-altitude="geoCaptureAltitude"
+                        :accuracy-threshold="geoAccuracyThreshold"
+                        :default-center="geoDefaultCenter"
+                        :default-zoom="geoDefaultZoom"
+                        @update:captureAltitude="setConfig('capture_altitude', $event)"
+                        @update:accuracyThreshold="setConfig('accuracy_threshold', $event)"
+                        @update:defaultCenter="setConfig('default_center', $event)"
+                        @update:defaultZoom="setConfig('default_zoom', $event)"
                     />
                 </template>
 

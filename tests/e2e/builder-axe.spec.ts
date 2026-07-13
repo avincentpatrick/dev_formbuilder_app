@@ -103,4 +103,25 @@ for (const theme of themes) {
             await scan(page, `grid demo tab ${i}`);
         }
     });
+
+    // The geospatial config editor (Increment G5b2b). The seeded "Geo Builder Demo" draft has a geopoint
+    // field FIRST, so the builder auto-selects it and its config tabs include "Map" — mounting GeoEditor
+    // (capture options + default map view, numeric inputs, no map). Walk the tabs (scanning the geo editor)
+    // with no palette interaction.
+    test(`Builder — geo config editor (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Geo Builder Demo');
+        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+
+        // The auto-selected geopoint field exposes a "Map" tab → GeoEditor (always shows "Default map view").
+        await page.getByRole('tab', { name: 'Map' }).click();
+        await expect(page.getByRole('heading', { name: 'Default map view' })).toBeVisible({ timeout: 10_000 });
+        await scan(page, 'geo config editor');
+
+        const fieldTabs = page.locator('[role="tab"]');
+        for (let i = 0; i < (await fieldTabs.count()); i++) {
+            await fieldTabs.nth(i).click();
+            await scan(page, `geo demo tab ${i}`);
+        }
+    });
 }

@@ -22,13 +22,15 @@ use Illuminate\Validation\Rule;
  * validated (the expression engine is deferred ADR-0004 work). Authorization is `can:update,form`; the
  * optimistic-concurrency token (`version`) is checked in the service, not here.
  *
- * Per-type `config` shape (Increment G4a/G4b): the choice-editor types (`config.options` = `[{value,label}]`),
- * `cascading_select` (`config.levels`/`config.options` with `level`/`parent`), and the object-valued grids
- * `matrix` (`config.rows`/`columns`/`cells`) + `likert_matrix` (`config.rows`/`columns`) get type/shape
- * rules here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that transiently
- * clears an option value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading /
+ * Per-type `config` shape (Increment G4a/G4b/G5b2b): the choice-editor types (`config.options` = `[{value,label}]`),
+ * `cascading_select` (`config.levels`/`config.options` with `level`/`parent`), the object-valued grids
+ * `matrix` (`config.rows`/`columns`/`cells`) + `likert_matrix` (`config.rows`/`columns`), and the geospatial
+ * types (`config.capture_altitude`/`accuracy_threshold`/`default_center {lat,lon}`/`default_zoom`) get
+ * type/shape rules here — but only the SHAPE, kept lenient (every value nullable) so a mid-edit blur that
+ * transiently clears a value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading /
  * grid integrity are enforced at PUBLISH (StructuralValidationGate), the same "persist unvalidated config,
- * validate at publish" posture as a calculated field's formula.
+ * validate at publish" posture as a calculated field's formula (geo config is wholly optional, so it has no
+ * publish-completeness gate).
  */
 final class UpdateFieldRequest extends FormRequest
 {
@@ -75,13 +77,25 @@ final class UpdateFieldRequest extends FormRequest
 
     /**
      * The per-type `config` shape rules (lenient — type/structure only; see the class docblock). A choice
-     * type validates its `options` list; `cascading_select` validates its `levels` + parented `options`.
-     * All values are `nullable` so a transient mid-edit state never rejects the optimistic PATCH.
+     * type validates its `options` list; `cascading_select` validates its `levels` + parented `options`; a
+     * geospatial type (Increment G5b2b) validates its map-capture options (all optional). All values are
+     * `nullable`/`sometimes` so a transient mid-edit state never rejects the optimistic PATCH.
      *
      * @return array<string, array<int, mixed>>
      */
     private function configRules(FieldType $type): array
     {
+        if ($type->isGeo()) {
+            return [
+                'config.capture_altitude' => ['sometimes', 'boolean'],
+                'config.accuracy_threshold' => ['nullable', 'numeric', 'min:0'],
+                'config.default_center' => ['sometimes', 'nullable', 'array'],
+                'config.default_center.lat' => ['nullable', 'numeric', 'between:-90,90'],
+                'config.default_center.lon' => ['nullable', 'numeric', 'between:-180,180'],
+                'config.default_zoom' => ['nullable', 'integer', 'between:0,22'],
+            ];
+        }
+
         if ($type === FieldType::CascadingSelect) {
             return [
                 'config.levels' => ['sometimes', 'array'],

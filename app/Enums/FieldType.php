@@ -144,7 +144,8 @@ enum FieldType: string
      * for none. `'choices'` is the plain option-list editor (all {@see hasOptions()} types); the others are
      * dedicated per-type editors. Single source the builder palette ships to the client so the config panel
      * never re-lists which type wires which editor. `matrix`/`likert_matrix` (Increment G4b) are the
-     * object-valued grids and use their own row/column/cell editors.
+     * object-valued grids and use their own row/column/cell editors; `geo` (Increment G5b2b) is the map
+     * config editor (capture/accuracy + default centre/zoom) shared by all three geospatial types.
      */
     public function configEditor(): ?string
     {
@@ -153,6 +154,7 @@ enum FieldType: string
             self::CascadingSelect => 'cascading',
             self::Matrix => 'matrix',
             self::LikertMatrix => 'likert_matrix',
+            self::Geopoint, self::Geotrace, self::Geoshape => 'geo',
             default => null,
         };
     }

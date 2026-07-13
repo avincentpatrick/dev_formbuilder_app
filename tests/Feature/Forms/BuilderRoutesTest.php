@@ -207,3 +207,66 @@ it('validates the key format and per-version uniqueness', function (): void {
         'label' => 'Bad', 'is_required' => 'optional', 'config' => [], 'validations' => [], 'version' => null,
     ])->assertStatus(422);
 });
+
+// Increment G5b2b — the geospatial "Map" config editor persists its options through the same optimistic
+// PATCH. The config is lenient (all optional, validated by UpdateFieldRequest::configRules()'s isGeo() arm)
+// but out-of-range coordinates are rejected; these are the exact snake_case keys the GeoEditor writes and
+// EncodeFormPresenter::geo()/buildGeo() read.
+it('persists a geospatial map config and rejects an out-of-range coordinate', function (): void {
+    $tenant = builderTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+    $form = app(FormService::class)->create($tenant, $admin, 'Field Survey');
+
+    $add = $this->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'geopoint'])
+        ->assertOk();
+    $fieldId = $add->json('id');
+    $key = $add->json('key');
+
+    // A full, valid geo config block persists verbatim.
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
+            'key' => $key,
+            'label' => 'Pin location',
+            'is_required' => 'optional',
+            'config' => [
+                'capture_altitude' => true,
+                'accuracy_threshold' => 20,
+                'default_center' => ['lat' => 14.6, 'lon' => 121.0],
+                'default_zoom' => 11,
+            ],
+            'validations' => [],
+            'version' => null,
+        ])
+        ->assertOk()
+        ->assertJsonPath('config.capture_altitude', true)
+        ->assertJsonPath('config.default_center.lat', 14.6)
+        ->assertJsonPath('config.default_zoom', 11);
+
+    // An out-of-range latitude is rejected (the one place geo config shape is checked).
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
+            'key' => $key,
+            'label' => 'Pin location',
+            'is_required' => 'optional',
+            'config' => ['default_center' => ['lat' => 999, 'lon' => 0]],
+            'validations' => [],
+            'version' => null,
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['config.default_center.lat']);
+
+    // Mid-edit leniency: an empty/partial geo config never 422s the optimistic PATCH.
+    $this->actingAs($admin)
+        ->patchJson("http://acme.meridian.test/forms/{$form->id}/fields/{$fieldId}", [
+            'key' => $key,
+            'label' => 'Pin location',
+            'is_required' => 'optional',
+            'config' => [],
+            'validations' => [],
+            'version' => null,
+        ])
+        ->assertOk();
+});

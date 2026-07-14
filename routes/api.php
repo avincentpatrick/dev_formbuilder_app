@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
+use App\Http\Controllers\Api\V1\FormXlsformApiController;
 use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestSubmissionController;
@@ -88,6 +89,13 @@ Route::prefix('api/v1')
             ->scopeBindings()
             ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
             ->name('forms.versions.show');
+
+        // XLSForm export (Increment G7a / docs/xlsform-interop-spec.md) — stream a version as an .xlsx
+        // workbook for the Kobo/ODK migration path. Scope-bound {version}; read ability + can:view,form.
+        Route::get('forms/{form}/versions/{version}/xlsform', [FormXlsformApiController::class, 'export'])
+            ->scopeBindings()
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
+            ->name('forms.versions.xlsform');
 
         // Publish the form's current draft (docs/form-versioning-schema-migration.md §3.2). The URL names
         // the draft version; the controller rejects a non-draft {version} before delegating to PublishService.

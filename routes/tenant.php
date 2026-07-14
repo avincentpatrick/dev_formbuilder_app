@@ -8,6 +8,7 @@ use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
+use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
@@ -88,6 +89,13 @@ Route::middleware([
         ->middleware('can:publish,form')->name('forms.publish');
     Route::post('/forms/{form}/versions/{version}/restore', [FormPublishController::class, 'restore'])
         ->middleware('can:update,form')->name('forms.restore');
+
+    // XLSForm export (Increment G7a) — download any version (draft or published) as an .xlsx workbook, the
+    // browser-facing twin of the doc-pinned /api/v1 endpoint. {version} is scope-bound to {form}; gated
+    // can:view,form (read access), mirroring the submissions-export download.
+    Route::get('/forms/{form}/versions/{version}/xlsform', [FormXlsformController::class, 'export'])
+        ->scopeBindings()
+        ->middleware('can:view,form')->name('forms.xlsform.export');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly

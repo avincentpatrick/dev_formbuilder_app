@@ -200,7 +200,7 @@ final class XlsformExporter
                 $survey[] = [
                     'type' => 'select_one '.$listName,
                     'name' => $key.'_'.$rowOpt['value'].'_'.$colOpt['value'],
-                    'label' => trim(($rowOpt['label'] ?? '').' — '.($colOpt['label'] ?? '')),
+                    'label' => trim($rowOpt['label'].' — '.$colOpt['label']),
                     '#meridian' => XlsformTypeMap::MARKER_MATRIX.':'.$key,
                 ];
             }
@@ -227,7 +227,7 @@ final class XlsformExporter
             $survey[] = [
                 'type' => 'select_one '.$listName,
                 'name' => $key.'_'.$rowOpt['value'],
-                'label' => (string) ($rowOpt['label'] ?? $rowOpt['value']),
+                'label' => $rowOpt['label'] !== '' ? $rowOpt['label'] : $rowOpt['value'],
                 '#meridian' => XlsformTypeMap::MARKER_LIKERT_MATRIX.':'.$key,
             ];
         }
@@ -389,7 +389,7 @@ final class XlsformExporter
     }
 
     /**
-     * @param  list<array{value: string, label: string, translations: mixed}>  $pairs
+     * @param  list<array{value: string, label: string, translations?: mixed}>  $pairs
      * @param  list<string>  $langs
      * @param  list<array<string, scalar|null>>  $choices
      * @param  array<string, true>  $listsSeen

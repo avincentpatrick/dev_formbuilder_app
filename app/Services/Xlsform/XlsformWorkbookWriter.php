@@ -64,6 +64,6 @@ final class XlsformWorkbookWriter
      */
     private function align(array $headers, array $row): array
     {
-        return array_map(static fn (string $header): string|int|float|bool|null => $row[$header] ?? '', $headers);
+        return array_map(static fn (string $header): string|int|float|bool => $row[$header] ?? '', $headers);
     }
 }

@@ -124,7 +124,7 @@ final class XlsformTypeMap
 
         $appearance = $appearance !== null ? strtolower(trim($appearance)) : null;
         // XLSForm select types carry the list_name inline ("select_one yn"); keep only the leading token.
-        $token = strtolower(trim(explode(' ', trim($type))[0] ?? ''));
+        $token = strtolower(trim(explode(' ', trim($type))[0]));
 
         return match ($token) {
             'text' => match ($appearance) {

@@ -14,6 +14,8 @@ export interface SubmitFlow {
 export const RuntimeKey: InjectionKey<FormRuntime> = Symbol('public-runtime');
 export const AnnouncerKey: InjectionKey<Announcer> = Symbol('public-runtime-announcer');
 export const SubmitFlowKey: InjectionKey<SubmitFlow> = Symbol('public-runtime-submit');
+/** Resolves the guest media-upload URL from the api-client's current share token (Increment G6). */
+export const UploadUrlKey: InjectionKey<() => string> = Symbol('public-runtime-upload-url');
 
 export function useRuntime(): FormRuntime {
     const runtime = inject(RuntimeKey);

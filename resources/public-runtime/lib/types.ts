@@ -8,19 +8,20 @@
  *  3. RUNTIME — bootstrap, normalized errors, and the localStorage draft blob.
  */
 
-import type { CompositeAnswer, EngineValue, GeoAnswer, InstanceAnswers, RequiredMode } from '../engine';
+import type { CompositeAnswer, EngineValue, GeoAnswer, InstanceAnswers, MediaAnswer, RequiredMode } from '../engine';
 
 // Re-exported so runtime/lib modules can pull the answer-value type from one place alongside the SPA types.
-export type { EngineValue, InstanceAnswers, CompositeAnswer, GeoAnswer } from '../engine';
+export type { EngineValue, InstanceAnswers, CompositeAnswer, GeoAnswer, MediaAnswer } from '../engine';
 
 /**
  * The runtime answer map (Increment G2/G4b/G5b2). A flat field key maps to a scalar {@link EngineValue}; a
  * repeatable section key maps to a list of per-instance answer maps ({@link InstanceAnswers}[]); a composite
  * grid field key (matrix/likert_matrix) maps to its object-valued answer ({@link CompositeAnswer}); a geo
- * field key maps to its GeoJSON envelope ({@link GeoAnswer}) — the exact nested shapes the G1/G4b/G5b1
- * pipeline persists and the F6a engine consumes.
+ * field key maps to its GeoJSON envelope ({@link GeoAnswer}); a media field key maps to its AttachmentRef
+ * list ({@link MediaAnswer}) — the exact nested shapes the G1/G4b/G5b1/G6 pipeline persists and the F6a
+ * engine consumes.
  */
-export type AnswerMap = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
+export type AnswerMap = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer | MediaAnswer>;
 
 // ── 1. RAW (wire) ────────────────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,8 @@ export type ControlKind =
     | 'matrix'
     // Increment G5b2: geospatial capture (geopoint / geotrace / geoshape) — a coordinate/vertex control + map.
     | 'geo'
+    // Increment G6: media capture (file / image / audio / video) — a file input + progressive-enhancement capture.
+    | 'media'
     | 'note'
     | 'unsupported';
 
@@ -182,6 +185,20 @@ export interface RenderGeo {
     defaultZoom: number | null;
 }
 
+/**
+ * Media capture config (Increment G6): author options for the file/image/audio/video control. Mirrors the
+ * `MediaFieldConfig` the shared `FieldInput.vue` control reads (camelCase). `acceptedTypes`/`maxFileSizeBytes`/
+ * `captureSource` drive upload-time behaviour (client reject + `accept`/`capture` attrs); `maxCount`/`minCount`
+ * also feed the engine's count check via `SchemaField.media`.
+ */
+export interface RenderMedia {
+    acceptedTypes: string[];
+    maxFileSizeBytes: number | null;
+    maxCount: number | null;
+    minCount: number | null;
+    captureSource: string | null;
+}
+
 export interface RenderField {
     key: string;
     sectionKey: string | null;
@@ -203,6 +220,8 @@ export interface RenderField {
     matrix: RenderMatrix | null;
     /** Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other field type. */
     geo: RenderGeo | null;
+    /** Media capture config (Increment G6: file / image / audio / video); null for every other field type. */
+    media: RenderMedia | null;
     sequence: number;
     sectionSequence: number | null;
 }

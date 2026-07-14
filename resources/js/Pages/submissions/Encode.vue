@@ -60,6 +60,10 @@ function emptyFieldValue(field: EncodeField): AnswerValue {
     if (field.field_type === 'geopoint' || field.field_type === 'geotrace' || field.field_type === 'geoshape') {
         return null;
     }
+    // A media field (Increment G6) holds a list of attachment references; seed an empty list.
+    if (field.field_type === 'file_upload' || field.field_type === 'image_capture' || field.field_type === 'audio_capture' || field.field_type === 'video_capture') {
+        return [];
+    }
     if (field.field_type === 'integer' || field.field_type === 'decimal') {
         return null;
     }

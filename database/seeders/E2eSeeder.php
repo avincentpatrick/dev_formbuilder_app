@@ -326,6 +326,29 @@ class E2eSeeder extends Seeder
                 // Left as a DRAFT (not published) so it opens straight into the builder.
             }
 
+            // A DRAFT form whose first field is an image_capture (Increment G6), so the builder auto-selects it
+            // on load and the builder-axe tab-walk mounts + scans the MediaEditor's "Media" tab (accepted types
+            // + size/count caps + capture source) at all viewports in light + dark, with no palette interaction.
+            // A file upload + audio + video follow so several media types exist in one demo.
+            if (Form::query()->where('title', 'Media Builder Demo')->doesntExist()) {
+                $mediaDemo = app(FormService::class)->create($tenant, $owner, 'Media Builder Demo', 'Media capture config editor (G6).');
+                $msb = app(FormBuilderService::class);
+                $msb->addField($mediaDemo, $owner, FieldType::ImageCapture, null)->update([
+                    'label' => 'Photo of the site',
+                    'config' => [
+                        'accepted_types' => ['image/jpeg', 'image/png'],
+                        'max_file_size_bytes' => 10 * 1_048_576,
+                        'max_count' => 3,
+                        'min_count' => 1,
+                        'capture_source' => 'camera',
+                    ],
+                ]);
+                $msb->addField($mediaDemo, $owner, FieldType::FileUpload, null)->update(['label' => 'Supporting document']);
+                $msb->addField($mediaDemo, $owner, FieldType::AudioCapture, null)->update(['label' => 'Voice note']);
+                $msb->addField($mediaDemo, $owner, FieldType::VideoCapture, null)->update(['label' => 'Short video']);
+                // Left as a DRAFT (not published) so it opens straight into the builder.
+            }
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();

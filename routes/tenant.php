@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Public\GuestFormController;
+use App\Http\Controllers\Tenant\AttachmentController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
@@ -138,6 +139,16 @@ Route::middleware([
         ->middleware('can:review,submission')->name('submissions.review');
     Route::get('/forms/{form}/submissions/export', [SubmissionInboxController::class, 'export'])
         ->middleware('can:export,'.Submission::class.',form')->name('forms.submissions.export');
+
+    // Attachments (Increment G6) — the shared polymorphic media write path. `store` stages an uploaded file
+    // against the form's published version (SubmissionPipeline re-points it to the submission at persist),
+    // gated by the same create policy as manual encoding. `show` streams a stored file back for the inbox/
+    // encode preview, gated on AttachmentPolicy::view and withheld until its scan status is servable. RLS
+    // scopes both to the tenant (a cross-tenant {attachment} id 404s at binding).
+    Route::post('/forms/{form}/attachments', [AttachmentController::class, 'store'])
+        ->middleware('can:create,'.Submission::class.',form')->name('forms.attachments.store');
+    Route::get('/attachments/{attachment}', [AttachmentController::class, 'show'])
+        ->middleware('can:view,attachment')->name('attachments.show');
 });
 
 /*

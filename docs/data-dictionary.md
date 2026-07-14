@@ -406,7 +406,7 @@ One unified polymorphic table replacing legacy's `image_path`/`file_path`/`excel
 | `attachable_type` | `varchar(100)` | No | — | No | Polymorphic morph type (e.g. `submission`, `form_field`, `tenant`, `webhook_delivery`). |
 | `attachable_id` | `uuid` | No | — | No | Polymorphic morph id — no hard FK constraint (standard, accepted trade-off of polymorphic associations; see Design Notes). |
 | `kind` | `varchar(30)` — PHP enum: `AttachmentKind` | No | — | No | See the 8-value catalog above. |
-| `disk` | `varchar(30)` | No | `'s3'` | No | Laravel filesystem disk name. |
+| `disk` | `varchar(30)` | No | `'local'` | No | Laravel filesystem disk name. **Phase-1 deviation (Increment G6):** the column default is `'local'` (the initial on-server backing store, deployment §7), not the aspirational `'s3'`; the write path (`AttachmentStorageService`) sets `disk` per-write from `config('filesystems.default')`, so an S3 swap is config-only. |
 | `path` | `varchar(500)` | No | — | No | Object storage key, namespaced `tenants/{tenant_id}/...` per plan §2.1. |
 | `original_filename` | `varchar(255)` | Yes | `NULL` | **Yes** | May contain a respondent's or staff member's name (e.g. `john_smith_id_scan.jpg`). |
 | `mime_type` | `varchar(150)` | Yes | `NULL` | No | — |

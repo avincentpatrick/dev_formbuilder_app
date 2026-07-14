@@ -4,10 +4,11 @@
  * an error terminal — around one long-lived, stateful `ApiClient`. It fetches the schema once, hosts the fill
  * session (re-keyed on a version-drift `reschema` so the store rebuilds cleanly), and shows the confirmation.
  */
-import { onMounted, ref, shallowRef } from 'vue';
+import { onMounted, provide, ref, shallowRef } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
+import { UploadUrlKey } from './composables/context';
 import { createApiClient } from './lib/api-client';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
@@ -28,6 +29,10 @@ const retainedAnswers = shallowRef<AnswerMap | undefined>(undefined);
 const driftNotice = ref<string | null>(null);
 
 const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.bootstrap.slug });
+
+// Media uploads (Increment G6) POST to the same token-scoped guest surface, resolved live so a re-minted token
+// is picked up. The manual-encode channel instead gets its form-scoped URL from EncodeFormPresenter.
+provide(UploadUrlKey, () => `/api/v1/public/f/${encodeURIComponent(client.token())}/attachments`);
 
 onMounted(load);
 

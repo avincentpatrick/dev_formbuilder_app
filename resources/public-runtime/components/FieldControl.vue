@@ -5,14 +5,15 @@
  * (label/hint/option text) and the engine-derived error message + required marker are computed here so
  * `FieldInput` receives already-resolved, presentation-ready props.
  */
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import { resolveCascade, resolveMatrix, resolveOptional, resolveText } from '../lib/schema-mapping';
-import { useRuntime } from '../composables/context';
+import { useRuntime, UploadUrlKey } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
 const props = defineProps<{ field: RenderField }>();
 const runtime = useRuntime();
+const resolveUploadUrl = inject(UploadUrlKey, null);
 
 const marker = computed(() => runtime.requiredMarkerFor(props.field));
 
@@ -31,6 +32,9 @@ const encodeField = computed<EncodeField>(() => ({
     matrix: resolveMatrix(props.field.matrix, runtime.locale.value),
     // Geo capture config (Increment G5b2) is labels-free, so it passes straight through with no resolution.
     geo: props.field.geo,
+    // Media capture config (Increment G6) is labels-free too; the upload URL is the token-scoped guest endpoint.
+    media: props.field.media,
+    upload: props.field.media !== null && resolveUploadUrl !== null ? { url: resolveUploadUrl() } : null,
     supported: props.field.supported,
 }));
 
@@ -40,7 +44,9 @@ const value = computed<AnswerValue>(() => {
         return null;
     }
     if (Array.isArray(current)) {
-        return current.map(String);
+        // A media answer (Increment G6) is a list of attachment-ref OBJECTS — pass it through untouched; a
+        // multi-select / cascading answer is a list of scalars — normalise each to a string.
+        return current.every((v) => v !== null && typeof v === 'object') ? (current as AnswerValue) : current.map(String);
     }
     // A composite grid (Increment G4b) or a geo envelope (Increment G5b2) is an object; pass it through
     // untouched (grid cells are already strings; a geo envelope is the frozen GeoJSON shape).

@@ -50,6 +50,8 @@ type FieldFragment = {
     cascade?: { levels: string[]; options: { value: string; level: string; parent: string | null }[] };
     // Composite grid config (G4b): row/column (and, for matrix, cell) VALUE keys.
     grid?: { rows: string[]; columns: string[]; cells?: string[] };
+    // Media count bounds (G6): min/max attachment count.
+    media?: { min?: number; max?: number };
 };
 
 type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
@@ -128,6 +130,7 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             options: field.options ?? null,
             cascade: field.cascade ?? null,
             grid: field.grid ?? null,
+            media: field.media ? { minCount: field.media.min ?? null, maxCount: field.media.max ?? null } : null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {

@@ -21,6 +21,7 @@ import ChoicesEditor from './ChoicesEditor.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
+import MediaEditor from './MediaEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, EnumOption, LocalField, LocalSection } from './types';
@@ -75,6 +76,7 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         if (configEditor.value === 'cascading') list.push({ key: 'cascading', label: 'Levels' });
         if (configEditor.value === 'matrix' || configEditor.value === 'likert_matrix') list.push({ key: 'grid', label: 'Grid' });
         if (configEditor.value === 'geo') list.push({ key: 'geo', label: 'Map' });
+        if (configEditor.value === 'media') list.push({ key: 'media', label: 'Media' });
         list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
         return list;
     }
@@ -132,6 +134,15 @@ const geoCaptureAltitude = computed<boolean>(() => (field.value?.config.capture_
 const geoAccuracyThreshold = computed<number | null>(() => (field.value?.config.accuracy_threshold as number | undefined) ?? null);
 const geoDefaultCenter = computed<{ lat: number; lon: number } | null>(() => (field.value?.config.default_center as { lat: number; lon: number } | undefined) ?? null);
 const geoDefaultZoom = computed<number | null>(() => (field.value?.config.default_zoom as number | undefined) ?? null);
+// A media field (Increment G6) carries upload constraints + capture options (all optional).
+const mediaAcceptedTypes = computed<string[]>(() => {
+    const raw = field.value?.config.accepted_types;
+    return Array.isArray(raw) ? raw.filter((t): t is string => typeof t === 'string') : [];
+});
+const mediaMaxFileSizeBytes = computed<number | null>(() => (field.value?.config.max_file_size_bytes as number | undefined) ?? null);
+const mediaMaxCount = computed<number | null>(() => (field.value?.config.max_count as number | undefined) ?? null);
+const mediaMinCount = computed<number | null>(() => (field.value?.config.min_count as number | undefined) ?? null);
+const mediaCaptureSource = computed<string | null>(() => (field.value?.config.capture_source as string | undefined) ?? null);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -290,6 +301,22 @@ function reparent(sectionId: string): void {
                         @update:accuracyThreshold="setConfig('accuracy_threshold', $event)"
                         @update:defaultCenter="setConfig('default_center', $event)"
                         @update:defaultZoom="setConfig('default_zoom', $event)"
+                    />
+                </template>
+
+                <template v-else-if="activeTab === 'media'">
+                    <MediaEditor
+                        :field-type="field.field_type"
+                        :accepted-types="mediaAcceptedTypes"
+                        :max-file-size-bytes="mediaMaxFileSizeBytes"
+                        :max-count="mediaMaxCount"
+                        :min-count="mediaMinCount"
+                        :capture-source="mediaCaptureSource"
+                        @update:acceptedTypes="setConfig('accepted_types', $event)"
+                        @update:maxFileSizeBytes="setConfig('max_file_size_bytes', $event)"
+                        @update:maxCount="setConfig('max_count', $event)"
+                        @update:minCount="setConfig('min_count', $event)"
+                        @update:captureSource="setConfig('capture_source', $event)"
                     />
                 </template>
 

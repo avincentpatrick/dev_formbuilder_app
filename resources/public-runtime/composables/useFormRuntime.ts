@@ -27,6 +27,7 @@ import {
     type EngineValue,
     type GeoAnswer,
     type InstanceAnswers,
+    type MediaAnswer,
     type RequiredMode,
     type SemanticError,
 } from '../engine';
@@ -94,7 +95,7 @@ export interface FormRuntime {
     readonly isFirstStep: ComputedRef<boolean>;
     readonly isLastStep: ComputedRef<boolean>;
 
-    setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | null): void;
+    setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | MediaAnswer | null): void;
     restoreAnswers(map: AnswerMap): void;
     markTouched(key: string): void;
     markManyTouched(keys: string[]): void;

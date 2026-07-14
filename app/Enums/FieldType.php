@@ -124,7 +124,7 @@ enum FieldType: string
     {
         return match ($this) {
             self::Geopoint, self::Geotrace, self::Geoshape,
-            self::ImageCapture, self::AudioCapture, self::VideoCapture,
+            self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature,
             self::CascadingSelect, self::Matrix, self::LikertMatrix => true,
             default => false,
         };
@@ -145,7 +145,9 @@ enum FieldType: string
      * dedicated per-type editors. Single source the builder palette ships to the client so the config panel
      * never re-lists which type wires which editor. `matrix`/`likert_matrix` (Increment G4b) are the
      * object-valued grids and use their own row/column/cell editors; `geo` (Increment G5b2b) is the map
-     * config editor (capture/accuracy + default centre/zoom) shared by all three geospatial types.
+     * config editor (capture/accuracy + default centre/zoom) shared by all three geospatial types;
+     * `media` (Increment G6) is the capture config editor (accepted types + size/count caps + capture
+     * source) shared by all five media types.
      */
     public function configEditor(): ?string
     {
@@ -155,6 +157,7 @@ enum FieldType: string
             self::Matrix => 'matrix',
             self::LikertMatrix => 'likert_matrix',
             self::Geopoint, self::Geotrace, self::Geoshape => 'geo',
+            self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature => 'media',
             default => null,
         };
     }
@@ -180,5 +183,21 @@ enum FieldType: string
     public function isGeo(): bool
     {
         return $this === self::Geopoint || $this === self::Geotrace || $this === self::Geoshape;
+    }
+
+    /**
+     * The five media-capture types (Increment G6): `file_upload` / `image_capture` / `audio_capture` /
+     * `video_capture` / `signature`. Their answer is an object-valued list of attachment-reference
+     * envelopes (`[{id, mime?, size?, …}]`), so — like composites and geo — they are handled by the
+     * dedicated `coerceMedia`/`processMedia` passes (never routed through scalar coercion), the referenced
+     * files live in the shared polymorphic `attachments` table, and they may not be nested in a
+     * repeatable section (enforced at publish).
+     */
+    public function isMedia(): bool
+    {
+        return match ($this) {
+            self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature => true,
+            default => false,
+        };
     }
 }

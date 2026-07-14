@@ -43,6 +43,7 @@ export type {
     LikertMatrixAnswer,
     MatrixAnswer,
     GeoAnswer,
+    MediaAnswer,
 } from './schema';
 export type { Node } from './ast';
 export type {

@@ -22,10 +22,17 @@ import { EvaluationContext, type Answers } from './context';
 import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
-import type { CompositeAnswer, GeoAnswer, InstanceAnswers, SchemaField, SemanticInput, ValidationRow } from './schema';
+import type { CompositeAnswer, GeoAnswer, InstanceAnswers, MediaAnswer, SchemaField, SemanticInput, ValidationRow } from './schema';
 
-/** The full effective-answers map: scalars/lists, repeat instances (G1), composite grids (G4b), geo (G5b1). */
-type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
+/** The full effective-answers map: scalars/lists, repeat instances (G1), composite grids (G4b), geo (G5b1), media (G6). */
+type EffectiveAnswers = Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer | MediaAnswer>;
+
+/** The five media field types (Increment G6) — mirror of PHP `FieldType::isMedia()`. */
+const MEDIA_FIELD_TYPES = new Set(['file_upload', 'image_capture', 'audio_capture', 'video_capture', 'signature']);
+
+function isMediaType(fieldType: string | undefined): boolean {
+    return fieldType !== undefined && MEDIA_FIELD_TYPES.has(fieldType);
+}
 
 const DEFAULT_CONSTRAINT_MESSAGE = 'This value is not valid.';
 const DEFAULT_REQUIRED_MESSAGE = 'This field is required.';
@@ -151,11 +158,17 @@ export class SemanticValidator {
         // empty envelope is deleted so effective answers stay byte-identical across the engines ({} vs []).
         const geoErrors = this.processGeo(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
 
+        // Media fields (Increment G6) are validated in their own pass (same reason as geo/composites: a
+        // list-of-objects answer must not hit scalar isEmpty). DB-free rules only — required + min/max count;
+        // an empty list is deleted so effective answers stay byte-identical across the engines. Existence/
+        // ownership/scan are the server's PHP-only AttachmentReferenceValidator, not part of this mirror.
+        const mediaErrors = this.processMedia(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now);
+
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`). See computeCalculated().
         const computed = this.computeCalculated(topLevelFields, effectiveAnswers, fieldRelevance, now);
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors], effectiveAnswers, computed, repeatRelevance);
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors, ...mediaErrors], effectiveAnswers, computed, repeatRelevance);
     }
 
     /**
@@ -380,6 +393,12 @@ export class SemanticValidator {
         // Geospatial fields (Increment G5b1) hold an object-valued GeoJSON envelope — validated by processGeo,
         // never here, for the same reason (isEmpty on the object diverges from the PHP authority).
         if (field.field_type === 'geopoint' || field.field_type === 'geotrace' || field.field_type === 'geoshape') {
+            return;
+        }
+
+        // Media fields (Increment G6) hold a list of attachment-reference objects — validated by processMedia
+        // (required + count), never here; existence/scan is the server's PHP-only AttachmentReferenceValidator.
+        if (isMediaType(field.field_type)) {
             return;
         }
 
@@ -792,6 +811,76 @@ export class SemanticValidator {
 
         return toNumber(a[0] as MaybeAbsent) === toNumber(b[0] as MaybeAbsent)
             && toNumber(a[1] as MaybeAbsent) === toNumber(b[1] as MaybeAbsent);
+    }
+
+    /**
+     * Media pass (Increment G6), the list-valued sibling of processGeo/processComposites and the mirror of
+     * PHP `processMedia`. Each relevant media field's answer is a `list<AttachmentRef>`; the DB-free checks
+     * are required (an empty/absent list is a required error, if required) and the min/max count bounds from
+     * `field.media`. An empty list is deleted so effective answers stay byte-identical across engines.
+     * Existence/ownership/scan are the server's PHP-only AttachmentReferenceValidator — never in this mirror.
+     */
+    private processMedia(
+        fields: SchemaField[],
+        fieldRelevance: Record<string, boolean>,
+        effectiveAnswers: EffectiveAnswers,
+        ruleSets: RuleSets,
+        fieldKeyById: FieldKeysById,
+        locale: string,
+        now: string | null,
+    ): SemanticError[] {
+        const errors: SemanticError[] = [];
+        const context = new EvaluationContext(effectiveAnswers as Answers, undefined, now);
+
+        for (const field of fields) {
+            if (!isMediaType(field.field_type)) {
+                continue;
+            }
+            if (fieldRelevance[field.key] !== true) {
+                continue; // hidden media: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            const raw = effectiveAnswers[field.key];
+            const count = Array.isArray(raw) ? raw.length : 0;
+
+            if (count === 0) {
+                const sets: Partial<RuleFamilies> = ruleSets[field.id] ?? {};
+                const [required, trigger] = this.requiredState(field, sets.required ?? [], context, fieldKeyById);
+                if (required) {
+                    const message = trigger !== null
+                        ? this.resolveMessage(trigger, locale, DEFAULT_REQUIRED_MESSAGE)
+                        : DEFAULT_REQUIRED_MESSAGE;
+                    errors.push({ fieldKey: field.key, rule: 'field_required', message, sectionKey: null, instanceIndex: null });
+                }
+                delete effectiveAnswers[field.key]; // empty list — keep engines byte-identical
+
+                continue;
+            }
+
+            const [min, max] = this.mediaCountBounds(field);
+            if (min !== null && count < min) {
+                errors.push({ fieldKey: field.key, rule: 'media_too_few', message: `Attach at least ${min} file(s).`, sectionKey: null, instanceIndex: null });
+            }
+            if (max !== null && count > max) {
+                errors.push({ fieldKey: field.key, rule: 'media_too_many', message: `Attach no more than ${max} file(s).`, sectionKey: null, instanceIndex: null });
+            }
+        }
+
+        return errors;
+    }
+
+    /**
+     * The `[min, max]` attachment-count bounds from a media field's `media` config, each null when unset or
+     * non-positive — the mirror of PHP `mediaCountBounds` (which reads `config.min_count`/`config.max_count`).
+     */
+    private mediaCountBounds(field: SchemaField): [number | null, number | null] {
+        const min = field.media?.minCount ?? null;
+        const max = field.media?.maxCount ?? null;
+
+        return [
+            typeof min === 'number' && min > 0 ? min : null,
+            typeof max === 'number' && max > 0 ? max : null,
+        ];
     }
 
     private processRepeats(

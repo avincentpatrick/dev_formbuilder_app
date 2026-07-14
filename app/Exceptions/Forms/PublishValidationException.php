@@ -102,4 +102,20 @@ final class PublishValidationException extends RuntimeException
     {
         return new self("The expression on “{$ownerKey}” references the location field “{$geoKey}”, which cannot be used in an expression.");
     }
+
+    /**
+     * A media field (Increment G6) nested in a repeatable section — its attachments are owned + counted per
+     * submission (top-level only), so media-in-a-repeat is unsupported for now (relaxing it later is
+     * non-breaking).
+     */
+    public static function mediaInRepeatableSection(string $fieldKey): self
+    {
+        return new self("The media field “{$fieldKey}” cannot be placed inside a repeatable section.");
+    }
+
+    /** A media field (Increment G6) whose optional count bounds are incoherent (e.g. min_count > max_count). */
+    public static function mediaConfigInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The media field “{$fieldKey}” is invalid ({$detail}).");
+    }
 }

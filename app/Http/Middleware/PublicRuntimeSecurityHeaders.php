@@ -9,15 +9,20 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Scoped Content-Security-Policy for the map-bearing pages (Increment G5b2 / ADR-0006 D3): the guest form
- * runtime (`GET /f/{slug}`) and the manual-encode page (`GET /forms/{form}/submissions/create`). It sets ONLY
- * the `img-src` directive — allowlisting `self` + inline `data:`/`blob:` URLs + the configured OpenStreetMap
- * tile origins ({@see config('geo.tile_csp_origins')}) — so the Leaflet map may load remote raster tiles while
- * every other image origin is blocked.
+ * Scoped Content-Security-Policy + Permissions-Policy for the capture-bearing pages (Increment G5b2 / G6):
+ * the guest form runtime (`GET /f/{slug}`) and the manual-encode page (`GET /forms/{form}/submissions/create`).
  *
- * Deliberately img-src-only: leaving `default-src`/`script-src`/`connect-src` unset keeps the Vite dev-server
- * HMR bundle, the inline Inertia bootstrap, and the SPA's same-origin API calls working in dev and prod. A
- * broader policy is a separate hardening concern, out of this increment's scope.
+ * Two CSP directives:
+ *  - `img-src` (G5b2 / ADR-0006 D3) — allowlists `self` + inline `data:`/`blob:` + the configured OpenStreetMap
+ *    tile origins ({@see config('geo.tile_csp_origins')}) so the Leaflet map may load remote raster tiles + a
+ *    captured photo's `blob:` preview, while every other image origin is blocked.
+ *  - `media-src` (G6) — `self` + `data:`/`blob:` so a captured audio/video answer plays back from its local
+ *    `blob:` URL; every other media origin is blocked.
+ *
+ * `default-src`/`script-src`/`connect-src` are deliberately left unset (the Vite HMR bundle, the inline Inertia
+ * bootstrap, and the SPA's same-origin API calls need them open) — a broader policy is a separate hardening
+ * concern. The Permissions-Policy grants `camera`/`microphone` to `self` so the native `<input capture>` (and a
+ * future in-page getUserMedia recorder) keeps working when the form is embedded in an iframe (Increment G6).
  */
 final class PublicRuntimeSecurityHeaders
 {
@@ -28,22 +33,27 @@ final class PublicRuntimeSecurityHeaders
 
         // Don't clobber a policy another layer already set (defensive — nothing else sets CSP today).
         if (! $response->headers->has('Content-Security-Policy')) {
-            $response->headers->set('Content-Security-Policy', $this->imgSrcPolicy());
+            $response->headers->set('Content-Security-Policy', $this->contentSecurityPolicy());
+        }
+
+        if (! $response->headers->has('Permissions-Policy')) {
+            $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(self)');
         }
 
         return $response;
     }
 
-    /** Build the single `img-src` directive from the configured tile origins. */
-    private function imgSrcPolicy(): string
+    /** Build the `img-src` (tiles + blob preview) + `media-src` (blob audio/video playback) directives. */
+    private function contentSecurityPolicy(): string
     {
         $origins = array_values(array_filter(
             (array) config('geo.tile_csp_origins', []),
             static fn ($origin): bool => is_string($origin) && $origin !== '',
         ));
 
-        $sources = array_merge(["'self'", 'data:', 'blob:'], $origins);
+        $imgSrc = 'img-src '.implode(' ', array_merge(["'self'", 'data:', 'blob:'], $origins));
+        $mediaSrc = "media-src 'self' data: blob:";
 
-        return 'img-src '.implode(' ', $sources);
+        return $imgSrc.'; '.$mediaSrc;
     }
 }

@@ -244,6 +244,15 @@ final class StructuralAnswerNormalizer
             // the relevance-aware Stage-3 checks (so they also run in the client engine, golden lockstep).
             FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape => $this->coerceGeo($field, $value),
 
+            // Media capture (Increment G6): the answer is a list of attachment-reference envelopes
+            // (`[{id, mime?, size?, …}]`) pointing at already-staged `attachments` rows. Only STRUCTURAL
+            // faults here (a list of objects each carrying a non-empty string `id`); the count/required rules
+            // are the relevance-aware Stage-3 checks (processMedia), and existence/ownership/scan are the
+            // DB-backed Stage-3.5 check (AttachmentReferenceValidator). Routed through its own pass so scalar
+            // coercion never mangles the objects — the same discipline as geo/composite.
+            FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture,
+            FieldType::VideoCapture, FieldType::Signature => $this->coerceMedia($field, $value),
+
             // Scalar-valued types: reject an array, otherwise store a canonical string. `likert_scale` (G4a)
             // is a single chosen scale point, so it coerces exactly like a single_select.
             FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
@@ -253,9 +262,9 @@ final class StructuralAnswerNormalizer
                 ? [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')]
                 : [true, Coercion::toStr($value), null],
 
-            // Remaining advanced types (media/duration) have no manual-encode renderer yet; pass any value
-            // through untouched so the pipeline stays channel-agnostic and a future channel's payload is
-            // not rejected here.
+            // Remaining advanced types (duration) have no manual-encode renderer yet; pass any value through
+            // untouched so the pipeline stays channel-agnostic and a future channel's payload is not
+            // rejected here.
             default => [true, $value, null],
         };
     }
@@ -370,6 +379,69 @@ final class StructuralAnswerNormalizer
 
             return Coercion::isNumericLike($element) ? Coercion::toNumber($element) : $element;
         }, $coordinates);
+    }
+
+    /**
+     * Media capture (Increment G6) → the canonical `list<AttachmentRef>` where each ref is
+     * `{id, mime?, size?, name?, width?, height?, duration?}`. Structural faults only: the value must be a
+     * LIST (not an object/scalar → `expected_list`); each element must be an object carrying a non-empty
+     * string `id` (else `media_malformed`). `id` is authoritative; the rest is display metadata, canonicalised
+     * (strings kept, numerics coerced to int, unknown keys dropped). A blank entry is dropped; an all-empty
+     * list normalises to not-stored (mirrors the isEmpty guard). Count/required are Stage-3 (processMedia);
+     * existence/ownership/scan are the DB-backed AttachmentReferenceValidator.
+     *
+     * @return array{0: bool, 1: list<array<string, mixed>>|null, 2: array{field: string, rule: string, message: string}|null}
+     */
+    private function coerceMedia(FormField $field, mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return [false, null, $this->mismatch($field->key, 'expected_list', 'This field must be a list of uploaded files.')];
+        }
+
+        /** @var list<array<string, mixed>> $refs */
+        $refs = [];
+        foreach ($value as $index => $ref) {
+            if (Coercion::isEmpty($ref)) {
+                continue; // a blank entry is dropped, not a fault
+            }
+            if (! is_array($ref) || array_is_list($ref)) {
+                return [false, null, $this->mismatch("{$field->key}[{$index}]", 'media_malformed', 'This uploaded file reference is malformed.')];
+            }
+            $id = $ref['id'] ?? null;
+            if (! is_string($id) || $id === '') {
+                return [false, null, $this->mismatch("{$field->key}[{$index}]", 'media_malformed', 'This uploaded file reference is missing its id.')];
+            }
+            $refs[] = $this->canonicalizeMediaRef($ref, $id);
+        }
+
+        return $refs === [] ? [false, null, null] : [true, $refs, null];
+    }
+
+    /**
+     * Canonicalise one attachment-reference envelope: the authoritative `id`, then the display members that
+     * are present and well-typed (string `mime`/`name`; numeric-string `size`/`width`/`height`/`duration`
+     * coerced to int). Unknown keys are dropped so the stored shape stays tight and mirrors the TS `MediaAnswer`.
+     *
+     * @param  array<string, mixed>  $ref
+     * @return array<string, mixed>
+     */
+    private function canonicalizeMediaRef(array $ref, string $id): array
+    {
+        $canonical = ['id' => $id];
+
+        foreach (['mime', 'name'] as $stringKey) {
+            if (isset($ref[$stringKey]) && is_string($ref[$stringKey])) {
+                $canonical[$stringKey] = $ref[$stringKey];
+            }
+        }
+
+        foreach (['size', 'width', 'height', 'duration'] as $numericKey) {
+            if (isset($ref[$numericKey]) && Coercion::isNumericLike($ref[$numericKey])) {
+                $canonical[$numericKey] = (int) Coercion::toNumber($ref[$numericKey]);
+            }
+        }
+
+        return $canonical;
     }
 
     /**

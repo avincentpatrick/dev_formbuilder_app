@@ -9,11 +9,13 @@ use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
+use App\Models\Attachment;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
+use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
@@ -36,8 +38,10 @@ use Illuminate\Support\Facades\DB;
  *                    projection (ADR-0006); `SubmissionCreated` dispatched post-commit.
  *
  * Registered as a singleton so it shares the memoised singleton expression parser/evaluator (via the
- * validator). Attachments and audit records — the architecture's other Stage-4 inserts — are deferred:
- * their tables do not exist in Phase 1 (same TODO posture as PublishService's audit/webhook side-effects).
+ * validator). Media attachments (Increment G6) are linked here: a Stage-3.5 DB check
+ * ({@see AttachmentReferenceValidator}) validates each referenced file exists/is owned/is not infected,
+ * then persist re-points each staged attachment to the submission and records the id list on the answer
+ * document. Audit records — the architecture's other Stage-4 insert — are still deferred (no audits table).
  */
 final class SubmissionPipeline
 {
@@ -46,6 +50,7 @@ final class SubmissionPipeline
         private readonly SemanticValidator $semantic,
         private readonly AnswerIndexProjector $projector,
         private readonly GeoIndexProjector $geoProjector,
+        private readonly AttachmentReferenceValidator $attachmentRefs,
     ) {}
 
     public function submit(SubmissionPayload $payload): SubmissionResult
@@ -76,6 +81,11 @@ final class SubmissionPipeline
         if (! $result->passed()) {
             throw SubmissionValidationException::semantic($this->mapErrors($result->errors));
         }
+
+        // Stage 3.5 (Increment G6) — the DB-backed half of media validation the shared engine can't do:
+        // each referenced attachment must exist, be tenant-owned, be staged for its field, and not be
+        // infected. Runs after semantics (so a hidden/pruned media field is already gone) and before persist.
+        $this->attachmentRefs->validate($version, $fields, $result->effectiveAnswers);
 
         // Stage 4 — transactional persist.
         try {
@@ -128,12 +138,24 @@ final class SubmissionPipeline
             'submitted_at' => now(),
         ]);
 
+        // Media attachments (Increment G6): collect every referenced attachment id from the media answers,
+        // re-point each staged file's polymorphic owner from its form_field to this submission, and record
+        // the flat id list on the answer document (attachment_refs). All inside the persist transaction, so
+        // the ownership move can never drift from the answer it belongs to. RLS scopes the update to the tenant.
+        $attachmentIds = $this->collectAttachmentIds($fields, $answers);
+        if ($attachmentIds !== []) {
+            Attachment::query()->whereIn('id', $attachmentIds)->update([
+                'attachable_type' => 'submission',
+                'attachable_id' => $submission->id,
+            ]);
+        }
+
         SubmissionAnswer::create([
             'submission_id' => $submission->id,
             'form_version_id' => $version->id,
             'answers' => $answers,
             'answers_schema_checksum' => $version->checksum,
-            'attachment_refs' => [],
+            'attachment_refs' => $attachmentIds,
             'last_saved_at' => now(),
         ]);
 
@@ -141,6 +163,41 @@ final class SubmissionPipeline
         $this->projectGeo($submission, $version, $fields, $answers);
 
         return $submission;
+    }
+
+    /**
+     * The unique attachment ids referenced by every media answer (Increment G6). Reads the `id` of each
+     * {@see StructuralAnswerNormalizer} canonical AttachmentRef under a media
+     * field key. Feeds both the ownership re-point and the denormalised `attachment_refs` list.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  array<string, mixed>  $answers
+     * @return list<string>
+     */
+    private function collectAttachmentIds(Collection $fields, array $answers): array
+    {
+        /** @var array<string, true> $mediaKeys */
+        $mediaKeys = [];
+        foreach ($fields as $field) {
+            if ($field->field_type->isMedia()) {
+                $mediaKeys[$field->key] = true;
+            }
+        }
+
+        /** @var array<string, true> $ids */
+        $ids = [];
+        foreach ($answers as $key => $value) {
+            if (! isset($mediaKeys[$key]) || ! is_array($value)) {
+                continue;
+            }
+            foreach ($value as $ref) {
+                if (is_array($ref) && isset($ref['id']) && is_string($ref['id'])) {
+                    $ids[$ref['id']] = true;
+                }
+            }
+        }
+
+        return array_keys($ids);
     }
 
     /**

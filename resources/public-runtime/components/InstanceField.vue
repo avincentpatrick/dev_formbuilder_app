@@ -10,7 +10,7 @@
  * `field-<address>` jump anchor the summary banner scrolls to.
  */
 import { computed, nextTick, ref, watch } from 'vue';
-import FieldInput, { type AnswerValue, type EncodeField, type GeoEnvelope } from '@/components/submissions/FieldInput.vue';
+import FieldInput, { type AnswerValue, type EncodeField, type GeoEnvelope, type MediaAttachmentRef } from '@/components/submissions/FieldInput.vue';
 import { resolveCascade, resolveOptional, resolveText } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
@@ -74,14 +74,15 @@ function rescueFocus(): void {
 }
 
 function onUpdate(next: AnswerValue): void {
-    // A composite grid (G4b) and a geo field (G5b2) are both banned from a repeatable section by the publish
-    // gate, so an instance answer is always a scalar/list EngineValue — the cast narrows the shared AnswerValue
-    // union (minus the grid objects + the geo envelope) to what setInstanceAnswer stores.
+    // A composite grid (G4b), a geo field (G5b2), and a media field (G6) are all banned from a repeatable
+    // section by the publish gate, so an instance answer is always a scalar/list EngineValue — the cast narrows
+    // the shared AnswerValue union (minus the grid objects, the geo envelope, and the media ref list) to what
+    // setInstanceAnswer stores.
     runtime.setInstanceAnswer(
         props.sectionKey,
         props.index,
         props.field.key,
-        next as Exclude<AnswerValue, Record<string, string> | Record<string, Record<string, string>> | GeoEnvelope>,
+        next as Exclude<AnswerValue, Record<string, string> | Record<string, Record<string, string>> | GeoEnvelope | MediaAttachmentRef[]>,
     );
 }
 

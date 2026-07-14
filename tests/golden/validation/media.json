@@ -1,0 +1,65 @@
+[
+  {
+    "name": "media_required_empty",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "image_capture", "is_required": "required" } ] },
+    "answers": { "photos": [] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "errors": [ { "field": "photos", "rule": "field_required" } ],
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "media_optional_empty_unset",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "image_capture" } ] },
+    "answers": { "photos": [] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "effective_answers": {}
+    }
+  },
+  {
+    "name": "media_single_optional_ok",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "image_capture" } ] },
+    "answers": { "photos": [ { "id": "att-1" } ] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "effective_answers": { "photos": [ { "id": "att-1" } ] }
+    }
+  },
+  {
+    "name": "media_min_count_too_few",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "image_capture", "media": { "min": 2 } } ] },
+    "answers": { "photos": [ { "id": "att-1" } ] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "errors": [ { "field": "photos", "rule": "media_too_few" } ],
+      "effective_answers": { "photos": [ { "id": "att-1" } ] }
+    }
+  },
+  {
+    "name": "media_max_count_too_many",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "video_capture", "media": { "max": 2 } } ] },
+    "answers": { "photos": [ { "id": "a" }, { "id": "b" }, { "id": "c" } ] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "errors": [ { "field": "photos", "rule": "media_too_many" } ],
+      "effective_answers": { "photos": [ { "id": "a" }, { "id": "b" }, { "id": "c" } ] }
+    }
+  },
+  {
+    "name": "media_required_within_bounds_ok",
+    "grammar_version": "2.0",
+    "schema": { "fields": [ { "key": "photos", "field_type": "file_upload", "is_required": "required", "media": { "min": 1, "max": 3 } } ] },
+    "answers": { "photos": [ { "id": "a", "mime": "application/pdf", "size": 2048 }, { "id": "b" } ] },
+    "expected": {
+      "relevance": { "fields": { "photos": true } },
+      "effective_answers": { "photos": [ { "id": "a", "mime": "application/pdf", "size": 2048 }, { "id": "b" } ] }
+    }
+  }
+]

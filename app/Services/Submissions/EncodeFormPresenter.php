@@ -46,6 +46,9 @@ final class EncodeFormPresenter
         FieldType::Matrix, FieldType::LikertMatrix,
         // Increment G5b2: geospatial capture (coordinate/vertex control + progressive-enhancement Leaflet map).
         FieldType::Geopoint, FieldType::Geotrace, FieldType::Geoshape,
+        // Increment G6: media capture (upload-on-selection + progressive-enhancement getUserMedia). `signature`
+        // (a canvas-draw control) is deferred, so it stays unsupported for now.
+        FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture, FieldType::VideoCapture,
     ];
 
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
@@ -78,7 +81,7 @@ final class EncodeFormPresenter
                 'repeatable' => false,
                 'min_instances' => null,
                 'max_instances' => null,
-                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($f))->values()->all(),
+                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f))->values()->all(),
             ];
         }
 
@@ -99,7 +102,7 @@ final class EncodeFormPresenter
                 'min_instances' => $section->is_repeatable ? $section->min_instances : null,
                 'max_instances' => $section->is_repeatable ? $section->max_instances : null,
                 'fields' => $sectionFields
-                    ->map(fn (FormField $f): array => $this->field($f))
+                    ->map(fn (FormField $f): array => $this->field($form, $f))
                     ->values()->all(),
             ];
         }
@@ -121,7 +124,7 @@ final class EncodeFormPresenter
     /**
      * @return array<string, mixed>
      */
-    private function field(FormField $field): array
+    private function field(Form $form, FormField $field): array
     {
         $type = $field->field_type;
 
@@ -139,6 +142,11 @@ final class EncodeFormPresenter
             'matrix' => $this->matrix($field),
             // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
             'geo' => $this->geo($field),
+            // Media capture config (Increment G6: file/image/audio/video); null for every other type.
+            'media' => $this->media($field),
+            // Where a media control POSTs a staged upload (Increment G6) — the authenticated form-scoped
+            // endpoint. Only media fields carry it; the shared FieldInput ignores it for other types.
+            'upload' => $type->isMedia() ? ['url' => route('forms.attachments.store', $form)] : null,
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2).
             'supported' => in_array($type, self::SUPPORTED, true),
@@ -237,6 +245,34 @@ final class EncodeFormPresenter
             'accuracyThreshold' => is_numeric($threshold) ? (float) $threshold : null,
             'defaultCenter' => $defaultCenter,
             'defaultZoom' => is_numeric($zoom) ? (int) $zoom : null,
+        ];
+    }
+
+    /**
+     * The media capture config (Increment G6) — author options for the file/image/audio/video control,
+     * normalised from the stored snake_case config into the camelCase shape the shared FieldInput media
+     * control consumes (mirrors schema-mapping.ts buildMedia). Null for every non-media type.
+     *
+     * @return array{acceptedTypes: list<string>, maxFileSizeBytes: int|null, maxCount: int|null, minCount: int|null, captureSource: string|null}|null
+     */
+    private function media(FormField $field): ?array
+    {
+        if (! $field->field_type->isMedia()) {
+            return null;
+        }
+
+        $accepted = data_get($field->config, 'accepted_types');
+        $maxSize = data_get($field->config, 'max_file_size_bytes');
+        $maxCount = data_get($field->config, 'max_count');
+        $minCount = data_get($field->config, 'min_count');
+        $source = data_get($field->config, 'capture_source');
+
+        return [
+            'acceptedTypes' => is_array($accepted) ? array_values(array_filter($accepted, 'is_string')) : [],
+            'maxFileSizeBytes' => is_numeric($maxSize) ? (int) $maxSize : null,
+            'maxCount' => is_numeric($maxCount) ? (int) $maxCount : null,
+            'minCount' => is_numeric($minCount) ? (int) $minCount : null,
+            'captureSource' => is_string($source) ? $source : null,
         ];
     }
 

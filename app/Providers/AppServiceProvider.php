@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Attachment;
 use App\Models\Form;
+use App\Models\FormField;
 use App\Models\PersonalAccessToken;
 use App\Models\Submission;
+use App\Policies\AttachmentPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\SubmissionPolicy;
 use App\Support\Guest\GuestShareTokenService;
@@ -14,6 +17,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\Server;
 use Dedoc\Scramble\Support\Generator\ServerVariable;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -53,6 +57,20 @@ class AppServiceProvider extends ServiceProvider
         // scope + published) — the `can:create,<Submission>,form` route middleware resolves this policy from
         // the Submission class-string and passes the bound Form as the extra argument.
         Gate::policy(Submission::class, SubmissionPolicy::class);
+
+        // Attachment read authorization (Increment G6): `view` gates the tenant-side signed serving of a
+        // stored file behind the same per-form visibility the inbox uses. RLS already scopes to the tenant.
+        Gate::policy(Attachment::class, AttachmentPolicy::class);
+
+        // Polymorphic morph map (Increment G6) — the repo's first `morphTo` (attachments.attachable). Store
+        // stable short aliases in `attachable_type` (data-dictionary §10) instead of fully-qualified class
+        // names, so a namespace move never rewrites persisted rows. NON-enforcing (morphMap, not
+        // enforceMorphMap): unmapped morphs (Spatie's role/permission pivots, Sanctum's tokenable) keep
+        // resolving by their stored FQCN — only the attachments aliases are registered here.
+        Relation::morphMap([
+            'submission' => Submission::class,
+            'form_field' => FormField::class,
+        ]);
 
         // The tenant-scoped API-key model (Increment E) — auto-fills tenant_id at mint so the strict RLS
         // WITH CHECK on personal_access_tokens passes, and scopes lookups to the current tenant.

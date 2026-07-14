@@ -33,6 +33,7 @@ import type {
     RenderField,
     RenderGeo,
     RenderMatrix,
+    RenderMedia,
     RenderModel,
     RenderOption,
     RenderSection,
@@ -53,6 +54,8 @@ const SUPPORTED = new Set<string>([
     'matrix', 'likert_matrix',
     // Increment G5b2: geospatial capture.
     'geopoint', 'geotrace', 'geoshape',
+    // Increment G6: media capture (signature's canvas control is deferred, so it stays unsupported).
+    'file_upload', 'image_capture', 'audio_capture', 'video_capture',
 ]);
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
@@ -100,6 +103,9 @@ export function controlFor(fieldType: string, supported: boolean): ControlKind {
     }
     if (fieldType === 'geopoint' || fieldType === 'geotrace' || fieldType === 'geoshape') {
         return 'geo';
+    }
+    if (fieldType === 'file_upload' || fieldType === 'image_capture' || fieldType === 'audio_capture' || fieldType === 'video_capture') {
+        return 'media';
     }
     return 'unsupported';
 }
@@ -402,6 +408,35 @@ function buildGeo(field: RawField): RenderGeo | null {
     };
 }
 
+/** The four media types wired to a renderer (Increment G6) — signature's canvas control is deferred. */
+function isMediaFieldType(fieldType: string): boolean {
+    return fieldType === 'file_upload' || fieldType === 'image_capture' || fieldType === 'audio_capture' || fieldType === 'video_capture';
+}
+
+/** The UI-facing media capture config (Increment G6), normalised snake_case config → camelCase RenderMedia. */
+function buildMedia(field: RawField): RenderMedia | null {
+    if (!isMediaFieldType(field.field_type)) {
+        return null;
+    }
+
+    const acceptedRaw = field.config?.accepted_types;
+    const acceptedTypes = Array.isArray(acceptedRaw) ? acceptedRaw.filter((t): t is string => typeof t === 'string') : [];
+    const source = field.config?.capture_source;
+
+    return {
+        acceptedTypes,
+        maxFileSizeBytes: configNumber(field, 'max_file_size_bytes'),
+        maxCount: configNumber(field, 'max_count'),
+        minCount: configNumber(field, 'min_count'),
+        captureSource: typeof source === 'string' ? source : null,
+    };
+}
+
+/** The min/max count the engine's media pass reads (Increment G6) → engine SchemaField.media. */
+function engineMediaConfig(field: RawField): { maxCount: number | null; minCount: number | null } {
+    return { maxCount: configNumber(field, 'max_count'), minCount: configNumber(field, 'min_count') };
+}
+
 function toRenderField(field: RawField): RenderField {
     const supported = SUPPORTED.has(field.field_type);
     const hasConditionalRequirement =
@@ -425,6 +460,7 @@ function toRenderField(field: RawField): RenderField {
         cascade: buildCascade(field),
         matrix: buildMatrix(field),
         geo: buildGeo(field),
+        media: buildMedia(field),
         sequence: field.sequence,
         sectionSequence: field.section_sequence,
     };
@@ -472,6 +508,8 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         cascade: f.field_type === 'cascading_select' ? engineCascadeConfig(f) : null,
         // Composite grid membership sets (Increment G4b) — row/column/cell VALUE keys only.
         grid: f.field_type === 'matrix' || f.field_type === 'likert_matrix' ? engineGridConfig(f) : null,
+        // Media count bounds (Increment G6) — min/max attachment count for the engine's processMedia pass.
+        media: isMediaFieldType(f.field_type) ? engineMediaConfig(f) : null,
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

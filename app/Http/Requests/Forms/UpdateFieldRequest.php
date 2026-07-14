@@ -30,7 +30,8 @@ use Illuminate\Validation\Rule;
  * transiently clears a value does not 422 the optimistic PATCH. Completeness, distinctness, and cascading /
  * grid integrity are enforced at PUBLISH (StructuralValidationGate), the same "persist unvalidated config,
  * validate at publish" posture as a calculated field's formula (geo config is wholly optional, so it has no
- * publish-completeness gate).
+ * publish-completeness gate). Media types (Increment G6: `config.accepted_types`/`max_file_size_bytes`/
+ * `max_count`/`min_count`/`capture_source`) are likewise wholly optional; only min ≤ max is checked at publish.
  */
 final class UpdateFieldRequest extends FormRequest
 {
@@ -85,6 +86,17 @@ final class UpdateFieldRequest extends FormRequest
      */
     private function configRules(FieldType $type): array
     {
+        if ($type->isMedia()) {
+            return [
+                'config.accepted_types' => ['sometimes', 'array'],
+                'config.accepted_types.*' => ['string', 'max:150'],
+                'config.max_file_size_bytes' => ['nullable', 'integer', 'min:1'],
+                'config.max_count' => ['nullable', 'integer', 'min:1'],
+                'config.min_count' => ['nullable', 'integer', 'min:0'],
+                'config.capture_source' => ['nullable', Rule::in(['camera', 'library', 'both'])],
+            ];
+        }
+
         if ($type->isGeo()) {
             return [
                 'config.capture_altitude' => ['sometimes', 'boolean'],

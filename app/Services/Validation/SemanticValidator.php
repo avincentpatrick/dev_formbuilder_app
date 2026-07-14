@@ -10,6 +10,7 @@ use App\Enums\ValidationRuleType;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
+use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Expressions\Coercion;
 use App\Services\Expressions\EvaluationContext;
 use App\Services\Expressions\ExpressionEvaluator;
@@ -114,6 +115,12 @@ final class SemanticValidator
         // effective answers stay byte-identical across the PHP/TS engines ({} vs []).
         $geoErrors = $this->processGeo($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
 
+        // Media fields (Increment G6) are validated in their own pass for the same reason as geo/composites
+        // (a list-of-objects answer must not hit scalar isEmpty). DB-free rules only — required + min/max
+        // count; an empty list is unset so effective answers stay byte-identical across engines. Existence/
+        // ownership/scan are the PHP-only AttachmentReferenceValidator, run by the pipeline after this.
+        $mediaErrors = $this->processMedia($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now);
+
         // Calculated fields (grammar v2.0) are computed last, over the full effective answers (flat + repeat
         // instance arrays merged above, so a calc can `count(${section})`); a relevant calc's formula result
         // is written to `computed`. Computed values do not feed back into relevance/constraints (documented).
@@ -122,7 +129,7 @@ final class SemanticValidator
         return new SemanticResult(
             $fieldRelevance,
             $sectionRelevance,
-            array_merge($errors, $repeatErrors, $compositeErrors, $geoErrors),
+            array_merge($errors, $repeatErrors, $compositeErrors, $geoErrors, $mediaErrors),
             $effectiveAnswers,
             $computed,
             $repeatRelevance,
@@ -422,6 +429,13 @@ final class SemanticValidator
         // the dedicated processGeo pass — never here, for the same reason as composites (Coercion::isEmpty
         // on the whole object diverges: PHP isEmpty([]) === true vs TS isEmpty({}) === false).
         if ($field->field_type->isGeo()) {
+            return;
+        }
+
+        // Media fields (Increment G6) hold a list of attachment-reference objects and are validated by the
+        // dedicated processMedia pass (required + count), never here — the object list must not hit scalar
+        // coercion, and its existence/scan checks are the DB-backed AttachmentReferenceValidator's.
+        if ($field->field_type->isMedia()) {
             return;
         }
 
@@ -899,6 +913,90 @@ final class SemanticValidator
 
         return Coercion::toNumber($a[0] ?? null) === Coercion::toNumber($b[0] ?? null)
             && Coercion::toNumber($a[1] ?? null) === Coercion::toNumber($b[1] ?? null);
+    }
+
+    /**
+     * Media pass (Increment G6), the list-valued sibling of processGeo/processComposites. Each relevant
+     * media field's answer is a `list<AttachmentRef>`; the DB-free checks are: required (an empty/absent
+     * list is a required error, if required) and the min/max instance-count bounds from the field config.
+     * An empty list is unset so effective answers stay byte-identical across engines. Existence, tenant
+     * ownership, and scan status are NOT checked here (they need the database) — that is the PHP-only
+     * {@see AttachmentReferenceValidator}, run by the pipeline after Stage 3, so
+     * this pass stays golden-parity-able with the TS mirror.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  array<string, bool>  $fieldRelevance
+     * @param  array<string, mixed>  $effectiveAnswers
+     * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
+     * @param  array<string, string>  $fieldKeyById
+     * @return list<SemanticError>
+     */
+    private function processMedia(
+        Collection $fields,
+        array $fieldRelevance,
+        array &$effectiveAnswers,
+        array $ruleSets,
+        array $fieldKeyById,
+        string $locale,
+        ?string $now,
+    ): array {
+        /** @var list<SemanticError> $errors */
+        $errors = [];
+        $context = new EvaluationContext($effectiveAnswers, now: $now);
+
+        foreach ($fields as $field) {
+            if (! $field->field_type->isMedia()) {
+                continue;
+            }
+            if (($fieldRelevance[$field->key] ?? false) !== true) {
+                continue; // hidden media: already pruned from effectiveAnswers, enforce nothing
+            }
+
+            $raw = $effectiveAnswers[$field->key] ?? null;
+            $count = is_array($raw) ? count($raw) : 0;
+
+            if ($count === 0) {
+                $sets = $ruleSets[$field->id] ?? [];
+                [$required, $trigger] = $this->requiredState($field, $sets['required'] ?? [], $context, $fieldKeyById);
+                if ($required) {
+                    $message = $trigger !== null
+                        ? $this->resolveMessage($trigger, $locale, self::DEFAULT_REQUIRED_MESSAGE)
+                        : self::DEFAULT_REQUIRED_MESSAGE;
+                    $errors[] = new SemanticError($field->key, 'field_required', $message);
+                }
+                unset($effectiveAnswers[$field->key]); // empty list — keep engines byte-identical
+
+                continue;
+            }
+
+            [$min, $max] = $this->mediaCountBounds($field);
+            if ($min !== null && $count < $min) {
+                $errors[] = new SemanticError($field->key, 'media_too_few', "Attach at least {$min} file(s).");
+            }
+            if ($max !== null && $count > $max) {
+                $errors[] = new SemanticError($field->key, 'media_too_many', "Attach no more than {$max} file(s).");
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * The `[min, max]` attachment-count bounds from a media field's config (`min_count`/`max_count`), each
+     * null when unset or non-positive. Read directly off `config` (PHP) — the TS mirror reads the same two
+     * values off `SchemaField.media` — so the two engines agree on the count check.
+     *
+     * @return array{0: ?int, 1: ?int}
+     */
+    private function mediaCountBounds(FormField $field): array
+    {
+        $min = data_get($field->config, 'min_count');
+        $max = data_get($field->config, 'max_count');
+
+        return [
+            is_numeric($min) && (int) $min > 0 ? (int) $min : null,
+            is_numeric($max) && (int) $max > 0 ? (int) $max : null,
+        ];
     }
 
     /**

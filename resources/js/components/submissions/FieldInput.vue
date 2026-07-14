@@ -27,6 +27,9 @@ import MatrixGrid from './MatrixGrid.vue';
 // geo-bearing form actually mounts — geo-free forms pay zero bundle cost.
 const GeoInput = defineAsyncComponent(() => import('./GeoInput.vue'));
 
+// Media capture (Increment G6) is lazy-loaded so its upload/preview logic only ships in a media-bearing form.
+const MediaInput = defineAsyncComponent(() => import('./MediaInput.vue'));
+
 export interface CascadeLevel {
     key: string;
     label: string;
@@ -68,6 +71,36 @@ export interface GeoFieldConfig {
     defaultZoom: number | null;
 }
 
+// One uploaded-file reference an answer to a media field carries (Increment G6). `id` is authoritative (an
+// `attachments` row); the rest is display metadata the control shows without a server round-trip. Matches the
+// TS engine `MediaAnswer` element + the PHP AttachmentRef the upload endpoint returns.
+export interface MediaAttachmentRef {
+    id: string;
+    mime?: string;
+    size?: number;
+    name?: string;
+    width?: number;
+    height?: number;
+    duration?: number;
+}
+
+// Author config for a media field (Increment G6); the backend emits it (EncodeFormPresenter::media /
+// schema-mapping buildMedia). `acceptedTypes`/`maxFileSizeBytes`/`captureSource` drive the file input;
+// `maxCount`/`minCount` bound the list (also enforced server-side by processMedia).
+export interface MediaFieldConfig {
+    acceptedTypes: string[];
+    maxFileSizeBytes: number | null;
+    maxCount: number | null;
+    minCount: number | null;
+    captureSource: string | null;
+}
+
+// Where a media control POSTs a staged upload (Increment G6): the channel's own endpoint (form-scoped for
+// manual encode, share-token-scoped for the guest SPA). Null for non-media fields.
+export interface MediaUploadConfig {
+    url: string;
+}
+
 export interface EncodeField {
     key: string;
     field_type: string;
@@ -82,6 +115,9 @@ export interface EncodeField {
     matrix?: MatrixConfig | null;
     // Geo capture config (Increment G5b2: geopoint / geotrace / geoshape); null for every other type.
     geo?: GeoFieldConfig | null;
+    // Media capture config + upload endpoint (Increment G6: file / image / audio / video); null otherwise.
+    media?: MediaFieldConfig | null;
+    upload?: MediaUploadConfig | null;
     supported: boolean;
 }
 
@@ -98,6 +134,8 @@ export type AnswerValue =
     | Record<string, Record<string, string>>
     // A geospatial answer envelope (Increment G5b2).
     | GeoEnvelope
+    // A media answer: a list of attachment references (Increment G6).
+    | MediaAttachmentRef[]
     | null;
 
 // The visual requirement marker (UX §4.4). When omitted it derives from `field.required`, preserving the
@@ -140,6 +178,7 @@ const control = computed<
     | 'matrix'
     | 'likert-matrix'
     | 'geo'
+    | 'media'
     | 'note'
     | 'unsupported'
 >(() => {
@@ -157,6 +196,7 @@ const control = computed<
     if (t === 'likert_matrix') return 'likert-matrix';
     if (t === 'matrix') return 'matrix';
     if (t === 'geopoint' || t === 'geotrace' || t === 'geoshape') return 'geo';
+    if (t === 'file_upload' || t === 'image_capture' || t === 'audio_capture' || t === 'video_capture') return 'media';
     return 'unsupported';
 });
 
@@ -366,6 +406,16 @@ function setCascadeLevel(index: number, value: string): void {
     <!-- Geospatial capture (Increment G5b2): geopoint / geotrace / geoshape (lazy Leaflet + a11y baseline) -->
     <GeoInput
         v-else-if="control === 'geo'"
+        :field="field"
+        :model-value="props.modelValue"
+        :error="error"
+        :required-marker="marker"
+        @update:model-value="emit('update:modelValue', $event)"
+    />
+
+    <!-- Media capture (Increment G6): file / image / audio / video (upload-on-selection + preview) -->
+    <MediaInput
+        v-else-if="control === 'media'"
         :field="field"
         :model-value="props.modelValue"
         :error="error"

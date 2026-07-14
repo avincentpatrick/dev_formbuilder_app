@@ -486,6 +486,131 @@
                 }
             }
         },
+        "/public/f/{shareToken}/attachments": {
+            "post": {
+                "operationId": "v1.public.attachments.store",
+                "tags": [
+                    "GuestAttachment"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreAttachmentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "form_updated"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This form has been updated. Please reload and try again."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "guest_disabled"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Guest submissions are disabled for this form."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/submissions": {
             "post": {
                 "operationId": "v1.public.submissions.store",
@@ -1035,6 +1160,27 @@
                     "abilities"
                 ],
                 "title": "StoreApiTokenRequest"
+            },
+            "StoreAttachmentRequest": {
+                "type": "object",
+                "description": "Validates a single staged media upload (Increment G6), for both the authenticated\n({@see AttachmentController}) and guest\n({@see GuestAttachmentController}) channels. Authorization is the route\nmiddleware's concern (`can:create,Submission,form` for the tenant channel; the guest-token tenant\ncontext + `throttle:guest` for the guest channel), so this request only shape-validates.\n\nThe `max:` ceiling is the global platform limit; the per-field size cap and the content-sniffed MIME\nallowlist are enforced in {@see AttachmentStorageService} (they depend on the\nresolved field's config and on the file's ACTUAL bytes, never the client-declared type \u2014 threat-model \u00a76).",
+                "properties": {
+                    "file": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "maxLength": 25600
+                    },
+                    "field_key": {
+                        "type": "string",
+                        "maxLength": 150
+                    }
+                },
+                "required": [
+                    "file",
+                    "field_key"
+                ],
+                "title": "StoreAttachmentRequest"
             },
             "TenantResource": {
                 "type": "object",

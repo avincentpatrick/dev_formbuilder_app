@@ -96,6 +96,15 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
             }
             $attributes['config'] = $gridConfig;
         }
+        // Media count bounds (G6): a vector's `media.min`/`media.max` → config.min_count/max_count, the shape
+        // the real FormField.config carries + the PHP engine's mediaCountBounds reads. The TS mirror maps the
+        // same fragment to SchemaField.media.
+        if (isset($field['media'])) {
+            $attributes['config'] = [
+                'min_count' => $field['media']['min'] ?? null,
+                'max_count' => $field['media']['max'] ?? null,
+            ];
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {

@@ -60,6 +60,16 @@ final class StructuralValidationGate
                     throw PublishValidationException::geoInRepeatableSection($field->key);
                 }
             }
+            // Increment G6: media config is wholly optional (so there is no required-config gate), but its
+            // attachment ownership + attachment_refs are per-submission (top-level), so a media field may not
+            // sit in a repeatable section (relaxing this later — instance-addressed media — is non-breaking);
+            // and any configured count bounds must be coherent (min ≤ max).
+            if ($field->field_type->isMedia()) {
+                if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
+                    throw PublishValidationException::mediaInRepeatableSection($field->key);
+                }
+                $this->assertMediaConfigResolves($field);
+            }
         }
 
         // Every validation's owning + comparison field belongs to the same version.
@@ -158,6 +168,21 @@ final class StructuralValidationGate
             if ($parent === null || ! isset($valuesByLevelIndex[$option['level'] - 1][$parent])) {
                 throw PublishValidationException::cascadingConfigInvalid($field->key, "option “{$option['value']}” has no valid parent");
             }
+        }
+    }
+
+    /**
+     * A media field's (Increment G6) count bounds, when both are set, must satisfy `min_count ≤ max_count`
+     * (otherwise no submission could ever satisfy the field). Every media config value is optional, so an
+     * unset bound is never a publish error.
+     */
+    private function assertMediaConfigResolves(FormField $field): void
+    {
+        $min = data_get($field->config, 'min_count');
+        $max = data_get($field->config, 'max_count');
+
+        if (is_numeric($min) && is_numeric($max) && (int) $min > (int) $max) {
+            throw PublishValidationException::mediaConfigInvalid($field->key, 'the minimum count exceeds the maximum count');
         }
     }
 

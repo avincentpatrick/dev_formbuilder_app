@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\TenantApiController;
+use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestSubmissionController;
 use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
@@ -113,4 +114,7 @@ Route::prefix('api/v1/public')
     ->group(function (): void {
         Route::get('f/{shareToken}', [PublicFormSchemaController::class, 'show'])->name('forms.schema');
         Route::post('f/{shareToken}/submissions', [GuestSubmissionController::class, 'store'])->name('submissions.store');
+        // Media upload (Increment G6) — a respondent stages a file mid-form (before submit) against the
+        // pinned version's media field; the returned AttachmentRef rides the answer document at submit.
+        Route::post('f/{shareToken}/attachments', [GuestAttachmentController::class, 'store'])->name('attachments.store');
     });

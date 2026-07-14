@@ -40,6 +40,15 @@ export type CompositeAnswer = LikertMatrixAnswer | MatrixAnswer;
  */
 export type GeoAnswer = { type: string; coordinates: unknown; accuracy?: number };
 
+/**
+ * A media answer (Increment G6): a list of attachment-reference envelopes `[{id, mime?, size?, …}]`, each
+ * pointing at a staged `attachments` row. The `id` is authoritative; `mime`/`size`/`name`/`width`/`height`/
+ * `duration` are display metadata. Object-valued and deliberately OUTSIDE `EngineValue` (never scalar-coerced)
+ * — validated (required + min/max count) by `processMedia`; existence/ownership/scan are the server's
+ * PHP-only concern, so this shape carries no security-bearing member.
+ */
+export type MediaAnswer = { id: string; mime?: string; size?: number; name?: string; width?: number; height?: number; duration?: number }[];
+
 export interface SchemaField {
     id: string;
     key: string;
@@ -59,6 +68,8 @@ export interface SchemaField {
     cascade?: CascadeConfig | null;
     /** Composite grid config (Increment G4b: matrix / likert_matrix). Absent ⇒ no composite check. */
     grid?: GridConfig | null;
+    /** Media count bounds (Increment G6): min/max attachment count for `processMedia`. Absent ⇒ no bounds. */
+    media?: { maxCount: number | null; minCount: number | null } | null;
 }
 
 export interface SchemaSection {
@@ -97,9 +108,9 @@ export interface SemanticInput {
     /**
      * Field key => value, plus (Increment G1) repeatable-section key => list of instance answer maps, plus
      * (Increment G4b) a composite grid field key => its object-valued answer, plus (Increment G5b1) a geo
-     * field key => its GeoJSON envelope.
+     * field key => its GeoJSON envelope, plus (Increment G6) a media field key => its AttachmentRef list.
      */
-    answers: Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer>;
+    answers: Record<string, EngineValue | InstanceAnswers[] | CompositeAnswer | GeoAnswer | MediaAnswer>;
     locale: string;
     /** Grammar v2.0: the injected clock (ISO-8601) that `today()`/`now()` read; null / omitted → unset. */
     now?: string | null;

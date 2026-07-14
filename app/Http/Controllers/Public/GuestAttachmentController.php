@@ -27,6 +27,8 @@ final class GuestAttachmentController extends Controller
     use ReadsGuestShareToken;
 
     /**
+     * Upload a guest attachment for a share token to the form's current published version.
+     *
      * @unauthenticated
      */
     public function store(StoreAttachmentRequest $request, AttachmentStorageService $service): JsonResponse

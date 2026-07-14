@@ -489,6 +489,7 @@
         "/public/f/{shareToken}/attachments": {
             "post": {
                 "operationId": "v1.public.attachments.store",
+                "summary": "Upload a guest attachment for a share token to the form's current published version",
                 "tags": [
                     "GuestAttachment"
                 ],

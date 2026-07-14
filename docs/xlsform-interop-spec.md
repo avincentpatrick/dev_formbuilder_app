@@ -124,3 +124,17 @@ This reuses the exact same "draft-repopulation convenience, not a special-cased 
 - Bulk/multi-form migration tooling (§5) — a Phase 3 candidate, not committed.
 - A live, ongoing sync between an external Kobo/ODK deployment and this product (this spec covers one-shot import/export, not continuous synchronization) — no existing doc requests this, and it would be a materially larger, separately-scoped feature.
 - The XLSForm `settings` sheet's less common columns (e.g., `style`, `public_key` for encrypted forms) — deferred until a specific customer need surfaces one.
+
+---
+
+## 8. Implementation Notes (as-built)
+
+**Export — Increment G7a (`app/Services/Xlsform/`, merged).** Reads the id-free canonical shape from `SchemaSnapshotSerializer::snapshot()`; the FieldType⇄XLSForm table lives in `XlsformTypeMap`; the §3.1 lat/lon flip is confined to `GeoWireConverter` (unit-tested both directions). Two pragmatic deviations from a strict reading of §2–§4, both **fully round-trippable through this product's own import** and documented for honesty:
+
+- **Cascading select** is exported as **one** `select_one <key>` question whose choices list carries extra `level` / `parent` columns (plus a `#meridian: cascading` marker), rather than the canonical *N*-questions-with-`choice_filter` ODK idiom. This preserves the entire hierarchy losslessly for our own re-import (§4); a foreign ODK client renders it as a flat select. Multi-question `choice_filter` cascades authored elsewhere are still recognised on import.
+- **Constraints**: expression-based validation rows pass through verbatim; structured rules are rendered to the `constraint` column only where the frozen grammar (v2.0) can express them (`min_value`/`max_value` → `. >= v` / `. <= v`, `greater_than_field`/`less_than_field` → `. > ${k}` / `. < ${k}`). Other structured rule types (`pattern`, `min_length`/`max_length`, `required_if`, …) have no faithful frozen-grammar constraint and are omitted from the `constraint` column — a documented export limitation, not silent corruption.
+- A `#meridian` survey column (ignored by pyxform) carries round-trip breadcrumbs XLSForm cannot natively express (`page_break`, `duration`, `email`/`url`/`phone` intent, the two grids). Only `page_break` and the text-intent markers are honoured on import; `duration`/`matrix`/`likert_matrix` are never reconstructed (§3).
+
+Both HTTP surfaces expose export: tenant-web `GET /forms/{form}/versions/{version}/xlsform` (Inertia builder toolbar) and API-v1 `GET /api/v1/forms/{form}/versions/{version}/xlsform` (the pinned Kobo-migration endpoint), over one `XlsformExporter`.
+
+**Import — Increment G7b.** _(pending)_

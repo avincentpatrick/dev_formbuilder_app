@@ -55,6 +55,13 @@ function publish(): void {
         router.post(`/forms/${props.form.id}/publish`, {}, { preserveScroll: true });
     });
 }
+
+function exportXlsform(): void {
+    // Download the current draft version as an XLSForm .xlsx (Increment G7a). Plain browser navigation to
+    // the streamed download, mirroring the submissions-export pattern.
+    if (props.draft === null) return;
+    window.location.href = `/forms/${props.form.id}/versions/${props.draft.id}/xlsform`;
+}
 </script>
 
 <template>
@@ -88,6 +95,14 @@ function publish(): void {
                     @click="store.redo()"
                 >
                     Redo
+                </MdsButton>
+                <MdsButton
+                    variant="secondary"
+                    icon-left="download"
+                    :disabled="readOnly"
+                    @click="exportXlsform"
+                >
+                    Export XLSForm
                 </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish

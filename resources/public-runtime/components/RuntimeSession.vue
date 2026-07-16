@@ -10,11 +10,13 @@
  */
 import { computed, onBeforeUnmount, provide, ref } from 'vue';
 import RuntimeShell from './RuntimeShell.vue';
+import OfflineIndicator from './OfflineIndicator.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
 import { createAnnouncer } from '../composables/useAnnouncer';
 import { createAutosave } from '../composables/useAutosave';
 import { createFormRuntime } from '../composables/useFormRuntime';
+import { useOnline } from '../composables/useOnline';
 import {
     AnnouncerKey,
     RuntimeKey,
@@ -70,6 +72,8 @@ if (props.initialAnswers === undefined) {
 
 onBeforeUnmount(() => autosave.dispose());
 
+const { online } = useOnline();
+
 type Notice = { type: 'info' | 'error' | 'rate-limited'; message: string } | null;
 const notice = ref<Notice>(props.notice ? { type: 'info', message: props.notice } : null);
 const submitting = ref(false);
@@ -112,6 +116,16 @@ async function submit(): Promise<SubmitOutcome> {
     if (!runtime.passed.value) {
         return 'field-errors';
     }
+    // Increment G8a — pre-flight offline guard. With no outbox yet (G8b), a submit while offline can only
+    // fail; block it with a clear message rather than firing a doomed POST that surfaces a generic error.
+    // The answers stay safe in the localStorage autosave until the respondent reconnects.
+    if (!online.value) {
+        notice.value = {
+            type: 'info',
+            message: "You're offline — your answers are saved on this device. Reconnect to submit.",
+        };
+        return 'blocked';
+    }
     submitting.value = true;
     notice.value = null;
     try {
@@ -145,6 +159,7 @@ const description = computed(() => runtime.renderModel.form.description);
         :saved-at="autosave.savedAt.value"
     >
         <template #notice>
+            <OfflineIndicator v-if="!online" />
             <div
                 v-if="notice"
                 class="session-notice"

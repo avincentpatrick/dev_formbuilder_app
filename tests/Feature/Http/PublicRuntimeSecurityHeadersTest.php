@@ -30,8 +30,13 @@ it('sets an img-src CSP allowlisting self, data/blob, and the configured tile or
         ->and($csp)->toContain('data:')
         ->and($csp)->toContain('blob:')
         ->and($csp)->toContain('https://*.tile.openstreetmap.org')
-        // img-src ONLY — script/connect are deliberately left unrestricted (dev HMR + Inertia).
+        // media-src (G6) + the G8a PWA self-pins for the guest service worker + web manifest.
+        ->and($csp)->toContain('media-src')
+        ->and($csp)->toContain("worker-src 'self'")
+        ->and($csp)->toContain("manifest-src 'self'")
+        // script/connect/default are deliberately left unrestricted (dev HMR + Inertia + same-origin API).
         ->and($csp)->not->toContain('script-src')
+        ->and($csp)->not->toContain('connect-src')
         ->and($csp)->not->toContain('default-src');
 });
 

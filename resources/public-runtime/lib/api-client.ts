@@ -19,6 +19,9 @@ export interface SubmitPayload {
     clientSubmissionUuid: string;
     locale: string;
     guestContactEmail?: string | null;
+    // Increment G8b — device provenance, threaded through for both live submits and offline outbox replay.
+    deviceId?: string | null;
+    appVersion?: string | null;
 }
 
 export interface ApiClient {
@@ -97,6 +100,8 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         client_submission_uuid: payload.clientSubmissionUuid,
                         locale: payload.locale,
                         ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
+                        ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
+                        ...(payload.appVersion ? { app_version: payload.appVersion } : {}),
                     }),
                 });
 

@@ -177,12 +177,22 @@ function readCookie(name: string): string | null {
     return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** POST one file to the staging endpoint via XHR (for upload progress); resolve the returned AttachmentRef. */
+/** POST one file to the staging endpoint via XHR (for upload progress); resolve the returned AttachmentRef.
+ *  Increment G8b (guest SPA only): when the network is unavailable, stash the file locally instead of failing —
+ *  the returned `local:` placeholder ref replays when the outbox syncs. */
 function uploadFile(file: File, onProgress: (pct: number) => void): Promise<MediaAttachmentRef> {
     return new Promise((resolve, reject) => {
         const url = props.field.upload?.url;
+        const stashOffline = props.field.upload?.stashOffline;
         if (url === undefined) {
             reject(new Error('Uploads are not configured for this field.'));
+            return;
+        }
+
+        // Offline pre-check: skip the doomed request and stash the blob locally.
+        if (stashOffline !== undefined && typeof navigator !== 'undefined' && !navigator.onLine) {
+            onProgress(100);
+            stashOffline(file, props.field.key).then(resolve).catch(reject);
             return;
         }
 
@@ -210,7 +220,16 @@ function uploadFile(file: File, onProgress: (pct: number) => void): Promise<Medi
                 reject(new Error(body?.error?.message ?? 'The upload was rejected. Please try a different file.'));
             }
         };
-        xhr.onerror = (): void => reject(new Error('Upload failed. Check your connection and retry.'));
+        xhr.onerror = (): void => {
+            // A dropped connection surfaces here (not xhr.onload). If offline staging is available, keep the
+            // blob locally so the pick isn't lost (Increment G8b); otherwise surface the retryable error.
+            if (stashOffline !== undefined) {
+                onProgress(100);
+                stashOffline(file, props.field.key).then(resolve).catch(reject);
+            } else {
+                reject(new Error('Upload failed. Check your connection and retry.'));
+            }
+        };
 
         const form = new FormData();
         form.append('file', file);

@@ -8,9 +8,10 @@
  * App re-mounts this component (a new `:key`) on a version-drift `reschema`, so a superseding republish gets a
  * clean store with a fresh `client_submission_uuid` while the retained answers are carried in by key.
  */
-import { computed, onBeforeUnmount, provide, ref } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, provide, ref } from 'vue';
 import RuntimeShell from './RuntimeShell.vue';
 import OfflineIndicator from './OfflineIndicator.vue';
+import SyncStatus from './SyncStatus.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
 import { createAnnouncer } from '../composables/useAnnouncer';
@@ -19,12 +20,19 @@ import { createFormRuntime } from '../composables/useFormRuntime';
 import { useOnline } from '../composables/useOnline';
 import {
     AnnouncerKey,
+    DbKey,
     RuntimeKey,
     SubmitFlowKey,
+    SyncOutboxKey,
     type SubmitFlow,
     type SubmitOutcome,
 } from '../composables/context';
 import { ApiError } from '../lib/error-normalizer';
+import { openDb } from '../lib/db';
+import { discardRow, enqueue, markSynced } from '../lib/outbox';
+import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
+import { getDeviceId } from '../lib/device';
+import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
 import type { AnswerMap, Bootstrap, SchemaResponse } from '../lib/types';
 
@@ -38,6 +46,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     submitted: [id: string];
+    queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
 }>();
 
@@ -50,8 +59,16 @@ const announcer = createAnnouncer();
 provide(RuntimeKey, runtime);
 provide(AnnouncerKey, announcer);
 
+// The offline DB + replay driver are provided by App.vue (shared with the service worker); fall back to a
+// fresh handle if a test mounts this component in isolation.
+const db = inject(DbKey) ?? openDb();
+const sync = inject(SyncOutboxKey, null);
+const deviceId = getDeviceId();
+
 const autosave = createAutosave({
+    db,
     formId: props.bootstrap.formId,
+    formVersionId: props.schema.version.id,
     slug: props.bootstrap.slug,
     checksum: runtime.schemaChecksum,
     answers: runtime.answers,
@@ -61,14 +78,17 @@ const autosave = createAutosave({
 
 // Restore a same-browser draft — but only on a FRESH session. A version-drift remount already carries the
 // retained answers in (`initialAnswers`), and its old-checksum draft would be discarded by the guard anyway.
-if (props.initialAnswers === undefined) {
-    const draft = autosave.restore();
-    if (draft !== null) {
-        runtime.restoreAnswers(draft.answers);
-        runtime.locale.value = draft.locale;
-        runtime.goToStep(draft.currentStepKey);
+// The Dexie-backed restore is async (Increment G8b), so it runs after mount; App.vue's loading phase covers it.
+onMounted(async () => {
+    if (props.initialAnswers === undefined) {
+        const draft = await autosave.restore();
+        if (draft !== null) {
+            runtime.restoreAnswers(draft.answers);
+            runtime.locale.value = draft.locale;
+            runtime.goToStep(draft.currentStepKey);
+        }
     }
-}
+});
 
 onBeforeUnmount(() => autosave.dispose());
 
@@ -88,8 +108,12 @@ async function handleDrift(): Promise<void> {
     }
 }
 
-function handleError(error: unknown): SubmitOutcome {
+/** Map an inline (online) submit failure. Client-resolvable outcomes discard the queued row; a genuine network
+ *  failure leaves it pending for the background driver (→ 'queued'). */
+async function handleSubmitError(error: unknown, uuid: string): Promise<SubmitOutcome> {
     if (error instanceof ApiError) {
+        await discardRow(db, uuid);
+        void sync?.refresh();
         const normalized = error.normalized;
         if (normalized.kind === 'field') {
             runtime.setServerErrors(normalized.fieldErrors);
@@ -107,8 +131,12 @@ function handleError(error: unknown): SubmitOutcome {
         notice.value = { type: 'error', message: normalized.message };
         return 'blocked';
     }
-    notice.value = { type: 'error', message: 'Something went wrong. Please try again.' };
-    return 'blocked';
+    // Not an ApiError → the connection dropped mid-submit. Keep the row queued; the driver replays it.
+    await autosave.clear();
+    sync?.registerBackgroundSync();
+    void sync?.refresh();
+    emit('queued', uuid);
+    return 'queued';
 }
 
 async function submit(): Promise<SubmitOutcome> {
@@ -116,29 +144,51 @@ async function submit(): Promise<SubmitOutcome> {
     if (!runtime.passed.value) {
         return 'field-errors';
     }
-    // Increment G8a — pre-flight offline guard. With no outbox yet (G8b), a submit while offline can only
-    // fail; block it with a clear message rather than firing a doomed POST that surfaces a generic error.
-    // The answers stay safe in the localStorage autosave until the respondent reconnects.
-    if (!online.value) {
-        notice.value = {
-            type: 'info',
-            message: "You're offline — your answers are saved on this device. Reconnect to submit.",
-        };
-        return 'blocked';
+
+    // Increment G8b — enqueue the finalized submission to the outbox FIRST (a durable, crash-safe record of
+    // intent), linking any offline-picked media blobs to it. Then replay inline if online, or defer if not.
+    const uuid = runtime.clientSubmissionUuid;
+    const answers = runtime.effectiveAnswers.value;
+    const localMediaIds = collectLocalMediaIds(answers);
+    if (localMediaIds.length > 0) {
+        await attachToSubmission(db, localMediaIds, uuid);
     }
+    await enqueue(db, {
+        client_submission_uuid: uuid,
+        slug: props.bootstrap.slug,
+        form_version_id: props.schema.version.id,
+        checksum: runtime.schemaChecksum,
+        answers,
+        locale: runtime.locale.value,
+        device_id: deviceId,
+        app_version: APP_VERSION,
+    });
+    void sync?.refresh();
+
+    if (!online.value) {
+        await autosave.clear();
+        sync?.registerBackgroundSync();
+        emit('queued', uuid);
+        return 'queued';
+    }
+
     submitting.value = true;
     notice.value = null;
     try {
         const result = await props.client.submit({
-            answers: runtime.effectiveAnswers.value,
-            clientSubmissionUuid: runtime.clientSubmissionUuid,
+            answers,
+            clientSubmissionUuid: uuid,
             locale: runtime.locale.value,
+            deviceId,
+            appVersion: APP_VERSION,
         });
-        autosave.clear();
+        await markSynced(db, uuid);
+        void sync?.refresh();
+        await autosave.clear();
         emit('submitted', result.id);
         return 'success';
     } catch (error) {
-        return handleError(error);
+        return await handleSubmitError(error, uuid);
     } finally {
         submitting.value = false;
     }
@@ -160,6 +210,7 @@ const description = computed(() => runtime.renderModel.form.description);
     >
         <template #notice>
             <OfflineIndicator v-if="!online" />
+            <SyncStatus />
             <div
                 v-if="notice"
                 class="session-notice"

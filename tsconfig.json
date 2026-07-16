@@ -31,6 +31,7 @@
         "public",
         "vendor",
         "packages",
-        "resources/public-runtime/**/*.test.ts"
+        "resources/public-runtime/**/*.test.ts",
+        "resources/public-runtime/sw.ts"
     ]
 }

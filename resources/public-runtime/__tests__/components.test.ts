@@ -45,6 +45,15 @@ async function waitForGeoInput(wrapper: { find: (s: string) => { exists: () => b
     );
 }
 
+// Increment G8b — submit() now awaits an IndexedDB enqueue (a macrotask) BEFORE the network call, so a
+// microtask-only flushPromises() no longer settles the whole chain; advance a few macrotasks too.
+async function settle(): Promise<void> {
+    for (let i = 0; i < 5; i += 1) {
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+}
+
 describe('RuntimeSession (component wiring)', () => {
     it('renders fields via the shared FieldInput and submits effective answers', async () => {
         const schema = schemaResponse({
@@ -57,14 +66,14 @@ describe('RuntimeSession (component wiring)', () => {
 
         // Submit while empty → blocked + inline required error; the network is not called.
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
         expect(client.submit).not.toHaveBeenCalled();
         expect(wrapper.text()).toContain('This field is required.');
 
         // Fill + submit → client.submit is called with the answer, and 'submitted' fires with the id.
         await wrapper.find('input').setValue('Ada');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
         expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID]);
 
@@ -108,14 +117,14 @@ describe('RuntimeSession (component wiring)', () => {
         expect(wrapper.find('input').exists()).toBe(false);
         const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add Household members'))!;
         await addButton.trigger('click');
-        await flushPromises();
+        await settle();
 
         // One instance now renders its member input; fill it and submit.
         const input = wrapper.find('input');
         expect(input.exists()).toBe(true);
         await input.setValue('Bob');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(
             expect.objectContaining({ answers: { hh: [{ member_name: 'Bob' }] } }),
@@ -147,10 +156,10 @@ describe('RuntimeSession (component wiring)', () => {
 
         const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add People'))!;
         await addButton.trigger('click');
-        await flushPromises();
+        await settle();
         await wrapper.find('input').setValue('40');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(wrapper.text()).toContain('Age must be a number.');
         wrapper.unmount();
@@ -175,7 +184,7 @@ describe('RuntimeSession (component wiring)', () => {
 
         await wrapper.find('input[value="3"]').setValue();
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { rating: '3' } }));
         wrapper.unmount();
@@ -206,7 +215,7 @@ describe('RuntimeSession (component wiring)', () => {
         expect(wrapper.findAll('select')[1].attributes('disabled')).toBeDefined();
 
         await wrapper.findAll('select')[0].setValue('ncr');
-        await flushPromises();
+        await settle();
 
         // Province is now enabled and filtered to NCR's children only (manila, not cebu_city).
         const provinceValues = wrapper
@@ -218,7 +227,7 @@ describe('RuntimeSession (component wiring)', () => {
 
         await wrapper.findAll('select')[1].setValue('manila');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { loc: ['ncr', 'manila'] } }));
         wrapper.unmount();
@@ -248,7 +257,7 @@ describe('RuntimeSession (component wiring)', () => {
         await wrapper.find('input[name="lm-sat-clean"][value="3"]').setValue();
         await wrapper.find('input[name="lm-sat-staff"][value="2"]').setValue();
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(
             expect.objectContaining({ answers: { sat: { clean: '3', staff: '2' } } }),
@@ -281,7 +290,7 @@ describe('RuntimeSession (component wiring)', () => {
         await selects[0].setValue('ok');
         await selects[1].setValue('no');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(
             expect.objectContaining({ answers: { svc: { a: { q1: 'ok', q2: 'no' } } } }),
@@ -305,7 +314,7 @@ describe('RuntimeSession (component wiring)', () => {
         await inputs[1].setValue('120.9842'); // longitude
 
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         // Stored envelope is lon-first (GeoJSON/PostGIS), display was lat-first.
         expect(client.submit).toHaveBeenCalledWith(
@@ -335,7 +344,7 @@ describe('RuntimeSession (component wiring)', () => {
         await inputs[3].setValue('4'); // v1 lon
 
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         expect(client.submit).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -369,7 +378,7 @@ describe('RuntimeSession (component wiring)', () => {
         await inputs[5].setValue('0'); // v2 lon
 
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
 
         // The UI edits the OPEN ring; the emitted Polygon closes it (first == last), lon-first.
         expect(client.submit).toHaveBeenCalledWith(
@@ -401,7 +410,7 @@ describe('RuntimeSession (component wiring)', () => {
 
         await wrapper.find('input').setValue('Ada');
         await wrapper.find('form').trigger('submit');
-        await flushPromises();
+        await settle();
         expect(wrapper.text()).toContain('Server says no.');
         wrapper.unmount();
     });

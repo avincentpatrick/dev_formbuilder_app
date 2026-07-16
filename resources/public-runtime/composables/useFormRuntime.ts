@@ -38,7 +38,7 @@ import {
     toSemanticInput,
     type EngineSchema,
 } from '../lib/schema-mapping';
-import { randomUuid } from '../lib/uuid';
+import { randomUuid, uuidv7 } from '../lib/uuid';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../lib/types';
 
 const LEAD_STEP_KEY = '__lead__';
@@ -180,7 +180,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     const submitAttempted = ref(false);
     const engineFailed = ref(false);
     const locale = ref(opts.initialLocale ?? schema.form.default_locale);
-    const clientSubmissionUuid = randomUuid();
+    // Increment G8b — a time-sortable UUIDv7 (was random v4): it is the outbox key + the server idempotency
+    // key, and its leading timestamp gives queued submissions a coarse chronological order for replay.
+    const clientSubmissionUuid = uuidv7();
 
     restoreAnswers(opts.initialAnswers ?? {});
 

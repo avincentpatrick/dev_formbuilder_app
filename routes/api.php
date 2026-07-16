@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
+use App\Http\Controllers\Api\V1\SyncManifestController;
+use App\Http\Controllers\Api\V1\SyncSubmissionController;
 use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestSubmissionController;
@@ -109,6 +111,19 @@ Route::prefix('api/v1')
             ->scopeBindings()
             ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:publish,form'])
             ->name('forms.versions.publish');
+
+        // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
+        // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).
+        // `form_version_id` is a query/body param, not a bound model, so authorization is `ability:` + RLS.
+        Route::get('sync/manifest', [SyncManifestController::class, 'show'])
+            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->name('sync.manifest');
+
+        // Idempotent batch replay of queued submissions (per-item results; a partial failure never rolls back
+        // its siblings). source = offline_sync; `client_submission_uuid` dedupes a duplicate replay to a no-op.
+        Route::post('sync/submissions', [SyncSubmissionController::class, 'store'])
+            ->middleware('ability:'.ApiAbilities::WRITE_SUBMISSIONS)
+            ->name('sync.submissions');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

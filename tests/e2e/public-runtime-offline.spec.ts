@@ -113,3 +113,94 @@ test('Public runtime — installable PWA renders offline + guards submit', async
         { timeout: 20_000 },
     );
 });
+
+// Increment G8c — the 409 conflict-resolution UX. The replay→409→park-as-conflict path itself is covered by
+// the Vitest replay suite; this proves the RESOLUTION half end-to-end against the real server. We produce a
+// genuine queued row through the real offline-submit flow (which safely creates the Dexie schema), then flip
+// its status to `conflict` — a faithful stand-in for "a republish superseded the queued version" — without
+// needing a mid-test republish. Then: Review → re-mint + re-fetch the live schema → resubmit → the parked row
+// is discarded and the resubmission syncs.
+test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', async ({ page, context }) => {
+    await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    // Queue a real submission offline (clinic-intake has no required fields → an empty submit passes the gate).
+    // This creates the Dexie `outbox` store + a pending row, so the raw-IDB edit below can't race schema creation.
+    await context.setOffline(true);
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.getByRole('heading', { name: /saved on this device/i })).toBeVisible({ timeout: 15_000 });
+
+    // Flip the queued row to a parked conflict (as the replay engine would after a 409), then reconnect. It is
+    // NOT `pending`, so the boot replay won't drain it — it surfaces in the "needs review" banner instead.
+    await page.evaluate(
+        () =>
+            new Promise<void>((resolve, reject) => {
+                const open = indexedDB.open('meridian-offline');
+                open.onsuccess = () => {
+                    const db = open.result;
+                    const tx = db.transaction('outbox', 'readwrite');
+                    const store = tx.objectStore('outbox');
+                    const all = store.getAll();
+                    all.onsuccess = () => {
+                        for (const row of all.result as Array<Record<string, unknown>>) {
+                            row.status = 'conflict';
+                            row.conflict_code = 'form_updated';
+                            row.last_error = 'This form has been updated.';
+                            store.put(row);
+                        }
+                    };
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                };
+                open.onerror = () => reject(open.error);
+            }),
+    );
+
+    await context.setOffline(false);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    // The conflict banner surfaces a Review CTA.
+    const reviewButton = page.getByRole('button', { name: 'Review' });
+    await expect(reviewButton).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/need review/i)).toBeVisible();
+    await assertClean(page, 'Public runtime conflict banner');
+
+    // Review → the app re-mints + re-fetches the current schema and re-opens the fill with a resolve notice
+    // plus a discard escape hatch.
+    await reviewButton.click();
+    await expect(page.getByText(/this form was updated/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: /discard this response/i })).toBeVisible();
+    await assertClean(page, 'Public runtime conflict resolve');
+
+    // Resubmit → the reviewed answers are recorded and the parked conflict row discarded.
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await expect(page.getByRole('heading', { name: /reviewed response has been submitted/i })).toBeVisible({
+        timeout: 15_000,
+    });
+
+    // The outbox is empty: the parked conflict was discarded and the resubmission synced.
+    await page.waitForFunction(
+        () =>
+            new Promise<boolean>((resolve) => {
+                const request = indexedDB.open('meridian-offline');
+                request.onsuccess = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains('outbox')) {
+                        resolve(true);
+                        return;
+                    }
+                    const count = db.transaction('outbox', 'readonly').objectStore('outbox').count();
+                    count.onsuccess = () => resolve(count.result === 0);
+                    count.onerror = () => resolve(false);
+                };
+                request.onerror = () => resolve(false);
+            }),
+        null,
+        { timeout: 20_000 },
+    );
+});

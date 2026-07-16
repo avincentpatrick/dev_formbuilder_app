@@ -80,6 +80,34 @@ describe('RuntimeSession (component wiring)', () => {
         wrapper.unmount();
     });
 
+    it('in resolve mode, offers a discard escape hatch and seeds the reviewed answers (Increment G8c)', async () => {
+        const schema = schemaResponse({
+            fields: [field({ key: 'name', label: 'Full name', is_required: 'required' })],
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema,
+                bootstrap,
+                client: fakeClient(),
+                initialAnswers: { name: 'Ada' },
+                notice: 'This form was updated. Please review and resubmit.',
+                resolving: true,
+            },
+        });
+        await settle();
+
+        // The saved answers are pre-filled onto the (new) schema, and the resolve notice is shown.
+        expect((wrapper.find('input').element as HTMLInputElement).value).toBe('Ada');
+        expect(wrapper.text()).toContain('This form was updated');
+
+        // A discard control is offered and emits 'discard'.
+        const discard = wrapper.get('.session-notice__discard');
+        await discard.trigger('click');
+        expect(wrapper.emitted('discard')).toHaveLength(1);
+
+        wrapper.unmount();
+    });
+
     it('shows the language switcher only for a multi-locale form', () => {
         const single = mount(RuntimeSession, {
             props: {

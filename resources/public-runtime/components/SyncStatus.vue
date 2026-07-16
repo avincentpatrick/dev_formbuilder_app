@@ -7,9 +7,10 @@
  * G8c UX. Nothing renders when the queue is empty.
  */
 import { computed, inject } from 'vue';
-import { SyncOutboxKey } from '../composables/context';
+import { ConflictReviewKey, SyncOutboxKey } from '../composables/context';
 
 const sync = inject(SyncOutboxKey, null);
+const reviewConflicts = inject(ConflictReviewKey, null);
 
 const pending = computed(() => sync?.pending.value ?? 0);
 const needsAttention = computed(() => sync?.needsAttention.value ?? 0);
@@ -33,6 +34,14 @@ function responses(n: number): string {
 
         <div v-if="conflict > 0" class="sync-status__row sync-status__row--conflict" role="status">
             <span>{{ responses(conflict) }} need review — the form changed after they were saved.</span>
+            <button
+                v-if="reviewConflicts"
+                type="button"
+                class="sync-status__action"
+                @click="reviewConflicts()"
+            >
+                Review
+            </button>
         </div>
 
         <div v-if="pending > 0" class="sync-status__row" role="status">

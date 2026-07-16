@@ -55,6 +55,10 @@ export interface OutboxRow {
     status: OutboxStatus;
     attempts: number;
     last_error: string | null;
+    /** Increment G8c — which 409 parked a `conflict` row: `form_updated`/`submission_version_superseded` (the
+     *  form changed) vs `submission_conflict` (a server-side copy already exists), so the resolve notice is accurate.
+     *  Not indexed → no `db.version()` bump. */
+    conflict_code: string | null;
     server_submission_id: string | null;
     created_at: string;
     updated_at: string;

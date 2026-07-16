@@ -8,6 +8,7 @@ use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\ValidationRuleType;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormFieldValidation;
@@ -385,6 +386,103 @@ it('treats a replayed client_submission_uuid as an idempotent no-op', function (
         ->and($second->created)->toBeFalse()
         ->and($second->submission->id)->toBe($first->submission->id)
         ->and(Submission::query()->count())->toBe(1);
+});
+
+it('stores an answers-content checksum on persist (Increment G8c)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $result = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: Str::uuid()->toString(),
+    ));
+
+    $doc = SubmissionAnswer::query()->findOrFail($result->submission->id);
+    expect($doc->answers_content_checksum)->toBeString()->toHaveLength(64);
+});
+
+it('treats a same-uuid replay carrying DIFFERENT content as a 409 conflict (Increment G8c)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $uuid = Str::uuid()->toString();
+    $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    // Same idempotency key, materially different answers → a genuine concurrent-edit conflict.
+    expect(fn () => $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Grace'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    )))->toThrow(SubmissionConflictException::class);
+
+    // The original submission is untouched — the conflict never persisted a second row.
+    expect(Submission::query()->count())->toBe(1)
+        ->and(SubmissionAnswer::query()->findOrFail(Submission::query()->firstOrFail()->id)->answers)->toBe(['name' => 'Ada']);
+});
+
+it('treats a same-uuid replay with key-reordered but equal content as an idempotent no-op (Increment G8c)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'first', FieldType::ShortText, 0);
+        addFormField($draft, $user, 'last', FieldType::ShortText, 1);
+    });
+
+    $uuid = Str::uuid()->toString();
+    $first = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['first' => 'Ada', 'last' => 'Lovelace'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    // Identical values, different key order — the canonical checksum matches → a 200 no-op, not a conflict.
+    $second = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['last' => 'Lovelace', 'first' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    expect($second->created)->toBeFalse()
+        ->and($second->submission->id)->toBe($first->submission->id)
+        ->and(Submission::query()->count())->toBe(1);
+});
+
+it('never false-conflicts on a legacy row with no stored content checksum (Increment G8c)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $uuid = Str::uuid()->toString();
+    $first = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    // Simulate a pre-G8c row: clear the stored checksum so the pipeline "cannot compare".
+    SubmissionAnswer::query()->where('submission_id', $first->submission->id)->update(['answers_content_checksum' => null]);
+
+    // Even different content must fall back to the idempotent no-op (no false 409 on legacy data).
+    $second = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Grace'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    expect($second->created)->toBeFalse()
+        ->and($second->submission->id)->toBe($first->submission->id);
 });
 
 it('refuses to submit against a non-published version', function (): void {

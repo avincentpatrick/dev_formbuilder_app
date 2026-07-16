@@ -27,6 +27,7 @@ export async function enqueue(db: MeridianDb, input: EnqueueInput): Promise<Outb
         status: 'pending',
         attempts: 0,
         last_error: null,
+        conflict_code: null,
         server_submission_id: null,
         created_at: now,
         updated_at: now,
@@ -57,9 +58,17 @@ async function deleteRow(db: MeridianDb, uuid: string): Promise<void> {
     });
 }
 
-/** Flag a genuine concurrent-edit conflict (409) for manual resolution (the G8c UX consumes this state). */
-export function markConflict(db: MeridianDb, uuid: string, error: string): Promise<number> {
-    return patch(db, uuid, { status: 'conflict', last_error: error });
+/** Flag a genuine concurrent-edit conflict (409) for manual resolution (the G8c UX consumes this state). The
+ *  `code` records which 409 parked it so the resolve notice can distinguish drift from a server-copy conflict. */
+export function markConflict(db: MeridianDb, uuid: string, error: string, code: string | null = null): Promise<number> {
+    return patch(db, uuid, { status: 'conflict', last_error: error, conflict_code: code });
+}
+
+/** Conflict rows awaiting the G8c review UX, oldest-first; scoped to one form's `slug` when given (the
+ *  interactive resolver reuses App's single share-token client, which is bound to the current form). */
+export async function listConflicts(db: MeridianDb, slug?: string): Promise<OutboxRow[]> {
+    const rows = await db.outbox.where('status').equals('conflict').sortBy('created_at');
+    return slug === undefined ? rows : rows.filter((row) => row.slug === slug);
 }
 
 /** Flag a row a human must look at: a rejected payload (422), or 5 exhausted retries. Never auto-retried. */

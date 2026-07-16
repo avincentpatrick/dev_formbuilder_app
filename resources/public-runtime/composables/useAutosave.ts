@@ -36,6 +36,12 @@ export interface AutosaveOptions {
     now?: () => number;
     /** For the one-time localStorage → Dexie migration read (default `window.localStorage`). */
     storage?: Storage;
+    /**
+     * Increment G8c — when false, autosave is fully inert (no restore, no writes, no watcher). Used by the
+     * conflict-review session, whose durable copy is the parked outbox row: a transient review must never
+     * write a `draft_answers` row that could clobber a live fill sharing the same `[form_version_id+slug]` key.
+     */
+    enabled?: boolean;
 }
 
 export interface Autosave {
@@ -48,6 +54,18 @@ export interface Autosave {
 }
 
 export function createAutosave(options: AutosaveOptions): Autosave {
+    // Increment G8c — an inert autosave (conflict-review session): no watcher, no restore, no writes.
+    if (options.enabled === false) {
+        return {
+            savedAt: ref<string | null>(null),
+            saving: ref(false),
+            restore: async () => null,
+            flush: () => {},
+            clear: async () => {},
+            dispose: () => {},
+        };
+    }
+
     const db = options.db;
     const now = options.now ?? (() => Date.now());
     const legacyStorage = options.storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);

@@ -316,6 +316,31 @@ it('treats a replayed client_submission_uuid as an idempotent no-op', function (
     expect(Submission::query()->count())->toBe(1);
 });
 
+it('409 submission_conflict when the same uuid replays with different content (Increment G8c)', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = guestForm($tenant, $owner);
+    $token = shareTokenFor($form);
+    $clientUuid = Uuid::uuid7()->toString();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['full_name' => 'Grace Hopper', 'age' => '45'],
+        'client_submission_uuid' => $clientUuid,
+    ])->assertCreated();
+
+    // Same idempotency key, materially different answers → a genuine concurrent-edit conflict.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['full_name' => 'Ada Lovelace', 'age' => '36'],
+        'client_submission_uuid' => $clientUuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict');
+
+    enterTenant($tenant->id);
+    expect(Submission::query()->count())->toBe(1);
+});
+
 it('409s (not 500) a submit against a token whose version the form has moved past', function (): void {
     $tenant = guestTenant();
     $owner = User::factory()->create();

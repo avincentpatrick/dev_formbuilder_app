@@ -97,6 +97,12 @@ Route::middleware([
         ->scopeBindings()
         ->middleware('can:view,form')->name('forms.xlsform.export');
 
+    // XLSForm import (Increment G7b) — destructively replace the form's current DRAFT with an uploaded .xlsx
+    // (docs/xlsform-interop-spec.md §5, mirroring "restore version"). A write → gated can:update,form (not the
+    // export's read gate); parse failures reject the file UPFRONT, before the draft is touched.
+    Route::post('/forms/{form}/draft/xlsform-import', [FormXlsformController::class, 'import'])
+        ->middleware('can:update,form')->name('forms.xlsform.import');
+
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly
     // (not Inertia visits, so the client keeps its undo/redo state). All gated by can:update,form; every

@@ -1,7 +1,7 @@
 # XLSForm Interop Spec
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
-**Status:** Draft v1.0 — the column-by-column import/export mapping the architecture plan calls for (§4 item 16), and the concrete Kobo/ODK/SurveyCTO migration path. Targets **XLSForm** by its real, external name (`docs/domain-glossary.md` §3 — never renamed or treated as this product's own vocabulary).
+**Status:** Implemented (Increment G7 — export G7a + import G7b; see §8 as-built) — the column-by-column import/export mapping the architecture plan calls for (§4 item 16), and the concrete Kobo/ODK/SurveyCTO migration path. Targets **XLSForm** by its real, external name (`docs/domain-glossary.md` §3 — never renamed or treated as this product's own vocabulary).
 **Resolves an explicitly deferred question**: `docs/form-versioning-schema-migration.md` §11 flagged "does an import always create a new form, or can it target an existing form's draft?" as deferred to this document. **Answer, §5 below**: it targets an existing form's draft, matching the endpoint shape already fixed in `docs/architecture/technical-architecture.md` §7.1 (`POST /api/v1/forms/{form}/draft/xlsform-import`) — a brand-new form is created first via the ordinary builder flow (even an empty one), then populated by import, exactly mirroring how `docs/form-versioning-schema-migration.md` §6 already models "restore an old version" as a draft-repopulation convenience.
 
 ---
@@ -137,4 +137,42 @@ This reuses the exact same "draft-repopulation convenience, not a special-cased 
 
 Both HTTP surfaces expose export: tenant-web `GET /forms/{form}/versions/{version}/xlsform` (Inertia builder toolbar) and API-v1 `GET /api/v1/forms/{form}/versions/{version}/xlsform` (the pinned Kobo-migration endpoint), over one `XlsformExporter`.
 
-**Import — Increment G7b.** _(pending)_
+**Import — Increment G7b (`app/Services/Xlsform/`, merged).** A `.xlsx` is read by `XlsformWorkbookReader`
+(openspout, sheet/column-name tolerant) into a `RawWorkbook`, then `XlsformImportParser` (pure, DB-free)
+turns it into an `ImportPlan`. Validation is **fully upfront** (§6): a missing `survey` sheet or an unmapped
+`type` throws `XlsformImportException` (`xlsform_missing_survey_sheet` / `xlsform_unsupported_field_type` with
+`details:{row,type}`) **before** any DB write. `XlsformImporter` then destructively replaces the target
+form's current draft exactly like `RestoreService` (lock form → delete validations→fields→sections →
+recreate sections→fields→validations with **explicit keys** + a key→id FK remap, `created_by` on fields),
+maps `settings`→`forms.*` (`public_slug` generated fallback; `version_number` never trusted, §4), and runs
+**no publish gates** — the author reviews the draft and publishes through the unchanged `PublishService`.
+Reuses G7a's `XlsformTypeMap::toFieldType`/`isImportable` and `GeoWireConverter::wireToGeoJson`.
+
+As-built import decisions (honest deviations from a naive reading of §2–§4):
+
+- **Cascades** are reconstructed in `CascadeResolver` for **both** shapes: our own export (single `select_one`
+  + `#meridian:cascading` marker + `level`/`parent` choice columns) rebuilt in place, **and** foreign
+  Kobo/ODK multi-question `choice_filter` chains collapsed into one `cascading_select` (levels keyed by the
+  chain questions, child questions removed). Non-linear / ambiguous filter chains degrade to independent
+  single-selects with a warning, never an error.
+- **`constraint`** always imports as one expression-based validation row (§2), never decomposed. **`required`**
+  is `yes`→required / blank→optional, never `conditional` (§5). A `constraint`/`relevant`/`calculation` with
+  an unsupported function is persisted raw and rejected only at **publish** by `ExpressionValidationGate`.
+- **Type narrowing** (data preserved, conservative type, §3): `select_one yes_no` → `single_select` (never
+  auto-inferred `yes_no`); a `select_one` with a numeric choice list → `single_select` (never auto-inferred
+  `likert_scale`); `duration` → `decimal`; `matrix`/`likert_matrix` markers are **not** rebuilt (their cells
+  import as separate single-selects). Each narrowing emits a warning; `calculate`, `page_break`, `email`/
+  `url`/`phone` and `hidden` round-trip via their `#meridian` markers.
+- **Key sanitization** rewrites an XLSForm `name` to `^[a-z][a-z0-9_]*$`, de-duplicated across the version's
+  sections + fields, with a warning on rewrite. A dynamic (expression) `repeat_count` imports as an unbounded
+  repeat (`max_instances = null`) + warning; XLSForm has no `min_instances` column, so it does not round-trip.
+
+Both HTTP surfaces expose import: tenant-web `POST /forms/{form}/draft/xlsform-import` (Inertia builder
+confirm-modal + a dismissible warnings banner) and API-v1 `POST /api/v1/forms/{form}/draft/xlsform-import`
+(`{data:{…counts}, warnings:[…]}`), gated as a form update (`can:update,form` / `WRITE_FORMS`), over one
+`XlsformImporter`. The keystone `XlsformRoundTripTest` proves an exported form re-imports by key and then
+**publishes** through both gates.
+
+**Feature gating (follow-up).** `xlsform_export`/`xlsform_import` are paid capabilities
+(`pricing-feature-gating-matrix.md`, Starter+), but no feature-flag enforcement layer exists yet and G7a
+shipped export ungated; G7b import stays consistent (ungated) — gate both when the entitlement layer lands.

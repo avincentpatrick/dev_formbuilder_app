@@ -544,6 +544,86 @@
                 }
             }
         },
+        "/forms/{form}/draft/xlsform-import": {
+            "post": {
+                "operationId": "v1.forms.xlsform.import",
+                "summary": "Import an XLSForm (`.xlsx`) into the form's current draft (destructive replace)",
+                "tags": [
+                    "FormXlsformApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "form",
+                        "in": "path",
+                        "required": true,
+                        "description": "The form ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/XlsformImportRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "section_count": {
+                                                    "type": "integer"
+                                                },
+                                                "field_count": {
+                                                    "type": "integer"
+                                                },
+                                                "validation_count": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "section_count",
+                                                "field_count",
+                                                "validation_count"
+                                            ]
+                                        },
+                                        "warnings": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "warnings"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/public/f/{shareToken}/attachments": {
             "post": {
                 "operationId": "v1.public.attachments.store",
@@ -1268,6 +1348,23 @@
                     "status"
                 ],
                 "title": "TenantResource"
+            },
+            "XlsformImportRequest": {
+                "type": "object",
+                "description": "Validates the uploaded `.xlsx` for XLSForm import (Increment G7b), for both the Inertia builder\n({@see FormXlsformController}) and the /api/v1 ({@see FormXlsformApiController}) channels. Authorization is\nthe route middleware's concern (`can:update,form` / `WRITE_FORMS` \u2014 import mutates the draft), so this only\nshape-validates. A form definition is tiny, so the ceiling is a hard 5 MB.\n\nA `.xlsx` is a zip container, so fileinfo commonly content-sniffs it as `application/zip`; `mimes:xlsx,zip`\naccepts both so a genuine workbook is not rejected. The real structural check is\n{@see XlsformWorkbookReader} opening it.",
+                "properties": {
+                    "file": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "description": "`xlsx,zip`: an .xlsx is a zip container, so fileinfo commonly guesses `application/zip` \u2014 allowing\nboth keeps a genuine workbook from being rejected. The real structural check is openspout opening it.",
+                        "maxLength": 5120
+                    }
+                },
+                "required": [
+                    "file"
+                ],
+                "title": "XlsformImportRequest"
             }
         },
         "responses": {

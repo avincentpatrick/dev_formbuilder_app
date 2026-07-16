@@ -97,6 +97,12 @@ Route::prefix('api/v1')
             ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
             ->name('forms.versions.xlsform');
 
+        // XLSForm import (Increment G7b / docs/xlsform-interop-spec.md §5) — destructively replace the form's
+        // current draft with the uploaded .xlsx. A write → WRITE_FORMS + can:update,form (mirroring publish).
+        Route::post('forms/{form}/draft/xlsform-import', [FormXlsformApiController::class, 'import'])
+            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:update,form'])
+            ->name('forms.xlsform.import');
+
         // Publish the form's current draft (docs/form-versioning-schema-migration.md §3.2). The URL names
         // the draft version; the controller rejects a non-draft {version} before delegating to PublishService.
         Route::post('forms/{form}/versions/{version}/publish', [FormVersionApiController::class, 'publish'])

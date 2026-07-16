@@ -23,7 +23,7 @@ declare module '@inertiajs/core' {
     interface PageProps {
         auth: { user: AppUser | null; can: AppAbilities };
         ui: { theme: { mode: ThemeMode; accent: string } };
-        flash: { toast: FlashToast | null };
+        flash: { toast: FlashToast | null; xlsformWarnings?: string[] | null };
         errors: Record<string, string>;
     }
 }

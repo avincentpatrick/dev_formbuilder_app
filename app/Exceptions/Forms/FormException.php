@@ -34,6 +34,11 @@ final class FormException extends RuntimeException
         return new self('Restore a version by first un-archiving the form.');
     }
 
+    public static function cannotImportOntoArchivedForm(): self
+    {
+        return new self('Import an XLSForm by first un-archiving the form.');
+    }
+
     public static function restoreSourceMustBePublished(): self
     {
         return new self('Only a published or superseded version can be restored.');

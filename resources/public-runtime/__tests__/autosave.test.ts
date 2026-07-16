@@ -38,6 +38,43 @@ function make(over: Record<string, unknown> = {}) {
 }
 
 describe('createAutosave (Dexie-backed)', () => {
+    it('is fully inert when disabled — no restore, no writes (Increment G8c resolve mode)', async () => {
+        const db = freshDb();
+        // Seed a draft that a live session WOULD restore; the disabled autosave must ignore it.
+        await db.draft_answers.put({
+            form_version_id: 'v1',
+            local_draft_id: 's',
+            checksum: 'c1',
+            locale: 'en',
+            current_step_key: 'x',
+            answers: { name: 'Existing' },
+            updated_at: new Date(T0).toISOString(),
+        });
+        const answers = reactive<Record<string, string>>({ name: 'Reviewing' });
+        const autosave = createAutosave({
+            db,
+            formId: 'f',
+            formVersionId: 'v1',
+            slug: 's',
+            checksum: 'c1',
+            answers,
+            locale: ref('en'),
+            currentStepKey: ref('x'),
+            storage: memStorage(),
+            now: () => T0,
+            enabled: false,
+        });
+
+        expect(await autosave.restore()).toBeNull();
+
+        // A change + flush must not overwrite the seeded draft (the review session's durable copy is the outbox row).
+        answers.name = 'Changed';
+        autosave.flush();
+        await Promise.resolve();
+        expect((await db.draft_answers.get(['v1', 's']))?.answers).toEqual({ name: 'Existing' });
+        autosave.dispose();
+    });
+
     it('persists and restores answers + locale + step (round trip)', async () => {
         const db = freshDb();
         const autosave = createAutosave({

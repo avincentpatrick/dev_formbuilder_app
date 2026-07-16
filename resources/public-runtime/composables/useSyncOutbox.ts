@@ -8,8 +8,8 @@
  */
 
 import { onScopeDispose, ref, type Ref } from 'vue';
-import type { MeridianDb } from '../lib/db';
-import { counts, retryAll } from '../lib/outbox';
+import type { MeridianDb, OutboxRow } from '../lib/db';
+import { counts, discardRow, listConflicts, retryAll } from '../lib/outbox';
 import { replayOutbox } from '../lib/replay';
 
 /** Background Sync's `SyncManager` is not in the standard TS lib typings. */
@@ -29,12 +29,18 @@ export interface SyncOutbox {
     syncNow(): Promise<void>;
     /** Return the "needs attention" rows to pending and replay them (from the banner's Retry). */
     retryNeedsAttention(): Promise<void>;
+    /** The oldest unresolved conflict row for this form (Increment G8c), or null — feeds the review UX. */
+    nextConflict(): Promise<OutboxRow | null>;
+    /** Drop a reviewed conflict row (and its queued media), then refresh the counts (Increment G8c). */
+    discardConflict(uuid: string): Promise<void>;
     /** Best-effort: register a Background-Sync tag (no-tab replay) + nudge the active worker to replay now. */
     registerBackgroundSync(): void;
     dispose(): void;
 }
 
 export interface SyncOutboxOptions {
+    /** The current form's slug — scopes conflict resolution to rows the App-level share-token client can resubmit. */
+    slug?: string;
     fetch?: typeof fetch;
     navigator?: Navigator;
     window?: Window;
@@ -99,6 +105,16 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         await syncNow();
     }
 
+    async function nextConflict(): Promise<OutboxRow | null> {
+        const rows = await listConflicts(db, options.slug);
+        return rows[0] ?? null;
+    }
+
+    async function discardConflict(uuid: string): Promise<void> {
+        await discardRow(db, uuid);
+        await refresh();
+    }
+
     function registerBackgroundSync(): void {
         if (nav === undefined || !('serviceWorker' in nav)) {
             return;
@@ -149,6 +165,8 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         refresh,
         syncNow,
         retryNeedsAttention,
+        nextConflict,
+        discardConflict,
         registerBackgroundSync,
         dispose,
     };

@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $form_version_id
  * @property array<string, mixed> $answers
  * @property ?string $answers_schema_checksum
+ * @property ?string $answers_content_checksum
  * @property array<int, mixed> $attachment_refs
  * @property ?int $completeness_percent
  * @property Carbon|null $last_saved_at
@@ -45,6 +46,7 @@ class SubmissionAnswer extends Model implements TenantScoped
         'form_version_id',
         'answers',
         'answers_schema_checksum',
+        'answers_content_checksum',
         'attachment_refs',
         'completeness_percent',
         'last_saved_at',

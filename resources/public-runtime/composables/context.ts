@@ -31,6 +31,8 @@ export const DbKey: InjectionKey<MeridianDb> = Symbol('public-runtime-db');
 export const SyncOutboxKey: InjectionKey<SyncOutbox> = Symbol('public-runtime-sync-outbox');
 /** Offline media staging (Increment G8b), provided by App.vue; threaded into the media control's upload config. */
 export const OfflineMediaKey: InjectionKey<OfflineMediaStash> = Symbol('public-runtime-offline-media');
+/** Open the conflict-review UX for the oldest parked conflict (Increment G8c), provided by App.vue for SyncStatus. */
+export const ConflictReviewKey: InjectionKey<() => void> = Symbol('public-runtime-conflict-review');
 
 export function useRuntime(): FormRuntime {
     const runtime = inject(RuntimeKey);

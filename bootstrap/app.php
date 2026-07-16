@@ -7,6 +7,7 @@ use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
@@ -210,6 +211,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // is an invariant violation there (the policy requires a published form) and keeps the default.
         $exceptions->render(fn (SubmissionException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage())
+            : null);
+
+        // Submission Pipeline CONTENT conflict (Increment G8c, offline-first-sync-design §5) — the same
+        // client_submission_uuid was already persisted with materially DIFFERENT answers (a genuine concurrent
+        // edit, not an idempotent replay). A distinct 409 code from submission_version_superseded so the offline
+        // client can tell "the form changed" from "another copy of this response already exists"; both route to
+        // the same review-and-resubmit UX. Only /api/v1; a web (manual-encode) request keeps the default.
+        $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(409, 'submission_conflict', $e->getMessage())
             : null);
 
         // Guest share-token failures (Increment F5). Thrown by EstablishGuestTenantContext BEFORE any tenant

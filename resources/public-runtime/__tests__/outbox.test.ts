@@ -4,6 +4,7 @@ import {
     counts,
     discardRow,
     enqueue,
+    listConflicts,
     listPending,
     markConflict,
     markNeedsAttention,
@@ -82,6 +83,25 @@ describe('outbox', () => {
         expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', last_error: 'form changed' });
         await markNeedsAttention(db, 'u1', 'rejected');
         expect(await db.outbox.get('u1')).toMatchObject({ status: 'needs_attention', last_error: 'rejected' });
+    });
+
+    it('markConflict records which 409 code parked the row (Increment G8c)', async () => {
+        await enqueue(db, input('u1'));
+        await markConflict(db, 'u1', 'form changed', 'form_updated');
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'form_updated' });
+    });
+
+    it('listConflicts returns conflict rows oldest-first, filtered by slug (Increment G8c)', async () => {
+        await db.outbox.put({ ...(await enqueue(db, input('a', { slug: 'x' }))), created_at: '2026-01-01T00:00:00.000Z' });
+        await db.outbox.put({ ...(await enqueue(db, input('b', { slug: 'x' }))), created_at: '2026-12-01T00:00:00.000Z' });
+        await enqueue(db, input('c', { slug: 'y' }));
+        await markConflict(db, 'a', 'e', 'form_updated');
+        await markConflict(db, 'b', 'e', 'submission_conflict');
+        await markConflict(db, 'c', 'e', 'form_updated');
+
+        expect((await listConflicts(db)).map((r) => r.client_submission_uuid).sort()).toEqual(['a', 'b', 'c']);
+        expect((await listConflicts(db, 'x')).map((r) => r.client_submission_uuid)).toEqual(['a', 'b']);
+        expect((await listConflicts(db, 'y')).map((r) => r.client_submission_uuid)).toEqual(['c']);
     });
 
     it('recordAttempt increments + returns the new count, keeping the row pending', async () => {

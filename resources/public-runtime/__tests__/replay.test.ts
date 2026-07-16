@@ -101,11 +101,18 @@ describe('replayOutbox', () => {
         expect((await db.outbox.get('u1'))?.status).toBe('needs_attention');
     });
 
-    it('flags a 409 as conflict for the G8c UX', async () => {
+    it('flags a 409 as conflict for the G8c UX and records the code', async () => {
         await enqueue(db, input('u1'));
         const { fetchFn } = makeFetch({ submit: () => res(409, errorBody('form_updated')) });
         expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1 });
-        expect((await db.outbox.get('u1'))?.status).toBe('conflict');
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'form_updated' });
+    });
+
+    it('records a content-conflict 409 code (Increment G8c)', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn } = makeFetch({ submit: () => res(409, errorBody('submission_conflict')) });
+        await replayOutbox(db, fetchFn);
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'submission_conflict' });
     });
 
     it('keeps a network failure pending and escalates to needs_attention after 5 attempts', async () => {

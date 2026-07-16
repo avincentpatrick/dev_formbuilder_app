@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\SubmissionSource;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Http\Controllers\Controller;
@@ -81,6 +82,8 @@ final class SyncSubmissionController extends Controller
             ];
         } catch (SubmissionValidationException $e) {
             return $this->failure($uuid, 'invalid', 'submission_invalid', $e->getMessage(), ['fields' => $e->fieldErrors()]);
+        } catch (SubmissionConflictException $e) {
+            return $this->failure($uuid, 'conflict', 'submission_conflict', $e->getMessage());
         } catch (SubmissionException $e) {
             return $this->failure($uuid, 'conflict', 'submission_version_superseded', $e->getMessage());
         }

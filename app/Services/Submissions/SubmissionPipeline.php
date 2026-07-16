@@ -7,6 +7,7 @@ namespace App\Services\Submissions;
 use App\Enums\FormVersionStatus;
 use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\Attachment;
@@ -68,10 +69,20 @@ final class SubmissionPipeline
         // Stage 1 — structural normalisation (throws on unknown key / type mismatch; nests repeat groups).
         $normalized = $this->normalizer->normalize($fields, $sections, $payload->answers);
 
-        // Stage 2b — idempotency: a replayed client_submission_uuid resolves to the existing row (no-op).
+        // The content checksum (Increment G8c) is taken over the normalized answers so the stored value and
+        // any later replay hash the same "what the client submitted" representation, independent of key order.
+        $contentChecksum = AnswersContentChecksum::of($normalized);
+
+        // Stage 2b — idempotency: a replayed client_submission_uuid resolves to the existing row. A
+        // byte-identical replay (or a legacy row with no stored checksum) is a 200 no-op; the same uuid
+        // carrying different content is a genuine concurrent-edit conflict → 409 (Increment G8c, §5).
         if ($payload->clientSubmissionUuid !== null) {
             $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
             if ($existing !== null) {
+                if ($this->contentConflicts($existing, $contentChecksum)) {
+                    throw SubmissionConflictException::contentConflict();
+                }
+
                 return new SubmissionResult($existing, created: false);
             }
         }
@@ -89,13 +100,18 @@ final class SubmissionPipeline
 
         // Stage 4 — transactional persist.
         try {
-            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $fields, $result));
+            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $fields, $result, $contentChecksum));
         } catch (QueryException $e) {
             // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
-            // won the insert. Resolve to that row: the duplicate is a success, not an error (§4.1).
+            // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
+            // but a same-uuid different-content winner is the same conflict Stage 2b guards (Increment G8c).
             if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
                 $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
                 if ($existing !== null) {
+                    if ($this->contentConflicts($existing, $contentChecksum)) {
+                        throw SubmissionConflictException::contentConflict();
+                    }
+
                     return new SubmissionResult($existing, created: false);
                 }
             }
@@ -114,7 +130,7 @@ final class SubmissionPipeline
      *
      * @param  Collection<int, FormField>  $fields
      */
-    private function persist(SubmissionPayload $payload, Collection $fields, SemanticResult $result): Submission
+    private function persist(SubmissionPayload $payload, Collection $fields, SemanticResult $result, string $contentChecksum): Submission
     {
         $version = $payload->version;
 
@@ -157,6 +173,7 @@ final class SubmissionPipeline
             'form_version_id' => $version->id,
             'answers' => $answers,
             'answers_schema_checksum' => $version->checksum,
+            'answers_content_checksum' => $contentChecksum,
             'attachment_refs' => $attachmentIds,
             'last_saved_at' => now(),
         ]);
@@ -296,6 +313,18 @@ final class SubmissionPipeline
     private function findByClientUuid(string $uuid): ?Submission
     {
         return Submission::query()->where('client_submission_uuid', $uuid)->first();
+    }
+
+    /**
+     * Increment G8c — does the already-persisted submission carry different answer content than this replay?
+     * A null stored checksum (a row created before the G8c migration) is treated as "cannot compare" → not a
+     * conflict, preserving the pre-G8c idempotent-no-op behaviour so legacy replays never false-conflict.
+     */
+    private function contentConflicts(Submission $existing, string $incomingChecksum): bool
+    {
+        $stored = SubmissionAnswer::query()->where('submission_id', $existing->id)->value('answers_content_checksum');
+
+        return is_string($stored) && $stored !== $incomingChecksum;
     }
 
     /**

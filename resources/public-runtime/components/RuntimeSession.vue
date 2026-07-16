@@ -42,12 +42,16 @@ const props = defineProps<{
     client: ApiClient;
     initialAnswers?: AnswerMap;
     notice?: string | null;
+    /** Increment G8c — this session is resolving a parked conflict (review & resubmit): suppress autosave and
+     *  the sync banner, and offer a "discard this response" escape hatch. */
+    resolving?: boolean;
 }>();
 
 const emit = defineEmits<{
     submitted: [id: string];
     queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
+    discard: [];
 }>();
 
 const runtime = createFormRuntime(props.schema, {
@@ -74,6 +78,8 @@ const autosave = createAutosave({
     answers: runtime.answers,
     locale: runtime.locale,
     currentStepKey: runtime.currentStepKey,
+    // A conflict-review session must not autosave — the durable copy is the parked outbox row (Increment G8c).
+    enabled: !props.resolving,
 });
 
 // Restore a same-browser draft — but only on a FRESH session. A version-drift remount already carries the
@@ -210,7 +216,7 @@ const description = computed(() => runtime.renderModel.form.description);
     >
         <template #notice>
             <OfflineIndicator v-if="!online" />
-            <SyncStatus />
+            <SyncStatus v-if="!resolving" />
             <div
                 v-if="notice"
                 class="session-notice"
@@ -219,6 +225,14 @@ const description = computed(() => runtime.renderModel.form.description);
             >
                 {{ notice.message }}
             </div>
+            <button
+                v-if="resolving"
+                type="button"
+                class="session-notice__discard"
+                @click="emit('discard')"
+            >
+                Discard this response instead
+            </button>
         </template>
         <PageView v-if="runtime.singlePageMode" />
         <StepView v-else />
@@ -248,5 +262,21 @@ const description = computed(() => runtime.renderModel.form.description);
 .session-notice--error {
     border-left: 4px solid var(--mds-color-action-danger-bg);
     color: var(--mds-color-danger-text);
+}
+
+.session-notice__discard {
+    align-self: flex-start;
+    padding: var(--mds-space-1) var(--mds-space-2);
+    background: transparent;
+    border: none;
+    color: var(--mds-color-text-secondary);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size, var(--mds-type-caption-font-size));
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.session-notice__discard:hover {
+    color: var(--mds-color-danger-text, var(--mds-color-text-body));
 }
 </style>

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDb, type MeridianDb } from '../lib/db';
-import { enqueue, type EnqueueInput } from '../lib/outbox';
+import { enqueue, markConflict, type EnqueueInput } from '../lib/outbox';
 import { createSyncOutbox, type SyncOutbox } from '../composables/useSyncOutbox';
 
 let n = 0;
@@ -32,10 +32,10 @@ function fakeEnv({ online = true, usage = 0, quota = 0 }: { online?: boolean; us
     return { nav, win, doc, fire: (t: string) => (listeners[t] ?? []).forEach((h) => h()) };
 }
 
-function input(uuid: string): EnqueueInput {
+function input(uuid: string, slug = 's'): EnqueueInput {
     return {
         client_submission_uuid: uuid,
-        slug: 's',
+        slug,
         form_version_id: 'v1',
         checksum: 'c1',
         answers: { a: '1' },
@@ -45,8 +45,8 @@ function input(uuid: string): EnqueueInput {
     };
 }
 
-function makeDriver(env: ReturnType<typeof fakeEnv>, fetchFn: typeof fetch): SyncOutbox {
-    const driver = createSyncOutbox(db, { fetch: fetchFn, navigator: env.nav, window: env.win, document: env.doc });
+function makeDriver(env: ReturnType<typeof fakeEnv>, fetchFn: typeof fetch, slug?: string): SyncOutbox {
+    const driver = createSyncOutbox(db, { slug, fetch: fetchFn, navigator: env.nav, window: env.win, document: env.doc });
     drivers.push(driver);
     return driver;
 }
@@ -95,5 +95,51 @@ describe('createSyncOutbox', () => {
         const driver = makeDriver(fakeEnv({ online: false, usage: 10, quota: 100 }), okFetch());
         await driver.refresh();
         expect(driver.quotaWarning.value).toBeNull();
+    });
+
+    it('nextConflict returns the oldest conflict scoped to the current form slug (Increment G8c)', async () => {
+        await db.outbox.put({ ...(await enqueue(db, input('old', 's'))), created_at: '2026-01-01T00:00:00.000Z' });
+        await db.outbox.put({ ...(await enqueue(db, input('new', 's'))), created_at: '2026-12-01T00:00:00.000Z' });
+        await enqueue(db, input('other', 'elsewhere'));
+        await markConflict(db, 'old', 'e');
+        await markConflict(db, 'new', 'e');
+        await markConflict(db, 'other', 'e');
+
+        const driver = makeDriver(fakeEnv({ online: false }), okFetch(), 's');
+        const next = await driver.nextConflict();
+        expect(next?.client_submission_uuid).toBe('old');
+    });
+
+    it('nextConflict is null when there are no conflicts for this form', async () => {
+        await enqueue(db, input('other', 'elsewhere'));
+        await markConflict(db, 'other', 'e');
+        const driver = makeDriver(fakeEnv({ online: false }), okFetch(), 's');
+        expect(await driver.nextConflict()).toBeNull();
+    });
+
+    it('discardConflict drops the row, its media, and refreshes the count (Increment G8c)', async () => {
+        await enqueue(db, input('c', 's'));
+        await db.media_queue.put({
+            attachment_local_id: 'm1',
+            client_submission_uuid: 'c',
+            field_key: 'photo',
+            blob: new Blob(['x']),
+            name: 'x',
+            mime: 'text/plain',
+            size: 1,
+            status: 'queued',
+            attachment_id: null,
+            attempts: 0,
+            created_at: '2026-07-16T00:00:00.000Z',
+        });
+        await markConflict(db, 'c', 'e');
+        const driver = makeDriver(fakeEnv({ online: false }), okFetch(), 's');
+        await driver.refresh();
+        expect(driver.conflict.value).toBe(1);
+
+        await driver.discardConflict('c');
+        expect(await db.outbox.get('c')).toBeUndefined();
+        expect(await db.media_queue.where('client_submission_uuid').equals('c').count()).toBe(0);
+        expect(driver.conflict.value).toBe(0);
     });
 });

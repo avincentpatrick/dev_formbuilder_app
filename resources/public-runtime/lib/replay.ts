@@ -127,7 +127,7 @@ async function replayRow(db: MeridianDb, fetchFn: typeof fetch, row: OutboxRow):
                 return 'needsAttention';
             }
             if (kind === 'refresh') {
-                await markConflict(db, uuid, error.normalized.message);
+                await markConflict(db, uuid, error.normalized.message, error.normalized.code);
                 return 'conflict';
             }
             if (kind === 'terminal') {

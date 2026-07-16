@@ -248,6 +248,34 @@ it('reports a conflict when replaying against a superseded version', function ()
         ->assertJsonPath('data.0.error.code', 'submission_version_superseded');
 });
 
+it('reports a content conflict when the same uuid replays with different answers (Increment G8c)', function (): void {
+    $tenant = syncTenant();
+    enterTenant($tenant->id);
+    $admin = syncMember('admin');
+    $form = syncPublishedForm($tenant, $admin);
+    $versionId = (string) $form->current_published_version_id;
+    $token = $admin->createToken('rw', [ApiAbilities::WRITE_SUBMISSIONS])->plainTextToken;
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/sync/submissions', ['submissions' => [
+            ['form_version_id' => $versionId, 'client_submission_uuid' => $uuid, 'answers' => ['full_name' => 'Ada', 'age' => '30']],
+        ]])
+        ->assertOk()->assertJsonPath('data.0.status', 'created');
+
+    // Same idempotency key, different content → a genuine concurrent-edit conflict (distinct from a version drift).
+    $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/sync/submissions', ['submissions' => [
+            ['form_version_id' => $versionId, 'client_submission_uuid' => $uuid, 'answers' => ['full_name' => 'Grace', 'age' => '40']],
+        ]])
+        ->assertOk()
+        ->assertJsonPath('data.0.status', 'conflict')
+        ->assertJsonPath('data.0.error.code', 'submission_conflict');
+
+    enterTenant($tenant->id);
+    expect(Submission::query()->count())->toBe(1);
+});
+
 it('403s a batch replay without the write:submissions ability', function (): void {
     $tenant = syncTenant();
     enterTenant($tenant->id);

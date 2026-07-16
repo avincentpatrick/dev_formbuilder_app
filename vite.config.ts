@@ -1,9 +1,23 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Increment G8b — the client build version stamped onto every submission's `app_version` column (≤20 chars).
+// Short git sha in CI/local; falls back to 'dev' where git is unavailable.
+function resolveAppVersion(): string {
+    try {
+        return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim().slice(0, 20) || 'dev';
+    } catch {
+        return 'dev';
+    }
+}
+
 export default defineConfig({
+    define: {
+        __APP_VERSION__: JSON.stringify(resolveAppVersion()),
+    },
     plugins: [
         laravel({
             // Two independent entries: the Inertia admin app (app.ts + app.css) and the standalone
@@ -20,64 +34,25 @@ export default defineConfig({
                 },
             },
         }),
-        // Increment G8a — installable PWA for the GUEST runtime only. The emitted sw.js is re-served
-        // from the root route GET /sw.js (ServiceWorkerController) and registered with scope '/f/' from
-        // main.ts, so it controls guest form pages and NEVER the Inertia admin app on the same origin.
+        // Increment G8a/G8b — installable, offline-capable PWA for the GUEST runtime only. The emitted sw.js
+        // is re-served from the root route GET /sw.js (ServiceWorkerController) and registered with scope '/f/'
+        // from main.ts, so it controls guest form pages and NEVER the Inertia admin app on the same origin.
         //
-        // We precache NOTHING (globPatterns: []) because the admin + public-runtime bundles share
-        // opaque-named vendor chunks that can't be split by glob; instead three runtimeCaching routes
-        // cache only what a /f/* page actually requests, so the admin bundle is never cached regardless
-        // of chunk naming. injectRegister:false (we register manually to pin scope) and manifest:false
-        // (the per-form manifest is a Laravel route, and a backend-integration build has no index.html
-        // for the plugin to inject into). inlineWorkboxRuntime keeps sw.js self-contained so no sibling
-        // workbox-*.js is needed (which would 404 when the SW is re-served from /sw.js).
+        // G8b switches from generateSW to injectManifest: the worker is hand-authored (resources/public-runtime/
+        // sw.ts) so it can own a Background-Sync `sync` handler that drains the Dexie outbox with no tab open.
+        // The three G8a runtime caches are re-expressed in Workbox code inside sw.ts; Rollup bundles Workbox
+        // (and Dexie) into one self-contained sw.js, so there are no sibling workbox-*.js files (which would 404
+        // when re-served from /sw.js) and no CSP change. We still precache NOTHING (injectManifest.globPatterns:
+        // []) because the admin + public-runtime bundles share opaque-named vendor chunks. injectRegister:false
+        // (we register manually to pin scope) and manifest:false (the per-form manifest is a Laravel route).
         VitePWA({
-            strategies: 'generateSW',
+            strategies: 'injectManifest',
+            srcDir: 'resources/public-runtime',
+            filename: 'sw.ts',
             injectRegister: false,
             manifest: false,
-            filename: 'sw.js',
-            workbox: {
+            injectManifest: {
                 globPatterns: [],
-                inlineWorkboxRuntime: true,
-                navigateFallback: null,
-                cleanupOutdatedCaches: true,
-                clientsClaim: true,
-                skipWaiting: true,
-                runtimeCaching: [
-                    {
-                        // The hashed public-runtime JS/CSS (and shared chunks) it pulls in.
-                        urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/build/'),
-                        handler: 'StaleWhileRevalidate',
-                        options: {
-                            cacheName: 'guest-shell-assets',
-                            expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
-                        },
-                    },
-                    {
-                        // The pinned form schema (choice lists inline) so a loaded form renders offline.
-                        urlPattern: ({ url, sameOrigin }) =>
-                            sameOrigin && url.pathname.startsWith('/api/v1/public/f/'),
-                        method: 'GET',
-                        handler: 'NetworkFirst',
-                        options: {
-                            cacheName: 'guest-schema',
-                            networkTimeoutSeconds: 5,
-                            cacheableResponse: { statuses: [200] },
-                            expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
-                        },
-                    },
-                    {
-                        // The shell HTML for /f/* navigations (serves the cached shell offline).
-                        urlPattern: ({ request, url, sameOrigin }) =>
-                            request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/'),
-                        handler: 'NetworkFirst',
-                        options: {
-                            cacheName: 'guest-shell-html',
-                            networkTimeoutSeconds: 5,
-                            expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
-                        },
-                    },
-                ],
             },
             // No SW under the `vite` dev server; the guest runtime exercises the SW only after
             // `npm run build` (the e2e job builds + serves via artisan serve).

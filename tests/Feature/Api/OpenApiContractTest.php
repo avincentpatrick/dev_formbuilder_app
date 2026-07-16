@@ -32,6 +32,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // Increment F5 — the public guest runtime surface.
         '/public/f/{shareToken}',
         '/public/f/{shareToken}/submissions',
+        // Increment G8b — the authenticated offline-sync surface.
+        '/sync/manifest',
+        '/sync/submissions',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

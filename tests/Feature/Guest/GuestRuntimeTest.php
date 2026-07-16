@@ -242,6 +242,41 @@ it('records a guest submission through the pipeline with full provenance', funct
         ->toBeTrue();
 });
 
+it('persists device_id + app_version when the guest supplies them (Increment G8b)', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = guestForm($tenant, $owner);
+    $token = shareTokenFor($form);
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['full_name' => 'Ada Lovelace', 'age' => '36'],
+        'device_id' => '0192f1a2-b3c4-7d5e-8f90-1a2b3c4d5e6f',
+        'app_version' => 'g8b-abc1234',
+    ])->assertCreated();
+
+    enterTenant($tenant->id);
+    $submission = Submission::query()->firstOrFail();
+    expect($submission->device_id)->toBe('0192f1a2-b3c4-7d5e-8f90-1a2b3c4d5e6f')
+        ->and($submission->app_version)->toBe('g8b-abc1234');
+});
+
+it('leaves device_id + app_version null when the guest omits them', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = guestForm($tenant, $owner);
+    $token = shareTokenFor($form);
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['full_name' => 'Ada Lovelace', 'age' => '36'],
+    ])->assertCreated();
+
+    enterTenant($tenant->id);
+    $submission = Submission::query()->firstOrFail();
+    expect($submission->device_id)->toBeNull()->and($submission->app_version)->toBeNull();
+});
+
 it('422s a missing required answer and persists nothing', function (): void {
     $tenant = guestTenant();
     $owner = User::factory()->create();

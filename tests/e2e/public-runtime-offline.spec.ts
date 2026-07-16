@@ -81,13 +81,35 @@ test('Public runtime — installable PWA renders offline + guards submit', async
         await context.setOffline(true);
     }
 
-    // The ambient offline pill + submit guard are SW-independent (navigator.onLine / the offline event):
-    // submitting is blocked with a clear message rather than a crash or a doomed POST (the outbox is G8b).
+    // Increment G8b — the Dexie outbox replaces the G8a hard block. The ambient offline pill is SW-independent
+    // (navigator.onLine / the offline event); an offline submit is now QUEUED on the device with a "saved on
+    // this device" confirmation (clinic-intake has no required fields, so an empty submit passes the gate).
     await expect(page.getByText(/offline/i).first()).toBeVisible();
     await page.getByRole('button', { name: 'Submit' }).click();
-    await expect(page.getByText(/reconnect to submit/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /saved on this device/i })).toBeVisible({ timeout: 15_000 });
 
-    await assertClean(page, 'Public runtime offline');
+    await assertClean(page, 'Public runtime queued confirmation');
 
+    // Reconnect → the app-driven replay driver mints a token, POSTs the queued submission, and drains the
+    // Dexie outbox. Assert the outbox empties (the row synced), reading IndexedDB directly.
     await context.setOffline(false);
+    await page.waitForFunction(
+        () =>
+            new Promise<boolean>((resolve) => {
+                const request = indexedDB.open('meridian-offline');
+                request.onsuccess = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains('outbox')) {
+                        resolve(true);
+                        return;
+                    }
+                    const count = db.transaction('outbox', 'readonly').objectStore('outbox').count();
+                    count.onsuccess = () => resolve(count.result === 0);
+                    count.onerror = () => resolve(false);
+                };
+                request.onerror = () => resolve(false);
+            }),
+        null,
+        { timeout: 20_000 },
+    );
 });

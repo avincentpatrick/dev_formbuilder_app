@@ -35,5 +35,8 @@ final readonly class SubmissionPayload
         public ?string $guestIp = null,
         public ?string $guestUserAgent = null,
         public ?string $guestContactEmail = null,
+        // Increment G8b — device provenance for the offline-sync + guest channels (data-dictionary §7).
+        public ?string $deviceId = null,
+        public ?string $appVersion = null,
     ) {}
 }

@@ -25,5 +25,7 @@ export default defineConfig({
     test: {
         include: ['resources/public-runtime/**/*.test.ts'],
         environment: 'happy-dom',
+        // Increment G8b — install fake-indexeddb before the Dexie offline-engine suites run.
+        setupFiles: ['resources/public-runtime/__tests__/setup.ts'],
     },
 });

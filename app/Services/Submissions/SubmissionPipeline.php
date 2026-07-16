@@ -134,6 +134,8 @@ final class SubmissionPipeline
             'guest_ip' => $payload->guestIp,
             'guest_user_agent' => $payload->guestUserAgent,
             'guest_contact_email' => $payload->guestContactEmail,
+            'device_id' => $payload->deviceId,
+            'app_version' => $payload->appVersion,
             'locale' => $payload->locale,
             'submitted_at' => now(),
         ]);

@@ -30,7 +30,24 @@ final class GuestSubmissionRequest extends FormRequest
             'guest_contact_email' => ['nullable', 'email', 'max:255'],
             'client_submission_uuid' => ['nullable', 'uuid'],
             'locale' => ['nullable', 'string', 'max:10'],
+            // Increment G8b — offline device provenance (data-dictionary §7); bounded to the column widths.
+            'device_id' => ['nullable', 'string', 'max:100'],
+            'app_version' => ['nullable', 'string', 'max:20'],
         ];
+    }
+
+    public function deviceId(): ?string
+    {
+        $value = $this->input('device_id');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    public function appVersion(): ?string
+    {
+        $value = $this->input('app_version');
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

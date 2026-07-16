@@ -42,6 +42,20 @@ describe('createApiClient', () => {
         expect((await replay.submit({ answers: {}, clientSubmissionUuid: 'u', locale: 'en' })).created).toBe(false);
     });
 
+    it('includes device_id/app_version in the submit body only when provided (Increment G8b)', async () => {
+        const fetchImpl = vi.fn(async () => res(201, { data: { id: 'a', status: 'submitted' } }));
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl });
+
+        await client.submit({ answers: {}, clientSubmissionUuid: 'u', locale: 'en', deviceId: 'dev-1', appVersion: 'g8b' });
+        const withDevice = JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string);
+        expect(withDevice).toMatchObject({ device_id: 'dev-1', app_version: 'g8b' });
+
+        await client.submit({ answers: {}, clientSubmissionUuid: 'u', locale: 'en' });
+        const withoutDevice = JSON.parse((fetchImpl.mock.calls[1][1] as RequestInit).body as string);
+        expect(withoutDevice).not.toHaveProperty('device_id');
+        expect(withoutDevice).not.toHaveProperty('app_version');
+    });
+
     it('transparently re-mints and retries once on an expired token', async () => {
         let submitCalls = 0;
         const fetchImpl = vi.fn(async (url: string) => {

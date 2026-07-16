@@ -99,6 +99,10 @@ export interface MediaFieldConfig {
 // manual encode, share-token-scoped for the guest SPA). Null for non-media fields.
 export interface MediaUploadConfig {
     url: string;
+    // Increment G8b — offline fallback (guest SPA only): when the live upload can't run (offline / network
+    // failure), stash the picked file locally and return a placeholder ref that replays on reconnect. Absent
+    // for the always-online manual-encode channel, which keeps the pure upload-on-selection behaviour.
+    stashOffline?: (file: File, fieldKey: string) => Promise<MediaAttachmentRef>;
 }
 
 export interface EncodeField {

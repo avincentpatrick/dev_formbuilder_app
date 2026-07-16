@@ -69,6 +69,8 @@ final class GuestSubmissionController extends Controller
             guestIp: $request->ip(),
             guestUserAgent: $request->userAgent(),
             guestContactEmail: $request->guestContactEmail(),
+            deviceId: $request->deviceId(),
+            appVersion: $request->appVersion(),
         ));
 
         return response()->json([

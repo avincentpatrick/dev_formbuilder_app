@@ -1,0 +1,12 @@
+{
+    "//": "Increment G8b — the guest service worker (sw.ts) runs in a ServiceWorkerGlobalScope, not the DOM.",
+    "//2": "It is excluded from the main tsconfig (whose DOM lib lacks ServiceWorkerGlobalScope/ExtendableEvent)",
+    "//3": "and type-checked here under the WebWorker lib. `npm run type-check` runs both programs.",
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "lib": ["ESNext", "WebWorker"],
+        "types": []
+    },
+    "include": ["resources/public-runtime/sw.ts"],
+    "exclude": ["node_modules", "public", "vendor", "packages"]
+}

@@ -1013,6 +1013,94 @@
                 "security": []
             }
         },
+        "/sync/manifest": {
+            "get": {
+                "operationId": "v1.sync.manifest",
+                "summary": "Get the offline sync manifest for a pinned form version",
+                "tags": [
+                    "SyncManifest"
+                ],
+                "parameters": [
+                    {
+                        "name": "form_version_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`SyncManifestResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/SyncManifestResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/sync/submissions": {
+            "post": {
+                "operationId": "v1.sync.submissions",
+                "summary": "Replay a batch of queued offline submissions (idempotent; per-item results)",
+                "tags": [
+                    "SyncSubmission"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SyncSubmissionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SyncSubmissionResultResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/tenant": {
             "get": {
                 "operationId": "v1.tenant.show",
@@ -1239,6 +1327,21 @@
                             "null"
                         ],
                         "maxLength": 10
+                    },
+                    "device_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Increment G8b \u2014 offline device provenance (data-dictionary \u00a77); bounded to the column widths.",
+                        "maxLength": 100
+                    },
+                    "app_version": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 20
                     }
                 },
                 "required": [
@@ -1320,6 +1423,135 @@
                     "field_key"
                 ],
                 "title": "StoreAttachmentRequest"
+            },
+            "SyncManifestResource": {
+                "type": "object",
+                "properties": {
+                    "form_version_id": {
+                        "type": "string"
+                    },
+                    "checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "schema_snapshot": {
+                        "type": "object"
+                    },
+                    "choice_lists": {
+                        "type": "object"
+                    },
+                    "media_refs": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "manifest_generated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "form_version_id",
+                    "checksum",
+                    "schema_snapshot",
+                    "choice_lists",
+                    "media_refs",
+                    "manifest_generated_at"
+                ],
+                "title": "SyncManifestResource"
+            },
+            "SyncSubmissionRequest": {
+                "type": "object",
+                "description": "The offline batch-replay request (Increment G8b, docs/offline-first-sync-design.md \u00a75). Authorization is\nthe route's `ability:write:submissions` middleware + RLS. Only the coarse shape is asserted here \u2014 each\nitem's per-field validation is the shared {@see SubmissionPipeline}, one item at\na time, so a partial failure never rolls back its siblings. `client_submission_uuid` is the idempotency key\n(a duplicate replay is a 200 no-op); `submitted_at` is accepted but informational \u2014 the server timestamp is\nauthoritative (architecture \u00a74.2). Bounded to 100 items per request.",
+                "properties": {
+                    "submissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_version_id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "client_submission_uuid": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "answers": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "locale": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 10
+                                },
+                                "device_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 100
+                                },
+                                "app_version": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 20
+                                },
+                                "submitted_at": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "format": "date-time"
+                                }
+                            },
+                            "required": [
+                                "form_version_id",
+                                "client_submission_uuid",
+                                "answers"
+                            ]
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "required": [
+                    "submissions"
+                ],
+                "title": "SyncSubmissionRequest"
+            },
+            "SyncSubmissionResultResource": {
+                "type": "object",
+                "properties": {
+                    "client_submission_uuid": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "submission": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "client_submission_uuid",
+                    "status",
+                    "submission",
+                    "error"
+                ],
+                "title": "SyncSubmissionResultResource"
             },
             "TenantResource": {
                 "type": "object",

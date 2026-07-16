@@ -33,6 +33,7 @@ export const icons = {
     edit: 'M4 20h4L18 10l-4-4L4 16z M14 6l4 4',
     trash: 'M4 7h16 M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2 M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13 M10 11v6 M14 11v6',
     download: 'M12 4v11 M8 11l4 4 4-4 M4 20h16',
+    upload: 'M12 20V9 M8 13l4-4 4 4 M4 4h16',
     'external-link': 'M14 4h6v6 M20 4l-9 9 M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6',
     'chevron-right': 'M9 6l6 6-6 6',
     'chevron-left': 'M15 6l-6 6 6 6',

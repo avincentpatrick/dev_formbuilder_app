@@ -8,9 +8,9 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, onMounted } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { MdsButton } from '@meridian/design-system';
+import { computed, onMounted, ref } from 'vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { MdsButton, MdsModal } from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
@@ -62,6 +62,40 @@ function exportXlsform(): void {
     if (props.draft === null) return;
     window.location.href = `/forms/${props.form.id}/versions/${props.draft.id}/xlsform`;
 }
+
+// ── Import XLSForm (Increment G7b) — destructive draft-replace behind a confirm modal ─────────────
+const page = usePage();
+const importOpen = ref(false);
+const importForm = useForm<{ file: File | null }>({ file: null });
+const fileInput = ref<HTMLInputElement | null>(null);
+
+// Non-fatal warnings flashed by the import controller (lossy coercions the author reviews before publish).
+const importWarnings = computed<string[]>(() => page.props.flash?.xlsformWarnings ?? []);
+const warningsDismissed = ref(false);
+
+function openImport(): void {
+    importForm.reset();
+    importForm.clearErrors();
+    if (fileInput.value) fileInput.value.value = '';
+    importOpen.value = true;
+}
+
+function onImportFile(event: Event): void {
+    importForm.file = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+function submitImport(): void {
+    // Replace the draft, then force a full remount (preserveState:false) so useBuilderStore re-hydrates
+    // from the newly-imported draft — a plain reload would keep the stale store state.
+    importForm.post(`/forms/${props.form.id}/draft/xlsform-import`, {
+        forceFormData: true,
+        preserveScroll: true,
+        preserveState: false,
+        onSuccess: () => {
+            importOpen.value = false;
+        },
+    });
+}
 </script>
 
 <template>
@@ -104,11 +138,39 @@ function exportXlsform(): void {
                 >
                     Export XLSForm
                 </MdsButton>
+                <MdsButton
+                    variant="secondary"
+                    icon-left="upload"
+                    :disabled="readOnly"
+                    @click="openImport"
+                >
+                    Import XLSForm
+                </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
                 </MdsButton>
             </div>
         </header>
+
+        <div
+            v-if="importWarnings.length > 0 && !warningsDismissed"
+            class="builder__warnings"
+            role="status"
+            aria-live="polite"
+        >
+            <div class="builder__warnings-body">
+                <strong class="builder__warnings-title">
+                    Imported with {{ importWarnings.length }}
+                    {{ importWarnings.length === 1 ? 'warning' : 'warnings' }}
+                </strong>
+                <ul class="builder__warnings-list">
+                    <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
+                </ul>
+            </div>
+            <MdsButton variant="tertiary" icon-left="close" @click="warningsDismissed = true">
+                Dismiss
+            </MdsButton>
+        </div>
 
         <div v-if="readOnly" class="builder__blocked">
             This form has no editable draft. Restore or publish a version from the
@@ -128,6 +190,37 @@ function exportXlsform(): void {
         </div>
 
         <ConflictDialog :conflict="conflict" @resolve="store.resolveConflict" />
+
+        <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">
+            <p class="builder__prose">
+                Importing an XLSForm <strong>replaces this draft's current content</strong>. Published
+                versions are untouched — review the imported draft, then publish it as a new version.
+            </p>
+            <div class="builder__upload">
+                <input
+                    ref="fileInput"
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    aria-label="XLSForm .xlsx file"
+                    @change="onImportFile"
+                />
+                <p v-if="importForm.errors.file" class="builder__upload-error" role="alert">
+                    {{ importForm.errors.file }}
+                </p>
+            </div>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="importOpen = false">Cancel</MdsButton>
+                <MdsButton
+                    variant="primary"
+                    icon-left="upload"
+                    :loading="importForm.processing"
+                    :disabled="importForm.file === null"
+                    @click="submitImport"
+                >
+                    Replace draft
+                </MdsButton>
+            </template>
+        </MdsModal>
     </div>
 </template>
 
@@ -211,6 +304,48 @@ function exportXlsform(): void {
     padding: var(--mds-space-8);
     color: var(--mds-color-text-secondary);
     text-align: center;
+}
+
+/* Post-import warnings banner (Increment G7b) — dismissible, above the panes. */
+.builder__warnings {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--mds-space-4);
+    padding: var(--mds-space-3) var(--mds-space-6);
+    border-bottom: 1px solid var(--mds-color-border-default);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.builder__warnings-title {
+    display: block;
+    margin-bottom: var(--mds-space-1);
+    color: var(--mds-color-text-heading);
+    font-size: var(--mds-type-body-sm-font-size);
+}
+
+.builder__warnings-list {
+    margin: 0;
+    padding-left: var(--mds-space-5);
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+}
+
+.builder__prose {
+    margin: 0 0 var(--mds-space-4);
+    color: var(--mds-color-text-body);
+}
+
+.builder__upload {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+}
+
+.builder__upload-error {
+    margin: 0;
+    color: var(--mds-color-text-danger, #b42318);
+    font-size: var(--mds-type-body-sm-font-size);
 }
 
 .builder__panes {

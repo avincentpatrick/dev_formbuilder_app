@@ -10,6 +10,7 @@ use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
+use App\Exceptions\Xlsform\XlsformImportException;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
@@ -172,6 +173,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (FormException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(422, 'form_rule_violated', $e->getMessage())
             : null);
+
+        // XLSForm import failure (Increment G7b) — a malformed workbook rejected UPFRONT, before the
+        // destructive draft-replace runs (§6). The API surface gets the stable code + {row,type} details it
+        // carries; a web (builder) request bounces back with an error toast (the FormPublishController shape).
+        $exceptions->render(function (XlsformImportException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(422, $e->code(), $e->getMessage(), $e->details());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
 
         // Submission Pipeline per-field failure (Increment F4b, Stages 1 & 3). The API surface gets the
         // structured 422 envelope; a web (manual-encode) request bounces back with the field errors keyed

@@ -71,6 +71,10 @@ class HandleInertiaRequests extends Middleware
             // ToastHost raises it once, then the session flash is gone.
             'flash' => [
                 'toast' => $request->session()->get('toast'),
+                // Non-fatal XLSForm-import warnings (Increment G7b) — the builder renders these as a
+                // dismissible banner after a destructive import so the author reviews lossy coercions
+                // (dynamic repeat_count, downgraded grids, sanitized keys) before publishing (§6).
+                'xlsformWarnings' => $request->session()->get('xlsformWarnings'),
             ],
         ];
     }

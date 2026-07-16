@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Public\GuestFormController;
+use App\Http\Controllers\Public\PwaManifestController;
+use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AttachmentController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
@@ -191,6 +193,11 @@ Route::middleware([
 | /api/v1/public schema + submit endpoints (routes/api.php). Serving the guest SPA shell at this URL is
 | Increment F6 — F5 returns the token as JSON.
 */
+// Increment G8a — re-serve the Vite-built guest PWA service worker from the root so its scope can cover
+// /f/ (a /build/ static can't carry Service-Worker-Allowed under artisan serve). Deliberately outside the
+// tenancy group: it streams a tenant-agnostic build artifact and needs no tenant/session context.
+Route::get('/sw.js', ServiceWorkerController::class)->name('pwa.sw');
+
 Route::middleware([
     'web',
     InitializeTenancyBySubdomain::class,
@@ -201,4 +208,8 @@ Route::middleware([
 ])->group(function (): void {
     Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
         ->middleware('throttle:guest-mint')->name('guest.form.mint');
+
+    // Increment G8a — per-form web manifest linked from the guest shell (installability). Same slug
+    // resolution + 404 gates as the mint route; no share token needed.
+    Route::get('/f/{slug}/manifest.webmanifest', PwaManifestController::class)->name('guest.form.manifest');
 });

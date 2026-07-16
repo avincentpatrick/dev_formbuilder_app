@@ -11,6 +11,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <title>{{ $form['title'] }} · {{ config('app.name', 'Meridian') }}</title>
+    {{-- Increment G8a — installable PWA. Per-form manifest (id/start_url/scope = this form's /f/{slug}), a
+         theme colour, and home-screen icons; the service worker itself is registered from main.ts. --}}
+    <meta name="theme-color" content="#1B5E5E">
+    <link rel="manifest" href="/f/{{ $slug }}/manifest.webmanifest">
+    <link rel="icon" type="image/png" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="{{ $form['title'] }}">
     @vite(['resources/public-runtime/main.ts'])
 </head>
 <body>

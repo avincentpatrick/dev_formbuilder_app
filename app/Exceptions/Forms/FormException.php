@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Forms;
 
+use App\Services\Forms\BlueprintValidator;
 use RuntimeException;
 
 /**
@@ -57,5 +58,15 @@ final class FormException extends RuntimeException
     public static function formHasNoDraft(): self
     {
         return new self('This form has no editable draft. Publish or restore a version first.');
+    }
+
+    /**
+     * A schema blueprint (a template's `schema_blueprint`, or a field-library item's field shape) failed the
+     * upfront structural check before materializing into rows — an unknown field_type, a duplicate or dangling
+     * key, or a malformed top-level shape. Thrown by {@see BlueprintValidator}.
+     */
+    public static function invalidBlueprint(string $reason): self
+    {
+        return new self($reason);
     }
 }

@@ -22,6 +22,7 @@ import {
     type DataTableColumn,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 
 type FormVersionRow = {
     id: string;
@@ -39,7 +40,7 @@ type FormRow = {
     draft_version: number | null;
     updated_at: string | null;
     versions: FormVersionRow[];
-    can: { edit: boolean; publish: boolean; delete: boolean; encode: boolean };
+    can: { edit: boolean; publish: boolean; delete: boolean; encode: boolean; template: boolean };
 };
 
 defineProps<{ forms: FormRow[] }>();
@@ -141,6 +142,15 @@ function submitArchive(): void {
     );
 }
 
+// ── Save as template (G9a) ────────────────────────────────────────────────
+const templateTarget = ref<FormRow | null>(null);
+const templateOpen = ref(false);
+
+function openSaveAsTemplate(row: FormRow): void {
+    templateTarget.value = row;
+    templateOpen.value = true;
+}
+
 // ── Version history + restore ─────────────────────────────────────────────
 const historyTarget = ref<FormRow | null>(null);
 const restoreTarget = ref<{ form: FormRow; version: FormVersionRow } | null>(null);
@@ -173,6 +183,9 @@ function submitRestore(): void {
 
         <PageHeader title="Forms" icon="forms">
             <template #actions>
+                <Link href="/forms/templates">
+                    <MdsButton variant="tertiary" icon-left="layout">New from template</MdsButton>
+                </Link>
                 <MdsButton variant="primary" icon-left="plus" @click="openCreate">New form</MdsButton>
             </template>
         </PageHeader>
@@ -204,6 +217,13 @@ function submitRestore(): void {
                     />
                     <MdsIconButton icon="clock" label="Version history" size="sm" @click="historyTarget = row" />
                     <MdsIconButton
+                        v-if="row.can.template"
+                        icon="copy"
+                        label="Save as template"
+                        size="sm"
+                        @click="openSaveAsTemplate(row)"
+                    />
+                    <MdsIconButton
                         v-if="row.can.edit"
                         icon="edit"
                         label="Rename form"
@@ -230,11 +250,16 @@ function submitRestore(): void {
             </template>
             <template #empty>
                 <MdsEmptyState
-                    headline="No forms yet"
-                    description="Create your first form to start collecting responses."
+                    headline="Create your first form"
+                    description="Start from a ready-made template, or build one from a blank canvas."
                 >
                     <template #action>
-                        <MdsButton variant="primary" icon-left="plus" @click="openCreate">New form</MdsButton>
+                        <div class="forms__empty-actions">
+                            <Link href="/forms/templates">
+                                <MdsButton variant="primary" icon-left="layout">Start from a template</MdsButton>
+                            </Link>
+                            <MdsButton variant="tertiary" icon-left="plus" @click="openCreate">Start from blank</MdsButton>
+                        </div>
                     </template>
                 </MdsEmptyState>
             </template>
@@ -340,6 +365,14 @@ function submitRestore(): void {
                 </MdsButton>
             </template>
         </MdsModal>
+
+        <!-- Save as template (G9a) -->
+        <SaveAsTemplateModal
+            v-if="templateTarget"
+            v-model:open="templateOpen"
+            :form-id="templateTarget.id"
+            :default-name="templateTarget.title"
+        />
     </div>
 </template>
 
@@ -348,6 +381,13 @@ function submitRestore(): void {
     display: inline-flex;
     gap: var(--mds-space-1);
     justify-content: flex-end;
+}
+
+.forms__empty-actions {
+    display: inline-flex;
+    gap: var(--mds-space-3);
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .forms__title-link {

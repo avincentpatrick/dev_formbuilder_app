@@ -291,6 +291,104 @@
                 }
             }
         },
+        "/form-templates": {
+            "get": {
+                "operationId": "v1.form-templates.index",
+                "summary": "Cursor-paginated template gallery (platform templates + the tenant's own), most-used first",
+                "tags": [
+                    "FormTemplateApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 25
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FormTemplateResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.form-templates.store",
+                "summary": "Save a form version as a tenant-owned private template. Authorizes `view` on the source form (a Form\nEditor may only template a form they can edit), then snapshots the version into a new template row",
+                "tags": [
+                    "FormTemplateApi"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreFormTemplateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`FormTemplateResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FormTemplateResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/forms/{form}/versions": {
             "get": {
                 "operationId": "v1.forms.versions.index",
@@ -1216,6 +1314,73 @@
                 ],
                 "title": "FormResource"
             },
+            "FormTemplateResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_public": {
+                        "type": "boolean"
+                    },
+                    "is_platform": {
+                        "type": "boolean"
+                    },
+                    "field_count": {
+                        "type": "integer"
+                    },
+                    "usage_count": {
+                        "type": "integer"
+                    },
+                    "source_form_version_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "category",
+                    "is_public",
+                    "is_platform",
+                    "field_count",
+                    "usage_count",
+                    "source_form_version_id",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "FormTemplateResource"
+            },
             "FormVersionResource": {
                 "type": "object",
                 "properties": {
@@ -1423,6 +1588,39 @@
                     "field_key"
                 ],
                 "title": "StoreAttachmentRequest"
+            },
+            "StoreFormTemplateRequest": {
+                "type": "object",
+                "description": "Validation for POST /api/v1/form-templates (Increment G9a) \u2014 \"save a version as a template\". Authorization\nis the route's `ability:write:forms` plus an in-controller `can:view` on the named version's parent form\n(the version isn't a bound model). `form_version_id` is RLS-scoped by `exists`, so a cross-tenant id fails\nvalidation rather than leaking existence.",
+                "properties": {
+                    "form_version_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    }
+                },
+                "required": [
+                    "form_version_id",
+                    "name"
+                ],
+                "title": "StoreFormTemplateRequest"
             },
             "SyncManifestResource": {
                 "type": "object",

@@ -52,6 +52,10 @@ class E2eSeeder extends Seeder
         // The fixed role/permission catalog must exist before we assign roles.
         $this->call(RolePermissionSeeder::class);
 
+        // The platform form-template gallery (G9a) — NULL-tenant rows so the demo/e2e env has content in
+        // the "New from template" gallery. Seeded via the privileged connection, like the RBAC catalog.
+        $this->call(PlatformTemplateSeeder::class);
+
         // Tenant + subdomain (tenants/domains are RLS-exempt central tables).
         $tenant = Tenant::firstOrCreate(['slug' => 'acme'], ['name' => 'Acme Research']);
         if (! $tenant->domains()->where('domain', 'acme')->exists()) {

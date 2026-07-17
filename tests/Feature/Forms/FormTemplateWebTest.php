@@ -70,7 +70,9 @@ it('renders the gallery with platform templates plus the tenant\'s own', functio
         ->get('http://acme.meridian.test/forms/templates')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('forms/Templates')
+            // `false` skips the on-disk page-file existence check (repo convention, cf. FormRoutesTest's
+            // component('forms/Index', false)) — the CI Pest job's view-finder doesn't resolve raw .vue files.
+            ->component('forms/Templates', false)
             ->has('templates', 2)
             // Platform sorts first (by usage), then the tenant's own.
             ->where('templates.0.name', 'Platform gallery pick')

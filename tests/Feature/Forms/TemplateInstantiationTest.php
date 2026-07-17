@@ -11,6 +11,7 @@ use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\TemplateService;
+use App\Support\Tenancy\PlatformRowCounter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     DB::connection('pgsql_privileged')->table('form_templates')->delete();
+    DB::connection('pgsql_privileged')->table('tenants')->where('slug', 'committed-co')->delete();
 });
 
 /** @return array<string, mixed> */
@@ -113,4 +115,40 @@ it('increments usage_count for a PLATFORM template via the elevated connection',
     // The elevated PlatformRowCounter actually moved the count (a plain tenant UPDATE would have no-op'd).
     $count = DB::connection('pgsql_privileged')->table('form_templates')->where('id', $id)->value('usage_count');
     expect((int) $count)->toBe(1);
+});
+
+it('refuses to touch a TENANT-owned row through the elevated counter', function (): void {
+    // Both rows go in on the privileged connection so they are COMMITTED and therefore visible to the
+    // counter's own session. A row written on the app connection would sit unseen inside RefreshDatabase's
+    // transaction, and this test would pass for the wrong reason — an invisible row, not a refused one.
+    // (Written through the query builder, not Tenant::on(): stancl's base model pins itself to the central
+    // connection and silently ignores on().)
+    $tenantId = Uuid::uuid7()->toString();
+    DB::connection('pgsql_privileged')->table('tenants')->insert([
+        'id' => $tenantId, 'name' => 'Committed Co', 'slug' => 'committed-co',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $id = Uuid::uuid7()->toString();
+    DB::connection('pgsql_privileged')->table('form_templates')->insert([
+        'id' => $id, 'tenant_id' => $tenantId, 'name' => 'Tenant owned',
+        'schema_blueprint' => json_encode(twoFieldBlueprint()), 'is_public' => false, 'usage_count' => 0,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    app(PlatformRowCounter::class)->increment('form_templates', $id);
+
+    // The counter's own whereNull('tenant_id') is the ONLY thing standing here: this connection is a
+    // superuser that bypasses RLS, so a cross-tenant write would otherwise land.
+    $count = DB::connection('pgsql_privileged')->table('form_templates')->where('id', $id)->value('usage_count');
+    expect((int) $count)->toBe(0);
+});
+
+it('refuses a table/column outside the platform-counter allowlist', function (): void {
+    $counter = app(PlatformRowCounter::class);
+
+    expect(fn () => $counter->increment('forms', Uuid::uuid7()->toString(), 'usage_count'))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => $counter->increment('form_templates', Uuid::uuid7()->toString(), 'version_number'))
+        ->toThrow(InvalidArgumentException::class);
 });

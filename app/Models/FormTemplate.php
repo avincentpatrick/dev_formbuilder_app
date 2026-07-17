@@ -9,7 +9,6 @@ use App\Models\Concerns\HasUuidv7;
 use App\Services\Forms\SchemaBlueprintMaterializer;
 use App\Services\Forms\SchemaSnapshotSerializer;
 use Database\Factories\FormTemplateFactory;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,11 +23,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * Deliberately does NOT use {@see BelongsToTenant}: the ORM strict-equality scope
  * would hide the platform (NULL) rows the widened SELECT policy is specifically written to reveal (the
- * same reasoning as {@see GlobalProbe}). Reads rely on RLS directly; the `platform()`/`ownedBy()` scopes
- * replace the ORM scope where a query wants only one side. Because the trait is absent, `tenant_id` is
- * NOT auto-filled — every create path sets it explicitly (and the strict INSERT policy means a tenant
- * connection can only ever write `tenant_id = <own tenant>`; platform rows come from the seeder's
- * elevated connection).
+ * same reasoning as {@see GlobalProbe}). Reads rely on RLS directly — a plain `query()` already returns
+ * the tenant's own rows PLUS platform rows; a query that wants only the platform gallery adds
+ * `whereNull('tenant_id')`. Because the trait is absent, `tenant_id` is NOT auto-filled — every create
+ * path sets it explicitly (and the strict INSERT policy means a tenant connection can only ever write
+ * `tenant_id = <own tenant>`; platform rows come from the seeder's elevated connection).
  *
  * @property string $id
  * @property ?string $tenant_id
@@ -74,18 +73,6 @@ class FormTemplate extends Model
             'usage_count' => 'integer',
             'deleted_at' => 'datetime',
         ];
-    }
-
-    /** Platform (system) templates only — the cross-tenant onboarding gallery rows. */
-    public function scopePlatform(Builder $query): Builder
-    {
-        return $query->whereNull('tenant_id');
-    }
-
-    /** A specific tenant's own saved templates only. */
-    public function scopeOwnedBy(Builder $query, string $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     /** @return BelongsTo<FormVersion, $this> */

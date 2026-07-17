@@ -50,7 +50,7 @@ final class TemplateService
     }
 
     /**
-     * @param  array{name: string, description?: ?string, category?: ?string}  $meta
+     * @param  array<string, mixed>  $meta  the validated template metadata: name (required) + optional description/category.
      */
     public function saveAsTemplate(FormVersion $version, User $actor, array $meta): FormTemplate
     {

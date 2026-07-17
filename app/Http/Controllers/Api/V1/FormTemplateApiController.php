@@ -28,16 +28,16 @@ final class FormTemplateApiController extends Controller
 
     /**
      * Cursor-paginated template gallery (platform templates + the tenant's own), most-used first.
-     *
-     * `usage_count` leads the sort AND is encoded into the cursor, so a template instantiated mid-walk can
-     * cross a page boundary and be seen twice or skipped. Accepted: this is a browse-and-pick gallery, not a
-     * sync feed (contrast the sync endpoints, which order on immutable keys precisely because they must not
-     * drop rows). A caller needing a stable walk should sort on `id`.
      */
     public function index(Request $request): JsonResponse
     {
         $limit = min(max($request->integer('limit', 25), 1), 100);
 
+        // `usage_count` leads the sort AND is encoded into the cursor, so a template instantiated mid-walk can
+        // cross a page boundary and be seen twice or skipped. Accepted: this is a browse-and-pick gallery, not
+        // a sync feed (contrast the sync endpoints, which order on immutable keys precisely because they must
+        // not drop rows). Kept out of the docblock deliberately — Scramble publishes those into openapi.json,
+        // and this is a maintainer's trade-off note, not a contract a consumer can act on.
         $templates = FormTemplate::query()
             ->withoutBlueprint()
             ->orderByDesc('usage_count')

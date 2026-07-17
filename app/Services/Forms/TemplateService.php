@@ -69,7 +69,14 @@ final class TemplateService
         ]);
     }
 
-    /** Bump `usage_count`: elevated path for a platform (NULL-tenant) row, ordinary Eloquent otherwise. */
+    /**
+     * Bump `usage_count`: elevated path for a platform (NULL-tenant) row, ordinary Eloquent otherwise.
+     *
+     * The platform path runs on a SEPARATE connection ({@see PlatformRowCounter}), so it autocommits and is
+     * NOT covered by instantiate()'s transaction: a rollback after this point leaves the count one high.
+     * Accepted — the alternative (deferring to after commit) trades a durable "popular" signal for a lossy
+     * one, and this counter drifting up by one on a failed instantiate is invisible in a gallery sort.
+     */
     private function bumpUsage(FormTemplate $template): void
     {
         if ($template->tenant_id === null) {

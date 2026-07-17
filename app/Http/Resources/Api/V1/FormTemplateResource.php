@@ -12,6 +12,10 @@ use Illuminate\Http\Request;
  * `schema_blueprint` jsonb is never serialized on the list (a consumer instantiates via the app, not the API),
  * only its `field_count` is derived — mirroring how {@see FormVersionResource} keeps the collection lean.
  *
+ * `field_count` comes from {@see FormTemplate::fieldCount()}, which reads the SQL projection that
+ * {@see FormTemplate::scopeWithoutBlueprint} adds on the list path (so the blueprint is never loaded just to be
+ * counted) and falls back to the in-memory blueprint on the `store` path, where the model was just created.
+ *
  * @mixin FormTemplate
  */
 final class FormTemplateResource extends ApiResource
@@ -28,7 +32,7 @@ final class FormTemplateResource extends ApiResource
             'category' => $this->category,
             'is_public' => $this->is_public,
             'is_platform' => $this->tenant_id === null,
-            'field_count' => count($this->schema_blueprint['fields'] ?? []),
+            'field_count' => $this->fieldCount(),
             'usage_count' => $this->usage_count,
             'source_form_version_id' => $this->source_form_version_id,
             'created_at' => $this->iso($this->created_at),

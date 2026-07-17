@@ -124,7 +124,14 @@ return [
 
         // Elevated connection for the rare operations that must bypass RLS: seeding platform-global
         // (tenant_id IS NULL) rows and any super-admin platform path (ADR-0002 §D3). Same database,
-        // superuser role. Defined now, first exercised in Increment B — never used by request code.
+        // superuser role. Defined now, first exercised in Increment B.
+        //
+        // Request code reaches this connection through exactly ONE allowlisted path (Increment G9a):
+        // App\Support\Tenancy\PlatformRowCounter, which bumps `form_templates.usage_count` on a platform
+        // row — a write the strict nullable-global UPDATE policy would otherwise silently no-op. It pins
+        // itself to `tenant_id IS NULL` and allowlists its table/column, because RLS cannot help here.
+        // Any OTHER request-path use is a bug: prefer the app connection, or pgsql_superadmin (still
+        // RLS-subject) for cross-tenant reads.
         'pgsql_privileged' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

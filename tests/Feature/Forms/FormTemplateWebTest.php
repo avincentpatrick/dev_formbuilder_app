@@ -8,6 +8,7 @@ use App\Models\FormTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Services\Forms\TemplateGalleryPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -78,6 +79,59 @@ it('renders the gallery with platform templates plus the tenant\'s own', functio
             ->where('templates.0.name', 'Platform gallery pick')
             ->where('templates.0.is_platform', true)
             ->where('templates.1.name', 'My saved template'));
+});
+
+it('derives field_count in SQL without ever reading the blueprint jsonb', function (): void {
+    $tenant = templateWebTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    FormTemplate::create([
+        'tenant_id' => $tenant->id, 'name' => 'Three fields', 'is_public' => false, 'usage_count' => 0,
+        'schema_blueprint' => ['sections' => [], 'fields' => [
+            ['key' => 'a', 'field_type' => 'short_text'],
+            ['key' => 'b', 'field_type' => 'short_text'],
+            ['key' => 'c', 'field_type' => 'email'],
+        ]],
+    ]);
+
+    $selects = [];
+    DB::listen(function ($query) use (&$selects): void {
+        if (str_starts_with(strtolower(trim($query->sql)), 'select') && str_contains($query->sql, 'form_templates')) {
+            $selects[] = $query->sql;
+        }
+    });
+
+    $cards = app(TemplateGalleryPresenter::class)->list($admin);
+
+    expect($cards)->toHaveCount(1)
+        ->and($cards[0]['field_count'])->toBe(3);
+
+    // The whole point of scopeWithoutBlueprint: the heavy jsonb is counted in Postgres, never selected.
+    expect($selects)->not->toBeEmpty();
+    foreach ($selects as $sql) {
+        expect($sql)->toContain('jsonb_array_length')
+            ->and($sql)->not->toContain('"form_templates".*');
+    }
+});
+
+it('counts zero fields for a blueprint with no usable fields array', function (): void {
+    $tenant = templateWebTenant();
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+    makeActiveMember($admin, 'admin');
+
+    // jsonb_array_length() raises on a non-array, so the SQL guards with jsonb_typeof — a blueprint missing
+    // `fields` (or holding an object there) must count 0, exactly as count($blueprint['fields'] ?? []) did.
+    FormTemplate::create([
+        'tenant_id' => $tenant->id, 'name' => 'Malformed', 'is_public' => false, 'usage_count' => 0,
+        'schema_blueprint' => ['sections' => []],
+    ]);
+
+    $cards = app(TemplateGalleryPresenter::class)->list($admin);
+
+    expect($cards[0]['field_count'])->toBe(0);
 });
 
 it('forbids a Viewer from the gallery and from instantiating', function (): void {

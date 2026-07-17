@@ -39,9 +39,13 @@ final class SchemaBlueprintMaterializer
     /**
      * Materialize a whole-form blueprint into the target draft. Returns the row counts written.
      *
+     * `$actor` is required (as on {@see materializeField}): it lands in `form_fields.created_by`, which is NOT
+     * NULL, so a null actor is not a "system-authored field" — it is a 23502 constraint violation, and one that
+     * would surface as a raw QueryException past the fail-closed BlueprintValidator.
+     *
      * @param  array<string, mixed>  $blueprint  the SchemaSnapshotSerializer shape: {sections: [...], fields: [...]}
      */
-    public function materializeInto(FormVersion $target, array $blueprint, ?User $actor = null): MaterializeResult
+    public function materializeInto(FormVersion $target, array $blueprint, User $actor): MaterializeResult
     {
         $this->validator->validate($blueprint);
 
@@ -136,7 +140,7 @@ final class SchemaBlueprintMaterializer
      * @param  array<string, mixed>  $field
      * @return array<string, mixed>
      */
-    private function fieldAttributes(FormVersion $target, array $field, ?string $sectionId, ?User $actor): array
+    private function fieldAttributes(FormVersion $target, array $field, ?string $sectionId, User $actor): array
     {
         return [
             'form_version_id' => $target->id,
@@ -160,7 +164,7 @@ final class SchemaBlueprintMaterializer
             'is_sensitive' => (bool) ($field['is_sensitive'] ?? false),
             'is_queryable' => (bool) ($field['is_queryable'] ?? false),
             'indexed_data_type' => $field['indexed_data_type'] ?? null,
-            'created_by' => $actor?->id,
+            'created_by' => $actor->id,
         ];
     }
 

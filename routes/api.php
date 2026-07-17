@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\FormApiController;
+use App\Http\Controllers\Api\V1\FormTemplateApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
 use App\Http\Controllers\Api\V1\SyncManifestController;
@@ -111,6 +112,17 @@ Route::prefix('api/v1')
             ->scopeBindings()
             ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:publish,form'])
             ->name('forms.versions.publish');
+
+        // Form templates (Increment G9a / architecture §7.1) — reusable whole-form blueprints. `index` lists
+        // the gallery RLS returns (platform + own); `store` saves a version as a tenant-owned private template.
+        // Read gates on read:forms; write on write:forms + an in-controller can:view on the source form (the
+        // version is a body param, not a bound model). Regenerate openapi.json after adding these.
+        Route::get('form-templates', [FormTemplateApiController::class, 'index'])
+            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->name('form-templates.index');
+        Route::post('form-templates', [FormTemplateApiController::class, 'store'])
+            ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
+            ->name('form-templates.store');
 
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).

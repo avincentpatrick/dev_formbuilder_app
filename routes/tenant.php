@@ -10,6 +10,7 @@ use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
+use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
@@ -83,6 +84,16 @@ Route::middleware([
         ->middleware('can:viewAny,'.Form::class)->name('forms.index');
     Route::post('/forms', [FormController::class, 'store'])
         ->middleware('can:create,'.Form::class)->name('forms.store');
+
+    // Form templates (Increment G9a) — the onboarding gallery + instantiate. Registered before the
+    // /forms/{form} patterns so the static `templates` segment is never captured as a {form} binding.
+    // Both gate on can:create,Form (the gallery exists to create a form from a template); instantiate
+    // clones the template's schema_blueprint into a brand-new form's draft (never a live reference).
+    Route::get('/forms/templates', [FormTemplateController::class, 'index'])
+        ->middleware('can:create,'.Form::class)->name('forms.templates.index');
+    Route::post('/forms/templates/{template}/instantiate', [FormTemplateController::class, 'instantiate'])
+        ->middleware('can:create,'.Form::class)->name('forms.templates.instantiate');
+
     Route::patch('/forms/{form}', [FormController::class, 'update'])
         ->middleware('can:update,form')->name('forms.update');
     Route::post('/forms/{form}/archive', [FormController::class, 'archive'])
@@ -91,6 +102,11 @@ Route::middleware([
         ->middleware('can:publish,form')->name('forms.publish');
     Route::post('/forms/{form}/versions/{version}/restore', [FormPublishController::class, 'restore'])
         ->middleware('can:update,form')->name('forms.restore');
+
+    // Save a form as a tenant-owned private template (Increment G9a) — snapshots the current draft's live
+    // rows into a new form_templates row. A read/derive of the form → gated can:view,form (mirrors export).
+    Route::post('/forms/{form}/save-as-template', [FormTemplateController::class, 'storeFromForm'])
+        ->middleware('can:view,form')->name('forms.templates.store-from-form');
 
     // XLSForm export (Increment G7a) — download any version (draft or published) as an .xlsx workbook, the
     // browser-facing twin of the doc-pinned /api/v1 endpoint. {version} is scope-bound to {form}; gated

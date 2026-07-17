@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
         // The fixed RBAC catalog (roles/permissions/matrix) — global rows, seeded via pgsql_privileged.
         $this->call(RolePermissionSeeder::class);
 
+        // The platform form-template gallery (G9a) — NULL-tenant rows, also seeded via pgsql_privileged.
+        $this->call(PlatformTemplateSeeder::class);
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

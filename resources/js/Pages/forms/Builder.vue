@@ -15,6 +15,7 @@ import FieldPalette from '@/components/builder/FieldPalette.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
+import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
 
@@ -53,6 +54,16 @@ function onAdd(typeValue: string): void {
 function publish(): void {
     void store.whenIdle().then(() => {
         router.post(`/forms/${props.form.id}/publish`, {}, { preserveScroll: true });
+    });
+}
+
+// ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
+// author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
+const templateOpen = ref(false);
+
+function openSaveAsTemplate(): void {
+    void store.whenIdle().then(() => {
+        templateOpen.value = true;
     });
 }
 
@@ -146,6 +157,14 @@ function submitImport(): void {
                 >
                     Import XLSForm
                 </MdsButton>
+                <MdsButton
+                    variant="secondary"
+                    icon-left="copy"
+                    :disabled="readOnly"
+                    @click="openSaveAsTemplate"
+                >
+                    Save as template
+                </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
                 </MdsButton>
@@ -190,6 +209,10 @@ function submitImport(): void {
         </div>
 
         <ConflictDialog :conflict="conflict" @resolve="store.resolveConflict" />
+
+        <!-- Save as template (G9a) — snapshots the current draft into a tenant-owned private template. -->
+        <SaveAsTemplateModal v-model:open="templateOpen" :form-id="form.id" :default-name="form.title" />
+
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">
             <p class="builder__prose">

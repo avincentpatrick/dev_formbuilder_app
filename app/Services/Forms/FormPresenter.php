@@ -61,6 +61,8 @@ final class FormPresenter
                 // Manual-encode entry point (F4b) — the SubmissionPolicy folds in "form is published",
                 // so this is false for a draft-only form and the row action stays hidden until publish.
                 'encode' => $user->can('create', [Submission::class, $form]),
+                // "Save as template" (G9a) — a read/derive of the form, so it gates on view, not update.
+                'template' => $user->can('view', $form),
             ],
         ];
     }

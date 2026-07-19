@@ -18,8 +18,9 @@ for (const theme of themes) {
     test(`Library picker — ${theme}`, async ({ page }) => {
         await openBuilder(page);
         await page.getByRole('button', { name: 'Library' }).click();
-        // The platform-seeded questions render.
-        await expect(page.getByRole('button', { name: /Full name/ })).toBeVisible({ timeout: 10_000 });
+        // Scope to the picker — the seeded form's canvas may already contain a same-named field.
+        const picker = page.locator('.library');
+        await expect(picker.getByRole('button', { name: /Full name/ })).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, `library picker ${theme}`);
     });
@@ -28,7 +29,8 @@ for (const theme of themes) {
 test('inserting a library question adds a field to the draft', async ({ page }) => {
     await openBuilder(page);
     await page.getByRole('button', { name: 'Library' }).click();
-    await page.getByRole('button', { name: /Full name/ }).click();
+    // Scope the insert to the picker (the canvas may hold a same-named field).
+    await page.locator('.library').getByRole('button', { name: /Full name/ }).click();
     // The materialized field is auto-selected → the config Basics tab's Label input carries the item label.
     await expect(page.getByRole('textbox', { name: 'Label' })).toHaveValue('Full name', { timeout: 10_000 });
 });

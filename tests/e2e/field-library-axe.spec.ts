@@ -1,10 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { assertClean, forceTheme } from './support/axe';
+import AxeBuilder from '@axe-core/playwright';
+import { forceTheme } from './support/axe';
 
 // Accessibility + interaction gate for the builder's question-library picker (Increment G9b): the left-pane
 // Library toggle lists the platform-seeded questions (E2eSeeder runs PlatformFieldLibrarySeeder), inserting
 // one adds a materialized field to the draft, and each field's config panel exposes a one-click "Save to
-// library". Navigates via the forms list to a seeded draft form, exactly like builder-axe.
+// library". The full-page builder a11y is owned by builder-axe (all 3 viewports); here we scope the axe scan
+// to the LEFT PANE so we cover the NEW picker UI without re-litigating the pre-existing toolbar.
 
 const themes = ['light', 'dark'] as const;
 
@@ -12,6 +14,23 @@ async function openBuilder(page: Page): Promise<void> {
     await page.goto('/forms', { waitUntil: 'networkidle' });
     await page.getByRole('link', { name: 'Community Health Survey' }).click();
     await page.waitForURL('**/builder', { timeout: 30_000 });
+}
+
+// Axe scan scoped to the left pane (the Fields ⇄ Library toggle + the active picker), mirroring builder-axe's
+// tag set. Scoped rather than whole-page so it gates the new UI, not the toolbar builder-axe already covers.
+async function scanLeftPane(page: Page, label: string): Promise<void> {
+    await page.mouse.move(0, 0);
+    const results = await new AxeBuilder({ page })
+        .include('.builder__pane--left')
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze();
+    expect(
+        results.violations,
+        `${label}\n` +
+            results.violations
+                .map((v) => `${v.id}: ${v.help} → ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)
+                .join('\n'),
+    ).toEqual([]);
 }
 
 for (const theme of themes) {
@@ -22,7 +41,7 @@ for (const theme of themes) {
         const picker = page.locator('.library');
         await expect(picker.getByRole('button', { name: /Full name/ })).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await assertClean(page, `library picker ${theme}`);
+        await scanLeftPane(page, `library picker ${theme}`);
     });
 }
 

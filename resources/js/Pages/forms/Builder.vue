@@ -12,6 +12,7 @@ import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
+import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
@@ -21,7 +22,10 @@ import type { BuilderPageProps } from '@/components/builder/types';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { selection, saving, canUndo, canRedo, conflict } = store;
+const { selection, saving, canUndo, canRedo, conflict, library } = store;
+
+// Left-pane view: add a fresh field type (palette) or insert a reusable question (library, Increment G9b).
+const leftTab = ref<'fields' | 'library'>('fields');
 
 const readOnly = computed(() => props.draft === null);
 
@@ -49,6 +53,10 @@ function targetSection(): string | null {
 
 function onAdd(typeValue: string): void {
     void store.addField(typeValue, targetSection());
+}
+
+function onInsertFromLibrary(itemId: string): void {
+    void store.insertFromLibrary(itemId, targetSection());
 }
 
 function publish(): void {
@@ -198,7 +206,41 @@ function submitImport(): void {
 
         <div v-else class="builder__panes">
             <div class="builder__pane builder__pane--left">
-                <FieldPalette :palette="store.palette" :disabled="saving" @add="onAdd" />
+                <div class="builder__left-tabs" role="group" aria-label="Add fields or insert from the library">
+                    <button
+                        type="button"
+                        :aria-pressed="leftTab === 'fields'"
+                        class="builder__left-tab"
+                        :class="{ 'builder__left-tab--active': leftTab === 'fields' }"
+                        @click="leftTab = 'fields'"
+                    >
+                        Fields
+                    </button>
+                    <button
+                        type="button"
+                        :aria-pressed="leftTab === 'library'"
+                        class="builder__left-tab"
+                        :class="{ 'builder__left-tab--active': leftTab === 'library' }"
+                        @click="leftTab = 'library'"
+                    >
+                        Library
+                    </button>
+                </div>
+                <div class="builder__left-body">
+                    <FieldPalette
+                        v-if="leftTab === 'fields'"
+                        :palette="store.palette"
+                        :disabled="saving"
+                        @add="onAdd"
+                    />
+                    <LibraryPicker
+                        v-else
+                        :items="library"
+                        :field-type-labels="fieldTypeLabels"
+                        :disabled="saving"
+                        @insert="onInsertFromLibrary"
+                    />
+                </div>
             </div>
             <div class="builder__pane builder__pane--canvas">
                 <BuilderCanvas :store="store" :field-type-labels="fieldTypeLabels" />
@@ -384,8 +426,57 @@ function submitImport(): void {
 }
 
 .builder__pane--left {
+    display: flex;
+    flex-direction: column;
     border-right: 1px solid var(--mds-color-border-default);
     background-color: var(--mds-color-bg-surface);
+}
+
+/* Fields ⇄ Library segmented toggle (Increment G9b) — a fixed header over the scrolling picker body. */
+.builder__left-tabs {
+    display: flex;
+    gap: var(--mds-space-1);
+    flex-shrink: 0;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border-bottom: 1px solid var(--mds-color-border-default);
+}
+
+.builder__left-tab {
+    flex: 1;
+    min-height: 32px;
+    padding: 0 var(--mds-space-2);
+    border: 1px solid transparent;
+    border-radius: var(--mds-radius-sm);
+    background: transparent;
+    color: var(--mds-color-text-secondary);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    cursor: pointer;
+    transition:
+        background-color var(--mds-duration-fast) var(--mds-ease-standard),
+        color var(--mds-duration-fast) var(--mds-ease-standard);
+}
+
+.builder__left-tab:hover {
+    background-color: var(--mds-color-bg-sunken);
+    color: var(--mds-color-text-body);
+}
+
+.builder__left-tab:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 1px;
+}
+
+.builder__left-tab--active {
+    background-color: var(--mds-color-bg-sunken);
+    color: var(--mds-color-text-heading);
+    border-color: var(--mds-color-border-default);
+}
+
+.builder__left-body {
+    flex: 1;
+    min-height: 0;
 }
 
 .builder__pane--config {

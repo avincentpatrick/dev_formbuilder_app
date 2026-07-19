@@ -8,6 +8,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import {
+    MdsButton,
     MdsCheckbox,
     MdsFormField,
     MdsNumberInput,
@@ -47,6 +48,9 @@ const field = props.store.selectedField;
 const section = props.store.selectedSection;
 const saveError = props.store.saveError;
 const enums = props.store.enums;
+const saving = props.store.saving;
+// Transient "Saved to library" confirmation (Increment G9b), cleared after a beat.
+const librarySaved = props.store.librarySaved;
 
 const optionTypes = new Set<string>();
 const advancedTypes = new Set<string>();
@@ -168,6 +172,19 @@ function setSection<K extends keyof LocalSection>(key: K, value: LocalSection[K]
 function reparent(sectionId: string): void {
     if (field.value) props.store.moveFieldToSection(field.value.uid, sectionId || null);
 }
+
+// One-click save to the question library (Increment G9b): the server names the item from the field label.
+function saveToLibrary(): void {
+    if (field.value) void props.store.saveFieldToLibrary(field.value.uid);
+}
+
+watch(librarySaved, (value) => {
+    if (value !== null) {
+        setTimeout(() => {
+            librarySaved.value = null;
+        }, 2500);
+    }
+});
 </script>
 
 <template>
@@ -395,6 +412,22 @@ function reparent(sectionId: string): void {
                             @update:model-value="setField('indexed_data_type', $event || null)"
                         />
                     </MdsFormField>
+
+                    <!-- Save this field to the reusable question library (Increment G9b) — one click; the item
+                         is named from the label and appears in the left-pane Library. -->
+                    <div class="config__library">
+                        <MdsButton
+                            variant="secondary"
+                            icon-left="plus"
+                            :disabled="saving"
+                            @click="saveToLibrary"
+                        >
+                            Save to library
+                        </MdsButton>
+                        <p v-if="librarySaved" class="config__library-note" role="status" aria-live="polite">
+                            Saved “{{ librarySaved }}” to your library.
+                        </p>
+                    </div>
                 </template>
             </div>
 
@@ -558,6 +591,22 @@ function reparent(sectionId: string): void {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-1);
+}
+
+/* Save-to-library affordance (Increment G9b) — set off from the field settings above it. */
+.config__library {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-3);
+    padding-top: var(--mds-space-3);
+    border-top: 1px solid var(--mds-color-border-default);
+}
+
+.config__library-note {
+    margin: 0;
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
 }
 
 .config__row {

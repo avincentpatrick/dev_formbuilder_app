@@ -36,6 +36,7 @@ final class PlatformRowCounter
      */
     private const COUNTABLE = [
         'form_templates' => ['usage_count'],
+        'field_library' => ['usage_count'],
     ];
 
     public function increment(string $table, string $id, string $column = 'usage_count'): void

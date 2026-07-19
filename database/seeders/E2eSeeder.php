@@ -56,6 +56,9 @@ class E2eSeeder extends Seeder
         // the "New from template" gallery. Seeded via the privileged connection, like the RBAC catalog.
         $this->call(PlatformTemplateSeeder::class);
 
+        // The platform question library (G9b) — NULL-tenant rows so the builder's Library picker has content.
+        $this->call(PlatformFieldLibrarySeeder::class);
+
         // Tenant + subdomain (tenants/domains are RLS-exempt central tables).
         $tenant = Tenant::firstOrCreate(['slug' => 'acme'], ['name' => 'Acme Research']);
         if (! $tenant->domains()->where('domain', 'acme')->exists()) {

@@ -8,9 +8,12 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Forms\SaveFieldToLibraryRequest;
+use App\Http\Requests\Forms\StoreFieldFromLibraryRequest;
 use App\Http\Requests\Forms\StoreFieldRequest;
 use App\Http\Requests\Forms\UpdateFieldRequest;
 use App\Http\Requests\Forms\UpdateSectionRequest;
+use App\Models\FieldLibrary;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -102,6 +105,39 @@ final class FormBuilderController extends Controller
         return $this->respond(fn (): array => $this->presenter->field(
             $this->builder->duplicateField($form, $this->actor($request), $field),
         ));
+    }
+
+    // ── Question library (Increment G9b) ──────────────────────────────────────────
+
+    public function storeFieldFromLibrary(StoreFieldFromLibraryRequest $request, Form $form): JsonResponse
+    {
+        // RLS-scoped to own + platform; is_active narrows out a deactivated item (a validated-but-inactive id 404s).
+        $item = FieldLibrary::query()
+            ->where('is_active', true)
+            ->whereKey($request->validated('library_item_id'))
+            ->firstOrFail();
+
+        return $this->respond(fn (): array => $this->presenter->field($this->builder->insertFromLibrary(
+            $form,
+            $this->actor($request),
+            $item,
+            $request->input('section_id'),
+        )));
+    }
+
+    public function saveFieldToLibrary(SaveFieldToLibraryRequest $request, Form $form, FormField $field): JsonResponse
+    {
+        return $this->respond(fn (): array => $this->presenter->libraryItem($this->builder->saveFieldToLibrary(
+            $form,
+            $this->actor($request),
+            $field,
+            $request->validated(),
+        )));
+    }
+
+    public function libraryItems(Form $form): JsonResponse
+    {
+        return response()->json($this->presenter->libraryList());
     }
 
     // ── Reorder (structural) ──────────────────────────────────────────────────────

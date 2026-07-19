@@ -9,6 +9,7 @@ use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
+use App\Models\FieldLibrary;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
@@ -63,6 +64,43 @@ final class BuilderPresenter
             'fields' => $fields,
             'palette' => $this->palette(),
             'enums' => $this->enums(),
+            'library' => $this->libraryList(),
+        ];
+    }
+
+    /**
+     * The question-library picker data (Increment G9b): the tenant's own + all platform items, active only,
+     * "popular" first. RLS returns own + platform from a plain `query()`; delivered as an Inertia prop
+     * (the builder's fetch sidecar has no GET) alongside `palette`/`enums`, refetchable via `forms.library-items`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function libraryList(): array
+    {
+        return array_values(
+            FieldLibrary::query()
+                ->where('is_active', true)
+                ->orderByDesc('usage_count')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn (FieldLibrary $item): array => $this->libraryItem($item))
+                ->all()
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function libraryItem(FieldLibrary $item): array
+    {
+        return [
+            'id' => $item->id,
+            'name' => $item->name,
+            'description' => $item->description,
+            'category' => $item->category,
+            'field_type' => $item->field_type,
+            'usage_count' => $item->usage_count,
+            'is_platform' => $item->tenant_id === null,
         ];
     }
 

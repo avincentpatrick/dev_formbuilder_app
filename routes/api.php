@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\ApiTokenController;
+use App\Http\Controllers\Api\V1\FieldLibraryApiController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
@@ -123,6 +124,17 @@ Route::prefix('api/v1')
         Route::post('form-templates', [FormTemplateApiController::class, 'store'])
             ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
             ->name('form-templates.store');
+
+        // Question library (Increment G9b / architecture §7.1) — reusable single questions. `index` lists the
+        // items RLS returns (platform + own, active); `store` authors a tenant-owned reusable question. Read
+        // gates on read:forms, write on write:forms (a library item is authoring metadata, not a bound model —
+        // no can: gate, mirroring form-templates). Regenerate openapi.json after adding these.
+        Route::get('field-library', [FieldLibraryApiController::class, 'index'])
+            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->name('field-library.index');
+        Route::post('field-library', [FieldLibraryApiController::class, 'store'])
+            ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
+            ->name('field-library.store');
 
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).

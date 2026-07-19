@@ -184,6 +184,104 @@
                 }
             }
         },
+        "/field-library": {
+            "get": {
+                "operationId": "v1.field-library.index",
+                "summary": "Cursor-paginated question library (platform items + the tenant's own, active only), most-used first",
+                "tags": [
+                    "FieldLibraryApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 25
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FieldLibraryResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.field-library.store",
+                "summary": "Author a tenant-owned reusable question from explicit attributes. The model omits BelongsToTenant, so\n`tenant_id` is set explicitly from the token's tenant context; the NOT-NULL jsonb columns default to\n`{}` / `[]` when omitted (never null)",
+                "tags": [
+                    "FieldLibraryApi"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreFieldLibraryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`FieldLibraryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FieldLibraryResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/forms": {
             "get": {
                 "operationId": "v1.forms.index",
@@ -1237,6 +1335,108 @@
             }
         },
         "schemas": {
+            "FieldLibraryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "field_type": {
+                        "type": "string"
+                    },
+                    "default_label": {
+                        "type": "string"
+                    },
+                    "is_platform": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "usage_count": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "category",
+                    "field_type",
+                    "default_label",
+                    "is_platform",
+                    "is_active",
+                    "usage_count",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "FieldLibraryResource"
+            },
+            "FieldType": {
+                "type": "string",
+                "description": "The 31-value field-type catalog across 8 categories (data-dictionary FieldType catalog, carried forward from legacy's 8-category `input_types` lookup, expressed as code with no lookup table). Backs `form_fields.field_type` and `field_library.field_type`. `matrix` is a generic grid (each cell independently typed) and is deliberately distinct from `likert_matrix` (a score-only Likert grid). Advanced types (geo*, *_capture, cascading_select, *matrix) are surfaced in the Phase-1 builder with a baseline config editor; their rich editors and runtime follow the form engine (ADR-0004).\n",
+                "enum": [
+                    "short_text",
+                    "long_text",
+                    "email",
+                    "phone",
+                    "url",
+                    "integer",
+                    "decimal",
+                    "calculated",
+                    "date",
+                    "time",
+                    "datetime",
+                    "duration",
+                    "single_select",
+                    "multi_select",
+                    "dropdown",
+                    "yes_no",
+                    "cascading_select",
+                    "likert_scale",
+                    "likert_matrix",
+                    "geopoint",
+                    "geotrace",
+                    "geoshape",
+                    "file_upload",
+                    "image_capture",
+                    "audio_capture",
+                    "video_capture",
+                    "signature",
+                    "note",
+                    "page_break",
+                    "hidden",
+                    "matrix"
+                ],
+                "title": "FieldType"
+            },
             "FormResource": {
                 "type": "object",
                 "properties": {
@@ -1588,6 +1788,67 @@
                     "field_key"
                 ],
                 "title": "StoreAttachmentRequest"
+            },
+            "StoreFieldLibraryRequest": {
+                "type": "object",
+                "description": "Validation for POST /api/v1/field-library (Increment G9b) \u2014 author a reusable question. Authorization is\nthe route's `ability:write:forms`; the model omits BelongsToTenant so the controller sets `tenant_id` from\nthe token's tenant context. `default_config` / `default_validations` are stored verbatim (their shape is\nre-validated when the item is inserted into a draft, {@see BlueprintValidator::validateField}).",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "field_type": {
+                        "$ref": "#/components/schemas/FieldType"
+                    },
+                    "default_label": {
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "default_hint": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "default_config": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "default_validations": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "field_type",
+                    "default_label"
+                ],
+                "title": "StoreFieldLibraryRequest"
             },
             "StoreFormTemplateRequest": {
                 "type": "object",

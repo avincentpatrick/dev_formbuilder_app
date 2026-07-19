@@ -14,6 +14,7 @@ import { builderClient, BuilderRequestError, type BuilderResult } from './builde
 import type {
     BuilderPageProps,
     CanvasGroup,
+    LibraryItem,
     LocalField,
     LocalSection,
     Selection,
@@ -62,6 +63,12 @@ export function useBuilderStore(props: BuilderPageProps) {
     const conflict = ref<ConflictState | null>(null);
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
+
+    // Question library (Increment G9b): the picker list, seeded from the Inertia prop and kept fresh by an
+    // optimistic bump on insert + a prepend on save (refreshLibrary() refetches for cross-session freshness).
+    // `librarySaved` is a transient "Saved to library" confirmation the config panel shows then clears.
+    const library = ref<LibraryItem[]>(props.library ?? []);
+    const librarySaved = ref<string | null>(null);
 
     // Last-persisted content per uid — the "before" for the next edit's history entry + the equality base
     // that keeps a no-op blur from recording an empty command.
@@ -339,6 +346,67 @@ export function useBuilderStore(props: BuilderPageProps) {
                     await restoreFieldServer(dupUid, type, sectionId, snap, seq);
                 },
             );
+        });
+    }
+
+    // ── Question library (Increment G9b) ────────────────────────────────────────
+    /** Insert a library question into the current draft — server materializes it; merge exactly like duplicate. */
+    function insertFromLibrary(itemId: string, sectionId: string | null = null): Promise<void> {
+        return enqueue(async () => {
+            const result = await guard(() =>
+                builderClient.post<ServerField>(`${base}/fields/from-library`, {
+                    library_item_id: itemId,
+                    section_id: sectionId,
+                }),
+            );
+            if (!result || result.conflict) return;
+            const local = toLocalField(result.data);
+            fields.value.push(local);
+            baselines.set(local.uid, fieldSnapshot(local));
+            selection.value = { kind: 'field', uid: local.uid };
+
+            // Reflect the server-side usage bump locally so the picker's "popular" order stays honest.
+            const item = library.value.find((i) => i.id === itemId);
+            if (item) item.usage_count += 1;
+
+            const newUid = local.uid;
+            const snap = fieldSnapshot(local);
+            const seq = local.sequence;
+            const secId = local.form_section_id;
+            const type = local.field_type;
+            pushHistory(
+                `Add ${local.label}`,
+                async () => {
+                    await deleteFieldServer(newUid);
+                },
+                async () => {
+                    await restoreFieldServer(newUid, type, secId, snap, seq);
+                },
+            );
+        });
+    }
+
+    /** Save the given field to the tenant's library (one-click: no name prompt; server names it from the label). */
+    function saveFieldToLibrary(uid: Uid): Promise<void> {
+        return enqueue(async () => {
+            const field = findField(uid);
+            if (!field) return;
+            const result = await guard(() =>
+                builderClient.post<LibraryItem>(`${base}/fields/${field.id}/save-to-library`, {}),
+            );
+            if (!result || result.conflict) return;
+            // Prepend the new item (dedupe by id in case of a double-submit); surface the transient confirmation.
+            library.value = [result.data, ...library.value.filter((i) => i.id !== result.data.id)];
+            librarySaved.value = result.data.name;
+        });
+    }
+
+    /** Refetch the picker list (cross-session freshness; the builder's fetch sidecar's only GET). */
+    function refreshLibrary(): Promise<void> {
+        return enqueue(async () => {
+            const result = await guard(() => builderClient.get<LibraryItem[]>(`${base}/library-items`));
+            if (!result || result.conflict) return;
+            library.value = result.data;
         });
     }
 
@@ -680,10 +748,15 @@ export function useBuilderStore(props: BuilderPageProps) {
         canRedo,
         palette: props.palette,
         enums: props.enums,
+        library,
+        librarySaved,
         // actions
         addField,
         deleteField,
         duplicateField,
+        insertFromLibrary,
+        saveFieldToLibrary,
+        refreshLibrary,
         addSection,
         deleteSection,
         moveFieldToSection,

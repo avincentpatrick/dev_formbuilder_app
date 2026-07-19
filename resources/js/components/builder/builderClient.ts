@@ -36,7 +36,7 @@ export class BuilderRequestError extends Error {
     }
 }
 
-type Method = 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, url: string, body?: unknown): Promise<BuilderResult<T>> {
     const token = readCookie('XSRF-TOKEN');
@@ -76,6 +76,7 @@ async function request<T>(method: Method, url: string, body?: unknown): Promise<
 }
 
 export const builderClient = {
+    get: <T>(url: string): Promise<BuilderResult<T>> => request<T>('GET', url),
     post: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('POST', url, body),
     patch: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('PATCH', url, body),
     delete: <T>(url: string, body?: unknown): Promise<BuilderResult<T>> => request<T>('DELETE', url, body),

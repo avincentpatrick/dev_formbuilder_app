@@ -35,6 +35,9 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
         '/sync/submissions',
+        // Increment G9a/G9b — the reusable-content surfaces (templates + question library).
+        '/form-templates',
+        '/field-library',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

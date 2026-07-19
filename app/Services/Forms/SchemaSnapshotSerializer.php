@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Models\FieldLibrary;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
@@ -68,6 +69,25 @@ final class SchemaSnapshotSerializer
         $sorted = $this->ksortRecursive($canonical);
 
         return $sorted;
+    }
+
+    /**
+     * Serialize a SINGLE field into the canonical field shape (Increment G9b — capture a draft field into the
+     * question library). Builds the section/field key maps from the field's own version so `section_key` and
+     * `related_field_key` resolve exactly as they do inside {@see snapshot()}. Reused by
+     * {@see FieldLibrary::fromField()}.
+     *
+     * @return array<string, mixed>
+     */
+    public function snapshotField(FormField $field): array
+    {
+        $versionId = $field->form_version_id;
+
+        $sectionKeyById = FormSection::query()->where('form_version_id', $versionId)->pluck('key', 'id');
+        $fieldKeyById = FormField::query()->where('form_version_id', $versionId)->pluck('key', 'id');
+        $validations = $field->validations()->get();
+
+        return $this->field($field, $sectionKeyById, $fieldKeyById, $validations);
     }
 
     /** SHA-256 over the canonical serialization of a version. */

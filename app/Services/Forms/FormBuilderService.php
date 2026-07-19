@@ -8,12 +8,15 @@ use App\Enums\FieldType;
 use App\Enums\RequiredMode;
 use App\Exceptions\Forms\BuilderConflictException;
 use App\Exceptions\Forms\FormException;
+use App\Models\FieldLibrary;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Support\Tenancy\PlatformRowCounter;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -181,6 +184,66 @@ final class FormBuilderService
 
             return $copy->refresh();
         });
+    }
+
+    // ── Question library (Increment G9b) ──────────────────────────────────────────
+
+    /**
+     * Insert a field-library item into the form's current draft. Mirrors {@see addField}'s structural-edit
+     * shape (transaction + form lock + resolve section), then delegates the row write to the shared
+     * {@see SchemaBlueprintMaterializer::materializeField} (mints a collision-free key, appends at the end,
+     * reverses logic-group ordinals). The item's blueprint is validated up front
+     * ({@see BlueprintValidator::validateField}) because materializeField — unlike materializeInto — does not.
+     * `usage_count` bumps through {@see PlatformRowCounter} for a platform (NULL-tenant) item, ordinary
+     * Eloquent for a tenant-owned one (the same strict-RLS reasoning as {@see TemplateService}).
+     */
+    public function insertFromLibrary(Form $form, User $user, FieldLibrary $item, ?string $sectionId): FormField
+    {
+        return DB::transaction(function () use ($form, $user, $item, $sectionId): FormField {
+            $draft = $this->lockDraft($form);
+            $section = $this->resolveDraftSectionId($draft, $sectionId);
+
+            $blueprint = $item->toBlueprintField();
+            app(BlueprintValidator::class)->validateField($blueprint);
+
+            $field = app(SchemaBlueprintMaterializer::class)->materializeField($draft, $blueprint, $section, $user);
+
+            $this->bumpLibraryUsage($item);
+
+            return $field;
+        });
+    }
+
+    /**
+     * Capture a draft field into the tenant's question library. Mirrors {@see TemplateService::saveAsTemplate}:
+     * guard the field is in THIS form's draft, then create a tenant-owned row (the model omits BelongsToTenant,
+     * so `tenant_id` is set explicitly). One-click save sends no meta → the item name defaults to the field
+     * label ({@see FieldLibrary::fromField}).
+     *
+     * @param  array<string, mixed>  $meta  optional name/description/category
+     */
+    public function saveFieldToLibrary(Form $form, User $user, FormField $field, array $meta): FieldLibrary
+    {
+        $this->assertDraftChild($form, $field);
+
+        return FieldLibrary::create([
+            ...FieldLibrary::fromField($field, $meta),
+            'tenant_id' => TenantContext::currentTenantId(),
+            'created_by' => $user->id,
+            'is_active' => true,
+            'usage_count' => 0,
+        ]);
+    }
+
+    private function bumpLibraryUsage(FieldLibrary $item): void
+    {
+        if ($item->tenant_id === null) {
+            app(PlatformRowCounter::class)->increment('field_library', $item->id);
+
+            return;
+        }
+
+        $item->increment('usage_count');
     }
 
     // ── Reorder (structural; serialized by the form-row lock, does NOT bump updated_at) ───────────

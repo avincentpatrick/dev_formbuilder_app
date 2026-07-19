@@ -87,6 +87,19 @@ export interface BuilderEnums {
     comparison_operators: EnumOption[];
 }
 
+// A question-library item as the picker shows it (Increment G9b). Mirrors BuilderPresenter::libraryItem —
+// the heavy default_config / default_validations jsonb never reaches the client; insert materializes it
+// server-side. `is_platform` = a NULL-tenant platform question (vs the tenant's own saved one).
+export interface LibraryItem {
+    id: string;
+    name: string;
+    description: string | null;
+    category: string | null;
+    field_type: string;
+    usage_count: number;
+    is_platform: boolean;
+}
+
 export interface BuilderPageProps {
     form: { id: string; title: string; description: string | null; status: string };
     draft: { id: string; version_number: number } | null;
@@ -94,6 +107,7 @@ export interface BuilderPageProps {
     fields: ServerField[];
     palette: PaletteGroup[];
     enums: BuilderEnums;
+    library: LibraryItem[];
 }
 
 // A group in the canvas: an optional owning section plus its ordered fields. `section === null` is the

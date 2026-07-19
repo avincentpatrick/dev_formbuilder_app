@@ -145,6 +145,17 @@ Route::middleware([
     Route::post('/forms/{form}/reorder', [FormBuilderController::class, 'reorder'])
         ->middleware('can:update,form')->name('forms.reorder');
 
+    // Question library (Increment G9b) — insert a reusable question into the draft, save a draft field back to
+    // the library, and refetch the picker list. Draft writes → gated can:update,form like the other builder
+    // mutations; insert delegates to SchemaBlueprintMaterializer::materializeField, save to FieldLibrary::fromField.
+    // `from-library` is a literal segment (no {field}) so it never collides with the fields/{field} routes above.
+    Route::post('/forms/{form}/fields/from-library', [FormBuilderController::class, 'storeFieldFromLibrary'])
+        ->middleware('can:update,form')->name('forms.fields.from-library');
+    Route::post('/forms/{form}/fields/{field}/save-to-library', [FormBuilderController::class, 'saveFieldToLibrary'])
+        ->middleware('can:update,form')->name('forms.fields.save-to-library');
+    Route::get('/forms/{form}/library-items', [FormBuilderController::class, 'libraryItems'])
+        ->middleware('can:update,form')->name('forms.library-items');
+
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),
     // resolved by `can:create,<Submission>,form`: the Authorize middleware passes the Submission class-string

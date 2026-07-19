@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
         // The platform form-template gallery (G9a) — NULL-tenant rows, also seeded via pgsql_privileged.
         $this->call(PlatformTemplateSeeder::class);
 
+        // The platform question library (G9b) — NULL-tenant rows, also seeded via pgsql_privileged.
+        $this->call(PlatformFieldLibrarySeeder::class);
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

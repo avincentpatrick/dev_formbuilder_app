@@ -317,6 +317,10 @@ function submitImport(): void {
 }
 
 .builder__back {
+    /* inline-flex + min-height keeps the link a ≥24px touch target (WCAG 2.2 AA 2.5.8) at every viewport. */
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
     text-decoration: none;

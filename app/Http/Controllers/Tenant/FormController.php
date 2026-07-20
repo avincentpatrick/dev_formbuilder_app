@@ -8,9 +8,11 @@ use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\FormMetadataRequest;
 use App\Models\Form;
+use App\Models\ScopeNode;
 use App\Models\User;
 use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
+use App\Services\Scoping\ScopeNodePresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -27,13 +29,17 @@ final class FormController extends Controller
 
     public function __construct(private readonly FormService $forms) {}
 
-    public function index(Request $request, FormPresenter $presenter): Response
+    public function index(Request $request, FormPresenter $presenter, ScopeNodePresenter $scopes): Response
     {
         /** @var User $user */
         $user = $request->user();
 
         return Inertia::render('forms/Index', [
             'forms' => $presenter->list($user),
+            // The scope picker's options (G10b2). Empty unless the viewer holds `scopes.manage` — assigning
+            // a form to a node is a grant-equivalent act, so both the control and its data are gated on the
+            // same permission the route stacks on top of can:update,form.
+            'scopes' => $user->can('viewAny', ScopeNode::class) ? $scopes->pickerOptions() : [],
         ]);
     }
 

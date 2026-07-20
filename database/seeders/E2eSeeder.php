@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\FieldType;
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
@@ -12,14 +13,17 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Role;
+use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Scoping\ScopeNodeService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +46,11 @@ class E2eSeeder extends Seeder
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
 
     private const PENDING_EMAIL = 'pending@meridian.test';
+
+    /** A second ACTIVE member (G10b2) — the grant modal needs a recipient other than the acting Owner. */
+    private const REVIEWER_EMAIL = 'reviewer@meridian.test';
+
+    private const REVIEWER_PASSWORD = 'meridian-e2e-2026';
 
     public function run(): void
     {
@@ -67,11 +76,12 @@ class E2eSeeder extends Seeder
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
         $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
+        $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
         // transaction-local RLS GUC (app.current_tenant_id) is actually in force for the INSERTs —
         // outside a transaction it wouldn't stick and the strict RLS WITH CHECK would reject the rows.
-        DB::transaction(function () use ($tenant, $owner, $pending): void {
+        DB::transaction(function () use ($tenant, $owner, $pending, $reviewer): void {
             TenantContext::applyLocal((string) $tenant->id, $owner->id);
             app(PermissionRegistrar::class)->setPermissionsTeamId((string) $tenant->id);
 
@@ -95,6 +105,20 @@ class E2eSeeder extends Seeder
                     'invite_expires_at' => now()->addDays(7),
                     'invite_token' => hash('sha256', Str::random(48)),
                 ]);
+            }
+
+            // A second ACTIVE member (Increment G10b2). Until now the tenant had exactly one active member
+            // (the Owner) plus one *invited* row — and the `users_visibility` RLS policy admits only ACTIVE
+            // co-tenants, so the grant modal's recipient list would render EMPTY and the scopes e2e spec
+            // could not complete a grant. Must exist before the grant below, which resolves them.
+            if (! TenantUser::query()->where('user_id', $reviewer->id)->exists()) {
+                TenantUser::create([
+                    'user_id' => $reviewer->id,
+                    'status' => TenantUserStatus::Active,
+                    'joined_at' => now(),
+                    'invited_role_id' => $this->roleId('reviewer'),
+                ]);
+                $reviewer->syncRoles(['reviewer']);
             }
 
             // A demo form for the Forms page (D3) + the builder (D4a): a section + a few fields on the
@@ -392,12 +416,71 @@ class E2eSeeder extends Seeder
                     ]);
                 }
             }
+
+            $this->seedScopingHierarchy($owner, $reviewer);
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
 
         TenantContext::flush();
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+    }
+
+    /**
+     * The tenant's scoping hierarchy (Increment G10b2) — the fixture the /scopes page and its axe spec run on.
+     *
+     * Deliberately FIVE levels deep. The minimum useful hierarchy is three, but the indent is
+     * `depth * --indent-step`, so a shallow fixture would leave the 375px horizontal-overflow case
+     * unreachable and make responsive-axe a false negative on the exact failure mode it is there to catch.
+     *
+     * Nodes go through ScopeNodeService — the only writer of `path`/`depth` — and forms through
+     * FormService::assignScope, so the fixture exercises the same writers the UI does rather than raw
+     * inserts that could drift from them.
+     */
+    private function seedScopingHierarchy(User $owner, User $reviewer): void
+    {
+        if (ScopeNode::query()->where('name', 'Luzon')->exists()) {
+            return;
+        }
+
+        $nodes = app(ScopeNodeService::class);
+
+        $luzon = $nodes->create(null, 'Luzon', ['code' => 'L', 'node_type' => 'island_group'], $owner);
+        $ncr = $nodes->create($luzon, 'National Capital Region', ['code' => 'NCR', 'node_type' => 'region'], $owner);
+        $manila = $nodes->create($ncr, 'City of Manila', ['code' => 'MNL', 'node_type' => 'city'], $owner);
+        $malate = $nodes->create($manila, 'Malate', ['code' => 'MLT', 'node_type' => 'barangay'], $owner);
+        $nodes->create($malate, 'Zone 82', ['code' => 'Z82', 'node_type' => 'zone'], $owner);
+        $nodes->create($ncr, 'Quezon City', ['code' => 'QC', 'node_type' => 'city'], $owner);
+
+        $visayas = $nodes->create(null, 'Visayas', ['code' => 'V', 'node_type' => 'island_group'], $owner);
+        $cebu = $nodes->create($visayas, 'Central Visayas', ['code' => 'VII', 'node_type' => 'region'], $owner);
+        // A node the e2e move spec owns exclusively. The spec runs once per viewport project against ONE
+        // seeded database, so it re-roots this node repeatedly; keeping it off the Luzon branch means the
+        // ARIA-structure assertions there (sibling sets, levels) stay stable no matter how often it runs.
+        $nodes->create($cebu, 'Movable District', ['code' => 'MOV', 'node_type' => 'district'], $owner);
+
+        // A deactivated branch, so the UI's "inactive" affordance and the resolver's zero-reach preview
+        // ("a grant here confers nothing until it is reactivated") both have a fixture to render.
+        $mindanao = $nodes->create(null, 'Mindanao', ['code' => 'M', 'node_type' => 'island_group'], $owner);
+        $nodes->setActive($mindanao, false);
+
+        // Forms assigned at DIFFERENT depths — a grant on NCR must demonstrably reach the Manila-level form
+        // through `includes_descendants` while the Cebu one stays out of range.
+        $forms = app(FormService::class);
+        foreach ([
+            'Community Health Survey' => $manila,
+            'Household Roster' => $ncr,
+            'Clinic Intake' => $cebu,
+        ] as $title => $node) {
+            $form = Form::query()->where('title', $title)->first();
+            if ($form !== null) {
+                $forms->assignScope($form, (string) $node->getKey());
+            }
+        }
+
+        // A descendant-inclusive Reviewer grant for the second active member: the state the whole G10 line
+        // exists to make reachable, and what makes the grant list on /scopes non-empty on first load.
+        app(ResourceGrantService::class)->grant($owner, $reviewer, $ncr, ResourceCapacity::Reviewer, true);
     }
 
     /** Resolve an existing identity on the pre-auth connection (users RLS hides non-members), or create it. */

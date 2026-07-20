@@ -68,6 +68,9 @@ final class FormPresenter
             'title' => $form->title,
             'description' => $form->description,
             'status' => $form->status->value,
+            // The scope picker's current value (G10b2). The picker itself is gated on `scopes.manage`; this
+            // is just the form's own column, already visible to anyone who can see the row.
+            'scope_node_id' => $form->scope_node_id !== null ? (string) $form->scope_node_id : null,
             'current_version' => $this->versionNumber($versions, $form->current_published_version_id),
             'draft_version' => $this->versionNumber($versions, $form->draft_version_id),
             'updated_at' => $form->updated_at?->toIso8601String(),

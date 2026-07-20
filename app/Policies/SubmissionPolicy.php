@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\ResourceCapacity;
 use App\Models\Form;
-use App\Models\FormCollaborator;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 
 /**
  * Authorization for the submissions inbox, review, and export (Increments F4b + F7). Mirrors
@@ -23,12 +24,22 @@ use App\Models\User;
  */
 final class SubmissionPolicy
 {
-    /** Manual encoding (F4b): submissions.create + published form + per-form scope. */
+    public function __construct(private readonly ResourceGrantResolver $grants) {}
+
+    /**
+     * Manual encoding (F4b): submissions.create + published form + per-form scope.
+     *
+     * G10a tightening (deliberate, flagged): the per-form scope now requires EDITOR capacity, where it
+     * previously accepted either capacity. Manual encoding is an authoring act, and once a grant can be
+     * made against a scope node a "reviewer" grant on an interior node would otherwise hand out write
+     * access to every form beneath it. No existing test asserted the old behaviour.
+     */
     public function create(User $user, Form $form): bool
     {
         return $user->can('submissions.create')
             && $form->current_published_version_id !== null
-            && ($user->can('forms.edit.any') || $this->collaboratesWith($user, $form->id));
+            && ($user->can('forms.edit.any')
+                || $this->grants->holdsOnFormId($user, $form->id, ResourceCapacity::Editor));
     }
 
     /** Reach the inbox list at all — row-level scoping is applied by the query, not here (F7). */
@@ -68,12 +79,14 @@ final class SubmissionPolicy
         return $user->can('dashboard.org.view');
     }
 
-    /** Any per-form collaborator row (editor OR reviewer capacity) scopes a `.own` role to this form. */
+    /**
+     * Any grant covering this form (editor OR reviewer capacity) scopes a `.own` role to it — the exact
+     * rule this policy has always applied. Since G10a the grant may name the form directly or name the
+     * scope node it belongs to; {@see ResourceGrantResolver} owns that distinction so this policy and
+     * {@see Submission::scopeVisibleTo()} cannot disagree about it.
+     */
     private function collaboratesWith(User $user, string $formId): bool
     {
-        return FormCollaborator::query()
-            ->where('form_id', $formId)
-            ->where('user_id', $user->id)
-            ->exists();
+        return $this->grants->holdsAny($user, $formId);
     }
 }

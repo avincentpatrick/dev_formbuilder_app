@@ -12,6 +12,12 @@ if (! function_exists('withTenantIsolation')) {
      * and the migration linter has one canonical call to look for. Delegates to
      * {@see TenantIsolation} for the actual policy SQL.
      *
+     * A sixth shape exists — {@see TenantIsolation::resourceGrantGuard()} for `resource_grants`
+     * (Increment G10a) — but is deliberately NOT routed through here: its per-alias morph-target map is
+     * an `array<string, string>` of a different shape than `$options`, and widening `$options` to carry
+     * it would loosen the type for every other caller. That migration calls the generator directly; the
+     * migration linter accepts any `TenantIsolation::` static call, so the backstop is still enforced.
+     *
      * @param  'strict'|'nullable_global'|'belongs_to_user'|'form_version'|'draft_child'  $variant
      * @param  array<string, string>  $options  variant-specific overrides — e.g. ['column' => 'user_id']
      *                                          for belongs_to_user, or the parent_table/fk_column/

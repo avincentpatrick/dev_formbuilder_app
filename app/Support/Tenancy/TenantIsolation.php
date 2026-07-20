@@ -142,6 +142,38 @@ final class TenantIsolation
         self::execute(self::draftChildGuardSql($table, $parentTable, $fkColumn, $parentStatusColumn, $draftValue, $tenantColumn));
     }
 
+    /**
+     * The polymorphic-grant guard for `resource_grants` (Increment G10a, multi-tenancy-rbac-design.md §8).
+     *
+     * A polymorphic target carries NO database foreign key — the target table varies by
+     * `scopeable_type` — so under the plain {@see strictSql()} shape an INSERT bearing
+     * `tenant_id = <mine>` and `scopeable_id = <another tenant's form>` is ACCEPTED by Postgres.
+     * For `attachments` (the repo's other morph) that would merely misfile a row; here the row is an
+     * AUTHORIZATION DECISION INPUT, so the same hole is a cross-tenant privilege grant. This variant
+     * closes it in the database by adding, to the INSERT/UPDATE WITH CHECK only, one EXISTS branch per
+     * registered morph alias asserting the target row exists IN THE SAME TENANT.
+     *
+     * SELECT and DELETE are deliberately NOT target-guarded: an orphaned grant (its target hard-deleted)
+     * must stay readable and therefore revocable. Grants are hard-deleted, so there is no soft-delete
+     * carve-out to reason about.
+     *
+     * Emitted as the SOLE write policy per command. Postgres OR-combines same-command permissive
+     * policies, so a migration calling BOTH this and `withTenantIsolation($table)` would silently widen
+     * INSERT back to bare tenant equality and still pass CI — the same hazard {@see draftChildGuardSql()}
+     * records. Call ONLY this variant on `resource_grants`.
+     *
+     * @param  array<string, string>  $targets  morph alias => target table (from ResourceScopeable::targetTables())
+     */
+    public static function resourceGrantGuard(
+        string $table,
+        array $targets,
+        string $tenantColumn = 'tenant_id',
+        string $typeColumn = 'scopeable_type',
+        string $idColumn = 'scopeable_id',
+    ): void {
+        self::execute(self::resourceGrantGuardSql($table, $targets, $tenantColumn, $typeColumn, $idColumn));
+    }
+
     // ── Pure SQL generators (no database access — the unit-test surface) ─────────────────────
 
     /**
@@ -377,6 +409,73 @@ final class TenantIsolation
             self::policy($table, 'draft_insert', 'INSERT', check: $writeGuard),
             self::policy($table, 'draft_update', 'UPDATE', using: $writeGuard, check: $writeGuard),
             self::policy($table, 'draft_delete', 'DELETE', using: $writeGuard),
+        ];
+    }
+
+    /**
+     * SQL for the {@see resourceGrantGuard()} shape. Strict tenant SELECT/DELETE; INSERT/UPDATE
+     * additionally require the polymorphic target to resolve to a row in the SAME tenant:
+     *
+     *   tenant_id = ctx AND (
+     *        (scopeable_type = 'form'       AND EXISTS (SELECT 1 FROM forms t
+     *             WHERE t.id = resource_grants.scopeable_id AND t.tenant_id = resource_grants.tenant_id))
+     *     OR (scopeable_type = 'scope_node' AND EXISTS (SELECT 1 FROM scope_nodes t WHERE ...))
+     *   )
+     *
+     * The branch set is provably exhaustive because a CHECK constraint pins `scopeable_type` to the same
+     * alias list (both generated from `ResourceScopeable`), so an unregistered alias cannot be stored and
+     * then fall through every branch. The EXISTS compares against the ROW's own `tenant_id` rather than
+     * the GUC so the predicate stays correct even on a connection whose context differs (e.g. a
+     * privileged backfill re-check), and the tenant equality is asserted separately anyway.
+     *
+     * @param  array<string, string>  $targets  morph alias => target table
+     * @return list<string>
+     */
+    public static function resourceGrantGuardSql(
+        string $table,
+        array $targets,
+        string $tenantColumn = 'tenant_id',
+        string $typeColumn = 'scopeable_type',
+        string $idColumn = 'scopeable_id',
+    ): array {
+        self::assertIdentifier($table);
+        self::assertIdentifier($tenantColumn);
+        self::assertIdentifier($typeColumn);
+        self::assertIdentifier($idColumn);
+
+        if ($targets === []) {
+            throw new InvalidArgumentException("resourceGrantGuard({$table}) requires at least one morph target.");
+        }
+
+        $branches = [];
+
+        foreach ($targets as $alias => $targetTable) {
+            self::assertLiteral($alias);
+            self::assertIdentifier($targetTable);
+
+            $branches[] = sprintf(
+                '(%s = %s AND EXISTS (SELECT 1 FROM %s t WHERE t.id = %s.%s AND t.%s = %s.%s))',
+                $typeColumn,
+                self::quote($alias),
+                $targetTable,
+                $table,
+                $idColumn,
+                $tenantColumn,
+                $table,
+                $tenantColumn,
+            );
+        }
+
+        $match = self::tenantMatch($tenantColumn);
+        $writeGuard = $match.' AND ('.implode(' OR ', $branches).')';
+
+        return [
+            ...self::enableAndForce($table),
+            // SELECT/DELETE stay tenant-only: an orphaned grant must remain readable AND revocable.
+            self::policy($table, 'tenant_select', 'SELECT', using: $match),
+            self::policy($table, 'target_insert', 'INSERT', check: $writeGuard),
+            self::policy($table, 'target_update', 'UPDATE', using: $match, check: $writeGuard),
+            self::policy($table, 'tenant_delete', 'DELETE', using: $match),
         ];
     }
 

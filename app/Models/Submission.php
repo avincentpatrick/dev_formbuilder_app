@@ -10,6 +10,7 @@ use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
 use App\Policies\SubmissionPolicy;
+use App\Services\Authorization\ResourceGrantResolver;
 use Database\Factories\SubmissionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -134,7 +135,11 @@ class Submission extends Model implements TenantScoped
      * Restrict the inbox list to what `$user` may see (F7). RLS already scopes every query to the tenant;
      * this adds the role-level split that {@see SubmissionPolicy} enforces per-row: Owner/Admin/
      * Viewer (who hold `dashboard.org.view`) see all tenant submissions, so no extra predicate; Form Editor/
-     * Reviewer see only forms they collaborate on. A user with no collaboration rows gets an empty set.
+     * Reviewer see only forms they hold a grant on. A user with no grants gets an empty set.
+     *
+     * Since G10a the grant subquery comes from {@see ResourceGrantResolver}, the same object
+     * {@see SubmissionPolicy} consults for single-row checks — so the list and the per-row check cannot
+     * drift into "a row appears in the inbox but 403s when opened".
      *
      * @param  Builder<Submission>  $query
      * @return Builder<Submission>
@@ -145,8 +150,6 @@ class Submission extends Model implements TenantScoped
             return $query;
         }
 
-        return $query->whereIn('form_id', FormCollaborator::query()
-            ->where('user_id', $user->id)
-            ->select('form_id'));
+        return $query->whereIn('form_id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
     }
 }

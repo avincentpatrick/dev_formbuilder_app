@@ -12,7 +12,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Seeds the fixed, platform-defined RBAC catalog (multi-tenancy-rbac-design.md §3, §5): five roles and
- * twenty-seven permissions, plus the role×permission grant matrix. These are GLOBAL rows (tenant_id IS
+ * twenty-eight permissions (the 28th, `scopes.manage`, added in Increment G10a), plus the
+ * role×permission grant matrix. These are GLOBAL rows (tenant_id IS
  * NULL) shared by every tenant — the catalog is closed (no UI ever inserts a sixth role).
  *
  * Written on the `pgsql_privileged` (superuser) connection, exactly like every other platform-global

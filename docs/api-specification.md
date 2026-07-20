@@ -90,6 +90,13 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `export:submissions` | `submissions.export` |
 | `manage:webhooks` | `webhooks.manage` |
 | `manage:settings` | `tenant.settings.manage` |
+
+> **Increment G10a note.** The 28th permission, `scopes.manage` (author the tenant's `scope_nodes`
+> hierarchy), maps to **no** token ability, and neither does `forms.collaborators.manage`. That is
+> deliberate: `scopes.manage` was added rather than folded into `tenant.settings.manage` precisely so
+> that already-minted `manage:settings` tokens do NOT retroactively gain authority to author
+> authorization structure. G10b, which ships the first write surface for grants and nodes, owns the
+> decision of which ability (if any) should map to them.
 | `read:audit_log` | `audit_log.view` |
 
 An API key (personal access token) is issued with an explicit subset of these abilities, independent of — but never exceeding — the issuing user's own RBAC permissions (a key can be narrower than its issuer's own access, never broader; enforced by intersecting the requested ability set against the issuer's actual permissions at token-creation time).

@@ -8,11 +8,13 @@ use App\Enums\FormStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Authorization\ResourceGrantResolver;
 use Database\Factories\FormFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -34,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property string $default_locale
  * @property array<int, string> $supported_locales
  * @property string $owner_user_id
+ * @property ?string $scope_node_id
  * @property string $created_by
  * @property ?Carbon $published_at
  * @property ?Carbon $archived_at
@@ -68,6 +71,7 @@ class Form extends Model implements TenantScoped
         'capability_flags',
         'theme',
         'owner_user_id',
+        'scope_node_id',
         'created_by',
         'updated_by',
         'published_at',
@@ -114,9 +118,21 @@ class Form extends Model implements TenantScoped
         return $this->belongsTo(FormVersion::class, 'current_published_version_id');
     }
 
-    /** @return HasMany<FormCollaborator, $this> */
-    public function collaborators(): HasMany
+    /** @return BelongsTo<ScopeNode, $this> */
+    public function scopeNode(): BelongsTo
     {
-        return $this->hasMany(FormCollaborator::class);
+        return $this->belongsTo(ScopeNode::class, 'scope_node_id');
+    }
+
+    /**
+     * Per-instance access grants naming THIS form directly (Increment G10a — replaces `collaborators()`).
+     * Note a user may also reach this form through a grant on its {@see scopeNode()}; only
+     * {@see ResourceGrantResolver} answers "who can do what here" completely.
+     *
+     * @return MorphMany<ResourceGrant, $this>
+     */
+    public function grants(): MorphMany
+    {
+        return $this->morphMany(ResourceGrant::class, 'scopeable');
     }
 }

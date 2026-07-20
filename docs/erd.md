@@ -1,7 +1,7 @@
 # Entity-Relationship Diagram (ERD)
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
-**Status:** Draft v1.0 — derived directly from `docs/data-dictionary.md` (21 entities) and `docs/multi-tenancy-rbac-design.md` (8 additional entities: `users`, `tenant_users`, `form_collaborators`, `roles`, `permissions`, `role_has_permissions`, `model_has_roles`, `model_has_permissions`), for a total of 29 entities.
+**Status:** Draft v1.0 — derived directly from `docs/data-dictionary.md` (21 entities) and `docs/multi-tenancy-rbac-design.md` (9 additional entities: `users`, `tenant_users`, `resource_grants`, `scope_nodes`, `roles`, `permissions`, `role_has_permissions`, `model_has_roles`, `model_has_permissions`), for a total of 30 entities. `resource_grants` + `scope_nodes` replaced `form_collaborators` in Increment G10a.
 **Purpose:** Two diagrams, per the architecture plan §4 item 6 — one full overview, one zoomed on the form/version/submission core. Diagrams use Mermaid `erDiagram` syntax, consistent with `docs/architecture/technical-architecture.md`'s existing C4 diagrams.
 **Scope note:** This document shows relationships and enough attributes to read the diagram; it is **not** a substitute for the column-level detail in `docs/data-dictionary.md` and `docs/multi-tenancy-rbac-design.md` — those remain the source of truth for every column's type, nullability, default, and PII classification.
 
@@ -20,7 +20,10 @@ Drawing all ~25 individual `tenants ||--o{ X` lines in the diagrams below would 
 ```mermaid
 erDiagram
     forms ||--o{ form_versions : "has versions"
-    forms ||--o{ form_collaborators : "access scoped by"
+    forms ||--o{ resource_grants : "access scoped by (polymorphic)"
+    scope_nodes ||--o{ resource_grants : "access scoped by (polymorphic)"
+    scope_nodes ||--o{ forms : "groups (nullable)"
+    scope_nodes ||--o{ scope_nodes : "parent of"
     forms |o--o{ webhook_endpoints : "scoped by (nullable = tenant-wide)"
     forms ||--o{ submissions : "collects (denormalized form_id)"
     forms ||--o{ attachments : "polymorphic attachable (forms)"
@@ -46,7 +49,7 @@ erDiagram
     submissions ||--o{ attachments : "polymorphic attachable (submissions)"
 
     users ||--o{ tenant_users : "one membership row per tenant"
-    users ||--o{ form_collaborators : "granted per-form access"
+    users ||--o{ resource_grants : "granted per-resource access"
     users |o--o{ forms : "owns / created / updated (attribution)"
     users |o--o{ submissions : "respondent / reviewer (nullable)"
     users |o--o{ audits : "acted (nullable = system action)"

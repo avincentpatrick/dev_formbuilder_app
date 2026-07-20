@@ -56,8 +56,10 @@ it('reveals the global catalog to every tenant, but lets no tenant author a glob
     TenantContext::applyLocal($a->id);
 
     // The nullable-global SELECT policy reveals the platform catalog to every tenant …
-    expect(DB::table('roles')->count())->toBe(5);
-    expect(DB::table('permissions')->count())->toBe(27);
+    // Derived from the seeder rather than hardcoded: the catalog grew to 28 in G10a (`scopes.manage`),
+    // and a literal here just means the next addition fails a test about RLS for reasons unrelated to RLS.
+    expect(DB::table('roles')->count())->toBe(count(RolePermissionSeeder::ROLES));
+    expect(DB::table('permissions')->count())->toBe(count(RolePermissionSeeder::PERMISSIONS));
 
     // … but the write policy stays strict: a tenant-scoped connection can never mint a global row.
     expect(fn () => DB::table('roles')->insert([

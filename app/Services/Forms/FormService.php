@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
-use App\Enums\FormCollaboratorCapacity;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
+use App\Enums\ResourceCapacity;
 use App\Models\Form;
-use App\Models\FormCollaborator;
 use App\Models\FormVersion;
+use App\Models\ResourceGrant;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Form creation (form-versioning-schema-migration.md §3.1). Creates the durable form, its initial draft
- * version (v1, empty snapshot), and the creator's editor collaborator row — in one transaction. Assumes
- * the caller has established the tenant DB context (BelongsToTenant auto-fills tenant_id; RLS is the
- * backstop).
+ * version (v1, empty snapshot), and the creator's editor grant — in one transaction. Assumes the caller
+ * has established the tenant DB context (BelongsToTenant auto-fills tenant_id; RLS is the backstop).
  */
 final class FormService
 {
+    public function __construct(private readonly ResourceGrantResolver $grants) {}
+
     public function create(Tenant $tenant, User $creator, string $title, ?string $description = null): Form
     {
         return DB::transaction(function () use ($tenant, $creator, $title, $description): Form {
@@ -45,14 +47,24 @@ final class FormService
 
             $form->forceFill(['draft_version_id' => $draft->id])->save();
 
-            // The creator gets an explicit editor collaborator row so `forms.edit.own` resolves for them
-            // (data-dictionary §2 design note; RBAC §8). Owner/Admin get tenant-wide `.any` without a row.
-            FormCollaborator::create([
-                'form_id' => $form->id,
-                'user_id' => $creator->id,
-                'capacity' => FormCollaboratorCapacity::Editor,
-                'added_by' => $creator->id,
+            // The creator gets an explicit editor grant so `forms.edit.own` resolves for them
+            // (data-dictionary §2 design note; RBAC §8). Owner/Admin get tenant-wide `.any` without one.
+            //
+            // associate() rather than a literal 'form' string: the alias comes from the registered morph
+            // map, so the type can never drift from what the RLS guard's CHECK constraint accepts.
+            $creatorId = (string) $creator->getKey();
+
+            $grant = new ResourceGrant([
+                'user_id' => $creatorId,
+                'capacity' => ResourceCapacity::Editor,
             ]);
+            $grant->scopeable()->associate($form);
+            $grant->granted_by = $creatorId;
+            $grant->save();
+
+            // The resolver memoizes per (user, tenant) for the request; this write must be visible to any
+            // policy check later in the SAME request (e.g. the redirect's Inertia render).
+            $this->grants->forget($creatorId);
 
             return $form->refresh();
         });

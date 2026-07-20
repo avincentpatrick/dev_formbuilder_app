@@ -2,14 +2,18 @@
 
 namespace App\Providers;
 
+use App\Enums\ResourceScopeable;
 use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
+use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Policies\AttachmentPolicy;
 use App\Policies\FormPolicy;
+use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Support\Guest\GuestShareTokenService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -42,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
 
             return new GuestShareTokenService($key, (int) config('guest.share_token.ttl'));
         });
+
+        // The per-instance authorization resolver (Increment G10a). `scoped`, NOT `singleton`: it memoizes
+        // a user's grants per (user, tenant) for the life of one request, and under Octane a singleton
+        // would carry that memo — an authorization cache — across requests.
+        $this->app->scoped(ResourceGrantResolver::class);
     }
 
     /**
@@ -62,15 +71,24 @@ class AppServiceProvider extends ServiceProvider
         // stored file behind the same per-form visibility the inbox uses. RLS already scopes to the tenant.
         Gate::policy(Attachment::class, AttachmentPolicy::class);
 
-        // Polymorphic morph map (Increment G6) — the repo's first `morphTo` (attachments.attachable). Store
-        // stable short aliases in `attachable_type` (data-dictionary §10) instead of fully-qualified class
-        // names, so a namespace move never rewrites persisted rows. NON-enforcing (morphMap, not
-        // enforceMorphMap): unmapped morphs (Spatie's role/permission pivots, Sanctum's tokenable) keep
-        // resolving by their stored FQCN — only the attachments aliases are registered here.
-        Relation::morphMap([
+        // The tenant's scoping hierarchy (Increment G10a). Authoring a node IS authoring authorization
+        // structure — a grant can be made against one — so it is Owner/Admin only, via `scopes.manage`.
+        Gate::policy(ScopeNode::class, ScopeNodePolicy::class);
+
+        // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
+        // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the
+        // *_type column (data-dictionary §10) instead of fully-qualified class names, so a namespace move
+        // never rewrites persisted rows. NON-enforcing (morphMap, not enforceMorphMap): unmapped morphs
+        // (Spatie's role/permission pivots, Sanctum's tokenable) keep resolving by their stored FQCN —
+        // enforcing it broke exactly those and cost 90 test failures.
+        //
+        // The G10a aliases come from ResourceScopeable rather than being spelled again here: that enum is
+        // also the source for the `scopeable_type` CHECK constraint and the RLS guard's per-alias EXISTS
+        // branches, and the three must never disagree.
+        Relation::morphMap(array_merge([
             'submission' => Submission::class,
             'form_field' => FormField::class,
-        ]);
+        ], ResourceScopeable::morphMap()));
 
         // The tenant-scoped API-key model (Increment E) — auto-fills tenant_id at mint so the strict RLS
         // WITH CHECK on personal_access_tokens passes, and scopes lookups to the current tenant.

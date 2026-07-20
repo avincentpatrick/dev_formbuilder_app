@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use Illuminate\Support\Collection;
 
 /**
@@ -18,6 +19,8 @@ use Illuminate\Support\Collection;
  */
 final class FormPresenter
 {
+    public function __construct(private readonly ResourceGrantResolver $grants) {}
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -28,6 +31,11 @@ final class FormPresenter
             ->where('status', '!=', FormStatus::Archived->value)
             ->orderByDesc('updated_at')
             ->get();
+
+        // Resolve every scope node on this page in ONE query before the per-row `can()` checks below
+        // start asking "does this user hold a grant here" (G10a). Without it each form with a node costs
+        // an extra lookup per policy call — five per row — turning the list into an N+1.
+        $this->grants->primeNodePaths($forms);
 
         return array_values($forms->map(fn (Form $form): array => $this->present($form, $user))->all());
     }

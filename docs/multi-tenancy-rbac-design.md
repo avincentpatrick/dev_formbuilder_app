@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0 — written against the approved architecture plan (§4, Documentation Artifact #9) and the already-ratified `docs/adr/0002-multi-tenancy-shared-db-rls.md`, before any migration is written.
-**Scope:** The tables `docs/data-dictionary.md` explicitly excludes as "belonging to the Multi-Tenancy & RBAC Design Doc" — `users`, `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions` — plus `tenant_users` (tenant membership/invites) and `form_collaborators` (per-form access), both new tables introduced by this document. It also formalizes the role catalog that `docs/architecture/technical-architecture.md` deferred here ("Tenant Admin is a role family, not a single role... fine-grained role definitions belong to the Multi-Tenancy & RBAC Design Doc") and operationalizes ADR-0002's enforcement table into an actionable checklist.
+**Scope:** The tables `docs/data-dictionary.md` explicitly excludes as "belonging to the Multi-Tenancy & RBAC Design Doc" — `users`, `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions` — plus `tenant_users` (tenant membership/invites) and, since Increment G10a, `resource_grants` + `scope_nodes` (per-resource access scoping, which replaced the original `form_collaborators`) — all introduced by this document. It also formalizes the role catalog that `docs/architecture/technical-architecture.md` deferred here ("Tenant Admin is a role family, not a single role... fine-grained role definitions belong to the Multi-Tenancy & RBAC Design Doc") and operationalizes ADR-0002's enforcement table into an actionable checklist.
 
 ---
 
@@ -39,7 +39,7 @@ A **fixed, platform-defined catalog of five roles** — tenants cannot define cu
 | Role | Grounded in | Summary |
 |---|---|---|
 | **Owner** | `tenants.owner_user_id` (Data Dictionary §1: "the account's primary owner/billing contact"); PRD's repeated "Owner/Admin" pairing | Everything Admin can do, **plus**: transfer ownership to another tenant member, delete/offboard the tenant, manage the primary billing relationship, and cannot be removed by an Admin. Exactly one active Owner per tenant at any time — enforced at the application layer (see §7's transfer-of-ownership note), not a database constraint, mirroring how `docs/data-dictionary.md` §4 enforces `min_instances <= max_instances` at the app layer rather than via `CHECK`. |
-| **Admin** | PRD §2.3 (the Tenant/Platform Administrator persona): "inviting/removing users, assigning roles, managing billing/plan tier"; PRD Feature #10: "tenant Owners/Admins" manage App Settings | Day-to-day tenant administration: invite/remove members, assign roles (but never grant/revoke Owner), manage Settings (Feature #10), manage webhooks, view the org-wide dashboard, view the Audit Log (PRD: *"visible to Owner/Admin roles"* — this is the literal source for restricting §5's `audit_log.view` permission to exactly these two roles). Tenant-wide access to every form, bypassing the `form_collaborators` scoping in §8. |
+| **Admin** | PRD §2.3 (the Tenant/Platform Administrator persona): "inviting/removing users, assigning roles, managing billing/plan tier"; PRD Feature #10: "tenant Owners/Admins" manage App Settings | Day-to-day tenant administration: invite/remove members, assign roles (but never grant/revoke Owner), manage Settings (Feature #10), manage webhooks, view the org-wide dashboard, view the Audit Log (PRD: *"visible to Owner/Admin roles"* — this is the literal source for restricting §5's `audit_log.view` permission to exactly these two roles). Tenant-wide access to every form, bypassing the `resource_grants` scoping in §8. |
 | **Form Editor** *(a.k.a. Form Owner/Builder in PRD prose)* | PRD's dashboard section: *"Form Owner/Editor view shows: submissions over time for that form..."*; PRD Feature #8 (the core builder) | Build/edit/publish forms **they are a collaborator on** (§8), manage that form's field library usage, manual-encode submissions against forms they collaborate on, view that form's dashboard. No user/role/settings/billing/webhook access, and no access to forms they are not a collaborator on. |
 | **Reviewer** *(a.k.a. Validator in PRD prose)* | `docs/data-dictionary.md` §7 (`submissions.validated_by`): *"reviewer who moved status to approved/returned"*; §7's `remarks` column: *"Internal reviewer notes"* | Review submissions (approve/return, write `remarks`) **on forms they are a collaborator on** (§8), and — per the §5 matrix — may also manual-encode (`submissions.create`) and export (`submissions.export`) submissions on those same forms, plus view that form's dashboard. Cannot edit form structure, cannot manage users/settings. |
 | **Viewer** | Not explicitly named anywhere in the PRD — a genuinely new addition, confirmed with the user (see this doc's originating discussion) rather than textually derived like the other four. | Read-only: org-wide dashboard, per-form dashboards, submission lists/detail. No edit, no review, no export, and — per PRD's explicit Owner/Admin-only restriction — **no Audit Log access**. |
@@ -74,9 +74,9 @@ A **fixed, platform-defined catalog of five roles** — tenants cannot define cu
 
 **Permission-string catalog** (each a `permissions.name` row, dot-namespaced by domain):
 
-`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`
+`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`, `scopes.manage`
 
-The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Owner/Admin) and per-form collaborator-scoped access (Form Editor/Reviewer) coexist as two distinct, independently grantable permissions rather than one permission with an implicit, code-only scoping rule — `.any` is a pure Spatie role check; `.own` additionally requires the Policy-layer `form_collaborators` lookup described in §8.
+The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Owner/Admin) and per-form collaborator-scoped access (Form Editor/Reviewer) coexist as two distinct, independently grantable permissions rather than one permission with an implicit, code-only scoping rule — `.any` is a pure Spatie role check; `.own` additionally requires the Policy-layer grant lookup described in §8 (`resource_grants`, resolved through `ResourceGrantResolver`).
 
 | Permission | Owner | Admin | Form Editor | Reviewer | Viewer |
 |---|:---:|:---:|:---:|:---:|:---:|
@@ -107,7 +107,17 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `audit_log.view` | ✓ | ✓ | | | |
 | `feedback.submit` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `feedback.view` | ✓ | ✓ | | | |
+| `scopes.manage` *(G10a — author the tenant's `scope_nodes` hierarchy)* | ✓ | ✓ | | | |
 
+> **Design Note (G10a)**: `scopes.manage` is the 28th permission, and is deliberately Owner/Admin only
+> for the same reason as `forms.collaborators.manage` below — a `scope_nodes` node is something a grant
+> can be made *against*, so authoring the hierarchy is authoring authorization structure. It is a new
+> permission rather than a reuse of `tenant.settings.manage` specifically because
+> `ApiAbilities::ABILITY_TO_PERMISSION` maps the `manage:settings` token ability onto that permission:
+> reusing it would retroactively hand every already-minted settings token the authority to author the
+> authorization hierarchy the moment G10b ships a write surface. No API ability maps to `scopes.manage`
+> yet; G10b owns that decision.
+>
 > **Design Note**: `forms.collaborators.manage` is deliberately restricted to Owner/Admin only — **not** delegable to a form's existing editors — specifically to prevent a Form Editor from adding themselves or others to additional forms they weren't granted access to by an administrator, i.e., a straightforward privilege-escalation vector that would otherwise exist if collaborator management were self-service.
 
 ---
@@ -186,36 +196,107 @@ Unique constraint: `(tenant_id, user_id)` — a person has at most one membershi
 
 ---
 
-## 8. `form_collaborators` Table — Per-Form Access Scoping
+## 8. `resource_grants` + `scope_nodes` — Per-Resource Access Scoping
 
-This table is what makes the **Form Editor** and **Reviewer** roles real for any specific form. Holding the Form Editor role at the tenant level (via `model_has_roles`) grants **no** access to any particular form by itself — it is a capability class ("this person is allowed to be assigned as an editor somewhere"), not a blanket grant. Owner and Admin bypass this table entirely (`forms.edit.any` / `submissions.review.any` are pure tenant-wide Spatie role checks); Form Editor/Reviewer access is always resolved through a Policy-layer lookup against this table.
+> **Increment G10a** generalized this section. It previously specified a single-purpose
+> `form_collaborators` table; its closing paragraph nominated that table's two-layer composition as
+> "the general pattern for any future resource that needs per-instance scoping beyond the tenant
+> level", and G10a made that literal. `form_collaborators` was backfilled into `resource_grants` and
+> dropped. The authorization SEMANTICS below are unchanged for the direct-per-form case.
+
+These tables are what make the **Form Editor** and **Reviewer** roles real for any specific form. Holding the Form Editor role at the tenant level (via `model_has_roles`) grants **no** access to any particular form by itself — it is a capability class ("this person is allowed to be assigned as an editor somewhere"), not a blanket grant. Owner and Admin bypass this table entirely (`forms.edit.any` / `submissions.review.any` are pure tenant-wide Spatie role checks); Form Editor/Reviewer access is always resolved through a Policy-layer lookup against this table.
+
+### 8.1 `resource_grants`
 
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
-| `tenant_id` | `uuid` | No | — | No | FK `tenants.id`; denormalized for RLS, per the Data Dictionary's stated convention for every tenant-scoped table. |
-| `form_id` | `uuid` | No | — | No | FK `forms.id`, `ON DELETE CASCADE`. |
+| `tenant_id` | `uuid` | No | — | No | FK `tenants.id`; denormalized for RLS. |
+| `scopeable_type` | `varchar(30)` — PHP enum: `ResourceScopeable` | No | — | No | Morph-map alias: `form` or `scope_node`. Pinned by a DB CHECK generated from the enum, so the RLS guard's per-alias branch set is provably exhaustive. |
+| `scopeable_id` | `uuid` | No | — | No | Polymorphic target — **no DB foreign key** (the target table varies by type). Unlike `attachments`, this is an authorization input, so the missing FK is closed at the database by a dedicated policy shape — see the RLS note below. |
 | `user_id` | `uuid` | No | — | No | FK `users.id`. |
-| `capacity` | `varchar(10)` — PHP enum: `FormCollaboratorCapacity` | No | — | No | `editor` or `reviewer` — which of the two per-form permissions (`forms.edit.own` / `submissions.review.own`) this row grants. |
-| `added_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. The Owner/Admin who granted this access (per §5's restriction that only they can). |
-| `created_at` | `timestamptz` | No | `now()` | No | — |
-| `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `capacity` | `varchar(20)` — PHP enum: `ResourceCapacity` | No | — | No | `editor` or `reviewer` — which per-resource permission (`forms.edit.own` / `submissions.review.own`) this row grants. |
+| `includes_descendants` | `boolean` | No | `false` | No | Meaningful only for a `scope_node` target (a CHECK forbids `true` on a form). When set, the grant reaches every form under that node's subtree. Default-off keeps each grant's blast radius legible from the row itself rather than inferred from tree position. |
+| `granted_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. The Owner/Admin who granted this access (per §5's restriction that only they can). Was `added_by`. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
 
-Unique constraint: `(form_id, user_id)` — a person holds exactly one capacity on a given form at a time (editor *or* reviewer, not simultaneously both; granting the other capacity updates the existing row rather than inserting a second one).
+Unique constraint: `(tenant_id, scopeable_type, scopeable_id, user_id)` — a person holds exactly one capacity on a given target at a time (editor *or* reviewer, never both). `capacity` is deliberately **not** in the key, so granting the other capacity UPDATES the existing row; were it in the key, a demotion from editor to reviewer would insert a second row and silently leave edit rights standing.
 
-**Authorization composition** (how §5's `.any`/`.own` split is actually enforced): a `FormPolicy::update($user, $form)` check is, conceptually:
+Hard deletes only, matching the table it replaces: revoke means gone. There is no `deleted_at`.
+
+> **RLS note — why this table does not use the plain strict shape.** A polymorphic column carries no
+> foreign key, so under `withTenantIsolation('resource_grants')` an INSERT bearing the attacker's own
+> `tenant_id` and another tenant's `form_id` is **accepted by PostgreSQL**. For `attachments` (the other
+> morph in this schema) that would merely misfile a row; here the row is an authorization decision input,
+> so the same gap is a cross-tenant privilege grant. `TenantIsolation::resourceGrantGuard` therefore adds
+> one same-tenant `EXISTS` branch per registered alias to the INSERT/UPDATE `WITH CHECK`. SELECT and
+> DELETE stay tenant-only, so a grant orphaned by a hard-deleted target stays readable and revokable.
+> It must be the **sole** write policy per command — Postgres OR-combines same-command permissive
+> policies, so additionally calling `withTenantIsolation()` would silently restore bare tenant equality.
+
+### 8.2 `scope_nodes`
+
+The tenant's own hierarchy — the generic successor to the legacy PSGC/catchment-area model, carrying
+**zero platform semantics**: `name`, `code` and `node_type` are the tenant's own labels, which the
+platform stores and displays but never interprets or switches on (PRD §7). A tenant needing Philippine
+geography, clinical-trial sites, or sales territories models all three identically.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK `tenants.id`. |
+| `parent_id` | `uuid` | Yes | `NULL` | No | Self-reference. **Composite** FK `(tenant_id, parent_id)` → `(tenant_id, id)`, `ON DELETE CASCADE` — ADR-0002 §D5. A single-column FK would be unsafe: PostgreSQL runs referential actions *bypassing RLS*, so one tenant's delete could cascade into another tenant's rows. |
+| `name` | `varchar(150)` | No | — | No | Display label. |
+| `code` | `varchar(60)` | Yes | `NULL` | No | The tenant's own opaque code; unique per tenant, never interpreted. |
+| `node_type` | `varchar(60)` | Yes | `NULL` | No | The tenant's own level label (e.g. "region"). **Never switched on in PHP** — that is precisely the anti-pattern this table replaces. |
+| `path` | `varchar(512)` **`COLLATE "C"`** | No | — | No | Self-inclusive materialized path, `/{root}/…/{self}/`. Derived from `parent_id`; written only by `ScopeNodeService`, and excluded from the model's `$fillable` so no payload can graft a node onto another branch and inherit its grants. The collation is load-bearing: descendant resolution is a constant-prefix `LIKE`, which PostgreSQL compiles into indexable range quals **only** under `COLLATE "C"`. |
+| `depth` | `smallint` | No | `0` | No | CHECK 0–12, which bounds `path` inside its `varchar(512)`. |
+| `position` | `integer` | No | `0` | No | Sibling ordering. |
+| `is_active` | `boolean` | No | `true` | No | Deactivation, used **instead of** a soft delete: a `deleted_at` the authorization resolver must remember to filter is a landmine. The resolver filters `is_active` in both of its query shapes, with tests on each. |
+| `created_by` | `uuid` | Yes | `NULL` | No | FK `users.id`. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+`forms` gains a nullable `scope_node_id` with the same composite-FK shape, plus a PostgreSQL 15+
+column-list `ON DELETE SET NULL (scope_node_id)` — a plain composite `SET NULL` would try to null
+`tenant_id` too and violate its NOT NULL constraint on every node delete.
+
+Authoring the hierarchy is gated on **`scopes.manage`** (§5), Owner/Admin only: a node is something a
+grant can be made against, so authoring the tree is authoring authorization structure.
+
+Re-parenting is rejected outright as of G10a. Moving a node must re-path its entire subtree, and an
+unlocked check-then-act cycle guard races into mutual ancestry that corrupts `path` irreversibly — and
+`path` is exactly what authorization reads. G10b ships `move()` with row locks and a concurrency test.
+
+### 8.3 Authorization composition
+
+How §5's `.any`/`.own` split is actually enforced. A `FormPolicy::update($user, $form)` check is:
+```php
+return $user->can('forms.edit.any')
+    || ($user->can('forms.edit.own')
+        && $this->grants->holds($user, $form, ResourceCapacity::Editor));
 ```
-return $user->hasPermissionTo('forms.edit.any')
-    || ($user->hasPermissionTo('forms.edit.own')
-        && FormCollaborator::where('form_id', $form->id)
-              ->where('user_id', $user->id)
-              ->where('capacity', 'editor')
-              ->exists());
-```
-`ReviewerPolicy`/submission-review checks follow the identical shape against `capacity = 'reviewer'` and `submissions.review.own`. This two-layer composition — a coarse Spatie permission ("can this role ever do this action, in principle") plus a fine Policy-layer resource check ("does this row grant it for *this specific* form") — is the general pattern for any future resource that needs per-instance scoping beyond the tenant level, not a one-off invented solely for forms.
+`$user->can()`, never `hasPermissionTo()` — the latter THROWS `PermissionDoesNotExist` when the catalog
+is unseeded, and policies are reached from `HandleInertiaRequests::share()` on every response, including
+off-tenant where no catalog or team is set.
+
+`ResourceGrantResolver` is the single place `resource_grants` is interpreted. It answers both the
+single-row question (`holds`) and the list-scoping one (`grantedFormIdsQuery`, used by
+`Submission::scopeVisibleTo`) from one loaded grant set, so a policy check and an inbox query cannot
+drift into "a row appears in the list but 403s when opened". A user reaches a form either by a direct
+grant naming it, or by a grant on the node it is assigned to — and, when that grant sets
+`includes_descendants`, by a grant on any ancestor of that node.
+
+Resolution runs **downward from the grant** (`scope_nodes.path LIKE :granted_path || '%'`), never upward
+from the form with a leading-wildcard substring: a leading `%` is unindexable by any btree, and this
+predicate sits inside the submissions inbox query. Cost is bounded by the user's *grant count*, never by
+descendant count — no descendant id set is ever materialized (PostgreSQL caps bind parameters at 65535,
+and a region-level subtree in a PSGC-shaped tree is ~44,000 nodes).
+`SubmissionPolicy`'s review check follows the identical shape against `capacity = 'reviewer'` and `submissions.review.own`. This two-layer composition — a coarse Spatie permission ("can this role ever do this action, in principle") plus a fine Policy-layer resource check ("does a grant cover *this specific* resource") — **is** the general pattern for per-instance scoping beyond the tenant level. Increment G10a made it literal: adding a third scopeable type is one `ResourceScopeable` case plus one migration, never a `switch`.
+
+> **One deliberate semantic change in G10a.** `SubmissionPolicy::create` (manual encoding) now requires **editor** capacity, where it previously accepted either. Encoding is an authoring act, and once a grant can name a subtree, a reviewer grant on an interior node would otherwise confer write access to every form beneath it.
 
 > **Design Note — relationship to `forms.owner_user_id`**
-> `docs/data-dictionary.md` §2 already defines `forms.owner_user_id` as "the form's business owner (dashboard scoping)." That column is retained as-is and continues to mean **attribution** — whose name shows as the form's primary point of contact, and the default assignee dashboard-scoping falls back to — but it is no longer the sole gate on who may edit the form. A form's creator is expected to also receive a `form_collaborators` row with `capacity = 'editor'` at creation time (so the common case of "I built it, I can edit it" keeps working without extra clicks), but that is now an ordinary collaborator row like any other, not a special-cased check against `owner_user_id` in the Policy layer.
+> `docs/data-dictionary.md` §2 already defines `forms.owner_user_id` as "the form's business owner (dashboard scoping)." That column is retained as-is and continues to mean **attribution** — whose name shows as the form's primary point of contact, and the default assignee dashboard-scoping falls back to — but it is no longer the sole gate on who may edit the form. A form's creator is expected to also receive a `resource_grants` row targeting that form with `capacity = 'editor'` at creation time (so the common case of "I built it, I can edit it" keeps working without extra clicks), but that is now an ordinary grant like any other, not a special-cased check against `owner_user_id` in the Policy layer.
 
 ---
 
@@ -252,7 +333,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 - [ ] `SET LOCAL app.current_tenant_id` issued (ADR-0002 §D3 session layer).
 - [ ] `SET LOCAL app.current_user_id` issued for authenticated requests (unset/NULL for guests) — **required** by the `users` (§6) and `user_ui_preferences` (ADR-0002 §D2) RLS policies, which key on it rather than `tenant_id`. Without it those tables fail closed and a logged-in user cannot read their own row or theme preference.
 - [ ] **Spatie's current team set** (`setPermissionsTeamId($tenantId)`, §2) — the RBAC-specific layer this document adds to ADR-0002's table. A request that establishes tenant context for isolation but forgets to also set the permissions team will fail every `hasRole()`/`hasPermissionTo()` check silently (Spatie simply finds no roles for the "no team" context) rather than leaking — fail-closed, but worth an explicit check since a silently-broken authorization check can look identical to "user genuinely has no permissions" during testing.
-- [ ] Any endpoint touching a per-form resource resolves the Policy-layer `form_collaborators` check (§8) in addition to the tenant-wide Spatie permission — **the other RBAC-specific layer this document adds**. An endpoint that checks only `hasPermissionTo('forms.edit.own')` without also checking the collaborator row would incorrectly grant every Form Editor access to every form in the tenant.
+- [ ] Any endpoint touching a per-form resource resolves the Policy-layer grant check (§8) in addition to the tenant-wide Spatie permission — **the other RBAC-specific layer this document adds**. Go through `ResourceGrantResolver`, never a hand-rolled `resource_grants` query: it is what keeps a single-row policy check and a list-scoping query in agreement, and it alone knows that a grant may name a `scope_nodes` subtree rather than the form itself. An endpoint that checks only `forms.edit.own` without the grant lookup would incorrectly grant every Form Editor access to every form in the tenant.
 
 **Every new queued job touching tenant-scoped or RBAC-scoped data:**
 - [ ] `tenant_id` serialized into the job payload (ADR-0002 §D3 jobs layer).
@@ -288,10 +369,17 @@ tenant_users.invited_role_id           -> roles.id                       (nullab
 tenant_users.invited_by                -> users.id                       (nullable)
 tenant_users.removed_by                -> users.id                       (nullable)
 
-form_collaborators.tenant_id           -> tenants.id
-form_collaborators.form_id             -> forms.id
-form_collaborators.user_id             -> users.id
-form_collaborators.added_by            -> users.id                       (nullable)
+resource_grants.tenant_id              -> tenants.id
+resource_grants.scopeable_id           -> forms.id | scope_nodes.id   (polymorphic; NO db-level FK,
+                                                                       guarded by RLS — see §8.1)
+resource_grants.user_id                -> users.id
+resource_grants.granted_by             -> users.id                    (nullable)
+
+scope_nodes.tenant_id                  -> tenants.id
+scope_nodes.(tenant_id, parent_id)     -> scope_nodes.(tenant_id, id) (nullable; COMPOSITE, ADR-0002 §D5)
+scope_nodes.created_by                 -> users.id                    (nullable)
+
+forms.(tenant_id, scope_node_id)       -> scope_nodes.(tenant_id, id) (nullable; COMPOSITE)
 
 roles.tenant_id                        -> tenants.id                     (nullable — always NULL, global catalog)
 permissions.tenant_id                  -> tenants.id                     (nullable — always NULL, global catalog)

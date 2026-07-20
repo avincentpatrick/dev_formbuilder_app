@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Enums\FormCollaboratorCapacity;
 use App\Enums\FormVersionStatus;
-use App\Models\FormCollaborator;
+use App\Enums\ResourceCapacity;
+use App\Enums\ResourceScopeable;
 use App\Models\FormField;
 use App\Models\FormTemplate;
 use App\Models\FormVersion;
+use App\Models\ResourceGrant;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\TemplateService;
@@ -69,8 +70,12 @@ it('creates a new draft form with an editor collaborator and materialized fields
 
     expect(FormField::query()->where('form_version_id', $draft->id)->count())->toBe(2);
 
-    expect(FormCollaborator::query()->where('form_id', $form->id)->where('user_id', $this->user->id)
-        ->where('capacity', FormCollaboratorCapacity::Editor)->exists())->toBeTrue();
+    // Instantiation delegates to FormService::create, so it inherits the G10a grant write for free.
+    expect(ResourceGrant::query()
+        ->where('scopeable_type', ResourceScopeable::Form->value)
+        ->where('scopeable_id', $form->id)
+        ->where('user_id', $this->user->id)
+        ->where('capacity', ResourceCapacity::Editor)->exists())->toBeTrue();
 });
 
 it('clones (never live-references) — editing the new form leaves the template untouched', function (): void {

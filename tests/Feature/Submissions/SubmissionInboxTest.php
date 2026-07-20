@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\FormCollaboratorCapacity;
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\Submission;
 use App\Models\User;
@@ -104,7 +104,7 @@ it('lets a Reviewer see submissions for a form they review but not others', func
     $reviewer = User::factory()->create();
     enterTenant($tenant->id, $reviewer->id);
     makeActiveMember($reviewer, 'reviewer');
-    makeCollaborator($reviewed, $reviewer, FormCollaboratorCapacity::Reviewer);
+    makeCollaborator($reviewed, $reviewer, ResourceCapacity::Reviewer);
 
     $this->actingAs($reviewer)
         ->get('http://acme.meridian.test/submissions')

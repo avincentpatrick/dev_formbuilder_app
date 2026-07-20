@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Per-form access scoping (multi-tenancy-rbac-design.md §8), deferred from Increment B2c to here since
  * it FKs `forms`. One row grants a Form Editor/Reviewer the per-form `.own` capability for a specific
- * form; Owner/Admin get tenant-wide `.any` without a row. Strictly tenant-scoped → strict RLS. The
- * FormPolicy composition that reads this table lands in D2; D1 lands the table + isolation only.
+ * form; Owner/Admin get tenant-wide `.any` without a row. Strictly tenant-scoped → strict RLS.
+ *
+ * RETIRED IN INCREMENT G10a — generalized into the polymorphic `resource_grants`, which scopes to a form
+ * OR a `scope_nodes` hierarchy node. This file is deliberately KEPT rather than deleted: `migrate:fresh`
+ * replays every migration in order, and the G10a backfill selects from this table. On a fresh database
+ * the table is created here and dropped again five migrations later.
  */
 return new class extends Migration
 {
@@ -21,7 +25,7 @@ return new class extends Migration
             $table->foreignUuid('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignUuid('form_id')->constrained('forms')->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('capacity', 10); // FormCollaboratorCapacity enum: editor | reviewer
+            $table->string('capacity', 10); // editor | reviewer (was the FormCollaboratorCapacity enum)
             $table->foreignUuid('added_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestampsTz();
 

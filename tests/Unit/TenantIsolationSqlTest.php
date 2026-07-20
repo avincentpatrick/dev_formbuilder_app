@@ -218,3 +218,110 @@ it('rejects an unsupported command in the bypass shape', function (): void {
     expect(fn () => TenantIsolation::superAdminBypassSql('users', 'meridian_superadmin', ['TRUNCATE']))
         ->toThrow(InvalidArgumentException::class);
 });
+
+// Increment G10a — the polymorphic-grant guard for `resource_grants`. A morph carries no database
+// foreign key, so the plain strict shape would ACCEPT a grant pointing at another tenant's form. Since
+// that row is an authorization decision input, these assertions are load-bearing security tests, not
+// formatting checks.
+
+/** The alias => table map the real migration passes, mirrored here so the tests stay independent of it. */
+function grantTargets(): array
+{
+    return ['form' => 'forms', 'scope_node' => 'scope_nodes'];
+}
+
+it('emits ENABLE and FORCE for the resource-grant guard shape', function (): void {
+    $sql = joined(TenantIsolation::resourceGrantGuardSql('resource_grants', grantTargets()));
+
+    expect($sql)
+        ->toContain('ALTER TABLE resource_grants ENABLE ROW LEVEL SECURITY;')
+        ->toContain('ALTER TABLE resource_grants FORCE ROW LEVEL SECURITY;');
+});
+
+it('guards every write with one same-tenant EXISTS branch per registered morph alias', function (): void {
+    $sql = joined(TenantIsolation::resourceGrantGuardSql('resource_grants', grantTargets()));
+
+    foreach (['forms', 'scope_nodes'] as $target) {
+        // Both halves matter: t.id anchors the target row, t.tenant_id proves it is OURS. Dropping the
+        // second is exactly the cross-tenant grant this shape exists to prevent.
+        expect($sql)->toContain(
+            "EXISTS (SELECT 1 FROM {$target} t WHERE t.id = resource_grants.scopeable_id "
+            .'AND t.tenant_id = resource_grants.tenant_id)'
+        );
+    }
+
+    expect($sql)
+        ->toContain("(scopeable_type = 'form' AND EXISTS")
+        ->toContain("(scopeable_type = 'scope_node' AND EXISTS");
+});
+
+it('applies the target guard to INSERT and UPDATE but never to SELECT or DELETE', function (): void {
+    $statements = TenantIsolation::resourceGrantGuardSql('resource_grants', grantTargets());
+
+    $find = function (string $command) use ($statements): string {
+        foreach ($statements as $statement) {
+            if (str_contains($statement, "FOR {$command} ")) {
+                return $statement;
+            }
+        }
+
+        return '';
+    };
+
+    // Writes are guarded …
+    expect($find('INSERT'))->toContain('EXISTS');
+    expect($find('UPDATE'))->toContain('EXISTS');
+
+    // … reads and revocations are NOT: an orphaned grant (its target hard-deleted) must stay readable,
+    // and therefore deletable. Guarding these would strand un-revokable rows.
+    expect($find('SELECT'))->not->toContain('EXISTS');
+    expect($find('DELETE'))->not->toContain('EXISTS');
+});
+
+it('emits exactly ONE policy per command so nothing OR-widens the write guard', function (): void {
+    $statements = TenantIsolation::resourceGrantGuardSql('resource_grants', grantTargets());
+
+    // Postgres OR-combines same-command PERMISSIVE policies. A second INSERT policy — e.g. from also
+    // calling withTenantIsolation() on this table — would silently restore bare tenant equality and
+    // still pass every other test here. This is the assertion that catches that.
+    foreach (['SELECT', 'INSERT', 'UPDATE', 'DELETE'] as $command) {
+        $matches = array_filter($statements, fn (string $s): bool => str_contains($s, "FOR {$command} "));
+        expect($matches)->toHaveCount(1, "expected exactly one {$command} policy");
+    }
+});
+
+it('keeps the UPDATE USING clause tenant-only while its WITH CHECK is guarded', function (): void {
+    $statements = TenantIsolation::resourceGrantGuardSql('resource_grants', grantTargets());
+    $update = '';
+
+    foreach ($statements as $statement) {
+        if (str_contains($statement, 'FOR UPDATE ')) {
+            $update = $statement;
+        }
+    }
+
+    [$using, $check] = explode('WITH CHECK', $update, 2);
+
+    // USING selects which rows may be updated (tenant-only, so a row whose target was deleted is still
+    // editable); WITH CHECK validates the RESULT, which is where the target must be proven same-tenant.
+    expect($using)->not->toContain('EXISTS');
+    expect($check)->toContain('EXISTS');
+});
+
+it('rejects an unsafe table, alias, or target table in the guard shape', function (): void {
+    expect(fn () => TenantIsolation::resourceGrantGuardSql('resource_grants; DROP TABLE tenants;--', grantTargets()))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => TenantIsolation::resourceGrantGuardSql('resource_grants', ["evil' OR 1=1--" => 'forms']))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => TenantIsolation::resourceGrantGuardSql('resource_grants', ['form' => 'forms; DROP TABLE x']))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+it('refuses to emit a guard with no morph targets', function (): void {
+    // An empty branch list would produce `tenant_id = ctx AND ()` — a syntax error at best, and at worst
+    // a shape someone "fixes" by dropping the parentheses, silently removing the guard entirely.
+    expect(fn () => TenantIsolation::resourceGrantGuardSql('resource_grants', []))
+        ->toThrow(InvalidArgumentException::class);
+});

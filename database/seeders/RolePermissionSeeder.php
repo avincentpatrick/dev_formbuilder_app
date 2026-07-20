@@ -12,7 +12,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Seeds the fixed, platform-defined RBAC catalog (multi-tenancy-rbac-design.md §3, §5): five roles and
- * twenty-seven permissions, plus the role×permission grant matrix. These are GLOBAL rows (tenant_id IS
+ * twenty-eight permissions (the 28th, `scopes.manage`, added in Increment G10a), plus the
+ * role×permission grant matrix. These are GLOBAL rows (tenant_id IS
  * NULL) shared by every tenant — the catalog is closed (no UI ever inserts a sixth role).
  *
  * Written on the `pgsql_privileged` (superuser) connection, exactly like every other platform-global
@@ -32,7 +33,14 @@ class RolePermissionSeeder extends Seeder
     /** The fixed 5-role catalog (§3). Stored as plain data, not a PHP enum (see §3 design note). */
     public const ROLES = ['owner', 'admin', 'form_editor', 'reviewer', 'viewer'];
 
-    /** The 27-permission catalog (§5), dot-namespaced by domain. */
+    /**
+     * The 28-permission catalog (§5), dot-namespaced by domain.
+     *
+     * `scopes.manage` is the Increment-G10a addition — authoring the tenant's scoping hierarchy. It is a
+     * genuinely new capability rather than a reuse of `tenant.settings.manage`: `ApiAbilities` maps the
+     * `manage:settings` token ability onto that permission, so reusing it would retroactively hand every
+     * already-minted settings token the authority to author authorization structure.
+     */
     public const PERMISSIONS = [
         'tenant.settings.manage', 'tenant.billing.manage', 'tenant.billing.view',
         'tenant.members.invite', 'tenant.members.remove', 'tenant.roles.assign',
@@ -45,12 +53,13 @@ class RolePermissionSeeder extends Seeder
         'dashboard.org.view', 'dashboard.form.view',
         'webhooks.manage', 'audit_log.view',
         'feedback.submit', 'feedback.view',
+        'scopes.manage',
     ];
 
     /**
      * The role → permission grant matrix (§5). `.own` permissions are held by Form Editor/Reviewer and
-     * additionally gated per-form by the Policy layer (form_collaborators, Increment D); `.any` are the
-     * tenant-wide Owner/Admin grants.
+     * additionally gated per-resource by the Policy layer (`resource_grants` since Increment G10a, which
+     * replaced `form_collaborators`); `.any` are the tenant-wide Owner/Admin grants.
      *
      * @var array<string, list<string>>
      */
@@ -61,7 +70,7 @@ class RolePermissionSeeder extends Seeder
             'tenant.members.invite', 'tenant.members.remove', 'tenant.roles.assign',
             'tenant.ownership.transfer',
             'forms.create', 'forms.edit.any', 'forms.publish.any', 'forms.delete',
-            'forms.collaborators.manage',
+            'forms.collaborators.manage', 'scopes.manage',
             'submissions.create', 'submissions.edit.any', 'submissions.review.any',
             'submissions.export', 'submissions.view',
             'dashboard.org.view', 'dashboard.form.view',
@@ -73,7 +82,7 @@ class RolePermissionSeeder extends Seeder
             'tenant.settings.manage', 'tenant.billing.view',
             'tenant.members.invite', 'tenant.members.remove', 'tenant.roles.assign',
             'forms.create', 'forms.edit.any', 'forms.publish.any', 'forms.delete',
-            'forms.collaborators.manage',
+            'forms.collaborators.manage', 'scopes.manage',
             'submissions.create', 'submissions.edit.any', 'submissions.review.any',
             'submissions.export', 'submissions.view',
             'dashboard.org.view', 'dashboard.form.view',

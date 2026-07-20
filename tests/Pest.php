@@ -2,23 +2,25 @@
 
 declare(strict_types=1);
 use App\Enums\FieldType;
-use App\Enums\FormCollaboratorCapacity;
 use App\Enums\FormVersionStatus;
 use App\Enums\RequiredMode;
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
-use App\Models\FormCollaborator;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use App\Models\ResourceGrant;
+use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\ExpressionLexer;
 use App\Services\Expressions\ExpressionParser;
@@ -26,6 +28,7 @@ use App\Services\Expressions\FunctionRegistry;
 use App\Services\Expressions\StructuredRuleLowering;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
@@ -274,8 +277,47 @@ function seedInboxSubmission(Form $form, ?User $respondent, SubmissionStatus $st
     return $submission;
 }
 
-/** Add a per-form collaborator row (editor or reviewer capacity) for `.own`-scoped access. */
-function makeCollaborator(Form $form, User $user, FormCollaboratorCapacity $capacity): void
+/**
+ * Grant a user editor/reviewer capacity on one form directly (`.own`-scoped access).
+ *
+ * Keeps its pre-G10a name and arity deliberately: its call sites across the suite are the regression
+ * gate proving the `resource_grants` rewiring is behaviour-identical for the direct-form case, and moving
+ * them would weaken that proof.
+ */
+function makeCollaborator(Form $form, User $user, ResourceCapacity $capacity): void
 {
-    FormCollaborator::create(['form_id' => $form->id, 'user_id' => $user->id, 'capacity' => $capacity]);
+    $grant = new ResourceGrant(['user_id' => $user->id, 'capacity' => $capacity]);
+    $grant->scopeable()->associate($form);
+    $grant->save();
+
+    app(ResourceGrantResolver::class)->forget($user->id);
+}
+
+/** Create a node in the tenant's scoping hierarchy, via the only writer of path/depth (G10a). */
+function makeScopeNode(?ScopeNode $parent = null, string $name = 'Region', array $attributes = []): ScopeNode
+{
+    return app(ScopeNodeService::class)->create($parent, $name, $attributes);
+}
+
+/**
+ * Grant a user capacity on a hierarchy NODE rather than a form. `$descendants` decides whether it covers
+ * only forms assigned to this node or the whole subtree beneath it.
+ */
+function grantOnNode(
+    ScopeNode $node,
+    User $user,
+    ResourceCapacity $capacity,
+    bool $descendants = false,
+): ResourceGrant {
+    $grant = new ResourceGrant([
+        'user_id' => $user->id,
+        'capacity' => $capacity,
+        'includes_descendants' => $descendants,
+    ]);
+    $grant->scopeable()->associate($node);
+    $grant->save();
+
+    app(ResourceGrantResolver::class)->forget($user->id);
+
+    return $grant;
 }

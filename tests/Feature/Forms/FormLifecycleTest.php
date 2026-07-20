@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\ComparisonOperator;
 use App\Enums\FieldType;
-use App\Enums\FormCollaboratorCapacity;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
+use App\Enums\ResourceCapacity;
+use App\Enums\ResourceScopeable;
 use App\Enums\ValidationRuleType;
-use App\Models\FormCollaborator;
 use App\Models\FormFieldValidation;
+use App\Models\ResourceGrant;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
@@ -30,7 +31,7 @@ beforeEach(function (): void {
     $this->restorer = app(RestoreService::class);
 });
 
-it('creates a form with an initial v1 draft and an editor collaborator for the creator', function (): void {
+it('creates a form with an initial v1 draft and an editor grant for the creator', function (): void {
     $form = $this->forms->create($this->tenant, $this->user, 'Household Survey');
 
     expect($form->status)->toBe(FormStatus::Draft)
@@ -43,11 +44,18 @@ it('creates a form with an initial v1 draft and an editor collaborator for the c
         ->and($draft->status)->toBe(FormVersionStatus::Draft)
         ->and($draft->schema_snapshot)->toBe([]);
 
-    expect(FormCollaborator::query()
-        ->where('form_id', $form->id)
+    // The morph type must be the SHORT ALIAS from the morph map, never a FQCN — a stored class name
+    // would break the moment the model moves namespace, and would not satisfy the RLS guard's CHECK.
+    $grant = ResourceGrant::query()
+        ->where('scopeable_type', ResourceScopeable::Form->value)
+        ->where('scopeable_id', $form->id)
         ->where('user_id', $this->user->id)
-        ->where('capacity', FormCollaboratorCapacity::Editor)
-        ->exists())->toBeTrue();
+        ->first();
+
+    expect($grant)->not->toBeNull()
+        ->and($grant->capacity)->toBe(ResourceCapacity::Editor)
+        ->and($grant->granted_by)->toBe($this->user->id)
+        ->and($grant->includes_descendants)->toBeFalse();
 });
 
 it('publishes the draft, points the form at it, and clones a fresh draft forward', function (): void {

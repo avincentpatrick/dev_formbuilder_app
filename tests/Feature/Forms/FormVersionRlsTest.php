@@ -130,7 +130,14 @@ it('runs as a non-superuser role with RLS enabled AND forced on every versioning
     expect((int) $role->is_super)->toBe(0);
     expect((int) $role->bypass_rls)->toBe(0);
 
-    foreach (['forms', 'form_versions', 'form_sections', 'form_fields', 'form_field_validations', 'form_collaborators'] as $table) {
+    $tables = [
+        'forms', 'form_versions', 'form_sections', 'form_fields', 'form_field_validations',
+        // G10a: `form_collaborators` retired in favour of these two. Listing them here means a future
+        // migration that drops FORCE on either fails this test rather than silently widening access.
+        'resource_grants', 'scope_nodes',
+    ];
+
+    foreach ($tables as $table) {
         $meta = DB::selectOne(
             'select relrowsecurity::int as enabled, relforcerowsecurity::int as forced from pg_class where relname = ?',
             [$table]

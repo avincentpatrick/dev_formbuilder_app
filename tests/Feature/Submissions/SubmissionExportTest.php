@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
-use App\Enums\FormCollaboratorCapacity;
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\FormVersion;
 use App\Models\Submission;
@@ -197,7 +197,7 @@ it('forbids a Viewer from exporting and confines an Editor to their own forms', 
     $editor = User::factory()->create();
     enterTenant($tenant->id, $editor->id);
     makeActiveMember($editor, 'form_editor');
-    makeCollaborator($mine, $editor, FormCollaboratorCapacity::Editor);
+    makeCollaborator($mine, $editor, ResourceCapacity::Editor);
 
     $this->actingAs($editor)
         ->get("http://acme.meridian.test/forms/{$mine->id}/submissions/export?format=csv")

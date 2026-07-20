@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\FormCollaboratorCapacity;
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\Submission;
 use App\Models\User;
@@ -141,7 +141,7 @@ it('lets a Reviewer review a form they collaborate on but forbids others', funct
     $reviewer = User::factory()->create();
     enterTenant($tenant->id, $reviewer->id);
     makeActiveMember($reviewer, 'reviewer');
-    makeCollaborator($mine, $reviewer, FormCollaboratorCapacity::Reviewer);
+    makeCollaborator($mine, $reviewer, ResourceCapacity::Reviewer);
 
     $this->actingAs($reviewer)
         ->patch("http://acme.meridian.test/submissions/{$mineSub->id}/review", ['action' => 'approve'])
@@ -165,7 +165,7 @@ it('forbids a Form Editor and a Viewer from reviewing', function (): void {
         enterTenant($tenant->id, $user->id);
         makeActiveMember($user, $role);
         if ($role === 'form_editor') {
-            makeCollaborator($form, $user, FormCollaboratorCapacity::Editor); // even collaborating, no review perm
+            makeCollaborator($form, $user, ResourceCapacity::Editor); // even collaborating, no review perm
         }
 
         $this->actingAs($user)

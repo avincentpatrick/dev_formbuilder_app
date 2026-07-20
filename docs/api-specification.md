@@ -90,13 +90,20 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `export:submissions` | `submissions.export` |
 | `manage:webhooks` | `webhooks.manage` |
 | `manage:settings` | `tenant.settings.manage` |
+| `manage:scopes` *(G10b)* | `scopes.manage` / `forms.collaborators.manage` |
 
-> **Increment G10a note.** The 28th permission, `scopes.manage` (author the tenant's `scope_nodes`
-> hierarchy), maps to **no** token ability, and neither does `forms.collaborators.manage`. That is
-> deliberate: `scopes.manage` was added rather than folded into `tenant.settings.manage` precisely so
-> that already-minted `manage:settings` tokens do NOT retroactively gain authority to author
-> authorization structure. G10b, which ships the first write surface for grants and nodes, owns the
-> decision of which ability (if any) should map to them.
+> **Increment G10b note.** `manage:scopes` covers both authoring the `scope_nodes` hierarchy and granting
+> access on it. It is a **new** ability rather than a reuse of `manage:settings`, which preserves the
+> property G10a added `scopes.manage` for in the first place: no already-minted token gains authority over
+> authorization structure, because none was minted carrying this ability.
+>
+> One ability rather than two, with one safeguard that has to stay true. The map's semantics are "holding
+> **any** listed permission grants the ability", so on its own `manage:scopes` would let a
+> `scopes.manage`-only principal mint a token that reaches the grant routes. It is safe because the
+> ability is a token **scope**, never the authorization: every `/scopes` and `/resource-grants` route also
+> carries its own `can:` policy gate, re-checked against the acting user's real permissions, and
+> `POST /resource-grants` adds the `grantCapacity` escalation check on top. **A route added to this group
+> without a `can:` gate would break that argument** — see `ApiAbilities::MANAGE_SCOPES`.
 | `read:audit_log` | `audit_log.view` |
 
 An API key (personal access token) is issued with an explicit subset of these abilities, independent of — but never exceeding — the issuing user's own RBAC permissions (a key can be narrower than its issuer's own access, never broader; enforced by intersecting the requested ability set against the issuer's actual permissions at token-creation time).

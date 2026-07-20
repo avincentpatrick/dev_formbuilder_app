@@ -74,8 +74,11 @@ return new class extends Migration
 
         // Depth cap bounds `path` at 13 × 37 = 481 bytes, inside the varchar(512) above.
         DB::statement('ALTER TABLE scope_nodes ADD CONSTRAINT scope_nodes_depth_max CHECK (depth BETWEEN 0 AND 12)');
-        // A one-node cycle is the only cycle expressible at INSERT time (a new node has no descendants);
-        // longer cycles are impossible because re-parenting is rejected outright in G10a (ScopeNode::booted).
+        // A one-node cycle is the only cycle a CHECK can express — it cannot see the rest of the tree.
+        // Longer cycles are prevented in the application: ScopeNodeService::move() takes a tenant-wide
+        // advisory lock, re-reads both nodes FOR UPDATE, and rejects a target that is the node itself or
+        // one of its descendants (one prefix test, because `path` is self-inclusive). Until G10b shipped
+        // move(), re-parenting was rejected outright by ScopeNode::booted() and this was moot.
         DB::statement('ALTER TABLE scope_nodes ADD CONSTRAINT scope_nodes_no_self_parent CHECK (parent_id IS NULL OR parent_id <> id)');
 
         withTenantIsolation('scope_nodes');

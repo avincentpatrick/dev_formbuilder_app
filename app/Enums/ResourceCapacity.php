@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 use App\Models\ResourceGrant;
+use App\Policies\ResourceGrantPolicy;
 
 /**
  * What a {@see ResourceGrant} row grants its holder (multi-tenancy-rbac-design.md §8, Increment G10a).
@@ -26,5 +27,22 @@ enum ResourceCapacity: string
     public static function values(): array
     {
         return array_map(static fn (self $case): string => $case->value, self::cases());
+    }
+
+    /**
+     * The tenant-wide `.any` permission corresponding to what this capacity confers per-resource
+     * (Increment G10b). Lives here so the capacity → permission mapping stays in one place: the class
+     * docblock above already names the `.own` half, and the anti-amplification rule in
+     * {@see ResourceGrantPolicy} needs the `.any` half.
+     *
+     * Used to enforce "you cannot hand out an authority you do not hold yourself" — a grant activates the
+     * `.own` permission for its holder, so the granter must hold the `.any` counterpart.
+     */
+    public function anyPermission(): string
+    {
+        return match ($this) {
+            self::Editor => 'forms.edit.any',
+            self::Reviewer => 'submissions.review.any',
+        };
     }
 }

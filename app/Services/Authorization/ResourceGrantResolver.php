@@ -14,6 +14,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Policies\FormPolicy;
 use App\Policies\SubmissionPolicy;
+use App\Services\Scoping\ScopeNodeService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
@@ -177,6 +178,52 @@ final class ResourceGrantResolver
         foreach (array_keys($nodeIds) as $nodeId) {
             $this->formPaths[$nodeId] = $paths[$nodeId] ?? null;
         }
+    }
+
+    /**
+     * How many forms a grant on `$node` would actually reach — the G10b blast-radius preview, and the
+     * reason `includes_descendants` defaults to FALSE. `direct` is what a plain grant confers; `descendant`
+     * is the extra reach the checkbox buys.
+     *
+     * Lives here, on the single interpreter of `resource_grants`, rather than in the UI layer or a second
+     * query: a preview that disagrees with the resolver is worse than no preview, because it is the number
+     * an administrator makes the escalation decision on.
+     *
+     * Counted through the same `formScope()` (`withTrashed()`) the grant itself resolves through, so the
+     * figure equals what the grant confers rather than what the forms list happens to show.
+     *
+     * @return array{direct: int, descendant: int}
+     */
+    public function nodeReach(ScopeNode $node): array
+    {
+        // A grant on a deactivated node — or one anywhere under a deactivated branch — confers nothing.
+        // Reporting its raw form count would advertise access the resolver will refuse to honour.
+        if ($this->isUnderInactiveBranch($node->path)) {
+            return ['direct' => 0, 'descendant' => 0];
+        }
+
+        $inactive = $this->inactivePaths();
+        $prefix = self::escapeLike($node->path);
+
+        $descendant = $this->formScope()
+            ->whereExists(function (QueryBuilder $sub) use ($node, $prefix, $inactive): void {
+                $sub->selectRaw('1')
+                    ->from('scope_nodes')
+                    ->whereColumn('scope_nodes.id', 'forms.scope_node_id')
+                    ->where('scope_nodes.id', '!=', $node->getKey())
+                    ->where('scope_nodes.is_active', true)
+                    ->where('scope_nodes.path', 'like', $prefix.'%');
+
+                foreach ($inactive as $path) {
+                    $sub->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
+                }
+            })
+            ->count();
+
+        return [
+            'direct' => $this->formScope()->where('scope_node_id', $node->getKey())->count(),
+            'descendant' => $descendant,
+        ];
     }
 
     /** Drop memoized grants after a write. Pass null to clear every user. */
@@ -379,8 +426,14 @@ final class ResourceGrantResolver
         return Form::withTrashed();
     }
 
-    /** Escape a value used as a LIKE prefix so a `%` or `_` in a path cannot widen the match. */
-    private static function escapeLike(string $value): string
+    /**
+     * Escape a value used as a LIKE prefix so a `%` or `_` in a path cannot widen the match.
+     *
+     * Public since G10b: {@see ScopeNodeService} re-paths subtrees with the same
+     * constant-prefix LIKE and must escape it identically. Two copies of an authorization-critical
+     * escaping rule is how they drift.
+     */
+    public static function escapeLike(string $value): string
     {
         return addcslashes($value, '%_\\');
     }

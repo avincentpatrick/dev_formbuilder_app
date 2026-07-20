@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
+use App\Http\Controllers\Api\V1\ResourceGrantApiController;
+use App\Http\Controllers\Api\V1\ScopeNodeApiController;
 use App\Http\Controllers\Api\V1\SyncManifestController;
 use App\Http\Controllers\Api\V1\SyncSubmissionController;
 use App\Http\Controllers\Api\V1\TenantApiController;
@@ -18,6 +20,8 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Models\Form;
+use App\Models\ResourceGrant;
+use App\Models\ScopeNode;
 use App\Support\Api\ApiAbilities;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
@@ -135,6 +139,44 @@ Route::prefix('api/v1')
         Route::post('field-library', [FieldLibraryApiController::class, 'store'])
             ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
             ->name('field-library.store');
+
+        // Scoping hierarchy (Increment G10b / multi-tenancy-rbac-design.md §8) — the tenant's own node tree.
+        // Every route pairs `ability:manage:scopes` with a ScopeNodePolicy `can:` gate: the ability scopes the
+        // TOKEN, the policy re-checks the acting user's real permissions. `move` is a separate endpoint rather
+        // than part of PATCH because it is a locked, subtree-wide operation with its own refusals (cycle,
+        // depth cap). Static segments precede the {scopeNode} patterns. Regenerate openapi.json after adding.
+        Route::get('scopes', [ScopeNodeApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:viewAny,'.ScopeNode::class])
+            ->name('scopes.index');
+        Route::post('scopes', [ScopeNodeApiController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:create,'.ScopeNode::class])
+            ->name('scopes.store');
+        Route::get('scopes/{scopeNode}/impact', [ScopeNodeApiController::class, 'impact'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:view,scopeNode'])
+            ->name('scopes.impact');
+        Route::post('scopes/{scopeNode}/move', [ScopeNodeApiController::class, 'move'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:update,scopeNode'])
+            ->name('scopes.move');
+        Route::patch('scopes/{scopeNode}', [ScopeNodeApiController::class, 'update'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:update,scopeNode'])
+            ->name('scopes.update');
+        Route::delete('scopes/{scopeNode}', [ScopeNodeApiController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:delete,scopeNode'])
+            ->name('scopes.destroy');
+
+        // Access grants (Increment G10b / RBAC §8) — the write surface that makes the Reviewer role
+        // assignable, and the first consumer of `forms.collaborators.manage` since it was defined. `store`
+        // adds an in-controller `grantCapacity` authorize on top of the route gate: the no-self-grant and
+        // anti-amplification rules depend on the capacity and recipient, which middleware cannot bind.
+        Route::get('resource-grants', [ResourceGrantApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:viewAny,'.ResourceGrant::class])
+            ->name('resource-grants.index');
+        Route::post('resource-grants', [ResourceGrantApiController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:create,'.ResourceGrant::class])
+            ->name('resource-grants.store');
+        Route::delete('resource-grants/{resourceGrant}', [ResourceGrantApiController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:delete,resourceGrant'])
+            ->name('resource-grants.destroy');
 
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).

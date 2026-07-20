@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\FormStatus;
+use App\Enums\ResourceCapacity;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
@@ -28,6 +29,20 @@ final class FormPresenter
     {
         $forms = Form::query()
             ->with(['versions' => fn ($q) => $q->orderByDesc('version_number')])
+            // Scope to what the viewer can actually author (Increment G10b). Until now this returned every
+            // non-archived form in the tenant to anyone passing `viewAny`, with only the per-row `can`
+            // flags differing — so a Form Editor saw the titles and version history of forms they hold no
+            // grant on. Submissions always had a list twin (`Submission::scopeVisibleTo`); forms did not.
+            //
+            // Editor capacity, not the null "any capacity" default: this is the authoring list, so a bare
+            // reviewer grant should not surface a form here with every `can` flag false.
+            //
+            // Routed through the resolver rather than a hand-rolled grants query (RBAC review gate), which
+            // also means it inherits the fail-closed empty set — never an unconstrained query.
+            ->when(
+                ! $user->can('forms.edit.any'),
+                fn ($q) => $q->whereIn('id', $this->grants->grantedFormIdsQuery($user, ResourceCapacity::Editor)),
+            )
             ->where('status', '!=', FormStatus::Archived->value)
             ->orderByDesc('updated_at')
             ->get();

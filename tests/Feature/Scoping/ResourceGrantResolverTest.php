@@ -171,6 +171,46 @@ it('treats a grant on a DEACTIVATED node as granting nothing, on both sides', fu
     expect(reachable($form, ResourceCapacity::Editor))->toBeFalse();
 });
 
+it('cuts off a whole subtree when an INTERMEDIATE node is deactivated', function (): void {
+    // Found by the end-to-end walkthrough, not by the unit tests: deactivating a mid-tree node used to
+    // leave its descendants reachable, because is_active was only ever checked on the GRANTED node and
+    // the FORM's own node. That made is_active a control that LOOKS like it revokes a branch but does
+    // not — precisely the failure mode the no-`deleted_at` decision exists to prevent.
+    $root = makeScopeNode(name: 'Region I');
+    $province = makeScopeNode($root, 'Province A');
+    $city = makeScopeNode($province, 'City X');
+    $form = assignTo(unownedForm(), $city->id);
+
+    grantOnNode($root, $this->user, ResourceCapacity::Editor, descendants: true);
+    expect(reachable($form, ResourceCapacity::Editor))->toBeTrue();
+
+    // Neither the granted node (root) nor the form's node (city) changes — only the one in between.
+    DB::table('scope_nodes')->where('id', $province->id)->update(['is_active' => false]);
+    $this->resolver->forget();
+
+    expect(reachable($form, ResourceCapacity::Editor))->toBeFalse();
+
+    DB::table('scope_nodes')->where('id', $province->id)->update(['is_active' => true]);
+    $this->resolver->forget();
+    expect(reachable($form, ResourceCapacity::Editor))->toBeTrue();
+});
+
+it('leaves a sibling branch reachable when one branch is deactivated', function (): void {
+    // The other half of the rule: deactivation must cut off exactly one subtree, not the whole grant.
+    $root = makeScopeNode(name: 'Region I');
+    $left = makeScopeNode($root, 'Province A');
+    $right = makeScopeNode($root, 'Province B');
+    $leftForm = assignTo(unownedForm('Left'), $left->id);
+    $rightForm = assignTo(unownedForm('Right'), $right->id);
+
+    grantOnNode($root, $this->user, ResourceCapacity::Editor, descendants: true);
+    DB::table('scope_nodes')->where('id', $left->id)->update(['is_active' => false]);
+    $this->resolver->forget();
+
+    expect(reachable($leftForm, ResourceCapacity::Editor))->toBeFalse()
+        ->and(reachable($rightForm, ResourceCapacity::Editor))->toBeTrue();
+});
+
 it('stops resolving grants once the holder is no longer an active member', function (): void {
     // TenantMembershipService::remove() sets status = removed and never touches grants, so without the
     // membership join a removed member's grants survive and silently re-arm on re-invite.

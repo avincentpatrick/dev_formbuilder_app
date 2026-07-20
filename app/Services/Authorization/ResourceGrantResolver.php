@@ -52,6 +52,9 @@ final class ResourceGrantResolver
     /** @var array<string, ?string> form id => its node's path (null when unassigned or unreadable) */
     private array $formPaths = [];
 
+    /** @var array<string, list<string>> tenant id => paths of DEACTIVATED nodes (usually empty) */
+    private array $inactive = [];
+
     /** Does the user hold this capacity on this form — directly, or via its node? */
     public function holds(User $user, Form $form, ResourceCapacity $capacity): bool
     {
@@ -116,7 +119,9 @@ final class ResourceGrantResolver
                     return;
                 }
 
-                $query->orWhereExists(function (QueryBuilder $sub) use ($exact, $prefixes): void {
+                $inactive = $this->inactivePaths();
+
+                $query->orWhereExists(function (QueryBuilder $sub) use ($exact, $prefixes, $inactive): void {
                     $sub->selectRaw('1')
                         ->from('scope_nodes')
                         ->whereColumn('scope_nodes.id', 'forms.scope_node_id')
@@ -130,6 +135,13 @@ final class ResourceGrantResolver
                                 $match->orWhere('scope_nodes.path', 'like', self::escapeLike($path).'%');
                             }
                         });
+
+                    // The list twin of isUnderInactiveBranch(): a deactivated node cuts off its whole
+                    // subtree, not just itself. Omitting this here (while decide() applies it) is exactly
+                    // how the inbox and the detail page drift apart.
+                    foreach ($inactive as $path) {
+                        $sub->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
+                    }
                 });
             });
     }
@@ -173,6 +185,7 @@ final class ResourceGrantResolver
         if ($userId === null) {
             $this->sets = [];
             $this->formPaths = [];
+            $this->inactive = [];
 
             return;
         }
@@ -201,7 +214,7 @@ final class ResourceGrantResolver
 
         $formPath = $this->pathFor($nodeId);
 
-        if ($formPath === null) {
+        if ($formPath === null || $this->isUnderInactiveBranch($formPath)) {
             return false;
         }
 
@@ -216,6 +229,44 @@ final class ResourceGrantResolver
         }
 
         return false;
+    }
+
+    /**
+     * Is this node beneath a DEACTIVATED ancestor (or deactivated itself)?
+     *
+     * `is_active` is the revocation control for a branch — there is no `deleted_at` — so deactivating a
+     * province must cut off its cities, not merely itself. Checking only the granted node and the form's
+     * own node would leave a control that LOOKS like it revokes a branch but silently does not, which is
+     * precisely the failure mode the no-`deleted_at` decision exists to avoid.
+     *
+     * Reuses the prefix machinery rather than walking ancestors: the tenant's inactive node paths are
+     * loaded once per request (normally zero rows — deactivation is rare), and containment is then a
+     * `str_starts_with` in memory. O(1) queries, and no dependence on tree depth.
+     */
+    private function isUnderInactiveBranch(string $formPath): bool
+    {
+        foreach ($this->inactivePaths() as $inactive) {
+            if (str_starts_with($formPath, $inactive)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function inactivePaths(): array
+    {
+        $key = TenantContext::currentTenantId() ?? '-';
+
+        if (isset($this->inactive[$key])) {
+            return $this->inactive[$key];
+        }
+
+        /** @var list<string> $paths */
+        $paths = ScopeNode::query()->where('is_active', false)->pluck('path')->all();
+
+        return $this->inactive[$key] = $paths;
     }
 
     private function setFor(User $user): GrantSet

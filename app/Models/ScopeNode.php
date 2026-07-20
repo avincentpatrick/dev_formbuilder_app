@@ -78,14 +78,24 @@ class ScopeNode extends Model implements TenantScoped
     }
 
     /**
-     * Re-parenting is rejected outright in G10a. Moving a node must re-write `path` for its entire
-     * subtree, and an unlocked check-then-act cycle guard races into mutual ancestry that corrupts
-     * `path` irreversibly — and `path` is precisely what authorization reads. G10b ships `move()` with
-     * `SELECT … FOR UPDATE` on both the node and the target parent, plus a concurrent-move test, and
-     * must REPLACE this guard rather than bypass it.
+     * `parent_id`, `path` and `depth` may never be written by an ordinary Eloquent save. They are
+     * AUTHORIZATION INPUTS — the resolver decides access by prefix-matching `path` — so a model-level
+     * write is how a request payload would graft a node onto another branch and inherit its grants.
      *
-     * At INSERT a node has no descendants, so no cycle check is needed there (and the
-     * `scope_nodes_no_self_parent` CHECK covers the one-node case at the database).
+     * G10a rejected re-parenting outright because re-pathing a subtree needs locks and a cycle check that
+     * did not exist yet. G10b ships them in {@see ScopeNodeService::move()}, and this guard is KEPT
+     * verbatim rather than relaxed: `move()` re-paths through a single query-builder UPDATE, which fires
+     * no model events, so the guard still covers every save while the one audited writer sits behind a
+     * tenant-wide advisory lock, `FOR UPDATE` re-reads, a cycle check and a subtree depth check.
+     *
+     * That is deliberate in preference to an `unguarded`/re-entrancy flag: a flag is something a future
+     * caller can switch off from anywhere, which converts a structural invariant back into a convention.
+     * The invariant here reads "no model save ever touches these columns" and has no exceptions.
+     *
+     * Note what this means for acyclicity: `scope_nodes_no_self_parent` only ever covered the single-node
+     * case, so from G10b on the ONLY thing preventing a longer cycle is `move()`'s post-lock check.
+     *
+     * At INSERT a node has no descendants, so no cycle check is needed there.
      */
     protected static function booted(): void
     {

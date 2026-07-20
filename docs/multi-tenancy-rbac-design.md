@@ -115,8 +115,9 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > permission rather than a reuse of `tenant.settings.manage` specifically because
 > `ApiAbilities::ABILITY_TO_PERMISSION` maps the `manage:settings` token ability onto that permission:
 > reusing it would retroactively hand every already-minted settings token the authority to author the
-> authorization hierarchy the moment G10b ships a write surface. No API ability maps to `scopes.manage`
-> yet; G10b owns that decision.
+> authorization hierarchy the moment G10b ships a write surface. **As of G10b** it maps to the new
+> `manage:scopes` token ability (api-specification.md §2.6), alongside `forms.collaborators.manage` —
+> a new ability, so no previously-minted token gained anything.
 >
 > **Design Note**: `forms.collaborators.manage` is deliberately restricted to Owner/Admin only — **not** delegable to a form's existing editors — specifically to prevent a Form Editor from adding themselves or others to additional forms they weren't granted access to by an administrator, i.e., a straightforward privilege-escalation vector that would otherwise exist if collaborator management were self-service.
 
@@ -263,9 +264,39 @@ column-list `ON DELETE SET NULL (scope_node_id)` — a plain composite `SET NULL
 Authoring the hierarchy is gated on **`scopes.manage`** (§5), Owner/Admin only: a node is something a
 grant can be made against, so authoring the tree is authoring authorization structure.
 
-Re-parenting is rejected outright as of G10a. Moving a node must re-path its entire subtree, and an
+Re-parenting was rejected outright in G10a, because moving a node must re-path its entire subtree and an
 unlocked check-then-act cycle guard races into mutual ancestry that corrupts `path` irreversibly — and
-`path` is exactly what authorization reads. G10b ships `move()` with row locks and a concurrency test.
+`path` is exactly what authorization reads.
+
+**G10b ships `ScopeNodeService::move()`.** Its concurrency model, in order:
+
+1. A transaction-scoped **advisory lock keyed on the tenant** serializes moves within a workspace. Locking
+   only the node and target parent is *not* sufficient: a concurrent move of an *ancestor* of the target
+   re-paths the target without locking it, so the first mover computes its new prefix from a path that is
+   already stale. There is no bounded set of rows the second mover could lock instead short of the
+   target's whole ancestor chain and the node's whole subtree. This is the only advisory lock in the
+   codebase — every other service serializes on a row — because it is the only operation whose
+   correctness spans an unbounded row set rather than one aggregate root.
+2. Both endpoints are re-read `FOR UPDATE` and all decisions are made on the **re-read** rows, never the
+   arguments. This also blocks a concurrent rename/deactivate of the two nodes.
+3. The cycle check is one prefix test (`path` is self-inclusive, so it covers "onto itself" too). From
+   G10b on this — not `scope_nodes_no_self_parent`, which only ever covered the single-node case — is what
+   prevents a longer cycle.
+4. The depth cap is measured across the whole **subtree**: a shallow node can carry a deep one.
+5. The re-path is a **single** `UPDATE` over the constant-prefix `LIKE`, so it is atomic, index-served by
+   `(tenant_id, path)` under `COLLATE "C"`, and costs one statement regardless of subtree size.
+
+Two CHECK constraints added in G10b make an incorrectly re-pathed row impossible regardless of which
+writer produced it — Eloquent, the query builder, raw SQL, or a future migration:
+`scope_nodes_path_self_suffix_chk` (a path ends with its own id) and `scope_nodes_depth_matches_path_chk`
+(`depth` equals the path's segment count). The second also forces `path` and `depth` to be written in the
+same statement. `ScopeNode::booted()` is kept unchanged and still rejects any *model-level* write to
+`parent_id`/`path`/`depth`; `move()` does not need an exemption from it because a query-builder statement
+fires no model events.
+
+Deleting a node cascades to its descendants and `SET NULL`s their forms' `scope_node_id`. Grants on the
+deleted subtree are removed **in the same transaction** — `resource_grants` is a morph, so it has no FK to
+cascade through, and leaving them would manufacture invisible authorization rows on every delete.
 
 ### 8.3 Authorization composition
 
@@ -294,6 +325,39 @@ and a region-level subtree in a PSGC-shaped tree is ~44,000 nodes).
 `SubmissionPolicy`'s review check follows the identical shape against `capacity = 'reviewer'` and `submissions.review.own`. This two-layer composition — a coarse Spatie permission ("can this role ever do this action, in principle") plus a fine Policy-layer resource check ("does a grant cover *this specific* resource") — **is** the general pattern for per-instance scoping beyond the tenant level. Increment G10a made it literal: adding a third scopeable type is one `ResourceScopeable` case plus one migration, never a `switch`.
 
 > **One deliberate semantic change in G10a.** `SubmissionPolicy::create` (manual encoding) now requires **editor** capacity, where it previously accepted either. Encoding is an authoring act, and once a grant can name a subtree, a reviewer grant on an interior node would otherwise confer write access to every form beneath it.
+
+### 8.4 Who may hand out access (G10b)
+
+Until G10b there was no writer of a grant other than `FormService::create` (always editor, always the
+creator), so `forms.collaborators.manage` and `FormPolicy::manageCollaborators` were defined but
+referenced nowhere — **a Reviewer could not be scoped to a form in production at all**.
+`ResourceGrantService` is that writer, and `ResourceGrantPolicy` gates it with three rules:
+
+1. **Base gate** — `forms.collaborators.manage` (Owner/Admin only, per the design note in §5).
+2. **No self-grant.** Without it, "may manage collaborators" silently means "may give myself any capacity
+   on any resource". Self-*revoke* stays allowed: it can only reduce what the actor holds.
+3. **Anti-amplification** — the actor must hold the **`.any`** counterpart of the capacity being handed
+   out (`ResourceCapacity::anyPermission()`: editor → `forms.edit.any`, reviewer →
+   `submissions.review.any`). A grant activates the `.own` half of a pair for its holder, so the granter
+   must already hold the tenant-wide half.
+
+| Actor holds | grant editor | grant reviewer | self-grant | revoke |
+|---|---|---|---|---|
+| Owner / Admin (both `.any`) | ✓ | ✓ | ✗ (rule 2) | ✓ |
+| Form Editor / Reviewer / Viewer | ✗ (rule 1) | ✗ (rule 1) | ✗ | ✗ |
+| `collaborators.manage` + `forms.edit.any` only | ✓ | ✗ (rule 3) | ✗ | ✓ |
+| `collaborators.manage` + `submissions.review.any` only | ✗ (rule 3) | ✓ | ✗ | ✓ |
+
+**Rule 3 is unreachable under the shipped 5-role matrix** — Owner and Admin are the only holders of
+`forms.collaborators.manage` and both hold each `.any` permission. It is stated here, and tested against
+directly-constructed permission subsets rather than seeded roles, so it does not get filed as dead code
+the way `forms.collaborators.manage` itself was. It is what stops any future custom role, or any
+delegation of collaborator management, from quietly becoming "may mint any authority".
+
+A separate service-level guard refuses a grant to someone who is not an **active** member: the resolver
+counts only active members' grants, so such a row would be written, listed in the UI, and confer nothing.
+In practice the `users` visibility RLS policy refuses first (an outsider is invisible, so the write 404s
+without confirming the account exists); the guard is the backstop if that policy ever widens.
 
 > **Design Note — relationship to `forms.owner_user_id`**
 > `docs/data-dictionary.md` §2 already defines `forms.owner_user_id` as "the form's business owner (dashboard scoping)." That column is retained as-is and continues to mean **attribution** — whose name shows as the form's primary point of contact, and the default assignee dashboard-scoping falls back to — but it is no longer the sole gate on who may edit the form. A form's creator is expected to also receive a `resource_grants` row targeting that form with `capacity = 'editor'` at creation time (so the common case of "I built it, I can edit it" keeps working without extra clicks), but that is now an ordinary grant like any other, not a special-cased check against `owner_user_id` in the Policy layer.

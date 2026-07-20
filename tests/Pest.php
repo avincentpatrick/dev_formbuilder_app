@@ -321,3 +321,19 @@ function grantOnNode(
 
     return $grant;
 }
+
+/**
+ * Create a form and assign it to a scope node (G10b). Reads `tenant`/`user` off the current test, the
+ * same way `unownedForm()` does.
+ *
+ * The assignment is a raw UPDATE because `forms.scope_node_id` has no service writer until the G10b2
+ * picker lands — keeping that fact visible here rather than inventing a test-only writer that would drift
+ * from the real one.
+ */
+function formIn(ScopeNode $node, string $title = 'Survey'): Form
+{
+    $form = app(FormService::class)->create(test()->tenant, test()->user, $title);
+    DB::table('forms')->where('id', $form->id)->update(['scope_node_id' => $node->id]);
+
+    return $form->refresh();
+}

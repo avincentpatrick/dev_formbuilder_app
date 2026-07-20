@@ -38,6 +38,13 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // Increment G9a/G9b — the reusable-content surfaces (templates + question library).
         '/form-templates',
         '/field-library',
+        // Increment G10b — the scoping hierarchy + the grant write surface.
+        '/scopes',
+        '/scopes/{scopeNode}',
+        '/scopes/{scopeNode}/move',
+        '/scopes/{scopeNode}/impact',
+        '/resource-grants',
+        '/resource-grants/{resourceGrant}',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

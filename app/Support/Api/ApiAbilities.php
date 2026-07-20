@@ -40,6 +40,23 @@ final class ApiAbilities
     public const READ_AUDIT_LOG = 'read:audit_log';
 
     /**
+     * Authoring the tenant's scoping hierarchy AND granting access on it (Increment G10b).
+     *
+     * G10a deliberately left this decision open, because `scopes.manage` was added as a NEW permission
+     * rather than folded into `tenant.settings.manage` specifically so already-minted `manage:settings`
+     * tokens would not retroactively gain authority over authorization structure. A new ability keeps that
+     * property: no existing token carries it, since none was minted with it.
+     *
+     * One ability covering both `scopes.manage` and `forms.collaborators.manage`, not two. Note the map's
+     * semantics — holding ANY one of the listed permissions grants the ability — so on its own this would
+     * let a `scopes.manage`-only principal mint a token that reaches the grant routes. What makes that
+     * safe is that the ability is a token SCOPE, never the authorization: every route below also carries
+     * its own `can:` policy gate, which re-checks the acting user's real permissions. A principal without
+     * `forms.collaborators.manage` is refused there regardless of what their token says.
+     */
+    public const MANAGE_SCOPES = 'manage:scopes';
+
+    /**
      * ability => the RBAC permissions that entitle a user to hold it (holding ANY one grants the ability).
      * `read:forms` mirrors FormPolicy::viewAny exactly, so a token's ability and the route policy agree.
      *
@@ -55,6 +72,7 @@ final class ApiAbilities
         self::MANAGE_WEBHOOKS => ['webhooks.manage'],
         self::MANAGE_SETTINGS => ['tenant.settings.manage'],
         self::READ_AUDIT_LOG => ['audit_log.view'],
+        self::MANAGE_SCOPES => ['scopes.manage', 'forms.collaborators.manage'],
     ];
 
     /**

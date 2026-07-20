@@ -1,12 +1,14 @@
 <?php
 
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Authorization\GrantException;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
+use App\Exceptions\Scoping\ScopeNodeException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
@@ -174,6 +176,28 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (FormException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(422, 'form_rule_violated', $e->getMessage())
             : null);
+
+        // Scoping-hierarchy rule violations (Increment G10b) — a move that would cycle, or one that would
+        // push the subtree past the depth cap. Both are raised upfront inside move()'s transaction, before
+        // the re-path statement, so this maps a deliberate refusal rather than dressing up a 23514.
+        $exceptions->render(function (ScopeNodeException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(422, $e->code(), $e->getMessage());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
+        // Grant escalation refusals (Increment G10b). The status travels ON the exception because the causes
+        // split across two classes: an escalation refusal is a 403 (self-grant, anti-amplification) while a
+        // bad request shape is a 422 (inactive recipient, descendants on a form target). See GrantException.
+        $exceptions->render(function (GrantException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
 
         // XLSForm import failure (Increment G7b) — a malformed workbook rejected UPFRONT, before the
         // destructive draft-replace runs (§6). The API surface gets the stable code + {row,type} details it

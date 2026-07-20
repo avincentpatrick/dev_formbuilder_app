@@ -7,10 +7,12 @@ use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
+use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Policies\AttachmentPolicy;
 use App\Policies\FormPolicy;
+use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Services\Authorization\ResourceGrantResolver;
@@ -74,6 +76,12 @@ class AppServiceProvider extends ServiceProvider
         // The tenant's scoping hierarchy (Increment G10a). Authoring a node IS authoring authorization
         // structure — a grant can be made against one — so it is Owner/Admin only, via `scopes.manage`.
         Gate::policy(ScopeNode::class, ScopeNodePolicy::class);
+
+        // Granting access (Increment G10b) — the escalation surface itself, gated on
+        // `forms.collaborators.manage` plus the no-self-grant and anti-amplification rules. Registration
+        // is not optional decoration here: an unmapped model class falls through to Gate closures and
+        // `before`, i.e. it fails OPEN rather than closed.
+        Gate::policy(ResourceGrant::class, ResourceGrantPolicy::class);
 
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the

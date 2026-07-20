@@ -1209,6 +1209,522 @@
                 "security": []
             }
         },
+        "/resource-grants": {
+            "get": {
+                "operationId": "v1.resource-grants.index",
+                "summary": "List grants, optionally filtered by target or recipient",
+                "tags": [
+                    "ResourceGrantApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "scopeable_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "scopeable_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ResourceGrantResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.resource-grants.store",
+                "summary": "Grant a capacity on a form or scope node, replacing any capacity the recipient already holds there",
+                "tags": [
+                    "ResourceGrantApi"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreResourceGrantRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ResourceGrantResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ResourceGrantResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/resource-grants/{resourceGrant}": {
+            "delete": {
+                "operationId": "v1.resource-grants.destroy",
+                "summary": "Revoke a grant",
+                "tags": [
+                    "ResourceGrantApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "resourceGrant",
+                        "in": "path",
+                        "required": true,
+                        "description": "The resource grant ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/scopes": {
+            "get": {
+                "operationId": "v1.scopes.index",
+                "summary": "Cursor-paginated hierarchy, in tree order",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ScopeNodeResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.scopes.store",
+                "summary": "Create a node",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreScopeNodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ScopeNodeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScopeNodeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/scopes/{scopeNode}/impact": {
+            "get": {
+                "operationId": "v1.scopes.impact",
+                "summary": "What a grant on this node would reach, and what deleting it would take with it",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "scopeNode",
+                        "in": "path",
+                        "required": true,
+                        "description": "The scope node ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "reach": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "direct": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                },
+                                                                "descendant": {
+                                                                    "type": "integer",
+                                                                    "minimum": 0
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "direct",
+                                                                "descendant"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "direct": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "descendant": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "direct",
+                                                                "descendant"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "deletion": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "forms": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "nodes": {
+                                                            "type": "string",
+                                                            "description": "Excludes the node itself \u2014 the warning is about what ELSE goes."
+                                                        },
+                                                        "grants": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "forms",
+                                                        "nodes",
+                                                        "grants"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "reach",
+                                                "deletion"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/scopes/{scopeNode}/move": {
+            "post": {
+                "operationId": "v1.scopes.move",
+                "summary": "Re-parent a node, re-pathing its subtree",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "scopeNode",
+                        "in": "path",
+                        "required": true,
+                        "description": "The scope node ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MoveScopeNodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ScopeNodeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScopeNodeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/scopes/{scopeNode}": {
+            "patch": {
+                "operationId": "v1.scopes.update",
+                "summary": "Rename or re-label a node",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "scopeNode",
+                        "in": "path",
+                        "required": true,
+                        "description": "The scope node ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateScopeNodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ScopeNodeResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScopeNodeResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1.scopes.destroy",
+                "summary": "Delete a node, its descendants, and the grants on them",
+                "tags": [
+                    "ScopeNodeApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "scopeNode",
+                        "in": "path",
+                        "required": true,
+                        "description": "The scope node ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/sync/manifest": {
             "get": {
                 "operationId": "v1.sync.manifest",
@@ -1714,6 +2230,23 @@
                 ],
                 "title": "GuestSubmissionRequest"
             },
+            "MoveScopeNodeRequest": {
+                "type": "object",
+                "description": "Re-parent a scope node (Increment G10b). A null `parent_id` re-roots it.\n\n`present` rather than `required`: null is a meaningful value here (move to the top level), and\n`required` rejects it. The key must still appear, so a caller cannot omit it and silently re-root.",
+                "properties": {
+                    "parent_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "parent_id"
+                ],
+                "title": "MoveScopeNodeRequest"
+            },
             "PublishVersionRequest": {
                 "type": "object",
                 "description": "Validation for publishing a draft version through the API (Increment E). Authorization is the route's\n`ability:write:forms` + `can:publish,form` gates; this only validates the optional publisher note that\nis appended to the auto-generated change summary.",
@@ -1727,6 +2260,126 @@
                     }
                 },
                 "title": "PublishVersionRequest"
+            },
+            "ResourceGrantResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "scopeable_type": {
+                        "type": "string"
+                    },
+                    "scopeable_id": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "string"
+                    },
+                    "capacity": {
+                        "type": "string"
+                    },
+                    "includes_descendants": {
+                        "type": "boolean"
+                    },
+                    "granted_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "scopeable_type",
+                    "scopeable_id",
+                    "user_id",
+                    "capacity",
+                    "includes_descendants",
+                    "granted_by",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ResourceGrantResource"
+            },
+            "ScopeNodeResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "parent_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "node_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "depth": {
+                        "type": "integer"
+                    },
+                    "position": {
+                        "type": "integer"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "parent_id",
+                    "name",
+                    "code",
+                    "node_type",
+                    "path",
+                    "depth",
+                    "position",
+                    "is_active",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ScopeNodeResource"
             },
             "StoreApiTokenRequest": {
                 "type": "object",
@@ -1756,7 +2409,8 @@
                                 "export:submissions",
                                 "manage:webhooks",
                                 "manage:settings",
-                                "read:audit_log"
+                                "read:audit_log",
+                                "manage:scopes"
                             ]
                         },
                         "minItems": 1
@@ -1882,6 +2536,95 @@
                     "name"
                 ],
                 "title": "StoreFormTemplateRequest"
+            },
+            "StoreResourceGrantRequest": {
+                "type": "object",
+                "description": "Grant a capacity on a form or a scope node (Increment G10b).\n\nThe target arrives as `scopeable_type` + `scopeable_id` \u2014 an alias from {@see ResourceScopeable}, never\na class name \u2014 and the controller resolves it to a real tenant-scoped model before handing it to the\nservice, which associates it. The raw pair is never mass-assigned: that is precisely the cross-tenant\nattack surface `ResourceGrant::$fillable` excludes those columns for.",
+                "properties": {
+                    "scopeable_type": {
+                        "type": "string",
+                        "enum": [
+                            "form",
+                            "scope_node"
+                        ]
+                    },
+                    "scopeable_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "capacity": {
+                        "type": "string",
+                        "enum": [
+                            "editor",
+                            "reviewer"
+                        ]
+                    },
+                    "includes_descendants": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "scopeable_type",
+                    "scopeable_id",
+                    "user_id",
+                    "capacity"
+                ],
+                "title": "StoreResourceGrantRequest"
+            },
+            "StoreScopeNodeRequest": {
+                "type": "object",
+                "description": "Create a scope node (Increment G10b).\n\n`path`/`depth` are absent by design \u2014 they are derived authorization inputs written only by\nScopeNodeService, and there is deliberately no field here that could carry them.\n\n`parent_id` uses `exists:` on the tenant connection, which RLS scopes, so another tenant's node fails\nvalidation rather than leaking that the id exists.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "parent_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "node_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "position": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "is_active": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "StoreScopeNodeRequest"
             },
             "SyncManifestResource": {
                 "type": "object",
@@ -2039,6 +2782,38 @@
                     "status"
                 ],
                 "title": "TenantResource"
+            },
+            "UpdateScopeNodeRequest": {
+                "type": "object",
+                "description": "Edit a scope node's labels (Increment G10b).\n\nNo `parent_id`: re-parenting is the dedicated `move` endpoint, because it is a locked, subtree-wide\noperation with its own refusals (cycle, depth cap) and folding it in here would make both the contract\nand the controller's branching worse.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "node_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 60
+                    },
+                    "position": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateScopeNodeRequest"
             },
             "XlsformImportRequest": {
                 "type": "object",

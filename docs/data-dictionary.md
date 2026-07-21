@@ -96,7 +96,7 @@ The durable record for one customer organization — the root of every tenant-sc
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key; also the value stamped into the RLS session variable and into every queued job payload (plan §2.1). |
 | `name` | `varchar(150)` | No | — | No | Organization display name. |
 | `slug` | `varchar(100)` | No | — | No | Unique, used to resolve the tenant from a subdomain (plan §2.1 "tenant resolved from subdomain via early middleware"). |
-| `domain` | `varchar(255)` | Yes | `NULL` | No | Custom domain, unique when set (Phase 3 "custom domains" feature; column exists from day one so the schema doesn't need a later migration). |
+| `domain` | `varchar(255)` | Yes | `NULL` | No | ⚠️ **This column does not exist — corrected 2026-07-21.** The row previously claimed it "exists from day one so the schema doesn't need a later migration"; the create-`tenants` migration declares `name`/`slug`/`status` only. Domain resolution is served by the separate **`domains`** table (RLS-exempt, driven by stancl's `HasDomains` on `App\Models\Tenant`), which has a live consumer in `TenantInvitationNotification`. Phase 3's custom-domains feature (H22) therefore builds on `domains`, and **will** need its own migration — plan for it rather than assuming a dormant column is waiting. |
 | `status` | `varchar(20)` — PHP enum: `TenantStatus` | No | `'trial'` | No | Lifecycle state of the whole account. |
 | `owner_user_id` | `uuid` | No | — | No | FK to `users.id` (external — see RBAC doc). The account's primary owner/billing contact. |
 | `scope_node_id` | `uuid` | Yes | `NULL` | No | FK → `scope_nodes` as a **composite** `(tenant_id, scope_node_id)` (ADR-0002 §D5), `ON DELETE SET NULL (scope_node_id)`. Which node of the tenant's own hierarchy this form belongs to — the basis for subtree-scoped access grants (multi-tenancy-rbac-design.md §8). NULL means the form is reachable only by a direct grant, which is every form's state as of Increment G10a; the picker that populates it is G10b. |
@@ -588,7 +588,7 @@ Platform-defined pricing tiers, Cashier-backed (plan §1/§2.2).
 | `code` | `varchar(20)` — PHP enum: `PlanTier` | No | — | No | Unique. |
 | `name` | `varchar(100)` | No | — | No | Display name. |
 | `description` | `text` | Yes | `NULL` | No | — |
-| `stripe_price_id` | `varchar(100)` | Yes | `NULL` | No | Cashier/Stripe linkage; `NULL` for a free tier with no Stripe price object. |
+| `stripe_price_id` | `varchar(100)` | Yes | `NULL` | No | Cashier/Stripe linkage; `NULL` for a free tier with no Stripe price object. **Design intent, not near-term work (2026-07-21):** neither `laravel/cashier` nor `stripe/stripe-php` is installed, and **payments are deferred out of Phase 3 to Phase 4** by product decision, so nothing consumes this column yet. |
 | `monthly_price_cents` | `integer` | Yes | `NULL` | No | — |
 | `yearly_price_cents` | `integer` | Yes | `NULL` | No | — |
 | `currency` | `varchar(3)` | No | `'usd'` | No | ISO 4217 code, plain string — open reference data, not a fixed vocabulary the app branches logic on, so it is not modeled as an enum (see "Conventions"). |
@@ -601,7 +601,8 @@ Platform-defined pricing tiers, Cashier-backed (plan §1/§2.2).
 | `updated_at` | `timestamptz` | No | `now()` | No | — |
 
 > **Design Notes**
-> - **`plans` has no `tenant_id` and is not RLS-scoped** — it is the platform's own global pricing catalog, shared read-only reference data across every tenant, structurally different from a tenant business record. It is *not* being used as a substitute "vocabulary lookup table" in the sense the enum-strategy section disclaims — its rows are admin-managed commercial content (price, quotas, feature flags) that changes independently of a code deploy, which is exactly the case where a real table (not an enum) is the right tool.
+> - ⚠️ **No `plans` migration exists yet** (verified 2026-07-21 — 42 migrations, zero hits for `plans`, `subscriptions` or `audits`). This section describes intended schema, not shipped schema. ADR-0007 §D3 nonetheless names `plans` alongside `tenants`/`domains` as a table a cross-tenant `MaintenanceJob` may read *once it exists*.
+> - **`plans` has no `tenant_id` and is not RLS-scoped** — it is the platform's own global pricing catalog, shared read-only reference data across every tenant, structurally different from a tenant business record. **Note on the migration linter:** `plans` needs **no** `EXEMPT_TABLES` entry in `scripts/migration-lint.php`, and adding one would be actively misleading — the linter's isolation rule short-circuits on any table that declares no literal `tenant_id` column, so a table like this never reaches the check. The exemption list is for tables that *do* carry a tenant identifier while deliberately having no RLS policy (`jobs`/`job_batches`/`failed_jobs`, the framework/Fortify tables), which per ADR-0002 §D2 is the case requiring justification. It is *not* being used as a substitute "vocabulary lookup table" in the sense the enum-strategy section disclaims — its rows are admin-managed commercial content (price, quotas, feature flags) that changes independently of a code deploy, which is exactly the case where a real table (not an enum) is the right tool.
 > - `feature_flags`/`quotas` are JSONB maps rather than rigid columns so new gates/metrics can be added without a migration, at the cost of losing a DB-level `CHECK` on their keys — accepted trade-off, validated at the application layer against the `UsageMetric`/feature-flag key enums instead.
 
 ---
@@ -618,7 +619,7 @@ A tenant's subscription to a plan, Cashier-backed (plan §1/§2.2).
 | `name` | `varchar(50)` | No | `'default'` | No | Cashier's internal subscription-name slot, supporting multiple concurrent subscriptions per tenant (e.g. add-ons) beyond the primary plan. |
 | `stripe_customer_id` | `varchar(100)` | Yes | `NULL` | No | External billing-system identifier for the organization; not itself an individual's personal data (the individual-level contact is `tenants.billing_email`). |
 | `stripe_subscription_id` | `varchar(100)` | Yes | `NULL` | No | — |
-| `stripe_status` | `varchar(40)` | No | — | No | **Deliberately free text, not a PHP enum** — mirrors Stripe's own status vocabulary verbatim (`trialing`, `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `incomplete_expired`, `paused`) as synced by Cashier's webhook handler. See Design Notes for why this is the one flagged exception to the enum-everywhere rule. |
+| `stripe_status` | `varchar(40)` | No | — | No | **Deliberately free text, not a PHP enum** — mirrors Stripe's own status vocabulary verbatim (`trialing`, `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `incomplete_expired`, `paused`) as synced by Cashier's webhook handler. See Design Notes for why this is the one flagged exception to the enum-everywhere rule. **No such handler exists (2026-07-21)** — Cashier is not installed, this table has no migration, and payments are deferred to Phase 4; the row records intended design. |
 | `billing_interval` | `varchar(10)` — PHP enum: `BillingInterval` | No | — | No | — |
 | `quantity` | `integer` | No | `1` | No | Seat count, where applicable. |
 | `trial_ends_at` | `timestamptz` | Yes | `NULL` | No | — |

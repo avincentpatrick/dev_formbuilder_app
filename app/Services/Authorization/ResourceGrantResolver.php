@@ -50,7 +50,13 @@ final class ResourceGrantResolver
     /** @var array<string, GrantSet> memo key => resolved grants */
     private array $sets = [];
 
-    /** @var array<string, ?string> form id => its node's path (null when unassigned or unreadable) */
+    /**
+     * Keyed by SCOPE NODE id, not form id — see {@see pathFor()} and {@see primeNodePaths()}. That is what
+     * makes re-assigning a form to a different node (G10b2's picker) safe without a `forget()`: nothing here
+     * is keyed by the thing that changed, and `holds()` reads `forms.scope_node_id` live off the model.
+     *
+     * @var array<string, ?string> scope node id => its path (null when inactive or unreadable)
+     */
     private array $formPaths = [];
 
     /** @var array<string, list<string>> tenant id => paths of DEACTIVATED nodes (usually empty) */

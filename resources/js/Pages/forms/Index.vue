@@ -6,8 +6,8 @@
  * flash. The interactive section/field builder is Increment D4 — "Rename" edits metadata for now.
  * Assembled entirely from shared design-system components (no page-local styling beyond layout).
  */
-import { reactive, ref } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     MdsBadge,
     MdsButton,
@@ -23,6 +23,7 @@ import {
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
+import AssignScopeModal from '@/components/forms/AssignScopeModal.vue';
 
 type FormVersionRow = {
     id: string;
@@ -36,6 +37,7 @@ type FormRow = {
     title: string;
     description: string | null;
     status: string;
+    scope_node_id: string | null;
     current_version: number | null;
     draft_version: number | null;
     updated_at: string | null;
@@ -43,7 +45,15 @@ type FormRow = {
     can: { edit: boolean; publish: boolean; delete: boolean; encode: boolean; template: boolean };
 };
 
-defineProps<{ forms: FormRow[] }>();
+type ScopeOption = { id: string; name: string; parent_id: string | null; is_active: boolean };
+
+defineProps<{ forms: FormRow[]; scopes: ScopeOption[] }>();
+
+const page = usePage();
+const canManageScopes = computed(() => page.props.auth.can.manageScopes);
+
+// ── Scope picker (G10b2) ────────────────────────────────────────────────
+const scopeTarget = ref<FormRow | null>(null);
 
 const columns: DataTableColumn[] = [
     { key: 'title', header: 'Form', sortable: true },
@@ -230,6 +240,19 @@ function submitRestore(): void {
                         size="sm"
                         @click="openEdit(row)"
                     />
+                    <!--
+                        Gated on manageScopes, not row.can.edit: assigning a form to a scope hands everyone
+                        holding a grant on that branch access to the form AND its submissions, so it is an
+                        Owner/Admin act. The route enforces the same thing independently by stacking
+                        can:viewAny,ScopeNode on top of can:update,form.
+                    -->
+                    <MdsIconButton
+                        v-if="canManageScopes"
+                        icon="building"
+                        label="Set form scope"
+                        size="sm"
+                        @click="scopeTarget = row"
+                    />
                     <MdsIconButton
                         v-if="row.can.publish"
                         icon="check"
@@ -367,6 +390,15 @@ function submitRestore(): void {
         </MdsModal>
 
         <!-- Save as template (G9a) -->
+        <AssignScopeModal
+            v-if="scopeTarget"
+            :open="true"
+            :form-id="scopeTarget.id"
+            :current-node-id="scopeTarget.scope_node_id"
+            :scopes="scopes"
+            @update:open="scopeTarget = null"
+        />
+
         <SaveAsTemplateModal
             v-if="templateTarget"
             v-model:open="templateOpen"

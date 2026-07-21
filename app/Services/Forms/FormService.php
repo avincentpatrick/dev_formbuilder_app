@@ -10,6 +10,7 @@ use App\Enums\ResourceCapacity;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\ResourceGrant;
+use App\Models\ScopeNode;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
@@ -86,6 +87,38 @@ final class FormService
 
             return $form->refresh();
         });
+    }
+
+    /**
+     * Assign a form to a scope node, or un-assign it (Increment G10b2) — the only writer of
+     * `forms.scope_node_id`.
+     *
+     * This column is an AUTHORIZATION INPUT, not metadata. Writing it confers capacity on the form — and,
+     * through `SubmissionPolicy`, on its entire submission history — to every holder of a grant on that node
+     * and on any ancestor whose grant sets `includes_descendants`. Clearing it strips every node-derived
+     * reviewer while leaving direct grants intact. Both directions are grant-equivalent acts, which is why
+     * the route stacks `can:viewAny,ScopeNode` (i.e. `scopes.manage`) on top of `can:update,form`.
+     *
+     * `forceFill` with an explicit key rather than the request's validated array: `scope_node_id` IS in
+     * `Form::$fillable`, so a `$form->update($validated)` anywhere on the `can:update,form` gate would hand a
+     * plain form editor this capability. Centralizing the write here is what keeps that structural.
+     *
+     * The node is re-resolved through the tenant-scoped model and must be ACTIVE — a foreign id 404s instead
+     * of tripping the composite FK, and parking a form on a deactivated node would be a disguised un-assign
+     * (the resolver discards inactive paths), so it is refused rather than silently accepted.
+     *
+     * No resolver invalidation: nothing memoized is keyed by form id — `$formPaths` is keyed by NODE id, and
+     * `holds()` reads `scope_node_id` live off the model. See ResourceGrantResolver::$formPaths.
+     */
+    public function assignScope(Form $form, ?string $scopeNodeId): Form
+    {
+        $node = $scopeNodeId === null
+            ? null
+            : ScopeNode::query()->whereKey($scopeNodeId)->where('is_active', true)->firstOrFail();
+
+        $form->forceFill(['scope_node_id' => $node?->getKey()])->save();
+
+        return $form->refresh();
     }
 
     /**

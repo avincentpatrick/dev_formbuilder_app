@@ -19,5 +19,8 @@ export const navItems: NavItem[] = [
     { key: 'submissions', label: 'Submissions', icon: 'submissions', href: '/submissions', enabled: true, gate: 'viewSubmissions' },
     { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard', enabled: true },
     { key: 'members', label: 'Members', icon: 'users', href: '/members', enabled: true, gate: 'manageMembers' },
+    // Scoping hierarchy (G10b2) — sits beside Members because both are Owner/Admin administration of WHO
+    // can reach what, rather than authoring surfaces.
+    { key: 'scopes', label: 'Scopes', icon: 'building', href: '/scopes', enabled: true, gate: 'manageScopes' },
     { key: 'settings', label: 'Settings', icon: 'settings', href: '/settings', enabled: true },
 ];

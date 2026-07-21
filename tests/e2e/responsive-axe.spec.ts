@@ -13,6 +13,9 @@ const pages = [
     { name: 'Forms', path: '/forms' },
     { name: 'Submissions', path: '/submissions' },
     { name: 'Members', path: '/members' },
+    // The scoping hierarchy (G10b2). This is the whole-page scan, so it owns the horizontal-overflow
+    // assertion for the tree — the deep seeded fixture exists so a 375px viewport actually reaches it.
+    { name: 'Scopes', path: '/scopes' },
     { name: 'Settings', path: '/settings' },
 ];
 

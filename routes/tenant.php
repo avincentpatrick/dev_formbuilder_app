@@ -10,17 +10,22 @@ use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
+use App\Http\Controllers\Tenant\FormScopeController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\PreferencesController;
+use App\Http\Controllers\Tenant\ResourceGrantController;
+use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Form;
+use App\Models\ResourceGrant;
+use App\Models\ScopeNode;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -76,6 +81,46 @@ Route::middleware([
     // and the cross-tenant support console are Phase 1 (need the attachments table + elevated read).
     Route::post('/feedback', [FeedbackController::class, 'store'])
         ->middleware('can:feedback.submit')->name('feedback.store');
+
+    // Scoping hierarchy (Increment G10b2) — the UI over the G10b1 backend, and the surface that makes the
+    // Reviewer role assignable. Gates mirror ScopeNodePolicy (every method = `scopes.manage`) and
+    // ResourceGrantPolicy (`forms.collaborators.manage`). Those two permissions travel together under today's
+    // 5-role matrix but are DISTINCT catalog entries, so the grant routes carry their own gate rather than
+    // riding the hierarchy one — the same separation `routes/api.php` relies on to make one coarse ability safe.
+    //
+    // No `ability:` middleware here, unlike the /api/v1 twins: that is Sanctum token-scope middleware and a
+    // session request carries no access token. The policy gate IS the authorization on this surface.
+    //
+    // /scopes/grants would collide with the {scopeNode} pattern, so grants live at their own top-level path
+    // (mirroring api.v1.resource-grants.*). Static `impact`/`grants`/`move` segments are declared before the
+    // bare PATCH/DELETE {scopeNode} routes.
+    Route::get('/scopes', [ScopeNodeController::class, 'index'])
+        ->middleware('can:viewAny,'.ScopeNode::class)->name('scopes.index');
+    Route::post('/scopes', [ScopeNodeController::class, 'store'])
+        ->middleware('can:create,'.ScopeNode::class)->name('scopes.store');
+    // The two read-only JSON sidecars (consumed by builderClient, not Inertia): the blast-radius preview the
+    // grant modal blocks its confirm on, and the selected node's grant list. Reads only — every mutation on
+    // this page is an Inertia visit, because a domain exception on a web route redirects rather than
+    // returning JSON (see ScopeNodeController's class docblock).
+    Route::get('/scopes/{scopeNode}/impact', [ScopeNodeController::class, 'impact'])
+        ->middleware('can:view,scopeNode')->name('scopes.impact');
+    Route::get('/scopes/{scopeNode}/grants', [ScopeNodeController::class, 'grants'])
+        ->middleware('can:view,scopeNode')->name('scopes.grants');
+    Route::post('/scopes/{scopeNode}/move', [ScopeNodeController::class, 'move'])
+        ->middleware('can:update,scopeNode')->name('scopes.move');
+    Route::patch('/scopes/{scopeNode}', [ScopeNodeController::class, 'update'])
+        ->middleware('can:update,scopeNode')->name('scopes.update');
+    Route::delete('/scopes/{scopeNode}', [ScopeNodeController::class, 'destroy'])
+        ->middleware('can:delete,scopeNode')->name('scopes.destroy');
+
+    // Grants on a scope node. `create` is the base gate; the per-grant escalation rules (no self-grant, no
+    // granting wider than your own capacity) are ResourceGrantPolicy::grantCapacity, authorized in the
+    // controller because they depend on the capacity and recipient. Revoke gates on `delete`, not
+    // grantCapacity — de-escalation is always safe, including revoking a grant you did not issue.
+    Route::post('/resource-grants', [ResourceGrantController::class, 'store'])
+        ->middleware('can:create,'.ResourceGrant::class)->name('resource-grants.store');
+    Route::delete('/resource-grants/{resourceGrant}', [ResourceGrantController::class, 'destroy'])
+        ->middleware('can:delete,resourceGrant')->name('resource-grants.destroy');
 
     // Forms — the durable form record + draft/publish lifecycle (Increment D3). Authorization is the
     // FormPolicy .any/.own composition, resolved by the `can:<ability>,<model>` middleware. The
@@ -155,6 +200,14 @@ Route::middleware([
         ->middleware('can:update,form')->name('forms.fields.save-to-library');
     Route::get('/forms/{form}/library-items', [FormBuilderController::class, 'libraryItems'])
         ->middleware('can:update,form')->name('forms.library-items');
+
+    // Assign a form to the scoping hierarchy (Increment G10b2). Deliberately NOT part of PATCH /forms/{form}:
+    // writing scope_node_id confers capacity on the form — and via SubmissionPolicy on its whole submission
+    // history — to every holder of a grant on that node and on any includes_descendants ancestor. `can:update,form`
+    // alone is held by a plain Form Editor on any form they created, so the hierarchy-authoring permission is
+    // stacked on top. Both gates must pass; the write itself is FormService::assignScope (never mass-assignment).
+    Route::patch('/forms/{form}/scope', [FormScopeController::class, 'update'])
+        ->middleware(['can:update,form', 'can:viewAny,'.ScopeNode::class])->name('forms.scope');
 
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Form;
+use App\Models\ScopeNode;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -59,6 +60,11 @@ class HandleInertiaRequests extends Middleware
                     // Gates the Submissions inbox nav item + list page (F7). All five roles that hold
                     // submissions.view; the presenter then scopes rows (tenant-wide vs own-forms).
                     'viewSubmissions' => (bool) $user?->can('submissions.view'),
+                    // Gates the Scopes nav item + the /scopes page + the form scope picker (G10b2).
+                    // ScopeNodePolicy::viewAny is exactly `scopes.manage` — Owner/Admin only. Deliberately
+                    // NOT reused for the grant surface inside the page: `forms.collaborators.manage` is a
+                    // separate catalog entry, and the page gates that block on its own presenter flag.
+                    'manageScopes' => (bool) $user?->can('viewAny', ScopeNode::class),
                 ],
             ],
             // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.

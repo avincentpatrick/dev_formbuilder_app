@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -19,7 +18,17 @@ import { describe, expect, it } from 'vitest';
  * Scoped to the `--mds-` prefix so component-local custom properties are ignored.
  */
 
-const repoRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
+/**
+ * Vitest runs with its config file's directory as cwd, which is the repo root — so this is both
+ * deterministic and portable.
+ *
+ * Deliberately NOT `fileURLToPath(new URL('../../../../../', import.meta.url))`, which works locally
+ * but throws ERR_INVALID_URL_SCHEME on CI: the suite runs under `environment: 'happy-dom'`, whose DOM
+ * `URL` global shadows Node's, and resolving a five-level *directory* URL (trailing slash) through it
+ * does not reliably preserve the file: scheme. The sibling suites in this folder get away with the
+ * same pattern because they resolve concrete *file* paths.
+ */
+const repoRoot = process.cwd();
 
 /** Where tokens are DEFINED: the Style Dictionary sources + the hand-authored theme layer. */
 const TOKEN_JSON_DIR = join(repoRoot, 'packages/design-system/tokens');
@@ -101,7 +110,8 @@ function referencedTokens(): Map<string, string[]> {
             for (const match of source.matchAll(/var\(\s*(--mds-[\w-]+)/g)) {
                 const name = match[1];
                 const sites = referenced.get(name) ?? [];
-                sites.push(file.slice(repoRoot.length).replace(/\\/g, '/'));
+                // +1 drops the leading separator, so failures read as `resources/js/…`.
+                sites.push(file.slice(repoRoot.length + 1).replace(/\\/g, '/'));
                 referenced.set(name, sites);
             }
         }

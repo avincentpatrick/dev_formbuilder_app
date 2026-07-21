@@ -465,7 +465,7 @@ The Pest failure was the **known-flaky tampered-token test**, and it was worth f
 
 ---
 
-## 2026-07-21 — H1a: ADR-0007 (async execution substrate) + 12 doc reconciliations — docs-only, PHASE 3 BUILDING STARTS
+## 2026-07-21 — H1a: ADR-0007 (async execution substrate) + 12 doc reconciliations — MERGED (PR #49 `0d9df25`), docs-only, PHASE 3 BUILDING STARTS
 
 **Phase 3's entry point, on the G5a/ADR-0006 docs-only precedent (PR #32 `d2a3ff7`): retire a cross-cutting design fork in a reviewable document before any code depends on it.** Six of Phase 3's twelve verticals dispatch jobs and every rollup/reaper/sweep in the phase is cross-tenant — a pattern with no precedent in the codebase — so the async contract had to exist before H2. The audit (three Explore agents, every `file:line` re-read against source) found the foundation is **almost entirely prose**: exactly one queued job (`ScanAttachmentJob`, `final`, defining none of `$queue`/`$tries`/`$backoff`/`$timeout`/`failed()`/`middleware()`); no worker or scheduler service anywhere (the only committed worker invocation is `queue:listen` in `composer.json`'s `dev` script); no scheduler at all (`routes/console.php` is 8 stock lines, no `withSchedule`, no `app/Console/`) against **four documents asserting one**, most bluntly `feature-backlog.md:85`'s *"scheduler + email + async export already exists"*; and `onQueue(` with **zero hits** against a five-name queue catalog documented as binding in two places.
 

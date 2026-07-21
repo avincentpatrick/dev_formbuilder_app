@@ -388,7 +388,7 @@ Decomposed G10b into **G10b1 (backend + API)** / **G10b2 (UI)** with the user, a
 
 ---
 
-## 2026-07-21 — G10b2: the scoping hierarchy UI (PR open)
+## 2026-07-21 — G10b2: the scoping hierarchy UI (MERGED, PR #47 `ae14bc2`) — G10 COMPLETE
 
 The UI half of G10b, over the backend merged in G10b1 — and the increment that finally makes the Reviewer role assignable by a human: build a hierarchy, assign forms to it, grant a teammate access to a whole branch. **Two user decisions up front:** ship as ONE PR (the backend carries every security-critical decision and is already CI-proven, so the risk is review size, not correctness); and the form→scope picker **requires `scopes.manage`**.
 
@@ -407,3 +407,9 @@ The UI half of G10b, over the backend merged in G10b1 — and the increment that
 **Local-environment caveat, verified not a regression:** `builder-axe` fails locally with `color-contrast` in a theme/viewport combination that changes between runs, and it fails **on `main` at `ca92379` too** (checked out and re-run to confirm). CI is green on main; this is a local rendering artifact.
 
 **Narrowings:** the tree ships whole, capped at 2,000 nodes with an honest notice (expand-on-demand is the follow-up for a ~44k-node PSGC shape); grants are managed per node only. Found and deliberately **not** folded in: `--mds-color-text-muted` and `--mds-type-heading-sm-*` do not exist and are referenced at 4+ live sites.
+
+**Merged with all 6 CI jobs green, after two fixes for failures this branch did not cause.** `composer audit` broke on three guzzle advisories published the same day (`<7.15.1`: host-only cookie scope, unbounded response cookies, Proxy-Authorization forwarded to origin) — bumped 7.13.2 → 7.15.1, transitive via `laravel/framework`, no constraint change. `npm audit --audit-level=high` then broke on `brace-expansion` and `shell-quote` DoS advisories reachable only through `@storybook/test-runner`; plain `npm audit fix` cleared both, and the 8 remaining moderates sit below the gate.
+
+The Pest failure was the **known-flaky tampered-token test**, and it was worth fixing rather than re-running: `GuestShareTokenServiceTest::tamperSegment` flipped the LAST base64url character while calling itself deterministic, but a 32-byte HMAC is 42.7 six-bit groups, so the trailing character carries 2 padding bits and several distinct trailing characters decode to the same raw bytes — the "tamper" could leave the signature intact. It flaked once locally and once on CI the same day. `GuestRuntimeTest` already carried the first-character fix for exactly this reason; the unit helper had been missed. **The repo now has no known flaky test**, and that gotcha entry has been retired.
+
+**E2E passing on CI is also what settled the local `builder-axe` `color-contrast` failures as environmental** — they reproduce on `main` at `ca92379` and not on CI's Linux runner.

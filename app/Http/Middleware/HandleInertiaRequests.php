@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Form;
 use App\Models\ScopeNode;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -67,10 +68,12 @@ class HandleInertiaRequests extends Middleware
                     'manageScopes' => (bool) $user?->can('viewAny', ScopeNode::class),
                 ],
             ],
-            // Drives the app shell's theme toggle (C2) and the <html> attribute emission below.
-            // Guests resolve to "system", which emits no attribute (prefers-color-scheme decides).
+            // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the
+            // <html> attribute emission in app.blade.php. Guests resolve to the product defaults, every
+            // one of which emits NO attribute (so prefers-color-scheme decides the theme and the type
+            // scale / body face stay at their base values).
             'ui' => [
-                'theme' => $user?->uiTheme() ?? ['mode' => 'system', 'accent' => 'blueprint'],
+                'theme' => $user?->uiTheme() ?? User::defaultUiTheme(),
             ],
             // One-shot flash → toast bridge (design-system §3.7). Controllers signal an outcome with
             // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's

@@ -172,7 +172,21 @@ function keyFor(row: Row, index: number): string {
 </template>
 
 <style scoped>
+/* `position: relative` is load-bearing, not decorative. This wrapper is the table's horizontal scroll
+   container, but `.mds-table__sr` (and, at the mobile breakpoint, the visually-hidden `thead`) are
+   `position: absolute`. Without a positioned ancestor here their containing block resolves OUTSIDE the
+   wrapper, so `overflow-x: auto` does not clip them — a 1px visually-hidden span sitting past the last
+   column then extends the DOCUMENT's scrollable width, and the whole page scrolls horizontally even
+   though the table itself is correctly contained.
+
+   Found in G11 by the personalization E2E: at 834px the combination of the extra_large type scale and
+   the wider dyslexia-friendly face pushed the "Actions" span past the viewport edge and the page gained
+   50px of real horizontal scroll. It is a latent bug in this component, not a personalization one —
+   personalization only made the table wide enough to reach it — so it is fixed here rather than worked
+   around at the page level. Note that no `overflow-x` on any ancestor can fix it: an absolutely
+   positioned element is clipped by its containing block, not by an arbitrary scrolling ancestor. */
 .mds-table__scroll {
+    position: relative;
     width: 100%;
     overflow-x: auto;
 }

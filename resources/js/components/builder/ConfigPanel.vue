@@ -561,7 +561,7 @@ watch(librarySaved, (value) => {
     margin: 0;
     padding: var(--mds-space-2) var(--mds-space-3);
     border-radius: var(--mds-radius-md);
-    background-color: var(--mds-color-danger-surface, var(--mds-color-bg-sunken));
+    background-color: var(--mds-color-bg-sunken);
     color: var(--mds-color-danger-text);
     font-size: var(--mds-type-body-sm-font-size);
 }

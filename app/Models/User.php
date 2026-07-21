@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AccentToken;
+use App\Enums\FontSizeScale;
+use App\Enums\ThemeMode;
 use App\Models\Concerns\HasUuidv7;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -84,25 +87,58 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Resolved theme preference for server-side <html> attribute emission (Increment C).
-     * Fail-safe: `user_ui_preferences` is under belongs-to-user RLS; if app.current_user_id
-     * isn't set the read fails closed — degrade to "system", never throw. (accent lands in C2.)
+     * Resolved appearance preferences for server-side <html> attribute emission (Increment C for
+     * `mode`; G11 added the other three — PRD Feature #9, design-system-reference.md §2.9).
      *
-     * @return array{mode: string, accent: string}
+     * Fail-safe: `user_ui_preferences` is under belongs-to-user RLS, so if app.current_user_id isn't
+     * set the read fails closed — degrade to the product defaults, never throw. That rescue is
+     * load-bearing and must be preserved: it is what lets any request render even when the tenant
+     * database context has not been established.
+     *
+     * Shape is camelCase because it crosses the wire as an Inertia prop (matching `auth.can.*`); the
+     * PATCH request fields stay snake_case to match the column names.
+     *
+     * @return array{mode: string, accent: string, fontSize: string, dyslexiaFont: bool}
      */
     public function uiTheme(): array
     {
         return rescue(
             function (): array {
-                $mode = $this->uiPreference()->value('theme_mode');
+                $preference = $this->uiPreference()->first();
+
+                if ($preference === null) {
+                    return self::defaultUiTheme();
+                }
 
                 return [
-                    'mode' => is_string($mode) ? $mode : 'system',
-                    'accent' => 'blueprint',
+                    'mode' => $preference->theme_mode->value,
+                    // NULL accent_token = Blueprint, the product default (data-dictionary §19).
+                    'accent' => AccentToken::fromColumn($preference->accent_token?->value)->value,
+                    'fontSize' => $preference->font_size_scale->value,
+                    'dyslexiaFont' => $preference->use_dyslexia_friendly_font,
                 ];
             },
-            ['mode' => 'system', 'accent' => 'blueprint'],
+            self::defaultUiTheme(),
             report: false,
         );
+    }
+
+    /**
+     * The product-default appearance, in one place.
+     *
+     * Both the rescue fallback above and HandleInertiaRequests' guest branch need these, and Increment
+     * C duplicated the literal across both — so a fourth axis would have meant editing two lists that
+     * nothing forced to agree.
+     *
+     * @return array{mode: string, accent: string, fontSize: string, dyslexiaFont: bool}
+     */
+    public static function defaultUiTheme(): array
+    {
+        return [
+            'mode' => ThemeMode::System->value,
+            'accent' => AccentToken::Blueprint->value,
+            'fontSize' => FontSizeScale::Standard->value,
+            'dyslexiaFont' => false,
+        ];
     }
 }

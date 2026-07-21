@@ -37,7 +37,7 @@ const label = computed(() => {
     width: 8px;
     height: 8px;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-success-text, var(--mds-color-text-secondary));
+    background-color: var(--mds-color-text-secondary);
 }
 
 .saved-indicator__dot--saving {

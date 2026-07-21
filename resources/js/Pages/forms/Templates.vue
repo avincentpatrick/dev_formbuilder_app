@@ -130,8 +130,8 @@ function useTemplate(template: TemplateCard): void {
 
 .templates__name {
     margin: 0;
-    font-size: var(--mds-type-heading-sm-font-size);
-    line-height: var(--mds-type-heading-sm-line-height);
+    font-size: var(--mds-type-heading-4-font-size);
+    line-height: var(--mds-type-heading-4-line-height);
     font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-heading);
 }
@@ -146,7 +146,7 @@ function useTemplate(template: TemplateCard): void {
 .templates__stats {
     margin: var(--mds-space-3) 0 0;
     font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-muted);
+    color: var(--mds-color-text-secondary);
 }
 
 .templates__dot {

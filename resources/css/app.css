@@ -1,9 +1,16 @@
 /* Meridian admin app global stylesheet.
    Shared design tokens + the theme/personalization re-pointing layer come from
    @meridian/design-system (wired in Increment C). tokens.css must load before theme.css
-   so the dark/accent overrides win the cascade. */
+   so the dark/accent overrides win the cascade.
+
+   fonts.css declares the optional dyslexia-friendly face (G11) and is imported HERE ONLY — the guest
+   form runtime deliberately does not get it, because personalization is authenticated-app-only
+   (design-system-reference.md §2.9). Declaring a @font-face costs no request: the browser fetches the
+   file only once a rule using the family matches, and the only such rule is gated behind the
+   data-dyslexia-font attribute the server emits for opted-in users. */
 @import '@meridian/design-system/tokens.css';
 @import '@meridian/design-system/theme.css';
+@import '@meridian/design-system/fonts.css';
 
 :root {
     color-scheme: light dark;

@@ -8,7 +8,8 @@
         ".": "./src/index.ts",
         "./tokens.css": "./dist/tokens.css",
         "./tokens": "./dist/tokens.ts",
-        "./theme.css": "./src/theme/theme-overrides.css"
+        "./theme.css": "./src/theme/theme-overrides.css",
+        "./fonts.css": "./src/theme/fonts.css"
     },
     "files": [
         "dist",

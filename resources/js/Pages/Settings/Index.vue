@@ -1,14 +1,20 @@
 <script setup lang="ts">
 /**
  * Settings — Profile, Appearance, and Security (2FA + password). Profile/password/2FA drive Fortify's
- * own account endpoints; Appearance persists theme_mode via the shared theme composable. Rendered inside
- * the persistent AppLayout. Feature #10 sections (Access/Modules/Maintenance) land in Phase 1.
+ * own account endpoints; Appearance persists the four personalization axes via the shared composable.
+ * Rendered inside the persistent AppLayout. Feature #10 sections (Access/Modules/Maintenance) land in
+ * Phase 1.
+ *
+ * This is the canonical home for personalization (PRD Feature #9, design-system-reference.md §2.9).
+ * The top-nav quick toggle is a deliberately narrow additional surface for theme mode only
+ * (exceptions-log #3) — the other three axes live here and nowhere else.
  */
 import { usePage } from '@inertiajs/vue3';
 import { useForm } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsCard,
+    MdsCheckbox,
     MdsFormField,
     MdsIcon,
     MdsPasswordInput,
@@ -18,19 +24,35 @@ import {
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
-import type { ThemeMode } from '@/types/inertia';
-import { useThemePreference } from '@/composables/useTheme';
+import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
+import { useAppearancePreference } from '@/composables/useTheme';
 
 defineProps<{ twoFactor: { enabled: boolean; confirmed: boolean } }>();
 
 const page = usePage();
 
-// Appearance
-const { mode, setMode } = useThemePreference();
+// Appearance — all four §2.9 axes. Each control PATCHes only its own field.
+const { mode, setMode, accent, setAccent, fontSize, setFontSize, dyslexiaFont, setDyslexiaFont } =
+    useAppearancePreference();
+
 const themeOptions: { value: ThemeMode; label: string; icon: IconName }[] = [
     { value: 'light', label: 'Light', icon: 'sun' },
     { value: 'dark', label: 'Dark', icon: 'moon' },
     { value: 'system', label: 'Match System', icon: 'monitor' },
+];
+
+// Label-only, deliberately: a colour swatch would be a colour-ONLY signifier (WCAG 1.4.1), and the
+// control already previews the accent for free — the selected chip is painted with
+// --mds-color-action-primary-bg, so choosing Teal turns the chip you just clicked teal.
+const accentOptions: { value: AccentToken; label: string }[] = [
+    { value: 'blueprint', label: 'Blueprint' },
+    { value: 'teal', label: 'Teal' },
+];
+
+const fontSizeOptions: { value: FontSizeScale; label: string }[] = [
+    { value: 'standard', label: 'Standard' },
+    { value: 'large', label: 'Large' },
+    { value: 'extra_large', label: 'Extra large' },
 ];
 
 // Profile (Fortify: PUT /user/profile-information)
@@ -114,6 +136,51 @@ function savePassword(): void {
                     :options="themeOptions"
                     ariaLabel="Theme"
                     @update:model-value="(v: string) => setMode(v as ThemeMode)"
+                />
+            </div>
+
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">Accent colour</p>
+                    <p class="settings-row__hint">
+                        Recolours primary buttons, links, and focus rings. Status colours are unaffected.
+                    </p>
+                </div>
+                <MdsSegmentedControl
+                    :model-value="accent"
+                    :options="accentOptions"
+                    ariaLabel="Accent colour"
+                    @update:model-value="(v: string) => setAccent(v as AccentToken)"
+                />
+            </div>
+
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">Text size</p>
+                    <p class="settings-row__hint">
+                        Scales all text across Meridian. Public forms your respondents see are not
+                        affected.
+                    </p>
+                </div>
+                <MdsSegmentedControl
+                    :model-value="fontSize"
+                    :options="fontSizeOptions"
+                    ariaLabel="Text size"
+                    @update:model-value="(v: string) => setFontSize(v as FontSizeScale)"
+                />
+            </div>
+
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">Dyslexia-friendly font</p>
+                    <p class="settings-row__hint">
+                        Switches body text to OpenDyslexic. Headings and code stay as they are.
+                    </p>
+                </div>
+                <MdsCheckbox
+                    :model-value="dyslexiaFont"
+                    label="Use a dyslexia-friendly font"
+                    @update:model-value="setDyslexiaFont"
                 />
             </div>
         </MdsCard>
@@ -242,6 +309,22 @@ function savePassword(): void {
     align-items: center;
     justify-content: space-between;
     gap: var(--mds-space-4);
+}
+
+/* The Appearance card carries four rows since G11 — separate them so each preference reads as its
+   own decision rather than one dense block. */
+.settings-row + .settings-row {
+    margin-top: var(--mds-space-5);
+    padding-top: var(--mds-space-5);
+    border-top: 1px solid var(--mds-color-border-default);
+}
+
+/* Let a control shrink/wrap rather than force a horizontal scroller inside the card: under the §2.9
+   text-size scale the three-segment "Text size" control grows ~25%, and at 375px that is enough to
+   exceed the card's content box. */
+.settings-row > :not(.settings-row__text) {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .settings-row__text {

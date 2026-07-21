@@ -256,7 +256,7 @@ const description = computed(() => runtime.renderModel.form.description);
 }
 
 .session-notice--rate-limited {
-    border-left: 4px solid var(--mds-color-warning-text, var(--mds-color-border-strong));
+    border-left: 4px solid var(--mds-color-border-strong);
 }
 
 .session-notice--error {

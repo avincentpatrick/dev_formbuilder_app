@@ -31,7 +31,13 @@
         "strong": { "value": "#8F5E28" }
     },
     "accent-teal": {
-        "600": { "value": "#1B5E5E" }
+        "50": { "value": "#E6F2F2" },
+        "300": { "value": "#34B4B4" },
+        "400": { "value": "#247E7E" },
+        "500": { "value": "#1D6666" },
+        "600": { "value": "#1B5E5E" },
+        "700": { "value": "#164E4E" },
+        "800": { "value": "#113C3C" }
     },
     "success": {
         "50": { "value": "#EAF3EE" },

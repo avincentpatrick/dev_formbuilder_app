@@ -55,10 +55,15 @@ const emit = defineEmits<{ 'toggle-drawer': [] }>();
     box-shadow: var(--mds-shadow-1);
 }
 
+/* min-width: 0 on both groups so they can shrink below their content instead of pushing the bar
+   wider than the viewport. Without it a flex item's automatic minimum size is its content size, and
+   the §2.9 text-size scale grows the wordmark ~25% at extra_large — at 375px that leaves only ~31px
+   of headroom, i.e. one long tenant name from overflowing. */
 .topnav__left {
     display: flex;
     align-items: center;
     gap: var(--mds-space-2);
+    min-width: 0;
 }
 
 .topnav__wordmark {
@@ -68,12 +73,17 @@ const emit = defineEmits<{ 'toggle-drawer': [] }>();
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
+    /* Truncate rather than force the bar wide (see .topnav__left). */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .topnav__right {
     display: flex;
     align-items: center;
     gap: var(--mds-space-1);
+    min-width: 0;
 }
 
 .topnav__hamburger {

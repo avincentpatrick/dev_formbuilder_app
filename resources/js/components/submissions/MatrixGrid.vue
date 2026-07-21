@@ -234,7 +234,7 @@ function setCell(rowValue: string, colValue: string, value: string): void {
 
 .mds-grid__radio {
     margin: 0;
-    accent-color: var(--mds-color-action-default, currentColor);
+    accent-color: currentColor;
 }
 
 /* matrix — wrapping labelled selects, one per column. */

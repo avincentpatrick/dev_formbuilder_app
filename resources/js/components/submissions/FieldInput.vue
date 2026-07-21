@@ -507,7 +507,7 @@ function setCascadeLevel(index: number, value: string): void {
 
 .encode-scale__radio {
     margin: 0;
-    accent-color: var(--mds-color-action-default, currentColor);
+    accent-color: currentColor;
 }
 
 /* Cascading select — one stacked select per level. */

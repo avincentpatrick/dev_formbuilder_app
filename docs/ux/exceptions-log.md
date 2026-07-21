@@ -93,3 +93,72 @@ guest-shell (#1), not a new top-level shell. Built entirely from shared design-s
 chrome is token-only — no one-off colors/spacing/radius/type). It lives in the app (Inertia-specific)
 rather than the package. If a broader internal-tooling surface emerges (Phase 1+ support/billing
 consoles), fold this into a shared console-shell primitive rather than adding a fifth layout.
+
+---
+
+## #5 — Self-hosted OpenDyslexic web font (`public/fonts/`, `packages/design-system/src/theme/fonts.css`)
+
+**Introduced:** Phase 2 · Increment G11 (richer personalization).
+
+**What deviates:** DSR §2.4 states that none of the three font roles "requires a webfont license or a
+data-URI font embed — all are either pre-installed OS fonts or universally available system fallbacks,
+which also keeps the public embeddable form runtime free of an extra font-loading round trip."
+OpenDyslexic is the **first webfont in the system**, breaking that all-system-stack property.
+
+**Why:** §2.9's dyslexia-friendly accommodation re-points `--mds-font-family-body` to OpenDyslexic. The
+literal reading of the original §2.9 snippet — reference the family and let it fall back — was rejected
+because OpenDyslexic is installed on essentially no machine, so the toggle would appear to work while
+doing nothing for virtually every user. A feature that silently no-ops is worse than no feature: the
+user believes the accommodation is applied.
+
+**Why it does not actually cost anything:** a browser fetches a `@font-face` `src` only when a rule
+*using* that family matches an element. The sole rule naming OpenDyslexic is
+`:root[data-dyslexia-font='true']`, and the server emits that attribute only for users who opted in. A
+user who never opts in parses two `@font-face` blocks and downloads **zero font bytes** — so §2.4's
+property still holds for the default path, which is what it was actually protecting.
+
+**Scoping:** the `@font-face` lives in a **new** `src/theme/fonts.css`, imported only by
+`resources/css/app.css`. It is deliberately **not** in `theme-overrides.css`, because
+`resources/public-runtime/public-runtime.css` imports that file — the declaration would otherwise ship
+in the guest bundle, which is designed to be embedded on third-party domains and must stay free of
+unexpected font references (§2.9's governing rule). Two weights only (400/700); 500 and 600 synthesise.
+No `size-adjust`: the wide advances and weighted bottoms *are* the accommodation, so normalising the
+metrics would defeat it — the extra width is absorbed by the shell guards in `AppLayout`/`TopNav`.
+
+**Provenance:** OpenDyslexic **5.2.5**, latin subset, as distributed by `@fontsource/opendyslexic`.
+© Abbie Gonzalez, **SIL Open Font License 1.1**, Reserved Font Name "OpenDyslexic" (not renamed).
+Licence vendored verbatim at `public/fonts/OpenDyslexic-LICENSE.txt`, as OFL §2 requires it to ship
+with the font.
+
+**Disposition:** accepted as a **scoped, opt-in accommodation**, not a general licence to add webfonts.
+Any future webfont needs its own entry here. No CSP change was required —
+`PublicRuntimeSecurityHeaders` sets no `default-src`, so `font-src` has nothing to fall back to and is
+unrestricted; `PublicRuntimeSecurityHeadersTest` now asserts the absence of `font-src` so a future
+hardening PR introducing `default-src` is forced to add `font-src 'self'` in the same change.
+
+---
+
+## #6 — Dark-mode teal accent inverts its press direction (`packages/design-system/src/theme/theme-overrides.css`)
+
+**Introduced:** Phase 2 · Increment G11 (richer personalization).
+
+**What deviates:** every other ramp in the system gets *lighter* on press in dark mode — Blueprint's
+dark `action-primary-bg-active` is `primary-300`, a paler step than its hover. Dark-mode **teal** goes
+the other way: `bg` `teal-500` → `bg-hover` `teal-400` (lighter, as expected) → `bg-active` `teal-700`
+(**darker**).
+
+**Why:** it is not a stylistic choice, it is forced by the hue. The lightest teal step that still
+clears 4.5:1 against white text is ≈`#247F7F` — which *is* the hover step. There is no lighter teal
+available for the active state that keeps its label readable, so "lighter on press" is mathematically
+unreachable for this hue. Darkening instead yields 9.40:1 and reads as a pressed-in surface, which is
+the conventional pressed metaphor anyway.
+
+**Related observation, deliberately not fixed here:** Blueprint's own dark `bg-active` (`primary-300`)
+measures **2.52:1** with white text — a pre-existing latent failure, invisible to CI because
+`assertClean` parks the pointer and axe never evaluates `:active`. It predates G11 and is unrelated to
+personalization; fixing it means re-deriving Blueprint's dark press step and re-verifying every
+component that uses it, which is its own change. Recorded here so it is not rediscovered as new.
+
+**Disposition:** accepted. Both directions are contrast-verified in DSR §4.1's 17-row table, and the
+`TealDark` / `MaxPersonalization` Storybook stories plus the Playwright `personalization-axe` spec keep
+the pairings under automated watch.

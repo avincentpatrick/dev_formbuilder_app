@@ -108,14 +108,168 @@
     }
 }
 
-/* ── Accent alternative (the ONLY personalization accent besides Blueprint) ─
-   Phase-2 personalization (§2.9). Moss (success) and Brass (annotation) are
-   deliberately excluded from this whitelist. Remaps only the primary action hue. */
+/* ── Accent alternative — Teal (the ONLY personalization accent besides Blueprint) ─────
+   Phase-2 personalization (§2.9). Moss (Success) and Brass (annotation) are deliberately
+   excluded from this whitelist: reusing a semantic hue as a personal accent would let a
+   user recolour every primary button the same green as "success". Remaps ONLY the
+   primary-action hue + focus ring — never a neutral/success/warning/danger scale.
+
+   G11 fixed four defects in the C2 stub, none of which were observable because nothing in
+   the product could set data-accent (and no E2E test ever had):
+     · -bg-hover pointed at --mds-primary-700 — a BLUE hover on a teal button;
+     · -bg-active and -tint were never overridden, so they stayed blue;
+     · there was no dark variant at all — and since [data-accent] had the SAME specificity
+       as [data-theme-mode='dark'] and appeared LATER in source order, teal won in dark and
+       painted light #1B5E5E on the #123350 dark ground: 1.74:1 for BOTH
+       action-primary-fg and focus-ring, failing WCAG 1.4.3 (4.5:1) and 1.4.11 (3:1).
+   Every pairing below is measured; the full table is DSR §4.1. */
+
+/* Light (and the light half of "system"). */
 :root[data-accent='teal'] {
-    --mds-color-action-primary-bg: var(--mds-accent-teal-600);
-    --mds-color-action-primary-bg-hover: var(--mds-primary-700);
-    --mds-color-action-primary-fg: var(--mds-accent-teal-600);
-    --mds-color-focus-ring: var(--mds-accent-teal-600);
+    --mds-color-action-primary-bg: var(--mds-accent-teal-600); /* white on it  7.48:1 */
+    --mds-color-action-primary-bg-hover: var(--mds-accent-teal-700); /*         9.40:1 */
+    --mds-color-action-primary-bg-active: var(--mds-accent-teal-800); /*       12.10:1 */
+    --mds-color-action-primary-fg: var(--mds-accent-teal-600); /* on #fff      7.48:1 */
+    --mds-color-action-primary-tint: var(--mds-accent-teal-50); /* ink on it   15.90:1 */
+    --mds-color-focus-ring: var(--mds-accent-teal-700); /* vs #fff             9.40:1 */
+}
+
+/* The dark-ground teal payload, defined ONCE. The two dark selectors below assign from these
+   private customs rather than repeating literals, so the explicit opt-in and the
+   prefers-color-scheme twin cannot drift apart the way the neutral dark block above did when
+   it was copy-pasted. (Defining them unconditionally on :root is inert — nothing reads them
+   unless one of those two selectors matches.)
+
+   Dark inverts the ramp direction: fill/hover climb toward the light end so they read as
+   raised on the drafting ground, and fg/ring take the palest step so pale-on-dark text clears
+   4.5:1. ACTIVE deliberately goes DARKER (teal-700, not a lighter step as blueprint does):
+   for this hue the lightest step still clearing 4.5:1 against white IS the hover step, so
+   "lighter on press" is mathematically unreachable. Darker-on-press reads as a pressed-in
+   surface and measures 9.40:1. Recorded as exceptions-log #6. */
+:root {
+    --mds-_accent-teal-dark-bg: var(--mds-accent-teal-500); /* white on it     6.68:1 */
+    --mds-_accent-teal-dark-bg-hover: var(--mds-accent-teal-400); /*           4.82:1 */
+    --mds-_accent-teal-dark-bg-active: var(--mds-accent-teal-700); /*          9.40:1 */
+    --mds-_accent-teal-dark-fg: var(--mds-accent-teal-300); /* on #123350      5.16:1 */
+    --mds-_accent-teal-dark-tint: rgba(36, 126, 126, 0.18); /* pale ink on it  9.54:1 */
+    --mds-_accent-teal-dark-ring: var(--mds-accent-teal-300); /* vs #123350    5.16:1 */
+}
+
+/* Dark + teal, explicit opt-in. (0,3,0) beats both the light teal rule (0,2,0) and the
+   neutral dark block (0,2,0) on specificity alone, independent of source order. */
+:root[data-theme-mode='dark'][data-accent='teal'] {
+    --mds-color-action-primary-bg: var(--mds-_accent-teal-dark-bg);
+    --mds-color-action-primary-bg-hover: var(--mds-_accent-teal-dark-bg-hover);
+    --mds-color-action-primary-bg-active: var(--mds-_accent-teal-dark-bg-active);
+    --mds-color-action-primary-fg: var(--mds-_accent-teal-dark-fg);
+    --mds-color-action-primary-tint: var(--mds-_accent-teal-dark-tint);
+    --mds-color-focus-ring: var(--mds-_accent-teal-dark-ring);
+}
+
+/* Dark + teal, system default (no explicit light/dark choice). Must live inside the media
+   query — a selector alone cannot carry the media condition. (0,4,0) beats the neutral
+   system-dark block (0,3,0). */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme-mode='light']):not([data-theme-mode='dark'])[data-accent='teal'] {
+        --mds-color-action-primary-bg: var(--mds-_accent-teal-dark-bg);
+        --mds-color-action-primary-bg-hover: var(--mds-_accent-teal-dark-bg-hover);
+        --mds-color-action-primary-bg-active: var(--mds-_accent-teal-dark-bg-active);
+        --mds-color-action-primary-fg: var(--mds-_accent-teal-dark-fg);
+        --mds-color-action-primary-tint: var(--mds-_accent-teal-dark-tint);
+        --mds-color-focus-ring: var(--mds-_accent-teal-dark-ring);
+    }
+}
+
+/* ── Text size (§2.9): PROPORTIONAL scaling of the whole type scale ─────────────────────
+   Both font-size AND line-height are multiplied (×1.125 large, ×1.25 extra_large); the
+   font-size is rounded to whole px and the line-height is then DERIVED as
+   round(roundedFontSize × the role's ORIGINAL ratio) — so every role keeps its vertical
+   rhythm to within ±2% and never drops below 1.22.
+
+   This deliberately DEVIATES from the original DSR §2.9 wording ("+2px per level, never
+   changing line-heights"), which at extra_large produced 17px body-sm text inside an 18px
+   line box (ratio 1.06) and 16px caption inside 16px (1.00) — line boxes tighter than the
+   glyphs, clipping descenders and failing WCAG 1.4.12 the moment a user also applies a
+   text-spacing override. An accessibility feature must not ship an accessibility
+   regression. §2.9 has been corrected to match the table below, and
+   src/theme/__tests__/type-scale.test.ts keeps the two in lockstep.
+
+   Uniform across the WHOLE scale, never per-component (§2.9 governing rule).
+   `standard` = the ABSENCE of data-font-size, matching the theme-mode convention.
+
+   `code` (mono) IS size-scaled even though the dyslexia toggle does NOT swap the mono face.
+   The two axes are different accommodations: font size is for low vision, and `code` is tied
+   for the smallest role in the system, so leaving it at 13px while body reaches 20px
+   recreates the exact "one region I can't read" failure the feature exists to fix; the face
+   swap is for letterform disambiguation in prose, where OpenDyslexic's weighted bottoms help
+   — in column-aligned data they hurt. */
+:root[data-font-size='large'] {
+    --mds-type-display-font-size: 41px;
+    --mds-type-display-line-height: 50px;
+    --mds-type-heading-1-font-size: 34px;
+    --mds-type-heading-1-line-height: 43px;
+    --mds-type-heading-2-font-size: 27px;
+    --mds-type-heading-2-line-height: 36px;
+    --mds-type-heading-3-font-size: 23px;
+    --mds-type-heading-3-line-height: 32px;
+    --mds-type-heading-4-font-size: 18px;
+    --mds-type-heading-4-line-height: 27px;
+    --mds-type-body-lg-font-size: 18px;
+    --mds-type-body-lg-line-height: 27px;
+    --mds-type-body-md-font-size: 16px;
+    --mds-type-body-md-line-height: 23px;
+    --mds-type-body-sm-font-size: 15px;
+    --mds-type-body-sm-line-height: 21px;
+    --mds-type-label-font-size: 15px;
+    --mds-type-label-line-height: 21px;
+    --mds-type-caption-font-size: 14px;
+    --mds-type-caption-line-height: 19px;
+    --mds-type-code-font-size: 15px;
+    --mds-type-code-line-height: 23px;
+}
+
+:root[data-font-size='extra_large'] {
+    --mds-type-display-font-size: 45px;
+    --mds-type-display-line-height: 55px;
+    --mds-type-heading-1-font-size: 38px;
+    --mds-type-heading-1-line-height: 48px;
+    --mds-type-heading-2-font-size: 30px;
+    --mds-type-heading-2-line-height: 40px;
+    --mds-type-heading-3-font-size: 25px;
+    --mds-type-heading-3-line-height: 35px;
+    --mds-type-heading-4-font-size: 20px;
+    --mds-type-heading-4-line-height: 30px;
+    --mds-type-body-lg-font-size: 20px;
+    --mds-type-body-lg-line-height: 30px;
+    --mds-type-body-md-font-size: 18px;
+    --mds-type-body-md-line-height: 26px;
+    --mds-type-body-sm-font-size: 16px;
+    --mds-type-body-sm-line-height: 22px;
+    --mds-type-label-font-size: 16px;
+    --mds-type-label-line-height: 22px;
+    --mds-type-caption-font-size: 15px;
+    --mds-type-caption-line-height: 20px;
+    --mds-type-code-font-size: 16px;
+    --mds-type-code-line-height: 25px;
+}
+
+/* ── Dyslexia-friendly body face (§2.9) ─────────────────────────────────────────────────
+   Re-points ONLY the semantic --mds-font-family-body alias, which every body type role
+   (body-lg/md/sm, label, caption) resolves through. The Display role (headings — the
+   product's visual personality) and the Utility/mono role (data, code, expressions, where
+   character-exactness and column alignment matter) are untouched, exactly as §2.9 requires:
+   a targeted accommodation, not a general typeface picker.
+
+   This is also the ONLY rule in the system that names the OpenDyslexic family, which is what
+   makes the face free for everyone else: a browser fetches a @font-face src only when a rule
+   using that family actually matches an element, and this rule can only match when the server
+   emitted the opt-in attribute. A user who never opts in downloads zero font bytes, so DSR
+   §2.4's webfont-free property still holds on the default path. The @font-face itself lives in
+   fonts.css, which the guest runtime deliberately does NOT import.
+
+   Falls back to the default body stack if the face fails to load. */
+:root[data-dyslexia-font='true'] {
+    --mds-font-family-body: 'OpenDyslexic', var(--mds-font-family-body-default);
 }
 
 /* ── Reduced motion: collapse all durations centrally (§2.8) ────────────────

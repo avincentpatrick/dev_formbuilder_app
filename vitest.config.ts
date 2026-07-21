@@ -23,7 +23,16 @@ export default defineConfig({
         },
     },
     test: {
-        include: ['resources/public-runtime/**/*.test.ts'],
+        // G11 widened this beyond the public runtime: the personalization work adds unit suites for
+        // the admin-side theme composable (resources/js) and for the design-system theme layer itself
+        // (the type-scale / dead-token / dark-block-drift guards, which parse the token JSON + CSS off
+        // disk). Verified at the time of widening that no stray *.test.ts existed outside
+        // resources/public-runtime/, so this cannot silently pick up unmaintained specs.
+        include: [
+            'resources/public-runtime/**/*.test.ts',
+            'resources/js/**/*.test.ts',
+            'packages/design-system/**/*.test.ts',
+        ],
         environment: 'happy-dom',
         // Increment G8b — install fake-indexeddb before the Dexie offline-engine suites run.
         setupFiles: ['resources/public-runtime/__tests__/setup.ts'],

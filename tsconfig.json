@@ -32,6 +32,7 @@
         "vendor",
         "packages",
         "resources/public-runtime/**/*.test.ts",
+        "resources/js/**/*.test.ts",
         "resources/public-runtime/sw.ts"
     ]
 }

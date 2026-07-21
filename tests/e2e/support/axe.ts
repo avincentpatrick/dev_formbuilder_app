@@ -39,3 +39,40 @@ export async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<v
         else document.documentElement.removeAttribute('data-theme-mode');
     }, theme);
 }
+
+export type Personalization = {
+    accent?: 'blueprint' | 'teal';
+    fontSize?: 'standard' | 'large' | 'extra_large';
+    dyslexia?: boolean;
+};
+
+/**
+ * Sibling of forceTheme for the other three §2.9 personalization axes (G11), driving the root
+ * attributes directly rather than round-tripping through Settings — so a scan costs one page load.
+ *
+ * Follows the same "default = ABSENCE of the attribute" convention the server uses, so a scan with
+ * `{}` measures exactly what an un-personalized user sees.
+ *
+ * The `document.fonts.ready` await is NOT optional. The dyslexia face is fetched only once a rule
+ * using the family matches an element — i.e. only after the attribute below is set — so without
+ * waiting, axe and the horizontal-overflow assertion measure the FALLBACK stack's glyph metrics.
+ * OpenDyslexic is substantially wider than the system stack, so that is the difference between a
+ * scan that means something and an intermittent failure that only reproduces under CI load.
+ */
+export async function forcePersonalization(page: Page, options: Personalization): Promise<void> {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    await page.evaluate((opts) => {
+        const html = document.documentElement;
+        const set = (attribute: string, value: string | null): void => {
+            if (value === null) html.removeAttribute(attribute);
+            else html.setAttribute(attribute, value);
+        };
+
+        set('data-accent', opts.accent === 'teal' ? 'teal' : null);
+        set('data-font-size', opts.fontSize && opts.fontSize !== 'standard' ? opts.fontSize : null);
+        set('data-dyslexia-font', opts.dyslexia ? 'true' : null);
+    }, options);
+
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+}

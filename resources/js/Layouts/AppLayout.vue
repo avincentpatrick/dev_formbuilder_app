@@ -78,6 +78,14 @@ function onKeydown(event: KeyboardEvent): void {
     height: 100vh;
     height: 100dvh;
     background-color: var(--mds-color-bg-canvas);
+    /* G11 belt: the §2.9 text-size scale can grow text ~25%, and .app-shell is the only element
+       between the top nav and the document — .app-shell__content below is its own scroll container,
+       so page content never reaches the document's overflow chain, but the nav does. `clip` (not
+       `hidden`) creates no scroll container and does not break position: sticky, so this guarantees
+       no personalization combination can ever scroll the DOCUMENT horizontally. The E2E
+       no-horizontal-overflow assertion then measures real layout regressions rather than flaking on
+       one long tenant name at 375px. */
+    overflow-x: clip;
 }
 
 .app-shell__body {

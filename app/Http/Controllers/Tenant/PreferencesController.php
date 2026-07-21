@@ -5,20 +5,24 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\UpdateAppearanceRequest;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * Per-user settings (Feature #9 appearance + profile/security). Runs inside the authenticated tenant
  * group, where EstablishTenantDatabaseContext has set app.current_user_id — the belongs-to-user RLS key
- * on user_ui_preferences — so the theme upsert is visible and writable. No permission gate: a user edits
+ * on user_ui_preferences — so the upsert is visible and writable. No permission gate: a user edits
  * only their own account (RLS-scoped). Profile/password/2FA are driven by Fortify's own endpoints; this
- * only renders the page and passes the current 2FA enrolment state. accent/font/dyslexia → Phase 2.
+ * only renders the page and passes the current 2FA enrolment state.
+ *
+ * The current appearance is NOT passed as a page prop — it reaches the panel through the shared
+ * `ui.theme` prop (HandleInertiaRequests), which the top-nav quick toggle reads too, so both surfaces
+ * cannot disagree.
  */
 final class PreferencesController extends Controller
 {
@@ -35,20 +39,20 @@ final class PreferencesController extends Controller
         ]);
     }
 
-    public function updateTheme(Request $request): RedirectResponse
+    /**
+     * Partial update of the four appearance axes (theme mode, accent, text size, dyslexia font).
+     *
+     * Every field on the request is `sometimes`, so this writes exactly the axes the caller sent — the
+     * top-nav quick toggle sends only `theme_mode` and cannot disturb the rest. See
+     * {@see UpdateAppearanceRequest} for why that guarantee lives in the request rather than here.
+     */
+    public function updateAppearance(UpdateAppearanceRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'theme_mode' => ['required', 'string', Rule::in(['system', 'light', 'dark'])],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
 
-        UserUiPreference::updateOrCreate(
-            ['user_id' => $user->id],
-            ['theme_mode' => $validated['theme_mode']],
-        );
+        UserUiPreference::updateOrCreate(['user_id' => $user->id], $request->toColumns());
 
-        return back()->with('status', 'theme-updated');
+        return back()->with('status', 'appearance-updated');
     }
 }

@@ -62,7 +62,7 @@ onMounted(() => heading.value?.focus());
 .confirmation__icon {
     width: 56px;
     height: 56px;
-    color: var(--mds-color-success-text, var(--mds-color-action-primary-fg));
+    color: var(--mds-color-action-primary-fg);
 }
 
 .confirmation__title {

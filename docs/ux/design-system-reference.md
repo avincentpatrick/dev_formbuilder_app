@@ -112,9 +112,19 @@ Unlike the previous draft's Teal "secondary" scale, Brass is **not** a parallel 
 
 A single additional hue reserved *exclusively* for the Phase-2 personalization mechanism (§2.9) — deliberately **not** Brass (reserved for narrow annotation use only, per the rule above) and **not** Moss/Success (reusing a semantic hue as a personal accent would let a user recolor every primary button the same green as "success," undermining the very separation §2.2 exists to establish). Teal exists so personalization has a second option at all without borrowing meaning from either of those.
 
+Shipped as a single `600` step in C1. **G11 extended it to a full ramp**, because implementing the accent for real exposed that one step cannot serve both grounds: `#1B5E5E` is a *light-mode* hue, and on the dark drafting-blue canvas it measured **1.74:1** as foreground text and focus ring (§4.1). Dark needs paler steps for foreground and mid steps for fills, exactly as the Blueprint ramp does. Steps `100`/`200`/`900` are deliberately omitted — no role needs them, and inventing unused primitives is what this section warns against.
+
 | Token | Hex | Typical use |
 |---|---|---|
-| `--mds-accent-teal-600` | `#1B5E5E` | The one Phase-2 personalization alternative to the default Blueprint accent — verified 7.48:1 white-text contrast, §4.1. Used *only* when a user has selected it; never a system-default, never a semantic-status color. |
+| `--mds-accent-teal-50` | `#E6F2F2` | Light-mode `action-primary-tint` (selected-row / subtle fill). Ink on it: 15.90:1. |
+| `--mds-accent-teal-300` | `#34B4B4` | **Dark-mode only** — `action-primary-fg` and the focus ring. 5.16:1 on the dark surface. |
+| `--mds-accent-teal-400` | `#247E7E` | **Dark-mode only** — primary hover fill. White on it: 4.82:1. |
+| `--mds-accent-teal-500` | `#1D6666` | **Dark-mode only** — primary fill. White on it: 6.68:1. |
+| `--mds-accent-teal-600` | `#1B5E5E` | Light-mode primary fill + `action-primary-fg` — verified 7.48:1 white-text contrast, §4.1. The original ratified value, unchanged. |
+| `--mds-accent-teal-700` | `#164E4E` | Light-mode hover fill + focus ring (9.40:1); also the **dark-mode active** fill — see §4.1's note on why dark inverts direction here. |
+| `--mds-accent-teal-800` | `#113C3C` | Light-mode active fill. White on it: 12.10:1. |
+
+Used *only* when a user has selected it; never a system default, never a semantic-status color.
 
 **Primitive scale — Success (Moss)**
 
@@ -329,18 +339,60 @@ Added after the original seven-subsection token model, at the user's explicit re
 :root { --mds-color-action-primary-bg: var(--mds-primary-600); }
 :root[data-theme-mode="dark"] { --mds-color-action-primary-bg: var(--mds-primary-400); }
 
-/* Personalization layer: applied on top, Phase 2 */
+/* Personalization layer: applied on top, Phase 2 (as built in G11) */
 :root[data-accent="teal"] { --mds-color-action-primary-bg: var(--mds-accent-teal-600); }
-:root[data-font-size="large"] { --mds-type-body-lg: 18px; /* ...uniform +2px step across the whole body scale */ }
+:root[data-font-size="large"] {
+    --mds-type-body-lg-font-size: 18px;   /* ×1.125, rounded */
+    --mds-type-body-lg-line-height: 27px; /* derived from the role's original ratio — see below */
+}
 :root[data-dyslexia-font="true"] { --mds-font-family-body: "OpenDyslexic", var(--mds-font-family-body-default); }
 ```
 
+> **Correction (G11, as-built).** An earlier draft of this section wrote the font-size example as
+> `--mds-type-body-lg: 18px`. **That token does not exist** — the generated names are
+> `--mds-type-{role}-font-size` / `-line-height` / `-font-weight` (§2.4). The example above is the real
+> shape. The same draft's "+2px, line-heights unchanged" rule has also been replaced; see the Font size
+> bullet for why it could not ship.
+
 - **Theme mode** (Phase 1): `data-theme-mode` resolves to `light` / `dark` — `system` is the *absence* of the attribute, letting the plain `@media (prefers-color-scheme: dark)` rule from §2.1 take over unopposed. This is why `system` costs nothing extra to implement: it is simply "don't set the override attribute."
 - **Accent** (Phase 2): the `data-accent` attribute only ever takes a value from the small, curated set defined here — currently `blueprint` (default, no attribute needed) and `teal` (§2.2's dedicated personalization-only accent alternative) — never an arbitrary color, and **never** Brass or a Success/Warning/Danger hue. This is a deliberately narrower set than an earlier draft of this section considered (which briefly proposed a "moss"/"brass-adjacent" option before this document caught that both would collide with meanings §2.2 already assigns those hues elsewhere — Moss is Success, Brass is annotation-only). Each curated option remaps only `--mds-color-action-primary-bg` and its hover/active/focus-ring siblings (§2.2's semantic alias table), never the neutral/success/warning/danger scales — a user cannot personalize their way into confusing "success green" with "my chosen accent," because accent and semantic color are architecturally separate layers (per §2.2's "spend your boldness in one place, semantic color is separate from the accent" principle, which this personalization layer must not undermine).
-- **Font size** (Phase 2): `data-font-size="large"`/`"extra_large"` uniformly shifts the entire type scale (§2.4) by a fixed step per level — never a per-component or per-page override, and never changing line-height ratios (only absolute sizes), so vertical rhythm stays intact at every scale.
+- **Font size** (Phase 2): `data-font-size="large"`/`"extra_large"` uniformly scales the entire type scale (§2.4) — never a per-component or per-page override. Each role's **font-size and line-height are both multiplied** by a fixed factor (**×1.125** large, **×1.25** extra large); the font-size is rounded to whole px and the line-height is then **derived** as `round(roundedFontSize × the role's original ratio)`. Every role therefore keeps its own line-height ratio to within ±2%, and vertical rhythm stays intact at every scale.
+
+  **This replaces this section's original rule ("a fixed +2px step per level, never changing line-heights"), which could not ship.** Holding line-height constant while growing font-size does not preserve a ratio — it destroys it. At extra large that rule produced `body-sm` as **17px text inside an 18px line box (ratio 1.06)** and `caption` as **16px inside 16px (1.00)**: line boxes tighter than the glyphs they contain, clipping descenders and failing WCAG 1.4.12 (Text Spacing) the moment a user also applies a text-spacing override. An accessibility accommodation must not ship an accessibility regression. The proportional rule below keeps every role at or above **1.22**.
+
+  Authoritative table (kept in lockstep with `packages/design-system/src/theme/theme-overrides.css` by `src/theme/__tests__/type-scale.test.ts`, which re-derives every value from the token source):
+
+  | Role | standard | large ×1.125 | extra large ×1.25 |
+  |---|---|---|---|
+  | `display` | 36 / 44 | 41 / 50 | 45 / 55 |
+  | `heading-1` | 30 / 38 | 34 / 43 | 38 / 48 |
+  | `heading-2` | 24 / 32 | 27 / 36 | 30 / 40 |
+  | `heading-3` | 20 / 28 | 23 / 32 | 25 / 35 |
+  | `heading-4` | 16 / 24 | 18 / 27 | 20 / 30 |
+  | `body-lg` | 16 / 24 | 18 / 27 | 20 / 30 |
+  | `body-md` | 14 / 20 | 16 / 23 | 18 / 26 |
+  | `body-sm` | 13 / 18 | 15 / 21 | 16 / 22 |
+  | `label` | 13 / 18 | 15 / 21 | 16 / 22 |
+  | `caption` | 12 / 16 | 14 / 19 | 15 / 20 |
+  | `code` | 13 / 20 | 15 / 23 | 16 / 25 |
+
+  Note the deliberate rounding rule: font-size and line-height are **not** rounded independently. Independent rounding compresses `caption` at large from 1.333 → 1.286 and `body-sm`/`label` from 1.385 → 1.333; deriving the line-height from the rounded font-size holds them at 1.357 and 1.400.
+
 - **Dyslexia-friendly font** (Phase 2): `data-dyslexia-font="true"` re-points only `--mds-font-family-body` (§2.4's Body role) to an alternative face; the Display role (headings, the product's visual personality) and the Utility/mono role (data, code) are untouched, consistent with Feature #9's acceptance criterion that this is a targeted accommodation, not a general typeface picker.
 
+  **`code` is scaled by the size axis but never swapped by the face axis** — an asymmetry worth stating so a future reader does not "fix" it. The two axes are different accommodations. Font size is for low vision, and `code` is tied for the smallest role in the system, so leaving it at 13px while body reaches 20px recreates the exact "one region I cannot read" failure the feature exists to fix. The face swap is for letterform disambiguation in prose; in column-aligned data and expressions, OpenDyslexic's weighted bottoms and wide advances hurt rather than help.
+
+  The face is **self-hosted** (`public/fonts/`, OpenDyslexic 5.2.5, SIL OFL 1.1 — exceptions-log #5), which is the first webfont in the system and a deliberate deviation from §2.4's all-system-stack property. It costs nothing on the default path: a browser fetches a `@font-face` `src` only when a rule using the family actually matches an element, and the sole rule naming OpenDyslexic is the attribute-gated one above. A user who never opts in downloads **zero font bytes**. The `@font-face` lives in `src/theme/fonts.css`, imported only by the admin app — deliberately *not* by the guest runtime, which imports `theme.css` and would otherwise carry the declaration.
+
 **Governing rule**: personalization attributes are set **once**, server-side, on the authenticated shell's root element at render time (from the user's `user_ui_preferences` row) — never re-computed per-component client-side, and never applied to the public/guest form runtime shell (§3.0), which renders only the base tenant-branded theme regardless of which admin/builder user is viewing analytics on the back end at the same moment. This keeps personalization a pure top-of-tree concern, exactly like the light/dark mapping it extends.
+
+**As-built notes (G11).**
+
+- **In every axis, the product default is the ABSENCE of the attribute** — `system` mode, `blueprint` accent, `standard` size, dyslexia off. There is no `data-font-size="standard"` rule and there never should be. This is what makes an un-personalized user render byte-identically to a guest, and it is why the blade emits each attribute through a whitelist (`in_array`) rather than interpolating the prop, so a corrupted row cannot inject an arbitrary attribute value.
+- **The server-side-once rule holds for the durable copy; the client also applies optimistically.** Inertia visits swap `<body>`, not `<html>`, so after choosing a preference `resources/js/composables/useTheme.ts` sets or removes the attribute itself for instant feedback, and `app.blade.php` re-emits the durable copy on the next full load. This is the same carve-out already granted for the theme toggle (exceptions-log #3), extended to the other three axes rather than a new deviation — the durable source of truth is unchanged.
+- **The guest runtime shares `theme.css`.** Every `[data-accent]` / `[data-font-size]` / `[data-dyslexia-font]` rule physically exists in the guest bundle; they are inert only because nothing ever sets those attributes on the guest `<html>`. `GuestRuntimeTest` pins this, asserting the guest shell emits none of them *while authenticated as a user with maximal preferences* — precisely the scenario this governing rule describes.
+- **Canonical home is Settings → Appearance.** The nav quick toggle (exceptions-log #3) remains theme-mode-only; the accent, text-size and dyslexia controls exist in Settings and nowhere else. Each control PATCHes only its own field, and every rule on `UpdateAppearanceRequest` is `sometimes`, so a partial payload structurally cannot clobber a sibling axis.
+- **Prop naming.** The shared Inertia prop stays `ui.theme` (rather than being renamed `ui.appearance`) even though it now carries four axes — renaming would churn the blade, the middleware, the composable, the TS types and two Pest files for no functional gain. Read "theme" there as "the whole appearance resolution".
 
 > **Decision (not pinned by the plan):** the curated accent set is deliberately small (two options at launch — default Blueprint and the dedicated Teal alternative) rather than an open picker, and implemented via `data-*` attribute selectors rather than arbitrary inline custom-property overrides — both choices trade a small amount of user freedom for a guarantee that every possible personalization combination has been pre-verified against §4.1's contrast requirements and never collides with an existing semantic or annotation hue. An arbitrary color picker would reopen exactly the accessibility risk the semantic-token architecture exists to close off.
 
@@ -422,6 +474,8 @@ Governing rule: **help text occupies its layout slot even when absent from a hid
 
 **Governing layout rule**: every form input's label, control, help text, and error message stack **vertically, left-aligned to the same edge**, at `--mds-space-2` internal gaps, inside a `FormField` wrapper that itself sits in the page's field-stack at `--mds-space-4` between fields and `--mds-space-6` between sections — no page hand-rolls its own label/input spacing.
 
+> **Implementation status (G11): `MdsSwitch` is specified above but NOT built.** The Toggle/switch row remains a forward specification. The one boolean preference shipped so far — the §2.9 dyslexia-font opt-in in Settings → Appearance — deliberately uses **`MdsCheckbox`** instead. Building a switch for it would have meant a new component, story, axe surface and doc section, and this row's own rule ("on/off is additionally labeled via visible text") means the result would have been a switch *plus* a text label — i.e. a checkbox with extra steps. `MdsCheckbox` already carries a 44×44 target, the correct focus ring, and a **check glyph** rather than fill colour as its non-color signifier. Build `MdsSwitch` when a genuine toggle-shaped need appears, not to satisfy this table.
+
 ### 3.3 Lists & Tables
 
 The data table is the single most-used composite component (submissions inbox, forms list, webhook delivery log, audit log). One component covers all of these, configured per use, not re-implemented per page.
@@ -434,6 +488,8 @@ The data table is the single most-used composite component (submissions inbox, f
 - **Row-level states**: hover (`--mds-neutral-50` background), selected (checkbox-driven row selection tinted `--mds-primary-50`), and an inline error/warning row indicator (e.g., a submission flagged for review) using a left-edge color bar plus a status pill (§3.8) — never row-background color alone as the only signifier.
 
 **Governing layout rule**: column headers, cell padding, row height, and the filter-bar/pagination placement are **fixed by the table component itself** — a page configures *which* columns/filters/actions appear, never *how* the table lays them out. A "denser" or "wider" one-off table for a specific page is exactly the kind of change that requires a documented exception (§1.3) or, more likely, a new density variant added to the shared component (§7.2).
+
+**Horizontal overflow containment (invariant, added G11).** A table wider than its column is contained by the component's own `overflow-x: auto` wrapper — the page never scrolls sideways because of a table. That wrapper **must** carry `position: relative`, and this is load-bearing rather than stylistic: the component places `position: absolute` visually-hidden content inside the table (the `.mds-table__sr` "Actions" label, and the whole `thead` at the mobile breakpoint). Without a positioned wrapper, those boxes resolve their containing block *outside* the scroll container, which therefore cannot clip them — and an absolutely positioned element is clipped by its containing block, **not** by whichever ancestor happens to scroll, so no `overflow` rule further up can compensate. G11 hit exactly this: at the tablet breakpoint the extra_large type scale plus the dyslexia-friendly face pushed a 1px hidden span past the last column and the *document* gained 50px of real horizontal scroll, while every visible element remained correctly contained. Any future component that combines a scroll wrapper with absolutely positioned descendants needs the same pairing.
 
 ### 3.4 Navigation
 
@@ -513,6 +569,36 @@ WCAG 2.2 AA is the baseline for the entire product, not only the guest-facing ru
 | `--mds-warning-700` (`#7A4F15`) text / white-surface background (warning text/icon) | 7.11:1 | Passes, comfortable margin |
 | `--mds-success-600` (`#2F6249`) text / white-surface background (success text/icon) | ~7.4:1 (darker step than the 500 fill below, chosen specifically for small-text safety margin) | Passes |
 | `--mds-danger-600` (`#A83A2A`) fill / white text (destructive button) | 6.36:1 | Passes, wider margin than the retired draft's 4.56:1 |
+
+**Teal accent — full verification (Increment G11).** The §2.9 personalization accent is the one hue a *user* can switch the entire primary-action surface to, so every pairing it produces is verified here rather than left to the Storybook matrix. All 17 computed with the WCAG relative-luminance formula against the real surface tokens in each theme.
+
+| # | Pairing | Ratio | Min | |
+|---|---|---|---|---|
+| **Light** | | | | |
+| 1 | white text on `teal-600` fill (button, selected chip, checked control) | 7.48:1 | 4.5 | ✅ |
+| 2 | white text on `teal-700` fill (hover) | 9.40:1 | 4.5 | ✅ |
+| 3 | white text on `teal-800` fill (active) | 12.10:1 | 4.5 | ✅ |
+| 4 | `teal-600` text on `bg-surface` (`#FFFFFF`) | 7.48:1 | 4.5 | ✅ |
+| 5 | `teal-600` text on `bg-canvas` (`#F3F4F1`) | 6.77:1 | 4.5 | ✅ |
+| 6 | `teal-600` UI boundary vs canvas | 6.77:1 | 3.0 | ✅ |
+| 7 | `teal-700` focus ring vs surface | 9.40:1 | 3.0 | ✅ |
+| 8 | `teal-700` focus ring vs canvas | 8.51:1 | 3.0 | ✅ |
+| 9 | `neutral-900` ink on `teal-50` tint | 15.90:1 | 4.5 | ✅ |
+| **Dark** | | | | |
+| 10 | white text on `teal-500` fill | 6.68:1 | 4.5 | ✅ |
+| 11 | white text on `teal-400` fill (hover) | 4.82:1 | 4.5 | ✅ |
+| 12 | white text on `teal-700` fill (active) | 9.40:1 | 4.5 | ✅ |
+| 13 | `teal-300` text on `bg-surface` (`#123350`) | 5.16:1 | 4.5 | ✅ |
+| 14 | `teal-300` text on `bg-canvas` (`#0C2337`) | 6.36:1 | 4.5 | ✅ |
+| 15 | `teal-300` focus ring vs dark surface | 5.16:1 | 3.0 | ✅ |
+| 16 | `teal-300` focus ring vs dark canvas | 6.36:1 | 3.0 | ✅ |
+| 17 | pale ink on the dark tint `rgba(36,126,126,.18)` composited over `#123350` | 9.54:1 | 4.5 | ✅ |
+
+Teal is never worse than Blueprint at the equivalent role, and in dark mode it is measurably better (dark fill 6.68 vs 6.14; dark hover 4.82 vs 3.96).
+
+> **The bug this table exists to prevent.** Until G11 the accent shipped as a four-declaration stub with no dark variant. Because `[data-accent]` carries the same specificity as `[data-theme-mode='dark']` and appeared *later* in source order, teal won in dark mode and painted the light `#1B5E5E` on the `#123350` ground: **1.74:1** for both `action-primary-fg` and the focus ring — failing 1.4.3 and 1.4.11 by a wide margin. It went unnoticed for two increments because nothing in the product could set `data-accent` and no test had ever set it either. The Playwright `personalization-axe` spec and the `TealDark` Storybook story now both exercise it.
+
+> **Two observed, deliberately out-of-scope findings.** (a) Blueprint's *dark* `action-primary-bg-active` (`primary-300`, `#7DA9C4`) yields only **2.52:1** with white text. It is pre-existing, unrelated to G11, and invisible to axe because `assertClean` parks the pointer and axe never measures `:active`. Recorded rather than fixed, to keep G11's diff to its own subject. (b) For teal specifically, "lighter on press" is mathematically unreachable — the lightest teal step still clearing 4.5:1 against white *is* the hover step — so dark-mode teal inverts direction and darkens on press (`teal-700`, 9.40:1). That divergence from Blueprint's ramp is exceptions-log #6.
 
 > **Note (correction):** the rows above are labeled "white-surface background" because that is what they are actually computed against — `--mds-color-bg-surface` (`--mds-neutral-0`, pure white), the background body text most commonly sits on (cards, panels, table rows, per the §2.2 semantic alias table). An earlier version of this table mislabeled them "paper background," which is a *different*, distinctly-valued token (`--mds-color-bg-canvas` / `--mds-neutral-50` / `#F3F4F1`) used for the page canvas behind those surfaces. For the record, text directly on the Paper canvas (rather than a white surface) is very slightly lower-contrast but still comfortably passes — e.g. Ink on Paper computes to ≈14.8:1, not 16.3:1 — so no pairing in this document is actually at risk; only the label was wrong.
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ThemeMode;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
@@ -61,9 +62,10 @@ it('persists a chosen theme and reflects it in the shared prop and <html>', func
         ->patch('http://acme.meridian.test/settings/appearance', ['theme_mode' => 'dark'])
         ->assertRedirect();
 
-    // The row is upserted under the user's own RLS context.
+    // The row is upserted under the user's own RLS context. Since G11 added the enum casts to
+    // UserUiPreference, value() returns a ThemeMode case rather than the raw string.
     enterTenant($tenant->id, $user->id);
-    expect(UserUiPreference::where('user_id', $user->id)->value('theme_mode'))->toBe('dark');
+    expect(UserUiPreference::where('user_id', $user->id)->value('theme_mode'))->toBe(ThemeMode::Dark);
 
     // The shared prop now resolves to dark, and a full render emits the root attribute.
     $html = $this->actingAs($user)->withoutVite()

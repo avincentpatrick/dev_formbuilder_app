@@ -57,11 +57,12 @@ Route::middleware([
 ])->group(function (): void {
     Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
 
-    // Settings — the current theme reaches the page via the shared `ui.theme` prop (no controller
-    // needed for the read). The appearance write persists theme_mode to user_ui_preferences; it lives
-    // here (not central) so app.current_user_id is set and the belongs-to-user RLS write succeeds.
+    // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
+    // needed for the read). The appearance write persists the four personalization axes to
+    // user_ui_preferences; it lives here (not central) so app.current_user_id is set and the
+    // belongs-to-user RLS write succeeds. Partial by design — see UpdateAppearanceRequest.
     Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
-    Route::patch('/settings/appearance', [PreferencesController::class, 'updateTheme'])
+    Route::patch('/settings/appearance', [PreferencesController::class, 'updateAppearance'])
         ->name('settings.appearance.update');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route

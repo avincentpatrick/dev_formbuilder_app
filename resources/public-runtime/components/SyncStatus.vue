@@ -83,14 +83,14 @@ function responses(n: number): string {
 }
 
 .sync-status__row--conflict {
-    border-left: 4px solid var(--mds-color-warning-text, var(--mds-color-border-strong));
+    border-left: 4px solid var(--mds-color-border-strong);
 }
 
 .sync-status__dot {
     width: 8px;
     height: 8px;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-warning-text, var(--mds-color-border-strong));
+    background-color: var(--mds-color-border-strong);
 }
 
 .sync-status__action {

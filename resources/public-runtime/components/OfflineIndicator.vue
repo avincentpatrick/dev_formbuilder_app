@@ -32,6 +32,6 @@
     width: 8px;
     height: 8px;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-warning-text, var(--mds-color-border-strong));
+    background-color: var(--mds-color-border-strong);
 }
 </style>

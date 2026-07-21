@@ -409,7 +409,7 @@ function submitImport(): void {
 
 .builder__upload-error {
     margin: 0;
-    color: var(--mds-color-text-danger, #b42318);
+    color: var(--mds-color-danger-text);
     font-size: var(--mds-type-body-sm-font-size);
 }
 

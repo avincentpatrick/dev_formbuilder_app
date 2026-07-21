@@ -37,7 +37,13 @@ it('sets an img-src CSP allowlisting self, data/blob, and the configured tile or
         // script/connect/default are deliberately left unrestricted (dev HMR + Inertia + same-origin API).
         ->and($csp)->not->toContain('script-src')
         ->and($csp)->not->toContain('connect-src')
-        ->and($csp)->not->toContain('default-src');
+        ->and($csp)->not->toContain('default-src')
+        // G11: with no default-src there is nothing for font-src to fall back to, so fonts are
+        // unrestricted and the self-hosted dyslexia face loads on the one authenticated page this
+        // middleware covers (the manual-encode screen, which renders inside the app shell). Pinned
+        // here so a future hardening PR that introduces default-src is forced to add font-src 'self'
+        // in the same change rather than silently breaking an accessibility accommodation.
+        ->and($csp)->not->toContain('font-src');
 });
 
 it('does not clobber a Content-Security-Policy another layer already set', function (): void {

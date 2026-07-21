@@ -13,6 +13,7 @@ use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\UserUiPreference;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Guest\GuestShareTokenService;
@@ -106,6 +107,45 @@ it('404s an unknown slug', function (): void {
     guestTenant();
 
     $this->getJson('http://acme.meridian.test/f/nope')->assertNotFound();
+});
+
+it('never emits personalization attributes on the guest runtime shell (Increment G11)', function (): void {
+    // PRD Feature #9 + design-system-reference.md §2.9's governing rule: personalization is strictly a
+    // per-user, authenticated-app concern. It must never affect how a tenant's public form renders to a
+    // respondent — that is tenant branding, a distinct Phase-3 concept serving a distinct audience.
+    //
+    // This matters more than it looks. public-runtime.css imports the SAME theme.css as the admin app,
+    // so every [data-accent] / [data-font-size] / [data-dyslexia-font] rule physically EXISTS in the
+    // guest bundle. They are inert only because nothing ever sets the attributes on the guest <html>.
+    // This test is what keeps that true if someone later reaches for a shared layout partial.
+    //
+    // Asserted while ACTING AS a user with maximal preferences — precisely the scenario §2.9 calls out
+    // ("regardless of which admin/builder user is viewing analytics on the back end at the same moment").
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    guestForm($tenant, $owner);
+
+    UserUiPreference::create([
+        'user_id' => $owner->id,
+        'theme_mode' => 'dark',
+        'accent_token' => 'teal',
+        'font_size_scale' => 'extra_large',
+        'use_dyslexia_friendly_font' => true,
+    ]);
+
+    $html = $this->actingAs($owner)
+        ->get('http://acme.meridian.test/f/intake')
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('<html')
+        ->and($html)->not->toContain('data-theme-mode')
+        ->and($html)->not->toContain('data-accent')
+        ->and($html)->not->toContain('data-font-size')
+        ->and($html)->not->toContain('data-dyslexia-font')
+        // The opt-in face must not even be referenced in the guest bundle's stylesheet graph.
+        ->and($html)->not->toContain('OpenDyslexic');
 });
 
 it('404s a form that exists and is published but has guest access disabled (non-disclosure)', function (): void {

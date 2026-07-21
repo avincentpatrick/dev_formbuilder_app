@@ -1,0 +1,56 @@
+/*
+ * Optional web fonts (design-system-reference.md §2.9 — the dyslexia-friendly accommodation).
+ *
+ * DELIBERATELY NOT imported by resources/public-runtime/public-runtime.css. Personalization is an
+ * authenticated-app concern (§2.9's governing rule + PRD Feature #9), and that runtime is designed to
+ * be embedded on third-party domains, where an unexpected font reference is exactly the kind of thing
+ * that should not exist. This file is imported ONLY from resources/css/app.css. (theme-overrides.css,
+ * by contrast, IS shared with the guest bundle, which is why the @font-face cannot live there.)
+ *
+ * Verified against a real production build: the guest stylesheet contains ZERO @font-face blocks and
+ * ZERO woff2 URLs. It does still contain the family NAME once — in the custom-property value of
+ * theme-overrides.css's `:root[data-dyslexia-font='true']` rule, which is unavoidably shared. That is
+ * inert twice over: the guest shell never emits the attribute, so the rule cannot match; and even if
+ * it did, the guest bundle declares no such face, so the stack falls through to
+ * --mds-font-family-body-default. No guest request for a font is possible.
+ *
+ * §2.4's "no webfont download" property still holds on the default path. A browser fetches a
+ * @font-face `src` only when a rule that actually uses the family matches an element, and the sole
+ * rule naming OpenDyslexic is `:root[data-dyslexia-font='true']` in theme-overrides.css — which the
+ * server emits only for users who opted in. Everyone else parses two @font-face blocks and downloads
+ * zero font bytes.
+ *
+ * Self-hosted rather than pulled from a font CDN: no cross-origin request, no third-party dependency
+ * on a path that an accessibility accommodation relies on, and no font-src CSP directive required
+ * (PublicRuntimeSecurityHeaders deliberately sets no default-src, so font-src is unrestricted — see
+ * PublicRuntimeSecurityHeadersTest, which pins that so a future hardening PR must consider it).
+ *
+ * Regular + Bold only. The Body type roles use 400 (body-*) and 500/600 (label); 500 and 600
+ * synthesise acceptably from these two, and shipping four weights would double the payload for a face
+ * already ~2x the size of a typical text font.
+ *
+ * No `size-adjust` / `ascent-override`: OpenDyslexic's metrics ARE the accommodation (large x-height,
+ * weighted bottoms, wide advances). Normalising them to match the system stack would defeat the
+ * purpose. The extra advance width is absorbed by the shell guards in AppLayout/TopNav instead.
+ *
+ * Provenance: OpenDyslexic 5.2.5 as distributed by @fontsource/opendyslexic (latin subset).
+ * © Abbie Gonzalez, SIL Open Font License 1.1, Reserved Font Name "OpenDyslexic".
+ * Licence vendered verbatim at public/fonts/OpenDyslexic-LICENSE.txt as OFL §2 requires.
+ * Recorded as exceptions-log #5.
+ */
+
+@font-face {
+    font-family: 'OpenDyslexic';
+    src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'OpenDyslexic';
+    src: url('/fonts/OpenDyslexic-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}

@@ -23,13 +23,23 @@ function shareTokens(string $key = 'unit-test-key'): GuestShareTokenService
     return new GuestShareTokenService($key, F5_TTL);
 }
 
-/** Flip the last character of one dot-segment to a different valid base64url char (deterministic tamper). */
+/**
+ * Flip the FIRST character of one dot-segment to a different valid base64url char.
+ *
+ * The first character, not the last: base64url encodes 6 bits per character, and a 32-byte HMAC does not
+ * divide evenly (256 / 6 = 42.7), so the trailing character carries only 4 significant bits plus 2 of
+ * padding. Several distinct trailing characters therefore decode to the SAME raw bytes — flipping it can
+ * leave the signature unchanged, the tamper slips through, and the test fails intermittently. That is the
+ * flake this helper used to produce, despite calling itself deterministic. The first character always
+ * carries 6 significant bits, so changing it always changes the decoded value.
+ *
+ * Same reasoning, same fix as GuestRuntimeTest's "401s a tampered token".
+ */
 function tamperSegment(string $token, int $index): string
 {
     $parts = explode('.', $token);
     $segment = $parts[$index];
-    $last = substr($segment, -1);
-    $parts[$index] = substr($segment, 0, -1).($last === 'A' ? 'B' : 'A');
+    $parts[$index] = ($segment[0] === 'A' ? 'B' : 'A').substr($segment, 1);
 
     return implode('.', $parts);
 }

@@ -388,7 +388,7 @@ Decomposed G10b into **G10b1 (backend + API)** / **G10b2 (UI)** with the user, a
 
 ---
 
-## 2026-07-21 — G11: richer personalization (accent / text-size / dyslexia font) — BUILT on `g11-personalization`, awaiting PR/CI
+## 2026-07-21 — G11: richer personalization (accent / text-size / dyslexia font) — PR #48, all 6 CI jobs green
 
 The last increment of Phase 2, and mostly an exercise in *executing* a spec that already existed (PRD Feature #9, DSR §2.9, data-dictionary §19) — except that three of the things the spec and the tracker asserted turned out not to be true.
 
@@ -410,7 +410,14 @@ The last increment of Phase 2, and mostly an exercise in *executing* a spec that
 
 **OpenDyslexic is the system's first webfont** and costs nothing on the default path: browsers fetch a `@font-face` src only when a rule using the family matches, and the only such rule is attribute-gated, so a user who never opts in downloads zero font bytes. It lives in a new `fonts.css` imported only by the admin app — putting it in `theme-overrides.css` would have shipped it to the guest bundle, which imports that file.
 
-Local gates: Pest **1001** (+13), Pint / controller-gate / migration-lint green, PHPStan **0 on every G11 file**, vue-tsc clean, no `openapi.json` drift. Vitest, the build, Storybook and Playwright are CI-only on this host, so the four new Vitest suites, five new stories and 18 new Playwright runs get their first execution on CI — their logic was pre-validated by running equivalent plain-Node scripts against the real files.
+Gates: Pest **1001** (+13), Vitest **457** (+43), Pint / controller-gate / migration-lint green, PHPStan **0 on every G11 file**, vue-tsc clean, no `openapi.json` drift.
+
+**CI needed two follow-up fixes, and both were harness-shaped — the two jobs actually feared passed first time.** `design-system-a11y` (story attribute leakage across the shared preview iframe) and `e2e` (the font-loading race and 375×extra_large reflow) were called out as the top risks and both went green on the first run, so the mitigations were the right ones. What broke instead:
+
+1. `token-references.test.ts` threw `ERR_INVALID_URL_SCHEME` on CI while passing locally. The suites run under `environment: 'happy-dom'`, whose DOM `URL` global shadows Node's, and resolving a five-level **directory** URL (trailing slash) through it does not preserve the `file:` scheme — its two sibling suites use the identical `import.meta.url` pattern and passed, because they resolve concrete **file** paths. Switched to `process.cwd()`, which under Vitest is its config file's directory.
+2. The new guest-shell test threw `Vite manifest not found`. It is the only test in `GuestRuntimeTest` that renders the shell rather than hitting a JSON endpoint, hence the only one evaluating `@vite`, and the Pest job builds no assets. It had passed locally purely because assets happened to be built — a silent local/CI divergence. `withoutVite()` (the existing convention), verified by deliberately moving `public/build/manifest.json` aside to reproduce the CI condition rather than trusting the fix.
+
+Both are now recorded as standing gotchas.
 
 ---
 

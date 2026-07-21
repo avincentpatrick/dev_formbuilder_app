@@ -34,7 +34,9 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Next Session — Resume Here
 
-**PRIMARY NEXT PROMPT →** `Read PROGRESS.md and merge PR #48, then start Phase 3`
+**PRIMARY NEXT PROMPT →** `Read PROGRESS.md, merge PR #48, then decompose Phase 3 into increments (the H-map)`
+
+Deliberately **decompose**, not "start building". Phase 2 only ran smoothly because `...shimmying-yeti.md` mapped it into G1→G11 with an entry-point rationale before any code. Phase 3 is currently a single roadmap bullet — visual workflow builder, piping, save-and-resume, payments, integrations, custom domains, analytics, OCR — several of which (payments, OCR, custom domains) carry infrastructure and third-party decisions that want an ADR before an increment. Producing an H-map first is the same move that made G10's "no design spec" problem tractable.
 
 **G11 is on PR #48 with all 6 CI jobs GREEN** (`g11-personalization`, head `de599f2`). Ready to `gh pr merge --squash`. On merge, **Increment G (G1→G11) and Phase 2 are COMPLETE** — update the roadmap table and pick the Phase-3 entry point (or Track B, the Windows Server host, `docs/deployment-infrastructure.md` §8).
 

@@ -3,6 +3,8 @@
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Status:** Draft v1.0 — `docs/architecture/technical-architecture.md` §7.4 already specifies the reliability mechanism in detail (transactional post-commit dispatch, `event_id` idempotency, delivery envelope, retry schedule, circuit breaker, DLQ, creation-time SSRF validation) and explicitly names this document as where the retry schedule gets finalized. This document **confirms** that mechanism, adds the two hardening recommendations `docs/security-threat-model.md` §5 flagged, defines the full event payload catalog, and specifies the phased native-integration list.
 
+> ⚠️ **UNBUILT as of 2026-07-21 — this document is a forward specification, not a description of shipped behaviour.** There is **no first-party outbound HTTP call site anywhere in the application** (`Http::`, `GuzzleHttp` and `curl_init` have zero hits in `app/`; guzzle is present only transitively). No `webhook_endpoints` or `webhook_deliveries` table exists, no delivery job exists, and there is no scheduler to sweep retries. The only shipped artifacts are the `webhooks.manage` permission, the `manage:webhooks` API ability, and a TODO marker. Everything below is design intent for Phase 3 (H13/H14), and the retry ladder in §1 in particular has never executed.
+
 ---
 
 ## 1. What's Already Decided (confirmed here, not re-derived)
@@ -11,6 +13,7 @@
 - Idempotency via a stable `event_id` (once per event, not per delivery attempt), enforced by a unique `(endpoint_id, event_id)` constraint plus a Redis dedup cache.
 - Delivery envelope: `{ event_id, event_type, occurred_at, tenant_id, api_version, data }`, HMAC-SHA256 signed, 10-second delivery timeout.
 - **Retry schedule — confirmed final**: `1m → 5m → 30m → 2h → 6h → 12h → 24h → 48h → 72h` (10 attempts total, ~7 days), matching `webhook_deliveries.max_attempts`'s schema default. Nothing about the actual operational experience of this schedule is known yet (no webhook traffic exists), so "confirmed" here means "adopted as the Phase 1 default," not "empirically validated" — revisit once real delivery-failure data exists.
+  - **Execution substrate (ADR-0007):** delivery runs on the **`webhooks`** queue — one of the five names §D6 makes binding on code — and the `next_retry_at` sweep is a `MaintenanceJob` on **`scheduled-maintenance`** (§D3), holding no tenant context and fanning out per-tenant children. **This ladder is webhook-specific and deliberately distinct from ADR-0007 §D7's generic job retry** (`$tries = 3`, `backoff() => [30, 120, 600]`): a customer endpoint being down for hours is an expected business condition warranting a ~7-day ladder, whereas a job failing three times is a defect. Implementing the ladder via `$tries`/`backoff()` would therefore be wrong — it belongs in the `next_retry_at` column, exactly as `docs/architecture/technical-architecture.md` §7.4 specifies. Per-tenant fairness (§D9) applies to the `webhooks` queue like any other.
 - Per-endpoint circuit breaker at 20 consecutive failures; manual re-enable.
 - Dead-letter queue with manual redeliver.
 - Creation-time SSRF validation of endpoint URLs against private/internal ranges.

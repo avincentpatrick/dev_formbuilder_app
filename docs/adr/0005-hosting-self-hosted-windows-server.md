@@ -4,6 +4,8 @@
 
 **Accepted** — 2026-07-04. **Supersedes [ADR-0003](0003-hosting-laravel-cloud.md)** (Laravel Cloud), which is now marked *Superseded*.
 
+**Partially superseded by [ADR-0007](0007-async-execution-substrate.md) — 2026-07-21**, in the **queue rows of the Decision table only**: "Cache / queue backend" (Redis via Memurai *as the queue backend*) and "Queue workers" (`php artisan horizon` as an NSSM service). ADR-0007 runs the queue on the `database` driver over the self-managed PostgreSQL with a plain `queue:work` process, and names Redis+Horizon as a documented, non-blocking upgrade path rather than the current state. **Every other row of this ADR — nginx, PHP 8.4, PostgreSQL, Realtime/Reverb, Scheduler, TLS, object storage, and the self-hosted-runner deploy — remains in force**, as does the decision to self-host on this box. The rows below are annotated in place.
+
 ## Context
 
 ADR-0003 chose **Laravel Cloud** as the managed production host, reasoning that a small team with no dedicated DevOps role should offload infrastructure ops to a managed platform. That decision is now reversed: the project owner has decided to **self-host the platform on hardware they already operate — a Windows Server 2016 machine** — and to make deployment a **git-driven** flow so that updating the running server is a `git push`, not a manual chore.
@@ -24,10 +26,10 @@ This changes the posture from "managed platform, pay to avoid ops" to "self-mana
 | Web server | **nginx for Windows**, reverse-proxying to a PHP 8.4 FastCGI backend (`php-cgi`), both run as Windows services via **NSSM**. |
 | PHP | PHP 8.4 (VC++ 2015–2022 runtime) with `pdo_pgsql` + `redis` extensions enabled. |
 | Database | **PostgreSQL for Windows** (EDB build), self-managed. Because we own the instance, **Row-Level Security and PostGIS are guaranteed available** — the standing ADR-0003 due-diligence item disappears. |
-| Cache / queue backend | **Redis via Memurai** (Redis-API-compatible, native Windows service). |
-| Queue workers | `php artisan horizon` run as a Windows service (NSSM). |
+| Cache / queue backend | ~~**Redis via Memurai** as the queue backend~~ — **superseded in part by ADR-0007 §D1 (2026-07-21)**: the queue runs on the `database` driver over the self-managed PostgreSQL. Memurai remains the intended **cache** backend; nothing is installed on the box today. |
+| Queue workers | ~~`php artisan horizon` run as a Windows service (NSSM)~~ — **superseded by ADR-0007 §D1 (2026-07-21)**: a plain `php artisan queue:work` process as an NSSM service, with the `--queue=` ordering string carrying priority until a supervisor exists. Horizon is deferred, not adopted. **`deploy.ps1` provisions no worker service today** — it only restarts `meridian-horizon`/`meridian-reverb` behind a `Get-Service` guard, which is a silent no-op on a box that has neither. |
 | Realtime | `php artisan reverb:start` run as a Windows service (NSSM), reverse-proxied by nginx with WebSocket upgrade. |
-| Scheduler | `php artisan schedule:run` every minute via **Windows Task Scheduler** (Windows has no cron). |
+| Scheduler | `php artisan schedule:run` every minute via **Windows Task Scheduler** (Windows has no cron). **Confirmed as the Track-B target by ADR-0007, with a gap named: `deploy.ps1` provisions no such task**, and the application-side schedule (`routes/console.php`) is itself unbuilt until H2. |
 | TLS | Let's Encrypt via **win-acme** (or a purchased certificate), terminated at nginx. |
 | Object storage | Local disk under the tenant-prefixed layout (Doc #22 §7) initially; an S3-compatible target (MinIO on the box, or external S3) is a drop-in later via the same `attachments` abstraction — no code change. |
 | Deploy | A **self-hosted GitHub Actions runner** installed as a Windows service on the box. When CI passes on `main`, a deploy workflow runs on that runner and executes `deploy.ps1` against the live checkout: fetch/reset to `origin/main` → `composer install --no-dev` → build assets → `migrate --force` → cache config/routes/views → restart Horizon/Reverb. |
@@ -71,12 +73,14 @@ Docker Compose **remains** the local-development and CI parity source (ADR-0003 
 
 ## Related Decisions
 - **Supersedes ADR-0003** (Laravel Cloud).
+- **Partially superseded by ADR-0007** (async execution substrate) — its queue-backend and queue-worker rows only; the rest of this ADR stands. ADR-0007 also confirms the Task Scheduler row as the Track-B target and records that `deploy.ps1` provisions neither the worker service nor the scheduler task.
 - **ADR-0001** (Postgres) — unaffected; Postgres runs natively on Windows Server with full RLS/PostGIS.
 - **ADR-0002** (multi-tenancy RLS) — unaffected and *de-risked*: we now control the Postgres instance, so RLS is guaranteed rather than assumed.
 - **Doc #22 — Deployment & Infrastructure** — rewritten to operationalize this decision (nginx, Windows services, self-hosted-runner deploy, self-managed backup/DR).
 
 ## References
 - Supersedes `docs/adr/0003-hosting-laravel-cloud.md`.
+- Partially superseded by `docs/adr/0007-async-execution-substrate.md` (queue backend + queue workers).
 - `docs/deployment-infrastructure.md` — the operational runbook for this decision.
 - `docs/non-functional-requirements.md` — availability/RTO/RPO targets, now self-managed.
 - Owner decision (2026-07-04): self-host on the existing Windows Server 2016 with git-driven deploys.

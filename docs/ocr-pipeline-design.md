@@ -27,6 +27,14 @@ A form version is `ocr_compatible = true` only if **every** field is one of: `sh
 
 `allow_ocr_single`/`allow_ocr_linelist` (`docs/data-dictionary.md` §2, both boolean, both default `false`) remain the tenant's own opt-in on top of this computed eligibility — a form can be `ocr_compatible = true` but still have OCR disabled by tenant choice.
 
+> ⚠️ **As-built gap — the shipped rule is weaker than the rule above (recorded 2026-07-21; do not read this section as describing built behaviour).**
+>
+> - **The spec is an allowlist; the code is a denylist.** `App\Services\Forms\CapabilityFlags` computes `ocr_compatible` as *"no geo field, no media field, no `calculated` field"* — so anything **not** on that exclusion list evaluates `true`. Concretely: `matrix` and `likert_matrix` are `false` per this document but **`true` in code**, and **every field type added in future defaults to OCR-compatible** rather than having to earn it. The allowlist framing above is the intended behaviour precisely because it fails safe; the denylist does not.
+> - **`is_repeatable` is never consulted.** `compute()` reads only the version's *fields* (mapped to `field_type`) and never loads sections at all, so the "any repeat group ⇒ `false`" clause is structurally unreachable, not merely unimplemented.
+> - **Storage subject mismatch.** This section says *a form **version*** is `ocr_compatible`, but the value is persisted on **`forms`** (`capability_flags` jsonb) and computed once at publish (`PublishService`). So it describes the most recently published version, not each version — and an older version's flag cannot be recovered from it.
+>
+> **H8 closes this gap** and is independent of the H1d provider bake-off, so it lands early regardless of the OCR go/no-go. Until then, treat `ocr_compatible = true` as "not obviously incompatible" rather than as this section's guarantee.
+
 ---
 
 ## 3. Extraction & Confidence Scoring

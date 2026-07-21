@@ -82,7 +82,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Researcher/GIS export formats — SPSS (.sav)/Stata (value+variable labels), GeoJSON/KML | should | 3 | Plain CSV loses choice value-labels; a concrete Kobo/ODK migration blocker |
 | Cross-tabulation / filter-results-by-answer | should | 3 | Extends the planned answer-index filtering |
 | Shareable public / read-only results report or live-dashboard link | should | 3 | Persona A donor reporting is named as a frustration; reuse the guest share-token pattern |
-| Scheduled / recurring emailed report digests | nice | 3 | Enabling infra (scheduler + email + async export) already exists |
+| Scheduled / recurring emailed report digests | nice | 3 | **Enabling infra does NOT exist yet** (corrected 2026-07-21 — this row previously claimed it did): there is no scheduler (`routes/console.php` is stock, no `withSchedule`, no `app/Console/`), no `app/Mail`, and async export is unbuilt. The scheduler + queue substrate is specified by ADR-0007 and built in H2; this item depends on it. |
 
 ## 6. Integrations & ecosystem
 

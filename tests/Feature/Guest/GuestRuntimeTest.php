@@ -134,7 +134,11 @@ it('never emits personalization attributes on the guest runtime shell (Increment
         'use_dyslexia_friendly_font' => true,
     ]);
 
+    // withoutVite(): this is the only test in this file that renders the guest SHELL rather than
+    // hitting a JSON endpoint, and the Pest CI job builds no assets — without the stub, @vite throws
+    // "Vite manifest not found". (It passes locally only if you happen to have built.)
     $html = $this->actingAs($owner)
+        ->withoutVite()
         ->get('http://acme.meridian.test/f/intake')
         ->assertOk()
         ->getContent();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AuditEvent;
 use App\Enums\FormVersionStatus;
 use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
@@ -20,6 +21,7 @@ use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -36,13 +38,13 @@ use Illuminate\Support\Facades\DB;
  *   3. Semantic    — {@see SemanticValidator}: relevance settle + required + constraints (F3).
  *   4. Persist     — one transaction: `submissions` + `submission_answers` (relevance-pruned JSONB) + the
  *                    typed `submission_answer_index` projection + the `submission_geo_index` PostGIS
- *                    projection (ADR-0006); `SubmissionCreated` dispatched post-commit.
+ *                    projection (ADR-0006) + the `created` audit row (H4); `SubmissionCreated` post-commit.
  *
  * Registered as a singleton so it shares the memoised singleton expression parser/evaluator (via the
  * validator). Media attachments (Increment G6) are linked here: a Stage-3.5 DB check
  * ({@see AttachmentReferenceValidator}) validates each referenced file exists/is owned/is not infected,
  * then persist re-points each staged attachment to the submission and records the id list on the answer
- * document. Audit records — the architecture's other Stage-4 insert — are still deferred (no audits table).
+ * document. The architecture's other Stage-4 insert — the `created` audit row — is written in {@see persist}.
  */
 final class SubmissionPipeline
 {
@@ -52,6 +54,7 @@ final class SubmissionPipeline
         private readonly AnswerIndexProjector $projector,
         private readonly GeoIndexProjector $geoProjector,
         private readonly AttachmentReferenceValidator $attachmentRefs,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function submit(SubmissionPayload $payload): SubmissionResult
@@ -119,7 +122,7 @@ final class SubmissionPipeline
             throw $e;
         }
 
-        event(new SubmissionCreated($submission)); // post-commit only
+        event(SubmissionCreated::for($submission)); // post-commit only (scalar-payload domain event)
 
         return new SubmissionResult($submission, created: true, semantic: $result);
     }
@@ -180,6 +183,23 @@ final class SubmissionPipeline
 
         $this->projectIndex($submission, $version, $fields, $answers);
         $this->projectGeo($submission, $version, $fields, $answers);
+
+        // Stage 4's other insert (technical-architecture §4.1): the `created` audit row, IN this transaction
+        // so it is atomic with the submission. Head-row attributes only — deliberately NOT the guest PII
+        // (guest_ip / guest_user_agent / guest_contact_email), which the ledger must never carry (spec §2).
+        $this->audit->record(
+            AuditEvent::Created,
+            'submission',
+            (string) $submission->id,
+            old: null,
+            new: [
+                'form_id' => $submission->form_id,
+                'form_version_id' => $submission->form_version_id,
+                'status' => $submission->status->value,
+                'source' => $submission->source->value,
+            ],
+            actorId: $payload->respondentUserId,
+        );
 
         return $submission;
     }

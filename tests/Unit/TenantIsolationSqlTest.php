@@ -58,6 +58,35 @@ it('widens only SELECT for the nullable-global shape, keeping writes strict', fu
     expect($insert)->not->toContain('IS NULL');
 });
 
+// H4 — the append-only ledger shape (`audits`). SELECT + INSERT only; the ABSENCE of update/delete
+// policies is the enforcement (FORCE RLS denies a policy-less command), so these assert the omission.
+
+it('emits strict SELECT and INSERT for the append-only shape', function (): void {
+    $sql = joined(TenantIsolation::appendOnlySql('audits'));
+
+    expect($sql)
+        ->toContain('ALTER TABLE audits ENABLE ROW LEVEL SECURITY;')
+        ->toContain('ALTER TABLE audits FORCE ROW LEVEL SECURITY;')
+        ->toContain('CREATE POLICY audits_tenant_select ON audits FOR SELECT USING')
+        ->toContain('CREATE POLICY audits_tenant_insert ON audits FOR INSERT WITH CHECK')
+        ->toContain("NULLIF(current_setting('app.current_tenant_id', true), '')::uuid");
+});
+
+it('emits NO update or delete policy for the append-only shape', function (): void {
+    // The omission IS the append-only guarantee: under FORCE RLS a command with no policy is denied for
+    // every role, so the ledger is immutable at the database. A "helpful" future UPDATE/DELETE policy here
+    // would silently break that — this test is what catches it.
+    $statements = TenantIsolation::appendOnlySql('audits');
+
+    expect(collect($statements)->filter(fn (string $s): bool => str_contains($s, 'FOR UPDATE')))->toBeEmpty();
+    expect(collect($statements)->filter(fn (string $s): bool => str_contains($s, 'FOR DELETE')))->toBeEmpty();
+});
+
+it('rejects an unsafe identifier in the append-only shape', function (): void {
+    expect(fn () => TenantIsolation::appendOnlySql('audits; DROP TABLE tenants;--'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('keys the belongs-to-user shape on the user setting, not the tenant setting', function (): void {
     $sql = joined(TenantIsolation::belongsToUserSql('user_ui_preferences'));
 

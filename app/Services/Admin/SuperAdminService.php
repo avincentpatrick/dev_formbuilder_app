@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Admin;
 
+use App\Enums\AuditEvent;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\SuperAdminContext;
+use App\Support\Tenancy\TenantContext;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,13 +30,17 @@ use Illuminate\Support\Facades\DB;
  *     place the `app.is_superadmin_context` GUC is ever opened, transaction-locally on the dedicated
  *     `pgsql_superadmin` connection.
  *
- * Deferred to Phase 1 (their tables don't exist yet): platform `settings` / billing / feedback-report
- * consoles, cross-tenant `audits` search, and Auditable logging of these actions (RBAC §9 requires the
- * log; there is no `audits` table until Phase 1 — see the TODO below, same posture as
- * TenantMembershipService::transferOwnership).
+ * Super-admin actions ARE audited (H4), into the AFFECTED tenant's own log (RBAC §9 transparency), by
+ * writing the audit UNDER that tenant's context on the default connection — atomically with the status
+ * change — so the strict INSERT policy passes with no elevated connection or INSERT bypass. It records the
+ * acting super-admin's id (a human acted; `is_system_action` stays false). Still deferred to later
+ * increments (tables don't exist yet): platform `settings` / billing / feedback-report consoles, and
+ * cross-tenant `audits` SEARCH.
  */
 final class SuperAdminService
 {
+    public function __construct(private readonly AuditLogger $audit) {}
+
     /**
      * Every tenant on the platform, display-ready (central, RLS-exempt table — default connection).
      *
@@ -53,26 +60,56 @@ final class SuperAdminService
     }
 
     /** Suspend a tenant (RBAC §9 console scope: `tenants.status`). Central table — a plain update. */
-    public function suspendTenant(Tenant $tenant): void
+    public function suspendTenant(Tenant $tenant, User $actor): void
     {
         if ($tenant->status === TenantStatus::Suspended->value) {
             throw SuperAdminException::alreadySuspended();
         }
 
-        $tenant->forceFill(['status' => TenantStatus::Suspended->value])->save();
-        // TODO(audits, Phase 1): emit an audit entry for this super-admin action (RBAC §9, transparency
-        // decision: surfaced in the affected tenant's own Audit Log) once the `audits` table lands.
+        $this->changeStatus($tenant, $actor, TenantStatus::Active->value, TenantStatus::Suspended->value);
     }
 
     /** Reactivate a suspended tenant. Central table — a plain update. */
-    public function reactivateTenant(Tenant $tenant): void
+    public function reactivateTenant(Tenant $tenant, User $actor): void
     {
         if ($tenant->status === TenantStatus::Active->value) {
             throw SuperAdminException::alreadyActive();
         }
 
-        $tenant->forceFill(['status' => TenantStatus::Active->value])->save();
-        // TODO(audits, Phase 1): emit an audit entry (see suspendTenant).
+        $this->changeStatus($tenant, $actor, TenantStatus::Suspended->value, TenantStatus::Active->value);
+    }
+
+    /**
+     * Flip the tenant's status and audit it into the AFFECTED tenant's own log (RBAC §9 transparency), in
+     * ONE transaction. `tenants` is central/RLS-exempt so the update needs no context; the audit is written
+     * UNDER the affected tenant's context so the strict append-only INSERT policy (`tenant_id = ctx`) passes
+     * — no elevated connection or INSERT bypass. The affected tenant's context is adopted only for this write
+     * and BOTH the DB GUC and the PHP mirror are restored after (via applyLocal of the saved pair), so
+     * nothing leaks into the rest of the central-host request — belt-and-braces, since a nested test
+     * savepoint would not reset a transaction-local GUC on its own.
+     */
+    private function changeStatus(Tenant $tenant, User $actor, string $from, string $to): void
+    {
+        DB::transaction(function () use ($tenant, $actor, $from, $to): void {
+            $tenant->forceFill(['status' => $to])->save();
+
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal((string) $tenant->getKey());
+
+            try {
+                $this->audit->record(
+                    AuditEvent::Updated,
+                    'tenant',
+                    (string) $tenant->getKey(),
+                    old: ['status' => $from],
+                    new: ['status' => $to],
+                    actorId: (string) $actor->getKey(),
+                );
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\ResourceScopeable;
 use App\Models\Attachment;
+use App\Models\Audit;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
@@ -11,6 +12,7 @@ use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Policies\AttachmentPolicy;
+use App\Policies\AuditPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
@@ -83,6 +85,10 @@ class AppServiceProvider extends ServiceProvider
         // `before`, i.e. it fails OPEN rather than closed.
         Gate::policy(ResourceGrant::class, ResourceGrantPolicy::class);
 
+        // Read-only access to the audit log (H4). Owner/Admin only, via `audit_log.view`. Registered
+        // explicitly for the same fail-OPEN reason as the policies above.
+        Gate::policy(Audit::class, AuditPolicy::class);
+
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the
         // *_type column (data-dictionary §10) instead of fully-qualified class names, so a namespace move
@@ -93,6 +99,12 @@ class AppServiceProvider extends ServiceProvider
         // The G10a aliases come from ResourceScopeable rather than being spelled again here: that enum is
         // also the source for the `scopeable_type` CHECK constraint and the RLS guard's per-alias EXISTS
         // branches, and the three must never disagree.
+        //
+        // H4's `audits.auditable_type` is DELIBERATELY not registered here. Its aliases include `users` and
+        // `tenant`; adding those to the global map would rewrite how Sanctum's `tokenable_type` and Spatie's
+        // `model_type` morphs serialize (User/Tenant), splitting old and new rows between alias and FQCN —
+        // the same class of break enforceMorphMap caused. Audit rows store the spec §1 alias as a plain
+        // string via AuditLogger and the read API surfaces it opaque, so no morph resolution is needed.
         Relation::morphMap(array_merge([
             'submission' => Submission::class,
             'form_field' => FormField::class,

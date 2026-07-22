@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Tenancy;
 
+use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
@@ -11,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
+use App\Support\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -30,6 +32,8 @@ use Illuminate\Support\Str;
 final class TenantMembershipService
 {
     private const INVITE_TTL_DAYS = 7;
+
+    public function __construct(private readonly AuditLogger $audit) {}
 
     /**
      * Invite a person (by email) to a tenant with a reserved role. Creates a placeholder user if the
@@ -181,19 +185,51 @@ final class TenantMembershipService
             throw MembershipException::alreadyOwner();
         }
 
-        DB::transaction(function () use ($tenant, $newOwner, $currentOwnerId): void {
+        DB::transaction(function () use ($tenant, $newOwner, $currentOwnerId, $actor): void {
+            // The incoming member's role before promotion — captured so the audit records the actual change.
+            $newOwnerPriorRole = $newOwner->getRoleNames()->first();
+
             // tenants is the central, RLS-exempt table — a plain update.
             $tenant->forceFill(['owner_user_id' => $newOwner->id])->save();
 
             $newOwner->syncRoles(['owner']);
 
+            // Audit the role changes (H4). auditable = `users` (the affected user's row, NOT the
+            // model_has_roles pivot — that composite PK has no surrogate id audits.auditable_id can address;
+            // spec §1). Each role change is one `permission_changed` row against the promoted/demoted user.
+            $this->audit->record(
+                AuditEvent::PermissionChanged,
+                'users',
+                (string) $newOwner->id,
+                old: ['role' => $newOwnerPriorRole],
+                new: ['role' => 'owner'],
+                actorId: (string) $actor->getKey(),
+            );
+
             if ($currentOwnerId !== null) {
                 // The outgoing Owner is by definition an active member ⇒ visible under the current
                 // tenant's `users` RLS policy, so a plain default-connection lookup resolves them.
                 User::find($currentOwnerId)?->syncRoles(['admin']);
+
+                $this->audit->record(
+                    AuditEvent::PermissionChanged,
+                    'users',
+                    (string) $currentOwnerId,
+                    old: ['role' => 'owner'],
+                    new: ['role' => 'admin'],
+                    actorId: (string) $actor->getKey(),
+                );
             }
 
-            // TODO(audits, Phase 1): emit audits event='permission_changed' once the audits table lands.
+            // The ownership pointer change itself (spec §1: tenant.updated for owner_user_id changes).
+            $this->audit->record(
+                AuditEvent::Updated,
+                'tenant',
+                (string) $tenant->id,
+                old: ['owner_user_id' => $currentOwnerId],
+                new: ['owner_user_id' => $newOwner->id],
+                actorId: (string) $actor->getKey(),
+            );
         });
     }
 

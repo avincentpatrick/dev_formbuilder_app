@@ -24,8 +24,16 @@ return [
     | used by your application. An example configuration is provided for
     | each backend supported by Laravel. You're also free to add more.
     |
-    | Drivers: "sync", "database", "beanstalkd", "sqs", "redis",
-    |          "deferred", "background", "failover", "null"
+    | Drivers: "sync", "database", "beanstalkd", "sqs", "redis", "null"
+    |
+    | The framework's "deferred", "background" and "failover" connections were REMOVED here per
+    | ADR-0007 §D11. `deferred` is the dangerous one: it runs the job in-process after the response,
+    | where the HTTP session GUC is STILL LIVE — so a job that correctly re-establishes tenant context
+    | and one that silently free-rides on ambient request context become indistinguishable in testing,
+    | and applyLocal() would overwrite the process static without restoring it, corrupting the
+    | terminating request. `failover` only existed to reference `deferred`. Deleting them (rather than
+    | commenting them as forbidden) means QUEUE_CONNECTION=deferred now throws InvalidArgumentException
+    | loudly at boot in every environment — a gate, not prose.
     |
     */
 
@@ -35,13 +43,27 @@ return [
             'driver' => 'sync',
         ],
 
+        // The substrate (ADR-0007 §D1): the `database` driver on the existing Postgres, drained by a
+        // plain `queue:work`. No Horizon, no Redis-backed queue — see §D1 for the upgrade path.
         'database' => [
             'driver' => 'database',
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
-            'after_commit' => false,
+
+            // INVARIANT (ADR-0007 §D7): timeout < retry_after. TenantAwareJob::$timeout is 60, so this
+            // must stay strictly above it. Raised 90 → 120 to hold the invariant with headroom; if it
+            // ever drops below a job's timeout, the queue hands the SAME job to a second worker while
+            // the first is still running it.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 120),
+
+            // ADR-0007 §D8. Was false, which is a real bug: AttachmentStorageService::store() creates
+            // the attachment row and dispatches ScanAttachmentJob with no enclosing transaction at that
+            // level, so a worker could reserve the job before the row was visible, take the
+            // `$attachment === null` early return, and strand virus_scan_status at `pending` FOREVER.
+            // Structurally untestable under QUEUE_CONNECTION=sync, which is why it never surfaced.
+            // Deliberately NOT env-overridable: this is a correctness invariant, not a tunable.
+            'after_commit' => true,
         ],
 
         'beanstalkd' => [
@@ -73,22 +95,6 @@ return [
             'after_commit' => false,
         ],
 
-        'deferred' => [
-            'driver' => 'deferred',
-        ],
-
-        'background' => [
-            'driver' => 'background',
-        ],
-
-        'failover' => [
-            'driver' => 'failover',
-            'connections' => [
-                'database',
-                'deferred',
-            ],
-        ],
-
     ],
 
     /*
@@ -102,8 +108,10 @@ return [
     |
     */
 
+    // Fallback is 'pgsql', not the skeleton's 'sqlite': this project is Postgres-only (ADR-0001) and
+    // a silent sqlite fallback would be a confusing failure rather than a useful default.
     'batching' => [
-        'database' => env('DB_CONNECTION', 'sqlite'),
+        'database' => env('DB_CONNECTION', 'pgsql'),
         'table' => 'job_batches',
     ],
 
@@ -122,8 +130,15 @@ return [
 
     'failed' => [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
-        'database' => env('DB_CONNECTION', 'sqlite'),
+        'database' => env('DB_CONNECTION', 'pgsql'),
         'table' => 'failed_jobs',
+
+        // How long a failed job is retained before App\Jobs\Maintenance\PruneFailedJobsJob sweeps it
+        // (ADR-0007 §D12). NOTE: `failed_jobs` is RLS-FREE and its payload carries tenant uuids, so
+        // retention here is a data-minimisation decision as well as a housekeeping one — any
+        // tenant-facing view of this table is a CROSS-TENANT read (§D12) and must go through
+        // pgsql_superadmin, never a tenant-scoped query.
+        'retention_days' => (int) env('QUEUE_FAILED_RETENTION_DAYS', 14),
     ],
 
 ];

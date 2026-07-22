@@ -6,7 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "inertiajs/inertia-laravel": "^3.1",
         "laravel/fortify": "^1.36",
         "laravel/framework": "^13.8",
@@ -67,11 +67,13 @@
         "analyse": "@php vendor/bin/phpstan analyse --no-progress",
         "controller-gate": "@php scripts/controller-gate.php",
         "migration-lint": "@php scripts/migration-lint.php",
+        "job-payload-lint": "@php scripts/job-payload-lint.php",
         "quality": [
             "@lint",
             "@analyse",
             "@controller-gate",
-            "@migration-lint"
+            "@migration-lint",
+            "@job-payload-lint"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

@@ -32,8 +32,10 @@ use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
+use Symfony\Component\Console\Output\NullOutput;
 use Tests\TestCase;
 
 /*
@@ -336,4 +338,43 @@ function formIn(ScopeNode $node, string $title = 'Survey'): Form
     DB::table('forms')->where('id', $form->id)->update(['scope_node_id' => $node->id]);
 
     return $form->refresh();
+}
+
+/**
+ * Drive ONE real job through the `database` queue driver, in-process (ADR-0007 `:112`).
+ *
+ * This is the only way to exercise serialize → enqueue → reserve → unserialize → context re-entry,
+ * which `sync` — every other test in this suite — structurally cannot: under `sync` the job never
+ * touches the `jobs` table and never leaves the caller's memory, so §D2's context re-establishment,
+ * §D4's listener and §D5's payload rule are all unexercised.
+ *
+ * IN-PROCESS IS DELIBERATE, not a shortcut. RefreshDatabase wraps every test in an uncommitted
+ * transaction, so a separate `php artisan queue:work` process could not see the enqueued row at all.
+ * Running the worker inside the test shares the same PDO connection, so it can. (This is also why the
+ * suite needs no committing-test precedent — see PROGRESS.md's note on that gap.)
+ *
+ * Two consequences the caller must respect:
+ *   1. The worker SWALLOWS exceptions (Worker::process catches and marks the job failed), so assert
+ *      on observable state — the `jobs`/`failed_jobs` tables, a probe's static, a row's column —
+ *      never by expecting a throw. Pair with Exceptions::fake()->assertNothingReported() if you want
+ *      an in-job assertion failure to surface.
+ *   2. After it returns, the tenant statics have been cleared by the §D4 listener. Re-enterTenant()
+ *      before any tenant-scoped read, or the read fails closed and returns nothing.
+ *
+ * Do NOT assert the GUC is null afterwards: applyLocal's is_local scope is the OUTERMOST transaction,
+ * which RefreshDatabase never commits.
+ *
+ * @return int the artisan exit code
+ */
+function workOneJob(string $queue = 'submissions'): int
+{
+    return Artisan::call('queue:work', [
+        'connection' => 'database',
+        '--once' => true,
+        '--queue' => $queue,
+        '--sleep' => 0,
+        // Deliberately NO --tries: the worker default would mask each job's own retryUntil()/$tries,
+        // and §D7's whole point is that those live on the class. --once returns after one job
+        // regardless, so there is no hang to guard against.
+    ], new NullOutput);
 }

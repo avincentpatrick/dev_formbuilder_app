@@ -8,6 +8,7 @@ use App\Exceptions\Forms\FormException;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
+use App\Exceptions\Jobs\InvalidJobPayloadException;
 use App\Exceptions\Scoping\ScopeNodeException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
@@ -121,6 +122,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // A queued job whose payload cannot scope itself to a tenant (ADR-0007 §D2) is a PERMANENT
+        // failure, not a transient one: the payload is immutable once enqueued, so retrying it three
+        // times only triples the noise in failed_jobs. Straight to failed_jobs on the first attempt.
+        $exceptions->dontRetry(InvalidJobPayloadException::class);
+
         // Render framework exceptions (validation, auth, model-not-found) as JSON for the JSON API surface
         // AND for any request that explicitly expects JSON — the builder's CSRF fetch sidecar (D4a) sends
         // Accept: application/json and needs a 422 body, not the HTML validation redirect Inertia visits get

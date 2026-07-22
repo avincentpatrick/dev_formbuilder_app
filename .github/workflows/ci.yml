@@ -44,6 +44,12 @@ jobs:
       - name: Tenant-isolation migration linter (RLS on every tenant-scoped table)
         run: composer run migration-lint
 
+      # ADR-0007's companion gate, discharging ADR-0002 §D6. Registered as its own step because no CI
+      # job runs `composer run quality` — the four steps above invoke the scripts individually, so a
+      # composer.json-only registration would gate nothing.
+      - name: Job payload linter (tenant-aware base class, queue name, scalar payloads)
+        run: composer run job-payload-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 

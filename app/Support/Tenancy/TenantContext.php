@@ -89,6 +89,23 @@ final class TenantContext
         self::$userId = null;
     }
 
+    /**
+     * Restore the PHP-side mirror to a previously captured pair, WITHOUT touching the database.
+     * The exact inverse of {@see flush()}, and deliberately not routed through {@see set()}: set()
+     * would issue two session-scoped `set_config` round-trips, which is both wasteful per job and
+     * wrong (it would leave a session-scoped GUC behind on a worker's long-lived connection).
+     *
+     * Sole caller is App\Listeners\Queue\ScopeTenantContextToJob (ADR-0007 §D4), which saves the
+     * ambient mirror before a job runs and restores it after. That matters under the `sync` driver —
+     * every current CI job — where the queue events fire INLINE in the caller's stack, so a blind
+     * flush would wipe the surrounding request's context mid-request.
+     */
+    public static function restoreMirror(?string $tenantId, ?string $userId): void
+    {
+        self::$tenantId = $tenantId;
+        self::$userId = $userId;
+    }
+
     private static function set(?string $tenantId, ?string $userId, bool $local, ?string $connection): void
     {
         // Clearing binds SQL NULL (not ''): set_config(name, NULL, …) RESETS the GUC so that

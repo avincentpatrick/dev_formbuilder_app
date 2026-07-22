@@ -17,6 +17,54 @@ services:
       mailpit:
         condition: service_started
 
+  # ── Async execution substrate (ADR-0007) ────────────────────────────────────────────────────────
+  # Before H2 NOTHING consumed the queue: `jobs` rows accumulated forever and no scheduler existed.
+  # These two services are the dev tier of ADR-0007's three (dev / CI / Track B). On the Windows box
+  # the equivalents are an NSSM service and a Task Scheduler task, NEITHER of which deploy.ps1
+  # provisions today — see docs/deployment-infrastructure.md §8 items 6 and 7.
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    # --queue= is the §D6 priority order, highest first; it must stay byte-identical to
+    # docs/deployment-infrastructure.md §6 and App\Enums\QueueName::workerOrder().
+    # `default` is deliberately ABSENT: a job that escaped scripts/job-payload-lint.php should strand
+    # visibly (select queue, count(*) from jobs group by 1), not be silently rescued by the worker.
+    # --timeout=60 matches TenantAwareJob::$timeout and must stay < the connection's retry_after (120).
+    # --max-time=3600 recycles the process hourly, which is why `restart` is required, not optional:
+    # a long-lived PHP worker accumulates memory and holds a stale container of a stale codebase.
+    # --memory=112 NOT the default 128: php:8.4-fpm-alpine ships no php.ini, so the CLI memory_limit
+    # is exactly 128M (verified). At --memory=128 the graceful "restart when over budget" check can
+    # never fire before PHP's hard limit does, turning a clean recycle into a fatal OOM mid-job.
+    command: php artisan queue:work --queue=submissions,webhooks,exports,ocr-processing,scheduled-maintenance --timeout=60 --sleep=3 --max-time=3600 --memory=112
+    restart: unless-stopped
+    # Longer than --timeout so an in-flight job can finish on `docker compose down` rather than being
+    # killed mid-transaction and left to retry_after.
+    stop_grace_period: 70s
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    # schedule:work is the long-running dev equivalent of a cron entry calling schedule:run each
+    # minute; on Track B that is a Windows Task Scheduler task, since Windows has no cron.
+    command: php artisan schedule:work
+    restart: unless-stopped
+    # schedule:work spawns a child process per due task; init gives them a real PID 1 to reap them.
+    init: true
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   web:
     image: nginx:1.27-alpine
     ports:

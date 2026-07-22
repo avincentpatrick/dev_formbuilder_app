@@ -66,6 +66,7 @@ const QUEUE_NAME_ENUM = 'App\Enums\QueueName';
 const ALLOWED_QUEUE_CASES = [
     'Submissions',
     'Webhooks',
+    'Mail',
     'Exports',
     'OcrProcessing',
     'ScheduledMaintenance',
@@ -81,7 +82,15 @@ const SCALAR_PAYLOAD_TYPES = ['string', 'int', 'float', 'bool', 'array'];
  * R2/R3/R4 still apply to an exempt class.
  */
 const EXEMPT_JOBS = [
-    // (none yet — H3's queued mailables are the first expected entries)
+    // Queued transactional Notifications (H3). They run via Illuminate\Notifications\SendQueuedNotifications
+    // (a vendor job this linter never scans), route to QueueName::Mail via #[Queue] (R2 still enforced),
+    // carry SCALAR-ONLY payloads — pre-built URLs + display strings (R3 still enforced) — and are sent to
+    // ON-DEMAND notifiables (Notification::route('mail', $email)) so no Eloquent model is ever serialized
+    // under a NULL GUC (§D5). Tenant-LESS on the worker by construction (everything they render is resolved
+    // in-request and carried as scalars), so they legitimately extend neither tenant-aware base. R1 only.
+    'App\Notifications\TenantInvitationNotification',
+    'App\Notifications\Auth\QueuedVerifyEmail',
+    'App\Notifications\Auth\QueuedResetPassword',
 ];
 
 $root = dirname(__DIR__);

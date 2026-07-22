@@ -57,6 +57,14 @@ return [
     'ceilings' => [
         QueueName::Submissions->value => (int) env('QUEUE_FAIRNESS_SUBMISSIONS', 120),
         QueueName::Webhooks->value => (int) env('QUEUE_FAIRNESS_WEBHOOKS', 60),
+
+        // Forward-looking only. H3's queued transactional mail is delivered by framework queued
+        // Notifications (Illuminate\Queue\...\SendQueuedNotifications), which are NOT TenantAwareJobs, so
+        // App\Providers\QueueServiceProvider's limiter returns Limit::none() for them — this ceiling does
+        // NOT throttle H3 mail. It governs a FUTURE TenantAwareJob on the `mail` queue (e.g. a bulk
+        // emailed-digest fan-out); without the key such a job would be unlimited (ceilingFor => null).
+        QueueName::Mail->value => (int) env('QUEUE_FAIRNESS_MAIL', 60),
+
         QueueName::Exports->value => (int) env('QUEUE_FAIRNESS_EXPORTS', 12),
         QueueName::OcrProcessing->value => (int) env('QUEUE_FAIRNESS_OCR', 30),
         QueueName::ScheduledMaintenance->value => (int) env('QUEUE_FAIRNESS_MAINTENANCE', 60),

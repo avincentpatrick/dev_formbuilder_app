@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 /**
@@ -52,8 +53,8 @@ final class TenantMembershipService
         $plainToken = Str::random(48);
 
         // Placeholder-user creation + the invite row are one unit: a failed invite must not orphan a
-        // freshly-created placeholder. The notification is sent only after the row commits.
-        [$invite, $user] = DB::transaction(function () use ($email, $role, $invitedBy, $plainToken): array {
+        // freshly-created placeholder.
+        $invite = DB::transaction(function () use ($email, $role, $invitedBy, $plainToken): TenantUser {
             $user = $this->resolveOrCreateUser($email);
 
             // RLS + BelongsToTenant scope this to the current tenant, so this is "their membership here".
@@ -76,10 +77,15 @@ final class TenantMembershipService
                 'removed_by' => null,
             ])->save(); // BelongsToTenant fills tenant_id on create
 
-            return [$invite, $user];
+            return $invite;
         });
 
-        $user->notify(new TenantInvitationNotification($tenant, $plainToken));
+        // Queued on the `mail` queue (H3). The accept URL is built HERE — in-request, under live tenant
+        // context — so the queued notification carries only scalars (§D5) and needs no context on the
+        // worker. after_commit=true (ADR-0007 §D8, global) backstops ordering: the mail job is not visible
+        // on the queue until the transaction above commits, and is never enqueued on a rollback.
+        Notification::route('mail', $email)
+            ->notify(new TenantInvitationNotification($tenant->name, $this->buildInviteAcceptUrl($tenant, $plainToken)));
 
         return $invite;
     }
@@ -271,6 +277,19 @@ final class TenantMembershipService
         if ($invite->invite_expires_at !== null && $invite->invite_expires_at->isPast()) {
             throw MembershipException::expired();
         }
+    }
+
+    /**
+     * The invitation accept URL — built in-request under live tenant context so the queued mail
+     * notification (H3) carries a scalar string, never a Tenant model (§D5). Invitations are accepted on
+     * the tenant's own subdomain (which is what establishes tenant context so the invite row is even
+     * visible under RLS); fall back to the slug if no domain row exists.
+     */
+    private function buildInviteAcceptUrl(Tenant $tenant, string $plainToken): string
+    {
+        $domain = $tenant->domains()->value('domain') ?? $tenant->slug;
+
+        return "https://{$domain}/invitations/{$plainToken}";
     }
 
     /** Resolve an existing global identity by email (cross-RLS via pgsql_auth), or create a placeholder. */

@@ -36,7 +36,7 @@ services:
     # --memory=112 NOT the default 128: php:8.4-fpm-alpine ships no php.ini, so the CLI memory_limit
     # is exactly 128M (verified). At --memory=128 the graceful "restart when over budget" check can
     # never fire before PHP's hard limit does, turning a clean recycle into a fatal OOM mid-job.
-    command: php artisan queue:work --queue=submissions,webhooks,exports,ocr-processing,scheduled-maintenance --timeout=60 --sleep=3 --max-time=3600 --memory=112
+    command: php artisan queue:work --queue=submissions,webhooks,mail,exports,ocr-processing,scheduled-maintenance --timeout=60 --sleep=3 --max-time=3600 --memory=112
     restart: unless-stopped
     # Longer than --timeout so an in-flight job can finish on `docker compose down` rather than being
     # killed mid-transaction and left to retry_after.

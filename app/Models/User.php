@@ -8,7 +8,11 @@ use App\Enums\AccentToken;
 use App\Enums\FontSizeScale;
 use App\Enums\ThemeMode;
 use App\Models\Concerns\HasUuidv7;
+use App\Notifications\Auth\QueuedResetPassword;
+use App\Notifications\Auth\QueuedVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -18,6 +22,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -58,6 +65,45 @@ class User extends Authenticatable implements MustVerifyEmail
     public function guardName(): string
     {
         return 'web';
+    }
+
+    /**
+     * Queue email verification on the `mail` queue (H3) instead of sending it synchronously in-request.
+     * The signed URL is built HERE — where $this is a live User and the URL captures the REQUEST host —
+     * and handed to a scalar-only queued notification delivered to an on-demand notifiable, so no User
+     * model is ever serialized under a NULL GUC on the worker (ADR-0007 §D5). Mirrors the stock
+     * {@see VerifyEmail::verificationUrl()}. Covers every call site: the
+     * Registered→SendEmailVerificationNotification listener and UpdateUserProfileInformation.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $url = URL::temporarySignedRoute(
+            'verification.verify',
+            Carbon::now()->addMinutes((int) Config::get('auth.verification.expire', 60)),
+            ['id' => $this->getKey(), 'hash' => sha1($this->getEmailForVerification())],
+        );
+
+        Notification::route('mail', $this->getEmailForVerification())
+            ->notify(new QueuedVerifyEmail($url));
+    }
+
+    /**
+     * Queue the password-reset link on the `mail` queue (H3). Same rationale as
+     * {@see sendEmailVerificationNotification()}: build the URL in-request, deliver to an on-demand
+     * notifiable, never serialize the User. Mirrors the stock
+     * {@see ResetPassword::resetUrl()}. Driven by the Fortify PasswordBroker.
+     *
+     * @param  string  $token
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $url = url(route('password.reset', [
+            'token' => $token,
+            'email' => $this->getEmailForPasswordReset(),
+        ], false));
+
+        Notification::route('mail', $this->getEmailForPasswordReset())
+            ->notify(new QueuedResetPassword($url));
     }
 
     /**

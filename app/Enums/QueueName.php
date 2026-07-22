@@ -14,10 +14,13 @@ use Illuminate\Queue\Attributes\Queue as QueueAttribute;
  * binding while `onQueue(` had ZERO hits repository-wide; this enum is what makes it real.
  *
  * Priority runs highest-first in declaration order: `submissions`/`webhooks` are user-facing or
- * near-real-time, `exports`/`ocr-processing` show a pending state, `scheduled-maintenance` is
- * background sweeping. That order is expressed as the `--queue=` ordering string in the documented
- * `queue:work` invocation ({@see self::workerOrder()}) until a supervisor with real per-queue
- * weighting exists — there is no Horizon (§D1).
+ * near-real-time, `mail` is user-facing transactional email (a person is waiting on an invite/reset),
+ * `exports`/`ocr-processing` show a pending state, `scheduled-maintenance` is background sweeping. `mail`
+ * sits above the pending-state queues but below `submissions` (core ingest) and `webhooks` (external
+ * SLA); its volume is low and bursty, so a high slot cannot starve the lower queues. That order is
+ * expressed as the `--queue=` ordering string in the documented `queue:work` invocation
+ * ({@see self::workerOrder()}) until a supervisor with real per-queue weighting exists — there is no
+ * Horizon (§D1).
  *
  * A job selects its queue with the framework's {@see QueueAttribute} class attribute, NEVER a `$queue`
  * property: `Illuminate\Bus\Queueable:29` declares `public $queue;` untyped, so redeclaring it with a
@@ -33,6 +36,7 @@ enum QueueName: string
 {
     case Submissions = 'submissions';
     case Webhooks = 'webhooks';
+    case Mail = 'mail';
     case Exports = 'exports';
     case OcrProcessing = 'ocr-processing';
     case ScheduledMaintenance = 'scheduled-maintenance';

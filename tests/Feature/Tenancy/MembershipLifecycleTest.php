@@ -53,7 +53,15 @@ it('invites with a hashed token, reserves the role, and grants nothing until acc
         ->and($invite->invited_role_id)->toBe(catalogRole('form_editor'))
         ->and($invite->invite_token)->toHaveLength(64)      // sha256 hex, never the plaintext
         ->and($invite->invite_expires_at->isFuture())->toBeTrue();
-    Notification::assertSentTimes(TenantInvitationNotification::class, 1);
+
+    // H3: the invitation is a QUEUED, on-demand mail notification carrying only scalars (the tenant
+    // name + a pre-built accept URL) — never a Tenant model. Sent to the invited address, not a User.
+    Notification::assertSentOnDemand(
+        TenantInvitationNotification::class,
+        fn (TenantInvitationNotification $n, array $channels, object $notifiable): bool => ($notifiable->routes['mail'] ?? null) === 'newbie@membertest.local'
+            && $n->tenantName === 'Alpha'
+            && str_contains($n->acceptUrl, '/invitations/')
+    );
 
     // The reserved role is not yet a real grant (§7): the placeholder user has no role.
     enterTenant($tenant->id, $invite->user_id); // the placeholder is visible to itself

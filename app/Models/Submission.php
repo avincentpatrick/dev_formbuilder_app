@@ -34,6 +34,9 @@ use Illuminate\Support\Carbon;
  * @property SubmissionSource $source
  * @property ?string $client_submission_uuid
  * @property ?string $locale
+ * @property ?int $completeness_percent
+ * @property Carbon|null $last_saved_at
+ * @property Carbon|null $draft_expires_at
  * @property ?string $validated_by
  * @property Carbon|null $validated_at
  * @property ?string $returned_reason
@@ -70,6 +73,9 @@ class Submission extends Model implements TenantScoped
         'device_id',
         'app_version',
         'locale',
+        'completeness_percent',
+        'last_saved_at',
+        'draft_expires_at',
         'source_batch_id',
         'validated_by',
         'validated_at',
@@ -88,6 +94,9 @@ class Submission extends Model implements TenantScoped
         return [
             'status' => SubmissionStatus::class,
             'source' => SubmissionSource::class,
+            'completeness_percent' => 'integer',
+            'last_saved_at' => 'datetime',
+            'draft_expires_at' => 'datetime',
             'validated_at' => 'datetime',
             'submitted_at' => 'datetime',
             'finalized_at' => 'datetime',

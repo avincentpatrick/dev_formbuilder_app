@@ -4,25 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
-use App\Enums\AuditEvent;
 use App\Enums\FormVersionStatus;
 use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
-use App\Models\Attachment;
 use App\Models\FormField;
-use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
-use App\Models\SubmissionAnswerIndex;
 use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
-use App\Support\Audit\AuditLogger;
-use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -44,17 +38,17 @@ use Illuminate\Support\Facades\DB;
  * validator). Media attachments (Increment G6) are linked here: a Stage-3.5 DB check
  * ({@see AttachmentReferenceValidator}) validates each referenced file exists/is owned/is not infected,
  * then persist re-points each staged attachment to the submission and records the id list on the answer
- * document. The architecture's other Stage-4 insert — the `created` audit row — is written in {@see persist}.
+ * document. The shared Stage-4 tail (answer document + typed/geo index + attachment re-point + the `created`
+ * audit row) is written by {@see SubmissionFinalizer}, so {@see SubmissionDraftService::promote()} reuses the
+ * identical persistence body when it finalizes a draft (Increment H9a).
  */
 final class SubmissionPipeline
 {
     public function __construct(
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
-        private readonly AnswerIndexProjector $projector,
-        private readonly GeoIndexProjector $geoProjector,
         private readonly AttachmentReferenceValidator $attachmentRefs,
-        private readonly AuditLogger $audit,
+        private readonly SubmissionFinalizer $finalizer,
     ) {}
 
     public function submit(SubmissionPayload $payload): SubmissionResult
@@ -128,8 +122,9 @@ final class SubmissionPipeline
     }
 
     /**
-     * The Stage-4 transaction body: the head submission, its 1:1 JSONB answer document, and one typed index
-     * row per queryable scalar answer.
+     * The Stage-4 transaction body: create the head submission row, then delegate the shared tail (the 1:1
+     * JSONB answer document + the typed/geo index projections + the attachment re-point + the `created` audit
+     * row) to {@see SubmissionFinalizer} — the identical body {@see SubmissionDraftService::promote()} reuses.
      *
      * @param  Collection<int, FormField>  $fields
      */
@@ -159,175 +154,9 @@ final class SubmissionPipeline
             'submitted_at' => now(),
         ]);
 
-        // Media attachments (Increment G6): collect every referenced attachment id from the media answers,
-        // re-point each staged file's polymorphic owner from its form_field to this submission, and record
-        // the flat id list on the answer document (attachment_refs). All inside the persist transaction, so
-        // the ownership move can never drift from the answer it belongs to. RLS scopes the update to the tenant.
-        $attachmentIds = $this->collectAttachmentIds($fields, $answers);
-        if ($attachmentIds !== []) {
-            Attachment::query()->whereIn('id', $attachmentIds)->update([
-                'attachable_type' => 'submission',
-                'attachable_id' => $submission->id,
-            ]);
-        }
-
-        SubmissionAnswer::create([
-            'submission_id' => $submission->id,
-            'form_version_id' => $version->id,
-            'answers' => $answers,
-            'answers_schema_checksum' => $version->checksum,
-            'answers_content_checksum' => $contentChecksum,
-            'attachment_refs' => $attachmentIds,
-            'last_saved_at' => now(),
-        ]);
-
-        $this->projectIndex($submission, $version, $fields, $answers);
-        $this->projectGeo($submission, $version, $fields, $answers);
-
-        // Stage 4's other insert (technical-architecture §4.1): the `created` audit row, IN this transaction
-        // so it is atomic with the submission. Head-row attributes only — deliberately NOT the guest PII
-        // (guest_ip / guest_user_agent / guest_contact_email), which the ledger must never carry (spec §2).
-        $this->audit->record(
-            AuditEvent::Created,
-            'submission',
-            (string) $submission->id,
-            old: null,
-            new: [
-                'form_id' => $submission->form_id,
-                'form_version_id' => $submission->form_version_id,
-                'status' => $submission->status->value,
-                'source' => $submission->source->value,
-            ],
-            actorId: $payload->respondentUserId,
-        );
+        $this->finalizer->finalize($submission, $version, $fields, $answers, $contentChecksum, $payload->respondentUserId);
 
         return $submission;
-    }
-
-    /**
-     * The unique attachment ids referenced by every media answer (Increment G6). Reads the `id` of each
-     * {@see StructuralAnswerNormalizer} canonical AttachmentRef under a media
-     * field key. Feeds both the ownership re-point and the denormalised `attachment_refs` list.
-     *
-     * @param  Collection<int, FormField>  $fields
-     * @param  array<string, mixed>  $answers
-     * @return list<string>
-     */
-    private function collectAttachmentIds(Collection $fields, array $answers): array
-    {
-        /** @var array<string, true> $mediaKeys */
-        $mediaKeys = [];
-        foreach ($fields as $field) {
-            if ($field->field_type->isMedia()) {
-                $mediaKeys[$field->key] = true;
-            }
-        }
-
-        /** @var array<string, true> $ids */
-        $ids = [];
-        foreach ($answers as $key => $value) {
-            if (! isset($mediaKeys[$key]) || ! is_array($value)) {
-                continue;
-            }
-            foreach ($value as $ref) {
-                if (is_array($ref) && isset($ref['id']) && is_string($ref['id'])) {
-                    $ids[$ref['id']] = true;
-                }
-            }
-        }
-
-        return array_keys($ids);
-    }
-
-    /**
-     * @param  Collection<int, FormField>  $fields
-     * @param  array<string, mixed>  $effectiveAnswers
-     */
-    private function projectIndex(Submission $submission, FormVersion $version, Collection $fields, array $effectiveAnswers): void
-    {
-        /** @var array<string, FormField> $byKey */
-        $byKey = [];
-        foreach ($fields as $field) {
-            $byKey[$field->key] = $field;
-        }
-
-        foreach ($effectiveAnswers as $key => $value) {
-            // Repeat-group instance arrays (keyed by section key) and multi-select lists are never indexed —
-            // only scalar field answers reach the typed index (data-dictionary §8/§9).
-            if (is_array($value)) {
-                continue;
-            }
-
-            $field = $byKey[$key] ?? null;
-            if ($field === null) {
-                continue;
-            }
-
-            $projection = $this->projector->project($field, $value);
-            if ($projection === null) {
-                continue;
-            }
-
-            SubmissionAnswerIndex::create([
-                'submission_id' => $submission->id,
-                'form_version_id' => $version->id,
-                'form_field_id' => $field->id,
-                'field_key' => $field->key,
-                $projection['column'] => $projection['value'],
-            ]);
-        }
-    }
-
-    /**
-     * The PostGIS geometry projection (ADR-0006 D1) — the object-valued sibling of {@see projectIndex},
-     * acting on exactly the top-level geo answers that projectIndex skips (arrays/objects are never
-     * scalar-indexed). Written inside the same persist transaction as the JSONB, so the geometry can
-     * never drift from the source-of-truth envelope (Risk R1). Uses a bound raw insert because the
-     * geometry is built by `ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)` (Blueprint/Eloquent cannot express
-     * a PostGIS function call); `tenant_id` comes from the request GUC the table's FORCE-RLS WITH CHECK
-     * matches. Geo inside a repeatable section is banned at publish, so top-level iteration suffices.
-     *
-     * @param  Collection<int, FormField>  $fields
-     * @param  array<string, mixed>  $effectiveAnswers
-     */
-    private function projectGeo(Submission $submission, FormVersion $version, Collection $fields, array $effectiveAnswers): void
-    {
-        /** @var array<string, FormField> $byKey */
-        $byKey = [];
-        foreach ($fields as $field) {
-            $byKey[$field->key] = $field;
-        }
-
-        $tenantId = TenantContext::currentTenantId();
-
-        foreach ($effectiveAnswers as $key => $value) {
-            $field = $byKey[$key] ?? null;
-            if ($field === null || ! $field->field_type->isGeo()) {
-                continue;
-            }
-
-            $projection = $this->geoProjector->project($field, $value);
-            if ($projection === null) {
-                continue;
-            }
-
-            DB::insert(
-                'INSERT INTO submission_geo_index '
-                .'(tenant_id, submission_id, form_version_id, form_field_id, field_key, '
-                .'geometry_type, captured_accuracy, geom, created_at, updated_at) '
-                .'VALUES (?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), now(), now())',
-                [
-                    $tenantId,
-                    $submission->id,
-                    $version->id,
-                    $field->id,
-                    $field->key,
-                    $projection['geometry_type'],
-                    $projection['captured_accuracy'],
-                    $projection['geojson'],
-                ],
-            );
-        }
     }
 
     private function findByClientUuid(string $uuid): ?Submission

@@ -601,7 +601,7 @@ Platform-defined pricing tiers, Cashier-backed (plan §1/§2.2).
 | `updated_at` | `timestamptz` | No | `now()` | No | — |
 
 > **Design Notes**
-> - ⚠️ **No `plans` migration exists yet** (verified 2026-07-21 — 42 migrations, zero hits for `plans`, `subscriptions` or `audits`). This section describes intended schema, not shipped schema. ADR-0007 §D3 nonetheless names `plans` alongside `tenants`/`domains` as a table a cross-tenant `MaintenanceJob` may read *once it exists*.
+> - ✅ **Built in H5a** (`2026_07_23_000001_create_plans_table`, ADR-0008) — as an **admin-assigned** catalog with **no Cashier**: `stripe_price_id` ships but is dormant until Phase 4 (nothing consumes it). Seeded by `PlanSeeder`/`PlanCatalog` (5 tiers, on the default connection since there is no RLS). `business`/`enterprise` seed `is_active = false` — built + gated, held from sale (ADR-0008 §D6). ADR-0007 §D3 names `plans` as a table a cross-tenant `MaintenanceJob` may read.
 > - **`plans` has no `tenant_id` and is not RLS-scoped** — it is the platform's own global pricing catalog, shared read-only reference data across every tenant, structurally different from a tenant business record. **Note on the migration linter:** `plans` needs **no** `EXEMPT_TABLES` entry in `scripts/migration-lint.php`, and adding one would be actively misleading — the linter's isolation rule short-circuits on any table that declares no literal `tenant_id` column, so a table like this never reaches the check. The exemption list is for tables that *do* carry a tenant identifier while deliberately having no RLS policy (`jobs`/`job_batches`/`failed_jobs`, the framework/Fortify tables), which per ADR-0002 §D2 is the case requiring justification. It is *not* being used as a substitute "vocabulary lookup table" in the sense the enum-strategy section disclaims — its rows are admin-managed commercial content (price, quotas, feature flags) that changes independently of a code deploy, which is exactly the case where a real table (not an enum) is the right tool.
 > - `feature_flags`/`quotas` are JSONB maps rather than rigid columns so new gates/metrics can be added without a migration, at the cost of losing a DB-level `CHECK` on their keys — accepted trade-off, validated at the application layer against the `UsageMetric`/feature-flag key enums instead.
 
@@ -632,6 +632,7 @@ A tenant's subscription to a plan, Cashier-backed (plan §1/§2.2).
 | `updated_at` | `timestamptz` | No | `now()` | No | — |
 
 > **Design Notes**
+> - ✅ **Built in H5a** (`2026_07_23_000002_create_subscriptions_table`, ADR-0008) — strict RLS. **Admin-assigned, no Cashier**: the `stripe_customer_id`/`stripe_subscription_id`/`stripe_status` columns ship but are dormant until Phase 4; the super-admin console writes `stripe_status = 'active'` on assign, and the current plan derives from the active subscription (`stripe_status ∈ {active, trialing}` ∧ `ended_at IS NULL`; `Subscription::scopeActive`). No `SubscriptionStatus` PHP enum — the free-text exception below stands as-built.
 > - **`stripe_status` is the one deliberate, explicitly-flagged exception** to "one consistent enum strategy" (plan §5): it stores Stripe's own vocabulary verbatim rather than a local PHP enum, because Stripe controls that vocabulary and can extend it outside this app's release cycle — constraining it locally with a `CHECK` would risk hard-rejecting a legitimate new Stripe status before the app has been updated to recognize it. This is a named, reasoned exception, not an inconsistency of the kind legacy had (e.g. its free-text `submission_source` sitting undocumented next to FK-backed siblings).
 
 ---
@@ -657,6 +658,7 @@ Metering rows backing quota enforcement and usage-based billing (plan §2.2).
 Unique constraint: `(tenant_id, metric, period_start)`.
 
 > **Design Notes**
+> - ✅ **Built in H5a** (`2026_07_23_000003_create_usage_counters_table`, ADR-0008) — strict RLS, `bigint identity` PK (so the model omits `HasUuidv7`). H5a ships the table + the `EntitlementService` read side only; the increment logic and the cross-tenant rollup (a `MaintenanceJob`, ADR-0007 §D3 — never a single-tenant job) land with **H5b**, so counters read 0 until then.
 > - `period_start`/`period_end` bounds are used instead of a single rolling counter so that plan upgrades/downgrades mid-cycle, and historical reporting, both stay accurate against the quota that actually applied at the time — a rolling-only counter would lose this history.
 > - As flagged in the enum catalog, `UsageMetric` is the vocabulary most likely to eventually outgrow a code-defined enum (e.g. per-integration metering added dynamically); promoting it to a real lookup table is the anticipated fallback, not needed at current scope.
 

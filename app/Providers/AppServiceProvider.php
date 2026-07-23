@@ -18,6 +18,7 @@ use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Entitlements\EntitlementService;
 use App\Support\Guest\GuestShareTokenService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -55,6 +56,11 @@ class AppServiceProvider extends ServiceProvider
         // a user's grants per (user, tenant) for the life of one request, and under Octane a singleton
         // would carry that memo — an authorization cache — across requests.
         $this->app->scoped(ResourceGrantResolver::class);
+
+        // The single entitlement resolver (H5a / ADR-0008). Same reasoning as above: it memoizes the
+        // current tenant's plan + usage per request, so `scoped` (reset per request under Octane), never
+        // `singleton` (which would leak one tenant's plan into another's request).
+        $this->app->scoped(EntitlementService::class);
     }
 
     /**

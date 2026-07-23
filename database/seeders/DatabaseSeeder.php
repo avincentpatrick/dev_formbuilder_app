@@ -24,6 +24,10 @@ class DatabaseSeeder extends Seeder
         // The platform question library (G9b) — NULL-tenant rows, also seeded via pgsql_privileged.
         $this->call(PlatformFieldLibrarySeeder::class);
 
+        // The global plan catalog (H5a) — the tenant_id-free `plans` table; seeded on the DEFAULT
+        // connection (it has no RLS), idempotent on `code`.
+        $this->call(PlanSeeder::class);
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

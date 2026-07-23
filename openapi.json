@@ -184,6 +184,95 @@
                 }
             }
         },
+        "/audits": {
+            "get": {
+                "operationId": "v1.audits.index",
+                "summary": "List audit rows newest-first, optionally filtered by target, event type, actor, or date range",
+                "tags": [
+                    "AuditApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "auditable_type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "auditable_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "event",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AuditResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/field-library": {
             "get": {
                 "operationId": "v1.field-library.index",
@@ -1851,6 +1940,84 @@
             }
         },
         "schemas": {
+            "AuditResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "auditable_type": {
+                        "type": "string"
+                    },
+                    "auditable_id": {
+                        "type": "string"
+                    },
+                    "event": {
+                        "type": "string"
+                    },
+                    "old_values": {
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "new_values": {
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "redacted_fields": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    },
+                    "user_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_system_action": {
+                        "type": "boolean"
+                    },
+                    "ip_address": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "user_agent": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "auditable_type",
+                    "auditable_id",
+                    "event",
+                    "old_values",
+                    "new_values",
+                    "redacted_fields",
+                    "user_id",
+                    "is_system_action",
+                    "ip_address",
+                    "user_agent",
+                    "created_at"
+                ],
+                "title": "AuditResource"
+            },
             "FieldLibraryResource": {
                 "type": "object",
                 "properties": {

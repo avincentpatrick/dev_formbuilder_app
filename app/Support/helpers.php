@@ -18,7 +18,7 @@ if (! function_exists('withTenantIsolation')) {
      * it would loosen the type for every other caller. That migration calls the generator directly; the
      * migration linter accepts any `TenantIsolation::` static call, so the backstop is still enforced.
      *
-     * @param  'strict'|'nullable_global'|'belongs_to_user'|'form_version'|'draft_child'  $variant
+     * @param  'strict'|'nullable_global'|'belongs_to_user'|'form_version'|'draft_child'|'append_only'  $variant
      * @param  array<string, string>  $options  variant-specific overrides — e.g. ['column' => 'user_id']
      *                                          for belongs_to_user, or the parent_table/fk_column/
      *                                          status_column/draft_value keys for draft_child.
@@ -44,6 +44,8 @@ if (! function_exists('withTenantIsolation')) {
                 $options['draft_value'] ?? 'draft',
                 $options['column'] ?? 'tenant_id',
             ),
+            // H4 — the append-only ledger shape (audits). SELECT + INSERT only; FORCE RLS denies mutation.
+            'append_only' => TenantIsolation::appendOnly($table, $options['column'] ?? 'tenant_id'),
         };
     }
 }

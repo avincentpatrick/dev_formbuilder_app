@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\AuditEvent;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
+use App\Events\FormPublished;
 use App\Exceptions\Forms\FormException;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Support\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,11 +31,12 @@ final class PublishService
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
         private readonly CapabilityFlags $capabilityFlags,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function publish(Form $form, User $publisher, ?string $note = null): FormVersion
     {
-        return DB::transaction(function () use ($form, $publisher, $note): FormVersion {
+        $published = DB::transaction(function () use ($form, $publisher, $note): FormVersion {
             // §3.4 — lock the form row for the transaction's duration.
             $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
 
@@ -102,11 +106,31 @@ final class PublishService
             $this->cloner->clone($draft, $newDraft);
             $locked->forceFill(['draft_version_id' => $newDraft->id])->save();
 
-            // TODO(audits/webhooks, Phase 1): emit AuditEvent.published + the form.published webhook once
-            // those tables land (data-dictionary §13/§15), inside this transaction (technical-architecture
-            // §7 — never pre-commit). Deferred, same pattern as TenantMembershipService.
+            // Audit the publish IN this transaction (technical-architecture §4.1 — the ledger row is atomic
+            // with the version flip, so a rolled-back publish leaves no `published` audit). The most
+            // consequential event this schema tracks (spec §1: form_version → published).
+            $this->audit->record(
+                AuditEvent::Published,
+                'form_version',
+                (string) $draft->id,
+                old: ['status' => FormVersionStatus::Draft->value],
+                new: [
+                    'status' => FormVersionStatus::Published->value,
+                    'version_number' => $draft->version_number,
+                    'checksum' => $checksum,
+                ],
+                actorId: (string) $publisher->getKey(),
+            );
 
             return $draft->refresh();
         });
+
+        // The post-commit domain event (technical-architecture §7.4) — the H13 webhook + notification seam,
+        // raised AFTER the transaction commits so `form.published` never fires for a publish that rolled
+        // back. Carries a scalar envelope, so a queued listener is §D5-safe. This is the SECOND record of
+        // one action: the audit above is the in-transaction ledger; this is the outbound announcement.
+        event(FormPublished::for($published, $publisher));
+
+        return $published;
     }
 }

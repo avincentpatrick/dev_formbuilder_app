@@ -45,6 +45,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/scopes/{scopeNode}/impact',
         '/resource-grants',
         '/resource-grants/{resourceGrant}',
+        // H4 — the read-only audit-log surface.
+        '/audits',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

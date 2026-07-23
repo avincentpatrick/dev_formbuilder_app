@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Authorization;
 
+use App\Enums\AuditEvent;
 use App\Enums\ResourceCapacity;
 use App\Enums\TenantUserStatus;
 use App\Exceptions\Authorization\GrantException;
@@ -14,6 +15,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Policies\ResourceGrantPolicy;
 use App\Services\Forms\FormService;
+use App\Support\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -34,7 +36,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class ResourceGrantService
 {
-    public function __construct(private readonly ResourceGrantResolver $grants) {}
+    public function __construct(
+        private readonly ResourceGrantResolver $grants,
+        private readonly AuditLogger $audit,
+    ) {}
 
     /**
      * Grant `$recipient` a capacity on `$target`, replacing any capacity they already hold there.
@@ -75,7 +80,15 @@ final class ResourceGrantService
                 ->where('user_id', $recipient->getKey())
                 ->first();
 
+            $oldValues = null;
             if ($existing !== null) {
+                // A replacement (e.g. an editor→reviewer demotion). Capture the prior capacity so the audit
+                // row carries the demotion's provenance, even though grant() records it as `created` (the
+                // spec §1 vocabulary for resource_grants is created/deleted — a grant was (re)established).
+                $oldValues = [
+                    'capacity' => $existing->capacity->value,
+                    'includes_descendants' => $existing->includes_descendants,
+                ];
                 $existing->fill([
                     'capacity' => $capacity,
                     'includes_descendants' => $includesDescendants,
@@ -97,7 +110,24 @@ final class ResourceGrantService
                 $grant->save();
             }
 
-            // TODO(audits, Phase 1): record the grant. Blocked — there is no `audits` table until Phase 1.
+            // Audit the grant (H4). Inside this transaction, so a rolled-back grant leaves no phantom ledger
+            // row. auditable = `resource_grants`; a subtree grant reaches many forms, so the row records the
+            // morph target + includes_descendants (spec §1) — without them the grant's reach is unreadable.
+            $this->audit->record(
+                AuditEvent::Created,
+                'resource_grants',
+                (string) $grant->getKey(),
+                old: $oldValues,
+                new: [
+                    'user_id' => $grant->user_id,
+                    'capacity' => $grant->capacity->value,
+                    'scopeable_type' => $grant->scopeable_type,
+                    'scopeable_id' => $grant->scopeable_id,
+                    'includes_descendants' => $grant->includes_descendants,
+                ],
+                actorId: (string) $actor->getKey(),
+            );
+
             $this->grants->forget((string) $recipient->getKey());
 
             return $grant;
@@ -108,10 +138,23 @@ final class ResourceGrantService
     public function revoke(ResourceGrant $grant): void
     {
         $userId = (string) $grant->user_id;
+        $grantId = (string) $grant->getKey();
 
-        DB::transaction(static fn () => $grant->delete());
+        // Snapshot the grant BEFORE it is hard-deleted: grants are hard-deleted, so this audit row is the
+        // ONLY record that a revoked grant ever existed (spec §1). Audit + delete in one transaction.
+        $old = [
+            'user_id' => $grant->user_id,
+            'capacity' => $grant->capacity->value,
+            'scopeable_type' => $grant->scopeable_type,
+            'scopeable_id' => $grant->scopeable_id,
+            'includes_descendants' => $grant->includes_descendants,
+        ];
 
-        // TODO(audits, Phase 1): record the revocation.
+        DB::transaction(function () use ($grant, $grantId, $old): void {
+            $this->audit->record(AuditEvent::Deleted, 'resource_grants', $grantId, old: $old, new: null);
+            $grant->delete();
+        });
+
         $this->grants->forget($userId);
     }
 

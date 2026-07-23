@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\ApiTokenController;
+use App\Http\Controllers\Api\V1\AuditApiController;
 use App\Http\Controllers\Api\V1\FieldLibraryApiController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Models\Audit;
 use App\Models\Form;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
@@ -177,6 +179,13 @@ Route::prefix('api/v1')
         Route::delete('resource-grants/{resourceGrant}', [ResourceGrantApiController::class, 'destroy'])
             ->middleware(['ability:'.ApiAbilities::MANAGE_SCOPES, 'can:delete,resourceGrant'])
             ->name('resource-grants.destroy');
+
+        // Audit log (H4 / audit-compliance-logging-spec.md §3) — read-only. Pairs `ability:read:audit_log`
+        // (scopes the TOKEN) with `can:viewAny,Audit` (re-checks the acting user's Owner/Admin permission);
+        // RLS scopes every row to the tenant. Append-only, so there is no write route. Regenerate openapi.json.
+        Route::get('audits', [AuditApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::READ_AUDIT_LOG, 'can:viewAny,'.Audit::class])
+            ->name('audits.index');
 
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).

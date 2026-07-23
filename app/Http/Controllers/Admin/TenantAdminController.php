@@ -32,18 +32,22 @@ final class TenantAdminController extends Controller
         ]);
     }
 
-    public function suspend(Tenant $tenant): RedirectResponse
+    public function suspend(Request $request, Tenant $tenant): RedirectResponse
     {
-        $this->superAdmin->suspendTenant($tenant);
+        /** @var User $actor */
+        $actor = $request->user();
+        $this->superAdmin->suspendTenant($tenant, $actor);
 
         return back()
             ->with('status', 'tenant-suspended')
             ->with('toast', ['type' => 'success', 'message' => "Suspended {$tenant->name}"]);
     }
 
-    public function reactivate(Tenant $tenant): RedirectResponse
+    public function reactivate(Request $request, Tenant $tenant): RedirectResponse
     {
-        $this->superAdmin->reactivateTenant($tenant);
+        /** @var User $actor */
+        $actor = $request->user();
+        $this->superAdmin->reactivateTenant($tenant, $actor);
 
         return back()
             ->with('status', 'tenant-reactivated')

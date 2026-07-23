@@ -66,6 +66,18 @@ final class TenantIsolation
     }
 
     /**
+     * Append-only shape (H4, audit-compliance-logging-spec.md §4, data-dictionary §13): strict tenant
+     * SELECT + INSERT and NOTHING ELSE. Under FORCE ROW LEVEL SECURITY a command with no policy is denied,
+     * so omitting the UPDATE and DELETE policies is the append-only enforcement itself — at the database,
+     * for EVERY role including the tenant owner. The `audits` ledger is immutable and never deleted; this
+     * shape makes "never mutated, never deleted" a Postgres invariant rather than an application promise.
+     */
+    public static function appendOnly(string $table, string $tenantColumn = 'tenant_id'): void
+    {
+        self::execute(self::appendOnlySql($table, $tenantColumn));
+    }
+
+    /**
      * The `users` fourth shape (RBAC §6): SELECT-only, visible to self + active co-tenant members.
      * Pair with usersWritePolicies() — this generator emits no write policies, and FORCE RLS denies
      * all writes without one.
@@ -214,6 +226,34 @@ final class TenantIsolation
             self::policy($table, 'tenant_insert', 'INSERT', check: $match),
             self::policy($table, 'tenant_update', 'UPDATE', using: $match, check: $match),
             self::policy($table, 'tenant_delete', 'DELETE', using: $match),
+        ];
+    }
+
+    /**
+     * The append-only shape's SQL (H4). Strict tenant SELECT + INSERT; NO update or delete policy.
+     *
+     * The absence is load-bearing, not an oversight: under FORCE RLS an UPDATE/DELETE with no matching
+     * policy is denied for everyone, so the ledger cannot be mutated or deleted through any connection —
+     * tenant, app, or (see {@see applySuperAdminBypass()}) even the elevated super-admin role, which the
+     * bypass grants only INSERT. A super-admin cross-tenant audit write is layered on top via
+     * `applySuperAdminBypass($table, ['INSERT'])`; this base stays strict so a NULL/foreign-tenant row is
+     * INVISIBLE to an ordinary tenant (the exact opposite of {@see nullableGlobalSql()}, which would leak it).
+     *
+     * @return list<string>
+     */
+    public static function appendOnlySql(string $table, string $tenantColumn = 'tenant_id'): array
+    {
+        self::assertIdentifier($table);
+        self::assertIdentifier($tenantColumn);
+
+        $match = self::tenantMatch($tenantColumn);
+
+        return [
+            ...self::enableAndForce($table),
+            self::policy($table, 'tenant_select', 'SELECT', using: $match),
+            self::policy($table, 'tenant_insert', 'INSERT', check: $match),
+            // Deliberately NO tenant_update / tenant_delete policy — FORCE RLS denies both commands, which
+            // IS the append-only enforcement. Do not add one "for completeness"; it would break the ledger.
         ];
     }
 

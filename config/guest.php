@@ -19,6 +19,20 @@ return [
         'key' => env('GUEST_SHARE_TOKEN_KEY'),
     ],
 
+    // The durable resume token (Increment H9b, App\Support\Guest\GuestShareTokenService::mintResume). Unlike
+    // the share token it is scoped to one draft submissions.id and lives long enough to survive a device
+    // change / cleared local storage. Signed with a SEPARATE domain-separated key so it can never be confused
+    // with a share token.
+    'resume_token' => [
+        // How long a resume link stays valid, in seconds (default: 30d — matches the draft's stamped
+        // draft_expires_at TTL; the tenant-configurable override is H10). Stamped once at mint time.
+        'ttl' => (int) env('SUBMISSION_RESUME_TOKEN_TTL', 2592000),
+
+        // Optional explicit signing key. Left null the service derives one from APP_KEY with domain
+        // separation ('guest-resume-token.v1'). Set only to rotate the resume key independently.
+        'key' => env('SUBMISSION_RESUME_TOKEN_KEY'),
+    ],
+
     // Rate limits (requests/minute). The submit + schema endpoints are limited per token AND per IP
     // (technical-architecture.md §7.2); the mint endpoint is limited per IP.
     'rate_limit' => [

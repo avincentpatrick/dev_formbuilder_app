@@ -1035,10 +1035,239 @@
                 "security": []
             }
         },
+        "/public/f/{shareToken}/draft": {
+            "post": {
+                "operationId": "v1.public.drafts.store",
+                "summary": "Create or update a guest draft and return a resume token for it",
+                "tags": [
+                    "GuestDraft"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GuestDraftRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "form_updated"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This form has been updated. Please reload and try again."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "guest_disabled"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Guest submissions are disabled for this form."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/public/drafts/{resumeToken}": {
+            "get": {
+                "operationId": "v1.public.drafts.resume",
+                "summary": "Fetch a guest draft's saved state for a resume token",
+                "tags": [
+                    "GuestDraftResume"
+                ],
+                "parameters": [
+                    {
+                        "name": "resumeToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "completeness_percent": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "client_submission_uuid": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "form_version_id": {
+                                                    "type": "string"
+                                                },
+                                                "answers": {},
+                                                "share_token": {
+                                                    "type": "string"
+                                                },
+                                                "share_token_expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "completeness_percent",
+                                                "client_submission_uuid",
+                                                "form_version_id",
+                                                "answers",
+                                                "share_token",
+                                                "share_token_expires_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "draft_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This draft is no longer available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/submissions": {
             "post": {
                 "operationId": "v1.public.submissions.store",
-                "summary": "Submit a guest response for a share token through the unified submission pipeline",
+                "summary": "Submit a guest response for a share token through the unified submission pipeline (or, if the response\nwas saved as a draft, promote that draft)",
                 "tags": [
                     "GuestSubmission"
                 ],
@@ -1814,6 +2043,64 @@
                 }
             }
         },
+        "/submissions/{submission}/promote": {
+            "post": {
+                "operationId": "v1.submissions.promote",
+                "summary": "Promote a draft to a submitted response",
+                "tags": [
+                    "SubmissionPromote"
+                ],
+                "parameters": [
+                    {
+                        "name": "submission",
+                        "in": "path",
+                        "required": true,
+                        "description": "The submission ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/sync/manifest": {
             "get": {
                 "operationId": "v1.sync.manifest",
@@ -2343,6 +2630,65 @@
                     "updated_at"
                 ],
                 "title": "FormVersionResource"
+            },
+            "GuestDraftRequest": {
+                "type": "object",
+                "description": "The guest draft upsert request (Increment H9b) \u2014 the same coarse shape as {@see GuestSubmissionRequest}\n(authorization is the share-token middleware, so authorize() is true; `answers` is a key\u21d2value map that\nthe {@see SubmissionDraftService} normalises), plus a `finish_later` flag. When true and the draft carries\na contact email, the upsert also emails the resume link (\u00a75.2). A draft may be INCOMPLETE, so unlike the\nsubmit request nothing here asserts completeness \u2014 only the outer envelope is validated.",
+                "properties": {
+                    "answers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "guest_contact_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "client_submission_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "locale": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 10
+                    },
+                    "device_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 100
+                    },
+                    "app_version": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 20
+                    },
+                    "finish_later": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "description": "\"Save and finish later\" \u2014 email the resume link (if a contact email is present) rather than only\nreturning it in the response body."
+                    }
+                },
+                "required": [
+                    "answers"
+                ],
+                "title": "GuestDraftRequest"
             },
             "GuestSubmissionRequest": {
                 "type": "object",

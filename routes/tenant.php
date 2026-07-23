@@ -290,6 +290,12 @@ Route::middleware([
     Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
         ->middleware('throttle:guest-mint')->name('guest.form.mint');
 
+    // Increment H9b — the save-and-resume entry. Opens the guest SPA shell from an emailed resume link
+    // (a static "resume" segment, so it never collides with a `public_slug` at `/f/{slug}`). The token is
+    // verified in the controller (404 on bad/expired); the SPA then restores the draft (restore itself is H10).
+    Route::get('/f/resume/{resumeToken}', [GuestFormController::class, 'resume'])
+        ->middleware('throttle:guest-mint')->name('guest.form.resume');
+
     // Increment G8a — per-form web manifest linked from the guest shell (installability). Same slug
     // resolution + 404 gates as the mint route; no share token needed.
     Route::get('/f/{slug}/manifest.webmanifest', PwaManifestController::class)->name('guest.form.manifest');

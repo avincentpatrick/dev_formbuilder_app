@@ -411,7 +411,7 @@ it('401s a submit with a forged token that claims this tenant but is signed with
     $form = guestForm($tenant, $owner);
 
     // An attacker fabricates a well-formed token for the real tenant/form/version, signed with a key they guessed.
-    $forged = (new GuestShareTokenService('attacker-key', 86_400))
+    $forged = (new GuestShareTokenService('attacker-key', 86_400, 'attacker-resume-key', 2_592_000))
         ->mint($tenant->id, $form->id, (string) $form->current_published_version_id)->token;
 
     $this->postJson("http://acme.meridian.test/api/v1/public/f/{$forged}/submissions", [

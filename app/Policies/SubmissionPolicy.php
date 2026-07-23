@@ -70,6 +70,20 @@ final class SubmissionPolicy
     }
 
     /**
+     * Finalize a draft (Increment H9b) — the encoder-confirm seam (an OCR-staged or manually-saved draft is
+     * promoted to `submitted`). Mirrors {@see create()}'s authorization: it is a submission-authoring act on
+     * the draft's form, so it needs `submissions.create` plus tenant-wide edit OR editor-capacity collaboration
+     * on that form. A draft is already pinned to a published version, so the published-version check create()
+     * makes is unnecessary here.
+     */
+    public function promote(User $user, Submission $submission): bool
+    {
+        return $user->can('submissions.create')
+            && ($user->can('forms.edit.any')
+                || $this->grants->holdsOnFormId($user, $submission->form_id, ResourceCapacity::Editor));
+    }
+
+    /**
      * Tenant-wide submission visibility. `dashboard.org.view` is the one permission that separates the
      * org-wide read roles (Owner/Admin/Viewer) from the collaborator-scoped ones (Form Editor/Reviewer,
      * who hold only `dashboard.form.view`) — multi-tenancy-rbac-design.md §5.

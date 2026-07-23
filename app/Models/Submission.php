@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property SubmissionSource $source
  * @property ?string $client_submission_uuid
  * @property ?string $locale
+ * @property ?string $guest_contact_email
  * @property ?int $completeness_percent
  * @property Carbon|null $last_saved_at
  * @property Carbon|null $draft_expires_at

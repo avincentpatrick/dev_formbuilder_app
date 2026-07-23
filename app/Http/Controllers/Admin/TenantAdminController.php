@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\BillingInterval;
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,6 +55,33 @@ final class TenantAdminController extends Controller
         return back()
             ->with('status', 'tenant-reactivated')
             ->with('toast', ['type' => 'success', 'message' => "Reactivated {$tenant->name}"]);
+    }
+
+    /**
+     * Assign (or change) a tenant's plan (H5a / ADR-0008 §D1). Thin adapter — validates the selected plan
+     * (from the global catalog) and delegates to SuperAdminService, which adopts the affected tenant's
+     * context and emits the `subscription.updated` audit atomically.
+     */
+    public function assignPlan(Request $request, Tenant $tenant): RedirectResponse
+    {
+        $validated = $request->validate([
+            'plan_id' => ['required', 'string', 'exists:plans,id'],
+            'billing_interval' => ['nullable', Rule::enum(BillingInterval::class)],
+        ]);
+
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $plan = Plan::query()->where('id', (string) $validated['plan_id'])->firstOrFail();
+        $interval = isset($validated['billing_interval'])
+            ? BillingInterval::from((string) $validated['billing_interval'])
+            : BillingInterval::Monthly;
+
+        $this->superAdmin->assignPlan($tenant, $plan, $actor, $interval);
+
+        return back()
+            ->with('status', 'tenant-plan-assigned')
+            ->with('toast', ['type' => 'success', 'message' => "Assigned {$plan->name} to {$tenant->name}"]);
     }
 
     public function users(): Response

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
+use App\Enums\BillingInterval;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Audit\AuditLogger;
@@ -104,6 +107,68 @@ final class SuperAdminService
                     (string) $tenant->getKey(),
                     old: ['status' => $from],
                     new: ['status' => $to],
+                    actorId: (string) $actor->getKey(),
+                );
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
+    }
+
+    /**
+     * Assign (or change) a tenant's plan (ADR-0008 §D1/§D10) — admin-assigned, no Cashier. Upserts the
+     * tenant's primary `default` subscription and emits a `subscription.updated` audit through the H4
+     * {@see AuditLogger} (the FIRST new consumer of that substrate).
+     *
+     * Uses the H4 adopt-tenant-context pattern (see {@see changeStatus}), NOT an elevated connection: in ONE
+     * transaction the affected tenant's context is adopted, so both the strict `subscriptions` write (`tenant_id`
+     * auto-fills to ctx, WITH CHECK passes) and the audit INSERT succeed on the app connection with no bypass
+     * and no extra GRANT — then the prior context is restored in `finally`. Records the acting super-admin's
+     * `user_id` (a human acted; `is_system_action` stays false).
+     */
+    public function assignPlan(
+        Tenant $tenant,
+        Plan $plan,
+        User $actor,
+        BillingInterval $interval = BillingInterval::Monthly,
+    ): void {
+        DB::transaction(function () use ($tenant, $plan, $actor, $interval): void {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal((string) $tenant->getKey());
+
+            try {
+                // The tenant's primary subscription (RLS-scoped to the adopted tenant). Upsert it: change the
+                // plan on an existing row, or create the row on first assignment.
+                $subscription = Subscription::query()->where('name', 'default')->first();
+
+                $old = $subscription === null ? null : [
+                    'plan_id' => $subscription->plan_id,
+                    'billing_interval' => $subscription->billing_interval->value,
+                    'stripe_status' => $subscription->stripe_status,
+                ];
+
+                $subscription ??= new Subscription;
+                // forceFill: quantity is deliberately omitted — a new row takes the DB default (1) and an
+                // existing row keeps its value. tenant_id auto-fills from the adopted context (BelongsToTenant).
+                $subscription->forceFill([
+                    'plan_id' => $plan->getKey(),
+                    'name' => 'default',
+                    'stripe_status' => 'active',
+                    'billing_interval' => $interval,
+                ])->save();
+
+                $this->audit->record(
+                    AuditEvent::Updated,
+                    'subscription',
+                    (string) $subscription->getKey(),
+                    old: $old,
+                    new: [
+                        'plan_id' => $plan->getKey(),
+                        'plan_code' => $plan->code->value,
+                        'billing_interval' => $interval->value,
+                        'stripe_status' => 'active',
+                    ],
                     actorId: (string) $actor->getKey(),
                 );
             } finally {

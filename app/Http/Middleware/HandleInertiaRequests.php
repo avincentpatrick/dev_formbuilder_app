@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Form;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Entitlements\EntitlementService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -75,6 +76,12 @@ class HandleInertiaRequests extends Middleware
             'ui' => [
                 'theme' => $user?->uiTheme() ?? User::defaultUiTheme(),
             ],
+            // The tenant's read-only entitlement model (H5a / ADR-0008): current plan tier, feature flags,
+            // and per-metric quota-vs-usage. One shared read-model both the H5b gated UI and any future
+            // Plan & Usage panel consume, so they cannot disagree — the same "one source" reasoning as
+            // ui.theme above. FAIL-CLOSED off-tenant: EntitlementService::snapshot() returns null when
+            // there is no active tenant context (guest/central routes), so no query runs and no plan leaks.
+            'entitlements' => app(EntitlementService::class)->snapshot(),
             // One-shot flash → toast bridge (design-system §3.7). Controllers signal an outcome with
             // ->with('toast', ['type' => 'success'|'error'|'info', 'message' => '…']); the app shell's
             // ToastHost raises it once, then the session flash is gone.

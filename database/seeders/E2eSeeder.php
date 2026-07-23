@@ -68,6 +68,9 @@ class E2eSeeder extends Seeder
         // The platform question library (G9b) — NULL-tenant rows so the builder's Library picker has content.
         $this->call(PlatformFieldLibrarySeeder::class);
 
+        // The global plan catalog (H5a) — the tenant_id-free `plans` table, on the default connection.
+        $this->call(PlanSeeder::class);
+
         // Tenant + subdomain (tenants/domains are RLS-exempt central tables).
         $tenant = Tenant::firstOrCreate(['slug' => 'acme'], ['name' => 'Acme Research']);
         if (! $tenant->domains()->where('domain', 'acme')->exists()) {

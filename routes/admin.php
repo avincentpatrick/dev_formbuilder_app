@@ -33,6 +33,9 @@ Route::domain((string) config('tenancy.central_domain'))
             Route::get('/tenants', [TenantAdminController::class, 'index'])->name('admin.tenants.index');
             Route::post('/tenants/{tenant}/suspend', [TenantAdminController::class, 'suspend'])->name('admin.tenants.suspend');
             Route::post('/tenants/{tenant}/reactivate', [TenantAdminController::class, 'reactivate'])->name('admin.tenants.reactivate');
+            // Assign (or change) a tenant's plan — admin-assigned, no Cashier (H5a / ADR-0008). The service
+            // adopts the affected tenant's context and audits it through the H4 AuditLogger.
+            Route::post('/tenants/{tenant}/plan', [TenantAdminController::class, 'assignPlan'])->name('admin.tenants.assign-plan');
 
             // Cross-tenant user list — exercises the `superadmin_bypass` RLS carve-out via SuperAdminService.
             Route::get('/users', [TenantAdminController::class, 'users'])->name('admin.users.index');

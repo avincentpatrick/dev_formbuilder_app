@@ -6,12 +6,14 @@ namespace App\Services\Tenancy;
 
 use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
+use App\Enums\UsageMetric;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
+use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -33,7 +35,10 @@ final class TenantMembershipService
 {
     private const INVITE_TTL_DAYS = 7;
 
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly QuotaGuard $quota,
+    ) {}
 
     /**
      * Invite a person (by email) to a tenant with a reserved role. Creates a placeholder user if the
@@ -65,6 +70,15 @@ final class TenantMembershipService
             $existing = TenantUser::query()->where('user_id', $user->id)->first();
             if ($existing !== null && $existing->status === TenantUserStatus::Active) {
                 throw MembershipException::alreadyMember($email);
+            }
+
+            // Hard-block the active_seats quota (H5b / ADR-0008 §D4), reserve-on-invite: the gauge counts
+            // Active + pending Invited (matching listMembers()), so only a GENUINELY NEW occupant consumes a
+            // seat. Re-sending to someone already Invited is count-neutral (their row is already counted);
+            // reactivating a Declined/Removed/Suspended row is a new seat. Inside the transaction so a
+            // refusal rolls back before a placeholder user is orphaned.
+            if ($existing === null || $existing->status !== TenantUserStatus::Invited) {
+                $this->quota->assertCanCreate(UsageMetric::ActiveSeats);
             }
 
             $invite = $existing ?? new TenantUser;

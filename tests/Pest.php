@@ -3,6 +3,7 @@
 declare(strict_types=1);
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
+use App\Enums\PlanTier;
 use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
@@ -13,14 +14,17 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use App\Models\Plan;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\ExpressionLexer;
 use App\Services\Expressions\ExpressionParser;
@@ -32,6 +36,7 @@ use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
@@ -83,6 +88,37 @@ function makeActiveMember(User $user, string $roleName): void
         'invited_role_id' => catalogRole($roleName),
     ]);
     $user->syncRoles([$roleName]);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Shared entitlement test helpers (H5b). Seed the catalog + assign a plan to the CURRENT tenant so a test's
+| hard-block quotas are governed by a known tier. Require enterTenant already called (so BelongsToTenant
+| auto-fills the subscription's tenant_id and the strict RLS write passes). Without a subscription a tenant
+| resolves to `free` only if the catalog is seeded; with no plans at all it resolves to null ⇒ unlimited, so
+| most of the suite (which seeds no plans) is unaffected by enforcement.
+|--------------------------------------------------------------------------
+*/
+
+/** Seed all 5 tiers (idempotent, default connection) and give the current tenant an active subscription on `$tier`. */
+function assignPlanTier(PlanTier $tier): Subscription
+{
+    app(PlanSeeder::class)->run();
+    $plan = Plan::query()->where('code', $tier->value)->firstOrFail();
+    $subscription = Subscription::factory()->forPlan($plan)->create();
+
+    // Drop any plan the scoped EntitlementService memoized before this assignment — in production the
+    // assign and the guarded action are separate requests (a fresh scoped service); in one test process the
+    // memo persists, so forget() here mirrors that fresh-request reality.
+    app(EntitlementService::class)->forget();
+
+    return $subscription;
+}
+
+/** Give the current tenant an active subscription on an unlimited plan (Enterprise = all-null quotas). */
+function assignUnlimitedPlan(): Subscription
+{
+    return assignPlanTier(PlanTier::Enterprise);
 }
 
 /*

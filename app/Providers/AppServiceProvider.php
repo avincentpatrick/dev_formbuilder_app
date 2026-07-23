@@ -19,6 +19,7 @@ use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Entitlements\QuotaGuard;
 use App\Support\Guest\GuestShareTokenService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -61,6 +62,10 @@ class AppServiceProvider extends ServiceProvider
         // current tenant's plan + usage per request, so `scoped` (reset per request under Octane), never
         // `singleton` (which would leak one tenant's plan into another's request).
         $this->app->scoped(EntitlementService::class);
+
+        // The hard-block quota guard (H5b). `scoped` so it shares the request's one EntitlementService
+        // instance (its live-gauge memo), the same reason the resolvers above are scoped.
+        $this->app->scoped(QuotaGuard::class);
     }
 
     /**

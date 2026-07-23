@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\BillingInterval;
 use App\Enums\FieldType;
+use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
@@ -12,10 +14,12 @@ use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Models\Plan;
 use App\Models\Role;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -87,6 +91,21 @@ class E2eSeeder extends Seeder
         DB::transaction(function () use ($tenant, $owner, $pending, $reviewer): void {
             TenantContext::applyLocal((string) $tenant->id, $owner->id);
             app(PermissionRegistrar::class)->setPermissionsTeamId((string) $tenant->id);
+
+            // Give acme a Professional plan (H5b) so the hard-block quota guards are inert for the demo/e2e
+            // fixture — Professional's forms_count is unlimited and every other quota is far above what this
+            // seeder creates, so the ~10 seeded forms don't trip the Free cap of 3. Idempotent.
+            if (! Subscription::query()->where('name', 'default')->exists()) {
+                $professionalId = Plan::query()->where('code', PlanTier::Professional->value)->value('id');
+                if ($professionalId !== null) {
+                    Subscription::create([
+                        'plan_id' => $professionalId,
+                        'name' => 'default',
+                        'stripe_status' => 'active',
+                        'billing_interval' => BillingInterval::Monthly,
+                    ]);
+                }
+            }
 
             if (! TenantUser::query()->where('user_id', $owner->id)->exists()) {
                 TenantUser::create([

@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\Maintenance\PruneFailedJobsJob;
+use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -39,3 +40,9 @@ Artisan::command('inspire', function () {
 // Failed jobs carry tenant uuids in an RLS-free table, so this is data minimisation as well as
 // housekeeping. Off-peak: it is a bulk delete against the same Postgres instance serving the app.
 Schedule::job(PruneFailedJobsJob::class)->dailyAt('03:10');
+
+// Usage-counter rollup (H5b / ADR-0008 §D9). Cross-tenant, so it is a MaintenanceJob that fans out one
+// per-tenant child (ReconcileTenantUsageJob) — never a single-tenant job. Off-peak, a little before the
+// failed-job prune so the two nightly sweeps do not contend. Overlap-safety comes from
+// MaintenanceJob::middleware()'s WithoutOverlapping lock, not a scheduler modifier.
+Schedule::job(RollUpUsageCountersJob::class)->dailyAt('02:40');

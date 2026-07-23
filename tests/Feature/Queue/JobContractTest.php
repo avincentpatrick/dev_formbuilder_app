@@ -75,7 +75,10 @@ function concreteJobClasses(): array
 {
     $classes = [];
 
-    foreach (glob(app_path('Jobs/**/*.php')) + glob(app_path('Jobs/*.php')) as $file) {
+    // array_merge, NOT `+`: glob returns 0-indexed arrays, and `+` unions by key — so once the
+    // subdirectory glob returns as many files as the top-level one, the top-level entries (ScanAttachmentJob,
+    // the base classes) get shadowed and silently dropped. Concatenate so every job file is scanned.
+    foreach (array_merge(glob(app_path('Jobs/**/*.php')), glob(app_path('Jobs/*.php'))) as $file) {
         $class = 'App\\Jobs\\'.str_replace(['/', '.php'], ['\\', ''], substr($file, strlen(app_path('Jobs/'))));
 
         if (! class_exists($class)) {

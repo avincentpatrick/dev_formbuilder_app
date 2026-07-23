@@ -136,9 +136,9 @@ Route::middleware([
     // Both gate on can:create,Form (the gallery exists to create a form from a template); instantiate
     // clones the template's schema_blueprint into a brand-new form's draft (never a live reference).
     Route::get('/forms/templates', [FormTemplateController::class, 'index'])
-        ->middleware('can:create,'.Form::class)->name('forms.templates.index');
+        ->middleware(['can:create,'.Form::class, 'feature:form_templates'])->name('forms.templates.index');
     Route::post('/forms/templates/{template}/instantiate', [FormTemplateController::class, 'instantiate'])
-        ->middleware('can:create,'.Form::class)->name('forms.templates.instantiate');
+        ->middleware(['can:create,'.Form::class, 'feature:form_templates'])->name('forms.templates.instantiate');
 
     Route::patch('/forms/{form}', [FormController::class, 'update'])
         ->middleware('can:update,form')->name('forms.update');
@@ -152,20 +152,20 @@ Route::middleware([
     // Save a form as a tenant-owned private template (Increment G9a) — snapshots the current draft's live
     // rows into a new form_templates row. A read/derive of the form → gated can:view,form (mirrors export).
     Route::post('/forms/{form}/save-as-template', [FormTemplateController::class, 'storeFromForm'])
-        ->middleware('can:view,form')->name('forms.templates.store-from-form');
+        ->middleware(['can:view,form', 'feature:form_templates'])->name('forms.templates.store-from-form');
 
     // XLSForm export (Increment G7a) — download any version (draft or published) as an .xlsx workbook, the
     // browser-facing twin of the doc-pinned /api/v1 endpoint. {version} is scope-bound to {form}; gated
     // can:view,form (read access), mirroring the submissions-export download.
     Route::get('/forms/{form}/versions/{version}/xlsform', [FormXlsformController::class, 'export'])
         ->scopeBindings()
-        ->middleware('can:view,form')->name('forms.xlsform.export');
+        ->middleware(['can:view,form', 'feature:xlsform_export'])->name('forms.xlsform.export');
 
     // XLSForm import (Increment G7b) — destructively replace the form's current DRAFT with an uploaded .xlsx
     // (docs/xlsform-interop-spec.md §5, mirroring "restore version"). A write → gated can:update,form (not the
     // export's read gate); parse failures reject the file UPFRONT, before the draft is touched.
     Route::post('/forms/{form}/draft/xlsform-import', [FormXlsformController::class, 'import'])
-        ->middleware('can:update,form')->name('forms.xlsform.import');
+        ->middleware(['can:update,form', 'feature:xlsform_export'])->name('forms.xlsform.import');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly
@@ -196,11 +196,11 @@ Route::middleware([
     // mutations; insert delegates to SchemaBlueprintMaterializer::materializeField, save to FieldLibrary::fromField.
     // `from-library` is a literal segment (no {field}) so it never collides with the fields/{field} routes above.
     Route::post('/forms/{form}/fields/from-library', [FormBuilderController::class, 'storeFieldFromLibrary'])
-        ->middleware('can:update,form')->name('forms.fields.from-library');
+        ->middleware(['can:update,form', 'feature:field_library'])->name('forms.fields.from-library');
     Route::post('/forms/{form}/fields/{field}/save-to-library', [FormBuilderController::class, 'saveFieldToLibrary'])
-        ->middleware('can:update,form')->name('forms.fields.save-to-library');
+        ->middleware(['can:update,form', 'feature:field_library'])->name('forms.fields.save-to-library');
     Route::get('/forms/{form}/library-items', [FormBuilderController::class, 'libraryItems'])
-        ->middleware('can:update,form')->name('forms.library-items');
+        ->middleware(['can:update,form', 'feature:field_library'])->name('forms.library-items');
 
     // Assign a form to the scoping hierarchy (Increment G10b2). Deliberately NOT part of PATCH /forms/{form}:
     // writing scope_node_id confers capacity on the form — and via SubmissionPolicy on its whole submission

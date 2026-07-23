@@ -2,7 +2,9 @@
 
 use App\Exceptions\Admin\SuperAdminException;
 use App\Exceptions\Authorization\GrantException;
+use App\Exceptions\Entitlements\FeatureGateException;
 use App\Exceptions\Entitlements\QuotaExceededException;
+use App\Exceptions\Entitlements\RateLimitExceededException;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\FormException;
@@ -21,6 +23,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireFeature;
 use App\Support\Api\ApiErrorResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authorize;
@@ -90,6 +93,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'superadmin.mfa' => EnsureSuperAdminMfa::class,
             'ability' => CheckForAnyAbility::class,
             'abilities' => CheckAbilities::class,
+            // feature:<key> (H5c) — plan feature-gate on top of ability/can. Requires tenant context (all
+            // gated routes have it); passes through a null (unseeded/dev) plan, blocks a resolved plan that
+            // denies the feature. See RequireFeature.
+            'feature' => RequireFeature::class,
         ]);
 
         // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session
@@ -218,6 +225,27 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
+
+        // Plan feature-gate refusals (H5c / ADR-0008 §D5) — a tenant reached a capability its plan does not
+        // include (xlsform_export / offline_sync / form_templates / field_library / api_access). Same 402
+        // entitlement-family status as a quota refusal, with the `feature_not_available` code + {feature}
+        // detail; a web request bounces back with an upgrade-prompt toast. A grandfathered tenant's override
+        // resolves the feature to true and never reaches here. See FeatureGateException / RequireFeature.
+        $exceptions->render(function (FeatureGateException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
+        // Per-month usage-quota rate limit (H5c / ADR-0008 §D4) — the metered api_requests (and, when H13
+        // ships webhook dispatch, webhook_deliveries) current-period usage reached the plan quota. 429 with a
+        // Retry-After to the period reset, the same envelope as the burst throttle above so an integration's
+        // existing 429 backoff handles it. API-only — a monthly API quota has no web surface.
+        $exceptions->render(fn (RateLimitExceededException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details())->withHeaders($e->headers())
+            : null);
 
         // XLSForm import failure (Increment G7b) — a malformed workbook rejected UPFRONT, before the
         // destructive draft-replace runs (§6). The API surface gets the stable code + {row,type} details it

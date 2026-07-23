@@ -41,11 +41,24 @@ export interface AppAbilities {
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };
 
+/**
+ * The tenant's entitlement snapshot (H5c) — mirrors EntitlementService::snapshot(). `null` off-tenant
+ * (guest/central), so client-side gating fail-closes (a falsy feature hides its affordance). `features` is
+ * the plan flag map, override-aware (a grandfathered tenant reads `true`); `quotas` is every metric's
+ * limit-vs-usage (`limit: null` = unlimited). Keys are the snake_case server keys.
+ */
+export interface EntitlementSnapshot {
+    plan: { code: string; name: string };
+    features: Record<string, boolean>;
+    quotas: Record<string, { limit: number | null; used: number }>;
+}
+
 declare module '@inertiajs/core' {
     interface PageProps {
         auth: { user: AppUser | null; can: AppAbilities };
         ui: { theme: UiTheme };
         flash: { toast: FlashToast | null; xlsformWarnings?: string[] | null };
+        entitlements: EntitlementSnapshot | null;
         errors: Record<string, string>;
     }
 }

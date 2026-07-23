@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Services\Entitlements\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
@@ -22,6 +23,12 @@ use Illuminate\Support\Str;
  * `public_slug`, RLS-scoped to the subdomain tenant; 404 — never 403 — for missing / guest-disabled /
  * unpublished so slug-probing can't distinguish them). No share token is needed: like the mint route this
  * resolves the form from the subdomain, unlike the token-consuming /api/v1/public endpoints.
+ *
+ * H5c adds a fourth 404 gate: `offline_sync` (installable PWA / offline collection) is plan-gated, so a tenant
+ * whose plan does not include it serves no manifest — the browser reads "not installable" and the form stays a
+ * plain online page (the never-block online submission path is untouched). The gate defers to the resolved
+ * plan, so it is inert until the catalog is seeded (the RequireFeature stance); the guest never sees a 402 —
+ * a manifest fetch has no upgrade UI, so a missing feature reads as a missing manifest (404), like the others.
  */
 final class PwaManifestController extends Controller
 {
@@ -29,13 +36,14 @@ final class PwaManifestController extends Controller
 
     private const BACKGROUND_COLOR = '#F3F4F1'; // --mds-neutral-50
 
-    public function __invoke(string $slug): JsonResponse
+    public function __invoke(EntitlementService $entitlements, string $slug): JsonResponse
     {
         $form = Form::query()->where('public_slug', $slug)->first();
 
         abort_if($form === null, 404);
         abort_unless($form->allow_guest_submissions, 404);
         abort_if($form->current_published_version_id === null, 404);
+        abort_if($entitlements->currentPlan() !== null && ! $entitlements->feature('offline_sync'), 404);
 
         $scope = '/f/'.$slug;
 

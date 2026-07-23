@@ -24,6 +24,11 @@ import {
 import PageHeader from '@/components/shell/PageHeader.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import AssignScopeModal from '@/components/forms/AssignScopeModal.vue';
+import { useEntitlements } from '@/composables/useEntitlements';
+
+// Hide the form_templates affordances when the plan doesn't include them (H5c) — the /forms/templates and
+// save-as-template routes are server-gated (feature:form_templates), so this only spares a 402 click.
+const { feature } = useEntitlements();
 
 type FormVersionRow = {
     id: string;
@@ -193,7 +198,7 @@ function submitRestore(): void {
 
         <PageHeader title="Forms" icon="forms">
             <template #actions>
-                <Link href="/forms/templates">
+                <Link v-if="feature('form_templates')" href="/forms/templates">
                     <MdsButton variant="tertiary" icon-left="layout">New from template</MdsButton>
                 </Link>
                 <MdsButton variant="primary" icon-left="plus" @click="openCreate">New form</MdsButton>
@@ -227,7 +232,7 @@ function submitRestore(): void {
                     />
                     <MdsIconButton icon="clock" label="Version history" size="sm" @click="historyTarget = row" />
                     <MdsIconButton
-                        v-if="row.can.template"
+                        v-if="row.can.template && feature('form_templates')"
                         icon="copy"
                         label="Save as template"
                         size="sm"
@@ -278,10 +283,16 @@ function submitRestore(): void {
                 >
                     <template #action>
                         <div class="forms__empty-actions">
-                            <Link href="/forms/templates">
+                            <Link v-if="feature('form_templates')" href="/forms/templates">
                                 <MdsButton variant="primary" icon-left="layout">Start from a template</MdsButton>
                             </Link>
-                            <MdsButton variant="tertiary" icon-left="plus" @click="openCreate">Start from blank</MdsButton>
+                            <MdsButton
+                                :variant="feature('form_templates') ? 'tertiary' : 'primary'"
+                                icon-left="plus"
+                                @click="openCreate"
+                            >
+                                Start from blank
+                            </MdsButton>
                         </div>
                     </template>
                 </MdsEmptyState>

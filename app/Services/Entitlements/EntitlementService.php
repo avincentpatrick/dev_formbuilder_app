@@ -11,6 +11,7 @@ use App\Enums\UsageMetric;
 use App\Jobs\TenantAwareJob;
 use App\Models\Attachment;
 use App\Models\Form;
+use App\Models\LegacyOverride;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TenantUser;
@@ -46,6 +47,9 @@ final class EntitlementService
 
     /** @var array<string, int> "{tenant id}:{gauge metric value}" => memoized live COUNT/SUM for the request */
     private array $gauges = [];
+
+    /** @var array<string, array<string, bool>> tenant id => memoized legacy (grandfather) override map */
+    private array $overrides = [];
 
     /**
      * The plan governing the current tenant: the plan of its active subscription, else the seeded `free`
@@ -171,18 +175,19 @@ final class EntitlementService
         ];
     }
 
-    /** Drop the memoized plan + usage + gauges (after an assign, or for test isolation). Null clears all. */
+    /** Drop the memoized plan + usage + gauges + overrides (after an assign, or for test isolation). Null clears all. */
     public function forget(?string $tenantId = null): void
     {
         if ($tenantId === null) {
             $this->plans = [];
             $this->usage = [];
             $this->gauges = [];
+            $this->overrides = [];
 
             return;
         }
 
-        unset($this->plans[$tenantId], $this->usage[$tenantId]);
+        unset($this->plans[$tenantId], $this->usage[$tenantId], $this->overrides[$tenantId]);
 
         foreach (array_keys($this->gauges) as $key) {
             if (str_starts_with($key, $tenantId.':')) {
@@ -276,13 +281,28 @@ final class EntitlementService
     }
 
     /**
-     * Per-tenant feature overrides — the grandfather seam (ADR-0008 §D5). Returns nothing in H5a; H5c backs
-     * this with storage and the merge-day backfill that grandfathers every then-existing tenant.
+     * Per-tenant feature overrides — the grandfather storage (ADR-0008 §D5). Consulted by {@see feature()}
+     * AHEAD of the plan flags, so a grandfathered tenant reads `true` for a feature its plan would deny. One
+     * row per tenant (RLS-scoped), memoized because {@see snapshot()} calls {@see feature()} once per flag
+     * key. Empty (and no query) off-tenant, and empty for any tenant with no override row (born-gated).
      *
      * @return array<string, bool>
      */
     private function legacyOverrides(): array
     {
-        return [];
+        $tenantId = TenantContext::currentTenantId();
+
+        if ($tenantId === null) {
+            return [];
+        }
+
+        if (! array_key_exists($tenantId, $this->overrides)) {
+            // Explicit null check rather than `->first()?->feature_flags ?? []`: Larastan flags the nullsafe
+            // as unnecessary on the left of ?? (the H5a `tier()` precedent), and this is equally clear.
+            $override = LegacyOverride::query()->first();
+            $this->overrides[$tenantId] = $override === null ? [] : $override->feature_flags;
+        }
+
+        return $this->overrides[$tenantId];
     }
 }

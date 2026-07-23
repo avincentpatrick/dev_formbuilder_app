@@ -46,6 +46,8 @@ Uses the **exact flag key names** `docs/data-dictionary.md` §16 already gives a
 | `save_and_resume` | ✗ | ✓ | ✓ | ✓ | ✓ |
 | `native_connectors` (Slack / Sheets / Airtable) | ✗ | ✓ | ✓ | ✓ | ✓ |
 | `branding` (tenant logo / theme) | ✗ | ✓ | ✓ | ✓ | ✓ |
+| `form_templates` (reusable whole-form blueprints) | ✗ | ✓ | ✓ | ✓ | ✓ |
+| `field_library` (reusable questions) | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Advanced cross-form analytics | ✗ | ✗ | ✗ | ✓ | ✓ |
 | `custom_domain` | ✗ | ✗ | ✗ | ✓ | ✓ |
 | Embedded payments (Stripe Checkout) — **deferred to Phase 4** | ✗ | ✗ | ✓ | ✓ | ✓ |
@@ -56,6 +58,8 @@ Uses the **exact flag key names** `docs/data-dictionary.md` §16 already gives a
 **Rationale for the two gating decisions most worth explaining**: `xlsform_export`/`offline_sync` are excluded from Free but included from Starter onward — both are genuine product differentiators (the Kobo/ODK migration lever, and the core "offline-first" pitch) that should be a *reason to upgrade from Free*, not something every trial user gets for nothing; `ocr_single`/`ocr_linelist` start at Professional, not Starter, because OCR processing carries real, ongoing third-party provider cost (`docs/ocr-pipeline-design.md`) that scales with usage — gating it to a higher-margin tier is a direct cost-alignment decision, not an arbitrary one.
 
 **Added by ADR-0008 (entitlement & metering)** — the two rows the original matrix left open, now resolved: `native_connectors` (the Slack/Sheets/Airtable connector framework, one capability behind one flag key) is **Starter+ uniformly**, not a per-connector matrix; `branding` (tenant logo/theme) is **unbundled from `custom_domain`** and set to **Starter+**, because branding is a broad differentiator that should not require the Business-tier custom-domain purchase — while `custom_domain` itself **stays Business**. Embedded payments is annotated **deferred to Phase 4** (nothing consumes the Stripe-shaped columns until then, per ADR-0008 §D1); its Professional+ tier is retained as forward intent, not a Phase-3 offering.
+
+**Added by H5c (the retro-gate)** — `form_templates` (the reusable whole-form blueprint gallery, Increment G9a) and `field_library` (the reusable-question library, Increment G9b) were shipped **ungated** in Phase 2 as route names only, with no feature-flag keys. H5c introduces the two keys and sets both to **Starter+**, alongside the other Phase-2 productivity differentiators (`xlsform_export`/`offline_sync`) — a reason to upgrade from Free, not something every trial user gets for nothing. Tenants existing at the H5c merge keep both permanently via the per-tenant legacy override (ADR-0008 §D5), so the retro-gate does not regress any live tenant.
 
 ---
 

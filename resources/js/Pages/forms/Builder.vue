@@ -19,10 +19,15 @@ import ConflictDialog from '@/components/builder/ConflictDialog.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
+import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
 const { selection, saving, canUndo, canRedo, conflict, library } = store;
+
+// Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
+// Each is server-gated on its route; this only spares a 402 click.
+const { feature } = useEntitlements();
 
 // Left-pane view: add a fresh field type (palette) or insert a reusable question (library, Increment G9b).
 const leftTab = ref<'fields' | 'library'>('fields');
@@ -150,6 +155,7 @@ function submitImport(): void {
                     Redo
                 </MdsButton>
                 <MdsButton
+                    v-if="feature('xlsform_export')"
                     variant="secondary"
                     icon-left="download"
                     :disabled="readOnly"
@@ -158,6 +164,7 @@ function submitImport(): void {
                     Export XLSForm
                 </MdsButton>
                 <MdsButton
+                    v-if="feature('xlsform_export')"
                     variant="secondary"
                     icon-left="upload"
                     :disabled="readOnly"
@@ -166,6 +173,7 @@ function submitImport(): void {
                     Import XLSForm
                 </MdsButton>
                 <MdsButton
+                    v-if="feature('form_templates')"
                     variant="secondary"
                     icon-left="copy"
                     :disabled="readOnly"
@@ -206,7 +214,14 @@ function submitImport(): void {
 
         <div v-else class="builder__panes">
             <div class="builder__pane builder__pane--left">
-                <div class="builder__left-tabs" role="group" aria-label="Add fields or insert from the library">
+                <!-- The Fields⇄Library toggle only appears when field_library is in the plan (H5c). Without it
+                     the left pane is the field palette alone (leftTab stays 'fields', its default). -->
+                <div
+                    v-if="feature('field_library')"
+                    class="builder__left-tabs"
+                    role="group"
+                    aria-label="Add fields or insert from the library"
+                >
                     <button
                         type="button"
                         :aria-pressed="leftTab === 'fields'"

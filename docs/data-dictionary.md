@@ -664,6 +664,26 @@ Unique constraint: `(tenant_id, metric, period_start)`.
 
 ---
 
+## 18a. `legacy_overrides`
+
+Per-tenant grandfather overrides (ADR-0008 §D5), added in **H5c** to fill the `EntitlementService::legacyOverrides()` seam. One row per tenant; the `feature_flags` map is consulted **ahead of** the plan flags, so a grandfathered tenant reads `true` for a feature its plan would deny.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `bigint identity` | No | auto-increment | No | Primary key — `bigint`, per the global PK strategy note: internal per-tenant state, never addressed externally (so the model omits `HasUuidv7`, the `usage_counters` precedent). |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id` (`cascadeOnDelete`). **Unique** — one override row per tenant. |
+| `feature_flags` | `jsonb` | No | `'{}'` | No | The override map, same shape as `plans.feature_flags`: `{ "<flag key>": true, … }`. No DB CHECK on its keys (validated at the application layer), mirroring `plans`. |
+| `created_at` | `timestamptz` | No | `now()` | No | — |
+| `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+Unique constraint: `(tenant_id)`.
+
+> **Design Notes**
+> - ✅ **Built in H5c** (`2026_07_23_000004_create_legacy_overrides_table`, ADR-0008 §D5) — strict RLS, `bigint identity` PK. A **merge-day backfill** (`2026_07_23_000005_…`, running `LegacyOverrideBackfill` on the privileged BYPASSRLS connection, the G10a `CollaboratorBackfill` precedent) stamps every **then-existing** tenant with the five ungated Phase-2 features (`xlsform_export`, `offline_sync`, `form_templates`, `field_library`, `api_access`) so the retro-gate regresses no live tenant. Tenants created after merge day get no row and are born gated.
+> - Consulted by `EntitlementService::feature()` before the plan flags (an override wins by `array_key_exists`, so even a `false` override would short-circuit — the backfill only writes `true`). Memoized per tenant alongside the resolved plan, since `snapshot()` calls `feature()` once per flag key.
+
+---
+
 ## 19. `user_ui_preferences`
 
 Backs PRD Feature #9 (User style/theme preferences). Added after the original 18-table model, at the user's explicit request.

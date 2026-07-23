@@ -29,6 +29,8 @@ final class PlanCatalog
         'ocr_single',
         'ocr_linelist',
         'save_and_resume',
+        'form_templates',
+        'field_library',
         'native_connectors',
         'branding',
         'custom_domain',
@@ -49,7 +51,7 @@ final class PlanCatalog
      */
     public static function all(): array
     {
-        $starter = ['api_access', 'webhooks', 'xlsform_export', 'offline_sync', 'save_and_resume', 'native_connectors', 'branding'];
+        $starter = ['api_access', 'webhooks', 'xlsform_export', 'offline_sync', 'save_and_resume', 'form_templates', 'field_library', 'native_connectors', 'branding'];
         $professional = [...$starter, 'ocr_single', 'ocr_linelist', 'embedded_payments'];
         $business = [...$professional, 'custom_domain', 'advanced_analytics'];
         $enterprise = [...$business, 'sso_saml', 'dedicated_db', 'data_residency'];

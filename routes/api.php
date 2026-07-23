@@ -18,6 +18,7 @@ use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestSubmissionController;
 use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnforceApiRequestQuota;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\MeterApiUsage;
@@ -60,7 +61,10 @@ Route::prefix('api/v1')
         // the issuer's permissions server-side), so it can never exceed its issuer; any active member may
         // mint one (a non-member's key trims to no abilities and its tokenable is hidden by RLS on use).
         // The plaintext secret is returned exactly once, on create.
-        Route::post('auth/tokens', [ApiTokenController::class, 'store'])->name('tokens.store');
+        // Minting a key requires api_access (H5c) — a plan without the REST API cannot issue one. List/revoke
+        // stay ungated so a downgraded tenant can still see and revoke its now-unusable keys.
+        Route::post('auth/tokens', [ApiTokenController::class, 'store'])
+            ->middleware('feature:api_access')->name('tokens.store');
         Route::get('auth/tokens', [ApiTokenController::class, 'index'])->name('tokens.index');
         // {id} constrained to digits — personal_access_tokens.id is a bigint; a non-numeric id would
         // otherwise reach the query and 500 on a bad cast instead of a clean 404.
@@ -76,10 +80,18 @@ Route::prefix('api/v1')
         PreventAccessFromCentralDomains::class,
         EstablishTenantDatabaseContext::class,
         AuthenticateApiToken::class,
+        // api_access feature-gate (H5c) — gates the WHOLE token-consumed REST API. Immediately after auth
+        // (tenant context is set; a 401 for no-token precedes a 402 for no-feature) and before throttle so a
+        // no-feature tenant is refused before consuming a burst slot. A grandfathered tenant's override passes.
+        'feature:api_access',
         'throttle:api',
-        // Meters api_requests (H5b) — AFTER auth + burst throttle, so an unauthenticated 401 or a
-        // rate-limited 429 is not counted toward the tenant's monthly volume. Meter only (no quota 429 —
-        // that is H5c). See MeterApiUsage.
+        // Monthly api_requests quota (H5c) — 429 when the metered current-period usage has reached the plan
+        // quota. After the burst throttle; before MeterApiUsage so a 429'd request is not itself metered. A
+        // quota of null (unlimited) or 0 (the Free "no API" sentinel, reached only via a grandfather override)
+        // never 429s. See EnforceApiRequestQuota.
+        EnforceApiRequestQuota::class,
+        // Meters api_requests (H5b) — AFTER auth + burst throttle + the quota gate, so an unauthenticated 401,
+        // a rate-limited 429, or an over-quota 429 is not counted toward the tenant's monthly volume.
         MeterApiUsage::class,
         SubstituteBindings::class,
     ])
@@ -109,13 +121,13 @@ Route::prefix('api/v1')
         // workbook for the Kobo/ODK migration path. Scope-bound {version}; read ability + can:view,form.
         Route::get('forms/{form}/versions/{version}/xlsform', [FormXlsformApiController::class, 'export'])
             ->scopeBindings()
-            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form'])
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'can:view,form', 'feature:xlsform_export'])
             ->name('forms.versions.xlsform');
 
         // XLSForm import (Increment G7b / docs/xlsform-interop-spec.md §5) — destructively replace the form's
         // current draft with the uploaded .xlsx. A write → WRITE_FORMS + can:update,form (mirroring publish).
         Route::post('forms/{form}/draft/xlsform-import', [FormXlsformApiController::class, 'import'])
-            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:update,form'])
+            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'can:update,form', 'feature:xlsform_export'])
             ->name('forms.xlsform.import');
 
         // Publish the form's current draft (docs/form-versioning-schema-migration.md §3.2). The URL names
@@ -130,10 +142,10 @@ Route::prefix('api/v1')
         // Read gates on read:forms; write on write:forms + an in-controller can:view on the source form (the
         // version is a body param, not a bound model). Regenerate openapi.json after adding these.
         Route::get('form-templates', [FormTemplateApiController::class, 'index'])
-            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'feature:form_templates'])
             ->name('form-templates.index');
         Route::post('form-templates', [FormTemplateApiController::class, 'store'])
-            ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
+            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'feature:form_templates'])
             ->name('form-templates.store');
 
         // Question library (Increment G9b / architecture §7.1) — reusable single questions. `index` lists the
@@ -141,10 +153,10 @@ Route::prefix('api/v1')
         // gates on read:forms, write on write:forms (a library item is authoring metadata, not a bound model —
         // no can: gate, mirroring form-templates). Regenerate openapi.json after adding these.
         Route::get('field-library', [FieldLibraryApiController::class, 'index'])
-            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'feature:field_library'])
             ->name('field-library.index');
         Route::post('field-library', [FieldLibraryApiController::class, 'store'])
-            ->middleware('ability:'.ApiAbilities::WRITE_FORMS)
+            ->middleware(['ability:'.ApiAbilities::WRITE_FORMS, 'feature:field_library'])
             ->name('field-library.store');
 
         // Scoping hierarchy (Increment G10b / multi-tenancy-rbac-design.md §8) — the tenant's own node tree.
@@ -195,8 +207,11 @@ Route::prefix('api/v1')
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).
         // `form_version_id` is a query/body param, not a bound model, so authorization is `ability:` + RLS.
+        // offline_sync gates the offline-collection ENTRY (the schema/manifest fetch). The replay endpoint
+        // below is NOT gated on offline_sync — already-collected data is always accepted (never-block, §D4);
+        // both remain behind the Group-B api_access gate.
         Route::get('sync/manifest', [SyncManifestController::class, 'show'])
-            ->middleware('ability:'.ApiAbilities::READ_FORMS)
+            ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'feature:offline_sync'])
             ->name('sync.manifest');
 
         // Idempotent batch replay of queued submissions (per-item results; a partial failure never rolls back

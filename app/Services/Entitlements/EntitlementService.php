@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Entitlements;
 
+use App\Enums\FormStatus;
 use App\Enums\PlanTier;
+use App\Enums\TenantUserStatus;
 use App\Enums\UsageMetric;
+use App\Jobs\TenantAwareJob;
+use App\Models\Attachment;
+use App\Models\Form;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\TenantUser;
 use App\Models\UsageCounter;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 
@@ -36,6 +43,9 @@ final class EntitlementService
 
     /** @var array<string, array<string, int>> tenant id => (metric value => current-period usage) */
     private array $usage = [];
+
+    /** @var array<string, int> "{tenant id}:{gauge metric value}" => memoized live COUNT/SUM for the request */
+    private array $gauges = [];
 
     /**
      * The plan governing the current tenant: the plan of its active subscription, else the seeded `free`
@@ -92,13 +102,32 @@ final class EntitlementService
     }
 
     /**
-     * The current tenant's metered usage for a metric in the current period. Always 0 in H5a — metering
-     * (increments + the cross-tenant rollup) lands with H5b; the read shape is here so the UI contract is
-     * stable now.
+     * The current tenant's usage for a metric (H5b). A GAUGE metric (forms/storage/seats) is computed
+     * LIVE (a COUNT/SUM under RLS) so the read-model reflects a just-created form immediately and can never
+     * drift from what the guard enforces; a FLOW metric (submissions/api/exports) is read from the metered
+     * `usage_counters` current-period row. Both are 0 off-tenant / unmetered.
      */
     public function usage(UsageMetric $metric): int
     {
+        if ($metric->isGauge()) {
+            return $this->liveGauge($metric);
+        }
+
         return $this->currentUsage()[$metric->value] ?? 0;
+    }
+
+    /**
+     * The authoritative, NON-memoized live level of a gauge metric — the number {@see QuotaGuard} checks
+     * immediately before a create, so a check and the write it guards see the same value with no
+     * intra-request memo staleness in between. Never reads `usage_counters`: a maintained running aggregate
+     * drifts (gauges move DOWN on archive/delete/remove; future in-worker writers would bypass it), whereas
+     * a COUNT/SUM under RLS is always correct (the H12a `max_responses` precedent — a transactional count,
+     * not a running total). Callable in-request and inside a {@see TenantAwareJob} transaction —
+     * both establish tenant context; it must NEVER be called from a MaintenanceJob (no context ⇒ zero rows).
+     */
+    public function countGauge(UsageMetric $metric): int
+    {
+        return $this->computeGauge($metric);
     }
 
     /**
@@ -142,17 +171,24 @@ final class EntitlementService
         ];
     }
 
-    /** Drop the memoized plan + usage (after an assign, or for test isolation). Null clears every tenant. */
+    /** Drop the memoized plan + usage + gauges (after an assign, or for test isolation). Null clears all. */
     public function forget(?string $tenantId = null): void
     {
         if ($tenantId === null) {
             $this->plans = [];
             $this->usage = [];
+            $this->gauges = [];
 
             return;
         }
 
         unset($this->plans[$tenantId], $this->usage[$tenantId]);
+
+        foreach (array_keys($this->gauges) as $key) {
+            if (str_starts_with($key, $tenantId.':')) {
+                unset($this->gauges[$key]);
+            }
+        }
     }
 
     // ── Internals ────────────────────────────────────────────────────────────────────────────────────
@@ -170,8 +206,47 @@ final class EntitlementService
         return $plan ?? Plan::query()->where('code', PlanTier::Free->value)->first();
     }
 
+    /** The memoized live gauge for the read-model — one COUNT/SUM per (tenant, gauge metric) per request. */
+    private function liveGauge(UsageMetric $metric): int
+    {
+        $tenantId = TenantContext::currentTenantId();
+
+        if ($tenantId === null) {
+            return 0;
+        }
+
+        $key = $tenantId.':'.$metric->value;
+
+        if (! array_key_exists($key, $this->gauges)) {
+            $this->gauges[$key] = $this->computeGauge($metric);
+        }
+
+        return $this->gauges[$key];
+    }
+
     /**
-     * The current tenant's current-period usage in one query, memoized. Empty in H5a (no counters written).
+     * The live level of a gauge metric, RLS-scoped to the current tenant. Non-archived forms; the sum of
+     * non-trashed attachment bytes; active + pending-invited seats (reserve-on-invite, matching
+     * {@see TenantMembershipService::listMembers()}). A non-gauge metric returns 0 —
+     * flow metrics are read from `usage_counters`, never here.
+     */
+    private function computeGauge(UsageMetric $metric): int
+    {
+        return match ($metric) {
+            UsageMetric::FormsCount => Form::query()
+                ->where('status', '!=', FormStatus::Archived->value)
+                ->count(),
+            UsageMetric::StorageBytes => (int) Attachment::query()->sum('size_bytes'),
+            UsageMetric::ActiveSeats => TenantUser::query()
+                ->whereIn('status', [TenantUserStatus::Active->value, TenantUserStatus::Invited->value])
+                ->count(),
+            default => 0,
+        };
+    }
+
+    /**
+     * The current tenant's current-period FLOW usage in one query, memoized. Gauges are excluded — they are
+     * computed live in {@see computeGauge()} and never read from `usage_counters`.
      *
      * @return array<string, int>
      */

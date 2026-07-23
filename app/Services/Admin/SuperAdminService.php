@@ -12,6 +12,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Entitlements\EntitlementService;
 use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\SuperAdminContext;
 use App\Support\Tenancy\TenantContext;
@@ -171,6 +172,10 @@ final class SuperAdminService
                     ],
                     actorId: (string) $actor->getKey(),
                 );
+
+                // Drop any memoized plan/usage for this tenant (H5b — the first caller of H5a's forget()
+                // seam) so a later read in the same request resolves the newly-assigned plan, not a stale one.
+                app(EntitlementService::class)->forget((string) $tenant->getKey());
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }

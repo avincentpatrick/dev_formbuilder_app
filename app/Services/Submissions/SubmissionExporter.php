@@ -6,9 +6,11 @@ namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
+use App\Enums\UsageMetric;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Entitlements\UsageMeter;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -40,7 +42,10 @@ final class SubmissionExporter
     /** Fixed leading metadata columns, before the per-field answer columns. */
     private const META_HEADERS = ['Submission ID', 'Status', 'Source', 'Respondent', 'Submitted at', 'Locale'];
 
-    public function __construct(private readonly SchemaValueFormatter $formatter) {}
+    public function __construct(
+        private readonly SchemaValueFormatter $formatter,
+        private readonly UsageMeter $meter,
+    ) {}
 
     /**
      * @param  array{status?: ?string, source?: ?string}  $filters
@@ -48,6 +53,10 @@ final class SubmissionExporter
      */
     public function stream(Form $form, array $filters, string $format): StreamedResponse
     {
+        // Meter exports_count (H5b) once per export request, before the stream — a streamed response can't
+        // reliably increment on completion. Metered for reporting only; exports are not in the hard-block set.
+        $this->meter->increment(UsageMetric::ExportsCount);
+
         $locale = $form->default_locale ?? 'en';
 
         // Resolve columns + per-version field maps up front (request scope, tenant context still set).

@@ -2,6 +2,7 @@
 
 use App\Exceptions\Admin\SuperAdminException;
 use App\Exceptions\Authorization\GrantException;
+use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Exceptions\Forms\FormException;
@@ -200,6 +201,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (GrantException $e, Request $request) use ($isApi) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
+        // Hard-block quota refusals (H5b / ADR-0008 §D4) — a create/upload/invite past a provisioning-gauge
+        // limit (forms_count / storage_bytes / active_seats). 402 Payment Required ("upgrade to proceed"),
+        // with the metric-specific code + {metric, limit, used} details so an integration can branch on
+        // exactly which ceiling was hit; a web request bounces back with an upgrade-prompt toast. A
+        // respondent's submission is never-block and can never reach here.
+        $exceptions->render(function (QuotaExceededException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }
 
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);

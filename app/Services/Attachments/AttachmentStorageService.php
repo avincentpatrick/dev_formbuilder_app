@@ -6,11 +6,13 @@ namespace App\Services\Attachments;
 
 use App\Enums\AttachmentKind;
 use App\Enums\ScanStatus;
+use App\Enums\UsageMetric;
 use App\Exceptions\Attachments\AttachmentException;
 use App\Jobs\ScanAttachmentJob;
 use App\Models\Attachment;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Services\Entitlements\QuotaGuard;
 use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -30,6 +32,8 @@ use Ramsey\Uuid\Uuid;
  */
 final class AttachmentStorageService
 {
+    public function __construct(private readonly QuotaGuard $quota) {}
+
     /**
      * Validate + store one uploaded file and return its persisted {@see Attachment}. `$uploadedBy` is the
      * acting user id, or null for a guest upload.
@@ -43,6 +47,15 @@ final class AttachmentStorageService
         $mime = $file->getMimeType() ?? 'application/octet-stream';
         $this->assertAccepted($field, $mime);
         $this->assertWithinFieldSize($field, (int) $file->getSize());
+
+        // Hard-block the storage_bytes quota (H5b / ADR-0008 §D4) — but ONLY for a signed-in member's
+        // upload. A guest respondent's upload ($uploadedBy === null) is data collection and is NEVER
+        // rejected over the tenant's billing status (the same never-block principle that protects
+        // submissions_count); it is bounded by the per-field size cap above + the guest rate limit, and
+        // overage drives the tenant's upsell, not a data-collection gate.
+        if ($uploadedBy !== null) {
+            $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+        }
 
         $kind = AttachmentKind::forFieldType($field->field_type);
         $tenantId = (string) TenantContext::currentTenantId();

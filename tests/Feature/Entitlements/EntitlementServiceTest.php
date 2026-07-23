@@ -6,7 +6,9 @@ use App\Enums\PlanTier;
 use App\Enums\UsageMetric;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Forms\FormService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -83,4 +85,29 @@ it('returns a null snapshot off-tenant (fail-closed)', function (): void {
     TenantContext::flush(); // central/guest route — no tenant context
 
     expect(app(EntitlementService::class)->snapshot())->toBeNull();
+});
+
+it('counts a gauge live and non-memoized for the guard (H5b)', function (): void {
+    $owner = User::factory()->create();
+    $svc = app(EntitlementService::class);
+
+    expect($svc->countGauge(UsageMetric::FormsCount))->toBe(0);
+
+    app(FormService::class)->create($this->tenant, $owner, 'Fresh');
+
+    // countGauge is the authoritative pre-write read the QuotaGuard uses — never memoized, so a create is
+    // reflected immediately (no stale slot).
+    expect($svc->countGauge(UsageMetric::FormsCount))->toBe(1);
+});
+
+it('reads a gauge through usage() live, but a flow metric from the counter (H5b)', function (): void {
+    $owner = User::factory()->create();
+    app(FormService::class)->create($this->tenant, $owner, 'One');
+
+    $svc = app(EntitlementService::class);
+
+    // forms_count is a gauge → computed live (the just-created form shows); submissions_count is a flow
+    // metric → read from usage_counters (0, nothing metered here).
+    expect($svc->usage(UsageMetric::FormsCount))->toBe(1)
+        ->and($svc->usage(UsageMetric::SubmissionsCount))->toBe(0);
 });

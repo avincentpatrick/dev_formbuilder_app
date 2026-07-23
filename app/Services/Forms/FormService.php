@@ -7,6 +7,7 @@ namespace App\Services\Forms;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
+use App\Enums\UsageMetric;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\ResourceGrant;
@@ -14,6 +15,7 @@ use App\Models\ScopeNode;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Entitlements\QuotaGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,11 +25,19 @@ use Illuminate\Support\Facades\DB;
  */
 final class FormService
 {
-    public function __construct(private readonly ResourceGrantResolver $grants) {}
+    public function __construct(
+        private readonly ResourceGrantResolver $grants,
+        private readonly QuotaGuard $quota,
+    ) {}
 
     public function create(Tenant $tenant, User $creator, string $title, ?string $description = null): Form
     {
         return DB::transaction(function () use ($tenant, $creator, $title, $description): Form {
+            // Hard-block the forms_count quota (H5b / ADR-0008 §D4) before anything is written. Inside the
+            // transaction so a refusal rolls back cleanly; covers the template-instantiate caller too (its
+            // outer transaction wraps this one). A live COUNT under RLS — archived forms free a slot.
+            $this->quota->assertCanCreate(UsageMetric::FormsCount);
+
             $form = Form::create([
                 'title' => $title,
                 'description' => $description,

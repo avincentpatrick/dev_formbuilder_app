@@ -20,6 +20,7 @@ use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Http\Middleware\MeterApiUsage;
 use App\Models\Audit;
 use App\Models\Form;
 use App\Models\ResourceGrant;
@@ -76,6 +77,10 @@ Route::prefix('api/v1')
         EstablishTenantDatabaseContext::class,
         AuthenticateApiToken::class,
         'throttle:api',
+        // Meters api_requests (H5b) — AFTER auth + burst throttle, so an unauthenticated 401 or a
+        // rate-limited 429 is not counted toward the tenant's monthly volume. Meter only (no quota 429 —
+        // that is H5c). See MeterApiUsage.
+        MeterApiUsage::class,
         SubstituteBindings::class,
     ])
     ->group(function (): void {

@@ -289,9 +289,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // client_submission_uuid was already persisted with materially DIFFERENT answers (a genuine concurrent
         // edit, not an idempotent replay). A distinct 409 code from submission_version_superseded so the offline
         // client can tell "the form changed" from "another copy of this response already exists"; both route to
-        // the same review-and-resubmit UX. Only /api/v1; a web (manual-encode) request keeps the default.
+        // the same review-and-resubmit UX. The draft save-vs-promote race (H9b) carries its own
+        // `draft_already_finalized` code via SubmissionConflictException::code(). Only /api/v1; a web
+        // (manual-encode) request keeps the default.
         $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(409, 'submission_conflict', $e->getMessage())
+            ? ApiErrorResponse::make(409, $e->code(), $e->getMessage())
             : null);
 
         // Guest share-token failures (Increment F5). Thrown by EstablishGuestTenantContext BEFORE any tenant

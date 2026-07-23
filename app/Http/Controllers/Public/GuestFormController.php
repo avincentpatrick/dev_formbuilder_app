@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Exceptions\Guest\ExpiredShareTokenException;
+use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Support\Guest\GuestShareTokenService;
@@ -56,6 +58,43 @@ final class GuestFormController extends Controller
                 'title' => $form->title,
             ],
             'slug' => $slug,
+            'locale' => $form->default_locale,
+        ]);
+    }
+
+    /**
+     * The save-and-resume entry point (Increment H9b). Opens the guest SPA shell from an emailed resume link:
+     * the `{resumeToken}` carries the tenant + form + pinned version + draft `submissions.id`. The token is
+     * verified before anything else (a bad/expired link 404s rather than leaking); the form is resolved under
+     * the SUBDOMAIN's RLS context, so a resume link for another tenant's form simply resolves to null → 404.
+     * A fresh share token for the pinned version is embedded so the SPA boots and renders the form immediately;
+     * the resume token is embedded alongside it for the SPA to restore the saved answers (that restore step is
+     * H10). Not a JSON endpoint — a resume link is always a browser navigation.
+     */
+    public function resume(string $resumeToken, GuestShareTokenService $tokens): View
+    {
+        try {
+            $token = $tokens->verifyResume($resumeToken);
+        } catch (InvalidShareTokenException|ExpiredShareTokenException) {
+            abort(404);
+        }
+
+        $form = Form::query()->whereKey($token->formId)->first();
+
+        abort_if($form === null, 404);
+        abort_unless($form->allow_guest_submissions, 404);
+
+        $minted = $tokens->mint($token->tenantId, $token->formId, $token->formVersionId);
+
+        return view('public-runtime', [
+            'shareToken' => $minted->token,
+            'expiresAt' => gmdate('c', $minted->expiresAt),
+            'resumeToken' => $resumeToken,
+            'form' => [
+                'id' => $form->id,
+                'title' => $form->title,
+            ],
+            'slug' => $form->public_slug,
             'locale' => $form->default_locale,
         ]);
     }

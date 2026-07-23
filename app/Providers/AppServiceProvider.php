@@ -50,7 +50,19 @@ class AppServiceProvider extends ServiceProvider
                 ? $configuredKey
                 : hash_hmac('sha256', 'guest-share-token.v1', (string) config('app.key'));
 
-            return new GuestShareTokenService($key, (int) config('guest.share_token.ttl'));
+            // The resume token (H9b) is signed with an independently domain-separated key so a share token
+            // and a resume token can never validate as each other, even before the claim-layer typ/sid checks.
+            $configuredResumeKey = config('guest.resume_token.key');
+            $resumeKey = is_string($configuredResumeKey) && $configuredResumeKey !== ''
+                ? $configuredResumeKey
+                : hash_hmac('sha256', 'guest-resume-token.v1', (string) config('app.key'));
+
+            return new GuestShareTokenService(
+                $key,
+                (int) config('guest.share_token.ttl'),
+                $resumeKey,
+                (int) config('guest.resume_token.ttl'),
+            );
         });
 
         // The per-instance authorization resolver (Increment G10a). `scoped`, NOT `singleton`: it memoizes

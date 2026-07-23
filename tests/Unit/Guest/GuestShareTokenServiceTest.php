@@ -18,9 +18,11 @@ use Ramsey\Uuid\Uuid;
 
 const F5_TTL = 3600;
 
-function shareTokens(string $key = 'unit-test-key'): GuestShareTokenService
+const H9B_RESUME_TTL = 7200;
+
+function shareTokens(string $key = 'unit-test-key', string $resumeKey = 'unit-test-resume-key'): GuestShareTokenService
 {
-    return new GuestShareTokenService($key, F5_TTL);
+    return new GuestShareTokenService($key, F5_TTL, $resumeKey, H9B_RESUME_TTL);
 }
 
 /**
@@ -122,4 +124,67 @@ it('produces a stable 64-hex fingerprint', function (): void {
     $fingerprint = $service->fingerprint($minted->token);
     expect($fingerprint)->toMatch('/^[0-9a-f]{64}$/')
         ->and($service->fingerprint($minted->token))->toBe($fingerprint);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment H9b — the resume token (the share-token variant scoped to a draft submissions.id).
+|--------------------------------------------------------------------------
+*/
+
+it('round-trips a resume token carrying the draft submission id and the resume TTL', function (): void {
+    $service = shareTokens();
+    $tid = Uuid::uuid7()->toString();
+    $fid = Uuid::uuid7()->toString();
+    $vid = Uuid::uuid7()->toString();
+    $sid = Uuid::uuid7()->toString();
+
+    $minted = $service->mintResume($tid, $fid, $vid, $sid, now: 1_000);
+    expect($minted->expiresAt)->toBe(1_000 + H9B_RESUME_TTL); // the LONGER resume TTL, not the share TTL
+
+    $token = $service->verifyResume($minted->token, now: 1_000);
+    expect($token->tenantId)->toBe($tid)
+        ->and($token->formId)->toBe($fid)
+        ->and($token->formVersionId)->toBe($vid)
+        ->and($token->submissionId)->toBe($sid)
+        ->and($token->expiresAt)->toBe(1_000 + H9B_RESUME_TTL);
+});
+
+it('will not accept a share token as a resume token (key + claim separation)', function (): void {
+    $service = shareTokens();
+    $shareToken = $service->mint(Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), now: 1_000);
+
+    // A share token is signed with the share key and carries no `sid`/`typ=resume` — it must never verify as one.
+    expect(fn () => $service->verifyResume($shareToken->token, now: 1_000))
+        ->toThrow(InvalidShareTokenException::class);
+});
+
+it('will not accept a resume token on the share verify path', function (): void {
+    $service = shareTokens();
+    $resume = $service->mintResume(
+        Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), now: 1_000,
+    );
+
+    expect(fn () => $service->verify($resume->token, now: 1_000))
+        ->toThrow(InvalidShareTokenException::class);
+});
+
+it('expires a resume token one second past its (longer) TTL', function (): void {
+    $service = shareTokens();
+    $minted = $service->mintResume(
+        Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), now: 1_000,
+    );
+
+    expect($service->verifyResume($minted->token, now: 1_000 + H9B_RESUME_TTL))->not->toBeNull();
+    expect(fn () => $service->verifyResume($minted->token, now: 1_000 + H9B_RESUME_TTL + 1))
+        ->toThrow(ExpiredShareTokenException::class);
+});
+
+it('rejects a resume token signed with a different resume key', function (): void {
+    $minted = shareTokens('shared', 'resume-a')->mintResume(
+        Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), Uuid::uuid7()->toString(), now: 1_000,
+    );
+
+    expect(fn () => shareTokens('shared', 'resume-b')->verifyResume($minted->token, now: 1_000))
+        ->toThrow(InvalidShareTokenException::class);
 });

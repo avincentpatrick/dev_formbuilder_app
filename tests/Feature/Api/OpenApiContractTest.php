@@ -32,6 +32,10 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // Increment F5 — the public guest runtime surface.
         '/public/f/{shareToken}',
         '/public/f/{shareToken}/submissions',
+        // Increment H9b — the save-and-resume surface (guest draft upsert + resume-read + encoder promote).
+        '/public/f/{shareToken}/draft',
+        '/public/drafts/{resumeToken}',
+        '/submissions/{submission}/promote',
         // Increment G8b — the authenticated offline-sync surface.
         '/sync/manifest',
         '/sync/submissions',
@@ -52,5 +56,8 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global
     // sanctumToken requirement — a Sanctum bearer must never be advertised on the public share-token routes.
     expect($spec['paths']['/public/f/{shareToken}']['get']['security'])->toBe([])
-        ->and($spec['paths']['/public/f/{shareToken}/submissions']['post']['security'])->toBe([]);
+        ->and($spec['paths']['/public/f/{shareToken}/submissions']['post']['security'])->toBe([])
+        // H9b: the guest draft-save + resume-read are equally unauthenticated (token, not bearer).
+        ->and($spec['paths']['/public/f/{shareToken}/draft']['post']['security'])->toBe([])
+        ->and($spec['paths']['/public/drafts/{resumeToken}']['get']['security'])->toBe([]);
 });

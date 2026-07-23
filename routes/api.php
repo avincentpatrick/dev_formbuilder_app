@@ -11,14 +11,18 @@ use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
 use App\Http\Controllers\Api\V1\ResourceGrantApiController;
 use App\Http\Controllers\Api\V1\ScopeNodeApiController;
+use App\Http\Controllers\Api\V1\SubmissionPromoteController;
 use App\Http\Controllers\Api\V1\SyncManifestController;
 use App\Http\Controllers\Api\V1\SyncSubmissionController;
 use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Public\GuestAttachmentController;
+use App\Http\Controllers\Public\GuestDraftController;
+use App\Http\Controllers\Public\GuestDraftResumeController;
 use App\Http\Controllers\Public\GuestSubmissionController;
 use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforceApiRequestQuota;
+use App\Http\Middleware\EstablishGuestDraftContext;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\MeterApiUsage;
@@ -219,6 +223,14 @@ Route::prefix('api/v1')
         Route::post('sync/submissions', [SyncSubmissionController::class, 'store'])
             ->middleware('ability:'.ApiAbilities::WRITE_SUBMISSIONS)
             ->name('sync.submissions');
+
+        // Draft promotion (Increment H9b) — finalize a saved draft (an OCR-staged or manually-saved partial)
+        // to `submitted`, recording the acting encoder. A write → write:submissions ability + a SubmissionPolicy
+        // can:promote gate on the bound {submission} (the standing rule: a resource-bound Group-B route carries
+        // BOTH). RLS scopes the binding to the tenant. Regenerate openapi.json after adding this.
+        Route::post('submissions/{submission}/promote', [SubmissionPromoteController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::WRITE_SUBMISSIONS, 'can:promote,submission'])
+            ->name('submissions.promote');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────
@@ -241,4 +253,27 @@ Route::prefix('api/v1/public')
         // Media upload (Increment G6) — a respondent stages a file mid-form (before submit) against the
         // pinned version's media field; the returned AttachmentRef rides the answer document at submit.
         Route::post('f/{shareToken}/attachments', [GuestAttachmentController::class, 'store'])->name('attachments.store');
+
+        // Save-and-resume draft upsert (Increment H9b) — create/overwrite a durable server draft and return a
+        // resume token scoped to its submissions.id. Gated on save_and_resume (Starter+): a paid convenience,
+        // not the respondent's final answer, so this does not breach never-block (submit above stays ungated).
+        // The feature middleware runs after EstablishGuestTenantContext, so tenant context is set. Regenerate
+        // openapi.json after adding this.
+        Route::post('f/{shareToken}/draft', [GuestDraftController::class, 'store'])
+            ->middleware('feature:save_and_resume')->name('drafts.store');
+    });
+
+// ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─
+//    from the signed resume token (not a share token), verified pre-RLS by EstablishGuestDraftContext. Same
+//    gate as the draft-save channel; the finalize path stays on the share-token submit route above.
+Route::prefix('api/v1/public')
+    ->name('api.v1.public.')
+    ->middleware([
+        'throttle:guest',
+        EstablishGuestDraftContext::class,
+        SubstituteBindings::class,
+        'feature:save_and_resume',
+    ])
+    ->group(function (): void {
+        Route::get('drafts/{resumeToken}', [GuestDraftResumeController::class, 'show'])->name('drafts.resume');
     });

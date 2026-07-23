@@ -12,6 +12,10 @@ namespace App\Support\Guest;
  * tenant context can be derived without a session or subdomain, and cross-tenant/cross-form replay is
  * signature-checked before any context is established. `rawToken` is retained so the ingest channel can
  * store its sha256 fingerprint on the submission (the raw token is too long for `submissions.guest_token`).
+ *
+ * `submissionId` is populated ONLY for a resume token (Increment H9b) — the durable variant additionally
+ * scoped to one draft `submissions.id`, minted by {@see GuestShareTokenService::mintResume()} and returned
+ * by {@see GuestShareTokenService::verifyResume()}. It is null for an ordinary share token.
  */
 final readonly class GuestShareToken
 {
@@ -21,5 +25,6 @@ final readonly class GuestShareToken
         public string $formVersionId,
         public int $expiresAt,
         public string $rawToken,
+        public ?string $submissionId = null,
     ) {}
 }

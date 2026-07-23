@@ -22,8 +22,11 @@
     @vite(['resources/public-runtime/main.ts'])
 </head>
 <body>
+    {{-- data-resume-token (Increment H9b) is present only when the shell was opened from a save-and-resume
+         link; the SPA reads it to restore the saved draft answers (H10). Empty on a first-time fill. --}}
     <div id="app"
         data-share-token="{{ $shareToken }}"
+        data-resume-token="{{ $resumeToken ?? '' }}"
         data-expires-at="{{ $expiresAt }}"
         data-form-id="{{ $form['id'] }}"
         data-form-title="{{ $form['title'] }}"

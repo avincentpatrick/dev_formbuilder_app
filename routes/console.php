@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\Maintenance\PruneFailedJobsJob;
+use App\Jobs\Maintenance\ReapExpiredDraftsJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -46,3 +47,8 @@ Schedule::job(PruneFailedJobsJob::class)->dailyAt('03:10');
 // failed-job prune so the two nightly sweeps do not contend. Overlap-safety comes from
 // MaintenanceJob::middleware()'s WithoutOverlapping lock, not a scheduler modifier.
 Schedule::job(RollUpUsageCountersJob::class)->dailyAt('02:40');
+
+// Draft-expiry reaper (H9b). Cross-tenant MaintenanceJob → one ReapTenantDraftsJob per active tenant, each
+// hard-deleting the drafts whose 30-day draft_expires_at has passed. Off-peak and staggered clear of the
+// 02:40 rollup and 03:10 prune so the nightly sweeps do not contend.
+Schedule::job(ReapExpiredDraftsJob::class)->dailyAt('03:40');

@@ -204,6 +204,10 @@ class E2eSeeder extends Seeder
                     'public_slug' => 'clinic-intake',
                     'allow_guest_submissions' => true,
                     'supported_locales' => ['en', 'es'],
+                    // Increment H10 — opt this guest form into save-and-resume so the public runtime renders the
+                    // "Save and finish later" control (acme's Professional plan includes the feature), giving the
+                    // control + its dialog a11y coverage in the public-runtime axe scan.
+                    'save_and_resume' => true,
                 ]);
             }
 

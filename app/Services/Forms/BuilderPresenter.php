@@ -55,6 +55,9 @@ final class BuilderPresenter
                 'title' => $form->title,
                 'description' => $form->description,
                 'status' => $form->status->value,
+                // Per-form save-and-resume opt-in (H10) — drives the builder toggle; the guest runtime reads its
+                // own effective flag (tenant plan AND this) from PublicFormPresenter.
+                'save_and_resume' => $form->save_and_resume,
             ],
             'draft' => $draft ? [
                 'id' => $draft->id,

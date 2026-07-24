@@ -10,7 +10,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsModal } from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsModal } from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -68,6 +68,25 @@ function publish(): void {
     void store.whenIdle().then(() => {
         router.post(`/forms/${props.form.id}/publish`, {}, { preserveScroll: true });
     });
+}
+
+// Per-form "Save and finish later" opt-in (Increment H10). A form-level setting (not a version edit), so it
+// PATCHes its own guarded route directly; gated `feature('save_and_resume')` client-side + at the route.
+const saveResume = ref(props.form.save_and_resume);
+function onToggleSaveResume(value: boolean): void {
+    saveResume.value = value;
+    router.patch(
+        `/forms/${props.form.id}/save-resume`,
+        { save_and_resume: value },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            // Revert the optimistic toggle if the write is rejected (e.g. the plan no longer includes it).
+            onError: () => {
+                saveResume.value = !value;
+            },
+        },
+    );
 }
 
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
@@ -181,6 +200,14 @@ function submitImport(): void {
                 >
                     Save as template
                 </MdsButton>
+                <!-- Per-form save-and-resume opt-in (H10) — only when the tenant plan includes it (Starter+). -->
+                <MdsCheckbox
+                    v-if="feature('save_and_resume')"
+                    :model-value="saveResume"
+                    label="Save &amp; resume"
+                    class="builder__toggle"
+                    @update:model-value="onToggleSaveResume"
+                />
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
                 </MdsButton>
@@ -377,6 +404,10 @@ function submitImport(): void {
 .builder__save {
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
+    white-space: nowrap;
+}
+
+.builder__toggle {
     white-space: nowrap;
 }
 

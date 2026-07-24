@@ -38,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property ?int $completeness_percent
  * @property Carbon|null $last_saved_at
  * @property Carbon|null $draft_expires_at
+ * @property ?string $draft_current_step
  * @property ?string $validated_by
  * @property Carbon|null $validated_at
  * @property ?string $returned_reason
@@ -77,6 +78,7 @@ class Submission extends Model implements TenantScoped
         'completeness_percent',
         'last_saved_at',
         'draft_expires_at',
+        'draft_current_step',
         'source_batch_id',
         'validated_by',
         'validated_at',

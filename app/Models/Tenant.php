@@ -25,6 +25,7 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property ?string $owner_user_id
  * @property ?string $status Tenant lifecycle (App\Enums\TenantStatus); not cast (stancl virtual columns).
  * @property string $default_locale Default locale for new forms (data-dictionary §1).
+ * @property ?int $draft_ttl_days Tenant-configured draft-expiry window in days; null ⇒ system default (H10).
  */
 class Tenant extends BaseTenant
 {
@@ -36,13 +37,15 @@ class Tenant extends BaseTenant
     public static function getCustomColumns(): array
     {
         // default_locale/supported_locales are real columns (2026_07_06_000200) — list them here so
-        // stancl treats them as columns, not `data` json virtual attributes.
+        // stancl treats them as columns, not `data` json virtual attributes. draft_ttl_days (H10,
+        // 2026_07_23_000008) is the same shape: a real column that MUST be whitelisted here or it
+        // spills into `data` and reads back null.
         //
         // 'status' MUST stay in this list. It is what makes scopeActive() below a real SQL predicate;
         // remove it and stancl silently relocates the value into the `data` json column, at which
         // point `where('status', …)` matches NOTHING and every tenant vanishes from every fan-out —
         // with no error. TenantCustomColumnsTest pins this.
-        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales'];
+        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days'];
     }
 
     /**

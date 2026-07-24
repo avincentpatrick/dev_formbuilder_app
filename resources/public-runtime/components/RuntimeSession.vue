@@ -14,6 +14,7 @@ import OfflineIndicator from './OfflineIndicator.vue';
 import SyncStatus from './SyncStatus.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
+import WelcomeBackBanner from './WelcomeBackBanner.vue';
 import { createAnnouncer } from '../composables/useAnnouncer';
 import { createAutosave } from '../composables/useAutosave';
 import { createFormRuntime } from '../composables/useFormRuntime';
@@ -21,9 +22,11 @@ import { useOnline } from '../composables/useOnline';
 import {
     AnnouncerKey,
     DbKey,
+    DraftFlowKey,
     RuntimeKey,
     SubmitFlowKey,
     SyncOutboxKey,
+    type DraftSaveResult,
     type SubmitFlow,
     type SubmitOutcome,
 } from '../composables/context';
@@ -45,6 +48,16 @@ const props = defineProps<{
     /** Increment G8c — this session is resolving a parked conflict (review & resubmit): suppress autosave and
      *  the sync banner, and offer a "discard this response" escape hatch. */
     resolving?: boolean;
+    /** Increment H10 — the reconciled resume seed when the session was opened from a resume link: the server
+     *  draft's uuid (so the finalize promotes it), the restored locale/step, and the welcome-back banner data.
+     *  Null on a normal fresh entry and on a version-drift remount (the banner is a one-time restore signal). */
+    resume?: {
+        uuid: string;
+        locale: string | null;
+        stepKey: string | null;
+        completeness: number | null;
+        note: string | null;
+    } | null;
 }>();
 
 const emit = defineEmits<{
@@ -55,8 +68,11 @@ const emit = defineEmits<{
 }>();
 
 const runtime = createFormRuntime(props.schema, {
-    initialLocale: props.bootstrap.defaultLocale || props.schema.form.default_locale,
+    // A resumed session restores its saved locale; otherwise the bootstrap/form default (Increment H10).
+    initialLocale: props.resume?.locale ?? (props.bootstrap.defaultLocale || props.schema.form.default_locale),
     initialAnswers: props.initialAnswers,
+    // A resumed session reuses the draft's uuid so its submit promotes that row (H9a invariant).
+    initialClientSubmissionUuid: props.resume?.uuid,
 });
 const announcer = createAnnouncer();
 
@@ -86,6 +102,14 @@ const autosave = createAutosave({
 // retained answers in (`initialAnswers`), and its old-checksum draft would be discarded by the guard anyway.
 // The Dexie-backed restore is async (Increment G8b), so it runs after mount; App.vue's loading phase covers it.
 onMounted(async () => {
+    // Increment H10 — a resume session already had its answers/locale reconciled and seeded via props; here we
+    // only restore the saved step (the server draft's, or the local draft's when it won the reconciliation).
+    if (props.resume) {
+        if (props.resume.stepKey) {
+            runtime.goToStep(props.resume.stepKey);
+        }
+        return;
+    }
     if (props.initialAnswers === undefined) {
         const draft = await autosave.restore();
         if (draft !== null) {
@@ -203,6 +227,45 @@ async function submit(): Promise<SubmitOutcome> {
 const flow: SubmitFlow = { submitting, submit };
 provide(SubmitFlowKey, flow);
 
+// Increment H10 — the "Save and finish later" flow. Sends the FULL retained answer set (not the pruned submit
+// set): a draft must preserve incomplete/currently-irrelevant values. Provided only when the form offers
+// save-and-resume and this is not a conflict-review session; SaveForLater self-hides when it's absent.
+const draftSaving = ref(false);
+const draftCompleteness = ref<number | null>(props.resume?.completeness ?? null);
+
+async function saveDraftAction(options: { email?: string | null; finishLater: boolean }): Promise<DraftSaveResult | null> {
+    draftSaving.value = true;
+    try {
+        const result = await props.client.saveDraft({
+            answers: { ...runtime.answers },
+            clientSubmissionUuid: runtime.clientSubmissionUuid,
+            locale: runtime.locale.value,
+            draftCurrentStep: runtime.currentStepKey.value,
+            guestContactEmail: options.email ?? null,
+            deviceId,
+            appVersion: APP_VERSION,
+            finishLater: options.finishLater,
+        });
+        draftCompleteness.value = result.completenessPercent;
+        const email = (options.email ?? '').trim();
+        return { resumeUrl: result.resumeUrl, emailed: options.finishLater && email !== '' };
+    } catch (error) {
+        // A republish between mint and save surfaces as a refresh drift — route it through the same reschema
+        // remount as submit (the caller sees null and closes; the session re-mounts against the new version).
+        if (error instanceof ApiError && error.normalized.kind === 'refresh') {
+            void handleDrift();
+            return null;
+        }
+        throw error;
+    } finally {
+        draftSaving.value = false;
+    }
+}
+
+if (props.schema.form.save_and_resume && !props.resolving) {
+    provide(DraftFlowKey, { saving: draftSaving, completeness: draftCompleteness, saveDraft: saveDraftAction });
+}
+
 const title = computed(() => runtime.renderModel.form.title);
 const description = computed(() => runtime.renderModel.form.description);
 </script>
@@ -215,6 +278,7 @@ const description = computed(() => runtime.renderModel.form.description);
         :saved-at="autosave.savedAt.value"
     >
         <template #notice>
+            <WelcomeBackBanner v-if="resume" :completeness="resume.completeness" :note="resume.note" />
             <OfflineIndicator v-if="!online" />
             <SyncStatus v-if="!resolving" />
             <div

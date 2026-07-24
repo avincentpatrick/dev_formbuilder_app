@@ -97,6 +97,9 @@ export interface SchemaResponse {
         default_locale: string;
         supported_locales: string[];
         single_page_mode: boolean;
+        // Increment H10 — whether the SPA should offer "Save and finish later" (per-form opt-in AND tenant
+        // plan; the backend PublicFormPresenter ANDs both). Older cached manifests may omit it → treat as false.
+        save_and_resume?: boolean;
     };
     version: {
         id: string;
@@ -256,6 +259,9 @@ export interface Bootstrap {
     formTitle: string;
     slug: string;
     defaultLocale: string;
+    // Increment H10 — present (non-empty) only when the SPA was opened via the `/f/resume/{token}` web shell.
+    // Drives the resume-and-restore flow (App.vue `load()`); empty on a normal `/f/{slug}` entry.
+    resumeToken: string;
 }
 
 /** How the SPA should react to a normalized API error. */
@@ -290,4 +296,47 @@ export interface SubmitResult {
     id: string;
     status: string;
     created: boolean;
+}
+
+// ── H10 save-and-resume ────────────────────────────────────────────────────────────────────────
+
+/** Body of `POST /api/v1/public/f/{token}/draft` — an upsert of the durable server draft (UX §5.2). */
+export interface SaveDraftPayload {
+    answers: AnswerMap;
+    clientSubmissionUuid: string;
+    locale: string;
+    /** The SPA's current step key, restored verbatim on resume; omitted for single-page forms. */
+    draftCurrentStep?: string | null;
+    /** When set, "Save and finish later" also emails the resume link to this address. */
+    guestContactEmail?: string | null;
+    deviceId?: string | null;
+    appVersion?: string | null;
+    /** True for the explicit "Save and finish later" action (email the link); false for ambient draft saves. */
+    finishLater?: boolean;
+}
+
+/** Response of a draft save — the durable resume handle. */
+export interface SaveDraftResult {
+    id: string;
+    completenessPercent: number | null;
+    resumeToken: string;
+    resumeUrl: string;
+    expiresAt: string;
+}
+
+/** Response of `GET /api/v1/public/drafts/{resumeToken}` — the saved state to restore (server tier). */
+export interface ResumeDraftResult {
+    id: string;
+    completenessPercent: number | null;
+    clientSubmissionUuid: string | null;
+    formVersionId: string;
+    answers: AnswerMap;
+    /** Server-side "last saved" (ISO 8601) — the tiebreaker for the Dexie↔server newest-wins reconciliation. */
+    lastSavedAt: string | null;
+    draftCurrentStep: string | null;
+    /** The locale the draft was last saved in; null falls back to the form default. */
+    locale: string | null;
+    /** A fresh short-lived SHARE token for the pinned version — the resumed session drives the ordinary endpoints. */
+    shareToken: string;
+    shareTokenExpiresAt: string;
 }

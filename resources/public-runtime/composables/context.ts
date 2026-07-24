@@ -19,10 +19,29 @@ export interface SubmitFlow {
     submit: () => Promise<SubmitOutcome>;
 }
 
+/**
+ * Increment H10 — the "Save and finish later" flow. `saveDraft` upserts the durable server draft (the FULL
+ * retained answers, not the relevance-pruned submit set) and returns the resume handle for the dialog to show
+ * (or null when a version drift routed the caller into the reschema path). `saving` drives the control's
+ * pending state; `completeness` is the latest server-reported progress, refreshed on each save.
+ */
+export interface DraftFlow {
+    saving: Ref<boolean>;
+    completeness: Ref<number | null>;
+    saveDraft: (options: { email?: string | null; finishLater: boolean }) => Promise<DraftSaveResult | null>;
+}
+
+export interface DraftSaveResult {
+    resumeUrl: string;
+    emailed: boolean;
+}
+
 /** Provided by `RuntimeSession.vue`; consumed by every runtime component. */
 export const RuntimeKey: InjectionKey<FormRuntime> = Symbol('public-runtime');
 export const AnnouncerKey: InjectionKey<Announcer> = Symbol('public-runtime-announcer');
 export const SubmitFlowKey: InjectionKey<SubmitFlow> = Symbol('public-runtime-submit');
+/** Increment H10 — the "Save and finish later" flow, provided by RuntimeSession, consumed by the fill views. */
+export const DraftFlowKey: InjectionKey<DraftFlow> = Symbol('public-runtime-draft');
 /** Resolves the guest media-upload URL from the api-client's current share token (Increment G6). */
 export const UploadUrlKey: InjectionKey<() => string> = Symbol('public-runtime-upload-url');
 /** The shared offline database (Increment G8b), provided by App.vue for the outbox submit + autosave paths. */
@@ -56,4 +75,9 @@ export function useSubmitFlow(): SubmitFlow {
         throw new Error('SubmitFlow was not provided.');
     }
     return flow;
+}
+
+/** The draft flow if a save-and-resume-enabled session provided one; null when the form has it disabled. */
+export function useDraftFlow(): DraftFlow | null {
+    return inject(DraftFlowKey, null);
 }

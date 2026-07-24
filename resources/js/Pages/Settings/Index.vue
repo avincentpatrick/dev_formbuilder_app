@@ -17,6 +17,7 @@ import {
     MdsCheckbox,
     MdsFormField,
     MdsIcon,
+    MdsNumberInput,
     MdsPasswordInput,
     MdsSegmentedControl,
     MdsTextInput,
@@ -27,7 +28,12 @@ import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
-defineProps<{ twoFactor: { enabled: boolean; confirmed: boolean } }>();
+const props = defineProps<{
+    twoFactor: { enabled: boolean; confirmed: boolean };
+    // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
+    // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
+    draftSettings: { draft_ttl_days: number; is_default: boolean; can_manage: boolean };
+}>();
 
 const page = usePage();
 
@@ -62,6 +68,13 @@ const profile = useForm({
 });
 function saveProfile(): void {
     profile.put('/user/profile-information', { preserveScroll: true });
+}
+
+// Drafts — tenant-level "Save and finish later" expiry (Increment H10). Owner/Admin only; PATCHes the one
+// tenant-scoped column. The change applies to drafts started afterwards (stamp-once — see the row hint).
+const draftForm = useForm({ draft_ttl_days: props.draftSettings.draft_ttl_days });
+function saveDraftSettings(): void {
+    draftForm.patch('/settings/drafts', { preserveScroll: true });
 }
 
 // Password (Fortify: PUT /user/password)
@@ -183,6 +196,37 @@ function savePassword(): void {
                     @update:model-value="setDyslexiaFont"
                 />
             </div>
+        </MdsCard>
+
+        <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
+        <MdsCard v-if="draftSettings.can_manage" class="settings-card">
+            <template #header>
+                <div class="settings-card__head">
+                    <MdsIcon name="clock" size="sm" aria-hidden="true" />
+                    <h2 class="settings-card__title">Drafts</h2>
+                </div>
+            </template>
+            <form class="settings-form" @submit.prevent="saveDraftSettings">
+                <MdsFormField
+                    label="Save &amp; resume link expiry (days)"
+                    help="How long a respondent's “Save and finish later” link stays valid. Applies to drafts started after this change."
+                    :error="draftForm.errors.draft_ttl_days"
+                    v-slot="{ id, describedby, invalid }"
+                >
+                    <MdsNumberInput
+                        :id="id"
+                        v-model="draftForm.draft_ttl_days"
+                        :min="1"
+                        :max="365"
+                        :describedby="describedby"
+                        :invalid="invalid"
+                    />
+                </MdsFormField>
+                <div class="settings-form__foot">
+                    <MdsButton variant="primary" type="submit" :loading="draftForm.processing">Save</MdsButton>
+                    <span v-if="draftForm.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
+                </div>
+            </form>
         </MdsCard>
 
         <!-- Security -->

@@ -23,6 +23,24 @@ for (const theme of themes) {
     });
 }
 
+// The save-and-resume UI (Increment H10). Clinic Intake opts into save-and-resume (E2eSeeder), so the multi-step
+// runtime renders a "Save and finish later" control; opening it upserts a server draft and shows a resume link in
+// a modal. Scan the open dialog for WCAG 2.2 AA + no horizontal overflow in light and dark.
+for (const theme of themes) {
+    test(`Public runtime save-for-later dialog (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Clinic Intake', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        await page.getByRole('button', { name: 'Save and finish later' }).click();
+        // The dialog saves the draft then shows the copyable resume link — wait for the ready state.
+        await page.getByRole('button', { name: 'Copy link' }).waitFor({ state: 'visible', timeout: 15_000 });
+        await assertClean(page, 'Save for later dialog');
+    });
+}
+
 // The repeat-group runtime (Increment G2). The guest-enabled "Household Roster" (E2eSeeder) has a repeatable
 // section; adding an instance renders a fieldset of member inputs. Scan both the initial (empty) state and a
 // populated instance for WCAG 2.2 AA + no horizontal overflow, in light and dark.

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createApiClient } from '../lib/api-client';
+import { createApiClient, resumeDraft } from '../lib/api-client';
 import { ApiError } from '../lib/error-normalizer';
 
 function res(status: number, body: unknown, headers: Record<string, string> = {}): Response {
@@ -91,5 +91,93 @@ describe('createApiClient', () => {
         });
         await client.remint();
         expect(client.token()).toBe('tX');
+    });
+
+    // ── H10 save-and-resume ────────────────────────────────────────────────────────────────────
+
+    it('saveDraft posts to the draft route and maps the resume handle', async () => {
+        const fetchImpl = vi.fn(async () =>
+            res(201, {
+                data: { id: 'sub-1', completeness_percent: 60, resume_token: 'rt', resume_url: 'https://acme/f/resume/rt', expires_at: '2026-08-01T00:00:00Z' },
+            }),
+        );
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl });
+
+        const result = await client.saveDraft({ answers: { a: 1 }, clientSubmissionUuid: 'u', locale: 'en' });
+        expect(fetchImpl.mock.calls[0][0]).toBe('/api/v1/public/f/t/draft');
+        expect(result).toEqual({
+            id: 'sub-1',
+            completenessPercent: 60,
+            resumeToken: 'rt',
+            resumeUrl: 'https://acme/f/resume/rt',
+            expiresAt: '2026-08-01T00:00:00Z',
+        });
+    });
+
+    it('saveDraft includes finish_later + draft_current_step only when set', async () => {
+        const fetchImpl = vi.fn(async () =>
+            res(200, { data: { id: 's', completeness_percent: 10, resume_token: 'r', resume_url: 'u', expires_at: 'e' } }),
+        );
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl });
+
+        await client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en', draftCurrentStep: 'sec-2', guestContactEmail: 'a@b.c', finishLater: true });
+        const withExtras = JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string);
+        expect(withExtras).toMatchObject({ draft_current_step: 'sec-2', guest_contact_email: 'a@b.c', finish_later: true });
+
+        await client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en' });
+        const bare = JSON.parse((fetchImpl.mock.calls[1][1] as RequestInit).body as string);
+        expect(bare).not.toHaveProperty('draft_current_step');
+        expect(bare).not.toHaveProperty('finish_later');
+    });
+
+    it('saveDraft surfaces a 409 form_updated as an ApiError kind refresh', async () => {
+        const client = createApiClient({
+            token: 't',
+            slug: 's',
+            fetch: async () => res(409, { error: { code: 'form_updated', message: 'updated' } }),
+        });
+        await expect(client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en' })).rejects.toMatchObject({
+            normalized: { kind: 'refresh' },
+        });
+    });
+
+    it('resumeDraft GETs the resume route and maps snake_case → camelCase', async () => {
+        const fetchImpl = vi.fn(async () =>
+            res(200, {
+                data: {
+                    id: 'sub-1',
+                    completeness_percent: 64,
+                    client_submission_uuid: 'uuid-1',
+                    form_version_id: 'ver-1',
+                    answers: { name: 'Ada' },
+                    last_saved_at: '2026-07-23T10:00:00Z',
+                    draft_current_step: 'sec-3',
+                    locale: 'es',
+                    share_token: 'fresh-share',
+                    share_token_expires_at: '2026-07-24T10:00:00Z',
+                },
+            }),
+        );
+
+        const result = await resumeDraft('rt', { fetch: fetchImpl });
+        expect(fetchImpl.mock.calls[0][0]).toBe('/api/v1/public/drafts/rt');
+        expect(result).toEqual({
+            id: 'sub-1',
+            completenessPercent: 64,
+            clientSubmissionUuid: 'uuid-1',
+            formVersionId: 'ver-1',
+            answers: { name: 'Ada' },
+            lastSavedAt: '2026-07-23T10:00:00Z',
+            draftCurrentStep: 'sec-3',
+            locale: 'es',
+            shareToken: 'fresh-share',
+            shareTokenExpiresAt: '2026-07-24T10:00:00Z',
+        });
+    });
+
+    it('resumeDraft throws a terminal ApiError when the draft is gone (404)', async () => {
+        await expect(
+            resumeDraft('rt', { fetch: async () => res(404, { error: { code: 'draft_not_found', message: 'gone' } }) }),
+        ).rejects.toMatchObject({ normalized: { kind: 'terminal' } });
     });
 });

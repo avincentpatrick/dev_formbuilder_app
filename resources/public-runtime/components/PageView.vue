@@ -6,6 +6,7 @@
  */
 import { computed, nextTick, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
+import SaveForLater from './SaveForLater.vue';
 import SectionView from './SectionView.vue';
 import SummaryBanner from './SummaryBanner.vue';
 import { useAnnouncer, useRuntime, useSubmitFlow } from '../composables/context';
@@ -39,6 +40,8 @@ async function onSubmit(): Promise<void> {
         <SummaryBanner v-if="bannerVisible && bannerItems.length" ref="banner" :items="bannerItems" />
         <SectionView v-for="step in runtime.visibleSteps.value" :key="step.key" :step="step" />
         <div class="page-view__actions">
+            <!-- Self-hides unless the form offers save-and-resume (Increment H10). -->
+            <SaveForLater />
             <MdsButton type="submit" size="lg" :loading="flow.submitting.value">Submit</MdsButton>
         </div>
     </form>
@@ -53,7 +56,9 @@ async function onSubmit(): Promise<void> {
 
 .page-view__actions {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mds-space-3);
     padding-top: var(--mds-space-2);
 }
 </style>

@@ -54,11 +54,22 @@ final class GuestDraftController extends Controller
             return ApiErrorResponse::make(403, 'guest_disabled', 'Guest submissions are disabled for this form.');
         }
 
+        // The per-form opt-in (H10) — the tenant-plan `feature:save_and_resume` gate at the route says the
+        // TENANT may offer save-and-resume; this says THIS FORM does. A form that never turned it on rejects the
+        // draft channel outright (the SPA hides the control off the same flag, so this is defence-in-depth).
+        if (! $form->save_and_resume) {
+            return ApiErrorResponse::make(403, 'save_resume_disabled', 'Save and resume is not enabled for this form.');
+        }
+
         if ($form->current_published_version_id !== $token->formVersionId) {
             return ApiErrorResponse::make(409, 'form_updated', 'This form has been updated. Please reload and try again.');
         }
 
         $version = FormVersion::query()->whereKey($token->formVersionId)->firstOrFail();
+
+        // Resolve the tenant's configured draft-expiry window (H10). `tenants` is RLS-exempt, so this reads under
+        // the guest tenant context; a null (unset) column falls back to the 30-day default inside the service.
+        $ttl = Tenant::query()->whereKey($token->tenantId)->value('draft_ttl_days');
 
         $result = $drafts->saveDraft(new SubmissionPayload(
             version: $version,
@@ -73,6 +84,8 @@ final class GuestDraftController extends Controller
             guestContactEmail: $request->guestContactEmail(),
             deviceId: $request->deviceId(),
             appVersion: $request->appVersion(),
+            draftCurrentStep: $request->draftCurrentStep(),
+            ttlDays: is_numeric($ttl) ? (int) $ttl : null,
         ));
 
         $submission = $result->submission;

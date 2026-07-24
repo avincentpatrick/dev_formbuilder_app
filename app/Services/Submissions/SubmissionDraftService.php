@@ -42,8 +42,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class SubmissionDraftService
 {
-    /** The draft-expiry default (docs/ux/form-filling-ux-flow.md §5.2, pricing-matrix). Stamped once at draft
-     * creation; the tenant-configurable override + the expiry reaper are H9b/H10. */
+    /** The draft-expiry default in days (docs/ux/form-filling-ux-flow.md §5.2, pricing-matrix). Stamped once at
+     * draft creation. H10 lets a tenant override the window: the caller resolves the tenant's `draft_ttl_days`
+     * and passes it as {@see SubmissionPayload::$ttlDays}, and this constant is the fallback when none is set. */
     public const DRAFT_TTL_DAYS = 30;
 
     public function __construct(
@@ -82,7 +83,7 @@ final class SubmissionDraftService
         if ($payload->clientSubmissionUuid !== null) {
             $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
             if ($existing !== null) {
-                return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness);
+                return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
             }
         }
 
@@ -171,9 +172,9 @@ final class SubmissionDraftService
      *
      * @param  array<string, mixed>  $normalized
      */
-    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness): SubmissionResult
+    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness, ?string $currentStep = null): SubmissionResult
     {
-        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness): SubmissionResult {
+        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness, $currentStep): SubmissionResult {
             $row = Submission::query()->whereKey($existing->id)->lockForUpdate()->first();
             if ($row === null || $row->status !== SubmissionStatus::Draft) {
                 throw SubmissionConflictException::draftAlreadyFinalized();
@@ -192,9 +193,12 @@ final class SubmissionDraftService
                 ],
             );
 
+            // The resume cursor moves with each save; `draft_expires_at` is deliberately NOT restamped (a
+            // draft's expiry is fixed at creation — the H9a/H10 stamp-once contract the reaper depends on).
             $row->forceFill([
                 'completeness_percent' => $completeness,
                 'last_saved_at' => now(),
+                'draft_current_step' => $currentStep,
             ])->save();
 
             return new SubmissionResult($row, created: false);
@@ -229,7 +233,10 @@ final class SubmissionDraftService
                     'locale' => $payload->locale,
                     'completeness_percent' => $completeness,
                     'last_saved_at' => now(),
-                    'draft_expires_at' => now()->addDays(self::DRAFT_TTL_DAYS),
+                    // Stamp-once: the tenant-configured TTL (H10) resolved by the caller, falling back to the
+                    // 30-day default. A later save never restamps this — see updateDraft().
+                    'draft_expires_at' => now()->addDays($payload->ttlDays ?? self::DRAFT_TTL_DAYS),
+                    'draft_current_step' => $payload->draftCurrentStep,
                 ]);
 
                 SubmissionAnswer::create([
@@ -249,7 +256,7 @@ final class SubmissionDraftService
             if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
                 $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
                 if ($existing !== null) {
-                    return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness);
+                    return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
                 }
             }
 

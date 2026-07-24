@@ -19,6 +19,8 @@ function readBootstrap(el: HTMLElement): Bootstrap {
         formTitle: data.formTitle ?? '',
         slug: data.formSlug ?? '',
         defaultLocale: data.defaultLocale || 'en',
+        // Increment H10 — populated by the `/f/resume/{token}` web shell; empty on a normal `/f/{slug}` entry.
+        resumeToken: data.resumeToken ?? '',
     };
 }
 

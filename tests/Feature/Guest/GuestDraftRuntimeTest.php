@@ -57,14 +57,17 @@ function draftTenant(string $slug = 'acme'): Tenant
     return $tenant;
 }
 
-/** A guest-enabled published form (required full_name + optional age). Requires enterTenant already called. */
+/**
+ * A guest-enabled published form (required full_name + optional age) with the per-form save-and-resume opt-in
+ * ON (Increment H10 gates the draft channel on it). Requires enterTenant already called.
+ */
 function draftForm(Tenant $tenant, User $owner, string $slug = 'intake'): Form
 {
     $form = app(FormService::class)->create($tenant, $owner, 'Intake');
     addFormField($form->draftVersion, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
     addFormField($form->draftVersion, $owner, 'age', FieldType::Integer, 1);
     app(PublishService::class)->publish($form->refresh(), $owner);
-    $form->refresh()->update(['public_slug' => $slug, 'allow_guest_submissions' => true]);
+    $form->refresh()->update(['public_slug' => $slug, 'allow_guest_submissions' => true, 'save_and_resume' => true]);
 
     return $form->refresh();
 }
@@ -316,4 +319,74 @@ it('404s a resume shell link with a bad token (non-disclosure)', function (): vo
     draftFixture();
 
     $this->get('http://acme.meridian.test/f/resume/v1.garbage.sig')->assertNotFound();
+});
+
+// ── H10 — per-form opt-in gate ────────────────────────────────────────────────────────────────
+
+it('403s the draft-save when the form has save_and_resume disabled (save_resume_disabled)', function (): void {
+    $f = draftFixture();
+    $f->form->forceFill(['save_and_resume' => false])->save();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'], 'client_submission_uuid' => Uuid::uuid7()->toString(),
+    ])
+        ->assertStatus(403)
+        ->assertJsonPath('error.code', 'save_resume_disabled');
+});
+
+// ── H10 — resume cursor (draft_current_step) + reconciliation fields on the resume-read ─────────
+
+it('persists the current step on save and returns it (with last_saved_at + locale) on resume', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $save = $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+        'draft_current_step' => 'section-2',
+        'locale' => 'en',
+    ])->assertCreated();
+
+    $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$save->json('data.resume_token')}")
+        ->assertOk()
+        ->assertJsonPath('data.draft_current_step', 'section-2')
+        ->assertJsonPath('data.locale', 'en')
+        ->assertJsonStructure(['data' => ['last_saved_at', 'draft_current_step', 'locale']]);
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->firstOrFail()->draft_current_step)->toBe('section-2');
+});
+
+// ── H10 — tenant-configurable draft TTL (stamped once at creation) ─────────────────────────────
+
+it('stamps the draft expiry from the tenant draft_ttl_days setting, defaulting to 30 days', function (): void {
+    $f = draftFixture();
+    $f->tenant->forceFill(['draft_ttl_days' => 7])->save();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'], 'client_submission_uuid' => Uuid::uuid7()->toString(),
+    ])->assertCreated();
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->firstOrFail()->draft_expires_at->toDateString())
+        ->toBe(now()->addDays(7)->toDateString());
+});
+
+it('does not restamp the draft expiry on a later save (stamp-once)', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
+
+    enterTenant($f->tenant->id);
+    $originalExpiry = Submission::query()->firstOrFail()->draft_expires_at->toIso8601String();
+
+    // Two days later, a second save must NOT move the (creation-time) expiry.
+    $this->travel(2)->days();
+    TenantContext::flush();
+    $this->postJson($url, ['answers' => ['age' => '31', 'full_name' => 'Ada'], 'client_submission_uuid' => $uuid])->assertOk();
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->firstOrFail()->draft_expires_at->toIso8601String())->toBe($originalExpiry);
 });

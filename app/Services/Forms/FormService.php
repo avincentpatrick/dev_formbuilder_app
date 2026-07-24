@@ -132,6 +132,23 @@ final class FormService
     }
 
     /**
+     * Toggle a form's per-form save-and-resume opt-in (Increment H10, UX §5.2) — the only writer of
+     * `forms.save_and_resume`.
+     *
+     * `forceFill` with an explicit key for the same reason as {@see self::assignScope()}: `save_and_resume` is
+     * in `Form::$fillable`, so centralizing the write keeps a plain `$form->update($validated)` from ever
+     * setting it. The tenant-plan half of the gate lives at the route (`feature:save_and_resume`); this method
+     * writes the per-form half. No pipeline/version effect — it only governs whether the guest runtime offers
+     * the control and whether the guest draft channel accepts a save.
+     */
+    public function setSaveAndResume(Form $form, bool $enabled): Form
+    {
+        $form->forceFill(['save_and_resume' => $enabled])->save();
+
+        return $form->refresh();
+    }
+
+    /**
      * Archive a form (form-versioning-schema-migration.md §9): discard the current draft (deleting the
      * draft version cascades its sections/fields/validations away), clear draft_version_id, and mark the
      * form archived. Published/superseded versions and current_published_version_id are untouched.

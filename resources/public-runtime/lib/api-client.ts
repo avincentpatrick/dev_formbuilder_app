@@ -11,7 +11,15 @@
  */
 
 import { ApiError, normalizeError } from './error-normalizer';
-import type { AnswerMap, MintResponse, SchemaResponse, SubmitResult } from './types';
+import type {
+    AnswerMap,
+    MintResponse,
+    ResumeDraftResult,
+    SaveDraftPayload,
+    SaveDraftResult,
+    SchemaResponse,
+    SubmitResult,
+} from './types';
 
 export interface SubmitPayload {
     // A nested repeat-section value (Increment G2) serializes straight through as a JSON array of instance maps.
@@ -27,6 +35,8 @@ export interface SubmitPayload {
 export interface ApiClient {
     fetchSchema(): Promise<SchemaResponse>;
     submit(payload: SubmitPayload): Promise<SubmitResult>;
+    // Increment H10 — upsert the durable server draft; returns the resume handle (token + url + completeness).
+    saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult>;
     remint(): Promise<MintResponse>;
     token(): string;
 }
@@ -120,6 +130,92 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             const data = (body as { data: { id: string; status: string } }).data;
             return { id: data.id, status: data.status, created: response.status === 201 };
         },
+
+        async saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult> {
+            // Share-token-bound like submit(), so it rides withFreshToken (transparent re-mint on expiry). A
+            // republish surfaces as an ApiError kind `refresh` (409 form_updated) exactly like submit().
+            const body = await withFreshToken<{
+                data: {
+                    id: string;
+                    completeness_percent: number | null;
+                    resume_token: string;
+                    resume_url: string;
+                    expires_at: string;
+                };
+            }>((token) =>
+                doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/draft`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({
+                        answers: payload.answers,
+                        client_submission_uuid: payload.clientSubmissionUuid,
+                        locale: payload.locale,
+                        ...(payload.draftCurrentStep ? { draft_current_step: payload.draftCurrentStep } : {}),
+                        ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
+                        ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
+                        ...(payload.appVersion ? { app_version: payload.appVersion } : {}),
+                        ...(payload.finishLater ? { finish_later: true } : {}),
+                    }),
+                }),
+            );
+            const data = body.data;
+            return {
+                id: data.id,
+                completenessPercent: data.completeness_percent,
+                resumeToken: data.resume_token,
+                resumeUrl: data.resume_url,
+                expiresAt: data.expires_at,
+            };
+        },
+    };
+}
+
+/**
+ * Fetch a saved draft's state for a resume link (Increment H10). Deliberately STANDALONE, not an
+ * {@link ApiClient} method: it runs BEFORE a share token exists and authenticates with the RESUME token in the
+ * path (a different context — `EstablishGuestDraftContext`), so it must NOT go through `withFreshToken`/re-mint.
+ * The response carries a fresh SHARE token the caller then hands to {@link createApiClient} for the resumed
+ * session. A promoted/reaped draft → 404 `draft_not_found`, normalized to kind `terminal`.
+ */
+export async function resumeDraft(
+    resumeToken: string,
+    options: { fetch?: typeof fetch } = {},
+): Promise<ResumeDraftResult> {
+    const doFetch = options.fetch ?? fetch;
+    const response = await doFetch(`/api/v1/public/drafts/${encodeURIComponent(resumeToken)}`, {
+        headers: { Accept: 'application/json' },
+    });
+    const body = await parseBody(response);
+    if (!response.ok) {
+        throw toError(response, body);
+    }
+    const data = (
+        body as {
+            data: {
+                id: string;
+                completeness_percent: number | null;
+                client_submission_uuid: string | null;
+                form_version_id: string;
+                answers: AnswerMap;
+                last_saved_at: string | null;
+                draft_current_step: string | null;
+                locale: string | null;
+                share_token: string;
+                share_token_expires_at: string;
+            };
+        }
+    ).data;
+    return {
+        id: data.id,
+        completenessPercent: data.completeness_percent,
+        clientSubmissionUuid: data.client_submission_uuid,
+        formVersionId: data.form_version_id,
+        answers: data.answers ?? {},
+        lastSavedAt: data.last_saved_at,
+        draftCurrentStep: data.draft_current_step,
+        locale: data.locale,
+        shareToken: data.share_token,
+        shareTokenExpiresAt: data.share_token_expires_at,
     };
 }
 

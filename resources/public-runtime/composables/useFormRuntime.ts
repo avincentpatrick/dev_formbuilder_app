@@ -137,6 +137,13 @@ export interface RuntimeOptions {
     initialLocale?: string;
     /** Restored answers (draft autosave or version-drift carry-over); applied only for keys still in the schema. */
     initialAnswers?: AnswerMap;
+    /**
+     * Increment H10 — seed the session's `client_submission_uuid` from a resumed server draft instead of
+     * minting a fresh one. This is the promote linchpin: the H9a substrate finalizes a same-uuid submit through
+     * `promote()` (flipping the existing draft row) rather than `submit()` (a new row), so a resumed session
+     * MUST reuse the draft's uuid or the finalize would create a duplicate submission.
+     */
+    initialClientSubmissionUuid?: string;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -182,7 +189,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     const locale = ref(opts.initialLocale ?? schema.form.default_locale);
     // Increment G8b — a time-sortable UUIDv7 (was random v4): it is the outbox key + the server idempotency
     // key, and its leading timestamp gives queued submissions a coarse chronological order for replay.
-    const clientSubmissionUuid = uuidv7();
+    // Increment H10 — a resumed session reuses the server draft's uuid so its eventual submit PROMOTES that
+    // draft row rather than creating a duplicate (the H9a same-uuid-finalize-through-promote invariant).
+    const clientSubmissionUuid = opts.initialClientSubmissionUuid ?? uuidv7();
 
     restoreAnswers(opts.initialAnswers ?? {});
 

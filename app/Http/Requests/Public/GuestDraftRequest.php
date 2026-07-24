@@ -33,6 +33,9 @@ final class GuestDraftRequest extends FormRequest
             'locale' => ['nullable', 'string', 'max:10'],
             'device_id' => ['nullable', 'string', 'max:100'],
             'app_version' => ['nullable', 'string', 'max:20'],
+            // The resume cursor (H10) — the SPA's current step key, restored verbatim on resume. Null for
+            // single-page forms. Loosely bounded; an unknown key just resumes at the first step client-side.
+            'draft_current_step' => ['nullable', 'string', 'max:255'],
             // "Save and finish later" — email the resume link (if a contact email is present) rather than only
             // returning it in the response body.
             'finish_later' => ['nullable', 'boolean'],
@@ -80,6 +83,13 @@ final class GuestDraftRequest extends FormRequest
     public function appVersion(): ?string
     {
         $value = $this->input('app_version');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    public function draftCurrentStep(): ?string
+    {
+        $value = $this->input('draft_current_step');
 
         return is_string($value) && $value !== '' ? $value : null;
     }

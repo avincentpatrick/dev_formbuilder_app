@@ -153,6 +153,36 @@ it('filters the inbox by form and by status', function (): void {
         ->assertInertia(fn ($page) => $page->where('meta.total', 1));
 });
 
+it('hides in-progress drafts by default and surfaces them (with completeness) under the Draft filter', function (): void {
+    // Increment H10 — drafts (guest "save and finish later") are excluded from the default review list, but
+    // the existing Draft status option opts them back in, carrying their progress columns.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Done']);
+    $draft = seedInboxSubmission($form, $owner, SubmissionStatus::Draft, ['full_name' => 'Partial']);
+    $draft->forceFill(['completeness_percent' => 40, 'last_saved_at' => now(), 'draft_expires_at' => now()->addDays(30)])->save();
+
+    // Default list: only the submitted row (the draft is hidden).
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 1)
+            ->has('data', 1)
+            ->where('data.0.status', 'submitted'));
+
+    // Draft filter: the draft appears with its completeness surfaced.
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=draft')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 1)
+            ->where('data.0.status', 'draft')
+            ->where('data.0.completeness_percent', 40));
+});
+
 it('paginates the inbox at 25 per page', function (): void {
     $this->withoutVite();
     $tenant = inboxTenant();

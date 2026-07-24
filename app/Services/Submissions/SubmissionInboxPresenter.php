@@ -41,6 +41,10 @@ final class SubmissionInboxPresenter
             ->with(['form:id,title', 'respondent:id,name'])
             ->when($filters['form_id'] ?? null, fn ($q, $v) => $q->where('form_id', $v))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+            // Hide in-progress drafts (H10) unless the status filter explicitly asks for them. The inbox is a
+            // review surface for completed responses; a half-filled guest draft is not something a reviewer
+            // acts on. Selecting the "Draft" status option surfaces them (the option is already in the catalog).
+            ->when(empty($filters['status']), fn ($q) => $q->where('status', '!=', SubmissionStatus::Draft->value))
             ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
             ->orderByDesc('id') // uuidv7 → recency without a dedicated submitted_at index
             ->paginate(self::PER_PAGE)
@@ -58,6 +62,11 @@ final class SubmissionInboxPresenter
                 'source_label' => $s->source->label(),
                 'respondent' => $this->respondentLabel($s),
                 'submitted_at' => ($s->submitted_at ?? $s->created_at)?->toIso8601String(),
+                // Draft progress (H10) — populated only on `status=draft` rows (promotion nulls the expiry);
+                // the inbox renders "Saved · N%" and the expiry for a filtered draft view.
+                'completeness_percent' => $s->completeness_percent,
+                'last_saved_at' => $s->last_saved_at?->toIso8601String(),
+                'draft_expires_at' => $s->draft_expires_at?->toIso8601String(),
             ])->all(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),

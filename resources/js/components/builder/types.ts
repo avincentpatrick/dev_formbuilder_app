@@ -101,7 +101,7 @@ export interface LibraryItem {
 }
 
 export interface BuilderPageProps {
-    form: { id: string; title: string; description: string | null; status: string };
+    form: { id: string; title: string; description: string | null; status: string; save_and_resume: boolean };
     draft: { id: string; version_number: number } | null;
     sections: ServerSection[];
     fields: ServerField[];

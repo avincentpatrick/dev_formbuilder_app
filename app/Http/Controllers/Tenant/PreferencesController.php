@@ -6,12 +6,15 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateAppearanceRequest;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
+use App\Services\Submissions\SubmissionDraftService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 /**
  * Per-user settings (Feature #9 appearance + profile/security). Runs inside the authenticated tenant
@@ -31,10 +34,20 @@ final class PreferencesController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        /** @var Tenant $tenant */
+        $tenant = app(TenantContract::class);
+
         return Inertia::render('Settings/Index', [
             'twoFactor' => [
                 'enabled' => $user->two_factor_secret !== null,
                 'confirmed' => $user->two_factor_confirmed_at !== null,
+            ],
+            // Tenant-level draft settings (H10). Only Owner/Admin (tenant.settings.manage) may edit; the page
+            // hides the card otherwise. The effective value falls back to the 30-day default when unset.
+            'draftSettings' => [
+                'draft_ttl_days' => $tenant->draft_ttl_days ?? SubmissionDraftService::DRAFT_TTL_DAYS,
+                'is_default' => $tenant->draft_ttl_days === null,
+                'can_manage' => $user->can('tenant.settings.manage'),
             ],
         ]);
     }

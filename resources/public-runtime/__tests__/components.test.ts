@@ -13,6 +13,13 @@ function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
             throw new Error('unused in these tests');
         }),
         submit: vi.fn(async () => ({ id: SUBMISSION_ID, status: 'submitted', created: true })),
+        saveDraft: vi.fn(async () => ({
+            id: SUBMISSION_ID,
+            completenessPercent: 64,
+            resumeToken: 'rt',
+            resumeUrl: 'https://acme/f/resume/rt',
+            expiresAt: '2026-08-01T00:00:00Z',
+        })),
         remint: vi.fn(async () => ({ shareToken: 't2', expiresAt: '', form: { id: 'f', title: 'T' } })),
         token: () => 't1',
         ...overrides,
@@ -26,6 +33,7 @@ const bootstrap: Bootstrap = {
     formTitle: 'T',
     slug: 's',
     defaultLocale: 'en',
+    resumeToken: '',
 };
 
 beforeEach(() => {
@@ -105,6 +113,52 @@ describe('RuntimeSession (component wiring)', () => {
         await discard.trigger('click');
         expect(wrapper.emitted('discard')).toHaveLength(1);
 
+        wrapper.unmount();
+    });
+
+    it('in resume mode, shows the welcome-back banner and offers Save-and-finish-later (Increment H10)', async () => {
+        const schema = schemaResponse({
+            fields: [field({ key: 'name', label: 'Full name' })],
+            form: { save_and_resume: true },
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema,
+                bootstrap,
+                client: fakeClient(),
+                initialAnswers: { name: 'Ada' },
+                resume: {
+                    uuid: 'draft-uuid-1',
+                    locale: null,
+                    stepKey: null,
+                    completeness: 64,
+                    note: 'You have more recent answers saved on this device, so we kept those.',
+                },
+            },
+        });
+        await settle();
+
+        // The welcome-back banner reports progress + the reconciliation note, and the answers are restored.
+        expect(wrapper.text()).toContain('Welcome back');
+        expect(wrapper.text()).toContain('64%');
+        expect(wrapper.text()).toContain('more recent answers saved on this device');
+        expect((wrapper.find('input').element as HTMLInputElement).value).toBe('Ada');
+
+        // The save-and-finish-later control is present because the form opted in.
+        expect(wrapper.text()).toContain('Save and finish later');
+
+        wrapper.unmount();
+    });
+
+    it('hides Save-and-finish-later when the form has not opted in (Increment H10)', () => {
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: schemaResponse({ fields: [field({ key: 'a' })] }), // save_and_resume undefined → off
+                bootstrap,
+                client: fakeClient(),
+            },
+        });
+        expect(wrapper.text()).not.toContain('Save and finish later');
         wrapper.unmount();
     });
 

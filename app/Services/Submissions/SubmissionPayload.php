@@ -38,5 +38,10 @@ final readonly class SubmissionPayload
         // Increment G8b — device provenance for the offline-sync + guest channels (data-dictionary §7).
         public ?string $deviceId = null,
         public ?string $appVersion = null,
+        // Increment H10 — draft-only: the resume cursor (the SPA's current step key, null for single-page /
+        // non-draft channels) and the tenant-configured expiry window in days (null ⇒ the 30-day default).
+        // Both are consumed only by the draft substrate; the finalize pipeline ignores them.
+        public ?string $draftCurrentStep = null,
+        public ?int $ttlDays = null,
     ) {}
 }

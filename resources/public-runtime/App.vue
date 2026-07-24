@@ -10,9 +10,10 @@ import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
 import { ConflictReviewKey, DbKey, OfflineMediaKey, SyncOutboxKey, UploadUrlKey } from './composables/context';
 import { createSyncOutbox } from './composables/useSyncOutbox';
-import { createApiClient } from './lib/api-client';
+import { createApiClient, resumeDraft } from './lib/api-client';
 import { openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
+import { reconcileDraft, type LocalDraft } from './lib/reconcile';
 import { uuidv7 } from './lib/uuid';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
@@ -44,6 +45,16 @@ const confirmationMessage = ref(CONFIRM_MESSAGE);
 const sessionKey = ref(0);
 const retainedAnswers = shallowRef<AnswerMap | undefined>(undefined);
 const driftNotice = ref<string | null>(null);
+// Increment H10 — the reconciled resume seed for RuntimeSession (null on a normal entry / drift remount).
+const resumeSeed = shallowRef<{
+    uuid: string;
+    locale: string | null;
+    stepKey: string | null;
+    completeness: number | null;
+    note: string | null;
+} | null>(null);
+const RESUME_UNAVAILABLE_MESSAGE =
+    'This saved form is no longer available — it may have already been submitted, or the link may have expired.';
 // Increment G8c — while resolving a parked conflict, the uuid of the row being reviewed (discarded on success).
 const resolvingUuid = ref<string | null>(null);
 const resolveMode = ref(false);
@@ -83,6 +94,10 @@ onMounted(load);
 async function load(): Promise<void> {
     phase.value = 'loading';
     try {
+        if (props.bootstrap.resumeToken !== '') {
+            await loadResume(props.bootstrap.resumeToken);
+            return;
+        }
         schema.value = await client.fetchSchema();
         phase.value = 'ready';
     } catch (error) {
@@ -90,6 +105,56 @@ async function load(): Promise<void> {
             error instanceof ApiError ? error.normalized.message : 'We could not load this form. Please try again.';
         phase.value = 'error';
     }
+}
+
+// Increment H10 — open from a resume link. The web shell already embedded a fresh pinned-version SHARE token
+// (data-share-token), so the existing `client` is ready; the resume-read gives the saved answers + a server
+// "last saved" to reconcile against any same-device local draft, and the draft's uuid so the eventual submit
+// PROMOTES that row. A promoted/reaped/expired draft → a resume-specific terminal message.
+async function loadResume(resumeToken: string): Promise<void> {
+    let server;
+    try {
+        server = await resumeDraft(resumeToken);
+    } catch (error) {
+        // A 404 (draft_not_found) / invalid token is terminal — the saved response is gone. Show a
+        // resume-specific message rather than the generic normalized one.
+        errorMessage.value =
+            error instanceof ApiError && error.normalized.kind === 'terminal'
+                ? RESUME_UNAVAILABLE_MESSAGE
+                : error instanceof ApiError
+                  ? error.normalized.message
+                  : 'We could not restore your saved form. Please try again.';
+        phase.value = 'error';
+        return;
+    }
+
+    schema.value = await client.fetchSchema();
+
+    const localRow = await db.draft_answers.get([server.formVersionId, props.bootstrap.slug]);
+    const local: LocalDraft | undefined =
+        localRow === undefined
+            ? undefined
+            : {
+                  checksum: localRow.checksum,
+                  locale: localRow.locale,
+                  currentStepKey: localRow.current_step_key,
+                  answers: localRow.answers,
+                  updatedAt: localRow.updated_at,
+              };
+
+    const reconciled = reconcileDraft(server, schema.value.version.checksum, local);
+
+    retainedAnswers.value = reconciled.answers;
+    resumeSeed.value = {
+        // Guest drafts always carry the SPA's uuid; the fallback only guards the impossible OCR-staged case
+        // (where a fresh uuid means the submit creates a new row rather than promoting — acceptable degradation).
+        uuid: server.clientSubmissionUuid ?? uuidv7(),
+        locale: reconciled.locale,
+        stepKey: reconciled.currentStepKey,
+        completeness: server.completenessPercent,
+        note: reconciled.note,
+    };
+    phase.value = 'ready';
 }
 
 function onSubmitted(id: string): void {
@@ -121,6 +186,9 @@ function onQueued(clientUuid: string): void {
 function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): void {
     schema.value = payload.schema;
     retainedAnswers.value = payload.answers;
+    // Increment H10 — a drift remount starts fresh against the new version (a new submission, fresh uuid) and
+    // is not a resume, so drop the welcome-back seed; the drift notice below explains the carry-over instead.
+    resumeSeed.value = null;
     // Increment G8c — a fresh republish DURING a conflict review keeps the resolve context (notice + row), so the
     // loop re-maps against the newer schema until the resubmit succeeds; otherwise it's the normal live-drift copy.
     driftNotice.value = resolveMode.value
@@ -143,6 +211,7 @@ async function beginConflictReview(): Promise<void> {
         await client.remint();
         schema.value = await client.fetchSchema();
         retainedAnswers.value = row.answers;
+        resumeSeed.value = null; // a conflict review is its own entry, never a resume (H10)
         resolvingUuid.value = row.client_submission_uuid;
         resolveMode.value = true;
         driftNotice.value = resolveNotice(row.conflict_code);
@@ -210,6 +279,7 @@ function onRestart(): void {
         :initial-answers="retainedAnswers"
         :notice="driftNotice"
         :resolving="resolveMode"
+        :resume="resumeSeed"
         @submitted="onSubmitted"
         @queued="onQueued"
         @reschema="onReschema"

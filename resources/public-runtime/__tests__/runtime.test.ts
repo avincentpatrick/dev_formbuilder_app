@@ -421,3 +421,19 @@ describe('createFormRuntime — repeat groups: submit body + banner + steps', ()
         expect(rt.attemptNext().advanced).toBe(true);
     });
 });
+
+describe('createFormRuntime — H10 resume seed (client_submission_uuid)', () => {
+    it('mints a fresh uuid per session by default', () => {
+        const a = createFormRuntime(schemaResponse({ fields: [field({ key: 'x', sequence: 0 })] }));
+        const b = createFormRuntime(schemaResponse({ fields: [field({ key: 'x', sequence: 0 })] }));
+        expect(a.clientSubmissionUuid).not.toBe(b.clientSubmissionUuid);
+        expect(a.clientSubmissionUuid).toMatch(/^[0-9a-f-]{36}$/i);
+    });
+
+    it('reuses a seeded uuid so a resumed session promotes that same draft row', () => {
+        const runtime = createFormRuntime(schemaResponse({ fields: [field({ key: 'x', sequence: 0 })] }), {
+            initialClientSubmissionUuid: 'seeded-uuid-1234',
+        });
+        expect(runtime.clientSubmissionUuid).toBe('seeded-uuid-1234');
+    });
+});

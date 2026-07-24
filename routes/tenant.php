@@ -10,6 +10,7 @@ use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
+use App\Http\Controllers\Tenant\FormSaveResumeController;
 use App\Http\Controllers\Tenant\FormScopeController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
+use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Form;
@@ -64,6 +66,10 @@ Route::middleware([
     Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
     Route::patch('/settings/appearance', [PreferencesController::class, 'updateAppearance'])
         ->name('settings.appearance.update');
+    // Tenant-level (org-wide) settings — Owner/Admin only (H10 draft-expiry window). Distinct from the
+    // per-user appearance write above; gated on the Spatie permission, not just `auth`.
+    Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])
+        ->middleware('can:tenant.settings.manage')->name('settings.drafts.update');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
@@ -209,6 +215,12 @@ Route::middleware([
     // stacked on top. Both gates must pass; the write itself is FormService::assignScope (never mass-assignment).
     Route::patch('/forms/{form}/scope', [FormScopeController::class, 'update'])
         ->middleware(['can:update,form', 'can:viewAny,'.ScopeNode::class])->name('forms.scope');
+
+    // Per-form save-and-resume opt-in (Increment H10, UX §5.2). Like the scope route, its own endpoint with a
+    // guarded FormService write. `feature:save_and_resume` stacks on `can:update,form` so a form owner can only
+    // enable a feature the tenant plan includes; the guest runtime + draft channel both consult the flag.
+    Route::patch('/forms/{form}/save-resume', [FormSaveResumeController::class, 'update'])
+        ->middleware(['can:update,form', 'feature:save_and_resume'])->name('forms.save-resume');
 
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),

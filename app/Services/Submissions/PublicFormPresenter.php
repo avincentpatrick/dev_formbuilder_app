@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Http\Middleware\RequireFeature;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Services\Entitlements\EntitlementService;
 
 /**
  * Shapes a published form + version for the public guest runtime (Increment F5). Thin by design: the
@@ -16,6 +18,8 @@ use App\Models\FormVersion;
  */
 final class PublicFormPresenter
 {
+    public function __construct(private readonly EntitlementService $entitlements) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -31,6 +35,11 @@ final class PublicFormPresenter
                 'supported_locales' => $this->supportedLocales($form),
                 // Single-page vs. multi-step presentation (UX §3.1); the SPA reads it to pick its flow.
                 'single_page_mode' => $form->single_page_mode,
+                // Whether the SPA should offer "Save and finish later" (H10, UX §5.2). Both gates must pass:
+                // the per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly —
+                // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
+                // route is still authoritative; this only decides whether the control is shown.
+                'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
             ],
             'version' => [
                 'id' => $version->id,
@@ -39,6 +48,16 @@ final class PublicFormPresenter
                 'schema' => $version->schema_snapshot,
             ],
         ];
+    }
+
+    /**
+     * Whether the tenant plan permits save-and-resume, mirroring {@see RequireFeature}'s
+     * fail-open rule: a request passes unless a plan resolves AND denies the feature. So an unseeded/dev tenant
+     * (no catalog) allows it, and a seeded Free tenant denies it — exactly what the draft route enforces.
+     */
+    private function tenantAllowsSaveResume(): bool
+    {
+        return $this->entitlements->currentPlan() === null || $this->entitlements->feature('save_and_resume');
     }
 
     /**

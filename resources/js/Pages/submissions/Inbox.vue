@@ -31,6 +31,11 @@ type SubmissionRow = {
     source_label: string;
     respondent: string;
     submitted_at: string | null;
+    // Increment H10 — draft progress; non-null only on `status=draft` rows (hidden by default; visible under
+    // the Draft status filter).
+    completeness_percent: number | null;
+    last_saved_at: string | null;
+    draft_expires_at: string | null;
 };
 
 type Meta = { current_page: number; last_page: number; total: number; per_page: number };
@@ -135,12 +140,29 @@ function formatDate(iso: string | null): string {
             />
         </div>
 
+        <p v-if="!selected.status" class="inbox__hint">
+            In-progress drafts are hidden. Choose the <strong>Draft</strong> status to see them.
+        </p>
+
         <MdsDataTable :columns="columns" :rows="data" caption="Submissions" row-key="id">
-            <template #cell-status="{ value }">
-                <MdsBadge v-bind="statusVariant(String(value))" />
+            <template #cell-status="{ row }">
+                <div class="inbox__status">
+                    <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" />
+                    <span
+                        v-if="(row as SubmissionRow).status === 'draft' && (row as SubmissionRow).completeness_percent !== null"
+                        class="inbox__progress"
+                    >
+                        {{ (row as SubmissionRow).completeness_percent }}%
+                    </span>
+                </div>
             </template>
             <template #cell-submitted_at="{ row }">
-                {{ formatDate((row as SubmissionRow).submitted_at) }}
+                <template v-if="(row as SubmissionRow).status === 'draft'">
+                    <span class="inbox__saved">Saved {{ formatDate((row as SubmissionRow).last_saved_at) }}</span>
+                </template>
+                <template v-else>
+                    {{ formatDate((row as SubmissionRow).submitted_at) }}
+                </template>
             </template>
             <template #row-actions="{ row }">
                 <MdsIconButton
@@ -179,5 +201,27 @@ function formatDate(iso: string | null): string {
 
 .inbox__filters :deep(.mds-select) {
     min-width: 12rem;
+}
+
+.inbox__hint {
+    margin: 0 0 var(--mds-space-3);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.inbox__status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+}
+
+.inbox__progress {
+    font-size: var(--mds-type-body-sm-font-size);
+    font-variant-numeric: tabular-nums;
+    color: var(--mds-color-text-secondary);
+}
+
+.inbox__saved {
+    color: var(--mds-color-text-secondary);
 }
 </style>

@@ -9,6 +9,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import ProgressIndicator from './ProgressIndicator.vue';
+import SaveForLater from './SaveForLater.vue';
 import SectionView from './SectionView.vue';
 import SummaryBanner from './SummaryBanner.vue';
 import { useAnnouncer, useRuntime, useSubmitFlow } from '../composables/context';
@@ -99,6 +100,8 @@ function onFormSubmit(): void {
             <MdsButton v-if="!runtime.isFirstStep.value" type="button" variant="secondary" @click="onBack">
                 Back
             </MdsButton>
+            <!-- Self-hides unless the form offers save-and-resume (Increment H10); shown on every step. -->
+            <SaveForLater />
             <span class="step-view__spacer" />
             <MdsButton v-if="!runtime.isLastStep.value" type="button" @click="onNext">Next</MdsButton>
             <MdsButton v-else type="submit" :loading="flow.submitting.value">Submit</MdsButton>

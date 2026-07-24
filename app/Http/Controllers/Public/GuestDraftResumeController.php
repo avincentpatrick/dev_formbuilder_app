@@ -59,6 +59,12 @@ final class GuestDraftResumeController extends Controller
                 'client_submission_uuid' => $draft->client_submission_uuid,
                 'form_version_id' => $draft->form_version_id,
                 'answers' => is_array($answers) && $answers !== [] ? $answers : (object) [],
+                // H10 — the two-tier (Dexie↔server) reconciliation needs a server-side "last saved" to break
+                // newest-wins ties, and the SPA restores the exact step + locale so a resumed session comes back
+                // in the language and position the respondent left it.
+                'last_saved_at' => optional($draft->last_saved_at)?->toIso8601String(),
+                'draft_current_step' => $draft->draft_current_step,
+                'locale' => $draft->locale,
                 'share_token' => $minted->token,
                 'share_token_expires_at' => gmdate('c', $minted->expiresAt),
             ],

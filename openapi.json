@@ -1114,32 +1114,65 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "error": {
+                                    "anyOf": [
+                                        {
                                             "type": "object",
                                             "properties": {
-                                                "code": {
-                                                    "type": "string",
-                                                    "const": "guest_disabled"
-                                                },
-                                                "message": {
-                                                    "type": "string",
-                                                    "const": "Guest submissions are disabled for this form."
-                                                },
-                                                "details": {
-                                                    "type": "null"
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "save_resume_disabled"
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "const": "Save and resume is not enabled for this form."
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
                                                 }
                                             },
                                             "required": [
-                                                "code",
-                                                "message",
-                                                "details"
+                                                "error"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "guest_disabled"
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "const": "Guest submissions are disabled for this form."
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
                                             ]
                                         }
-                                    },
-                                    "required": [
-                                        "error"
                                     ]
                                 }
                             }
@@ -1199,6 +1232,22 @@
                                                     "type": "string"
                                                 },
                                                 "answers": {},
+                                                "last_saved_at": {
+                                                    "type": "string",
+                                                    "description": "H10 \u2014 the two-tier (Dexie\u2194server) reconciliation needs a server-side \"last saved\" to break\nnewest-wins ties, and the SPA restores the exact step + locale so a resumed session comes back\nin the language and position the respondent left it."
+                                                },
+                                                "draft_current_step": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "locale": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
                                                 "share_token": {
                                                     "type": "string"
                                                 },
@@ -1212,6 +1261,9 @@
                                                 "client_submission_uuid",
                                                 "form_version_id",
                                                 "answers",
+                                                "last_saved_at",
+                                                "draft_current_step",
+                                                "locale",
                                                 "share_token",
                                                 "share_token_expires_at"
                                             ]
@@ -1435,6 +1487,10 @@
                                                         "single_page_mode": {
                                                             "type": "boolean",
                                                             "description": "Single-page vs. multi-step presentation (UX \u00a73.1); the SPA reads it to pick its flow."
+                                                        },
+                                                        "save_and_resume": {
+                                                            "type": "string",
+                                                            "description": "Whether the SPA should offer \"Save and finish later\" (H10, UX \u00a75.2). Both gates must pass:\nthe per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly \u2014\nfail-open when no catalog resolves \u2014 so this flag and the draft route never disagree. The\nroute is still authoritative; this only decides whether the control is shown."
                                                         }
                                                     },
                                                     "required": [
@@ -1443,7 +1499,8 @@
                                                         "description",
                                                         "default_locale",
                                                         "supported_locales",
-                                                        "single_page_mode"
+                                                        "single_page_mode",
+                                                        "save_and_resume"
                                                     ]
                                                 },
                                                 "version": {
@@ -2676,6 +2733,14 @@
                             "null"
                         ],
                         "maxLength": 20
+                    },
+                    "draft_current_step": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The resume cursor (H10) \u2014 the SPA's current step key, restored verbatim on resume. Null for\nsingle-page forms. Loosely bounded; an unknown key just resumes at the first step client-side.",
+                        "maxLength": 255
                     },
                     "finish_later": {
                         "type": [

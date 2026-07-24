@@ -68,6 +68,7 @@ export function schemaResponse(opts: {
             default_locale: opts.form?.default_locale ?? 'en',
             supported_locales: opts.form?.supported_locales ?? ['en'],
             single_page_mode: opts.form?.single_page_mode ?? true,
+            save_and_resume: opts.form?.save_and_resume ?? false,
         },
         version: {
             id: 'ver-1',

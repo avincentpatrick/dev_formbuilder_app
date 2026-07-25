@@ -1,52 +1,63 @@
 <script setup lang="ts">
 // Authenticated tenant landing page, rendered inside the persistent AppLayout (assigned in app.ts).
-// Stat tiles + the "no forms yet" empty state are placeholders until form building lands (Phase 1).
+// KPI tiles show real, visibility-scoped counts from DashboardController → DashboardMetricsService (H11):
+// Owner/Admin/Viewer see org-wide totals; a Form Editor/Reviewer sees own-forms counts and no Members tile.
 import { computed } from 'vue';
-import { usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCard, MdsEmptyState, MdsIcon, type IconName } from '@meridian/design-system';
+import { router, usePage } from '@inertiajs/vue3';
+import { MdsButton, MdsCard, MdsEmptyState, MdsStatTile, type IconName } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+
+const props = defineProps<{
+  // `members` is null when the user lacks org-wide visibility → the Members tile is omitted.
+  kpis: { forms: number; submissions: number; members: number | null };
+}>();
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const canCreate = computed(() => page.props.auth.can.manageForms);
 
-const stats: { label: string; value: string; icon: IconName }[] = [
-  { label: 'Forms', value: '—', icon: 'forms' },
-  { label: 'Submissions', value: '—', icon: 'submissions' },
-  { label: 'Members', value: '—', icon: 'users' },
-];
+const tiles = computed(() => {
+  const list: { label: string; value: string; icon: IconName }[] = [
+    { label: 'Forms', value: props.kpis.forms.toLocaleString(), icon: 'forms' },
+    { label: 'Submissions', value: props.kpis.submissions.toLocaleString(), icon: 'submissions' },
+  ];
+  if (props.kpis.members !== null) {
+    list.push({ label: 'Members', value: props.kpis.members.toLocaleString(), icon: 'users' });
+  }
+  return list;
+});
+
+// The create-form flow is the "New form" modal on the Forms page; land there rather than duplicate it.
+const goToForms = () => router.visit('/forms');
 </script>
 
 <template>
   <div>
     <PageHeader title="Dashboard" icon="dashboard">
-      <template #actions>
-        <MdsButton variant="primary" icon-left="plus" disabled>Create form</MdsButton>
+      <template v-if="canCreate" #actions>
+        <MdsButton variant="primary" icon-left="plus" @click="goToForms">Create form</MdsButton>
       </template>
     </PageHeader>
 
     <p class="dash__welcome">Welcome back, {{ user?.name }}.</p>
 
     <div class="dash__stats">
-      <MdsCard v-for="stat in stats" :key="stat.label">
-        <div class="dash__stat">
-          <span class="dash__stat-badge" aria-hidden="true">
-            <MdsIcon :name="stat.icon" size="md" />
-          </span>
-          <div class="dash__stat-text">
-            <p class="dash__stat-value">{{ stat.value }}</p>
-            <p class="dash__stat-label">{{ stat.label }}</p>
-          </div>
-        </div>
-      </MdsCard>
+      <MdsStatTile
+        v-for="tile in tiles"
+        :key="tile.label"
+        :label="tile.label"
+        :value="tile.value"
+        :icon="tile.icon"
+      />
     </div>
 
-    <MdsCard class="dash__empty-card">
+    <MdsCard v-if="kpis.forms === 0" class="dash__empty-card">
       <MdsEmptyState
         headline="No forms yet"
-        description="Once form building lands, the forms you create will appear here."
+        description="Create your first form to start collecting responses."
       >
-        <template #action>
-          <MdsButton variant="primary" icon-left="plus" disabled>Create form</MdsButton>
+        <template v-if="canCreate" #action>
+          <MdsButton variant="primary" icon-left="plus" @click="goToForms">Create form</MdsButton>
         </template>
       </MdsEmptyState>
     </MdsCard>
@@ -65,43 +76,6 @@ const stats: { label: string; value: string; icon: IconName }[] = [
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--mds-space-4);
   margin-bottom: var(--mds-space-6);
-}
-
-.dash__stat {
-  display: flex;
-  align-items: center;
-  gap: var(--mds-space-4);
-}
-
-.dash__stat-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border-radius: var(--mds-radius-lg);
-  background-color: var(--mds-color-action-primary-tint);
-  color: var(--mds-color-action-primary-fg);
-}
-
-.dash__stat-text {
-  min-width: 0;
-}
-
-.dash__stat-value {
-  margin: 0 0 var(--mds-space-1);
-  font-family: var(--mds-font-family-display);
-  font-size: var(--mds-type-heading-1-font-size);
-  line-height: var(--mds-type-heading-1-line-height);
-  font-weight: var(--mds-type-heading-1-font-weight);
-  color: var(--mds-color-text-heading);
-}
-
-.dash__stat-label {
-  margin: 0;
-  font-size: var(--mds-type-body-md-font-size);
-  color: var(--mds-color-text-secondary);
 }
 
 .dash__empty-card {

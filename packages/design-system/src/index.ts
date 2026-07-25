@@ -8,6 +8,7 @@ export { default as MdsNumberInput } from './components/NumberInput/NumberInput.
 export { default as MdsPasswordInput } from './components/PasswordInput/PasswordInput.vue';
 export { default as MdsIcon } from './components/Icon/Icon.vue';
 export { default as MdsCard } from './components/Card/Card.vue';
+export { default as MdsStatTile } from './components/StatTile/StatTile.vue';
 export { default as MdsEmptyState } from './components/EmptyState/EmptyState.vue';
 export { default as MdsSegmentedControl } from './components/SegmentedControl/SegmentedControl.vue';
 export { default as MdsSpinner } from './components/Spinner/Spinner.vue';

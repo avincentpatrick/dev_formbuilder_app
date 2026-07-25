@@ -101,13 +101,27 @@ export interface LibraryItem {
 }
 
 export interface BuilderPageProps {
-    form: { id: string; title: string; description: string | null; status: string; save_and_resume: boolean };
+    form: {
+        id: string;
+        title: string;
+        description: string | null;
+        status: string;
+        save_and_resume: boolean;
+        // Raw schedule window + cap (Increment H12b) — the Schedule modal prefills from these. ISO instants
+        // (rendered back into `timezone` for the datetime-local inputs); null when that bound is unset.
+        opens_at: string | null;
+        closes_at: string | null;
+        timezone: string;
+        max_responses: number | null;
+    };
     draft: { id: string; version_number: number } | null;
     sections: ServerSection[];
     fields: ServerField[];
     palette: PaletteGroup[];
     enums: BuilderEnums;
     library: LibraryItem[];
+    // The canonical IANA identifier list for the Schedule modal's timezone select (Increment H12b).
+    timezones: string[];
 }
 
 // A group in the canvas: an optional owning section plus its ordered fields. `section === null` is the

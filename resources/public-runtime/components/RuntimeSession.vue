@@ -31,13 +31,14 @@ import {
     type SubmitOutcome,
 } from '../composables/context';
 import { ApiError } from '../lib/error-normalizer';
+import { acceptanceForReasonCode, hasScheduleConstraint } from '../lib/schedule';
 import { openDb } from '../lib/db';
 import { discardRow, enqueue, markSynced } from '../lib/outbox';
 import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
 import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
-import type { AnswerMap, Bootstrap, SchemaResponse } from '../lib/types';
+import type { AnswerMap, Bootstrap, ScheduleAcceptance, SchemaResponse } from '../lib/types';
 
 const props = defineProps<{
     schema: SchemaResponse;
@@ -65,6 +66,8 @@ const emit = defineEmits<{
     queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
     discard: [];
+    // Increment H12b — a submit rejected because the form closed / filled mid-fill; App shows the full-screen state.
+    unavailable: [acceptance: ScheduleAcceptance];
 }>();
 
 const runtime = createFormRuntime(props.schema, {
@@ -158,6 +161,12 @@ async function handleSubmitError(error: unknown, uuid: string): Promise<SubmitOu
             notice.value = { type: 'rate-limited', message: normalized.message };
             return 'blocked';
         }
+        if (normalized.kind === 'schedule') {
+            // Increment H12b — the form closed / filled while being filled in. The queued row was already
+            // discarded above; hand off to App.vue to replace the form with the full-screen unavailable state.
+            emit('unavailable', acceptanceForReasonCode(normalized.code) ?? 'closed');
+            return 'blocked';
+        }
         notice.value = { type: 'error', message: normalized.message };
         return 'blocked';
     }
@@ -173,6 +182,20 @@ async function submit(): Promise<SubmitOutcome> {
     runtime.markSubmitAttempted();
     if (!runtime.passed.value) {
         return 'field-errors';
+    }
+
+    // Increment H12b — fail CLOSED offline for a scheduled/capped form. Its `acceptance` was computed
+    // server-side at load and can flip (close / fill up) while offline, and an offline SPA can't re-verify it.
+    // Blocking here (before any enqueue) avoids optimistically queuing a response that would 403 on replay.
+    // Unscheduled forms are untouched — they keep the G8b offline outbox; a device-local draft can still save.
+    if (!online.value && hasScheduleConstraint(props.schema.form.schedule)) {
+        notice.value = {
+            type: 'error',
+            message:
+                "This form can't be submitted while you're offline, because it has a limited open period. " +
+                'Please reconnect to submit.',
+        };
+        return 'blocked';
     }
 
     // Increment G8b — enqueue the finalized submission to the outbox FIRST (a durable, crash-safe record of

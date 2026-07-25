@@ -17,11 +17,14 @@ import { reconcileDraft, type LocalDraft } from './lib/reconcile';
 import { uuidv7 } from './lib/uuid';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
-import type { AnswerMap, Bootstrap, SchemaResponse } from './lib/types';
+import { formatInstantInZone, scheduleStateCopy, type ScheduleStateCopy } from './lib/schedule';
+import type { AnswerMap, Bootstrap, ScheduleAcceptance, ScheduleBlock, SchemaResponse } from './lib/types';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
-type Phase = 'loading' | 'ready' | 'confirmation' | 'error';
+// 'unavailable' = a scheduled form the runtime refuses to render for filling (opens-soon / closed / full),
+// computed from the server-side `acceptance` label (Increment H12b). It REPLACES the form.
+type Phase = 'loading' | 'ready' | 'confirmation' | 'error' | 'unavailable';
 
 const CONFIRM_MESSAGE = 'Thanks — your response has been recorded.';
 const QUEUED_MESSAGE = "Saved on this device — we'll submit it automatically when you're back online.";
@@ -40,6 +43,8 @@ function resolveNotice(code: string | null): string {
 const phase = ref<Phase>('loading');
 const schema = shallowRef<SchemaResponse | null>(null);
 const errorMessage = ref('');
+// Increment H12b — the full-screen "unavailable" copy (opens-soon / closed / full) when phase === 'unavailable'.
+const unavailableCopy = ref<ScheduleStateCopy | null>(null);
 const reference = ref('');
 const confirmationMessage = ref(CONFIRM_MESSAGE);
 const sessionKey = ref(0);
@@ -99,12 +104,53 @@ async function load(): Promise<void> {
             return;
         }
         schema.value = await client.fetchSchema();
+        // Increment H12b — a scheduled form that isn't accepting fresh responses (opens-soon / closed / full)
+        // shows a full-screen state INSTEAD of the fill session. This gate is on the FRESH-load path only: a
+        // resume link (loadResume) is never blocked here, so H12a's grace window (a draft started before close
+        // may still be promoted) is honoured — write-path enforcement is authoritative for that case.
+        const state = scheduleState(schema.value.form.schedule);
+        if (state !== null) {
+            unavailableCopy.value = state;
+            phase.value = 'unavailable';
+            return;
+        }
         phase.value = 'ready';
     } catch (error) {
         errorMessage.value =
             error instanceof ApiError ? error.normalized.message : 'We could not load this form. Please try again.';
         phase.value = 'error';
     }
+}
+
+/** Render an ISO instant in the given zone using the SPA's default locale (Increment H12b). */
+function formatInstant(iso: string, timeZone: string): string {
+    return formatInstantInZone(iso, timeZone, props.bootstrap.defaultLocale || 'en');
+}
+
+/** The unavailable-state copy for a schedule block, or null when the form is open / unscheduled (H12b). */
+function scheduleState(schedule: ScheduleBlock | undefined): ScheduleStateCopy | null {
+    if (schedule === undefined || schedule.acceptance === 'open') {
+        return null;
+    }
+    return scheduleStateCopy(schedule, formatInstant);
+}
+
+/**
+ * Increment H12b — a submit that 403s with a schedule reason (the form closed / filled while being filled in
+ * online) transitions the whole SPA to the unavailable state, overriding the load-time acceptance with the
+ * one the server just reported.
+ */
+function onUnavailable(acceptance: ScheduleAcceptance): void {
+    const base: ScheduleBlock = schema.value?.form.schedule ?? {
+        opens_at: null,
+        closes_at: null,
+        timezone: 'UTC',
+        max_responses: null,
+        acceptance,
+        remaining: null,
+    };
+    unavailableCopy.value = scheduleStateCopy({ ...base, acceptance }, formatInstant);
+    phase.value = 'unavailable';
 }
 
 // Increment H10 — open from a resume link. The web shell already embedded a fresh pinned-version SHARE token
@@ -264,6 +310,13 @@ function onRestart(): void {
     <div v-else-if="phase === 'error'" class="app-state">
         <MdsEmptyState illustration="lock" headline="This form isn’t available" :description="errorMessage" />
     </div>
+    <div v-else-if="phase === 'unavailable' && unavailableCopy" class="app-state">
+        <MdsEmptyState
+            :illustration="unavailableCopy.illustration"
+            :headline="unavailableCopy.headline"
+            :description="unavailableCopy.description"
+        />
+    </div>
     <ConfirmationScreen
         v-else-if="phase === 'confirmation'"
         :reference="reference"
@@ -284,6 +337,7 @@ function onRestart(): void {
         @queued="onQueued"
         @reschema="onReschema"
         @discard="onDiscard"
+        @unavailable="onUnavailable"
     />
 </template>
 

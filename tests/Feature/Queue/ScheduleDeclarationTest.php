@@ -6,6 +6,7 @@ use App\Enums\QueueName;
 use App\Jobs\Maintenance\PruneFailedJobsJob;
 use App\Jobs\Maintenance\ReapExpiredDraftsJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
+use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use App\Jobs\MaintenanceJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -55,11 +56,22 @@ it('registers the draft-expiry reaper on the expected cadence', function (): voi
         ->and($match->expression)->toBe('40 3 * * *'); // dailyAt('03:40')
 });
 
+it('registers the scheduled-forms state-flip sweep on the expected cadence', function (): void {
+    $events = app(Schedule::class)->events();
+
+    $match = collect($events)->first(
+        fn ($event): bool => str_contains($event->getSummaryForDisplay(), SweepScheduledFormsJob::class),
+    );
+
+    expect($match)->not->toBeNull()
+        ->and($match->expression)->toBe('*/5 * * * *'); // everyFiveMinutes()
+});
+
 it('keeps every scheduled job queueable rather than inline', function (): void {
     // Schedule::job() silently falls back to dispatchNow() for a non-ShouldQueue object. A job that
     // lost its interface would then run INSIDE the scheduler process — synchronously, without the
     // §D4 listener's worker edges and without the fairness limiter, while blocking the next tick.
-    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class] as $job) {
+    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class, SweepScheduledFormsJob::class] as $job) {
         expect(is_subclass_of($job, ShouldQueue::class))->toBeTrue()
             ->and(is_subclass_of($job, MaintenanceJob::class))->toBeTrue();
     }

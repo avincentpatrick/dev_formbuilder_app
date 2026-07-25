@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\SubmissionStatus;
 use App\Http\Middleware\RequireFeature;
 use App\Models\Form;
 use App\Models\FormVersion;
+use App\Models\Submission;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Forms\FormSchedule;
+use Carbon\CarbonImmutable;
 
 /**
  * Shapes a published form + version for the public guest runtime (Increment F5). Thin by design: the
@@ -40,6 +44,11 @@ final class PublicFormPresenter
                 // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
                 // route is still authoritative; this only decides whether the control is shown.
                 'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
+                // Scheduled-form window + response cap (Increment H12a). Advisory: the runtime (H12b) reads
+                // `acceptance` to show an "opens soon"/"closed"/"full" state and `remaining` for a cap count.
+                // Enforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is
+                // still returned for a closed form so the runtime can render the closed state.
+                'schedule' => $this->schedule($form),
             ],
             'version' => [
                 'id' => $version->id,
@@ -48,6 +57,38 @@ final class PublicFormPresenter
                 'schema' => $version->schema_snapshot,
             ],
         ];
+    }
+
+    /**
+     * The scheduled-form runtime block (Increment H12a). `acceptance` is the live label; `remaining` is the
+     * cap headroom (null when uncapped). The live finalized COUNT is taken only when a cap exists, so an
+     * uncapped form costs no extra query. The explicit array shape keeps the generated OpenAPI types precise.
+     *
+     * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
+     */
+    private function schedule(Form $form): array
+    {
+        $cap = $form->max_responses;
+        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+        $remaining = ($cap === null || $finalizedCount === null) ? null : (int) max(0, $cap - $finalizedCount);
+
+        return [
+            'opens_at' => $form->opens_at?->toIso8601String(),
+            'closes_at' => $form->closes_at?->toIso8601String(),
+            'timezone' => $form->timezone,
+            'max_responses' => $cap,
+            'acceptance' => FormSchedule::acceptance($form, $finalizedCount, CarbonImmutable::now()),
+            'remaining' => $remaining,
+        ];
+    }
+
+    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
+    private function finalizedCount(Form $form): int
+    {
+        return Submission::query()
+            ->where('form_id', $form->id)
+            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->count();
     }
 
     /**

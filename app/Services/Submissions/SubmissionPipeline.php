@@ -10,6 +10,7 @@ use App\Events\SubmissionCreated;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -49,6 +50,7 @@ final class SubmissionPipeline
         private readonly SemanticValidator $semantic,
         private readonly AttachmentReferenceValidator $attachmentRefs,
         private readonly SubmissionFinalizer $finalizer,
+        private readonly FormAcceptanceGuard $acceptance,
     ) {}
 
     public function submit(SubmissionPayload $payload): SubmissionResult
@@ -59,6 +61,13 @@ final class SubmissionPipeline
         if ($version->status !== FormVersionStatus::Published) {
             throw SubmissionException::versionNotPublished();
         }
+
+        // Stage 2c (Increment H12a) — scheduled-form acceptance. A FRESH submission may start only inside the
+        // open window (opens_at/closes_at, live vs now()); the response cap is enforced transactionally at
+        // finalize. Runs early so a refusal is cheap and rolls back nothing. The form is loaded RLS-scoped from
+        // the version and threaded into persist() so the finalizer's cap COUNT can lock/read it.
+        $form = Form::query()->findOrFail($version->form_id);
+        $this->acceptance->assertCanStart($form);
 
         $fields = $version->fields()->get();
         $sections = $version->sections()->get();
@@ -97,7 +106,7 @@ final class SubmissionPipeline
 
         // Stage 4 — transactional persist.
         try {
-            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $fields, $result, $contentChecksum));
+            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $form, $fields, $result, $contentChecksum));
         } catch (QueryException $e) {
             // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
             // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
@@ -128,7 +137,7 @@ final class SubmissionPipeline
      *
      * @param  Collection<int, FormField>  $fields
      */
-    private function persist(SubmissionPayload $payload, Collection $fields, SemanticResult $result, string $contentChecksum): Submission
+    private function persist(SubmissionPayload $payload, Form $form, Collection $fields, SemanticResult $result, string $contentChecksum): Submission
     {
         $version = $payload->version;
 
@@ -154,7 +163,7 @@ final class SubmissionPipeline
             'submitted_at' => now(),
         ]);
 
-        $this->finalizer->finalize($submission, $version, $fields, $answers, $contentChecksum, $payload->respondentUserId);
+        $this->finalizer->finalize($submission, $form, $version, $fields, $answers, $contentChecksum, $payload->respondentUserId);
 
         return $submission;
     }

@@ -1491,6 +1491,50 @@
                                                         "save_and_resume": {
                                                             "type": "string",
                                                             "description": "Whether the SPA should offer \"Save and finish later\" (H10, UX \u00a75.2). Both gates must pass:\nthe per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly \u2014\nfail-open when no catalog resolves \u2014 so this flag and the draft route never disagree. The\nroute is still authoritative; this only decides whether the control is shown."
+                                                        },
+                                                        "schedule": {
+                                                            "type": "object",
+                                                            "description": "Scheduled-form window + response cap (Increment H12a). Advisory: the runtime (H12b) reads\n`acceptance` to show an \"opens soon\"/\"closed\"/\"full\" state and `remaining` for a cap count.\nEnforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is\nstill returned for a closed form so the runtime can render the closed state.",
+                                                            "properties": {
+                                                                "opens_at": {
+                                                                    "type": "string"
+                                                                },
+                                                                "closes_at": {
+                                                                    "type": "string"
+                                                                },
+                                                                "timezone": {
+                                                                    "type": "string"
+                                                                },
+                                                                "max_responses": {
+                                                                    "type": [
+                                                                        "integer",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "acceptance": {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "open",
+                                                                        "capacity_reached",
+                                                                        "opens_soon",
+                                                                        "closed"
+                                                                    ]
+                                                                },
+                                                                "remaining": {
+                                                                    "type": [
+                                                                        "integer",
+                                                                        "null"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "opens_at",
+                                                                "closes_at",
+                                                                "timezone",
+                                                                "max_responses",
+                                                                "acceptance",
+                                                                "remaining"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -1500,7 +1544,8 @@
                                                         "default_locale",
                                                         "supported_locales",
                                                         "single_page_mode",
-                                                        "save_and_resume"
+                                                        "save_and_resume",
+                                                        "schedule"
                                                     ]
                                                 },
                                                 "version": {

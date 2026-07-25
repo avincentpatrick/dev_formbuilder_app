@@ -13,6 +13,7 @@ use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Exceptions\Jobs\InvalidJobPayloadException;
 use App\Exceptions\Scoping\ScopeNodeException;
+use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
@@ -295,6 +296,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, $e->code(), $e->getMessage())
             : null);
+
+        // Scheduled-form refusal (Increment H12a) — the form is not accepting a submission right now: not yet
+        // open (`form_not_open`), closed past `closes_at` (`form_closed`), or its `max_responses` cap is full
+        // (`max_responses_reached`, decided by a transactional COUNT-under-RLS at finalize). 403 (the form
+        // exists; you may not submit to it now) with the boundary/cap figures in `details` so the guest SPA
+        // (H12b) can render "opens soon"/"closed"/"full"; a web (manual-encode) request bounces back a toast.
+        // A pre-close save-and-resume draft is exempt by the grace window and never reaches here on promote.
+        $exceptions->render(function (FormNotAcceptingSubmissionException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
 
         // Guest share-token failures (Increment F5). Thrown by EstablishGuestTenantContext BEFORE any tenant
         // context is set, so a forged/tampered/expired link never engages RLS. Both 401 on the /api/v1 surface;

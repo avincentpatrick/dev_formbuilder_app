@@ -8,6 +8,7 @@ use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
 use App\Enums\UsageMetric;
+use App\Exceptions\Forms\FormException;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\ResourceGrant;
@@ -16,6 +17,9 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\QuotaGuard;
+use App\Support\Forms\FormSchedule;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -144,6 +148,43 @@ final class FormService
     public function setSaveAndResume(Form $form, bool $enabled): Form
     {
         $form->forceFill(['save_and_resume' => $enabled])->save();
+
+        return $form->refresh();
+    }
+
+    /**
+     * Set (or clear) a form's schedule + response cap (Increment H12a) — the only writer of `forms.opens_at`,
+     * `closes_at`, `timezone`, `max_responses` and `schedule_state`. `forceFill` with explicit keys for the same
+     * reason as {@see self::setSaveAndResume()}: it keeps a plain `$form->update($validated)` from ever setting
+     * them. `opens_at`/`closes_at` are absolute instants (the request supplies parsed Carbon values); `timezone`
+     * is authoring metadata only.
+     *
+     * `schedule_state` is recomputed from the new window on every write, so re-configuring is coherent: pushing
+     * `closes_at` into the future reopens a closed form and re-arms a later `form.closed`, while a "born
+     * open/closed" window (a boundary already in the past at config time) initializes directly and the sweep
+     * emits no transition event for it. Enforcement is live and never reads `schedule_state`.
+     *
+     * The ordering guard is a backstop behind the request's `after:opens_at` rule.
+     */
+    public function setSchedule(
+        Form $form,
+        ?CarbonInterface $opensAt,
+        ?CarbonInterface $closesAt,
+        string $timezone,
+        ?int $maxResponses,
+    ): Form {
+        if ($opensAt !== null && $closesAt !== null && $opensAt->greaterThanOrEqualTo($closesAt)) {
+            throw FormException::invalidSchedule();
+        }
+
+        $form->forceFill([
+            'opens_at' => $opensAt,
+            'closes_at' => $closesAt,
+            'timezone' => $timezone,
+            'max_responses' => $maxResponses,
+        ]);
+        $form->schedule_state = FormSchedule::initialState($form, CarbonImmutable::now());
+        $form->save();
 
         return $form->refresh();
     }

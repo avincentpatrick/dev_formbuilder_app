@@ -3,6 +3,7 @@
 use App\Jobs\Maintenance\PruneFailedJobsJob;
 use App\Jobs\Maintenance\ReapExpiredDraftsJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
+use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -52,3 +53,9 @@ Schedule::job(RollUpUsageCountersJob::class)->dailyAt('02:40');
 // hard-deleting the drafts whose 30-day draft_expires_at has passed. Off-peak and staggered clear of the
 // 02:40 rollup and 03:10 prune so the nightly sweeps do not contend.
 Schedule::job(ReapExpiredDraftsJob::class)->dailyAt('03:40');
+
+// Scheduled-forms state flip (H12a). Cross-tenant MaintenanceJob → one SweepTenantScheduledFormsJob per active
+// tenant, each advancing that tenant's published forms across their opens_at/closes_at boundaries and emitting
+// form.opened/form.closed. everyFiveMinutes() (not dailyAt) so a time boundary announces within ~5 minutes;
+// enforcement is live at submit time, so this cadence never affects whether a form actually accepts responses.
+Schedule::job(SweepScheduledFormsJob::class)->everyFiveMinutes();

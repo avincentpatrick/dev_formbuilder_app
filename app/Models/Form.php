@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
@@ -32,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $public_slug
  * @property bool $allow_guest_submissions
  * @property bool $single_page_mode
+ * @property bool $save_and_resume
  * @property array<string, mixed> $capability_flags
  * @property string $default_locale
  * @property array<int, string> $supported_locales
@@ -40,6 +42,11 @@ use Illuminate\Support\Carbon;
  * @property string $created_by
  * @property ?Carbon $published_at
  * @property ?Carbon $archived_at
+ * @property ?Carbon $opens_at
+ * @property ?Carbon $closes_at
+ * @property string $timezone
+ * @property ?int $max_responses
+ * @property ?FormScheduleState $schedule_state
  */
 class Form extends Model implements TenantScoped
 {
@@ -67,6 +74,11 @@ class Form extends Model implements TenantScoped
         'allow_offline_sync',
         'single_page_mode',
         'save_and_resume',
+        'opens_at',
+        'closes_at',
+        'timezone',
+        'max_responses',
+        'schedule_state',
         'default_locale',
         'supported_locales',
         'capability_flags',
@@ -99,6 +111,10 @@ class Form extends Model implements TenantScoped
             'theme' => 'array',
             'published_at' => 'datetime',
             'archived_at' => 'datetime',
+            'opens_at' => 'datetime',
+            'closes_at' => 'datetime',
+            'max_responses' => 'integer',
+            'schedule_state' => FormScheduleState::class,
         ];
     }
 

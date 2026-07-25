@@ -297,6 +297,28 @@ function publishedInboxForm(Tenant $tenant, User $owner, string $title = 'Intake
 }
 
 /**
+ * A published single-required-field form with an optional schedule applied (Increment H12a). `$schedule` is a
+ * partial `forms` column map (opens_at / closes_at / timezone / max_responses / schedule_state) written
+ * straight onto the form row. Returns the current published FormVersion (build a SubmissionPayload from it);
+ * read the form via Form::find($version->form_id) when you need its schedule columns. Requires enterTenant.
+ *
+ * @param  array<string, mixed>  $schedule
+ */
+function scheduledForm(Tenant $tenant, User $user, array $schedule = [], string $title = 'Scheduled'): FormVersion
+{
+    $form = app(FormService::class)->create($tenant, $user, $title);
+    addFormField($form->draftVersion, $user, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    app(PublishService::class)->publish($form->refresh(), $user);
+    $form = $form->refresh();
+
+    if ($schedule !== []) {
+        $form->forceFill($schedule)->save();
+    }
+
+    return FormVersion::findOrFail($form->current_published_version_id);
+}
+
+/**
  * Persist a submission + its answer document against a form's current published version.
  *
  * @param  array<string, mixed>  $answers

@@ -6,6 +6,7 @@ namespace App\Services\Submissions;
 
 use App\Enums\AuditEvent;
 use App\Models\Attachment;
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Submission;
@@ -38,6 +39,7 @@ final class SubmissionFinalizer
         private readonly AnswerIndexProjector $projector,
         private readonly GeoIndexProjector $geoProjector,
         private readonly AuditLogger $audit,
+        private readonly FormAcceptanceGuard $acceptance,
     ) {}
 
     /**
@@ -46,12 +48,20 @@ final class SubmissionFinalizer
      */
     public function finalize(
         Submission $submission,
+        Form $form,
         FormVersion $version,
         Collection $fields,
         array $answers,
         string $contentChecksum,
         ?string $actorId,
     ): void {
+        // Scheduled-form response cap (Increment H12a) — the ONE transactional capacity gate, run here so both
+        // finalize paths (submit + promote) share it. The head row already exists (created on submit / flipped
+        // to Submitted on promote) so the live COUNT-under-RLS includes it; a full cap throws and rolls back
+        // this whole persist transaction (uncreating the submit / leaving the draft resumable). No-op for an
+        // uncapped form. See FormAcceptanceGuard::assertCapacity for the form-row-lock serialization.
+        $this->acceptance->assertCapacity($form);
+
         // Media attachments (Increment G6): collect every referenced attachment id from the media answers,
         // re-point each staged file's polymorphic owner from its form_field to this submission, and record
         // the flat id list on the answer document (attachment_refs). All inside the persist transaction, so

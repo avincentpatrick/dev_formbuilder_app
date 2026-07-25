@@ -6,6 +6,7 @@ use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
@@ -30,7 +31,6 @@ use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
@@ -57,7 +57,9 @@ Route::middleware([
     EstablishTenantDatabaseContext::class,
     'auth',
 ])->group(function (): void {
-    Route::get('/dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+    // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
+    // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to

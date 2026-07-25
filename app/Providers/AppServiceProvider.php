@@ -18,6 +18,7 @@ use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Guest\GuestShareTokenService;
@@ -78,6 +79,11 @@ class AppServiceProvider extends ServiceProvider
         // The hard-block quota guard (H5b). `scoped` so it shares the request's one EntitlementService
         // instance (its live-gauge memo), the same reason the resolvers above are scoped.
         $this->app->scoped(QuotaGuard::class);
+
+        // The dashboard KPI aggregator (H11). `scoped` so it shares the request's one ResourceGrantResolver
+        // (its per-user grant memo, used to scope a Form Editor/Reviewer's counts), the same reason the
+        // resolvers above are scoped — never `singleton`, which would leak that memo across requests.
+        $this->app->scoped(DashboardMetricsService::class);
     }
 
     /**

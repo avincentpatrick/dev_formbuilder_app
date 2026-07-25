@@ -10,6 +10,7 @@ use App\Events\SubmissionCreated;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
+use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -52,6 +53,7 @@ final class SubmissionDraftService
         private readonly SemanticValidator $semantic,
         private readonly AttachmentReferenceValidator $attachmentRefs,
         private readonly SubmissionFinalizer $finalizer,
+        private readonly FormAcceptanceGuard $acceptance,
     ) {}
 
     /**
@@ -83,9 +85,16 @@ final class SubmissionDraftService
         if ($payload->clientSubmissionUuid !== null) {
             $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
             if ($existing !== null) {
+                // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
+                // so a respondent mid-fill is never stranded — no start guard on this branch.
                 return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
             }
         }
+
+        // A NEW draft may only start inside the open window (H12a). Capacity is NOT gated at draft-create (a
+        // draft isn't a finalized row) — the authoritative cap runs at promote's finalize.
+        $form = Form::query()->findOrFail($version->form_id);
+        $this->acceptance->assertCanStart($form);
 
         return $this->createDraft($payload, $normalized, $checksum, $completeness);
     }
@@ -116,6 +125,12 @@ final class SubmissionDraftService
             throw SubmissionException::versionNotPublished();
         }
 
+        // Scheduled-form grace window (Increment H12a): a draft STARTED before the form closed may still be
+        // promoted after close (the whole point of save-and-resume) — only a draft created at/after the close
+        // instant is refused. The response cap is still enforced transactionally in the finalizer below.
+        $form = Form::query()->findOrFail($draft->form_id);
+        $this->acceptance->assertCanPromote($form, $draft);
+
         $fields = $version->fields()->get();
 
         $stored = SubmissionAnswer::query()->where('submission_id', $draft->id)->firstOrFail();
@@ -137,7 +152,7 @@ final class SubmissionDraftService
         // submit() would store for an equivalent raw submission (submit() hashes its Stage-1 output).
         $checksum = AnswersContentChecksum::of($answers);
 
-        $result = DB::transaction(function () use ($draft, $version, $fields, $final, $checksum, $actorId, $semantic): SubmissionResult {
+        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $final, $checksum, $actorId, $semantic): SubmissionResult {
             $row = Submission::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             // Already finalized (double-promote, or a concurrent promote won under the lock) — idempotent
@@ -152,7 +167,7 @@ final class SubmissionDraftService
                 'draft_expires_at' => null,
             ])->save();
 
-            $this->finalizer->finalize($row, $version, $fields, $final, $checksum, $actorId ?? $row->respondent_user_id);
+            $this->finalizer->finalize($row, $form, $version, $fields, $final, $checksum, $actorId ?? $row->respondent_user_id);
 
             return new SubmissionResult($row, created: true, semantic: $semantic);
         });

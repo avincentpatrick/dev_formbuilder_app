@@ -12,6 +12,7 @@ use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
+use App\Http\Controllers\Tenant\FormScheduleController;
 use App\Http\Controllers\Tenant\FormScopeController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
@@ -223,6 +224,12 @@ Route::middleware([
     // enable a feature the tenant plan includes; the guest runtime + draft channel both consult the flag.
     Route::patch('/forms/{form}/save-resume', [FormSaveResumeController::class, 'update'])
         ->middleware(['can:update,form', 'feature:save_and_resume'])->name('forms.save-resume');
+
+    // Scheduled forms (Increment H12a) — set/clear a form's open/close window + response cap. Its own route +
+    // guarded FormService::setSchedule write. Ungated (all tiers): scheduled forms carry no plan feature, so
+    // only can:update,form gates it (schedule config is an editor's job, like save-resume/scope above).
+    Route::patch('/forms/{form}/schedule', [FormScheduleController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.schedule');
 
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),

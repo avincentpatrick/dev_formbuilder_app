@@ -29,6 +29,8 @@ enum DomainEventType: string
 {
     case SubmissionCreated = 'submission.created';
     case FormPublished = 'form.published';
+    case FormOpened = 'form.opened';
+    case FormClosed = 'form.closed';
 
     /**
      * @return list<string>

@@ -46,6 +46,15 @@ final class FormException extends RuntimeException
     }
 
     /**
+     * A scheduled-form window (Increment H12a) was set with an open time at or after its close time — the
+     * service-level backstop behind the request's `closes_at` `after:opens_at` rule.
+     */
+    public static function invalidSchedule(): self
+    {
+        return new self("A form's open time must be before its close time.");
+    }
+
+    /**
      * A builder mutation targeted a section/field that is not part of the form's current draft version
      * (i.e. it belongs to a published/superseded version). The draft_child RLS guard is the DB backstop;
      * this is the service-level guard that returns a clean 403 instead of a silent zero-row write.

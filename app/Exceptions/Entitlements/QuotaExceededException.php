@@ -37,6 +37,7 @@ final class QuotaExceededException extends RuntimeException
             UsageMetric::FormsCount => "You have reached your plan's limit of {$limit} forms. Archive a form or upgrade your plan to create more.",
             UsageMetric::StorageBytes => "You have reached your plan's storage limit. Free up space or upgrade your plan to upload more.",
             UsageMetric::ActiveSeats => "You have reached your plan's limit of {$limit} members. Remove a member or upgrade your plan to invite more.",
+            UsageMetric::WebhookEndpointsCount => "You have reached your plan's limit of {$limit} webhook endpoints. Delete an endpoint or upgrade your plan to add more.",
             default => "You have reached your plan's {$metric->value} limit of {$limit}. Upgrade your plan to continue.",
         };
 

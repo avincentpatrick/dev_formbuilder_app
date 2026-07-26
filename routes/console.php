@@ -4,6 +4,7 @@ use App\Jobs\Maintenance\PruneFailedJobsJob;
 use App\Jobs\Maintenance\ReapExpiredDraftsJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use App\Jobs\Maintenance\SweepScheduledFormsJob;
+use App\Jobs\Maintenance\SweepWebhookRetriesJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -59,3 +60,9 @@ Schedule::job(ReapExpiredDraftsJob::class)->dailyAt('03:40');
 // form.opened/form.closed. everyFiveMinutes() (not dailyAt) so a time boundary announces within ~5 minutes;
 // enforcement is live at submit time, so this cadence never affects whether a form actually accepts responses.
 Schedule::job(SweepScheduledFormsJob::class)->everyFiveMinutes();
+
+// Webhook retry-ladder sweep (H13a). Cross-tenant MaintenanceJob → one SweepTenantWebhookRetriesJob per active
+// tenant, each re-dispatching the tenant's `failed` deliveries whose next_retry_at has arrived. everyFiveMinutes()
+// keeps a due retry's added latency small without sweeping more often than the ladder's finest (1-minute) step
+// meaningfully rewards; the delivery jobs themselves run on the `webhooks` queue.
+Schedule::job(SweepWebhookRetriesJob::class)->everyFiveMinutes();

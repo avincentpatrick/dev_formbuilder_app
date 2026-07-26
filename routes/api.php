@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\V1\SubmissionPromoteController;
 use App\Http\Controllers\Api\V1\SyncManifestController;
 use App\Http\Controllers\Api\V1\SyncSubmissionController;
 use App\Http\Controllers\Api\V1\TenantApiController;
+use App\Http\Controllers\Api\V1\WebhookDeliveryController;
+use App\Http\Controllers\Api\V1\WebhookEndpointController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestDraftController;
 use App\Http\Controllers\Public\GuestDraftResumeController;
@@ -30,6 +32,7 @@ use App\Models\Audit;
 use App\Models\Form;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
+use App\Models\WebhookEndpoint;
 use App\Support\Api\ApiAbilities;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
@@ -231,6 +234,30 @@ Route::prefix('api/v1')
         Route::post('submissions/{submission}/promote', [SubmissionPromoteController::class, 'store'])
             ->middleware(['ability:'.ApiAbilities::WRITE_SUBMISSIONS, 'can:promote,submission'])
             ->name('submissions.promote');
+
+        // Webhook endpoints (H13a / webhook-integration-design.md) — the tenant's outbound delivery targets.
+        // Every route carries the standing triplet: `ability:manage:webhooks` (scopes the TOKEN) + a
+        // WebhookEndpointPolicy `can:` gate (re-checks the acting user's Owner/Admin permission) + the
+        // `feature:webhooks` plan gate (Starter+). RLS scopes every query and {webhookEndpoint} binding to the
+        // tenant. Static + more-specific segments precede the {webhookEndpoint} patterns. Regenerate openapi.json.
+        Route::get('webhooks', [WebhookEndpointController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:viewAny,'.WebhookEndpoint::class, 'feature:webhooks'])
+            ->name('webhooks.index');
+        Route::post('webhooks', [WebhookEndpointController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:create,'.WebhookEndpoint::class, 'feature:webhooks'])
+            ->name('webhooks.store');
+        Route::get('webhooks/{webhookEndpoint}/deliveries', [WebhookDeliveryController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:view,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.deliveries.index');
+        Route::get('webhooks/{webhookEndpoint}', [WebhookEndpointController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:view,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.show');
+        Route::patch('webhooks/{webhookEndpoint}', [WebhookEndpointController::class, 'update'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:update,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.update');
+        Route::delete('webhooks/{webhookEndpoint}', [WebhookEndpointController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:delete,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.destroy');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

@@ -37,6 +37,7 @@ enum UsageMetric: string
     case ActiveSeats = 'active_seats';
     case FormsCount = 'forms_count';
     case ExportsCount = 'exports_count';
+    case WebhookEndpointsCount = 'webhook_endpoints_count';
 
     /** @return list<string> */
     public static function values(): array
@@ -48,7 +49,7 @@ enum UsageMetric: string
     public function enforcementMode(): EnforcementMode
     {
         return match ($this) {
-            self::FormsCount, self::StorageBytes, self::ActiveSeats => EnforcementMode::HardBlock,
+            self::FormsCount, self::StorageBytes, self::ActiveSeats, self::WebhookEndpointsCount => EnforcementMode::HardBlock,
             self::SubmissionsCount => EnforcementMode::NeverBlock,
             self::ApiRequests, self::WebhookDeliveries => EnforcementMode::RateLimit,
             self::ExportsCount => EnforcementMode::Unclassified,
@@ -63,7 +64,7 @@ enum UsageMetric: string
     public function isGauge(): bool
     {
         return match ($this) {
-            self::FormsCount, self::StorageBytes, self::ActiveSeats => true,
+            self::FormsCount, self::StorageBytes, self::ActiveSeats, self::WebhookEndpointsCount => true,
             self::SubmissionsCount, self::ApiRequests, self::WebhookDeliveries, self::ExportsCount => false,
         };
     }

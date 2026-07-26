@@ -90,4 +90,27 @@ final class QuotaGuard
             throw RateLimitExceededException::forMetric($metric, $limit, $used);
         }
     }
+
+    /**
+     * The non-throwing predicate behind {@see assertWithinRateQuota()}, for callers that must DECIDE rather
+     * than reject — the H13a webhook delivery job hard-caps `webhook_deliveries` by dead-lettering an
+     * over-quota delivery instead of throwing (there is no inbound request to 429). Same semantics: a null,
+     * off-tenant, or `<= 0` (Free "no access" sentinel) quota is never a cap, so this returns true; otherwise
+     * true iff the metered current-period usage is below the plan's monthly quota. Only a rate-limit metric
+     * may be asked — anything else is a programming error.
+     */
+    public function hasRateQuotaRemaining(UsageMetric $metric): bool
+    {
+        if ($metric->enforcementMode() !== EnforcementMode::RateLimit) {
+            throw new LogicException("QuotaGuard::hasRateQuotaRemaining only enforces rate-limit metrics; {$metric->value} is not one.");
+        }
+
+        $limit = $this->entitlements->quota($metric);
+
+        if ($limit === null || $limit <= 0) {
+            return true;
+        }
+
+        return $this->entitlements->usage($metric) < $limit;
+    }
 }

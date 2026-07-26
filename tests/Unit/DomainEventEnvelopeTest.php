@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\DomainEventType;
+use App\Enums\SubmissionSource;
+use App\Enums\SubmissionStatus;
 use App\Events\DomainEvent;
 use App\Events\FormPublished;
 use App\Events\SubmissionCreated;
@@ -53,7 +55,13 @@ it('builds the FormPublished envelope with the right type and an all-scalar payl
 });
 
 it('builds the SubmissionCreated envelope as a scalar payload, never carrying the model', function (): void {
-    $submission = new Submission(['tenant_id' => Uuid::uuid7()->toString(), 'form_id' => Uuid::uuid7()->toString(), 'form_version_id' => Uuid::uuid7()->toString()]);
+    $submission = new Submission([
+        'tenant_id' => Uuid::uuid7()->toString(),
+        'form_id' => Uuid::uuid7()->toString(),
+        'form_version_id' => Uuid::uuid7()->toString(),
+        'status' => SubmissionStatus::Submitted,
+        'source' => SubmissionSource::Guest,
+    ]);
     $submission->id = Uuid::uuid7()->toString();
 
     $event = SubmissionCreated::for($submission);
@@ -61,6 +69,10 @@ it('builds the SubmissionCreated envelope as a scalar payload, never carrying th
 
     expect($env['event_type'])->toBe('submission.created');
     expect($env['data']['submission_id'])->toBe($submission->id);
+    // H13a enriched the payload to the design-doc §3 shape (identifiers + metadata, never the answers).
+    expect($env['data']['status'])->toBe('submitted');
+    expect($env['data']['source'])->toBe('guest');
+    expect($env['data'])->not->toHaveKey('answers');
 
     foreach ($env['data'] as $value) {
         expect(is_scalar($value) || is_null($value))->toBeTrue();

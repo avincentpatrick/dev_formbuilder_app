@@ -57,11 +57,13 @@ final class WebhookEndpointController extends Controller
             ->setStatusCode(201);
     }
 
+    /** Show one webhook endpoint, with the signing secret masked to its suffix. */
     public function show(WebhookEndpoint $webhookEndpoint): WebhookEndpointResource
     {
         return WebhookEndpointResource::make($webhookEndpoint);
     }
 
+    /** Update a webhook endpoint; setting the status to active resets the circuit breaker. */
     public function update(UpdateWebhookEndpointRequest $request, WebhookEndpoint $webhookEndpoint): WebhookEndpointResource
     {
         return WebhookEndpointResource::make(
@@ -69,6 +71,7 @@ final class WebhookEndpointController extends Controller
         );
     }
 
+    /** Soft-delete a webhook endpoint. */
     public function destroy(WebhookEndpoint $webhookEndpoint): Response
     {
         $this->service->delete($webhookEndpoint);

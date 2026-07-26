@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
  */
 final class WebhookDeliveryController extends Controller
 {
+    /** Cursor-paginated delivery-observability log for one webhook endpoint, newest first. */
     public function index(Request $request, WebhookEndpoint $webhookEndpoint): JsonResponse
     {
         $limit = min(max($request->integer('limit', 50), 1), 100);

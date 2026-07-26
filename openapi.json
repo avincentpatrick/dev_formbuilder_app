@@ -2323,6 +2323,7 @@
         "/webhooks/{webhookEndpoint}/deliveries": {
             "get": {
                 "operationId": "v1.webhooks.deliveries.index",
+                "summary": "Cursor-paginated delivery-observability log for one webhook endpoint, newest first",
                 "tags": [
                     "WebhookDelivery"
                 ],
@@ -2499,6 +2500,7 @@
         "/webhooks/{webhookEndpoint}": {
             "get": {
                 "operationId": "v1.webhooks.show",
+                "summary": "Show one webhook endpoint, with the signing secret masked to its suffix",
                 "tags": [
                     "WebhookEndpoint"
                 ],
@@ -2542,6 +2544,7 @@
             },
             "patch": {
                 "operationId": "v1.webhooks.update",
+                "summary": "Update a webhook endpoint; setting the status to active resets the circuit breaker",
                 "tags": [
                     "WebhookEndpoint"
                 ],
@@ -2597,6 +2600,7 @@
             },
             "delete": {
                 "operationId": "v1.webhooks.destroy",
+                "summary": "Soft-delete a webhook endpoint",
                 "tags": [
                     "WebhookEndpoint"
                 ],

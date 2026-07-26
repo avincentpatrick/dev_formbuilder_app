@@ -11,6 +11,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
+use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
@@ -143,6 +144,9 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap(array_merge([
             'submission' => Submission::class,
             'form_field' => FormField::class,
+            // H13b: an oversized webhook delivery envelope archived to attachment storage is owned by its
+            // delivery row (WebhookPayloadArchive), so `attachments.attachable_type` stores this short alias.
+            'webhook_delivery' => WebhookDelivery::class,
         ], ResourceScopeable::morphMap()));
 
         // The tenant-scoped API-key model (Increment E) — auto-fills tenant_id at mint so the strict RLS

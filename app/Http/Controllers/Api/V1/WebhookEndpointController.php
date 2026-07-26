@@ -11,6 +11,7 @@ use App\Http\Resources\Api\V1\WebhookEndpointResource;
 use App\Models\User;
 use App\Models\WebhookEndpoint;
 use App\Services\Webhooks\WebhookEndpointService;
+use App\Services\Webhooks\WebhookTester;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -77,5 +78,19 @@ final class WebhookEndpointController extends Controller
         $this->service->delete($webhookEndpoint);
 
         return response()->noContent();
+    }
+
+    /** Send a synthetic test.ping to the endpoint and return the delivery result inline; persists nothing. */
+    public function test(WebhookEndpoint $webhookEndpoint, WebhookTester $tester): JsonResponse
+    {
+        return response()->json(['data' => $tester->send($webhookEndpoint)]);
+    }
+
+    /** Rotate the signing secret; the new plaintext is returned once, the old stays valid for a grace window. */
+    public function rotateSecret(WebhookEndpoint $webhookEndpoint): JsonResponse
+    {
+        return WebhookEndpointResource::make($this->service->rotateSecret($webhookEndpoint))
+            ->revealSecret()
+            ->response();
     }
 }

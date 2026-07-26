@@ -31,6 +31,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class WebhookEventDispatcher
 {
+    public function __construct(private readonly WebhookPayloadArchive $archive) {}
+
     public function fanOut(DomainEvent $event): void
     {
         $tenantId = $event->tenantId();
@@ -72,8 +74,33 @@ final class WebhookEventDispatcher
             );
 
             if ($delivery->wasRecentlyCreated) {
+                $this->maybeArchivePayload($delivery);
+
                 DeliverWebhookJob::dispatch($tenantId, (string) $delivery->getKey());
             }
         }
+    }
+
+    /**
+     * Off-load an oversized envelope to attachment storage (H13b), trimming the inline `payload` to a marker
+     * and pointing `payload_attachment_id` at the archive; the delivery job reads it back before signing. A
+     * sub-threshold payload (today's ID-only envelopes) stays fully inline — no archive row is written.
+     */
+    private function maybeArchivePayload(WebhookDelivery $delivery): void
+    {
+        $threshold = (int) config('webhooks.payload_archive_threshold_bytes', 32768);
+
+        $encoded = json_encode($delivery->payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '';
+
+        if ($threshold <= 0 || strlen($encoded) <= $threshold) {
+            return;
+        }
+
+        $attachmentId = $this->archive->archive($delivery, $delivery->payload);
+
+        $delivery->forceFill([
+            'payload_attachment_id' => $attachmentId,
+            'payload' => ['archived' => true],
+        ])->save();
     }
 }

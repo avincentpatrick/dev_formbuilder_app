@@ -93,6 +93,7 @@ const EXEMPT_JOBS = [
     'App\Notifications\Auth\QueuedResetPassword',
     'App\Notifications\Entitlements\QuotaOverageNotification',
     'App\Notifications\ResumeLinkNotification',
+    'App\Notifications\Webhooks\WebhookAutoDisabledNotification',
 ];
 
 $root = dirname(__DIR__);

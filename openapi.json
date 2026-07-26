@@ -2393,6 +2393,90 @@
                 }
             }
         },
+        "/webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver": {
+            "post": {
+                "operationId": "v1.webhooks.deliveries.redeliver",
+                "summary": "Re-enter the delivery pipeline for one delivery (re-runs SSRF; does not re-consume the monthly quota).\nThe delivery must belong to the bound endpoint, which must be active \u2014 a paused endpoint is re-enabled\n(and its breaker reset) via a status update first",
+                "tags": [
+                    "WebhookDelivery"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "webhookDelivery",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook delivery ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "queued"
+                                                }
+                                            },
+                                            "required": [
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "example": "Re-enable the endpoint before redelivering."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/webhooks": {
             "get": {
                 "operationId": "v1.webhooks.index",
@@ -2493,6 +2577,180 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/webhooks/{webhookEndpoint}/test": {
+            "post": {
+                "operationId": "v1.webhooks.test",
+                "summary": "Send a synthetic test.ping to the endpoint and return the delivery result inline; persists nothing",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "delivered": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "response_status": {
+                                                            "type": "integer"
+                                                        },
+                                                        "response_time_ms": {
+                                                            "type": "integer"
+                                                        },
+                                                        "response_body_excerpt": {
+                                                            "type": "string"
+                                                        },
+                                                        "error": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "delivered",
+                                                        "response_status",
+                                                        "response_time_ms",
+                                                        "response_body_excerpt",
+                                                        "error"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "delivered": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "response_status": {
+                                                            "type": "null"
+                                                        },
+                                                        "response_time_ms": {
+                                                            "type": "integer"
+                                                        },
+                                                        "response_body_excerpt": {
+                                                            "type": "null"
+                                                        },
+                                                        "error": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "delivered",
+                                                        "response_status",
+                                                        "response_time_ms",
+                                                        "response_body_excerpt",
+                                                        "error"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "delivered": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "response_status": {
+                                                            "type": "null"
+                                                        },
+                                                        "response_time_ms": {
+                                                            "type": "null"
+                                                        },
+                                                        "response_body_excerpt": {
+                                                            "type": "null"
+                                                        },
+                                                        "error": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "delivered",
+                                                        "response_status",
+                                                        "response_time_ms",
+                                                        "response_body_excerpt",
+                                                        "error"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/webhooks/{webhookEndpoint}/rotate-secret": {
+            "post": {
+                "operationId": "v1.webhooks.rotate-secret",
+                "summary": "Rotate the signing secret; the new plaintext is returned once, the old stays valid for a grace window",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`WebhookEndpointResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WebhookEndpointResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
                     }
                 }
             }
@@ -3951,7 +4209,14 @@
                     },
                     "secret": {
                         "type": "string",
-                        "description": "The plaintext secret, present ONLY in the create response; omitted everywhere else."
+                        "description": "The plaintext secret, present ONLY in the create + rotate responses; omitted everywhere else."
+                    },
+                    "secret_previous_expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "While a dual-secret rotation grace window is open, when the previous secret stops signing (H13b)."
                     },
                     "last_success_at": {
                         "type": [
@@ -3989,6 +4254,7 @@
                     "consecutive_failure_count",
                     "signing_algorithm",
                     "secret_masked",
+                    "secret_previous_expires_at",
                     "last_success_at",
                     "last_failure_at",
                     "created_at",

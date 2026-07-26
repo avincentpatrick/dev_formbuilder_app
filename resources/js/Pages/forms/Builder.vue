@@ -410,6 +410,10 @@ function submitImport(): void {
 .builder__actions {
     display: flex;
     align-items: center;
+    /* Wrap the action buttons instead of overflowing — the toolbar now carries enough controls (incl. the H12b
+       Schedule button) to exceed a narrow viewport or a large personalization font size (responsive contract). */
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--mds-space-2);
 }
 

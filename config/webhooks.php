@@ -64,6 +64,23 @@ return [
     'response_excerpt_bytes' => (int) env('WEBHOOK_RESPONSE_EXCERPT_BYTES', 2000),
 
     /*
+    | Dual-secret rotation grace (H13b — webhook-integration-design.md §5). On POST …/rotate-secret the
+    | current secret becomes `secret_previous` and stays valid for signing for this many SECONDS, so a
+    | receiver mid-rotation on its own side isn't a hard cutover. During the window every delivery carries
+    | BOTH signatures (comma-joined); after it, only the new secret signs. Default 24h.
+    */
+    'secret_rotation_grace_seconds' => (int) env('WEBHOOK_SECRET_ROTATION_GRACE_SECONDS', 86400),
+
+    /*
+    | Oversized-payload archival threshold, in BYTES (H13b). A delivery whose JSON envelope exceeds this is
+    | written to attachment storage (AttachmentKind::WebhookPayloadArchive) at creation and referenced via
+    | `webhook_deliveries.payload_attachment_id`, keeping the hot deliveries table lean; the job reads the
+    | full payload back before signing. Today's ID-only envelopes sit well under this — it's forward
+    | infrastructure for the per-endpoint include_answers opt-in (§3). Default 32 KiB.
+    */
+    'payload_archive_threshold_bytes' => (int) env('WEBHOOK_PAYLOAD_ARCHIVE_THRESHOLD_BYTES', 32768),
+
+    /*
     | SSRF allow-list (technical-architecture.md §7.4: private/internal ranges are "blocked by default;
     | explicitly allow-listable for enterprise/on-prem integration cases"). Exact lowercase hostnames whose
     | resolved private/internal IPs OutboundUrlGuard will permit anyway. Empty by default — the safe posture.

@@ -32,6 +32,8 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $url
  * @property string $secret
+ * @property ?string $secret_previous
+ * @property ?Carbon $secret_previous_expires_at
  * @property list<string> $event_types
  * @property WebhookEndpointStatus $status
  * @property ?string $disabled_reason
@@ -60,6 +62,8 @@ class WebhookEndpoint extends Model implements TenantScoped
         'name',
         'url',
         'secret',
+        'secret_previous',
+        'secret_previous_expires_at',
         'event_types',
         'status',
         'disabled_reason',
@@ -68,13 +72,13 @@ class WebhookEndpoint extends Model implements TenantScoped
     ];
 
     /**
-     * `secret` is never in the array/JSON form of the model (it must not leak into logs, Inertia props, or a
-     * default resource) — the API returns the plaintext once at creation from the raw value and a masked
-     * suffix thereafter, via {@see maskedSecret()}.
+     * Neither signing secret is ever in the array/JSON form of the model (they must not leak into logs,
+     * Inertia props, or a default resource) — the API returns the plaintext once at creation/rotation from
+     * the raw value and a masked suffix thereafter, via {@see maskedSecret()}.
      *
      * @var list<string>
      */
-    protected $hidden = ['secret'];
+    protected $hidden = ['secret', 'secret_previous'];
 
     /**
      * @return array<string, string>
@@ -83,6 +87,8 @@ class WebhookEndpoint extends Model implements TenantScoped
     {
         return [
             'secret' => 'encrypted',
+            'secret_previous' => 'encrypted',
+            'secret_previous_expires_at' => 'datetime',
             'event_types' => 'array',
             'status' => WebhookEndpointStatus::class,
             'consecutive_failure_count' => 'integer',
@@ -95,6 +101,19 @@ class WebhookEndpoint extends Model implements TenantScoped
     public function maskedSecret(): string
     {
         return '…'.mb_substr($this->secret, -4);
+    }
+
+    /**
+     * The previous signing secret, IFF a rotation grace window is still open (H13b). Null once the window
+     * has lapsed (or none was ever set) — the single source of truth for whether a delivery is dual-signed.
+     */
+    public function activePreviousSecret(): ?string
+    {
+        if ($this->secret_previous === null || $this->secret_previous_expires_at === null) {
+            return null;
+        }
+
+        return $this->secret_previous_expires_at->isFuture() ? $this->secret_previous : null;
     }
 
     /** @return BelongsTo<Form, $this> */

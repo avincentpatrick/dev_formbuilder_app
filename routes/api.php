@@ -249,6 +249,19 @@ Route::prefix('api/v1')
         Route::get('webhooks/{webhookEndpoint}/deliveries', [WebhookDeliveryController::class, 'index'])
             ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:view,webhookEndpoint', 'feature:webhooks'])
             ->name('webhooks.deliveries.index');
+        // H13b: manual redeliver re-enters the pipeline (re-runs SSRF; exempt from re-metering). Nested under
+        // {webhookEndpoint} + {webhookDelivery}, both RLS-scoped; gated on the parent endpoint's update ability.
+        Route::post('webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver', [WebhookDeliveryController::class, 'redeliver'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:update,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.deliveries.redeliver');
+        // H13b: send a synthetic test.ping (synchronous, inline result, persists nothing).
+        Route::post('webhooks/{webhookEndpoint}/test', [WebhookEndpointController::class, 'test'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:update,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.test');
+        // H13b: rotate the signing secret (new plaintext returned once; old valid during the grace window).
+        Route::post('webhooks/{webhookEndpoint}/rotate-secret', [WebhookEndpointController::class, 'rotateSecret'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:update,webhookEndpoint', 'feature:webhooks'])
+            ->name('webhooks.rotate-secret');
         Route::get('webhooks/{webhookEndpoint}', [WebhookEndpointController::class, 'show'])
             ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:view,webhookEndpoint', 'feature:webhooks'])
             ->name('webhooks.show');

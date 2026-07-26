@@ -33,7 +33,7 @@ final class AuditRedactor
      */
     private const array SECRETS = [
         'users' => ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'],
-        'webhook_endpoint' => ['secret'],
+        'webhook_endpoint' => ['secret', 'secret_previous'],
         'tenant_users' => ['invite_token'],
         'personal_access_tokens' => ['token'],
     ];

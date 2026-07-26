@@ -55,6 +55,10 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/webhooks',
         '/webhooks/{webhookEndpoint}',
         '/webhooks/{webhookEndpoint}/deliveries',
+        // H13b — send-test, dual-secret rotation, and manual redeliver.
+        '/webhooks/{webhookEndpoint}/test',
+        '/webhooks/{webhookEndpoint}/rotate-secret',
+        '/webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

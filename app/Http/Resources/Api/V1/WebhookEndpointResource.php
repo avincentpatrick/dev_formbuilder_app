@@ -42,8 +42,10 @@ final class WebhookEndpointResource extends ApiResource
             'consecutive_failure_count' => $this->consecutive_failure_count,
             'signing_algorithm' => $this->signing_algorithm,
             'secret_masked' => $this->resource->maskedSecret(),
-            // The plaintext secret, present ONLY in the create response; omitted everywhere else.
+            // The plaintext secret, present ONLY in the create + rotate responses; omitted everywhere else.
             'secret' => $this->when($this->revealSecret, fn (): string => $this->resource->secret),
+            // While a dual-secret rotation grace window is open, when the previous secret stops signing (H13b).
+            'secret_previous_expires_at' => $this->iso($this->secret_previous_expires_at),
             'last_success_at' => $this->iso($this->last_success_at),
             'last_failure_at' => $this->iso($this->last_failure_at),
             'created_at' => $this->iso($this->created_at),

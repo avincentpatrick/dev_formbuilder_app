@@ -6,13 +6,17 @@ namespace App\Services\Webhooks;
 
 use App\Enums\AuditEvent;
 use App\Enums\UsageMetric;
+use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
 use App\Http\Controllers\Api\V1\WebhookEndpointController;
+use App\Jobs\Webhooks\DeliverWebhookJob;
 use App\Models\User;
+use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -109,6 +113,63 @@ final class WebhookEndpointService
         });
     }
 
+    /**
+     * Rotate the signing secret (H13b — webhook-integration-design.md §5). The current secret moves to
+     * `secret_previous` and stays valid for signing until `secret_previous_expires_at` (the configured grace
+     * window), so a receiver mid-rotation on its own side isn't a hard cutover; a fresh `secret` is minted and
+     * returned in plaintext ONCE (the create-response pattern). Rotating again inside a window replaces the
+     * previous secret — only one grace secret is ever active. Audited under the `webhook_endpoint` alias, with
+     * both secrets redacted by {@see AuditRedactor}.
+     */
+    public function rotateSecret(WebhookEndpoint $endpoint): WebhookEndpoint
+    {
+        return DB::transaction(function () use ($endpoint): WebhookEndpoint {
+            $old = $this->auditValues($endpoint);
+
+            $graceSeconds = (int) config('webhooks.secret_rotation_grace_seconds', 86400);
+
+            $endpoint->forceFill([
+                'secret_previous' => $endpoint->secret,
+                'secret_previous_expires_at' => Carbon::now()->addSeconds($graceSeconds),
+                'secret' => self::generateSecret(),
+            ])->save();
+
+            $this->audit->record(
+                AuditEvent::Updated,
+                'webhook_endpoint',
+                (string) $endpoint->getKey(),
+                $old,
+                $this->auditValues($endpoint),
+            );
+
+            return $endpoint;
+        });
+    }
+
+    /**
+     * Re-enter the delivery pipeline for one delivery (H13b — webhook-integration-design.md §5). Resets it to
+     * a fresh Pending attempt (a new retry ladder, cleared response fields) and re-dispatches
+     * {@see DeliverWebhookJob} with `$skipMeter` — so the delivery-time SSRF re-validation runs again but the
+     * monthly delivery quota is NOT re-consumed (the event was already metered on its first send). The delivery
+     * row is itself the record of the new attempt, so there is no separate audit.
+     */
+    public function redeliver(WebhookDelivery $delivery): void
+    {
+        DB::transaction(function () use ($delivery): void {
+            $delivery->forceFill([
+                'status' => WebhookDeliveryStatus::Pending,
+                'attempt_count' => 0,
+                'next_retry_at' => null,
+                'last_attempted_at' => null,
+                'response_status_code' => null,
+                'response_body_excerpt' => null,
+                'response_time_ms' => null,
+            ])->save();
+        });
+
+        DeliverWebhookJob::dispatch((string) $delivery->tenant_id, (string) $delivery->getKey(), skipMeter: true);
+    }
+
     public function delete(WebhookEndpoint $endpoint): void
     {
         DB::transaction(function () use ($endpoint): void {
@@ -147,6 +208,7 @@ final class WebhookEndpointService
             'event_types' => $endpoint->event_types,
             'status' => $endpoint->status->value,
             'secret' => $endpoint->secret,
+            'secret_previous' => $endpoint->secret_previous,
         ];
     }
 }

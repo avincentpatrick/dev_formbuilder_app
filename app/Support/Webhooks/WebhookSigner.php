@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Webhooks;
 
+use App\Models\WebhookEndpoint;
 use App\Support\Guest\GuestShareTokenService;
 
 /**
@@ -37,5 +38,25 @@ final class WebhookSigner
     public function signatureHeader(string $secret, string $timestamp, string $rawBody): string
     {
         return 'sha256='.$this->sign($secret, $timestamp, $rawBody);
+    }
+
+    /**
+     * The `X-Webhook-Signature` value for an endpoint (H13b) — the single builder both {@see DeliverWebhookJob}
+     * and the "send test event" path use, so the two can never drift. Signs with the current secret and, while
+     * a rotation grace window is open ({@see WebhookEndpoint::activePreviousSecret()}), ALSO with the previous
+     * secret, comma-joining the two `sha256=<hex>` values (Stripe-style) so a receiver mid-rotation verifies
+     * with EITHER. The current secret is always first.
+     */
+    public function signatureHeaderFor(WebhookEndpoint $endpoint, string $timestamp, string $rawBody): string
+    {
+        $header = $this->signatureHeader($endpoint->secret, $timestamp, $rawBody);
+
+        $previous = $endpoint->activePreviousSecret();
+
+        if ($previous !== null) {
+            $header .= ','.$this->signatureHeader($previous, $timestamp, $rawBody);
+        }
+
+        return $header;
     }
 }

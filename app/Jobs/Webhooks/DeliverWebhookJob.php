@@ -9,18 +9,24 @@ use App\Enums\UsageMetric;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
 use App\Exceptions\Webhooks\BlockedWebhookUrlException;
+use App\Jobs\Entitlements\ReconcileTenantUsageJob;
 use App\Jobs\Maintenance\SweepWebhookRetriesJob;
 use App\Jobs\TenantAwareJob;
+use App\Models\Tenant;
+use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
+use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
+use App\Services\Webhooks\WebhookPayloadArchive;
 use App\Support\Webhooks\OutboundUrlGuard;
 use App\Support\Webhooks\WebhookSigner;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Delivers one {@see WebhookDelivery} to its endpoint over HTTP (H13a). Runs on the `webhooks` queue, so it
@@ -45,6 +51,10 @@ final class DeliverWebhookJob extends TenantAwareJob
     public function __construct(
         public readonly string $tenantId,
         public readonly string $deliveryId,
+        // A manual redeliver (H13b) re-runs SSRF + re-signs + re-attempts on a fresh ladder, but does NOT
+        // re-consume the monthly delivery quota — the event was already metered on its first send, mirroring
+        // how automatic retries never re-meter. Scalar so the job-payload gate stays green.
+        public readonly bool $skipMeter = false,
     ) {}
 
     protected function handleForTenant(): void
@@ -65,8 +75,9 @@ final class DeliverWebhookJob extends TenantAwareJob
         }
 
         // First attempt only: hard-cap the monthly delivery quota, then meter. Retries neither re-check nor
-        // re-meter (a delivery is one metered unit regardless of how many attempts it takes).
-        if ($delivery->attempt_count === 0) {
+        // re-meter (a delivery is one metered unit regardless of how many attempts it takes); nor does a
+        // manual redeliver ($skipMeter — H13b), which re-sends an already-metered delivery.
+        if ($delivery->attempt_count === 0 && ! $this->skipMeter) {
             if (! app(QuotaGuard::class)->hasRateQuotaRemaining(UsageMetric::WebhookDeliveries)) {
                 $this->deadLetterForQuota($delivery);
 
@@ -93,9 +104,13 @@ final class DeliverWebhookJob extends TenantAwareJob
             return;
         }
 
-        $rawBody = json_encode($delivery->payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
-        $timestamp = (string) ($delivery->payload['occurred_at'] ?? Carbon::now()->toIso8601String());
-        $signature = app(WebhookSigner::class)->signatureHeader($endpoint->secret, $timestamp, $rawBody);
+        // Read the full envelope back from archival storage when the inline payload was off-loaded (H13b),
+        // so the signed body is always the real payload, not the trimmed marker.
+        $payload = app(WebhookPayloadArchive::class)->read($delivery);
+        $rawBody = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}';
+        $timestamp = (string) ($payload['occurred_at'] ?? Carbon::now()->toIso8601String());
+        // Signs with the current secret and, during a rotation grace window, the previous one too (H13b).
+        $signature = app(WebhookSigner::class)->signatureHeaderFor($endpoint, $timestamp, $rawBody);
         $startedAt = microtime(true);
 
         try {
@@ -182,6 +197,35 @@ final class DeliverWebhookJob extends TenantAwareJob
         }
 
         $endpoint->forceFill($attrs)->save();
+
+        // The breaker just tripped (Active → Paused this attempt — the job guard only reaches here for an
+        // Active endpoint, so this fires exactly once per trip): tell the tenant owner (H13b).
+        if (($attrs['status'] ?? null) === WebhookEndpointStatus::Paused) {
+            $this->notifyAutoDisabled($endpoint, $failures);
+        }
+    }
+
+    /**
+     * Notify the tenant owner that the circuit breaker auto-paused this endpoint (H13b). Scalar-only, on-demand
+     * notifiable — the {@see ReconcileTenantUsageJob} overage recipe. Best-effort: a
+     * missing tenant/owner/email is swallowed so a notification hiccup never disrupts delivery accounting.
+     */
+    private function notifyAutoDisabled(WebhookEndpoint $endpoint, int $failures): void
+    {
+        $ownerId = Tenant::query()->whereKey($this->tenantId)->value('owner_user_id'); // RLS-exempt central table
+
+        if (! is_string($ownerId) || $ownerId === '') {
+            return;
+        }
+
+        $email = User::query()->whereKey($ownerId)->value('email');
+
+        if (! is_string($email) || $email === '') {
+            return;
+        }
+
+        Notification::route('mail', $email)
+            ->notify(new WebhookAutoDisabledNotification($endpoint->name, $endpoint->url, $failures));
     }
 
     private function deadLetterForQuota(WebhookDelivery $delivery): void

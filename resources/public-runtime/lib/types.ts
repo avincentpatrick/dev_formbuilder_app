@@ -89,6 +89,23 @@ export interface RawSchemaSnapshot {
     fields: RawField[];
 }
 
+/** The live scheduled-form label the runtime branches on (Increment H12a backend; consumed by H12b). */
+export type ScheduleAcceptance = 'open' | 'opens_soon' | 'closed' | 'capacity_reached';
+
+/**
+ * The scheduled-form window + response cap block (Increment H12a `PublicFormPresenter.form.schedule`).
+ * `acceptance` is computed SERVER-SIDE at load; `remaining` is cap headroom (null when uncapped). Enforcement
+ * is authoritative in the write path — the block is advisory for rendering the closed/opens-soon/full states.
+ */
+export interface ScheduleBlock {
+    opens_at: string | null;
+    closes_at: string | null;
+    timezone: string;
+    max_responses: number | null;
+    acceptance: ScheduleAcceptance;
+    remaining: number | null;
+}
+
 export interface SchemaResponse {
     form: {
         id: string;
@@ -100,6 +117,9 @@ export interface SchemaResponse {
         // Increment H10 — whether the SPA should offer "Save and finish later" (per-form opt-in AND tenant
         // plan; the backend PublicFormPresenter ANDs both). Older cached manifests may omit it → treat as false.
         save_and_resume?: boolean;
+        // Increment H12a/b — the schedule window + response cap. Optional: an older cached manifest may omit
+        // it, which the runtime treats as an unconstrained (always-open) form.
+        schedule?: ScheduleBlock;
     };
     version: {
         id: string;
@@ -270,6 +290,7 @@ export type ErrorKind =
     | 'remint' // token expired — silently re-mint + retry, same schema
     | 'refresh' // version superseded — re-mint + re-fetch schema
     | 'rate_limited' // 429 — back off
+    | 'schedule' // 403 form_not_open/form_closed/max_responses_reached — show the schedule state (H12b)
     | 'terminal' // 401 invalid / 403 disabled / 404 — unrecoverable
     | 'unknown';
 

@@ -12,6 +12,7 @@
  * field binds to `answers[sectionKey][i][fieldKey]` and its 422 keys `answers.<sectionKey>[i].<fieldKey>`; a
  * min/max count failure keys the bare `answers.<sectionKey>`.
  */
+import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { MdsButton, MdsCard } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
@@ -31,11 +32,66 @@ interface Block {
 type EncodeInstance = Record<string, AnswerValue>;
 type EncodeAnswer = AnswerValue | EncodeInstance[];
 
+// The scheduled-form block (Increment H12b) — the twin of the guest presenter's, emitted by EncodeFormPresenter.
+interface ScheduleBlock {
+    opens_at: string | null;
+    closes_at: string | null;
+    timezone: string;
+    max_responses: number | null;
+    acceptance: 'open' | 'opens_soon' | 'closed' | 'capacity_reached';
+    remaining: number | null;
+}
+
 const props = defineProps<{
-    form: { id: string; title: string; description: string | null };
+    form: { id: string; title: string; description: string | null; schedule: ScheduleBlock };
     version: { id: string; version_number: number };
     blocks: Block[];
 }>();
+
+// Increment H12b — pre-warn the encoder when the form isn't accepting fresh responses. The write path is
+// already blocked server-side (FormAcceptanceGuard); the banner + disabled submit spare a doomed POST. The
+// form stays visible so staff can still reference it.
+const isOpen = computed(() => props.form.schedule.acceptance === 'open');
+
+function formatInstant(iso: string): string {
+    try {
+        const formatted = new Intl.DateTimeFormat('en', {
+            timeZone: props.form.schedule.timezone,
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(new Date(iso));
+        return `${formatted} (${props.form.schedule.timezone})`;
+    } catch {
+        return iso;
+    }
+}
+
+const scheduleNotice = computed<{ title: string; body: string } | null>(() => {
+    const schedule = props.form.schedule;
+    switch (schedule.acceptance) {
+        case 'opens_soon':
+            return {
+                title: 'This form isn’t open yet',
+                body: schedule.opens_at
+                    ? `It opens on ${formatInstant(schedule.opens_at)}. Submissions are blocked until then.`
+                    : 'Submissions are blocked until it opens.',
+            };
+        case 'closed':
+            return {
+                title: 'This form is closed',
+                body: schedule.closes_at
+                    ? `It closed on ${formatInstant(schedule.closes_at)}. New submissions are no longer accepted.`
+                    : 'New submissions are no longer accepted.',
+            };
+        case 'capacity_reached':
+            return {
+                title: 'This form is full',
+                body: 'It has reached its response limit. New submissions are no longer accepted.',
+            };
+        default:
+            return null;
+    }
+});
 
 // A stable client id per repeat instance (decoupled from array index) so removing a middle row never
 // re-keys another row's inputs. A monotonic counter — NOT crypto.randomUUID, which throws outside a secure
@@ -182,6 +238,10 @@ function countError(block: Block): string | undefined {
 }
 
 function submit(): void {
+    // Increment H12b — never POST a submission the schedule guard will 403 (the button is disabled too).
+    if (!isOpen.value) {
+        return;
+    }
     encodeForm.post(`/forms/${props.form.id}/submissions`, {
         preserveScroll: true,
         // The controller redirects back to this same page; reset so the encoder starts a clean next entry.
@@ -209,6 +269,12 @@ function submit(): void {
         <p class="encode__intro">
             Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
         </p>
+
+        <!-- Scheduled-form pre-warning (H12b): the form is visible for reference, but submitting is blocked. -->
+        <div v-if="scheduleNotice" class="encode__schedule-banner" role="alert">
+            <strong class="encode__schedule-title">{{ scheduleNotice.title }}</strong>
+            <span class="encode__schedule-body">{{ scheduleNotice.body }}</span>
+        </div>
 
         <form class="encode__form" @submit.prevent="submit">
             <MdsCard v-for="(block, bi) in blocks" :key="block.id ?? `ungrouped-${bi}`">
@@ -289,7 +355,13 @@ function submit(): void {
 
             <div class="encode__actions">
                 <Link href="/forms" class="encode__cancel">Cancel</Link>
-                <MdsButton type="submit" variant="primary" icon-left="check" :loading="encodeForm.processing">
+                <MdsButton
+                    type="submit"
+                    variant="primary"
+                    icon-left="check"
+                    :loading="encodeForm.processing"
+                    :disabled="!isOpen"
+                >
                     Submit response
                 </MdsButton>
             </div>
@@ -326,6 +398,30 @@ function submit(): void {
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
     color: var(--mds-color-text-secondary);
+}
+
+/* Scheduled-form pre-warning (H12b) — an alert banner, border-accent (never color alone, WCAG 1.4.1). */
+.encode__schedule-banner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    margin: 0 0 var(--mds-space-6);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    border: 1px solid var(--mds-color-border-default);
+    border-left: 4px solid var(--mds-color-action-danger-bg);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+}
+
+.encode__schedule-title {
+    color: var(--mds-color-text-heading);
+    font-size: var(--mds-type-body-md-font-size);
+}
+
+.encode__schedule-body {
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
 }
 
 .encode__form {

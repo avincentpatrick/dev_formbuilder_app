@@ -6,6 +6,7 @@ use App\Enums\FormScheduleState;
 use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Forms\BuilderPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,4 +116,42 @@ it('clears a schedule back to null when the window is removed', function (): voi
     $fresh = Form::findOrFail($form->id);
     expect($fresh->closes_at)->toBeNull()
         ->and($fresh->schedule_state)->toBeNull(); // no window ⇒ no lifecycle
+});
+
+it('interprets a naive wall-clock in the submitted timezone (Increment H12b)', function (): void {
+    $form = makeForm($this->admin, 'Survey');
+
+    // The builder sends a naive datetime-local string + an IANA zone; 09:00 in Asia/Manila (UTC+8) is 01:00Z.
+    $this->actingAs($this->admin)->withoutVite()
+        ->patch(scheduleUrl($form), [
+            'opens_at' => '2026-08-01T09:00',
+            'closes_at' => '2026-08-01T17:00',
+            'timezone' => 'Asia/Manila',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $fresh = Form::findOrFail($form->id);
+    expect($fresh->opens_at->utc()->format('Y-m-d H:i'))->toBe('2026-08-01 01:00')
+        ->and($fresh->closes_at->utc()->format('Y-m-d H:i'))->toBe('2026-08-01 09:00');
+});
+
+it('surfaces raw schedule values + the timezone list to the builder (Increment H12b)', function (): void {
+    $form = makeForm($this->admin, 'Survey');
+    $form->forceFill([
+        'opens_at' => now()->addDay(),
+        'closes_at' => now()->addWeek(),
+        'timezone' => 'Asia/Manila',
+        'max_responses' => 250,
+    ])->save();
+
+    $props = app(BuilderPresenter::class)->present($form->refresh());
+
+    expect($props['form']['timezone'])->toBe('Asia/Manila')
+        ->and($props['form']['max_responses'])->toBe(250)
+        ->and($props['form']['opens_at'])->not->toBeNull()
+        ->and($props['form']['closes_at'])->not->toBeNull()
+        ->and($props['timezones'])->toContain('Asia/Manila')
+        ->and($props['timezones'])->toContain('UTC');
 });

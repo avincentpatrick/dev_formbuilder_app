@@ -15,6 +15,7 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
+use DateTimeZone;
 use Illuminate\Support\Collection;
 
 /**
@@ -58,6 +59,13 @@ final class BuilderPresenter
                 // Per-form save-and-resume opt-in (H10) — drives the builder toggle; the guest runtime reads its
                 // own effective flag (tenant plan AND this) from PublicFormPresenter.
                 'save_and_resume' => $form->save_and_resume,
+                // Raw schedule values (Increment H12b) — the Schedule modal prefills from these (the ISO instants
+                // are rendered back into `timezone` for the datetime-local inputs). Enforcement uses `acceptance`
+                // on the runtime presenters; the builder only needs the raw window + cap to round-trip a PATCH.
+                'opens_at' => $form->opens_at?->toIso8601String(),
+                'closes_at' => $form->closes_at?->toIso8601String(),
+                'timezone' => $form->timezone,
+                'max_responses' => $form->max_responses,
             ],
             'draft' => $draft ? [
                 'id' => $draft->id,
@@ -68,6 +76,10 @@ final class BuilderPresenter
             'palette' => $this->palette(),
             'enums' => $this->enums(),
             'library' => $this->libraryList(),
+            // The canonical IANA identifier list for the Schedule modal's timezone <select> (Increment H12b).
+            // Sourced server-side so every option is guaranteed to pass UpdateFormScheduleRequest's
+            // Rule::in(DateTimeZone::listIdentifiers()) — a client-built list could drift and 422.
+            'timezones' => DateTimeZone::listIdentifiers(),
         ];
     }
 

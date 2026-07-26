@@ -16,6 +16,7 @@ import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
+import ScheduleModal from '@/components/builder/ScheduleModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
@@ -88,6 +89,10 @@ function onToggleSaveResume(value: boolean): void {
         },
     );
 }
+
+// ── Schedule (Increment H12b) — a form-level open/close window + response cap. A modal over its own guarded
+// PATCH route (ungated, `can:update,form`), independent of the draft/version edits. ──
+const scheduleOpen = ref(false);
 
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
 // author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
@@ -208,6 +213,10 @@ function submitImport(): void {
                     class="builder__toggle"
                     @update:model-value="onToggleSaveResume"
                 />
+                <!-- Scheduled-form config (H12b) — ungated, all tiers; enforcement is server-side. -->
+                <MdsButton variant="secondary" icon-left="calendar" @click="scheduleOpen = true">
+                    Schedule
+                </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
                 </MdsButton>
@@ -296,6 +305,9 @@ function submitImport(): void {
 
         <!-- Save as template (G9a) — snapshots the current draft into a tenant-owned private template. -->
         <SaveAsTemplateModal v-model:open="templateOpen" :form-id="form.id" :default-name="form.title" />
+
+        <!-- Scheduled-form config (H12b) — open/close window + response cap over PATCH /forms/{form}/schedule. -->
+        <ScheduleModal v-model:open="scheduleOpen" :form-id="form.id" :form="form" :timezones="timezones" />
 
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">
@@ -398,6 +410,10 @@ function submitImport(): void {
 .builder__actions {
     display: flex;
     align-items: center;
+    /* Wrap the action buttons instead of overflowing — the toolbar now carries enough controls (incl. the H12b
+       Schedule button) to exceed a narrow viewport or a large personalization font size (responsive contract). */
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: var(--mds-space-2);
 }
 

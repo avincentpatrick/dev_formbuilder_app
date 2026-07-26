@@ -6,6 +6,7 @@ namespace Database\Seeders;
 
 use App\Enums\BillingInterval;
 use App\Enums\FieldType;
+use App\Enums\FormScheduleState;
 use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
@@ -335,6 +336,26 @@ class E2eSeeder extends Seeder
                     'allow_guest_submissions' => true,
                     'supported_locales' => ['en'],
                     'single_page_mode' => true,
+                ]);
+            }
+
+            // A guest-enabled but CLOSED scheduled form (Increment H12b) — reached at /f/closed-survey. Its
+            // window has passed (closes_at in the past), so the public runtime renders the full-screen "This
+            // form is closed" state INSTEAD of the fill session (the schema is still served — H12a). Gives the
+            // closed state a11y coverage in the public-runtime axe scan.
+            if (Form::query()->where('title', 'Closed Survey')->doesntExist()) {
+                $closed = app(FormService::class)->create(
+                    $tenant, $owner, 'Closed Survey', 'A survey whose open window has passed (H12b demo).'
+                );
+                app(FormBuilderService::class)->addField($closed, $owner, FieldType::ShortText, null)
+                    ->update(['label' => 'Your name']);
+                app(PublishService::class)->publish($closed->refresh(), $owner);
+
+                $closed->update([
+                    'public_slug' => 'closed-survey',
+                    'allow_guest_submissions' => true,
+                    'closes_at' => now()->subDay(),
+                    'schedule_state' => FormScheduleState::Closed,
                 ]);
             }
 

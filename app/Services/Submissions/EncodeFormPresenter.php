@@ -6,9 +6,12 @@ namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Models\Submission;
+use App\Support\Forms\FormScheduleView;
 use Illuminate\Support\Collection;
 
 /**
@@ -112,6 +115,10 @@ final class EncodeFormPresenter
                 'id' => $form->id,
                 'title' => $form->title,
                 'description' => $form->description,
+                // Scheduled-form window + cap (Increment H12b) — the encode page pre-warns (banner + disabled
+                // submit) when `acceptance` != 'open'. Enforcement stays authoritative in the pipeline
+                // ({@see FormAcceptanceGuard}); this is advisory, the twin of PublicFormPresenter's block.
+                'schedule' => $this->schedule($form),
             ],
             'version' => [
                 'id' => $version->id,
@@ -119,6 +126,29 @@ final class EncodeFormPresenter
             ],
             'blocks' => $blocks,
         ];
+    }
+
+    /**
+     * The scheduled-form runtime block (Increment H12b) — the same wire shape the guest presenter emits, via
+     * the shared {@see FormScheduleView}. The live finalized COUNT is read only when a cap exists.
+     *
+     * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
+     */
+    private function schedule(Form $form): array
+    {
+        $cap = $form->max_responses;
+        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+
+        return FormScheduleView::present($form, $finalizedCount);
+    }
+
+    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
+    private function finalizedCount(Form $form): int
+    {
+        return Submission::query()
+            ->where('form_id', $form->id)
+            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->count();
     }
 
     /**

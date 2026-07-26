@@ -100,6 +100,20 @@ for (const theme of themes) {
     });
 }
 
+// The scheduled-form closed state (Increment H12b). "Closed Survey" (E2eSeeder) has a past close time, so the
+// public runtime replaces the fill session with a full-screen "This form is closed" state (the schema is still
+// served — H12a). Scan that state for WCAG 2.2 AA + no horizontal overflow in light and dark.
+for (const theme of themes) {
+    test(`Public runtime closed form (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/f/closed-survey', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'This form is closed' })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Public runtime closed form');
+    });
+}
+
 // A full guest submit (Clinic Intake's fields are all optional) drives the F5 guest submit endpoint end-to-end
 // and lands on the post-submit confirmation, which is itself scanned for accessibility.
 test('Public runtime — submit reaches an accessible confirmation', async ({ page }) => {

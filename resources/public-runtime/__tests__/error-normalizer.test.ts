@@ -38,6 +38,10 @@ describe('normalizeError', () => {
         [401, 'share_token_expired', 'remint'],
         [401, 'invalid_share_token', 'terminal'],
         [403, 'guest_disabled', 'terminal'],
+        // Increment H12b — schedule 403s get their own kind (App shows the closed/opens-soon/full state).
+        [403, 'form_closed', 'schedule'],
+        [403, 'form_not_open', 'schedule'],
+        [403, 'max_responses_reached', 'schedule'],
         [409, 'form_updated', 'refresh'],
         [409, 'submission_version_superseded', 'refresh'],
         [429, 'rate_limited', 'rate_limited'],

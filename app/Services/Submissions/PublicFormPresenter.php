@@ -10,8 +10,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\EntitlementService;
-use App\Support\Forms\FormSchedule;
-use Carbon\CarbonImmutable;
+use App\Support\Forms\FormScheduleView;
 
 /**
  * Shapes a published form + version for the public guest runtime (Increment F5). Thin by design: the
@@ -70,16 +69,8 @@ final class PublicFormPresenter
     {
         $cap = $form->max_responses;
         $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
-        $remaining = ($cap === null || $finalizedCount === null) ? null : (int) max(0, $cap - $finalizedCount);
 
-        return [
-            'opens_at' => $form->opens_at?->toIso8601String(),
-            'closes_at' => $form->closes_at?->toIso8601String(),
-            'timezone' => $form->timezone,
-            'max_responses' => $cap,
-            'acceptance' => FormSchedule::acceptance($form, $finalizedCount, CarbonImmutable::now()),
-            'remaining' => $remaining,
-        ];
+        return FormScheduleView::present($form, $finalizedCount);
     }
 
     /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */

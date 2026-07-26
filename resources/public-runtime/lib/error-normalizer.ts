@@ -82,7 +82,11 @@ function classify(status: number, code: string): ErrorKind {
         return code === 'share_token_expired' ? 'remint' : 'terminal';
     }
     if (status === 403) {
-        return 'terminal';
+        // A form that was open at load can close / fill up before submit — the write path 403s with a
+        // schedule reason code. Surface the schedule state rather than a generic terminal error (H12b).
+        return code === 'form_not_open' || code === 'form_closed' || code === 'max_responses_reached'
+            ? 'schedule'
+            : 'terminal';
     }
     if (status === 409) {
         return 'refresh';

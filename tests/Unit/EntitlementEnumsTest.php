@@ -17,7 +17,7 @@ it('exposes both billing intervals', function (): void {
     expect(BillingInterval::values())->toBe(['monthly', 'yearly']);
 });
 
-it('exposes the seven usage metrics in catalog order', function (): void {
+it('exposes the eight usage metrics in catalog order', function (): void {
     expect(UsageMetric::values())->toBe([
         'submissions_count',
         'storage_bytes',
@@ -26,5 +26,6 @@ it('exposes the seven usage metrics in catalog order', function (): void {
         'active_seats',
         'forms_count',
         'exports_count',
+        'webhook_endpoints_count', // H13a — the per-tier endpoint COUNT cap gauge
     ]);
 });

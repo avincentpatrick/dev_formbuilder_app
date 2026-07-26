@@ -51,6 +51,10 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/resource-grants/{resourceGrant}',
         // H4 — the read-only audit-log surface.
         '/audits',
+        // H13a — the webhook engine management + delivery-log surface.
+        '/webhooks',
+        '/webhooks/{webhookEndpoint}',
+        '/webhooks/{webhookEndpoint}/deliveries',
     );
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global

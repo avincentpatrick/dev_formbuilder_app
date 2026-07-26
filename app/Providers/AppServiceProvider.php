@@ -11,12 +11,14 @@ use App\Models\PersonalAccessToken;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
+use App\Models\WebhookEndpoint;
 use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
+use App\Policies\WebhookEndpointPolicy;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
@@ -117,6 +119,10 @@ class AppServiceProvider extends ServiceProvider
         // Read-only access to the audit log (H4). Owner/Admin only, via `audit_log.view`. Registered
         // explicitly for the same fail-OPEN reason as the policies above.
         Gate::policy(Audit::class, AuditPolicy::class);
+
+        // Webhook endpoints (H13a). Owner/Admin only, via `webhooks.manage`. Registered explicitly for the
+        // same fail-OPEN reason as the policies above.
+        Gate::policy(WebhookEndpoint::class, WebhookEndpointPolicy::class);
 
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the

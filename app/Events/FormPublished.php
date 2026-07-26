@@ -26,6 +26,8 @@ final class FormPublished extends DomainEvent
         public readonly string $formVersionId,
         public readonly int $versionNumber,
         public readonly ?string $publishedByUserId,
+        public readonly ?string $publishedAt,
+        public readonly ?string $changeSummary,
     ) {
         parent::__construct();
     }
@@ -38,6 +40,10 @@ final class FormPublished extends DomainEvent
             formVersionId: (string) $version->id,
             versionNumber: $version->version_number,
             publishedByUserId: (string) $publisher->getKey(),
+            publishedAt: $version->published_at?->toIso8601String(),
+            // The persisted auto-generated changelog (SchemaChangeClassification), so an integration can show
+            // WHAT changed without a second API call (webhook-integration-design.md §3).
+            changeSummary: $version->change_summary,
         );
     }
 
@@ -62,6 +68,8 @@ final class FormPublished extends DomainEvent
             'form_version_id' => $this->formVersionId,
             'version_number' => $this->versionNumber,
             'published_by' => $this->publishedByUserId,
+            'published_at' => $this->publishedAt,
+            'change_summary' => $this->changeSummary,
         ];
     }
 }

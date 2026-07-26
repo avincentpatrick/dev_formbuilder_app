@@ -71,6 +71,7 @@ final class PlanCatalog
                     'active_seats' => 2,
                     'api_requests' => 0,
                     'webhook_deliveries' => 0,
+                    'webhook_endpoints_count' => 0,
                     'exports_count' => 5,
                 ],
             ),
@@ -88,6 +89,7 @@ final class PlanCatalog
                     'active_seats' => 10,
                     'api_requests' => 10000,
                     'webhook_deliveries' => 5000,
+                    'webhook_endpoints_count' => 3, // pricing-feature-gating-matrix.md §3
                     'exports_count' => null, // unlimited
                 ],
             ),
@@ -105,6 +107,7 @@ final class PlanCatalog
                     'active_seats' => 50,
                     'api_requests' => 100000,
                     'webhook_deliveries' => 50000,
+                    'webhook_endpoints_count' => 10, // pricing-feature-gating-matrix.md §3
                     'exports_count' => null, // unlimited
                 ],
             ),

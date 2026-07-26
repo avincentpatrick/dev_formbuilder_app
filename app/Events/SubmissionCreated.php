@@ -25,6 +25,9 @@ final class SubmissionCreated extends DomainEvent
         public readonly string $submissionId,
         public readonly string $formId,
         public readonly string $formVersionId,
+        public readonly string $source,
+        public readonly string $status,
+        public readonly ?string $submittedAt,
     ) {
         parent::__construct();
     }
@@ -36,6 +39,9 @@ final class SubmissionCreated extends DomainEvent
             submissionId: (string) $submission->id,
             formId: (string) $submission->form_id,
             formVersionId: (string) $submission->form_version_id,
+            source: $submission->source->value,
+            status: $submission->status->value,
+            submittedAt: $submission->submitted_at?->toIso8601String(),
         );
     }
 
@@ -55,10 +61,16 @@ final class SubmissionCreated extends DomainEvent
      */
     public function data(): array
     {
+        // Deliberately EXCLUDES the answers content (webhook-integration-design.md §3): a webhook is a
+        // third-party destination the tenant configures, so the default payload is identifiers + metadata,
+        // and a consumer needing the answers fetches them via the REST API using submission_id.
         return [
             'submission_id' => $this->submissionId,
             'form_id' => $this->formId,
             'form_version_id' => $this->formVersionId,
+            'source' => $this->source,
+            'status' => $this->status,
+            'submitted_at' => $this->submittedAt,
         ];
     }
 }

@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property string $title
  * @property array<string, mixed> $schema_snapshot
  * @property ?string $checksum
+ * @property ?string $change_summary
  * @property Carbon|null $published_at
  * @property Carbon|null $superseded_at
  */

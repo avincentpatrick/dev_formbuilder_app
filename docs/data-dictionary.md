@@ -528,8 +528,8 @@ Tenant-configured delivery targets (plan §2.5).
 | `form_id` | `uuid` | Yes | `NULL` | No | FK to `forms.id`. `NULL` = tenant-wide endpoint subscribing across all forms; non-null = scoped to one form. |
 | `name` | `varchar(150)` | No | — | No | Admin-facing label. |
 | `url` | `varchar(500)` | No | — | No | Destination URL. |
-| `secret` | `varchar(255)` | No | — | No | Signing secret. Not personal data, but a credential requiring the same at-rest protection — masked in the UI/API after creation, never returned in full again (see Design Notes). |
-| `event_types` | `jsonb` | No | `'[]'` | No | Array of subscribed `WebhookEventType` values. |
+| `secret` | `text` | No | — | No | Signing secret. Not personal data, but a credential requiring the same at-rest protection — masked in the UI/API after creation, never returned in full again (see Design Notes). **H13a build note:** stored as `text`, NOT `varchar(255)` — the Laravel `encrypted` cast inflates even a short secret to ~290 chars (`base64(JSON{iv,value,mac})`), which the original `varchar(255)` (sized for plaintext) cannot hold. |
+| `event_types` | `jsonb` | No | `'[]'` | No | Array of subscribed event-type values. **H13a build note:** these are **`DomainEventType`** values, NOT a separate `WebhookEventType` enum — `DomainEventType`'s own docblock instructs H13 to reference the one shared catalog (`submission.created`, `form.published`, `form.opened`, `form.closed`) rather than mint a second enum, so the webhook subscription vocabulary and the domain-event vocabulary cannot drift. |
 | `status` | `varchar(20)` — PHP enum: `WebhookEndpointStatus` | No | `'active'` | No | — |
 | `disabled_reason` | `varchar(30)` | Yes | `NULL` | No | Free-text-but-small reason code (`too_many_failures`, `manual`, `tenant_suspended`) — kept as constrained free text rather than a full enum since it is purely informational, never branched on programmatically. |
 | `consecutive_failure_count` | `integer` | No | `0` | No | Drives the per-endpoint circuit breaker (plan §2.5). |
@@ -557,7 +557,7 @@ Individual delivery attempts — queue-first ingestion, mandatory idempotency, e
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
 | `webhook_endpoint_id` | `uuid` | No | — | No | FK to `webhook_endpoints.id`, `ON DELETE CASCADE`. |
 | `event_id` | `uuid` | No | — | No | Unique — the idempotency key (plan §2.2: "`event_id` unique"). |
-| `event_type` | `varchar(60)` — PHP enum: `WebhookEventType` | No | — | No | See the starter catalog above. |
+| `event_type` | `varchar(60)` — PHP enum: `DomainEventType` (H13a; see `webhook_endpoints.event_types` note) | No | — | No | See the starter catalog above. |
 | `payload` | `jsonb` | No | — | **Yes (conditional)** | The delivered event body; may embed submission answer data, so content-dependent PII exposure identical to `submission_answers.answers`. |
 | `payload_attachment_id` | `uuid` | Yes | `NULL` | No | FK to `attachments.id` (`kind = 'webhook_payload_archive'`); used when a payload is too large to store inline and is archived to object storage instead. |
 | `status` | `varchar(20)` — PHP enum: `WebhookDeliveryStatus` | No | `'pending'` | No | — |
@@ -573,8 +573,9 @@ Individual delivery attempts — queue-first ingestion, mandatory idempotency, e
 | `updated_at` | `timestamptz` | No | `now()` | No | — |
 
 > **Design Notes**
-> - `event_id` uniqueness **is** the idempotency mechanism (plan §2.2/§5): a producer retrying a publish is safe to call again with the same `event_id`, the unique constraint rejects the duplicate insert.
-> - `WebhookEventType` is explicitly a starter catalog (plan §2.5's "phase in more — not 50 at once"); new events require a code change to emit anyway, so growing this enum over time (rather than making it data-driven) is intentional, not a limitation to work around later.
+> - `event_id` uniqueness **is** the idempotency mechanism (plan §2.2/§5): a producer retrying a publish is safe to call again with the same `event_id`, the unique constraint rejects the duplicate insert. **H13a note:** the DB unique is on `(webhook_endpoint_id, event_id)` (one delivery per endpoint per event), which is what the fan-out `firstOrCreate` relies on.
+> - The event catalog (`DomainEventType`, H13a) is explicitly a starter set (plan §2.5's "phase in more — not 50 at once"); new events require a code change to emit anyway, so growing the enum over time (rather than making it data-driven) is intentional, not a limitation to work around later.
+> - **H13a note — no distinct status for SSRF/quota outcomes.** The design doc names a `dns_rebinding_blocked` outcome and this increment adds a monthly-quota refusal; both are recorded as a `[marker]` prefix in `response_body_excerpt` (a delivery-time SSRF re-block → `[dns_rebinding_blocked]` `failed`; an over-monthly-quota first attempt → `[quota_exceeded]` `dead_lettered`) rather than as new `WebhookDeliveryStatus` values, keeping the pinned five-value status enum intact. A dedicated status/column is a H14 option if the delivery-log UI needs to filter on it.
 
 ---
 

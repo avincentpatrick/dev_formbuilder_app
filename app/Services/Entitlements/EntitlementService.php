@@ -16,6 +16,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TenantUser;
 use App\Models\UsageCounter;
+use App\Models\WebhookEndpoint;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Tenancy\TenantContext;
@@ -245,6 +246,9 @@ final class EntitlementService
             UsageMetric::ActiveSeats => TenantUser::query()
                 ->whereIn('status', [TenantUserStatus::Active->value, TenantUserStatus::Invited->value])
                 ->count(),
+            // A live COUNT of active (non-soft-deleted) endpoints — the per-tier cap gauge (H13a); moves
+            // down when an endpoint is deleted, exactly like FormsCount on archive.
+            UsageMetric::WebhookEndpointsCount => WebhookEndpoint::query()->count(),
             default => 0,
         };
     }

@@ -2319,6 +2319,314 @@
                     }
                 }
             }
+        },
+        "/webhooks/{webhookEndpoint}/deliveries": {
+            "get": {
+                "operationId": "v1.webhooks.deliveries.index",
+                "summary": "Cursor-paginated delivery-observability log for one webhook endpoint, newest first",
+                "tags": [
+                    "WebhookDelivery"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/WebhookDeliveryResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/webhooks": {
+            "get": {
+                "operationId": "v1.webhooks.index",
+                "summary": "Cursor-paginated list of the tenant's endpoints, newest first",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/WebhookEndpointResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.webhooks.store",
+                "summary": "Create an endpoint. The plaintext signing secret is returned ONCE here, never again",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreWebhookEndpointRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`WebhookEndpointResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WebhookEndpointResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/webhooks/{webhookEndpoint}": {
+            "get": {
+                "operationId": "v1.webhooks.show",
+                "summary": "Show one webhook endpoint, with the signing secret masked to its suffix",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`WebhookEndpointResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WebhookEndpointResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "v1.webhooks.update",
+                "summary": "Update a webhook endpoint; setting the status to active resets the circuit breaker",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateWebhookEndpointRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`WebhookEndpointResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WebhookEndpointResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1.webhooks.destroy",
+                "summary": "Soft-delete a webhook endpoint",
+                "tags": [
+                    "WebhookEndpoint"
+                ],
+                "parameters": [
+                    {
+                        "name": "webhookEndpoint",
+                        "in": "path",
+                        "required": true,
+                        "description": "The webhook endpoint ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -3249,6 +3557,46 @@
                 ],
                 "title": "StoreScopeNodeRequest"
             },
+            "StoreWebhookEndpointRequest": {
+                "type": "object",
+                "description": "Create a webhook endpoint (H13a). `url` runs the {@see PublicHttpUrl} SSRF check at save time.\n`event_types` must be a non-empty subset of the {@see DomainEventType} catalog (the webhook subscription\nvocabulary and the domain-event vocabulary are the same catalog by design). `form_id` uses `exists:` on the\nRLS-scoped connection, so another tenant's form fails validation rather than leaking that the id exists.\nThe signing secret is minted server-side, never accepted from the client.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "url": {
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "submission.created",
+                                "form.published",
+                                "form.opened",
+                                "form.closed"
+                            ]
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "name",
+                    "url",
+                    "event_types"
+                ],
+                "title": "StoreWebhookEndpointRequest"
+            },
             "SyncManifestResource": {
                 "type": "object",
                 "properties": {
@@ -3437,6 +3785,226 @@
                     }
                 },
                 "title": "UpdateScopeNodeRequest"
+            },
+            "UpdateWebhookEndpointRequest": {
+                "type": "object",
+                "description": "Update a webhook endpoint (H13a). Every field is `sometimes` (a partial write). `status` accepts the\nlifecycle values; setting it to `active` is the manual circuit-breaker reset. The secret is never updated\nthrough this request (rotation is H13b).",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "url": {
+                        "type": "string",
+                        "maxLength": 500
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/WebhookEndpointStatus"
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "submission.created",
+                                "form.published",
+                                "form.opened",
+                                "form.closed"
+                            ]
+                        },
+                        "minItems": 1
+                    }
+                },
+                "title": "UpdateWebhookEndpointRequest"
+            },
+            "WebhookDeliveryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "webhook_endpoint_id": {
+                        "type": "string"
+                    },
+                    "event_id": {
+                        "type": "string"
+                    },
+                    "event_type": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "attempt_count": {
+                        "type": "integer"
+                    },
+                    "max_attempts": {
+                        "type": "integer"
+                    },
+                    "next_retry_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_attempted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "response_status_code": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "response_body_excerpt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "response_time_ms": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "webhook_endpoint_id",
+                    "event_id",
+                    "event_type",
+                    "status",
+                    "attempt_count",
+                    "max_attempts",
+                    "next_retry_at",
+                    "last_attempted_at",
+                    "response_status_code",
+                    "response_body_excerpt",
+                    "response_time_ms",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "WebhookDeliveryResource"
+            },
+            "WebhookEndpointResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "disabled_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "consecutive_failure_count": {
+                        "type": "integer"
+                    },
+                    "signing_algorithm": {
+                        "type": "string"
+                    },
+                    "secret_masked": {
+                        "type": "string"
+                    },
+                    "secret": {
+                        "type": "string",
+                        "description": "The plaintext secret, present ONLY in the create response; omitted everywhere else."
+                    },
+                    "last_success_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_failure_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "form_id",
+                    "name",
+                    "url",
+                    "event_types",
+                    "status",
+                    "disabled_reason",
+                    "consecutive_failure_count",
+                    "signing_algorithm",
+                    "secret_masked",
+                    "last_success_at",
+                    "last_failure_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "WebhookEndpointResource"
+            },
+            "WebhookEndpointStatus": {
+                "type": "string",
+                "description": "The lifecycle state of a {@see WebhookEndpoint} (data-dictionary \u00a714 `WebhookEndpointStatus`, H13a). The `webhook_endpoints_status_check` CHECK is generated from {@see values()} so enum and constraint cannot drift. - {@see Active}   \u2014 deliveries fan out to it.   - {@see Paused}   \u2014 temporarily off: the per-endpoint circuit breaker auto-pauses at     `config('webhooks.breaker_threshold')` consecutive failures (`disabled_reason = 'too_many_failures'`);     re-enabling is a manual admin action that resets the breaker.   - {@see Disabled} \u2014 turned off by an admin (`disabled_reason = 'manual'`) or the platform.  Only {@see Active} endpoints receive deliveries; the fan-out ({@see WebhookEventDispatcher}) filters on it.\n",
+                "enum": [
+                    "active",
+                    "paused",
+                    "disabled"
+                ],
+                "title": "WebhookEndpointStatus"
             },
             "XlsformImportRequest": {
                 "type": "object",

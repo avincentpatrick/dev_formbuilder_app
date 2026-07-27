@@ -72,6 +72,11 @@ class HandleInertiaRequests extends Middleware
                     // nav item ALSO combines this with the `webhooks` plan feature (Sidebar.vue) so a tier
                     // without the feature never sees a destination it would only bounce off.
                     'manageWebhooks' => (bool) $user?->can('webhooks.manage'),
+                    // Gates the Integrations nav item + the /integrations pages (H15b). Exactly
+                    // ConnectionPolicy::viewAny — the `integrations.manage` permission, Owner/Admin only. Like
+                    // manageWebhooks the nav item ALSO requires the `native_connectors` plan feature
+                    // (Sidebar.vue), so a tier without it never sees a destination it would only bounce off.
+                    'manageIntegrations' => (bool) $user?->can('integrations.manage'),
                 ],
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the

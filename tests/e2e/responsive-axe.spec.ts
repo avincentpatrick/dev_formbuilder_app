@@ -18,6 +18,10 @@ const pages = [
     { name: 'Scopes', path: '/scopes' },
     // Webhook management (H14) — the list, summary tiles, Zapier recipe card, and the seeded endpoints table.
     { name: 'Webhooks', path: '/webhooks' },
+    // Native connectors (H15b) — the provider catalog, two seeded workspaces (one of them in the amber
+    // "Reconnect needed" state) and their rules tables. The connect button renders DISABLED here because e2e
+    // has no Slack credentials, which is exactly the state a fresh deployment shows.
+    { name: 'Integrations', path: '/integrations' },
     { name: 'Settings', path: '/settings' },
 ];
 
@@ -115,5 +119,25 @@ for (const theme of themes) {
         await page.getByRole('link', { name: 'Back to webhooks' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Webhook detail');
+    });
+}
+
+// The connector rule detail + delivery log (H15b). Same shape as the webhook detail above, reached from
+// /integrations by opening the seeded "New submissions → #ops" rule. Deliberately does NOT open the rule
+// modal: that is the only control on this surface that calls Slack, and e2e has no credentials (nor any
+// business making a live third-party request). The seeded rule carries a delivery spread so the action bar,
+// both detail cards and every delivery-status Badge are mounted for the scan.
+for (const theme of themes) {
+    test(`Integration rule detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/integrations', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'New submissions' })
+            .getByRole('button', { name: 'View rule' })
+            .click();
+        await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Integration rule detail');
     });
 }

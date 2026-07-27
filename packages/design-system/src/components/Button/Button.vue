@@ -11,6 +11,12 @@
  * to make an action iconic without every page hand-rolling icon+text markup. Icons are decorative
  * (the button's text label is the accessible name); while loading, the leading spinner replaces
  * `iconLeft`.
+ *
+ * `as="a"` + `href` renders a real anchor with identical styling, mirroring MdsCard. An action that
+ * NAVIGATES — especially to another origin, like an OAuth consent screen — has to be a link: a
+ * <button> announces the wrong role, drops middle-click and "open in new tab", and would otherwise
+ * push pages into hand-rolling their own link-that-looks-like-a-button (H15b). A disabled anchor is
+ * expressed with aria-disabled + no href, since HTML has no disabled attribute for links.
  */
 import { computed } from 'vue';
 import MdsIcon from '../Icon/Icon.vue';
@@ -25,9 +31,16 @@ const props = withDefaults(
         loading?: boolean;
         iconLeft?: IconName;
         iconRight?: IconName;
+        as?: 'button' | 'a';
+        href?: string;
     }>(),
-    { variant: 'primary', size: 'md', type: 'button', disabled: false, loading: false },
+    { variant: 'primary', size: 'md', type: 'button', disabled: false, loading: false, as: 'button' },
 );
+
+// Dropping href is what actually makes a disabled link inert — an <a> ignores the disabled attribute,
+// and keeping the href would leave it clickable and in the tab order while claiming to be disabled.
+const isLink = computed(() => props.as === 'a');
+const resolvedHref = computed(() => (isLink.value && !props.disabled && !props.loading ? props.href : undefined));
 
 // Glyphs are sized down one step from the text so they sit optically balanced beside the label.
 const iconSize = computed(() => (props.size === 'lg' ? 'md' : 'sm'));
@@ -43,15 +56,17 @@ function onClick(event: MouseEvent) {
 </script>
 
 <template>
-    <button
+    <component
+        :is="as"
         class="mds-button"
         :class="[
             `mds-button--${variant}`,
             `mds-button--${size}`,
-            { 'mds-button--loading': loading },
+            { 'mds-button--loading': loading, 'mds-button--disabled': isLink && disabled },
         ]"
-        :type="type"
-        :disabled="disabled"
+        :type="isLink ? undefined : type"
+        :disabled="isLink ? undefined : disabled"
+        :href="resolvedHref"
         :aria-disabled="disabled || loading || undefined"
         :aria-busy="loading || undefined"
         @click="onClick"
@@ -60,7 +75,7 @@ function onClick(event: MouseEvent) {
         <MdsIcon v-else-if="iconLeft" :name="iconLeft" :size="iconSize" />
         <slot />
         <MdsIcon v-if="iconRight" :name="iconRight" :size="iconSize" />
-    </button>
+    </component>
 </template>
 
 <style scoped>
@@ -161,18 +176,30 @@ function onClick(event: MouseEvent) {
     background-color: var(--mds-color-action-danger-bg-active);
 }
 
-/* ── Disabled (native :disabled only — exempt from AA contrast, §4.1) ───── */
-.mds-button:disabled {
+/* ── Disabled (exempt from AA contrast, §4.1) ──────────────────────────────
+   An <a> ignores :disabled, so the as="a" form carries .mds-button--disabled instead; the two
+   selectors are paired everywhere so a link and a button never disagree about what disabled looks
+   like. `pointer-events: none` is the link's stand-in for the click blocking :disabled gives free —
+   the href is already dropped, so this only stops the cursor lying about it. */
+.mds-button:disabled,
+.mds-button--disabled {
     cursor: not-allowed;
 }
+.mds-button--disabled {
+    pointer-events: none;
+}
 .mds-button--primary:disabled,
-.mds-button--destructive:disabled {
+.mds-button--destructive:disabled,
+.mds-button--primary.mds-button--disabled,
+.mds-button--destructive.mds-button--disabled {
     background-color: var(--mds-color-action-disabled-bg);
     color: var(--mds-color-action-disabled-text);
     border-color: transparent;
 }
 .mds-button--secondary:disabled,
-.mds-button--tertiary:disabled {
+.mds-button--tertiary:disabled,
+.mds-button--secondary.mds-button--disabled,
+.mds-button--tertiary.mds-button--disabled {
     color: var(--mds-color-text-disabled);
     border-color: var(--mds-color-border-default);
     background-color: transparent;

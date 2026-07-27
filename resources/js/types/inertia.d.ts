@@ -38,6 +38,7 @@ export interface AppAbilities {
     viewSubmissions: boolean;
     manageScopes: boolean;
     manageWebhooks: boolean;
+    manageIntegrations: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

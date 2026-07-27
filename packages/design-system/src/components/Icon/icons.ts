@@ -68,6 +68,11 @@ export const icons = {
     image: 'M4 5h16v14H4z M8.5 11a1.5 1.5 0 1 0 0-.01 M4 16l5-4 4 3 3-2 4 3',
     layout: 'M4 5h16v14H4z M4 9h16 M10 9v10',
     sliders: 'M4 7h12 M4 12h8 M4 17h14 M18 5v4 M14 10v4 M8 15v4',
+
+    // ── Integrations (H15b) ───────────────────────────────────────────────────
+    // A two-pin plug: prongs, body, cord. Deliberately generic rather than a vendor mark — the set is
+    // hand-authored line art (see the header), and a brand logo would be neither line art nor ours.
+    plug: 'M9 3v5 M15 3v5 M6 8h12v3a6 6 0 0 1-12 0z M12 17v4',
 } as const;
 
 export type IconName = keyof typeof icons;

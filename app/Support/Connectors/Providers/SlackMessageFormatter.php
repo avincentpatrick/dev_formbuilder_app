@@ -29,19 +29,26 @@ final class SlackMessageFormatter
      */
     public function build(array $envelope, ConnectorEventContext $context): array
     {
-        $eventType = DomainEventType::tryFrom((string) ($envelope['event_type'] ?? ''));
+        $rawType = (string) ($envelope['event_type'] ?? '');
+        $eventType = DomainEventType::tryFrom($rawType);
         $data = is_array($envelope['data'] ?? null) ? $envelope['data'] : [];
 
         $formLabel = $context->formName
             ?? (is_string($data['form_id'] ?? null) ? 'form '.$data['form_id'] : 'a form');
 
-        $headline = match ($eventType) {
-            DomainEventType::SubmissionCreated => "*New submission* — {$formLabel}",
-            DomainEventType::FormPublished => "*Form published* — {$formLabel}",
-            DomainEventType::FormOpened => "*Form opened for responses* — {$formLabel}",
-            DomainEventType::FormClosed => "*Form closed* — {$formLabel}",
-            default => "*Update* — {$formLabel}",
-        };
+        // The H15b test send (ConnectorTester) is matched on the RAW string, not the enum: `test.ping` is
+        // deliberately not a DomainEventType, so tryFrom() returns null and it would otherwise land in the
+        // default arm and read as "*Update* — a form" — indistinguishable from a real event about a form the
+        // recipient cannot find.
+        $headline = $rawType === 'test.ping'
+            ? '*Test message* — your form-builder workspace is connected to this channel.'
+            : match ($eventType) {
+                DomainEventType::SubmissionCreated => "*New submission* — {$formLabel}",
+                DomainEventType::FormPublished => "*Form published* — {$formLabel}",
+                DomainEventType::FormOpened => "*Form opened for responses* — {$formLabel}",
+                DomainEventType::FormClosed => "*Form closed* — {$formLabel}",
+                default => "*Update* — {$formLabel}",
+            };
 
         $blocks = [[
             'type' => 'section',

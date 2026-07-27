@@ -23,3 +23,18 @@ describe('statusVariant — webhook tokens (H14)', () => {
         expect(statusVariant('quantum')).toEqual({ variant: 'neutral', label: 'quantum' });
     });
 });
+
+describe('statusVariant — native-connector tokens (H15b)', () => {
+    it('labels a connection by what the tenant must do, not by the enum word', () => {
+        expect(statusVariant('refresh_failed')).toEqual({ variant: 'danger', label: 'Reconnect needed' });
+        expect(statusVariant('revoked')).toEqual({ variant: 'neutral', label: 'Disconnected' });
+    });
+
+    it('reuses the shared descriptors for the statuses connectors have in common with webhooks', () => {
+        // ConnectorSubscriptionStatus is active/paused/disabled — the same three words the webhook endpoint
+        // lifecycle already owns, so a rule and an endpoint must never render the same word two ways.
+        expect(statusVariant('active')).toEqual({ variant: 'success', label: 'Active' });
+        expect(statusVariant('paused')).toEqual({ variant: 'warning', label: 'Paused' });
+        expect(statusVariant('disabled')).toEqual({ variant: 'neutral', label: 'Disabled' });
+    });
+});

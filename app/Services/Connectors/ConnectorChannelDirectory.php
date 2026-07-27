@@ -1,0 +1,84 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Connectors;
+
+use App\Enums\ConnectionStatus;
+use App\Exceptions\Connectors\ConnectorChannelException;
+use App\Models\Connection;
+use App\Support\Connectors\ConnectorChannel;
+use App\Support\Connectors\ConnectorRegistry;
+use App\Support\Connectors\ListsChannels;
+
+/**
+ * The read model behind the H15b channel picker's JSON sidecar: resolve the provider's optional
+ * {@see ListsChannels} capability, ask it, and reduce every outcome — including every
+ * failure — to a shape the picker can render.
+ *
+ * NOTHING HERE THROWS. A picker is an aid, not the feature: a Slack outage, a dead grant or a provider with no
+ * listing capability must all leave the tenant able to finish writing their rule (the modal falls back to a
+ * manual channel id). So a failure returns `error` beside an empty list rather than a 5xx, which would make the
+ * sidecar's client discard the reason along with the response.
+ *
+ * NO CACHING, deliberately. `grep -rn "Cache::" app/` finds nothing — the repo has never written to a cache at
+ * runtime, and making a picker the first consumer would buy a cache-key tenancy question and an unproven
+ * dependency for a call that only fires when a human opens a modal. The client holds the list for the page's
+ * lifetime and offers an explicit refresh, which is where the benefit actually was. (`conversations.list` is a
+ * Tier-2 method at ~20 requests/minute; user-initiated opens are nowhere near it.)
+ */
+final class ConnectorChannelDirectory
+{
+    public function __construct(private readonly ConnectorRegistry $registry) {}
+
+    /**
+     * @return array{channels: list<array{id: string, label: string, available: bool, unavailable_reason: ?string}>, truncated: bool, error: ?string}
+     */
+    public function list(Connection $connection): array
+    {
+        if ($connection->status !== ConnectionStatus::Active) {
+            return $this->failure('This workspace needs to be reconnected before we can list its channels.');
+        }
+
+        $lister = $this->registry->channelListerFor($connection->provider);
+
+        if ($lister === null) {
+            return $this->failure('This integration doesn’t offer a channel list. Enter the destination id instead.');
+        }
+
+        try {
+            $page = $lister->channels($connection);
+        } catch (ConnectorChannelException $e) {
+            return $this->failure($this->message($e->errorCode));
+        }
+
+        return [
+            'channels' => array_map(static fn (ConnectorChannel $c): array => $c->toArray(), $page->channels),
+            'truncated' => $page->truncated,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Provider error code to copy a tenant can act on. The default is deliberately generic: the code can be any
+     * string the provider chooses, so echoing it would put unreviewed third-party text on our page.
+     */
+    private function message(string $errorCode): string
+    {
+        return match ($errorCode) {
+            'invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'not_authed' => 'Slack rejected our credentials. Reconnect this workspace, then try again.',
+            'missing_scope' => 'The Slack app is missing the permission needed to list channels. Reconnect this workspace to grant it.',
+            'ratelimited' => 'Slack is rate-limiting us. Wait a moment and refresh the channel list.',
+            'transport_error' => 'We couldn’t reach Slack. Check your connection and refresh the channel list.',
+            default => 'We couldn’t load channels from Slack. Refresh to try again, or enter a channel id.',
+        };
+    }
+
+    /**
+     * @return array{channels: list<array{id: string, label: string, available: bool, unavailable_reason: ?string}>, truncated: bool, error: string}
+     */
+    private function failure(string $message): array
+    {
+        return ['channels' => [], 'truncated' => false, 'error' => $message];
+    }
+}

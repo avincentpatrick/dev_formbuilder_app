@@ -6,6 +6,8 @@ use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\ConnectionController;
+use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\FeedbackController;
@@ -296,6 +298,37 @@ Route::middleware([
         ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.update');
     Route::delete('/webhooks/{webhookEndpoint}', [WebhookController::class, 'destroy'])
         ->middleware(['can:delete,webhookEndpoint', 'feature:webhooks'])->name('webhooks.destroy');
+
+    // Native-connector management UI (Increment H15b) — the session-authed Inertia surface over the H15a
+    // framework, delegating to the SAME ConnectionService / ConnectionSubscriptionService as the /api/v1 twins
+    // (routes/api.php). Gates mirror the API MINUS `ability:` (Sanctum token-scope only; a session carries no
+    // token, so the policy `can:` gate IS the authorization here) plus the `feature:native_connectors` Starter+
+    // plan gate — the nav item is hidden for tiers without it, and a direct visit bounces with an upgrade toast.
+    //
+    // SHALLOW NESTING: only `store` binds a {connection}, because a rule is created ON a grant but thereafter
+    // has its own page. The rest are flat and gated by ConnectionSubscriptionPolicy — a nested {connection}
+    // binding would 404 after a disconnect, which soft-deletes the grant while KEEPING its rules (paused).
+    // Nothing here can shadow /integrations/{provider}/connect below: that pattern's third segment must be the
+    // literal string `connect`. Static `/test` precedes the bare {connectionSubscription} verbs (the H14 rule).
+    Route::get('/integrations', [ConnectionController::class, 'index'])
+        ->middleware(['can:viewAny,'.Connection::class, 'feature:native_connectors'])->name('integrations.index');
+    Route::get('/integrations/rules/{connectionSubscription}', [ConnectionRuleController::class, 'show'])
+        ->middleware(['can:view,connectionSubscription', 'feature:native_connectors'])->name('integrations.rules.show');
+    Route::post('/integrations/rules/{connectionSubscription}/test', [ConnectionRuleController::class, 'test'])
+        ->middleware(['can:update,connectionSubscription', 'feature:native_connectors'])->name('integrations.rules.test');
+    Route::patch('/integrations/rules/{connectionSubscription}', [ConnectionRuleController::class, 'update'])
+        ->middleware(['can:update,connectionSubscription', 'feature:native_connectors'])->name('integrations.rules.update');
+    Route::delete('/integrations/rules/{connectionSubscription}', [ConnectionRuleController::class, 'destroy'])
+        ->middleware(['can:delete,connectionSubscription', 'feature:native_connectors'])->name('integrations.rules.destroy');
+    Route::post('/integrations/connections/{connection}/rules', [ConnectionRuleController::class, 'store'])
+        ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.rules.store');
+    // The one read-only JSON sidecar on this surface (the scopes.impact/scopes.grants precedent) — the channel
+    // picker must load without navigating. Every MUTATION above is an Inertia visit, because a domain exception
+    // on a web route redirects rather than returning JSON.
+    Route::get('/integrations/connections/{connection}/channels', [ConnectionController::class, 'channels'])
+        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.channels');
+    Route::delete('/integrations/connections/{connection}', [ConnectionController::class, 'destroy'])
+        ->middleware(['can:delete,connection', 'feature:native_connectors'])->name('integrations.connections.destroy');
 
     // Native-connector OAuth start (H15a / ADR-0009). The ONLY half of the flow with a session: it mints the
     // signed `state` that carries tenant + user identity to the central-domain callback (routes/connectors.php),

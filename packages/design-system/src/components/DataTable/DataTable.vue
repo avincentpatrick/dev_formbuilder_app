@@ -14,7 +14,7 @@
  * the table advertises `aria-busy` while loading. Sortable columns toggle an internal client-side sort
  * with `aria-sort` on the header (§4.3).
  */
-import { computed, ref, useSlots } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useSlots, watch } from 'vue';
 import Icon from '../Icon/Icon.vue';
 import Skeleton from '../Skeleton/Skeleton.vue';
 
@@ -76,10 +76,74 @@ function keyFor(row: Row, index: number): string {
     const k = row[props.rowKey];
     return k == null ? String(index) : String(k);
 }
+
+/*
+ * A horizontally scrolling region must be reachable by keyboard, or someone who cannot use a pointer
+ * simply cannot read the columns that are off-screen (WCAG 2.1.1; axe `scrollable-region-focusable`).
+ * `.mds-table__scroll` is `overflow-x: auto`, so ANY table wider than its container is one — this bit
+ * consumers on the first page whose columns did not fit at tablet width, and it is a latent defect in
+ * this component rather than that page's problem (the same reasoning as the sticky-cell fix below).
+ *
+ * Measured rather than assumed, so a table that fits adds no tab stop to the page: focusability is the
+ * remedy for content you would otherwise be unable to reach, not a decoration. It re-measures on
+ * resize (a viewport change or the personalization type scale can push a fitting table over) and
+ * whenever the rows change. Guarded for SSR, where there is no element and no ResizeObserver.
+ *
+ * `role="group"`, deliberately NOT `region`: a page may legitimately render several tables that share a
+ * caption (Integrations draws one per connected workspace), and `region` would mint duplicate landmarks
+ * with the same name — an axe `landmark-unique` failure. `group` names the focus stop without that.
+ */
+const scroller = ref<HTMLElement | null>(null);
+const scrollable = ref(false);
+
+function measure(): void {
+    const el = scroller.value;
+
+    if (!el) {
+        scrollable.value = false;
+
+        return;
+    }
+
+    // At <=480px the component drops to a card-per-row layout with `overflow-x: visible`, so the element
+    // is not a scroll container at all even if the content is wider.
+    const overflowX = getComputedStyle(el).overflowX;
+    const scrolls = overflowX === 'auto' || overflowX === 'scroll';
+
+    scrollable.value = scrolls && el.scrollWidth > el.clientWidth + 1;
+}
+
+let observer: ResizeObserver | null = null;
+
+onMounted(() => {
+    measure();
+
+    if (typeof ResizeObserver === 'undefined' || !scroller.value) return;
+
+    observer = new ResizeObserver(() => measure());
+    observer.observe(scroller.value);
+
+    // The table itself, not just its container: a column can grow without the wrapper changing size.
+    const table = scroller.value.querySelector('table');
+    if (table) observer.observe(table);
+});
+
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    observer = null;
+});
+
+watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(measure), { deep: false });
 </script>
 
 <template>
-    <div class="mds-table__scroll">
+    <div
+        ref="scroller"
+        class="mds-table__scroll"
+        :tabindex="scrollable ? 0 : undefined"
+        :role="scrollable ? 'group' : undefined"
+        :aria-label="scrollable ? caption : undefined"
+    >
         <table class="mds-table" :aria-busy="loading || undefined">
             <caption class="mds-table__caption">{{ caption }}</caption>
             <thead>
@@ -189,6 +253,14 @@ function keyFor(row: Row, index: number): string {
     position: relative;
     width: 100%;
     overflow-x: auto;
+}
+
+/* The scroll region only becomes focusable when it actually scrolls (see `measure()`), and a focus stop
+   the user cannot see is worse than none — WCAG 2.4.7. `outline-offset` is negative here, unlike the
+   button's: the region spans the full content width, so an outset ring would be clipped by the page. */
+.mds-table__scroll:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: -2px;
 }
 
 .mds-table {

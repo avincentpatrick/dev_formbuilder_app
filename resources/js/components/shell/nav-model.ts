@@ -29,5 +29,6 @@ export const navItems: NavItem[] = [
     // Webhook management + delivery log (H14) — Owner/Admin (gate) AND a Starter+ plan feature (feature),
     // so a tier without `webhooks` never sees the item (a direct visit still bounces off `feature:webhooks`).
     { key: 'webhooks', label: 'Webhooks', icon: 'activity', href: '/webhooks', enabled: true, gate: 'manageWebhooks', feature: 'webhooks' },
+    { key: 'integrations', label: 'Integrations', icon: 'plug', href: '/integrations', enabled: true, gate: 'manageIntegrations', feature: 'native_connectors' },
     { key: 'settings', label: 'Settings', icon: 'settings', href: '/settings', enabled: true },
 ];

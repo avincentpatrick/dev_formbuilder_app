@@ -24,7 +24,10 @@ final class WebhookDeliveryResource extends ApiResource
     {
         return [
             'id' => $this->id,
+            // Exactly one owner is non-null — the ledger is shared by the webhook and native-connector
+            // channels (H15a) and a DB CHECK enforces the exclusivity.
             'webhook_endpoint_id' => $this->webhook_endpoint_id,
+            'connection_subscription_id' => $this->connection_subscription_id,
             'event_id' => $this->event_id,
             'event_type' => $this->event_type->value,
             'status' => $this->status->value,

@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Listeners\Connectors;
+
+use App\Events\SubmissionCreated;
+use App\Listeners\Webhooks\DispatchWebhooksForSubmissionCreated;
+use App\Services\Connectors\ConnectorEventDispatcher;
+
+/**
+ * Auto-discovered SYNCHRONOUS listener fanning `submission.created` out to the tenant's native-connector
+ * subscriptions (H15a) — the {@see DispatchWebhooksForSubmissionCreated} twin for the connector channel.
+ *
+ * A SEPARATE listener rather than a second call inside the webhook one: the two channels then fail
+ * independently (a connector query error cannot suppress webhook delivery, or vice versa), and adding the
+ * channel touched no shipped file. Like its twin it must not be `ShouldQueue` — it only creates ledger rows
+ * and enqueues jobs (no outbound I/O), and a queued listener would run under a null tenant GUC.
+ */
+final class DispatchConnectorsForSubmissionCreated
+{
+    public function __construct(private readonly ConnectorEventDispatcher $dispatcher) {}
+
+    public function handle(SubmissionCreated $event): void
+    {
+        $this->dispatcher->fanOut($event);
+    }
+}

@@ -21,6 +21,7 @@ use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
 use App\Services\Webhooks\WebhookPayloadArchive;
 use App\Support\Webhooks\OutboundUrlGuard;
+use App\Support\Webhooks\RetryLadder;
 use App\Support\Webhooks\WebhookSigner;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\Attributes\Queue;
@@ -164,17 +165,12 @@ final class DeliverWebhookJob extends TenantAwareJob
 
     private function finishFailed(WebhookDelivery $delivery, WebhookEndpoint $endpoint, int $attempt, ?int $status, string $excerpt, ?int $ms, ?string $signature): void
     {
-        /** @var list<int> $ladder */
-        $ladder = config('webhooks.retry_ladder', []);
-        $exhausted = $attempt >= $delivery->max_attempts;
-
-        $nextRetryAt = null;
-        $deliveryStatus = WebhookDeliveryStatus::DeadLettered;
-
-        if (! $exhausted && isset($ladder[$attempt - 1])) {
-            $deliveryStatus = WebhookDeliveryStatus::Failed;
-            $nextRetryAt = Carbon::now()->addMinutes($ladder[$attempt - 1]);
-        }
+        // The ladder is shared with the connector channel (H15a) so the two cannot drift — same config key,
+        // same exhaustion rule, one ledger table.
+        $nextRetryAt = RetryLadder::nextRetryAt($attempt, $delivery->max_attempts);
+        $deliveryStatus = $nextRetryAt === null
+            ? WebhookDeliveryStatus::DeadLettered
+            : WebhookDeliveryStatus::Failed;
 
         $delivery->forceFill([
             'status' => $deliveryStatus,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
+use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
@@ -78,8 +80,8 @@ Route::middleware([
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
-    // The roster page is gated on the same manage ability (the 27-permission catalog is closed — there
-    // is no separate members.view — so viewing the roster is an Owner/Admin management surface).
+    // The roster page is gated on the same manage ability (the permission catalog is closed — there is no
+    // separate members.view — so viewing the roster is an Owner/Admin management surface).
     Route::get('/members', [MemberController::class, 'index'])
         ->middleware('can:tenant.members.invite')->name('members.index');
     Route::post('/members/invitations', [MemberController::class, 'invite'])
@@ -294,6 +296,17 @@ Route::middleware([
         ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.update');
     Route::delete('/webhooks/{webhookEndpoint}', [WebhookController::class, 'destroy'])
         ->middleware(['can:delete,webhookEndpoint', 'feature:webhooks'])->name('webhooks.destroy');
+
+    // Native-connector OAuth start (H15a / ADR-0009). The ONLY half of the flow with a session: it mints the
+    // signed `state` that carries tenant + user identity to the central-domain callback (routes/connectors.php),
+    // which has no session to read them from, and redirects away to the provider's consent screen.
+    //
+    // Gates mirror the API MINUS `ability:` — a session carries no token, so the ConnectionPolicy `can:` gate
+    // IS the authorization here (the H14 convention) — plus the `feature:native_connectors` Starter+ plan gate.
+    // No page is rendered: H15a is backend+api, and H15b builds the Integrations UI that links here.
+    Route::get('/integrations/{provider}/connect', [ConnectorAuthController::class, 'redirect'])
+        ->middleware(['can:create,'.Connection::class, 'feature:native_connectors'])
+        ->name('integrations.connect');
 });
 
 /*

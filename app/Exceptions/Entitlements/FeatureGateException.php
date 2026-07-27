@@ -35,6 +35,8 @@ final class FeatureGateException extends RuntimeException
             'form_templates' => 'form templates',
             'field_library' => 'the question library',
             'api_access' => 'the REST API',
+            'webhooks' => 'webhooks',
+            'native_connectors' => 'native integrations like Slack',
             default => $key,
         };
 

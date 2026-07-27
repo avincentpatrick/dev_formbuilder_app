@@ -9,6 +9,7 @@ use App\Enums\WebhookDeliveryStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Webhooks\WebhookRetrySweeper;
 use Database\Factories\WebhookDeliveryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,13 +17,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A single webhook delivery attempt-record (data-dictionary §15, H13a). Mutable tenant-owned record → the
- * plain `strict` RLS shape. `(webhook_endpoint_id, event_id)` is unique — the idempotency key. `payload`
- * is the full delivered envelope `{event_id, event_type, occurred_at, tenant_id, api_version, data}`.
+ * A single outbound delivery attempt-record (data-dictionary §15, H13a; generalized in H15a). Mutable
+ * tenant-owned record → the plain `strict` RLS shape. `payload` is the full delivered envelope
+ * `{event_id, event_type, occurred_at, tenant_id, api_version, data}`.
+ *
+ * SHARED LEDGER (H15a): a row is owned by EITHER a {@see WebhookEndpoint} (the H13a channel — the tenant
+ * runs the receiver) OR a {@see ConnectionSubscription} (the H15a native-connector channel — we hold an
+ * OAuth grant and post on their behalf), never both and never neither; a DB CHECK
+ * (`webhook_deliveries_owner_check`) enforces it. Idempotency is `(owner, event_id)` on whichever side is
+ * populated, as two PARTIAL uniques. One ledger means one retry ladder, one delivery quota and one log
+ * shape across both channels — {@see WebhookRetrySweeper} reads the owner columns to
+ * decide which delivery job to dispatch.
  *
  * @property string $id
  * @property string $tenant_id
- * @property string $webhook_endpoint_id
+ * @property ?string $webhook_endpoint_id
+ * @property ?string $connection_subscription_id
  * @property string $event_id
  * @property DomainEventType $event_type
  * @property array<string, mixed> $payload
@@ -51,6 +61,7 @@ class WebhookDelivery extends Model implements TenantScoped
     protected $fillable = [
         'tenant_id',
         'webhook_endpoint_id',
+        'connection_subscription_id',
         'event_id',
         'event_type',
         'payload',
@@ -84,9 +95,23 @@ class WebhookDelivery extends Model implements TenantScoped
         ];
     }
 
-    /** @return BelongsTo<WebhookEndpoint, $this> */
+    /**
+     * The webhook-channel owner; null on a connector-owned row.
+     *
+     * @return BelongsTo<WebhookEndpoint, $this>
+     */
     public function endpoint(): BelongsTo
     {
         return $this->belongsTo(WebhookEndpoint::class, 'webhook_endpoint_id');
+    }
+
+    /**
+     * The connector-channel owner (H15a); null on a webhook-owned row.
+     *
+     * @return BelongsTo<ConnectionSubscription, $this>
+     */
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(ConnectionSubscription::class, 'connection_subscription_id');
     }
 }

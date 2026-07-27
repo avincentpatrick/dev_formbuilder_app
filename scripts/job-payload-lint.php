@@ -94,6 +94,7 @@ const EXEMPT_JOBS = [
     'App\Notifications\Entitlements\QuotaOverageNotification',
     'App\Notifications\ResumeLinkNotification',
     'App\Notifications\Webhooks\WebhookAutoDisabledNotification',
+    'App\Notifications\Connectors\ConnectionRevokedNotification',
 ];
 
 $root = dirname(__DIR__);

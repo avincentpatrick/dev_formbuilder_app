@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\AuditApiController;
+use App\Http\Controllers\Api\V1\ConnectionController;
+use App\Http\Controllers\Api\V1\ConnectionSubscriptionController;
 use App\Http\Controllers\Api\V1\FieldLibraryApiController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
@@ -29,6 +31,7 @@ use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\MeterApiUsage;
 use App\Models\Audit;
+use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
@@ -271,6 +274,45 @@ Route::prefix('api/v1')
         Route::delete('webhooks/{webhookEndpoint}', [WebhookEndpointController::class, 'destroy'])
             ->middleware(['ability:'.ApiAbilities::MANAGE_WEBHOOKS, 'can:delete,webhookEndpoint', 'feature:webhooks'])
             ->name('webhooks.destroy');
+
+        // Native connectors (H15a / ADR-0009) — the tenant's OAuth grants and the delivery rules on them.
+        // Standing triplet on every route: `ability:manage:integrations` (scopes the TOKEN) + a
+        // ConnectionPolicy `can:` gate (re-checks the acting user's Owner/Admin permission) + the
+        // `feature:native_connectors` plan gate (Starter+, ADR-0008 §D7).
+        //
+        // There is deliberately no POST/PATCH for a CONNECTION: a grant can only be created by the
+        // interactive OAuth flow (GET /integrations/{provider}/connect on the tenant host → the provider's
+        // consent screen → the central-domain callback), so a bearer API can start nothing and never accepts
+        // a token as input. Subscription routes are nested under {connection} so authorization is decided on
+        // the grant that owns the rule. Static + more-specific segments precede the {subscription} patterns.
+        // Regenerate openapi.json.
+        Route::get('connections', [ConnectionController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:viewAny,'.Connection::class, 'feature:native_connectors'])
+            ->name('connections.index');
+        Route::get('connections/{connection}/subscriptions', [ConnectionSubscriptionController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:view,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.index');
+        Route::post('connections/{connection}/subscriptions', [ConnectionSubscriptionController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:update,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.store');
+        Route::get('connections/{connection}/subscriptions/{subscription}/deliveries', [ConnectionSubscriptionController::class, 'deliveries'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:view,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.deliveries');
+        Route::get('connections/{connection}/subscriptions/{subscription}', [ConnectionSubscriptionController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:view,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.show');
+        Route::patch('connections/{connection}/subscriptions/{subscription}', [ConnectionSubscriptionController::class, 'update'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:update,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.update');
+        Route::delete('connections/{connection}/subscriptions/{subscription}', [ConnectionSubscriptionController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:update,connection', 'feature:native_connectors'])
+            ->name('connections.subscriptions.destroy');
+        Route::get('connections/{connection}', [ConnectionController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:view,connection', 'feature:native_connectors'])
+            ->name('connections.show');
+        Route::delete('connections/{connection}', [ConnectionController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:delete,connection', 'feature:native_connectors'])
+            ->name('connections.destroy');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

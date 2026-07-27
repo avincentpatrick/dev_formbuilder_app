@@ -51,3 +51,12 @@ export const WebhookPausedDark: Story = { args: { variant: 'warning', label: 'Pa
 export const WebhookDisabledDark: Story = { args: { variant: 'neutral', label: 'Disabled' }, decorators: [dark] };
 export const DeliverySucceededDark: Story = { args: { variant: 'success', label: 'Succeeded' }, decorators: [dark] };
 export const DeliveryDeadLetteredDark: Story = { args: { variant: 'danger', label: 'Dead-lettered' }, decorators: [dark] };
+
+// Native-connector grant tokens (Increment H15b) — ConnectionStatus's two non-shared states. Both labels are
+// longer than the webhook pills above, which is the point of scanning them: a wider pill changes where the
+// text sits on the tint, and dark mode is where that contrast is tightest.
+export const ConnectionRefreshFailed: Story = { args: { variant: 'danger', label: 'Reconnect needed' } };
+export const ConnectionRevoked: Story = { args: { variant: 'neutral', label: 'Disconnected' } };
+
+export const ConnectionRefreshFailedDark: Story = { args: { variant: 'danger', label: 'Reconnect needed' }, decorators: [dark] };
+export const ConnectionRevokedDark: Story = { args: { variant: 'neutral', label: 'Disconnected' }, decorators: [dark] };

@@ -6,6 +6,7 @@ use App\Enums\ResourceScopeable;
 use App\Models\Attachment;
 use App\Models\Audit;
 use App\Models\Connection;
+use App\Models\ConnectionSubscription;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
@@ -17,6 +18,7 @@ use App\Models\WebhookEndpoint;
 use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\ConnectionPolicy;
+use App\Policies\ConnectionSubscriptionPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
@@ -144,10 +146,16 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(WebhookEndpoint::class, WebhookEndpointPolicy::class);
 
         // Native-connector OAuth grants (H15a). Owner/Admin only, via the new `integrations.manage`
-        // permission. Registered explicitly for the same fail-OPEN reason as the policies above. Subscription
-        // routes are all nested under a bound Connection, so authorization is decided on the grant that owns
-        // the rule rather than on a second policy that could disagree with this one.
+        // permission. Registered explicitly for the same fail-OPEN reason as the policies above. The /api/v1
+        // subscription routes are all nested under a bound Connection, so authorization there is decided on
+        // the grant that owns the rule.
         Gate::policy(Connection::class, ConnectionPolicy::class);
+
+        // Delivery rules on a connection (H15b). The SAME `integrations.manage` check, split out because the
+        // Integrations UI gives a rule its own page and therefore flat routes with no {connection} binding to
+        // gate on — and a nested one would 404 after a disconnect, which soft-deletes the grant but keeps its
+        // rules. See ConnectionSubscriptionPolicy's docblock.
+        Gate::policy(ConnectionSubscription::class, ConnectionSubscriptionPolicy::class);
 
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the

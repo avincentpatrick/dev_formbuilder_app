@@ -56,4 +56,24 @@ final class ConnectorRegistry
     {
         return $this->fromKey($key)->key();
     }
+
+    /**
+     * The provider's OPTIONAL destination lister (H15b), or null when it offers no picker.
+     *
+     * Config-driven exactly like `adapter`, and null rather than throwing: a missing channel_lister is not a
+     * misconfiguration, it is a provider that has no such concept (H16's Sheets enumerates spreadsheets, not
+     * channels). The caller degrades the picker; nothing 404s, because the CONNECTION is still perfectly valid.
+     */
+    public function channelListerFor(ConnectorProviderKey $provider): ?ListsChannels
+    {
+        $class = config("connectors.providers.{$provider->value}.channel_lister");
+
+        if (! is_string($class) || ! is_a($class, ListsChannels::class, true)) {
+            return null;
+        }
+
+        $lister = $this->container->make($class);
+
+        return $lister instanceof ListsChannels ? $lister : null;
+    }
 }

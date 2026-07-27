@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\BillingInterval;
+use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
@@ -15,6 +16,8 @@ use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
+use App\Models\Connection;
+use App\Models\ConnectionSubscription;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -472,6 +475,8 @@ class E2eSeeder extends Seeder
 
             $this->seedWebhooks($owner);
 
+            $this->seedConnections($owner);
+
             $this->seedScopingHierarchy($owner, $reviewer);
         });
 
@@ -528,6 +533,83 @@ class E2eSeeder extends Seeder
 
         foreach ($specs as $spec) {
             WebhookDelivery::factory()->forEndpoint($active)->create([
+                'status' => $spec['status'],
+                'attempt_count' => $spec['attempts'],
+                'response_status_code' => $spec['code'],
+                'response_time_ms' => $spec['ms'],
+                'response_body_excerpt' => $spec['body'],
+                'last_attempted_at' => $spec['status'] === WebhookDeliveryStatus::Pending ? null : now(),
+            ]);
+        }
+    }
+
+    /**
+     * Native-connector fixtures (Increment H15b) — so /integrations and a populated /integrations/rules/{id}
+     * render for the responsive-axe scan (acme is Professional, so `native_connectors` is available).
+     *
+     * Grants go through the FACTORY, not ConnectionService: a real grant can only come from an OAuth exchange,
+     * and there is no provider to call in e2e. That is also why nothing here triggers an outbound request —
+     * the channel picker only calls Slack when a human opens the rule modal, which the specs never do.
+     *
+     * Two workspaces so both connection-status badges render (`active` and the amber "Reconnect needed"), and
+     * a rule spread that covers active / form-scoped / breaker-paused plus every delivery-status badge.
+     * Idempotent on the workspace label.
+     */
+    private function seedConnections(User $owner): void
+    {
+        if (Connection::query()->where('external_account_label', 'Acme HQ')->exists()) {
+            return;
+        }
+
+        $live = Connection::factory()->create([
+            'external_account_label' => 'Acme HQ',
+            'status' => ConnectionStatus::Active,
+            'connected_by' => $owner->id,
+        ]);
+
+        // A grant that died on its own — renders the "Reconnect needed" badge + the not-delivering notice.
+        Connection::factory()->refreshFailed()->create([
+            'external_account_label' => 'Acme Field Ops',
+            'connected_by' => $owner->id,
+        ]);
+
+        $active = ConnectionSubscription::factory()->forConnection($live)->create([
+            'name' => 'New submissions → #ops',
+            'event_types' => DomainEventType::values(),
+            'config' => ['channel_id' => 'C0OPS00001', 'channel_name' => 'ops'],
+            'created_by' => $owner->id,
+        ]);
+
+        $intake = Form::query()->where('title', 'Clinic Intake')->first();
+
+        if ($intake !== null) {
+            ConnectionSubscription::factory()->forConnection($live)->forForm($intake->id)->create([
+                'name' => 'Clinic Intake → #clinic',
+                'config' => ['channel_id' => 'C0CLINIC01', 'channel_name' => 'clinic'],
+                'created_by' => $owner->id,
+            ]);
+        }
+
+        ConnectionSubscription::factory()->forConnection($live)->paused()->create([
+            'name' => 'Legacy alerts → #archive',
+            'config' => ['channel_id' => 'C0ARCHIVE1', 'channel_name' => 'archive'],
+            'consecutive_failure_count' => 20,
+            'last_failure_at' => now(),
+            'created_by' => $owner->id,
+        ]);
+
+        // A spread across the shared ledger so the rule detail's log + every delivery badge render. The
+        // `Result` column is the diagnostic here (Slack fails at HTTP 200), so each row carries a real excerpt.
+        $specs = [
+            ['status' => WebhookDeliveryStatus::Succeeded, 'attempts' => 1, 'code' => 200, 'ms' => 141, 'body' => 'ok'],
+            ['status' => WebhookDeliveryStatus::Succeeded, 'attempts' => 1, 'code' => 200, 'ms' => 96, 'body' => 'ok'],
+            ['status' => WebhookDeliveryStatus::Failed, 'attempts' => 3, 'code' => 200, 'ms' => 88, 'body' => '[not_in_channel] Slack rejected the message.'],
+            ['status' => WebhookDeliveryStatus::DeadLettered, 'attempts' => 10, 'code' => 200, 'ms' => 92, 'body' => '[channel_not_found] Slack rejected the message.'],
+            ['status' => WebhookDeliveryStatus::Pending, 'attempts' => 0, 'code' => null, 'ms' => null, 'body' => null],
+        ];
+
+        foreach ($specs as $spec) {
+            WebhookDelivery::factory()->forSubscription($active)->create([
                 'status' => $spec['status'],
                 'attempt_count' => $spec['attempts'],
                 'response_status_code' => $spec['code'],

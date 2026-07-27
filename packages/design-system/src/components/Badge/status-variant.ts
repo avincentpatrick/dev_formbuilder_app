@@ -42,6 +42,13 @@ const STATUS: Record<string, StatusDescriptor> = {
     succeeded: { variant: 'success', label: 'Succeeded' },
     failed: { variant: 'warning', label: 'Failed' },
     dead_lettered: { variant: 'danger', label: 'Dead-lettered' },
+    // Native-connector grant lifecycle (Increment H15b): ConnectionStatus (active/refresh_failed/revoked).
+    // `active` reuses the shared success descriptor. The other two are labelled by what the tenant must DO
+    // rather than by the enum's own word — neither "Refresh failed" nor "Revoked" tells anyone what happens
+    // next. `refresh_failed` is red because the grant died on its own and deliveries are silently stopping;
+    // `revoked` is neutral because the tenant disconnected it on purpose and nothing is wrong.
+    refresh_failed: { variant: 'danger', label: 'Reconnect needed' },
+    revoked: { variant: 'neutral', label: 'Disconnected' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

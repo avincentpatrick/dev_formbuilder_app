@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Connectors\Providers\SlackChannelLister;
 use App\Support\Connectors\Providers\SlackConnector;
 
 /*
@@ -36,15 +37,31 @@ return [
     |
     | Slack scopes are least-privilege (ADR-0009 §D8): post a message to a chosen channel, and list
     | channels so the H15b picker can offer them. No history, no user, no file scopes.
+    |
+    | `channel_lister` is the OPTIONAL H15b destination-picker capability. It is a separate key from `adapter`
+    | because not every provider has one and the concept is not shared: H16's Google Sheets enumerates
+    | spreadsheets, not channels. Absent (or unbuildable) means "this provider offers no picker" — the rule
+    | modal falls back to a manual destination id, and nothing 404s, because the CONNECTION is still valid.
     */
     'providers' => [
         'slack' => [
             'adapter' => SlackConnector::class,
+            'channel_lister' => SlackChannelLister::class,
             'client_id' => env('SLACK_CONNECTOR_CLIENT_ID'),
             'client_secret' => env('SLACK_CONNECTOR_CLIENT_SECRET'),
             'scopes' => ['chat:write', 'channels:read'],
         ],
     ],
+
+    /*
+    | How many pages of `conversations.list` the picker will read before it stops and reports the list as
+    | partial. At Slack's 200-per-page maximum this is 1,000 channels, which is far past the point where a
+    | native <select> stops being the right control — the cap exists so one enormous workspace cannot turn a
+    | modal open into a dozen sequential round trips, not because 1,000 is a meaningful number.
+    |
+    | >> ALSO AN UNVALIDATED PLANNING ASSUMPTION. <<
+    */
+    'channel_page_limit' => (int) env('CONNECTOR_CHANNEL_PAGE_LIMIT', 5),
 
     /*
     | The OAuth `state` parameter (ADR-0009 §D3) — the only carrier of tenant + user identity across the

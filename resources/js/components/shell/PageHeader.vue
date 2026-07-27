@@ -72,8 +72,12 @@ defineProps<{ title: string; icon?: IconName }>();
     color: var(--mds-color-text-heading);
 }
 
+/* Wrap rather than overflow: an action slot can carry several buttons (the webhook detail page runs to
+   five), and a non-wrapping row spills past a 375px viewport — the responsive-overflow gate's failure mode.
+   Same fix the builder toolbar took in H12b. */
 .page-header__actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--mds-space-2);
 }
 </style>

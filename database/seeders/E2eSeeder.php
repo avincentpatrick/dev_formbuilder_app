@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\BillingInterval;
+use App\Enums\DomainEventType;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
 use App\Enums\PlanTier;
@@ -12,6 +13,8 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
+use App\Enums\WebhookDeliveryStatus;
+use App\Enums\WebhookEndpointStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -24,11 +27,14 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Models\WebhookDelivery;
+use App\Models\WebhookEndpoint;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
+use App\Services\Webhooks\WebhookEndpointService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -464,6 +470,8 @@ class E2eSeeder extends Seeder
                 }
             }
 
+            $this->seedWebhooks($owner);
+
             $this->seedScopingHierarchy($owner, $reviewer);
         });
 
@@ -471,6 +479,63 @@ class E2eSeeder extends Seeder
 
         TenantContext::flush();
         app(PermissionRegistrar::class)->setPermissionsTeamId(null);
+    }
+
+    /**
+     * Webhook fixtures (Increment H14) — so the /webhooks list + a populated /webhooks/{id} delivery log
+     * render for the responsive-axe scan (acme is Professional, so the `webhooks` feature + endpoint quota are
+     * available). One active tenant-wide endpoint with a spread of deliveries across every status (Badge
+     * variety), and one breaker-paused endpoint so the Show page's paused notice + failure metadata are covered.
+     * Endpoints go through WebhookEndpointService (the same writer the UI uses); idempotent on the endpoint name.
+     */
+    private function seedWebhooks(User $owner): void
+    {
+        if (WebhookEndpoint::query()->where('name', 'Zapier')->exists()) {
+            return;
+        }
+
+        $service = app(WebhookEndpointService::class);
+
+        $active = $service->create([
+            'name' => 'Zapier',
+            'url' => 'https://hooks.zapier.example.com/hooks/catch/123456/abcdef',
+            'event_types' => DomainEventType::values(),
+            'form_id' => null,
+        ], $owner);
+
+        // A second endpoint the circuit breaker auto-paused — renders the Show page's paused state + failures.
+        $paused = $service->create([
+            'name' => 'CRM sync',
+            'url' => 'https://api.crm.example.com/webhooks/forms',
+            'event_types' => [DomainEventType::SubmissionCreated->value],
+            'form_id' => null,
+        ], $owner);
+        $paused->forceFill([
+            'status' => WebhookEndpointStatus::Paused,
+            'disabled_reason' => 'too_many_failures',
+            'consecutive_failure_count' => 20,
+            'last_failure_at' => now(),
+        ])->save();
+
+        // A spread of deliveries on the active endpoint so the log + every delivery-status Badge render.
+        $specs = [
+            ['status' => WebhookDeliveryStatus::Succeeded, 'attempts' => 1, 'code' => 200, 'ms' => 118, 'body' => '{"ok":true}'],
+            ['status' => WebhookDeliveryStatus::Succeeded, 'attempts' => 1, 'code' => 202, 'ms' => 143, 'body' => 'Accepted'],
+            ['status' => WebhookDeliveryStatus::Failed, 'attempts' => 3, 'code' => 500, 'ms' => 87, 'body' => 'Internal Server Error'],
+            ['status' => WebhookDeliveryStatus::DeadLettered, 'attempts' => 10, 'code' => 500, 'ms' => 91, 'body' => 'Internal Server Error'],
+            ['status' => WebhookDeliveryStatus::Pending, 'attempts' => 0, 'code' => null, 'ms' => null, 'body' => null],
+        ];
+
+        foreach ($specs as $spec) {
+            WebhookDelivery::factory()->forEndpoint($active)->create([
+                'status' => $spec['status'],
+                'attempt_count' => $spec['attempts'],
+                'response_status_code' => $spec['code'],
+                'response_time_ms' => $spec['ms'],
+                'response_body_excerpt' => $spec['body'],
+                'last_attempted_at' => $spec['status'] === WebhookDeliveryStatus::Pending ? null : now(),
+            ]);
+        }
     }
 
     /**

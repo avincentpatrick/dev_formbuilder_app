@@ -37,9 +37,22 @@ export interface AppAbilities {
     manageForms: boolean;
     viewSubmissions: boolean;
     manageScopes: boolean;
+    manageWebhooks: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };
+
+/** One-shot plaintext signing secret, flashed once after a webhook create/rotate (H14). */
+export type FlashNewSecret = { id: string; name: string; secret: string };
+
+/** The synchronous test.ping outcome, flashed to the webhook Show page's result modal (H14). */
+export type FlashTestResult = {
+    delivered: boolean;
+    response_status: number | null;
+    response_time_ms: number | null;
+    response_body_excerpt: string | null;
+    error: string | null;
+};
 
 /**
  * The tenant's entitlement snapshot (H5c) — mirrors EntitlementService::snapshot(). `null` off-tenant
@@ -57,7 +70,12 @@ declare module '@inertiajs/core' {
     interface PageProps {
         auth: { user: AppUser | null; can: AppAbilities };
         ui: { theme: UiTheme };
-        flash: { toast: FlashToast | null; xlsformWarnings?: string[] | null };
+        flash: {
+            toast: FlashToast | null;
+            xlsformWarnings?: string[] | null;
+            newSecret?: FlashNewSecret | null;
+            testResult?: FlashTestResult | null;
+        };
         entitlements: EntitlementSnapshot | null;
         errors: Record<string, string>;
     }

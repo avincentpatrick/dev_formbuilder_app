@@ -67,6 +67,11 @@ class HandleInertiaRequests extends Middleware
                     // NOT reused for the grant surface inside the page: `forms.collaborators.manage` is a
                     // separate catalog entry, and the page gates that block on its own presenter flag.
                     'manageScopes' => (bool) $user?->can('viewAny', ScopeNode::class),
+                    // Gates the Webhooks nav item + the /webhooks management pages (H14). Exactly
+                    // WebhookEndpointPolicy::viewAny — the `webhooks.manage` permission, Owner/Admin only. The
+                    // nav item ALSO combines this with the `webhooks` plan feature (Sidebar.vue) so a tier
+                    // without the feature never sees a destination it would only bounce off.
+                    'manageWebhooks' => (bool) $user?->can('webhooks.manage'),
                 ],
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the
@@ -91,6 +96,13 @@ class HandleInertiaRequests extends Middleware
                 // dismissible banner after a destructive import so the author reviews lossy coercions
                 // (dynamic repeat_count, downgraded grids, sanitized keys) before publishing (§6).
                 'xlsformWarnings' => $request->session()->get('xlsformWarnings'),
+                // Webhook one-shot flashes (H14). `newSecret` carries the plaintext signing secret exactly
+                // once after a create/rotate so the page can reveal + copy it, then it is gone (never a durable
+                // prop; AuditRedactor already strips it from the ledger). `testResult` carries the synchronous
+                // test.ping outcome for the Show page's result modal — the tester never throws, so it is a plain
+                // 200-shaped array. Both live for a single request via the session flash.
+                'newSecret' => $request->session()->get('newSecret'),
+                'testResult' => $request->session()->get('testResult'),
             ],
         ];
     }

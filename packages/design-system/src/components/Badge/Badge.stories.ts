@@ -37,3 +37,17 @@ export const WarningDark: Story = { args: { variant: 'warning', label: 'Suspende
 export const DangerDark: Story = { args: { variant: 'danger', label: 'Error' }, decorators: [dark] };
 export const InfoDark: Story = { args: { variant: 'info', label: 'Pending' }, decorators: [dark] };
 export const NeutralDark: Story = { args: { variant: 'neutral', label: 'Removed' }, decorators: [dark] };
+
+// Webhook status tokens (Increment H14) — endpoint (paused/disabled) + delivery
+// (delivering/succeeded/dead-lettered) descriptors, scanned in light + dark so axe measures the
+// pale-on-deep-tint contrast of every webhook pill the mgmt UI renders.
+export const WebhookPaused: Story = { args: { variant: 'warning', label: 'Paused' } };
+export const WebhookDisabled: Story = { args: { variant: 'neutral', label: 'Disabled' } };
+export const DeliveryDelivering: Story = { args: { variant: 'info', label: 'Delivering' } };
+export const DeliverySucceeded: Story = { args: { variant: 'success', label: 'Succeeded' } };
+export const DeliveryDeadLettered: Story = { args: { variant: 'danger', label: 'Dead-lettered' } };
+
+export const WebhookPausedDark: Story = { args: { variant: 'warning', label: 'Paused' }, decorators: [dark] };
+export const WebhookDisabledDark: Story = { args: { variant: 'neutral', label: 'Disabled' }, decorators: [dark] };
+export const DeliverySucceededDark: Story = { args: { variant: 'success', label: 'Succeeded' }, decorators: [dark] };
+export const DeliveryDeadLetteredDark: Story = { args: { variant: 'danger', label: 'Dead-lettered' }, decorators: [dark] };

@@ -25,12 +25,14 @@ use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
+use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Form;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
 use App\Models\Submission;
+use App\Models\WebhookEndpoint;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -267,6 +269,31 @@ Route::middleware([
         ->middleware('can:create,'.Submission::class.',form')->name('forms.attachments.store');
     Route::get('/attachments/{attachment}', [AttachmentController::class, 'show'])
         ->middleware('can:view,attachment')->name('attachments.show');
+
+    // Webhook management + delivery-log UI (Increment H14) — the session-authed Inertia surface over the
+    // H13a/H13b engine, delegating to the SAME WebhookEndpointService as the /api/v1 twins (routes/api.php).
+    // Gates mirror the API MINUS `ability:` (Sanctum token-scope only; a session carries no token, so the
+    // WebhookEndpointPolicy `can:` gate IS the authorization here). `feature:webhooks` stacks the Starter+ plan
+    // gate — the nav item is hidden for tiers without it, and a direct visit bounces with an upgrade toast.
+    // Static action segments (/test, /rotate-secret, /deliveries) are declared before the bare
+    // GET/PATCH/DELETE {webhookEndpoint} routes so they are never captured as a binding. Every mutation is an
+    // Inertia visit → redirect + flash; there is no JSON sidecar (test.ping flashes its synchronous result).
+    Route::get('/webhooks', [WebhookController::class, 'index'])
+        ->middleware(['can:viewAny,'.WebhookEndpoint::class, 'feature:webhooks'])->name('webhooks.index');
+    Route::post('/webhooks', [WebhookController::class, 'store'])
+        ->middleware(['can:create,'.WebhookEndpoint::class, 'feature:webhooks'])->name('webhooks.store');
+    Route::post('/webhooks/{webhookEndpoint}/test', [WebhookController::class, 'test'])
+        ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.test');
+    Route::post('/webhooks/{webhookEndpoint}/rotate-secret', [WebhookController::class, 'rotateSecret'])
+        ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.rotate-secret');
+    Route::post('/webhooks/{webhookEndpoint}/deliveries/{webhookDelivery}/redeliver', [WebhookController::class, 'redeliver'])
+        ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.deliveries.redeliver');
+    Route::get('/webhooks/{webhookEndpoint}', [WebhookController::class, 'show'])
+        ->middleware(['can:view,webhookEndpoint', 'feature:webhooks'])->name('webhooks.show');
+    Route::patch('/webhooks/{webhookEndpoint}', [WebhookController::class, 'update'])
+        ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.update');
+    Route::delete('/webhooks/{webhookEndpoint}', [WebhookController::class, 'destroy'])
+        ->middleware(['can:delete,webhookEndpoint', 'feature:webhooks'])->name('webhooks.destroy');
 });
 
 /*

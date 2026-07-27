@@ -15,10 +15,16 @@ const emit = defineEmits<{ close: [] }>();
 
 const page = usePage();
 
-// Hide permission-gated items (e.g. Members) from users who lack the ability. Gates resolve
-// fail-closed off-tenant, so central/guest chrome never shows a tenant-only destination.
+// Hide permission-gated items (e.g. Members) from users who lack the ability, AND plan-gated items
+// (e.g. Webhooks = Starter+) from tenants whose plan lacks the feature. Both gates resolve fail-closed
+// off-tenant (auth.can.* false, entitlements null), so central/guest chrome never shows a tenant-only
+// destination — and a plan-gated item never appears where its `feature:` route guard would only bounce.
 const visibleItems = computed(() =>
-    navItems.filter((item) => !item.gate || page.props.auth.can[item.gate]),
+    navItems.filter(
+        (item) =>
+            (!item.gate || page.props.auth.can[item.gate]) &&
+            (!item.feature || page.props.entitlements?.features?.[item.feature] === true),
+    ),
 );
 
 function isActive(href?: string): boolean {

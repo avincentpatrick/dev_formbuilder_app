@@ -186,10 +186,12 @@ function channelLabel(rule: RuleRow): string {
                     This workspace isn’t delivering. Reconnect it above to resume — your rules are kept.
                 </p>
 
+                <!-- Caption names the workspace: a tenant can connect several, and "Delivery rules" three
+                     times over tells a screen-reader user nothing about which one they are in. -->
                 <MdsDataTable
                     :columns="columns"
                     :rows="connection.rules"
-                    caption="Delivery rules"
+                    :caption="`Delivery rules — ${connection.external_account_label}`"
                     row-key="id"
                 >
                     <template #cell-channel_name="{ row }">

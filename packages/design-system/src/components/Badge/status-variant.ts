@@ -30,6 +30,18 @@ const STATUS: Record<string, StatusDescriptor> = {
     under_review: { variant: 'warning', label: 'Under review' },
     approved: { variant: 'success', label: 'Approved' },
     returned: { variant: 'danger', label: 'Returned' },
+    // Webhook endpoint lifecycle (Increment H14): WebhookEndpointStatus (active/paused/disabled). `active`
+    // reuses the shared success descriptor above. `paused` = circuit-breaker auto-pause (needs attention)
+    // → amber; `disabled` = manually/platform off (intentionally inert) → neutral.
+    paused: { variant: 'warning', label: 'Paused' },
+    disabled: { variant: 'neutral', label: 'Disabled' },
+    // Webhook delivery lifecycle (Increment H14): WebhookDeliveryStatus. `failed` still has retries pending
+    // (transient) → amber; `dead_lettered` is terminal (exhausted / quota-refused) → red.
+    pending: { variant: 'neutral', label: 'Pending' },
+    delivering: { variant: 'info', label: 'Delivering' },
+    succeeded: { variant: 'success', label: 'Succeeded' },
+    failed: { variant: 'warning', label: 'Failed' },
+    dead_lettered: { variant: 'danger', label: 'Dead-lettered' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

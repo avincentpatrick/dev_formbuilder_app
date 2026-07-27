@@ -16,6 +16,8 @@ const pages = [
     // The scoping hierarchy (G10b2). This is the whole-page scan, so it owns the horizontal-overflow
     // assertion for the tree — the deep seeded fixture exists so a 375px viewport actually reaches it.
     { name: 'Scopes', path: '/scopes' },
+    // Webhook management (H14) — the list, summary tiles, Zapier recipe card, and the seeded endpoints table.
+    { name: 'Webhooks', path: '/webhooks' },
     { name: 'Settings', path: '/settings' },
 ];
 
@@ -93,5 +95,25 @@ for (const theme of themes) {
         await page.getByRole('link', { name: 'Back to submissions' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Submission detail');
+    });
+}
+
+// The webhook endpoint detail + delivery log (H14). Reached from the /webhooks list by opening the seeded
+// "Zapier" endpoint's "View endpoint" action (no id in the URL). A CSS `tr` locator scoped by row text is used
+// rather than getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.
+// The seeded endpoint carries a spread of deliveries so the action bar, detail cards, and delivery-log rows
+// (every status Badge) are all mounted for the scan.
+for (const theme of themes) {
+    test(`Webhook detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/webhooks', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Zapier' })
+            .getByRole('button', { name: 'View endpoint' })
+            .click();
+        await page.waitForURL(/\/webhooks\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('link', { name: 'Back to webhooks' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Webhook detail');
     });
 }

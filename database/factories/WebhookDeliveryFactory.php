@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Enums\DomainEventType;
 use App\Enums\WebhookDeliveryStatus;
+use App\Models\ConnectionSubscription;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -52,6 +53,21 @@ class WebhookDeliveryFactory extends Factory
         return $this->state(fn (): array => [
             'tenant_id' => $endpoint->tenant_id,
             'webhook_endpoint_id' => $endpoint->getKey(),
+            'connection_subscription_id' => null,
+        ]);
+    }
+
+    /**
+     * Attach the delivery to a connector subscription instead of a webhook endpoint (H15a). The two owners
+     * are mutually exclusive — `webhook_deliveries_owner_check` rejects a row with both or neither — so this
+     * nulls the endpoint the default definition would otherwise create.
+     */
+    public function forSubscription(ConnectionSubscription $subscription): static
+    {
+        return $this->state(fn (): array => [
+            'tenant_id' => $subscription->tenant_id,
+            'webhook_endpoint_id' => null,
+            'connection_subscription_id' => $subscription->getKey(),
         ]);
     }
 

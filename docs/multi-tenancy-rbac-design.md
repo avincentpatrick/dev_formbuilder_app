@@ -74,7 +74,7 @@ A **fixed, platform-defined catalog of five roles** — tenants cannot define cu
 
 **Permission-string catalog** (each a `permissions.name` row, dot-namespaced by domain):
 
-`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`, `scopes.manage`
+`tenant.settings.manage`, `tenant.billing.manage`, `tenant.billing.view`, `tenant.members.invite`, `tenant.members.remove`, `tenant.roles.assign`, `tenant.ownership.transfer`, `forms.create`, `forms.edit.any`, `forms.edit.own`, `forms.publish.any`, `forms.publish.own`, `forms.delete`, `forms.collaborators.manage`, `submissions.create`, `submissions.edit.any`, `submissions.edit.own`, `submissions.review.any`, `submissions.review.own`, `submissions.export`, `submissions.view`, `dashboard.org.view`, `dashboard.form.view`, `webhooks.manage`, `integrations.manage`, `audit_log.view`, `feedback.submit`, `feedback.view`, `scopes.manage`
 
 The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Owner/Admin) and per-form collaborator-scoped access (Form Editor/Reviewer) coexist as two distinct, independently grantable permissions rather than one permission with an implicit, code-only scoping rule — `.any` is a pure Spatie role check; `.own` additionally requires the Policy-layer grant lookup described in §8 (`resource_grants`, resolved through `ResourceGrantResolver`).
 
@@ -104,6 +104,7 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `dashboard.org.view` | ✓ | ✓ | | | ✓ |
 | `dashboard.form.view` | ✓ | ✓ | ✓ (own forms) | ✓ (own forms) | ✓ |
 | `webhooks.manage` | ✓ | ✓ | | | |
+| `integrations.manage` *(H15a — hold the OAuth grants for native connectors)* | ✓ | ✓ | | | |
 | `audit_log.view` | ✓ | ✓ | | | |
 | `feedback.submit` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `feedback.view` | ✓ | ✓ | | | |
@@ -118,6 +119,13 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > authorization hierarchy the moment G10b ships a write surface. **As of G10b** it maps to the new
 > `manage:scopes` token ability (api-specification.md §2.6), alongside `forms.collaborators.manage` —
 > a new ability, so no previously-minted token gained anything.
+>
+> **Design Note (H15a)**: `integrations.manage` is the **29th** permission, Owner/Admin only, and is new
+> for the same reason one step sharper. A native connector stores an OAuth credential that lets the
+> platform act *inside the tenant's own third-party workspace* (ADR-0009), so folding it into
+> `webhooks.manage` would retroactively hand every already-minted `manage:webhooks` token authority whose
+> blast radius reaches outside this platform entirely. It maps to the new `manage:integrations` token
+> ability (api-specification.md §2.6); no previously-minted token carries it.
 >
 > **Design Note**: `forms.collaborators.manage` is deliberately restricted to Owner/Admin only — **not** delegable to a form's existing editors — specifically to prevent a Form Editor from adding themselves or others to additional forms they weren't granted access to by an administrator, i.e., a straightforward privilege-escalation vector that would otherwise exist if collaborator management were self-service.
 

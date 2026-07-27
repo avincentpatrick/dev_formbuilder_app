@@ -57,6 +57,17 @@ final class ApiAbilities
     public const MANAGE_SCOPES = 'manage:scopes';
 
     /**
+     * Managing the tenant's native-connector OAuth grants and their delivery rules (H15a / ADR-0009).
+     *
+     * A NEW ability mapped to a NEW permission, for the same reason `manage:scopes` is: `manage:webhooks`
+     * tokens have already been minted, and folding connections into `webhooks.manage` would retroactively
+     * grant every one of them authority over credentials that let the platform act inside the tenant's Slack
+     * workspace — an authority no issuer of those tokens agreed to. A new ability cannot be held retroactively,
+     * because no token was ever minted with it.
+     */
+    public const MANAGE_INTEGRATIONS = 'manage:integrations';
+
+    /**
      * ability => the RBAC permissions that entitle a user to hold it (holding ANY one grants the ability).
      * `read:forms` mirrors FormPolicy::viewAny exactly, so a token's ability and the route policy agree.
      *
@@ -73,6 +84,7 @@ final class ApiAbilities
         self::MANAGE_SETTINGS => ['tenant.settings.manage'],
         self::READ_AUDIT_LOG => ['audit_log.view'],
         self::MANAGE_SCOPES => ['scopes.manage', 'forms.collaborators.manage'],
+        self::MANAGE_INTEGRATIONS => ['integrations.manage'],
     ];
 
     /**

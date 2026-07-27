@@ -273,6 +273,488 @@
                 }
             }
         },
+        "/connections": {
+            "get": {
+                "operationId": "v1.connections.index",
+                "summary": "Cursor-paginated list of the tenant's connections, newest first",
+                "tags": [
+                    "Connection"
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ConnectionResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/connections/{connection}": {
+            "get": {
+                "operationId": "v1.connections.show",
+                "summary": "One connection: which workspace, which scopes, and whether the grant still works",
+                "tags": [
+                    "Connection"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ConnectionResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConnectionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1.connections.destroy",
+                "summary": "Disconnect: destroy the stored credential and pause the rules that used it. Local destruction is\nunconditional \u2014 a provider-side revoke is attempted best-effort elsewhere and its outcome never gates\nthis, since an unreachable provider is exactly when a tenant most wants the token gone",
+                "tags": [
+                    "Connection"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/connections/{connection}/subscriptions": {
+            "get": {
+                "operationId": "v1.connections.subscriptions.index",
+                "summary": "List the delivery rules on one connection, newest first",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ConnectionSubscriptionResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.connections.subscriptions.store",
+                "summary": "Create a delivery rule: which events, which form scope, and the provider destination",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreConnectionSubscriptionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConnectionSubscriptionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/connections/{connection}/subscriptions/{subscription}/deliveries": {
+            "get": {
+                "operationId": "v1.connections.subscriptions.deliveries",
+                "summary": "Cursor-paginated delivery log for one rule, newest first \u2014 the shared outbound ledger",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subscription",
+                        "in": "path",
+                        "required": true,
+                        "description": "The subscription ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/WebhookDeliveryResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "next_cursor": {
+                                                    "type": "string"
+                                                },
+                                                "has_more": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "next_cursor",
+                                                "has_more"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/connections/{connection}/subscriptions/{subscription}": {
+            "get": {
+                "operationId": "v1.connections.subscriptions.show",
+                "summary": "One delivery rule",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subscription",
+                        "in": "path",
+                        "required": true,
+                        "description": "The subscription ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ConnectionSubscriptionResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConnectionSubscriptionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "v1.connections.subscriptions.update",
+                "summary": "Partially update a rule, including the pause/re-enable status toggle",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subscription",
+                        "in": "path",
+                        "required": true,
+                        "description": "The subscription ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateConnectionSubscriptionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ConnectionSubscriptionResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ConnectionSubscriptionResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1.connections.subscriptions.destroy",
+                "summary": "Soft-delete a rule; its delivery history stays in the shared ledger",
+                "tags": [
+                    "ConnectionSubscription"
+                ],
+                "parameters": [
+                    {
+                        "name": "connection",
+                        "in": "path",
+                        "required": true,
+                        "description": "The connection ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subscription",
+                        "in": "path",
+                        "required": true,
+                        "description": "The subscription ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/field-library": {
             "get": {
                 "operationId": "v1.field-library.index",
@@ -2973,6 +3455,163 @@
                 ],
                 "title": "AuditResource"
             },
+            "ConnectionResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "type": "string"
+                    },
+                    "external_account_id": {
+                        "type": "string"
+                    },
+                    "external_account_label": {
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "token_expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Null for a non-expiring grant (Slack's default bot token) \u2014 not \"unknown\", but \"never expires\"."
+                    },
+                    "last_refreshed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The provider's own error code from the last failure (e.g. `invalid_grant`), never a body."
+                    },
+                    "last_error_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "connected_by": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "provider",
+                    "external_account_id",
+                    "external_account_label",
+                    "scopes",
+                    "status",
+                    "token_expires_at",
+                    "last_refreshed_at",
+                    "last_error",
+                    "last_error_at",
+                    "connected_by",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ConnectionResource"
+            },
+            "ConnectionSubscriptionResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "connection_id": {
+                        "type": "string"
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "config": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "consecutive_failure_count": {
+                        "type": "integer"
+                    },
+                    "last_success_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last_failure_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "connection_id",
+                    "form_id",
+                    "name",
+                    "event_types",
+                    "config",
+                    "status",
+                    "consecutive_failure_count",
+                    "last_success_at",
+                    "last_failure_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ConnectionSubscriptionResource"
+            },
             "FieldLibraryResource": {
                 "type": "object",
                 "properties": {
@@ -3599,7 +4238,8 @@
                                 "manage:webhooks",
                                 "manage:settings",
                                 "read:audit_log",
-                                "manage:scopes"
+                                "manage:scopes",
+                                "manage:integrations"
                             ]
                         },
                         "minItems": 1
@@ -3631,6 +4271,61 @@
                     "field_key"
                 ],
                 "title": "StoreAttachmentRequest"
+            },
+            "StoreConnectionSubscriptionRequest": {
+                "type": "object",
+                "description": "Create a delivery rule on a connection (ADR-0009, H15a). `event_types` must be a non-empty subset of the\n{@see DomainEventType} catalog \u2014 connectors subscribe to the same vocabulary webhooks do, deliberately, so\nthere is one event catalog rather than a per-channel dialect. `form_id` uses `exists:` on the RLS-scoped\nconnection, so another tenant's form fails validation rather than leaking that the id exists.\n\n`config.channel_id` is required because a Slack rule with no destination can never deliver: accepting one\nwould defer a permanent failure to delivery time, where it looks like an outage instead of a mistake. It is\nvalidated as a shape, not against Slack \u2014 verifying the channel exists needs an API call this request has\nno business making (H15b's picker offers real channels).",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "submission.created",
+                                "form.published",
+                                "form.opened",
+                                "form.closed"
+                            ]
+                        },
+                        "minItems": 1
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "channel_id": {
+                                "type": "string",
+                                "maxLength": 64
+                            },
+                            "channel_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 150
+                            }
+                        },
+                        "required": [
+                            "channel_id"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "event_types",
+                    "config"
+                ],
+                "title": "StoreConnectionSubscriptionRequest"
             },
             "StoreFieldLibraryRequest": {
                 "type": "object",
@@ -4012,6 +4707,61 @@
                 ],
                 "title": "TenantResource"
             },
+            "UpdateConnectionSubscriptionRequest": {
+                "type": "object",
+                "description": "Partially update a delivery rule (ADR-0009, H15a). Every field is `sometimes`, so a caller may send only\nwhat it changes; `config` is replaced wholesale when present (it is one small destination object, and a\ndeep merge would make \"clear this key\" unexpressible).\n\n`status` accepts the full {@see ConnectorSubscriptionStatus} vocabulary \u2014 setting it back to `active` is\nhow a tenant clears a circuit-breaker pause, which also resets the failure counter in the service.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "form_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "paused",
+                            "disabled"
+                        ]
+                    },
+                    "event_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "submission.created",
+                                "form.published",
+                                "form.opened",
+                                "form.closed"
+                            ]
+                        },
+                        "minItems": 1
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "channel_id": {
+                                "type": "string",
+                                "maxLength": 64
+                            },
+                            "channel_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 150
+                            }
+                        }
+                    }
+                },
+                "title": "UpdateConnectionSubscriptionRequest"
+            },
             "UpdateScopeNodeRequest": {
                 "type": "object",
                 "description": "Edit a scope node's labels (Increment G10b).\n\nNo `parent_id`: re-parenting is the dedicated `move` endpoint, because it is a locked, subtree-wide\noperation with its own refusals (cycle, depth cap) and folding it in here would make both the contract\nand the controller's branching worse.",
@@ -4089,7 +4839,17 @@
                         "type": "string"
                     },
                     "webhook_endpoint_id": {
-                        "type": "string"
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Exactly one owner is non-null \u2014 the ledger is shared by the webhook and native-connector\nchannels (H15a) and a DB CHECK enforces the exclusivity."
+                    },
+                    "connection_subscription_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "event_id": {
                         "type": "string"
@@ -4152,6 +4912,7 @@
                 "required": [
                     "id",
                     "webhook_endpoint_id",
+                    "connection_subscription_id",
                     "event_id",
                     "event_type",
                     "status",

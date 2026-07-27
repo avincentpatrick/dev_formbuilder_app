@@ -2,6 +2,8 @@
 
 use App\Exceptions\Admin\SuperAdminException;
 use App\Exceptions\Authorization\GrantException;
+use App\Exceptions\Connectors\InvalidConnectorStateException;
+use App\Exceptions\Connectors\UnknownConnectorProviderException;
 use App\Exceptions\Entitlements\FeatureGateException;
 use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Entitlements\RateLimitExceededException;
@@ -71,6 +73,10 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function (): void {
             Route::middleware('web')->group(base_path('routes/admin.php'));
             Route::group([], base_path('routes/api.php'));
+            // The native-connector OAuth callbacks (H15a) — central-domain, and deliberately NOT inside
+            // `web`: a third-party GET from a consent screen carries no session and no CSRF token, and the
+            // signed `state` parameter is the CSRF control (ADR-0009 §D3). The group declares its own stack.
+            Route::group([], base_path('routes/connectors.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -321,6 +327,25 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (ExpiredShareTokenException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(401, 'share_token_expired', 'This share link has expired.')
             : null);
+
+        // Native-connector OAuth `state` failures (H15a / ADR-0009 §D3). Thrown by
+        // EstablishConnectorOauthContext BEFORE any tenant context is set, so a forged/tampered/expired/
+        // wrong-provider state never engages RLS. The callback is a browser landing on the CENTRAL domain,
+        // so the only useful response is a bounce to the app URL: there is no tenant host to return to (we
+        // could not verify which tenant this was), and naming one would disclose whether it exists.
+        $exceptions->render(fn (InvalidConnectorStateException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(400, 'invalid_connector_state', $e->getMessage())
+            : redirect()->away((string) config('app.url')));
+
+        // A provider key with no configured adapter (H15a) — an unknown URL, not a server fault. 404 keeps
+        // the non-disclosure posture the rest of the surface uses for "this does not exist".
+        $exceptions->render(function (UnknownConnectorProviderException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(404, 'unknown_connector_provider', 'This integration is not available.');
+            }
+
+            throw new NotFoundHttpException;
+        });
 
         // Submit-time expression failure — a defensive backstop. Published expressions are pre-validated by
         // the F3 ExpressionValidationGate at publish, so reaching here signals a server bug, not user error;

@@ -551,12 +551,15 @@ Tenant-configured delivery targets (plan §2.5).
 
 Individual delivery attempts — queue-first ingestion, mandatory idempotency, exponential backoff (plan §2.5).
 
+> **H15a — this is now the SHARED OUTBOUND LEDGER.** A row is owned by **either** a `webhook_endpoints` row (the tenant runs the receiver) **or** a `connection_subscriptions` row (a native connector — we hold an OAuth grant and post on their behalf), never both and never neither. One ledger means one retry ladder, one `webhook_deliveries` quota metric, and one delivery-log shape across both channels; the table keeps its name for continuity with §14 and the API surface. See ADR-0009.
+
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`. |
-| `webhook_endpoint_id` | `uuid` | No | — | No | FK to `webhook_endpoints.id`, `ON DELETE CASCADE`. |
-| `event_id` | `uuid` | No | — | No | Unique — the idempotency key (plan §2.2: "`event_id` unique"). |
+| `webhook_endpoint_id` | `uuid` | **Yes (H15a)** | `NULL` | No | FK to `webhook_endpoints.id`, `ON DELETE CASCADE`. Non-null on a webhook-channel row; NULL on a connector row. |
+| `connection_subscription_id` | `uuid` | Yes | `NULL` | No | **H15a** — FK to `connection_subscriptions.id`, `ON DELETE CASCADE`. Non-null on a native-connector row; NULL on a webhook row. Exactly one of the two owner columns is set (`webhook_deliveries_owner_check`). |
+| `event_id` | `uuid` | No | — | No | The idempotency key (plan §2.2: "`event_id` unique"), unique **per owner** — see Design Notes. |
 | `event_type` | `varchar(60)` — PHP enum: `DomainEventType` (H13a; see `webhook_endpoints.event_types` note) | No | — | No | See the starter catalog above. |
 | `payload` | `jsonb` | No | — | **Yes (conditional)** | The delivered event body; may embed submission answer data, so content-dependent PII exposure identical to `submission_answers.answers`. |
 | `payload_attachment_id` | `uuid` | Yes | `NULL` | No | FK to `attachments.id` (`kind = 'webhook_payload_archive'`); used when a payload is too large to store inline and is archived to object storage instead. |
@@ -573,7 +576,7 @@ Individual delivery attempts — queue-first ingestion, mandatory idempotency, e
 | `updated_at` | `timestamptz` | No | `now()` | No | — |
 
 > **Design Notes**
-> - `event_id` uniqueness **is** the idempotency mechanism (plan §2.2/§5): a producer retrying a publish is safe to call again with the same `event_id`, the unique constraint rejects the duplicate insert. **H13a note:** the DB unique is on `(webhook_endpoint_id, event_id)` (one delivery per endpoint per event), which is what the fan-out `firstOrCreate` relies on.
+> - `event_id` uniqueness **is** the idempotency mechanism (plan §2.2/§5): a producer retrying a publish is safe to call again with the same `event_id`, the unique constraint rejects the duplicate insert. **H13a note:** the DB unique is on `(webhook_endpoint_id, event_id)` (one delivery per endpoint per event), which is what the fan-out `firstOrCreate` relies on. **H15a note:** with a second owner column both uniques became **partial** — `… (webhook_endpoint_id, event_id) WHERE webhook_endpoint_id IS NOT NULL` and the mirror for `connection_subscription_id`. They have to be: under Postgres NULL semantics a plain unique over a nullable column would let unlimited connector rows share an `event_id`, silently ending idempotency for half the ledger.
 > - The event catalog (`DomainEventType`, H13a) is explicitly a starter set (plan §2.5's "phase in more — not 50 at once"); new events require a code change to emit anyway, so growing the enum over time (rather than making it data-driven) is intentional, not a limitation to work around later.
 > - **H13a note — no distinct status for SSRF/quota outcomes.** The design doc names a `dns_rebinding_blocked` outcome and this increment adds a monthly-quota refusal; both are recorded as a `[marker]` prefix in `response_body_excerpt` (a delivery-time SSRF re-block → `[dns_rebinding_blocked]` `failed`; an over-monthly-quota first attempt → `[quota_exceeded]` `dead_lettered`) rather than as new `WebhookDeliveryStatus` values, keeping the pinned five-value status enum intact. A dedicated status/column is a H14 option if the delivery-log UI needs to filter on it.
 
@@ -806,6 +809,67 @@ Backs PRD Feature #13 — a user's per-tenant, per-type choice of which channels
 
 ---
 
+## 24. `connections`
+
+The platform's OAuth grant on a tenant's third-party workspace (H15a; ADR-0009; webhook-integration-design.md §4). One row per `(tenant, provider, external workspace)`.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `provider` | `varchar(30)` — PHP enum: `ConnectorProviderKey` | No | — | No | `slack` in H15a; Sheets/Airtable are H16. CHECK generated from the enum. |
+| `external_account_id` | `varchar(255)` | No | — | No | The provider's own handle for the workspace (a Slack team id). |
+| `external_account_label` | `varchar(255)` | No | — | No | Display name of the workspace, for the UI. |
+| `scopes` | `jsonb` | No | `'[]'` | No | The scopes actually granted — stored for display and re-consent detection (ADR-0009 §D8). |
+| `access_token` | `text` | No | — | No (a **credential**) | **Encrypted at rest** (`encrypted` cast). `text`, not `varchar`, because the cast inflates the value well past 255 chars. Returned by **no** API or presenter in any form, masked or otherwise (ADR-0009 §D1). |
+| `refresh_token` | `text` | Yes | `NULL` | No (a **credential**) | Same custody rules. NULL when the provider issues none (Slack's default bot token). |
+| `token_expires_at` | `timestamptz` | Yes | `NULL` | No | NULL = the grant does not expire, so the refresh sweep skips it — not "unknown". |
+| `status` | `varchar(20)` — PHP enum: `ConnectionStatus` | No | `'active'` | No | `active` / `refresh_failed` (a refused refresh) / `revoked` (disconnected, or the provider rejected the credential mid-delivery). CHECK from the enum. |
+| `last_refreshed_at` | `timestamptz` | Yes | `NULL` | No | Stamped by a successful refresh; a machine refresh is not audited, so this is its record. |
+| `last_error_at` | `timestamptz` | Yes | `NULL` | No | — |
+| `last_error` | `varchar(255)` | Yes | `NULL` | No | The provider's own error code (`invalid_grant`), never a response body and never a token. |
+| `connected_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL` — the user who completed the OAuth flow, carried in the signed `state`. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `deleted_at` | `timestamptz` | Yes | `NULL` | No | Soft delete = disconnected. |
+
+**Uniqueness**: `(tenant_id, id)` (the composite-FK target) and a **partial** unique `(tenant_id, provider, external_account_id) WHERE deleted_at IS NULL` — one LIVE grant per workspace, so re-connecting updates in place while disconnected history survives.
+
+> **Design Notes**
+> - **RLS**: strict (`withTenantIsolation('connections')`). The OAuth callback lands on the central domain with no tenant bound, so it adopts context from the signed `state` **before** writing — without that the INSERT would match no policy and write zero rows *without erroring* (ADR-0009 §D4).
+> - **Credentials live here; ROUTING lives in §25.** One grant can feed many destinations without duplicating — or re-refreshing — a token per rule.
+> - Both token columns are in `AuditRedactor`'s unconditional secret list under the `connection` alias, registered in the same increment that created the table (ADR-0009 §D10).
+
+---
+
+## 25. `connection_subscriptions`
+
+One "send these events to this destination" rule on a connection (H15a; ADR-0009) — the §14 `webhook_endpoints` analogue for native connectors, minus the secret lifecycle.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `connection_id` | `uuid` | No | — | No | Composite FK `(tenant_id, connection_id) → connections (tenant_id, id)`, `ON DELETE CASCADE` (ADR-0002 §D5). |
+| `form_id` | `uuid` | Yes | `NULL` | No | Composite FK `(tenant_id, form_id) → forms (tenant_id, id)`, `ON DELETE CASCADE`. NULL = tenant-wide. |
+| `name` | `varchar(150)` | No | — | No | — |
+| `event_types` | `jsonb` | No | `'[]'` | No | Subscribed `DomainEventType` values — the same catalog webhooks use, deliberately (no per-channel dialect). |
+| `config` | `jsonb` | No | `'{}'` | No | The provider-specific destination (Slack: `{channel_id, channel_name}`). Never holds a credential. |
+| `status` | `varchar(20)` — PHP enum: `ConnectorSubscriptionStatus` | No | `'active'` | No | `active` / `paused` / `disabled`. CHECK from the enum. |
+| `consecutive_failure_count` | `integer` | No | `0` | No | Drives the circuit breaker, mirroring §14. |
+| `last_success_at` / `last_failure_at` | `timestamptz` | Yes | `NULL` | No | — |
+| `created_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL`. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+| `deleted_at` | `timestamptz` | Yes | `NULL` | No | Soft delete. |
+
+**Uniqueness**: `(tenant_id, id)` — the composite-FK target §15's shared ledger points back to.
+
+> **Design Notes**
+> - **RLS**: strict. A rule delivers only while BOTH it and its grant are active; a dead grant pauses its rules rather than deleting them, so routing survives a re-connect.
+> - **No per-tier cap.** Unlike `webhook_endpoints` (`UsageMetric::WebhookEndpointsCount`) there is no subscription-count gauge: the pricing matrix has no such row, and the real cost — actual sends — is already bounded by the shared monthly `webhook_deliveries` quota. A deliberate H15a narrowing, not an omission.
+> - `config` is jsonb rather than provider-specific columns because H16's Sheets/Airtable destinations are shaped nothing like a channel id. Each adapter validates its own shape at the request layer.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -877,9 +941,18 @@ webhook_endpoints.tenant_id            -> tenants.id
 webhook_endpoints.form_id              -> forms.id           (nullable)
 webhook_endpoints.created_by           -> users.id           (external, nullable)
 
-webhook_deliveries.tenant_id               -> tenants.id
-webhook_deliveries.webhook_endpoint_id     -> webhook_endpoints.id
-webhook_deliveries.payload_attachment_id   -> attachments.id (nullable)
+webhook_deliveries.tenant_id                     -> tenants.id
+webhook_deliveries.webhook_endpoint_id           -> webhook_endpoints.id        (nullable — H15a: exactly one owner)
+webhook_deliveries.connection_subscription_id    -> connection_subscriptions.id (nullable — H15a: exactly one owner)
+webhook_deliveries.payload_attachment_id         -> attachments.id (nullable)
+
+connections.tenant_id                  -> tenants.id
+connections.connected_by               -> users.id           (external, nullable)
+
+connection_subscriptions.tenant_id     -> tenants.id
+connection_subscriptions.connection_id -> connections.id
+connection_subscriptions.form_id       -> forms.id           (nullable)
+connection_subscriptions.created_by    -> users.id           (external, nullable)
 
 subscriptions.tenant_id                -> tenants.id
 subscriptions.plan_id                  -> plans.id

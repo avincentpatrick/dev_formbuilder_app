@@ -91,6 +91,7 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `manage:webhooks` | `webhooks.manage` |
 | `manage:settings` | `tenant.settings.manage` |
 | `manage:scopes` *(G10b)* | `scopes.manage` / `forms.collaborators.manage` |
+| `manage:integrations` *(H15a)* | `integrations.manage` |
 
 > **Increment G10b note.** `manage:scopes` covers both authoring the `scope_nodes` hierarchy and granting
 > access on it. It is a **new** ability rather than a reuse of `manage:settings`, which preserves the
@@ -104,6 +105,15 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > carries its own `can:` policy gate, re-checked against the acting user's real permissions, and
 > `POST /resource-grants` adds the `grantCapacity` escalation check on top. **A route added to this group
 > without a `can:` gate would break that argument** — see `ApiAbilities::MANAGE_SCOPES`.
+
+> **H15a note.** `manage:integrations` scopes the native-connector surface (`/connections` and the delivery
+> rules nested under it). New rather than a reuse of `manage:webhooks` for the reason above, one step
+> sharper: a connection holds an OAuth credential that lets the platform act inside the tenant's own
+> third-party workspace (ADR-0009 §D1), so reusing the webhook permission would retroactively grant every
+> already-minted webhook token an authority whose blast radius leaves this platform. Note what the surface
+> deliberately does **not** offer: there is no `POST /connections` and no `PATCH /connections/{id}` — a
+> grant can only be created by the interactive OAuth flow, and an API that accepted a token as input would
+> be a path to writing a credential the platform then acts with.
 | `read:audit_log` | `audit_log.view` |
 
 An API key (personal access token) is issued with an explicit subset of these abilities, independent of — but never exceeding — the issuing user's own RBAC permissions (a key can be narrower than its issuer's own access, never broader; enforced by intersecting the requested ability set against the issuer's actual permissions at token-creation time).

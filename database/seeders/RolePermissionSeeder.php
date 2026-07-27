@@ -12,7 +12,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Seeds the fixed, platform-defined RBAC catalog (multi-tenancy-rbac-design.md §3, §5): five roles and
- * twenty-eight permissions (the 28th, `scopes.manage`, added in Increment G10a), plus the
+ * twenty-nine permissions (the 28th, `scopes.manage`, added in Increment G10a; the 29th, `integrations.manage`, in H15a), plus the
  * role×permission grant matrix. These are GLOBAL rows (tenant_id IS
  * NULL) shared by every tenant — the catalog is closed (no UI ever inserts a sixth role).
  *
@@ -34,12 +34,17 @@ class RolePermissionSeeder extends Seeder
     public const ROLES = ['owner', 'admin', 'form_editor', 'reviewer', 'viewer'];
 
     /**
-     * The 28-permission catalog (§5), dot-namespaced by domain.
+     * The 29-permission catalog (§5), dot-namespaced by domain.
      *
      * `scopes.manage` is the Increment-G10a addition — authoring the tenant's scoping hierarchy. It is a
      * genuinely new capability rather than a reuse of `tenant.settings.manage`: `ApiAbilities` maps the
      * `manage:settings` token ability onto that permission, so reusing it would retroactively hand every
      * already-minted settings token the authority to author authorization structure.
+     *
+     * `integrations.manage` is the H15a addition (ADR-0009) — holding the OAuth grants that let the platform
+     * act inside a tenant's third-party workspace. New for the same reason, one step sharper: reusing
+     * `webhooks.manage` would hand every already-minted `manage:webhooks` token authority over those
+     * credentials, and the blast radius of that authority reaches outside this platform entirely.
      */
     public const PERMISSIONS = [
         'tenant.settings.manage', 'tenant.billing.manage', 'tenant.billing.view',
@@ -51,7 +56,7 @@ class RolePermissionSeeder extends Seeder
         'submissions.review.any', 'submissions.review.own', 'submissions.export',
         'submissions.view',
         'dashboard.org.view', 'dashboard.form.view',
-        'webhooks.manage', 'audit_log.view',
+        'webhooks.manage', 'integrations.manage', 'audit_log.view',
         'feedback.submit', 'feedback.view',
         'scopes.manage',
     ];
@@ -74,7 +79,7 @@ class RolePermissionSeeder extends Seeder
             'submissions.create', 'submissions.edit.any', 'submissions.review.any',
             'submissions.export', 'submissions.view',
             'dashboard.org.view', 'dashboard.form.view',
-            'webhooks.manage', 'audit_log.view',
+            'webhooks.manage', 'integrations.manage', 'audit_log.view',
             'feedback.submit', 'feedback.view',
         ],
         // Owner minus tenant.billing.manage and tenant.ownership.transfer.
@@ -86,7 +91,7 @@ class RolePermissionSeeder extends Seeder
             'submissions.create', 'submissions.edit.any', 'submissions.review.any',
             'submissions.export', 'submissions.view',
             'dashboard.org.view', 'dashboard.form.view',
-            'webhooks.manage', 'audit_log.view',
+            'webhooks.manage', 'integrations.manage', 'audit_log.view',
             'feedback.submit', 'feedback.view',
         ],
         // Build/edit/publish forms they collaborate on; manual-encode + export those forms.

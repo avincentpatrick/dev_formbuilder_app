@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Enums\ResourceScopeable;
 use App\Models\Attachment;
 use App\Models\Audit;
+use App\Models\Connection;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
@@ -15,6 +16,7 @@ use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Policies\AttachmentPolicy;
 use App\Policies\AuditPolicy;
+use App\Policies\ConnectionPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
@@ -24,6 +26,7 @@ use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
+use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestShareTokenService;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
@@ -67,6 +70,21 @@ class AppServiceProvider extends ServiceProvider
                 $resumeKey,
                 (int) config('guest.resume_token.ttl'),
             );
+        });
+
+        // The native-connector OAuth `state` signer (H15a / ADR-0009 §D3) — the third token family, and the
+        // only carrier of tenant + user identity across the host boundary to the central-domain callback
+        // (the session cookie is host-only, so a tenant session is unreadable there). Singleton so the
+        // derived key + TTL resolve once. The key is domain-separated from the two guest keys above, so a
+        // share, resume or state token can never validate as another; set CONNECTOR_STATE_KEY to rotate it
+        // independently of APP_KEY.
+        $this->app->singleton(ConnectorOAuthStateService::class, function (): ConnectorOAuthStateService {
+            $configuredKey = config('connectors.state.key');
+            $key = is_string($configuredKey) && $configuredKey !== ''
+                ? $configuredKey
+                : hash_hmac('sha256', 'connector-oauth-state.v1', (string) config('app.key'));
+
+            return new ConnectorOAuthStateService($key, (int) config('connectors.state.ttl', 600));
         });
 
         // The per-instance authorization resolver (Increment G10a). `scoped`, NOT `singleton`: it memoizes
@@ -125,6 +143,12 @@ class AppServiceProvider extends ServiceProvider
         // same fail-OPEN reason as the policies above.
         Gate::policy(WebhookEndpoint::class, WebhookEndpointPolicy::class);
 
+        // Native-connector OAuth grants (H15a). Owner/Admin only, via the new `integrations.manage`
+        // permission. Registered explicitly for the same fail-OPEN reason as the policies above. Subscription
+        // routes are all nested under a bound Connection, so authorization is decided on the grant that owns
+        // the rule rather than on a second policy that could disagree with this one.
+        Gate::policy(Connection::class, ConnectionPolicy::class);
+
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the
         // *_type column (data-dictionary §10) instead of fully-qualified class names, so a namespace move
@@ -176,6 +200,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('guest-mint', fn (Request $request): Limit => Limit::perMinute(
             (int) config('guest.rate_limit.mint_per_ip'),
         )->by('gmint:'.$request->ip()));
+
+        // Native-connector OAuth callback (H15a / ADR-0009). An unauthenticated public endpoint on the
+        // central domain: a real tenant reaches it once per connection, so a per-IP ceiling this low costs
+        // nothing legitimate while bounding an attacker grinding forged `state` values against it.
+        RateLimiter::for('connector-oauth', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by('coauth:'.$request->ip()));
 
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum

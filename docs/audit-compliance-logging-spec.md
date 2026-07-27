@@ -16,6 +16,8 @@
 | `submission` | `created`, `updated` (status transitions: approve/return; **and deliberate post-submission answer edits** via `submissions.edit`, fast-follow — see note), `deleted`, `restored`, `exported` | Review-workflow accountability; `exported` covers a reviewer/admin pulling submission data out of the system. |
 | `settings` | `created`, `updated` | Per PRD Feature #12's explicit callout; both tenant-level and (when actor is super-admin) platform-level rows. |
 | `webhook_endpoint` | `created`, `updated`, `deleted` | Configuration changes to an outbound data-sharing surface. |
+| `connection` *(H15a)* | `created` (OAuth grant completed), `updated` (re-connected, or marked dead after a refused refresh / rejected credential), `deleted` (disconnected) | The platform's OAuth grant on a tenant's third-party workspace (ADR-0009). Higher stakes than a webhook endpoint: the credential lets the platform act *inside* that workspace, so its whole lifecycle is on the ledger. Both token columns are unconditionally redacted (§2). |
+| `connection_subscription` *(H15a)* | `created`, `updated`, `deleted` | Which events go to which destination on a connection — the routing half, holding no credential. |
 | `subscription` | `updated` | Billing-plan changes, per PRD Feature #12. |
 | `tenant_users` | `created` (invite sent), `updated` (status transitions), `deleted`/`removed` | Membership lifecycle (`docs/multi-tenancy-rbac-design.md` §7). |
 | role grant/revoke — recorded against `auditable_type = users`, `auditable_id = <affected user's uuid>`, with the granted/revoked role captured in `old_values`/`new_values` | `permission_changed` | Every role grant/revoke — the RBAC doc's own `tenant.ownership.transfer` flow explicitly logs this event type. The assignment is audited against the affected `users` row rather than the `model_has_roles` pivot itself, because that pivot has a composite PK with no surrogate `id` (RBAC §4), and `audits.auditable_id` is a single `uuid` that cannot address a composite-key row. |
@@ -35,9 +37,14 @@
 **Always redacted, unconditionally** (a fixed, code-defined list — not tenant-configurable, since these are platform-level secrets/credentials, not tenant content):
 - `users.password`, `users.remember_token`
 - `users.two_factor_secret`, `users.two_factor_recovery_codes` (Fortify 2FA credentials, PRD Feature #14)
-- `webhook_endpoints.secret`
+- `webhook_endpoints.secret` (and `secret_previous`, H13b's rotation grace copy)
+- `connections.access_token`, `connections.refresh_token` (H15a / ADR-0009 §D10 — third-party OAuth credentials, encrypted at rest and never returned by any API in any form). The audit snapshot deliberately *includes* them so the redactor is what strips them and records the strip in `redacted_fields`; a snapshot that quietly omitted them would leave no evidence the ledger ever saw a credential-bearing write.
 - `tenant_users.invite_token`
 - Any Sanctum token value
+
+> The list is hand-maintained by construction, keyed by the §1 auditable-type alias. A new credential-bearing
+> alias that is not registered here is silently un-redacted and **nothing detects it** — so registering it
+> belongs in the same increment that creates the table, not a follow-up.
 
 **Redacted based on the Data Dictionary's own PII/sensitivity flags** (dynamic, not a fixed list, since these are tenant-declared or content-dependent):
 - Any column the Data Dictionary marks **PII = Yes** or **PII = Yes (conditional)** — e.g., `submissions.guest_ip`/`guest_user_agent`/`guest_contact_email`, `attachments.original_filename`, `feedback_reports.remarks`/`browser_info`.

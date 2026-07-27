@@ -34,6 +34,11 @@ final class AuditRedactor
     private const array SECRETS = [
         'users' => ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'],
         'webhook_endpoint' => ['secret', 'secret_previous'],
+        // A native-connector OAuth grant (H15a / ADR-0009 §D10). Registered in the SAME increment that
+        // creates the table: an unregistered credential-bearing alias is silently un-redacted and nothing
+        // detects the omission. Highest blast radius of anything on this list — these tokens act inside the
+        // tenant's own third-party workspace, not against this platform.
+        'connection' => ['access_token', 'refresh_token'],
         'tenant_users' => ['invite_token'],
         'personal_access_tokens' => ['token'],
     ];

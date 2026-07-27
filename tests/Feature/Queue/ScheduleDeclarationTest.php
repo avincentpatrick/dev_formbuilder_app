@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\QueueName;
 use App\Jobs\Maintenance\PruneFailedJobsJob;
 use App\Jobs\Maintenance\ReapExpiredDraftsJob;
+use App\Jobs\Maintenance\RefreshConnectorTokensJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use App\Jobs\Maintenance\SweepWebhookRetriesJob;
@@ -79,11 +80,24 @@ it('registers the webhook retry-ladder sweep on the expected cadence', function 
         ->and($match->expression)->toBe('*/5 * * * *'); // everyFiveMinutes()
 });
 
+it('registers the connector token-refresh sweep on the expected cadence', function (): void {
+    $events = app(Schedule::class)->events();
+
+    $match = collect($events)->first(
+        fn ($event): bool => str_contains($event->getSummaryForDisplay(), RefreshConnectorTokensJob::class),
+    );
+
+    // hourly() against a 2-hour refresh lead: a grant is renewed with a full sweep cycle to spare, so one
+    // missed sweep cannot expire a token (H15a / ADR-0009 §D6).
+    expect($match)->not->toBeNull()
+        ->and($match->expression)->toBe('0 * * * *');
+});
+
 it('keeps every scheduled job queueable rather than inline', function (): void {
     // Schedule::job() silently falls back to dispatchNow() for a non-ShouldQueue object. A job that
     // lost its interface would then run INSIDE the scheduler process — synchronously, without the
     // §D4 listener's worker edges and without the fairness limiter, while blocking the next tick.
-    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class, SweepScheduledFormsJob::class, SweepWebhookRetriesJob::class] as $job) {
+    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class, SweepScheduledFormsJob::class, SweepWebhookRetriesJob::class, RefreshConnectorTokensJob::class] as $job) {
         expect(is_subclass_of($job, ShouldQueue::class))->toBeTrue()
             ->and(is_subclass_of($job, MaintenanceJob::class))->toBeTrue();
     }

@@ -2,6 +2,7 @@
 
 use App\Jobs\Maintenance\PruneFailedJobsJob;
 use App\Jobs\Maintenance\ReapExpiredDraftsJob;
+use App\Jobs\Maintenance\RefreshConnectorTokensJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use App\Jobs\Maintenance\SweepWebhookRetriesJob;
@@ -66,3 +67,11 @@ Schedule::job(SweepScheduledFormsJob::class)->everyFiveMinutes();
 // keeps a due retry's added latency small without sweeping more often than the ladder's finest (1-minute) step
 // meaningfully rewards; the delivery jobs themselves run on the `webhooks` queue.
 Schedule::job(SweepWebhookRetriesJob::class)->everyFiveMinutes();
+
+// Native-connector OAuth token refresh (H15a / ADR-0009 §D6). Cross-tenant MaintenanceJob → one
+// RefreshTenantConnectorTokensJob per active tenant, each renewing the grants whose token_expires_at falls
+// inside connectors.refresh_lead_seconds. hourly() against a 2-hour lead, so a grant is renewed with a full
+// sweep cycle to spare and one missed sweep cannot expire a token. Refresh is deliberately never lazy: doing
+// it inside a delivery attempt would put a second outbound call in the delivery transaction and let a
+// provider outage stampede every queued delivery at once.
+Schedule::job(RefreshConnectorTokensJob::class)->hourly();

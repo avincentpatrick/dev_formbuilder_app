@@ -19,6 +19,8 @@
 | Sections/groups with reordering | ✓ | ✓ | ✓ | ✓ | 1 | #8 |
 | Repeat groups | ✓ | ◐ (workarounds only, no native repeat) | ✓ (separate-table storage) | ✓ | 2 | #8 |
 | Matrix/grid questions | ◐ (via repeat + select workaround) | ✓ | ✓ | ✓ | 2 | #8 |
+| Answer piping into later question text | ◐ (`${name}` in a `label` cell is the XLSForm idiom, but escaping/output-encoding is the form-renderer's problem, unspecified) | ✓ | ✗ | ✓ (`${key}` holes under a separately-versioned template grammar + a per-surface output-encoding contract) | 3 | #26 |
+| Piping into the confirmation/thank-you screen | ✗ (no author-editable completion text) | ✓ | ✗ | ✓ (needs the `forms.confirmation_message` column H6a adds) | 3 | #26 |
 | Likert-scale questions | ◐ (modeled as select_one rows) | ✓ | ✓ (numeric-score storage, confirmed-good) | ✓ | 2 | #8 |
 | Cascading select (N-level) | ✓ | ✗ | ✓ (PSGC-specific) | ✓ (generalized) | 2 | #8 |
 | Geopoint/geotrace/geoshape | ✓ | ✗ | ◐ (JSON strings, no spatial query) | ✓ (PostGIS-backed) | 2 | #8 |

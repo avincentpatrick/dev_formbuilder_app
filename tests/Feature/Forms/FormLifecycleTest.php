@@ -10,9 +10,11 @@ use App\Enums\ResourceCapacity;
 use App\Enums\ResourceScopeable;
 use App\Enums\ValidationRuleType;
 use App\Models\FormFieldValidation;
+use App\Models\FormSection;
 use App\Models\ResourceGrant;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Forms\CapabilityFlags;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Forms\RestoreService;
@@ -104,6 +106,58 @@ it('recomputes capability flags and supersedes the prior version on republish', 
         ->and($form->capability_flags['has_geofields'])->toBeTrue()
         ->and($form->capability_flags['ocr_compatible'])->toBeFalse()
         ->and($form->draftVersion->version_number)->toBe(3);
+});
+
+it('computes capability flags from the very snapshot it froze', function (): void {
+    // THE SINGLE-AUTHORITY INVARIANT (Increment H8). Step 8 of the publish transaction must derive the flags
+    // from the snapshot step 3 froze — not from a second read of the live rows. Point step 8 at any other
+    // input and this fails, which is what makes the stored flag a provable function of the published bytes
+    // and lets the retroactive backfill and H18a re-derive it from the same column.
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    addFormField($form->draftVersion, $this->user, 'name');
+    $published = $this->publisher->publish($form->refresh(), $this->user);
+
+    expect($form->refresh()->capability_flags)
+        ->toEqual(CapabilityFlags::forSnapshot($published->refresh()->schema_snapshot));
+});
+
+it('publishes a grid-bearing version as not ocr_compatible', function (): void {
+    // The charter's headline, end to end through the real publish transaction: before H8 a `likert_matrix`
+    // published as ocr_compatible = true, against docs/ocr-pipeline-design.md §2's own words.
+    $form = $this->forms->create($this->tenant, $this->user, 'Satisfaction');
+    addFormField($form->draftVersion, $this->user, 'name');
+    addFormField($form->draftVersion, $this->user, 'sat', FieldType::LikertMatrix, 1, [
+        'config' => [
+            'rows' => [['value' => 'clean', 'label' => 'Cleanliness']],
+            'columns' => [['value' => '1', 'label' => 'Poor'], ['value' => '5', 'label' => 'Excellent']],
+        ],
+    ]);
+    $this->publisher->publish($form->refresh(), $this->user);
+
+    expect($form->refresh()->capability_flags)->toEqual([
+        'has_geofields' => false,
+        'has_media' => false,
+        'ocr_compatible' => false,
+    ]);
+});
+
+it('publishes an all-scalar version with a repeat group as not ocr_compatible', function (): void {
+    // The clause that was structurally unreachable before H8: compute() never loaded sections at all.
+    $form = $this->forms->create($this->tenant, $this->user, 'Household Roster');
+    $section = FormSection::create([
+        'form_version_id' => $form->draftVersion->id,
+        'key' => 'members',
+        'label' => 'Members',
+        'sequence' => 0,
+        'is_repeatable' => true,
+    ]);
+    addFormField($form->draftVersion, $this->user, 'prepared_by');
+    addFormField($form->draftVersion, $this->user, 'member_name', FieldType::ShortText, 1, [
+        'form_section_id' => $section->id,
+    ]);
+    $this->publisher->publish($form->refresh(), $this->user);
+
+    expect($form->refresh()->capability_flags['ocr_compatible'])->toBeFalse();
 });
 
 it('remaps validation foreign keys onto the cloned draft, never dangling on the published version', function (): void {

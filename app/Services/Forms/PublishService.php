@@ -30,7 +30,6 @@ final class PublishService
         private readonly SchemaChangeClassifier $classifier,
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
-        private readonly CapabilityFlags $capabilityFlags,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -85,11 +84,13 @@ final class PublishService
                 'superseded_at' => now(),
             ])->save();
 
-            // 8. Point the form at the new published version + recompute capability flags.
+            // 8. Point the form at the new published version + recompute capability flags FROM THE
+            //    SNAPSHOT frozen at step 3 — the same bytes the H8 retroactive backfill and H18a's
+            //    eligibility check read later, so what we advertise and what we froze cannot disagree.
             $locked->forceFill([
                 'current_published_version_id' => $draft->id,
                 'status' => FormStatus::Published,
-                'capability_flags' => $this->capabilityFlags->compute($draft),
+                'capability_flags' => CapabilityFlags::forSnapshot($snapshot),
                 'published_at' => $locked->published_at ?? now(),
             ])->save();
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Exceptions\Forms;
 
 use App\Exceptions\Expressions\ExpressionException;
+use App\Exceptions\Templates\TemplateSyntaxException;
+use App\Services\Templates\TemplateScopeResolver;
 use RuntimeException;
 
 /**
@@ -45,6 +47,22 @@ final class PublishValidationException extends RuntimeException
     public static function ruleValueInvalid(string $fieldKey, string $detail): self
     {
         return new self("The validation rule on “{$fieldKey}” is invalid ({$detail}).");
+    }
+
+    /**
+     * A template-bearing value (`docs/piping-output-encoding-design.md` §6, Increment H6a) that will not
+     * parse, or whose `${key}` hole does not resolve to a pipeable field the host may legally reference.
+     * `$column` names WHICH text — `label`, `hint`, `placeholder`, `description`, `confirmation_message`,
+     * or a locale variant of one (`label[fil]`) — because a field can carry several templates and the
+     * builder needs to point at the offending one, not merely at the field.
+     *
+     * `$detail` is the stable snake_case slug: {@see TemplateSyntaxException}'s
+     * for a grammar failure, {@see TemplateScopeResolver}'s for a scope one. Tests
+     * match the slug, never the wording.
+     */
+    public static function templateInvalid(string $ownerKey, string $column, string $detail): self
+    {
+        return new self("The {$column} on “{$ownerKey}” has an invalid reference ({$detail}).");
     }
 
     /** A choice field (Increment G4a) with no options or duplicate option values — unanswerable / ambiguous. */

@@ -11,6 +11,14 @@
 
 export { GRAMMAR_VERSION } from './evaluator';
 
+// The piping TEMPLATE grammar (Increment H6a, Doc #26 §2) — a SIBLING of the expression grammar with its
+// own version constant and its own `tests/golden/templates/` corpus. `GRAMMAR_VERSION` above stays '2.0'.
+// Co-located in `engine/` for packaging only: one barrel, one import path for the SPA. This barrel is also
+// what makes `template.ts` reachable by vue-tsc — `*.test.ts` are excluded from tsconfig, so the golden
+// runner itself is executed but never type-checked.
+export { TEMPLATE_VERSION, TemplateParser, TemplateSyntaxError, makeTemplateParser } from './template';
+export type { TemplateSegment } from './template';
+
 export { ABSENT } from './coercion';
 export type { EngineValue, MaybeAbsent, Absent } from './coercion';
 export * as Coercion from './coercion';

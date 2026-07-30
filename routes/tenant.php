@@ -12,6 +12,7 @@ use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
+use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
@@ -236,6 +237,14 @@ Route::middleware([
     // only can:update,form gates it (schedule config is an editor's job, like save-resume/scope above).
     Route::patch('/forms/{form}/schedule', [FormScheduleController::class, 'update'])
         ->middleware('can:update,form')->name('forms.schedule');
+
+    // The confirmation message (Increment H6a, Doc #26 §6.2) — the thank-you copy the guest runtime shows
+    // after a submit, and the first author-editable text that may carry `${key}` piping holes. Same shape
+    // as the schedule route above: its own endpoint, a guarded FormService::setConfirmationMessage write,
+    // ungated by plan (confirmation copy carries no tier feature). The request rule checks grammar; the
+    // publish gate resolves the references.
+    Route::patch('/forms/{form}/confirmation', [FormConfirmationMessageController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.confirmation');
 
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),

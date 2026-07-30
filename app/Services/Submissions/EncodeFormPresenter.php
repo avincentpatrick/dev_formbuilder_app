@@ -11,6 +11,8 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Templates\TemplateRenderer;
+use App\Services\Templates\TemplateSources;
 use App\Support\Forms\FormScheduleView;
 use Illuminate\Support\Collection;
 
@@ -57,7 +59,10 @@ final class EncodeFormPresenter
     /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
     private const OMITTED = [FieldType::PageBreak, FieldType::Hidden, FieldType::Calculated];
 
-    public function __construct(private readonly SchemaValueFormatter $formatter) {}
+    public function __construct(
+        private readonly SchemaValueFormatter $formatter,
+        private readonly TemplateRenderer $templates,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -65,8 +70,21 @@ final class EncodeFormPresenter
     public function present(Form $form, FormVersion $version): array
     {
         $sections = $version->sections()->orderBy('sequence')->get();
-        $fields = $version->fields()->orderBy('sequence')->get()
+        $allFields = $version->fields()->orderBy('sequence')->get();
+        $fields = $allFields
             ->reject(fn (FormField $f): bool => in_array($f->field_type, self::OMITTED, true));
+
+        // Increment H6a — piping (Doc #26 §3.4). This page serves a BLANK keying form: there is no
+        // submission and therefore no answer document, so every hole renders as the empty string. That is
+        // the contract, not a shortfall — a hole is never emitted as the raw `${key}` token, and §8 records
+        // the same narrowing for a printed OCR form ("prose with a gap", not a substitution).
+        //
+        // Note that `OMITTED` drops `hidden` and `calculated`, both of which ARE pipeable SOURCES per §3.1.
+        // That is fine: a source need not have a row on this page for its consumer's label to be correct,
+        // and the source map is built from every field for exactly that reason. With no answers the point
+        // is moot today; it matters once H7 un-omits `hidden` from this surface.
+        $sources = TemplateSources::fromFields($allFields);
+        $answers = [];
 
         /** @var Collection<string, Collection<int, FormField>> $bySection */
         $bySection = $fields->groupBy(fn (FormField $f): string => $f->form_section_id ?? '');
@@ -84,7 +102,7 @@ final class EncodeFormPresenter
                 'repeatable' => false,
                 'min_instances' => null,
                 'max_instances' => null,
-                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f))->values()->all(),
+                'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))->values()->all(),
             ];
         }
 
@@ -99,13 +117,13 @@ final class EncodeFormPresenter
                 // The stable section KEY — a repeatable section's nested instance answers are keyed on it (G2),
                 // matching the StructuralAnswerNormalizer / schema_snapshot contract.
                 'key' => $section->key,
-                'label' => $section->label,
-                'description' => $section->description,
+                'label' => $this->templates->render($section->label, $sources, $answers),
+                'description' => $this->templates->renderOptional($section->description, $sources, $answers),
                 'repeatable' => $section->is_repeatable,
                 'min_instances' => $section->is_repeatable ? $section->min_instances : null,
                 'max_instances' => $section->is_repeatable ? $section->max_instances : null,
                 'fields' => $sectionFields
-                    ->map(fn (FormField $f): array => $this->field($form, $f))
+                    ->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))
                     ->values()->all(),
             ];
         }
@@ -152,18 +170,20 @@ final class EncodeFormPresenter
     }
 
     /**
+     * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
+     * @param  array<string, mixed>  $answers
      * @return array<string, mixed>
      */
-    private function field(Form $form, FormField $field): array
+    private function field(Form $form, FormField $field, array $sources, array $answers): array
     {
         $type = $field->field_type;
 
         return [
             'key' => $field->key,
             'field_type' => $type->value,
-            'label' => $field->label,
-            'hint' => $field->hint,
-            'placeholder' => $field->placeholder,
+            'label' => $this->templates->render($field->label, $sources, $answers),
+            'hint' => $this->templates->renderOptional($field->hint, $sources, $answers),
+            'placeholder' => $this->templates->renderOptional($field->placeholder, $sources, $answers),
             'required' => $field->is_required === RequiredMode::Required,
             'options' => $this->options($field),
             // Cascading hierarchy (Increment G4a); null for every other type so the shared FieldInput ignores it.

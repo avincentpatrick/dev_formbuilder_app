@@ -34,6 +34,8 @@ use Illuminate\Support\Carbon;
  * @property bool $allow_guest_submissions
  * @property bool $single_page_mode
  * @property bool $save_and_resume
+ * @property ?string $confirmation_message
+ * @property ?array<string, mixed> $confirmation_message_translations
  * @property array<string, mixed> $capability_flags
  * @property string $default_locale
  * @property array<int, string> $supported_locales
@@ -106,6 +108,11 @@ class Form extends Model implements TenantScoped
             'allow_offline_sync' => 'boolean',
             'single_page_mode' => 'boolean',
             'save_and_resume' => 'boolean',
+            // Increment H6a — the confirmation template (Doc #26 §6.2). Deliberately NOT in $fillable:
+            // the only writer is FormService::setConfirmationMessage()'s forceFill, so mass-assignment
+            // can never reach a template-bearing column, and Form has no $hidden/$guarded — a fillable
+            // column would serialize into every presenter payload by default.
+            'confirmation_message_translations' => 'array',
             'supported_locales' => 'array',
             'capability_flags' => 'array',
             'theme' => 'array',

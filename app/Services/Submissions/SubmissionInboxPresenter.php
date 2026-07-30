@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
@@ -13,6 +14,8 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
 use App\Services\Forms\FormPresenter;
+use App\Services\Templates\TemplateRenderer;
+use App\Services\Templates\TemplateSources;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,12 +24,19 @@ use Illuminate\Support\Collection;
  * forms list. Row-level visibility is delegated to {@see Submission::scopeVisibleTo()} so the query and
  * {@see SubmissionPolicy} enforce one visibility rule. The detail walks the submission's immutable
  * `form_version` schema, pairing each field with its stored answer through {@see SchemaValueFormatter}.
+ *
+ * Increment H6a: this is the ONE surface in the product where a piping hole actually FILLS — it is the only
+ * PHP renderer holding a label, the field catalog and the answer document together. A label authored as
+ * "Age of ${child_name}" reads "Age of Maria" here, per Doc #26 §3.2/§3.4.
  */
 final class SubmissionInboxPresenter
 {
     private const PER_PAGE = 25;
 
-    public function __construct(private readonly SchemaValueFormatter $formatter) {}
+    public function __construct(
+        private readonly SchemaValueFormatter $formatter,
+        private readonly TemplateRenderer $templates,
+    ) {}
 
     /**
      * The paginated, filtered inbox list plus the filter option catalogs and the export capability.
@@ -141,8 +151,13 @@ final class SubmissionInboxPresenter
     private function answerBlocks(FormVersion $version, array $answers): array
     {
         $sections = $version->sections()->orderBy('sequence')->get();
-        $fields = $version->fields()->orderBy('sequence')->get()
-            ->filter(fn (FormField $f): bool => $this->formatter->isDataField($f->field_type));
+        $allFields = $version->fields()->orderBy('sequence')->get();
+
+        // Piping sources are drawn from EVERY field, not just the displayed ones (H6a): `hidden` and
+        // `calculated` are pipeable per Doc #26 §3.1 whether or not they have a row of their own.
+        $sources = TemplateSources::fromFields($allFields);
+
+        $fields = $allFields->filter(fn (FormField $f): bool => $this->formatter->isDataField($f->field_type));
 
         /** @var Collection<string, Collection<int, FormField>> $bySection */
         $bySection = $fields->groupBy(fn (FormField $f): string => $f->form_section_id ?? '');
@@ -151,7 +166,7 @@ final class SubmissionInboxPresenter
 
         $ungrouped = $bySection->get('');
         if ($ungrouped !== null && $ungrouped->isNotEmpty()) {
-            $blocks[] = ['id' => null, 'label' => null, 'fields' => $this->fieldRows($ungrouped, $answers)];
+            $blocks[] = ['id' => null, 'label' => null, 'fields' => $this->fieldRows($ungrouped, $answers, $sources)];
         }
 
         foreach ($sections as $section) {
@@ -161,8 +176,8 @@ final class SubmissionInboxPresenter
             }
             $blocks[] = [
                 'id' => $section->id,
-                'label' => $section->label,
-                'fields' => $this->fieldRows($sectionFields, $answers),
+                'label' => $this->templates->render($section->label, $sources, $answers),
+                'fields' => $this->fieldRows($sectionFields, $answers, $sources),
             ];
         }
 
@@ -172,13 +187,14 @@ final class SubmissionInboxPresenter
     /**
      * @param  Collection<int, FormField>  $fields
      * @param  array<string, mixed>  $answers
+     * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
      * @return list<array{key: string, label: string, value: string}>
      */
-    private function fieldRows(Collection $fields, array $answers): array
+    private function fieldRows(Collection $fields, array $answers, array $sources): array
     {
         return array_values($fields->map(fn (FormField $f): array => [
             'key' => $f->key,
-            'label' => $f->label,
+            'label' => $this->templates->render($f->label, $sources, $answers),
             'value' => $this->formatter->displayValue($f->field_type, $answers[$f->key] ?? null, $f->config ?? []),
         ])->all());
     }

@@ -22,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $form_version_id
  * @property string $key
  * @property string $label
+ * @property ?array<string, string> $label_translations
+ * @property ?string $description
+ * @property ?array<string, string> $description_translations
  * @property int $sequence
  * @property bool $is_repeatable
  * @property int|null $min_instances

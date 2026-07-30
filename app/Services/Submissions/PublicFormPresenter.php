@@ -43,6 +43,16 @@ final class PublicFormPresenter
                 // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
                 // route is still authoritative; this only decides whether the control is shown.
                 'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
+                // The author-editable confirmation copy (Increment H6a, Doc #26 §6.2), emitted RAW — as a
+                // template, with its `${key}` holes unfilled — plus its locale variants. Two reasons it is
+                // not rendered here: `version.schema` below travels VERBATIM with a checksum the runtime
+                // pins against, so interpolating server-side would break that pin; and the respondent picks
+                // their locale client-side and reactively, so the server does not know which variant to
+                // resolve. §4's normative order (resolve the locale, THEN render) can only be honoured on
+                // the client. H6b builds that renderer; until then the runtime keeps its hardcoded default
+                // when this is null.
+                'confirmation_message' => $form->confirmation_message,
+                'confirmation_message_translations' => $form->confirmation_message_translations,
                 // Scheduled-form window + response cap (Increment H12a). Advisory: the runtime (H12b) reads
                 // `acceptance` to show an "opens soon"/"closed"/"full" state and `remaining` for a cap count.
                 // Enforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is

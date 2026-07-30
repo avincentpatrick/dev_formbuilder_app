@@ -1974,6 +1974,20 @@
                                                             "type": "string",
                                                             "description": "Whether the SPA should offer \"Save and finish later\" (H10, UX \u00a75.2). Both gates must pass:\nthe per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly \u2014\nfail-open when no catalog resolves \u2014 so this flag and the draft route never disagree. The\nroute is still authoritative; this only decides whether the control is shown."
                                                         },
+                                                        "confirmation_message": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ],
+                                                            "description": "The author-editable confirmation copy (Increment H6a, Doc #26 \u00a76.2), emitted RAW \u2014 as a\ntemplate, with its `${key}` holes unfilled \u2014 plus its locale variants. Two reasons it is\nnot rendered here: `version.schema` below travels VERBATIM with a checksum the runtime\npins against, so interpolating server-side would break that pin; and the respondent picks\ntheir locale client-side and reactively, so the server does not know which variant to\nresolve. \u00a74's normative order (resolve the locale, THEN render) can only be honoured on\nthe client. H6b builds that renderer; until then the runtime keeps its hardcoded default\nwhen this is null."
+                                                        },
+                                                        "confirmation_message_translations": {
+                                                            "type": [
+                                                                "array",
+                                                                "null"
+                                                            ],
+                                                            "items": {}
+                                                        },
                                                         "schedule": {
                                                             "type": "object",
                                                             "description": "Scheduled-form window + response cap (Increment H12a). Advisory: the runtime (H12b) reads\n`acceptance` to show an \"opens soon\"/\"closed\"/\"full\" state and `remaining` for a cap count.\nEnforcement is authoritative in the write path ({@see FormAcceptanceGuard}); the schema is\nstill returned for a closed form so the runtime can render the closed state.",
@@ -2027,6 +2041,8 @@
                                                         "supported_locales",
                                                         "single_page_mode",
                                                         "save_and_resume",
+                                                        "confirmation_message",
+                                                        "confirmation_message_translations",
                                                         "schedule"
                                                     ]
                                                 },

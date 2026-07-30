@@ -11,6 +11,8 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\UsageMeter;
+use App\Services\Templates\TemplateRenderer;
+use App\Services\Templates\TemplateSources;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -45,6 +47,7 @@ final class SubmissionExporter
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
         private readonly UsageMeter $meter,
+        private readonly TemplateRenderer $templates,
     ) {}
 
     /**
@@ -125,6 +128,10 @@ final class SubmissionExporter
             $fields = $version->schema_snapshot['fields'] ?? [];
             usort($fields, fn (array $a, array $b): int => ($a['sequence'] ?? 0) <=> ($b['sequence'] ?? 0));
 
+            // Piping sources for this version's headers (H6a) — every field, since `hidden`/`calculated`
+            // are pipeable sources without being data columns of their own.
+            $sources = TemplateSources::fromSnapshot($fields);
+
             foreach ($fields as $field) {
                 $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
                 if ($type === null || ! $this->formatter->isDataField($type)) {
@@ -136,7 +143,7 @@ final class SubmissionExporter
                 $fieldMeta[$version->id][$key] = ['type' => $type, 'config' => $config];
 
                 if (! array_key_exists($key, $columns)) {
-                    $columns[$key] = $this->header($field, $locale, $key);
+                    $columns[$key] = $this->header($field, $locale, $key, $sources);
                 }
             }
         }
@@ -145,13 +152,27 @@ final class SubmissionExporter
     }
 
     /**
+     * One column header: the label resolved into `$locale`, then rendered as a template (H6a).
+     *
+     * The order is normative (Doc #26 §4): resolve the locale, THEN fill the holes — rendering first would
+     * fill holes into a string nobody is going to read.
+     *
+     * The answer map is deliberately EMPTY. One header row serves every submission in the export, so a
+     * piped header has no single answer to fill from — it is structurally unfillable, and §3.4 requires the
+     * gap rather than the raw `${key}` token. A label of "Age of ${child_name}" therefore heads its column
+     * as "Age of ". Only the header is templated; the answer CELLS are untouched, and the separate
+     * spreadsheet formula-injection prefix §5 calls for is a different increment's row.
+     *
      * @param  array<string, mixed>  $field
+     * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
      */
-    private function header(array $field, string $locale, string $key): string
+    private function header(array $field, string $locale, string $key, array $sources): string
     {
         $translations = is_array($field['label_translations'] ?? null) ? $field['label_translations'] : [];
 
-        return (string) ($translations[$locale] ?? $field['label'] ?? $key);
+        $label = (string) ($translations[$locale] ?? $field['label'] ?? $key);
+
+        return $this->templates->render($label, $sources, []);
     }
 
     /**

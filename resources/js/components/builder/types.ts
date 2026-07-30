@@ -113,6 +113,13 @@ export interface BuilderPageProps {
         closes_at: string | null;
         timezone: string;
         max_responses: number | null;
+        // The confirmation template + its locale variants (Increment H6a) — RAW, holes unfilled: an author
+        // needs to see `${child_name}`, not a value there is no submission to supply. Null when unset, in
+        // which case the runtime's built-in default stands.
+        confirmation_message: string | null;
+        confirmation_message_translations: Record<string, string>;
+        default_locale: string;
+        supported_locales: string[];
     };
     draft: { id: string; version_number: number } | null;
     sections: ServerSection[];

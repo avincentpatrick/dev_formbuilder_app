@@ -1,0 +1,13 @@
+[
+  {"name":"err_unterminated_open","template_version":"1.0","template":"${","expected_error":"malformed_reference"},
+  {"name":"err_empty_key","template_version":"1.0","template":"${}","expected_error":"malformed_reference"},
+  {"name":"err_leading_digit_key","template_version":"1.0","template":"${1abc}","expected_error":"malformed_reference"},
+  {"name":"err_hyphen_in_key","template_version":"1.0","template":"${a-b}","expected_error":"malformed_reference"},
+  {"name":"err_space_in_key","template_version":"1.0","template":"${a b}","expected_error":"malformed_reference"},
+  {"name":"err_unterminated_word","template_version":"1.0","template":"Age of ${child_name","expected_error":"malformed_reference"},
+  {"name":"err_unterminated_single_char","template_version":"1.0","template":"${a","expected_error":"malformed_reference"},
+  {"name":"err_dot_key","template_version":"1.0","template":"${.}","expected_error":"malformed_reference"},
+  {"name":"err_dollar_key","template_version":"1.0","template":"${$}","expected_error":"malformed_reference"},
+  {"name":"err_hole_cap_twenty_one","template_version":"1.0","template_repeat":{"prefix":"${a}","times":21,"core":"","suffix":""},"expected_error":"too_many_holes"},
+  {"name":"err_byte_cap_exceeded","template_version":"1.0","template_repeat":{"prefix":"y","times":1998,"core":"${a}","suffix":""},"expected_error":"template_too_long"}
+]

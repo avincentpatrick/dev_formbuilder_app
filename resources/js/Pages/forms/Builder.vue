@@ -16,6 +16,7 @@ import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
+import ConfirmationModal from '@/components/builder/ConfirmationModal.vue';
 import ScheduleModal from '@/components/builder/ScheduleModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
@@ -93,6 +94,11 @@ function onToggleSaveResume(value: boolean): void {
 // ── Schedule (Increment H12b) — a form-level open/close window + response cap. A modal over its own guarded
 // PATCH route (ungated, `can:update,form`), independent of the draft/version edits. ──
 const scheduleOpen = ref(false);
+
+// ── Confirmation message (Increment H6a) — the thank-you copy shown after a submit, and the first
+// author-editable text that may carry `${key}` piping holes. Same shape as Schedule: a modal over its own
+// guarded PATCH route, ungated by plan. ──
+const confirmationOpen = ref(false);
 
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
 // author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
@@ -217,6 +223,10 @@ function submitImport(): void {
                 <MdsButton variant="secondary" icon-left="calendar" @click="scheduleOpen = true">
                     Schedule
                 </MdsButton>
+                <!-- Confirmation message (H6a) — ungated, all tiers; references are checked at publish. -->
+                <MdsButton variant="secondary" icon-left="message-check" @click="confirmationOpen = true">
+                    Confirmation
+                </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
                 </MdsButton>
@@ -308,6 +318,9 @@ function submitImport(): void {
 
         <!-- Scheduled-form config (H12b) — open/close window + response cap over PATCH /forms/{form}/schedule. -->
         <ScheduleModal v-model:open="scheduleOpen" :form-id="form.id" :form="form" :timezones="timezones" />
+
+        <!-- Confirmation message (H6a) — the post-submit thank-you copy, over PATCH /forms/{form}/confirmation. -->
+        <ConfirmationModal v-model:open="confirmationOpen" :form-id="form.id" :form="form" />
 
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">

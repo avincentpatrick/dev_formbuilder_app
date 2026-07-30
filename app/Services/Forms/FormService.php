@@ -153,6 +153,37 @@ final class FormService
     }
 
     /**
+     * Set (or clear) a form's confirmation message (Increment H6a,
+     * `docs/piping-output-encoding-design.md` §6.2) — the only writer of `forms.confirmation_message` and
+     * `confirmation_message_translations`. When both are null the hardcoded runtime default stands, so the
+     * column is additive for every existing form.
+     *
+     * `forceFill` with explicit keys, and — unlike `save_and_resume` — these columns are deliberately NOT
+     * in `Form::$fillable` at all, so mass-assignment cannot reach a template-bearing value even by
+     * accident.
+     *
+     * This INVERTS {@see self::setSaveAndResume()}'s "No pipeline/version effect" note: the message is
+     * TEMPLATE-BEARING, so its `${key}` holes are validated at publish by
+     * {@see TemplateValidationGate} against the version being published. Two consequences worth knowing:
+     * the request rule checks grammar only (there is no version to resolve against at edit time), and an
+     * edit made AFTER the last publish can introduce a reference that dangles until the next publish
+     * refuses it — a hole renders as the empty string in the meantime and never throws (§3.4), so the
+     * failure is cosmetic rather than an outage. Doc #26 §8 records the gap and assigns closing it to H6b,
+     * which owns the confirmation surface.
+     *
+     * @param  array<string, string>|null  $translations
+     */
+    public function setConfirmationMessage(Form $form, ?string $message, ?array $translations): Form
+    {
+        $form->forceFill([
+            'confirmation_message' => $message,
+            'confirmation_message_translations' => $translations === null || $translations === [] ? null : $translations,
+        ])->save();
+
+        return $form->refresh();
+    }
+
+    /**
      * Set (or clear) a form's schedule + response cap (Increment H12a) — the only writer of `forms.opens_at`,
      * `closes_at`, `timezone`, `max_responses` and `schedule_state`. `forceFill` with explicit keys for the same
      * reason as {@see self::setSaveAndResume()}: it keeps a plain `$form->update($validated)` from ever setting

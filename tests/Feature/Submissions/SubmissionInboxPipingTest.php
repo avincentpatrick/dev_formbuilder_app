@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\SubmissionStatus;
+use App\Models\Form;
 use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
@@ -50,7 +51,7 @@ afterEach(function (): void {
 });
 
 /** A published form with one repeatable `roster` section whose member label pipes a same-instance sibling. */
-function pipingRosterForm(Tenant $tenant, User $owner): App\Models\Form
+function pipingRosterForm(Tenant $tenant, User $owner): Form
 {
     $form = app(FormService::class)->create($tenant, $owner, 'Household');
     $version = $form->draftVersion;

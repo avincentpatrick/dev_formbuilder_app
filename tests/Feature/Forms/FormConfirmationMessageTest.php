@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\User;
+use App\Services\Forms\FormService;
+use App\Services\Forms\PublishService;
 use App\Services\Submissions\PublicFormPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -166,7 +169,7 @@ it('stays silent when every hole resolves against the published version', functi
 
 it('stays silent on a form with no published version at all', function (): void {
     // A3's own reasoning: there is nothing to resolve against, and inventing an answer would be dishonest.
-    $draftOnly = app(App\Services\Forms\FormService::class)->create($this->tenant, $this->owner, 'Unpublished');
+    $draftOnly = app(FormService::class)->create($this->tenant, $this->owner, 'Unpublished');
 
     $this->actingAs($this->owner)
         ->patch("http://acme.meridian.test/forms/{$draftOnly->id}/confirmation", [
@@ -188,9 +191,9 @@ it('warns about a dangling hole inside a locale variant, naming that variant', f
 });
 
 it('warns with the right reason when the referenced field exists but is not pipeable', function (): void {
-    $form = app(App\Services\Forms\FormService::class)->create($this->tenant, $this->owner, 'Sketchpad');
-    addFormField($form->draftVersion, $this->owner, 'sig', App\Enums\FieldType::Signature, 1);
-    app(App\Services\Forms\PublishService::class)->publish($form->refresh(), $this->owner);
+    $form = app(FormService::class)->create($this->tenant, $this->owner, 'Sketchpad');
+    addFormField($form->draftVersion, $this->owner, 'sig', FieldType::Signature, 1);
+    app(PublishService::class)->publish($form->refresh(), $this->owner);
 
     $this->actingAs($this->owner)
         ->patch("http://acme.meridian.test/forms/{$form->id}/confirmation", [

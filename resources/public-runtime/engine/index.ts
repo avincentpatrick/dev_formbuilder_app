@@ -19,6 +19,15 @@ export { GRAMMAR_VERSION } from './evaluator';
 export { TEMPLATE_VERSION, TemplateParser, TemplateSyntaxError, makeTemplateParser } from './template';
 export type { TemplateSegment } from './template';
 
+// H6b's render side: the twins of `SchemaValueFormatter::displayValue()` and `TemplateRenderer`. Exported
+// here for the same reason `template.ts` is — `*.test.ts` is excluded from tsconfig, so this barrel is the
+// ONLY thing that puts either module under vue-tsc. `displayValue` is exported in its own right and not
+// merely dragged in by the renderer: it is a legitimate standalone surface (an offline review screen is
+// the obvious next consumer) and the barrel is the documented one import path for the SPA.
+export { displayValue } from './display-value';
+export { TemplateRenderer, makeTemplateRenderer } from './template-renderer';
+export type { RenderSource, RenderSources } from './template-renderer';
+
 export { ABSENT } from './coercion';
 export type { EngineValue, MaybeAbsent, Absent } from './coercion';
 export * as Coercion from './coercion';

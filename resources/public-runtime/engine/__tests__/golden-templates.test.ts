@@ -9,10 +9,12 @@
  * Vectors assert TEMPLATE_VERSION, never GRAMMAR_VERSION — the sibling grammars are versioned
  * independently (Doc #26 §2).
  *
- * RENDER vectors (`engines: ["php"]`) are counted by the guards but their assertion is SKIPPED here:
- * filling a hole means running `SchemaValueFormatter::displayValue()`, which has no TypeScript twin yet.
- * Doc #26 §3.2 assigns building one to H6b — that twin, not the parser, is the real R3 hazard in this
- * feature. When H6b lands it drops the `engines` key and these run on both engines unchanged.
+ * Two modes. A `parse` vector asserts the SEGMENT list; a `render` vector asserts the rendered STRING,
+ * feeding `sources` + `answers` (+ an optional `locale`) through the renderer. Until H6b the render
+ * vectors carried `engines: ["php"]` and were counted-but-skipped here, because filling a hole means
+ * running `SchemaValueFormatter::displayValue()` and that had no TypeScript twin — the real R3 hazard in
+ * this feature, and not the parser. H6b built the twin, so the key is gone from the corpus entirely and
+ * every vector now runs on both engines.
  *
  * Path resolution copies `golden-expressions.test.ts` verbatim: `dirname(fileURLToPath(import.meta.url))`
  * then `join(...)`. All 30 Vitest suites share ONE `happy-dom` environment, whose DOM `URL` global shadows
@@ -26,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { TEMPLATE_VERSION, TemplateParser, TemplateSyntaxError, type TemplateSegment } from '../template';
+import { makeTemplateRenderer, type RenderSources } from '../template-renderer';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, '..', '..', '..', '..', 'tests', 'golden', 'templates');
@@ -34,13 +37,16 @@ type TemplateVector = {
     name: string;
     template_version: string;
     mode?: 'parse' | 'render';
-    engines?: string[];
     template?: string;
     template_repeat?: { prefix: string; times: number; core: string; suffix: string };
+    sources?: RenderSources;
+    answers?: Record<string, unknown>;
+    locale?: string;
     expected?: TemplateSegment[] | string;
     expected_whole_literal?: boolean;
     expected_repeat?: { times: number; segment: TemplateSegment };
     expected_error?: string;
+    note?: string;   // documentation only; both runners ignore it
 };
 
 function vectorFiles(): string[] {
@@ -81,18 +87,8 @@ function expectedSegments(vector: TemplateVector, template: string): TemplateSeg
     return vector.expected as TemplateSegment[];
 }
 
-/** A vector this engine runs: no `engines` key, or one that names 'ts'. */
-function runsHere(vector: TemplateVector): boolean {
-    return vector.engines === undefined || vector.engines.includes('ts');
-}
-
 describe('golden template vectors (PHP ⇄ TS drift contract)', () => {
     for (const vector of loadVectors()) {
-        if (!runsHere(vector)) {
-            it.skip(`skipped (PHP-only, awaiting H6b's displayValue twin): ${vector.name}`, () => {});
-            continue;
-        }
-
         it(`matches the golden template vector: ${vector.name}`, () => {
             expect(vector.template_version).toBe(TEMPLATE_VERSION);
 
@@ -109,6 +105,21 @@ describe('golden template vectors (PHP ⇄ TS drift contract)', () => {
 
                 expect(thrown, `expected error “${vector.expected_error}” but none was thrown for: ${template}`).toBeInstanceOf(TemplateSyntaxError);
                 expect((thrown as TemplateSyntaxError).slug).toBe(vector.expected_error);
+
+                return;
+            }
+
+            // A fresh renderer per vector, matching `makeTemplateRenderer()` in the PHP runner, so no
+            // vector can be affected by another.
+            if ((vector.mode ?? 'parse') === 'render') {
+                const rendered = makeTemplateRenderer().render(
+                    template,
+                    vector.sources as RenderSources,
+                    vector.answers as Record<string, unknown>,
+                    vector.locale,
+                );
+
+                expect(rendered).toBe(vector.expected as string);
 
                 return;
             }
@@ -139,10 +150,37 @@ describe('golden template vectors (PHP ⇄ TS drift contract)', () => {
             }
         }
 
-        // Counted on BOTH sides including the PHP-only render vectors, so a vector cannot be dropped here
-        // to make a skip disappear.
+        // Counted on BOTH sides, so a vector cannot be quietly dropped from one engine's view.
         expect(loaded).toBe(manifest.total); // a dropped/added vector fails here
         expect(perFile).toEqual(manifest.files); // a vector moved between files fails here
         expect(new Set(names).size).toBe(manifest.total); // a duplicate name fails here
+    });
+
+    it('requires every vector to carry exactly one expected outcome', () => {
+        // The FOURTH guard, mirroring `TemplateGoldenVectorsTest.php`. Doc #26 §7 states four; a guard
+        // living on one side only is itself runner drift, and the runners ARE the enforcement mechanism.
+        // It exists because the sibling runners default optional keys with `?? []`, which lets a vector
+        // that asserts NOTHING pass vacuously.
+        const outcomeKeys = ['expected', 'expected_error', 'expected_whole_literal', 'expected_repeat'] as const;
+
+        for (const vector of loadVectors()) {
+            const declared = outcomeKeys.filter((key) => Object.prototype.hasOwnProperty.call(vector, key));
+
+            expect(declared, `vector “${vector.name}” must declare exactly one expected outcome`).toHaveLength(1);
+        }
+    });
+
+    it('requires every render vector to carry the inputs it renders from', () => {
+        // A render vector whose `sources`/`answers` were forgotten would render every hole empty and could
+        // still match an `expected` that happens to be mostly literal text — green for the wrong reason.
+        for (const vector of loadVectors()) {
+            if ((vector.mode ?? 'parse') !== 'render') {
+                continue;
+            }
+
+            expect(vector.sources, `render vector “${vector.name}” needs sources`).toBeTypeOf('object');
+            expect(vector.answers, `render vector “${vector.name}” needs answers`).toBeTypeOf('object');
+            expect(typeof vector.expected, `render vector “${vector.name}” expects a string`).toBe('string');
+        }
     });
 });

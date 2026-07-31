@@ -52,10 +52,15 @@ final class TemplateRenderer
      * §3.3 rule 2's "current instance" needs no addressable path (the stored instances carry no stable
      * id anyway).
      *
+     * `$locale` is threaded to {@see SchemaValueFormatter::displayValue()} so a piped choice answer
+     * resolves its option's `label_translations` variant (Increment H6b, Doc #26 amendment A8). §4's
+     * order still holds and is still the CALLER's job: resolve `$template`'s own locale variant first,
+     * then pass the same locale here so the value dropped into it agrees with the sentence around it.
+     *
      * @param  array<string, RenderSource>  $sources  field key ⇒ its type + config
      * @param  array<string, mixed>  $answers  key ⇒ stored answer, already scoped to one repeat instance
      */
-    public function render(string $template, array $sources, array $answers): string
+    public function render(string $template, array $sources, array $answers, ?string $locale = null): string
     {
         if ($template === '') {
             return '';
@@ -83,6 +88,7 @@ final class TemplateRenderer
                 $source['type'],
                 $answers[$segment['value']] ?? null,
                 $source['config'],
+                $locale,
             );
         }
 
@@ -98,8 +104,8 @@ final class TemplateRenderer
      * @param  array<string, RenderSource>  $sources
      * @param  array<string, mixed>  $answers
      */
-    public function renderOptional(?string $template, array $sources, array $answers): ?string
+    public function renderOptional(?string $template, array $sources, array $answers, ?string $locale = null): ?string
     {
-        return $template === null ? null : $this->render($template, $sources, $answers);
+        return $template === null ? null : $this->render($template, $sources, $answers, $locale);
     }
 }

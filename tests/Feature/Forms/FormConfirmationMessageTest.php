@@ -75,12 +75,17 @@ it('rejects a malformed hole inside a locale variant', function (): void {
 it('accepts a hole naming a field that does not exist, deferring that to publish', function (): void {
     // The deliberate split (§6.2 as amended): request time cannot resolve references because the column is
     // form-level and editable on a form with no published version at all. The next publish refuses it.
+    // Increment H6b WARNS about it here (below) but still accepts — see the A3 block.
     $this->actingAs($this->owner)
         ->patch("http://acme.meridian.test/forms/{$this->form->id}/confirmation", [
             'confirmation_message' => 'Thanks, ${ghost}!',
         ])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->owner->id);
+
+    expect(Form::findOrFail($this->form->id)->confirmation_message)->toBe('Thanks, ${ghost}!');
 });
 
 it('clears the message back to the runtime default', function (): void {
@@ -124,4 +129,82 @@ it('is emitted raw to the guest runtime, never rendered server-side', function (
 
     expect($presented['form']['confirmation_message'])->toBe('Thanks, ${full_name}!')
         ->and($presented['form']['confirmation_message_translations'])->toBe(['fil' => 'Salamat!']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Amendment A3, closed by H6b as a WARNING (amendment A10)
+|
+| A message edited after the last publish can dangle a reference that nothing notices until the next
+| publish refuses it, naming a message edited weeks earlier. The edit path now resolves against the
+| CURRENTLY PUBLISHED version and says so — without refusing the write, because the publish gate resolves
+| against a DIFFERENT version (the one being published), so an author whose draft adds the field is right
+| and a 422 would block them for being early.
+|--------------------------------------------------------------------------
+*/
+
+it('warns when a saved message references a field the published form does not have', function (): void {
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$this->form->id}/confirmation", [
+            'confirmation_message' => 'Thanks, ${ghost}!',
+        ])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'info'
+            && str_contains($toast['message'], 'Confirmation message saved.')
+            && str_contains($toast['message'], 'ghost')
+            && str_contains($toast['message'], 'not a field on the published form'));
+});
+
+it('stays silent when every hole resolves against the published version', function (): void {
+    // `full_name` is a real short_text field on publishedInboxForm's published version.
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$this->form->id}/confirmation", [
+            'confirmation_message' => 'Thanks, ${full_name}!',
+        ])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'success'
+            && $toast['message'] === 'Confirmation message saved.');
+});
+
+it('stays silent on a form with no published version at all', function (): void {
+    // A3's own reasoning: there is nothing to resolve against, and inventing an answer would be dishonest.
+    $draftOnly = app(App\Services\Forms\FormService::class)->create($this->tenant, $this->owner, 'Unpublished');
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$draftOnly->id}/confirmation", [
+            'confirmation_message' => 'Thanks, ${ghost}!',
+        ])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'success');
+});
+
+it('warns about a dangling hole inside a locale variant, naming that variant', function (): void {
+    // §4: each variant is independently a template, and parity across locales is NOT required — so the
+    // base resolving is no excuse for the variant that does not.
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$this->form->id}/confirmation", [
+            'confirmation_message' => 'Thanks, ${full_name}!',
+            'confirmation_message_translations' => ['fil' => 'Salamat, ${ghost}!'],
+        ])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'info'
+            && str_contains($toast['message'], 'ghost'));
+});
+
+it('warns with the right reason when the referenced field exists but is not pipeable', function (): void {
+    $form = app(App\Services\Forms\FormService::class)->create($this->tenant, $this->owner, 'Sketchpad');
+    addFormField($form->draftVersion, $this->owner, 'sig', App\Enums\FieldType::Signature, 1);
+    app(App\Services\Forms\PublishService::class)->publish($form->refresh(), $this->owner);
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$form->id}/confirmation", [
+            'confirmation_message' => 'Signed: ${sig}',
+        ])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'info'
+            && str_contains($toast['message'], 'cannot be piped'));
+});
+
+it('says nothing at all when the message is cleared', function (): void {
+    $this->form->forceFill(['confirmation_message' => 'Thanks, ${ghost}!'])->save();
+
+    $this->actingAs($this->owner)
+        ->patch("http://acme.meridian.test/forms/{$this->form->id}/confirmation", ['confirmation_message' => ''])
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'success'
+            && $toast['message'] === 'Confirmation message reset to the default.');
 });

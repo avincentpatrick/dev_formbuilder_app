@@ -1,0 +1,14 @@
+[
+  {"name":"hole_only","template_version":"1.0","template":"${name}","expected":[{"type":"hole","value":"name"}]},
+  {"name":"hole_at_start","template_version":"1.0","template":"${name}, how old are you?","expected":[{"type":"hole","value":"name"},{"type":"literal","value":", how old are you?"}]},
+  {"name":"hole_in_middle","template_version":"1.0","template":"Age of ${child_name} in years","expected":[{"type":"literal","value":"Age of "},{"type":"hole","value":"child_name"},{"type":"literal","value":" in years"}]},
+  {"name":"hole_at_end","template_version":"1.0","template":"Thanks, ${name}","expected":[{"type":"literal","value":"Thanks, "},{"type":"hole","value":"name"}]},
+  {"name":"hole_two_distinct","template_version":"1.0","template":"${first} ${last}","expected":[{"type":"hole","value":"first"},{"type":"literal","value":" "},{"type":"hole","value":"last"}]},
+  {"name":"hole_adjacent","template_version":"1.0","template":"${a}${b}","expected":[{"type":"hole","value":"a"},{"type":"hole","value":"b"}]},
+  {"name":"hole_same_key_twice","template_version":"1.0","template":"${n} and ${n}","expected":[{"type":"hole","value":"n"},{"type":"literal","value":" and "},{"type":"hole","value":"n"}]},
+  {"name":"hole_leading_underscore_key","template_version":"1.0","template":"${_a}","expected":[{"type":"hole","value":"_a"}]},
+  {"name":"hole_alnum_key","template_version":"1.0","template":"${a1_b2}","expected":[{"type":"hole","value":"a1_b2"}]},
+  {"name":"hole_uppercase_key_lexes","template_version":"1.0","template":"${Name}","expected":[{"type":"hole","value":"Name"}],"note":"The grammar admits [A-Za-z_][A-Za-z0-9_]* verbatim from ExpressionLexer::lexReference(), but no ingress path can produce an uppercase key: UpdateFieldRequest and UpdateSectionRequest both pin ^[a-z][a-z0-9_]*$, and XlsformImportParser::sanitizeKey() strtolower()s. So ${Name} LEXES and then always fails resolution at publish with unknown_template_reference — a resolution error, never a lexical one. Pinned so the boundary is deliberate."},
+  {"name":"hole_multibyte_around","template_version":"1.0","template":"Kumusta, ${name} — 你好","expected":[{"type":"literal","value":"Kumusta, "},{"type":"hole","value":"name"},{"type":"literal","value":" — 你好"}]},
+  {"name":"hole_cap_twenty_passes","template_version":"1.0","template_repeat":{"prefix":"${a}","times":20,"core":"","suffix":""},"expected_repeat":{"times":20,"segment":{"type":"hole","value":"a"}},"note":"Boundary: the cap is 'may not contain MORE than 20 holes', so 20 pass and the 21st throws (parse-errors.json). Mirrors ExpressionLexer's strict > after append."}
+]

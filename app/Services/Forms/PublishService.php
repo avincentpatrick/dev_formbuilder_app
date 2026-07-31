@@ -27,6 +27,7 @@ final class PublishService
     public function __construct(
         private readonly StructuralValidationGate $gate,
         private readonly ExpressionValidationGate $expressionGate,
+        private readonly TemplateValidationGate $templateGate,
         private readonly SchemaChangeClassifier $classifier,
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly SchemaTreeCloner $cloner,
@@ -52,9 +53,15 @@ final class PublishService
                 ? FormVersion::query()->whereKey($locked->current_published_version_id)->first()
                 : null;
 
-            // 1. Validate the draft (throws the specific §4 violation) — structure, then expressions (F3).
+            // 1. Validate the draft (throws the specific §4 violation) — structure, then expressions (F3),
+            //    then templates (H6a). The template gate runs HERE so step 1 stays the single validation
+            //    phase and a doomed publish is never serialized; the COMMITTED-snapshot guarantee comes
+            //    from this transaction, not from the ordering. It takes the locked form too:
+            //    `forms.confirmation_message` is a form-level column, so it is not frozen per version and
+            //    its holes are validated against the version being published (Doc #26 §6.2 as amended).
             $this->gate->assertPublishable($draft);
             $this->expressionGate->assertExpressionsResolve($draft);
+            $this->templateGate->assertTemplatesResolve($draft, $locked);
             // 2. Classify the change.
             $classification = $this->classifier->classify($draft, $currentPublished);
 

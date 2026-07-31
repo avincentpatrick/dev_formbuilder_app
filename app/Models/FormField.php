@@ -28,6 +28,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property FieldType $field_type
  * @property array<string, mixed> $config
  * @property string $label
+ * @property ?array<string, string> $label_translations
+ * @property ?string $hint
+ * @property ?array<string, string> $hint_translations
+ * @property ?string $placeholder
+ * @property ?string $relevant_expression
+ * @property int $sequence
+ * @property ?int $section_sequence
  * @property RequiredMode $is_required
  * @property ?IndexedDataType $indexed_data_type
  * @property bool $is_queryable

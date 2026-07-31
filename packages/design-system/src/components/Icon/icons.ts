@@ -73,6 +73,9 @@ export const icons = {
     // A two-pin plug: prongs, body, cord. Deliberately generic rather than a vendor mark — the set is
     // hand-authored line art (see the header), and a brand logo would be neither line art nor ours.
     plug: 'M9 3v5 M15 3v5 M6 8h12v3a6 6 0 0 1-12 0z M12 17v4',
+    // The post-submit confirmation message (Increment H6a) — the `feedback` speech bubble with a check
+    // inside. Distinct from bare `check`, which the builder's Publish action already owns.
+    'message-check': 'M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z M8.5 10l2.5 2.5 4.5-4.5',
 } as const;
 
 export type IconName = keyof typeof icons;

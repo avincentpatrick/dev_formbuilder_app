@@ -66,6 +66,14 @@ final class BuilderPresenter
                 'closes_at' => $form->closes_at?->toIso8601String(),
                 'timezone' => $form->timezone,
                 'max_responses' => $form->max_responses,
+                // The confirmation template + its locale variants (Increment H6a) — raw, so the Confirmation
+                // modal round-trips exactly what the author wrote. The builder never renders a template:
+                // an author needs to see `${child_name}`, not a value there is no submission to supply.
+                'confirmation_message' => $form->confirmation_message,
+                'confirmation_message_translations' => $form->confirmation_message_translations ?? [],
+                // The form's locale set, so the modal can offer one message box per supported locale.
+                'default_locale' => $form->default_locale,
+                'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),
             ],
             'draft' => $draft ? [
                 'id' => $draft->id,

@@ -5,16 +5,74 @@
  * Advanced types (geo / media capture / cascading / matrix) are shown fully but flagged — their rich
  * config editors follow the form engine (ADR-0004). Adding places the field in the current section.
  */
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { MdsIcon } from '@meridian/design-system';
 import type { IconName } from '@meridian/design-system';
 import type { PaletteGroup } from './types';
 
-defineProps<{ palette: PaletteGroup[]; disabled?: boolean }>();
+const props = defineProps<{ palette: PaletteGroup[]; disabled?: boolean }>();
 const emit = defineEmits<{ add: [typeValue: string] }>();
+
+/**
+ * Keyboard access to the palette's own scroll region (WCAG 2.1.1 / axe `scrollable-region-focusable`).
+ *
+ * `.palette` is `overflow-y: auto` over 31 add-buttons, so at a short viewport it always scrolls. It
+ * normally passes the rule *because of* those buttons — but `:disabled="saving"` makes every one of them
+ * non-focusable while a debounced save is in flight, and a scroll region with no focusable content and no
+ * tab stop of its own is unreachable by keyboard: the types past the fold simply cannot be got at. That is
+ * a real defect, and it is also why `builder-axe` has been intermittently red on `main` (it fired on the
+ * `e04e68b` run and again here) — the gate was catching a genuine race, not flaking.
+ *
+ * Measured rather than assumed, mirroring `DataTable.vue`: a palette that fits adds no tab stop, since
+ * focusability is the remedy for content you would otherwise be unable to reach, not a decoration.
+ * `role="group"` deliberately, NOT `region` — a landmark here would compete with the page's own.
+ * Re-measures on resize (a viewport change or the personalization type scale can push a fitting palette
+ * over) and whenever the type list changes. Guarded for SSR.
+ */
+const root = ref<HTMLElement | null>(null);
+const scrollable = ref(false);
+
+function measure(): void {
+    const el = root.value;
+    if (!el) {
+        scrollable.value = false;
+
+        return;
+    }
+
+    const overflowY = getComputedStyle(el).overflowY;
+    const scrolls = overflowY === 'auto' || overflowY === 'scroll';
+
+    scrollable.value = scrolls && el.scrollHeight > el.clientHeight + 1;
+}
+
+let observer: ResizeObserver | null = null;
+
+onMounted(() => {
+    measure();
+
+    if (typeof ResizeObserver === 'undefined' || !root.value) return;
+
+    observer = new ResizeObserver(() => measure());
+    observer.observe(root.value);
+});
+
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    observer = null;
+});
+
+watch(() => props.palette, () => queueMicrotask(measure), { deep: false });
 </script>
 
 <template>
-    <div class="palette">
+    <div
+        ref="root"
+        class="palette"
+        :tabindex="scrollable ? 0 : undefined"
+        :role="scrollable ? 'group' : undefined"
+        :aria-label="scrollable ? 'Add a field' : undefined"
+    >
         <h2 class="palette__title">Add a field</h2>
         <div v-for="group in palette" :key="group.category" class="palette__group">
             <div class="palette__group-head">
@@ -47,6 +105,13 @@ const emit = defineEmits<{ add: [typeValue: string] }>();
     padding: var(--mds-space-4);
     height: 100%;
     overflow-y: auto;
+}
+
+/* The scroll region only becomes focusable when it actually scrolls (see `measure()`), so this focus ring
+   appears only on a real tab stop. */
+.palette:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: -2px;
 }
 
 .palette__title {

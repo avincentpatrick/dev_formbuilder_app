@@ -83,7 +83,9 @@ describe('RuntimeSession (component wiring)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID]);
+        // The second payload is Increment H6b's rendered confirmation copy — null here because this form
+        // sets no `confirmation_message`, which is what keeps App.vue's hardcoded default in place.
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
 
         wrapper.unmount();
     });
@@ -494,6 +496,140 @@ describe('RuntimeSession (component wiring)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
         expect(wrapper.text()).toContain('Server says no.');
+        wrapper.unmount();
+    });
+});
+
+/*
+ * Increment H6b — piping through the real component tree, i.e. through the SHARED `FieldInput.vue` the
+ * authenticated encode channel also uses. The cross-engine formatting contract is the golden corpus's job;
+ * these assert the wiring and the two obligations Doc #26 puts on this surface specifically.
+ */
+describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
+    function pipedSchema(form: Partial<import('../lib/types').SchemaResponse['form']> = {}) {
+        return schemaResponse({
+            form,
+            fields: [
+                field({ key: 'name', label: 'Your name', sequence: 0 }),
+                field({ key: 'confirm_it', label: 'Confirm this is you, ${name}', sequence: 1 }),
+            ],
+        });
+    }
+
+    it('renders a piped label into the DOM and updates it as the source is typed', async () => {
+        const wrapper = mount(RuntimeSession, { props: { schema: pipedSchema(), bootstrap, client: fakeClient() } });
+
+        expect(wrapper.text()).toContain('Confirm this is you,');
+
+        await wrapper.findAll('input')[0].setValue('Ada');
+        await settle();
+
+        expect(wrapper.text()).toContain('Confirm this is you, Ada');
+        wrapper.unmount();
+    });
+
+    // ── The output-encoding test Doc #26 §5 owes this increment ────────────────────────────────────
+    it('renders a piped answer containing markup as visible TEXT, never as live markup', async () => {
+        // §5's first table row: guest SPA + encode page, DOM text context, escaper = Vue's own text
+        // interpolation / prop binding, required test = exactly this. It is a regression guard rather
+        // than a fix — `resources/` has one `v-html` in the entire tree and it is a 2FA QR SVG that must
+        // never be given form content. CSP is NOT a second layer here: `PublicRuntimeSecurityHeaders`
+        // sets no `script-src`, so output encoding is the sole control.
+        //
+        // The payload is markup-shaped and never token-shaped, per §7's note that gitleaks scans the tree.
+        const wrapper = mount(RuntimeSession, { props: { schema: pipedSchema(), bootstrap, client: fakeClient() } });
+        const scriptsBefore = document.querySelectorAll('script').length;
+
+        await wrapper.findAll('input')[0].setValue('<script>alert(1)</script>');
+        await settle();
+
+        expect(wrapper.text()).toContain('Confirm this is you, <script>alert(1)</script>');
+        expect(wrapper.find('script').exists()).toBe(false);
+        expect(document.querySelectorAll('script').length).toBe(scriptsBefore);
+        expect(wrapper.html()).toContain('&lt;script&gt;');
+
+        wrapper.unmount();
+    });
+
+    it('emits the author confirmation message, locale-resolved and hole-filled', async () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: pipedSchema({ confirmation_message: 'Thanks, ${name}!' }), bootstrap, client: fakeClient() },
+        });
+
+        await wrapper.findAll('input')[0].setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, 'Thanks, Ada!']);
+        wrapper.unmount();
+    });
+
+    it('emits the Filipino variant when the session is in Filipino', async () => {
+        const schema = pipedSchema({
+            supported_locales: ['en', 'fil'],
+            default_locale: 'fil',
+            confirmation_message: 'Thanks, ${name}!',
+            confirmation_message_translations: { fil: 'Salamat, ${name}!' },
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap: { ...bootstrap, defaultLocale: 'fil' }, client: fakeClient() } });
+
+        await wrapper.findAll('input')[0].setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, 'Salamat, Ada!']);
+        wrapper.unmount();
+    });
+
+    it('emits null when there is no message, so App.vue keeps its hardcoded default', async () => {
+        const wrapper = mount(RuntimeSession, { props: { schema: pipedSchema(), bootstrap, client: fakeClient() } });
+
+        await wrapper.findAll('input')[0].setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
+        wrapper.unmount();
+    });
+
+    it('emits null when the message renders to nothing, rather than an empty heading', async () => {
+        // A message that is entirely unanswered holes would give ConfirmationScreen's focused `<h1>` an
+        // empty accessible name — an axe `empty-heading` violation on a page the e2e gate scans.
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: pipedSchema({ confirmation_message: '${name}' }), bootstrap, client: fakeClient() },
+        });
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
+        wrapper.unmount();
+    });
+
+    it('pipes each repeat instance against its OWN answers, in the rendered DOM', async () => {
+        const schema = schemaResponse({
+            sections: [{ ...section({ key: 'roster', label: 'Member', sequence: 1 }), is_repeatable: true, min_instances: 0, max_instances: 5 }],
+            fields: [
+                field({ key: 'member_name', section_key: 'roster', sequence: 1 }),
+                field({ key: 'member_age', section_key: 'roster', sequence: 2, label: 'Age of ${member_name}' }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+
+        await wrapper.find('.repeat-group__add button').trigger('click');
+        await wrapper.find('.repeat-group__add button').trigger('click');
+        await settle();
+
+        const nameInputs = wrapper.findAll('[data-repeat-instance] input');
+        await nameInputs[0].setValue('Ana');
+        await nameInputs[2].setValue('Beni');
+        await settle();
+
+        const instances = wrapper.findAll('[data-repeat-instance]');
+        expect(instances[0].text()).toContain('Age of Ana');
+        expect(instances[1].text()).toContain('Age of Beni');
+        expect(instances[0].text()).not.toContain('Beni');
+
         wrapper.unmount();
     });
 });

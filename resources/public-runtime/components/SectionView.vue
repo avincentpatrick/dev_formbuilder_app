@@ -8,7 +8,6 @@
 import { computed } from 'vue';
 import FieldRow from './FieldRow.vue';
 import RepeatGroup from './RepeatGroup.vue';
-import { resolveOptional, resolveText } from '../lib/schema-mapping';
 import { useRuntime } from '../composables/context';
 import type { RuntimeStep } from '../composables/useFormRuntime';
 
@@ -21,15 +20,12 @@ const section = computed(() =>
         : (runtime.renderModel.sections.find((s) => s.key === props.step.sectionKey) ?? null),
 );
 
-const title = computed(() =>
-    section.value ? resolveText(section.value.label, section.value.labelTranslations, runtime.locale.value) : null,
-);
+// Increment H6b — locale-resolved then hole-filled through the store's seam. No repeat scope: a section
+// sits BEFORE its own members positionally, so a hole in its heading naming one is a forward reference
+// the publish gate refuses. Its holes can only ever name flat fields.
+const title = computed(() => (section.value ? runtime.sectionTitleFor(section.value) : null));
 
-const description = computed(() =>
-    section.value
-        ? resolveOptional(section.value.description, section.value.descriptionTranslations, runtime.locale.value)
-        : null,
-);
+const description = computed(() => (section.value ? runtime.sectionDescriptionFor(section.value) : null));
 
 const fields = computed(() =>
     props.step.fieldKeys

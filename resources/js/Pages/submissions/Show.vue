@@ -261,7 +261,7 @@ function formatDate(iso: string | null): string {
 .detail__empty {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-muted);
+    color: var(--mds-color-text-secondary);
 }
 
 .detail__meta-row,

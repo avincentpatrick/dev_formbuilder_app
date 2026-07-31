@@ -7,7 +7,7 @@
  */
 import { computed, inject } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
-import { resolveCascade, resolveMatrix, resolveOptional, resolveText } from '../lib/schema-mapping';
+import { resolveCascade, resolveMatrix, resolveText } from '../lib/schema-mapping';
 import { useRuntime, OfflineMediaKey, UploadUrlKey } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -21,9 +21,13 @@ const marker = computed(() => runtime.requiredMarkerFor(props.field));
 const encodeField = computed<EncodeField>(() => ({
     key: props.field.key,
     field_type: props.field.fieldType,
+    // Increment H6b — label/hint/placeholder are TEMPLATE-BEARING (§6's closed list), so they go through
+    // the store's piping seam: locale variant first, then holes. Option labels deliberately do NOT — they
+    // are excluded from that list, the publish gate never validates a hole in one, and rendering one would
+    // create a permanent blank publish could never refuse.
     label: runtime.labelFor(props.field),
-    hint: resolveOptional(props.field.hint, props.field.hintTranslations, runtime.locale.value),
-    placeholder: props.field.placeholder,
+    hint: runtime.hintFor(props.field),
+    placeholder: runtime.placeholderFor(props.field),
     required: marker.value === 'required',
     options: props.field.options.map((o) => ({
         value: o.value,

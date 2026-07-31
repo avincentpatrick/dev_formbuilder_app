@@ -62,7 +62,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    submitted: [id: string];
+    // Increment H6b — `confirmation` is the author's message, ALREADY locale-resolved and hole-filled, or
+    // null to keep App.vue's hardcoded default. It is rendered here rather than there because App unmounts
+    // this session the instant it flips to the confirmation phase (they are mutually exclusive branches),
+    // so the store — and with it the locale, the source map and the submitted answers — does not outlive
+    // the emit. See {@link authoredConfirmation}.
+    submitted: [id: string, confirmation: string | null];
     queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
     discard: [];
@@ -238,13 +243,38 @@ async function submit(): Promise<SubmitOutcome> {
         await markSynced(db, uuid);
         void sync?.refresh();
         await autosave.clear();
-        emit('submitted', result.id);
+        emit('submitted', result.id, authoredConfirmation());
         return 'success';
     } catch (error) {
         return await handleSubmitError(error, uuid);
     } finally {
         submitting.value = false;
     }
+}
+
+/**
+ * The author-set confirmation copy (Increment H6b, Doc #26 §6.2), locale-resolved then hole-filled.
+ *
+ * Computed HERE, at submit time, for a structural reason: `App.vue` renders `ConfirmationScreen` and
+ * `RuntimeSession` as mutually exclusive branches, so this component unmounts the moment the phase flips.
+ * The answers it renders from are literally the ones just enqueued and POSTed, so the thank-you says what
+ * was actually recorded — and matches what `SubmissionInboxPresenter` will later render for that row.
+ *
+ * Flat scope, no repeat instance: §6.2 validates the message at the maximal position in flat scope, so
+ * its holes can only name flat fields.
+ *
+ * A message that is absent, or that renders to nothing (every hole unanswered), collapses to null so the
+ * hardcoded default stands. That is not tidiness — `ConfirmationScreen` renders it into the page's only
+ * `<h1>` and focuses it on mount, so an empty render would give a focused heading an empty accessible
+ * name: an axe `empty-heading` violation on a page the e2e gate scans.
+ */
+function authoredConfirmation(): string | null {
+    const rendered = runtime.templateOptional(
+        props.schema.form.confirmation_message ?? null,
+        props.schema.form.confirmation_message_translations ?? null,
+    );
+
+    return rendered === null || rendered.trim() === '' ? null : rendered;
 }
 
 const flow: SubmitFlow = { submitting, submit };

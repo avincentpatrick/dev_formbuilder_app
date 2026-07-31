@@ -136,4 +136,38 @@ final class PublishValidationException extends RuntimeException
     {
         return new self("The media field “{$fieldKey}” is invalid ({$detail}).");
     }
+
+    /**
+     * A `hidden` field (Increment H7) that could produce an error the respondent can never repair — it is
+     * marked required/conditional, or it carries a validation rule. Either way the failure mode is a submit
+     * that fails forever against a field nobody can see, so it is refused at publish where the author can
+     * still act on it.
+     *
+     * `$detail` is a stable snake_case slug (`hidden_field_required` / `hidden_field_has_validations`);
+     * tests match the slug, never the wording (the A4 rule — this envelope is message-only).
+     */
+    public static function hiddenFieldNotAnswerable(string $fieldKey, string $detail): self
+    {
+        return new self("The hidden field “{$fieldKey}” cannot require an answer ({$detail}).");
+    }
+
+    /**
+     * A `hidden` field (Increment H7) nested in a repeatable section. Neither prefill source can address one
+     * instance out of N — a URL carries one value for the whole form, and an authored literal is the same
+     * for every row — so the field could only ever be written flat, outside the instance list where nothing
+     * would read it.
+     */
+    public static function hiddenInRepeatableSection(string $fieldKey): self
+    {
+        return new self("The hidden field “{$fieldKey}” cannot be placed inside a repeatable section.");
+    }
+
+    /**
+     * A `hidden` field (Increment H7) sourced from the link whose declared query-parameter name is not a
+     * usable one. `$detail` is the stable snake_case slug `prefill_param_invalid`.
+     */
+    public static function prefillConfigInvalid(string $fieldKey, string $detail): self
+    {
+        return new self("The prefill settings on “{$fieldKey}” are invalid ({$detail}).");
+    }
 }

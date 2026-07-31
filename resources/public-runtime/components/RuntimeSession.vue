@@ -59,6 +59,9 @@ const props = defineProps<{
         completeness: number | null;
         note: string | null;
     } | null;
+    /** Increment H7 — the raw `location.search` to prefill `url`-sourced hidden fields from. App.vue reads
+     *  the DOM once and threads it here so the store itself stays DOM-free. */
+    search?: string;
 }>();
 
 const emit = defineEmits<{
@@ -81,6 +84,8 @@ const runtime = createFormRuntime(props.schema, {
     initialAnswers: props.initialAnswers,
     // A resumed session reuses the draft's uuid so its submit promotes that row (H9a invariant).
     initialClientSubmissionUuid: props.resume?.uuid,
+    // Increment H7 — hidden-field prefill. Seeded before `initialAnswers`, so a restored draft wins.
+    search: props.search,
 });
 const announcer = createAnnouncer();
 

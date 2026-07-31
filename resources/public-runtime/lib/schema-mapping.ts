@@ -59,6 +59,29 @@ const SUPPORTED = new Set<string>([
     'file_upload', 'image_capture', 'audio_capture', 'video_capture',
 ]);
 
+/**
+ * Field types that render NOTHING on a respondent's form (Increment H7).
+ *
+ * This set deliberately does NOT mirror `EncodeFormPresenter::OMITTED`, and the divergence is the point.
+ * H7 makes the two channels asymmetric: a keyer SHOULD see a hidden field (they are staff, and they may be
+ * the only source of an externally-sourced value on a paper form), while a respondent must never see one —
+ * that is what the type means.
+ *
+ * Without this set all three of these fall through `SUPPORTED` below into `controlFor()`'s `'unsupported'`
+ * branch and render the encode channel's "Not available for manual entry yet (Phase 2)" notice on a public
+ * form. That was live for `hidden`, `calculated` and `page_break` alike before H7; nothing pinned it.
+ *
+ * Dropping them from the step model is only SAFE because neither engine can produce an error on a hidden or
+ * calculated field (`semantic-validator.ts::collectFieldErrors`) — otherwise the error-summary banner could
+ * offer a jump link to a row that does not exist. `page_break` carries no answer at all.
+ */
+const RENDERS_NOTHING = new Set<string>(['hidden', 'calculated', 'page_break']);
+
+/** Whether a field type is rendered to a respondent at all (Increment H7). */
+export function rendersNothing(fieldType: string): boolean {
+    return RENDERS_NOTHING.has(fieldType);
+}
+
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
 const HAS_OPTIONS = new Set<string>(['single_select', 'multi_select', 'dropdown', 'likert_scale']);
 

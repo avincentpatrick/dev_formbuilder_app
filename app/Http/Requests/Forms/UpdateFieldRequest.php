@@ -146,6 +146,16 @@ final class UpdateFieldRequest extends FormRequest
             ];
         }
 
+        // Increment H7: where a hidden field's value comes from. Shape only, like every arm above —
+        // `url_param`'s character set and the "a hidden field cannot require an answer" rule are the publish
+        // gate's (StructuralValidationGate), so a mid-edit blur never 422s the optimistic PATCH.
+        if ($type === FieldType::Hidden) {
+            return [
+                'config.prefill_source' => ['nullable', Rule::in(['fixed', 'url'])],
+                'config.url_param' => ['nullable', 'string', 'max:64'],
+            ];
+        }
+
         if ($type->configEditor() === 'choices') {
             return [
                 'config.options' => ['sometimes', 'array'],

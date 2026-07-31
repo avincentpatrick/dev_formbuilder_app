@@ -23,6 +23,7 @@ import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
+import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, EnumOption, LocalField, LocalSection } from './types';
@@ -81,6 +82,7 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
         if (configEditor.value === 'matrix' || configEditor.value === 'likert_matrix') list.push({ key: 'grid', label: 'Grid' });
         if (configEditor.value === 'geo') list.push({ key: 'geo', label: 'Map' });
         if (configEditor.value === 'media') list.push({ key: 'media', label: 'Media' });
+        if (configEditor.value === 'prefill') list.push({ key: 'prefill', label: 'Prefill' });
         list.push({ key: 'validation', label: 'Validation' }, { key: 'advanced', label: 'Advanced' });
         return list;
     }
@@ -147,6 +149,10 @@ const mediaMaxFileSizeBytes = computed<number | null>(() => (field.value?.config
 const mediaMaxCount = computed<number | null>(() => (field.value?.config.max_count as number | undefined) ?? null);
 const mediaMinCount = computed<number | null>(() => (field.value?.config.min_count as number | undefined) ?? null);
 const mediaCaptureSource = computed<string | null>(() => (field.value?.config.capture_source as string | undefined) ?? null);
+// A hidden field (Increment H7) carries only where its value comes from; the fixed literal reuses the
+// existing `default_value` column rather than a second config key.
+const prefillSource = computed<string | null>(() => (field.value?.config.prefill_source as string | undefined) ?? null);
+const prefillUrlParam = computed<string | null>(() => (field.value?.config.url_param as string | undefined) ?? null);
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -334,6 +340,18 @@ watch(librarySaved, (value) => {
                         @update:maxCount="setConfig('max_count', $event)"
                         @update:minCount="setConfig('min_count', $event)"
                         @update:captureSource="setConfig('capture_source', $event)"
+                    />
+                </template>
+
+                <template v-else-if="activeTab === 'prefill'">
+                    <PrefillEditor
+                        :field-key="field.key"
+                        :source="prefillSource"
+                        :url-param="prefillUrlParam"
+                        :default-value="field.default_value"
+                        @update:source="setConfig('prefill_source', $event)"
+                        @update:urlParam="setConfig('url_param', $event)"
+                        @update:defaultValue="setField('default_value', $event)"
                     />
                 </template>
 

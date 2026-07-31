@@ -36,11 +36,13 @@ import {
     buildEngineSchema,
     buildRenderModel,
     buildTemplateSources,
+    rendersNothing,
     resolveOptional,
     resolveText,
     toSemanticInput,
     type EngineSchema,
 } from '../lib/schema-mapping';
+import { buildPrefill } from '../lib/prefill';
 import { randomUuid, uuidv7 } from '../lib/uuid';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../lib/types';
 
@@ -162,6 +164,12 @@ export interface RuntimeOptions {
      * MUST reuse the draft's uuid or the finalize would create a duplicate submission.
      */
     initialClientSubmissionUuid?: string;
+    /**
+     * Increment H7 — the raw `location.search` this session was opened with, used to prefill `url`-sourced
+     * hidden fields. Passed IN rather than read here so this store stays DOM-free and unit-testable (its own
+     * docblock's invariant); `buildPrefill()` is a pure function of it.
+     */
+    search?: string;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -215,6 +223,11 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     // draft row rather than creating a duplicate (the H9a same-uuid-finalize-through-promote invariant).
     const clientSubmissionUuid = opts.initialClientSubmissionUuid ?? uuidv7();
 
+    // Increment H7 — hidden-field prefill, seeded FIRST so a restored answer always wins over it. That
+    // ordering is the whole rule: a resumed draft carries no query string, and the value it saved is the one
+    // the respondent's submission was built against. Routing both through `restoreAnswers` also means the
+    // prefill inherits its flat-key guard for free.
+    restoreAnswers(buildPrefill(schema, opts.search ?? ''));
     restoreAnswers(opts.initialAnswers ?? {});
 
     // Snapshot-degrade wrapper: a malformed published expression THROWS (it is pre-validated by the F3 gate,
@@ -280,7 +293,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         const steps: RuntimeStep[] = [];
 
         const leadFields = renderModel.fields
-            .filter((f) => f.sectionKey === null)
+            .filter((f) => f.sectionKey === null && !rendersNothing(f.fieldType))
             .sort((a, b) => a.sequence - b.sequence);
         if (leadFields.length > 0) {
             steps.push({
@@ -297,11 +310,16 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
                 continue;
             }
             const isRepeat = section.isRepeatable;
-            const sectionFields = isRepeat
-                ? membersBySection[section.key] ?? []
-                : renderModel.fields
-                      .filter((f) => f.sectionKey === section.key)
-                      .sort((a, b) => (a.sectionSequence ?? a.sequence) - (b.sectionSequence ?? b.sequence));
+            const sectionFields = (
+                isRepeat
+                    ? membersBySection[section.key] ?? []
+                    : renderModel.fields
+                          .filter((f) => f.sectionKey === section.key)
+                          .sort((a, b) => (a.sectionSequence ?? a.sequence) - (b.sectionSequence ?? b.sequence))
+            ).filter((f) => !rendersNothing(f.fieldType));
+            // Increment H7 — the filter runs BEFORE this emptiness check on purpose: a section holding
+            // nothing but hidden/calculated fields has no question in it, so it should vanish entirely
+            // rather than render a heading over a blank panel.
             if (sectionFields.length === 0) {
                 continue;
             }

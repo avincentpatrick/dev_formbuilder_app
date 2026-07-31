@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
+use App\Enums\PrefillSource;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -33,6 +34,21 @@ use Illuminate\Support\Collection;
  * (`expected_instance_array`/`expected_instance_object`), an unknown inner key is `unknown_field` addressed
  * `section[i].field`, and a repeat-member field sent at the TOP level is `misplaced_repeat_field`. Empty
  * inner answers and fully-empty instances are dropped; an empty repeat group is dropped entirely.
+ *
+ * Hidden-field prefill (Increment H7): a `hidden` field's value is decided by {@see PrefillSource}, not by
+ * the client. A {@see PrefillSource::Fixed} field is OVERWRITTEN with the authored `default_value` — and
+ * INJECTED when the payload omits it entirely, which is why this class needs a second pass over the FIELDS
+ * (the main loop walks the client's keys and can only ever visit what it was sent). A
+ * {@see PrefillSource::Url} field keeps the submitted value but only as a scalar under
+ * {@see PrefillSource::MAX_VALUE_BYTES}; over-cap is the structural fault `prefill_too_long`. A
+ * {@see PrefillSource::None} field is dropped like a `calculated` one.
+ *
+ * That the prefill pass lives HERE rather than in a caller is load-bearing twice over. Both write paths
+ * ({@see SubmissionPipeline::submit()} and {@see SubmissionDraftService::saveDraft()}) call `normalize()`
+ * and then immediately hash the result with {@see AnswersContentChecksum}, so this placement is the one
+ * that gives drafts the same treatment as submissions AND keeps the checksum deterministic: a replay that
+ * omits a fixed value and one that includes it normalise to the identical document, so neither can raise a
+ * spurious G8c content conflict against the other.
  */
 final class StructuralAnswerNormalizer
 {
@@ -127,6 +143,50 @@ final class StructuralAnswerNormalizer
 
         if ($errors !== []) {
             throw SubmissionValidationException::structural($errors);
+        }
+
+        return $this->applyFixedPrefills($fields, $repeatMemberKeys, $normalized);
+    }
+
+    /**
+     * Increment H7 — write every {@see PrefillSource::Fixed} hidden field's authored literal into the
+     * document, whether or not the payload mentioned it.
+     *
+     * A second pass over the FIELDS is unavoidable: the main loop iterates the client's keys, so a fixed
+     * value the client never sent is a key it never visits. `coerce()` has already dropped any client-sent
+     * value for these fields, so this pass is the sole writer and the value is server-authoritative on
+     * every ingest channel.
+     *
+     * The literal is written VERBATIM — no coercion. `default_value` is a `text` column, the SPA seeds the
+     * identical string for its own render, and a transformation on either side would be a formatting
+     * decision able to drift between the two. A blank/absent literal writes nothing, so the field is simply
+     * unanswered.
+     *
+     * Repeat members are skipped defensively. The publish gate refuses a `hidden` field inside a repeatable
+     * section, but it is not retroactive, so a version published before H7 can still carry one — and a flat
+     * write would land it outside the instance list where nothing would ever read it.
+     *
+     * @param  Collection<int, FormField>  $fields
+     * @param  array<string, true>  $repeatMemberKeys
+     * @param  array<string, mixed>  $normalized
+     * @return array<string, mixed>
+     */
+    private function applyFixedPrefills(Collection $fields, array $repeatMemberKeys, array $normalized): array
+    {
+        foreach ($fields as $field) {
+            if (isset($repeatMemberKeys[$field->key])) {
+                continue;
+            }
+            if (PrefillSource::for($field->field_type, $field->config) !== PrefillSource::Fixed) {
+                continue;
+            }
+
+            $literal = $field->default_value;
+            if ($literal === null || $literal === '') {
+                continue;
+            }
+
+            $normalized[$field->key] = $literal;
         }
 
         return $normalized;
@@ -253,12 +313,15 @@ final class StructuralAnswerNormalizer
             FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture,
             FieldType::VideoCapture, FieldType::Signature => $this->coerceMedia($field, $value),
 
+            // Hidden fields (Increment H7) are the ONE scalar type whose value is not the client's to
+            // decide — see coerceHidden(). Split out of the scalar arm below deliberately.
+            FieldType::Hidden => $this->coerceHidden($field, $value),
+
             // Scalar-valued types: reject an array, otherwise store a canonical string. `likert_scale` (G4a)
             // is a single chosen scale point, so it coerces exactly like a single_select.
             FieldType::ShortText, FieldType::LongText, FieldType::Email, FieldType::Phone, FieldType::Url,
             FieldType::SingleSelect, FieldType::Dropdown, FieldType::LikertScale,
-            FieldType::Date, FieldType::Time, FieldType::Datetime,
-            FieldType::Hidden => is_array($value)
+            FieldType::Date, FieldType::Time, FieldType::Datetime => is_array($value)
                 ? [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')]
                 : [true, Coercion::toStr($value), null],
 
@@ -267,6 +330,49 @@ final class StructuralAnswerNormalizer
             // rejected here.
             default => [true, $value, null],
         };
+    }
+
+    /**
+     * A `hidden` field's submitted value (Increment H7). The one place in this class where the client is
+     * NOT the authority on its own answer.
+     *
+     * {@see PrefillSource::Fixed} and {@see PrefillSource::None} drop whatever arrived — silently, exactly
+     * as `calculated` does above, because a rejection would teach an integrator nothing it can act on and
+     * would break the offline replay of a payload built against a form the author has since re-sourced.
+     * A `Fixed` field's real value is written by {@see applyFixedPrefills()} afterwards.
+     *
+     * {@see PrefillSource::Url} is the untrusted path and the only one that stores what it was sent. Two
+     * constraints, both structural: it must be a scalar, and it must fit in
+     * {@see PrefillSource::MAX_VALUE_BYTES}.
+     *
+     * The over-cap value is REJECTED here while `lib/prefill.ts` DROPS an over-cap URL parameter on the
+     * client. That asymmetry is deliberate and the two can never disagree: the SPA never puts an over-cap
+     * value into its answer map, so this fault is reachable only from a direct API post — where a 422
+     * naming the field is the useful answer, and where silently swallowing 2KB of someone's payload is not.
+     *
+     * @return array{0: bool, 1: string|null, 2: array{field: string, rule: string, message: string}|null}
+     */
+    private function coerceHidden(FormField $field, mixed $value): array
+    {
+        if (PrefillSource::for($field->field_type, $field->config) !== PrefillSource::Url) {
+            return [false, null, null];
+        }
+
+        if (is_array($value)) {
+            return [false, null, $this->mismatch($field->key, 'expected_scalar', 'This field must be a single value.')];
+        }
+
+        $string = Coercion::toStr($value);
+
+        if (strlen($string) > PrefillSource::MAX_VALUE_BYTES) {
+            return [false, null, $this->mismatch(
+                $field->key,
+                'prefill_too_long',
+                'This prefilled value is too long (maximum '.PrefillSource::MAX_VALUE_BYTES.' bytes).',
+            )];
+        }
+
+        return [true, $string, null];
     }
 
     /**

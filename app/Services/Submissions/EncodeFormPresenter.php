@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
+use App\Enums\PrefillSource;
 use App\Enums\RequiredMode;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
@@ -24,9 +25,16 @@ use Illuminate\Support\Collection;
  * "Render-supported, mark-the-rest" (confirmed scope decision): the ~14 Phase-1 scalar field types render a
  * real input; everything else (advanced geo/media/matrix/likert/cascading, duration, signature) is emitted
  * with `supported = false` so the page shows a read-only "not available for manual entry (Phase 2)" notice
- * rather than silently dropping it. Display-only `note` fields render as static prose. `page_break`/`hidden`/
+ * rather than silently dropping it. Display-only `note` fields render as static prose. `page_break` and
  * `calculated` are structural/derived and are omitted from the encode surface entirely (they are never a
  * manually-entered answer).
+ *
+ * Hidden fields (Increment H7) are NOT omitted, and this channel is deliberately asymmetric with the guest
+ * SPA on that point. A respondent must never see a hidden field — that is what the type means. A keyer is
+ * the opposite case: they are staff transcribing a paper form, so a `url`-sourced hidden field has no URL to
+ * come from and they are the only possible source (stamping a batch id on a linelist sheet). Each row
+ * therefore carries `prefill`: `'url'` rows are `supported` and render a real text input, `'fixed'` rows are
+ * server-set and render read-only.
  *
  * Repeat groups (Increment G2): a repeatable section is now emitted with its `min_instances`/`max_instances`
  * bounds; its member fields render exactly like any other (a scalar type is supported), and the page renders
@@ -56,8 +64,12 @@ final class EncodeFormPresenter
         FieldType::FileUpload, FieldType::ImageCapture, FieldType::AudioCapture, FieldType::VideoCapture,
     ];
 
-    /** Structural / server-derived types that never carry a manually-entered answer — omitted from the page. */
-    private const OMITTED = [FieldType::PageBreak, FieldType::Hidden, FieldType::Calculated];
+    /**
+     * Structural / server-derived types that never carry a manually-entered answer — omitted from the page.
+     * `hidden` LEFT this list in Increment H7 (see the class docblock); it is now presented, with its
+     * keyability decided per-field by {@see PrefillSource}.
+     */
+    private const OMITTED = [FieldType::PageBreak, FieldType::Calculated];
 
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
@@ -79,10 +91,10 @@ final class EncodeFormPresenter
         // the contract, not a shortfall — a hole is never emitted as the raw `${key}` token, and §8 records
         // the same narrowing for a printed OCR form ("prose with a gap", not a substitution).
         //
-        // Note that `OMITTED` drops `hidden` and `calculated`, both of which ARE pipeable SOURCES per §3.1.
-        // That is fine: a source need not have a row on this page for its consumer's label to be correct,
-        // and the source map is built from every field for exactly that reason. With no answers the point
-        // is moot today; it matters once H7 un-omits `hidden` from this surface.
+        // Note that `OMITTED` still drops `calculated`, which IS a pipeable SOURCE per §3.1. That is fine:
+        // a source need not have a row on this page for its consumer's label to be correct, and the source
+        // map is built from EVERY field for exactly that reason — including the ones with no row.
+        // (Increment H7 un-omitted `hidden`; `calculated` remains omitted.)
         $sources = TemplateSources::fromFields($allFields);
         $answers = [];
 
@@ -177,6 +189,7 @@ final class EncodeFormPresenter
     private function field(Form $form, FormField $field, array $sources, array $answers): array
     {
         $type = $field->field_type;
+        $prefill = PrefillSource::for($type, $field->config);
 
         return [
             'key' => $field->key,
@@ -197,9 +210,20 @@ final class EncodeFormPresenter
             // Where a media control POSTs a staged upload (Increment G6) — the authenticated form-scoped
             // endpoint. Only media fields carry it; the shared FieldInput ignores it for other types.
             'upload' => $type->isMedia() ? ['url' => route('forms.attachments.store', $form)] : null,
+            // Where a hidden field's value comes from (Increment H7); null for every other type, which is
+            // what makes this additive for every existing row. `'fixed'` renders read-only (the server
+            // writes the authored literal regardless of what this page sends), `'url'` renders a real input.
+            'prefill' => $type === FieldType::Hidden ? $prefill->value : null,
+            // The already-server-set value shown beside a `'fixed'` row, so the keyer can see what will be
+            // recorded rather than an unexplained blank. Never editable, never submitted.
+            'prefill_value' => $prefill === PrefillSource::Fixed ? $field->default_value : null,
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
-            // supported and render inside the add/remove-instance loop (Increment G2).
-            'supported' => in_array($type, self::SUPPORTED, true),
+            // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
+            // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this
+            // channel could legitimately contribute (Increment H7).
+            'supported' => $type === FieldType::Hidden
+                ? $prefill === PrefillSource::Url
+                : in_array($type, self::SUPPORTED, true),
         ];
     }
 

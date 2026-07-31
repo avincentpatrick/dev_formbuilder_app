@@ -12,6 +12,11 @@ import { MdsBadge, MdsButton, MdsCard, MdsFormField, MdsModal, MdsTextarea, stat
 import PageHeader from '@/components/shell/PageHeader.vue';
 
 type FieldRow = { key: string; label: string; value: string };
+/**
+ * `id` is a stable unique key for the block, not a section id — a repeatable section emits one block per
+ * stored instance (Increment H6b) carrying `"{sectionId}#{n}"`, so `fields` can legitimately be empty for
+ * a repeat the respondent added nothing to.
+ */
 type Block = { id: string | null; label: string | null; fields: FieldRow[] };
 
 type Submission = {
@@ -155,7 +160,8 @@ function formatDate(iso: string | null): string {
 
         <MdsCard v-for="(block, i) in blocks" :key="block.id ?? `ungrouped-${i}`" class="detail__block">
             <template v-if="block.label" #header><h2 class="detail__card-title">{{ block.label }}</h2></template>
-            <dl class="detail__answers">
+            <p v-if="block.fields.length === 0" class="detail__empty">No entries.</p>
+            <dl v-else class="detail__answers">
                 <div v-for="field in block.fields" :key="field.key" class="detail__answer">
                     <dt>{{ field.label }}</dt>
                     <dd>{{ field.value || '—' }}</dd>
@@ -248,6 +254,14 @@ function formatDate(iso: string | null): string {
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);
+}
+
+/* A repeatable section the respondent added nothing to (Increment H6b) — distinct from a section whose
+   fields were left blank, which still renders its rows with an em-dash value. */
+.detail__empty {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 
 .detail__meta-row,

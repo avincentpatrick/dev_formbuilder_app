@@ -22,6 +22,7 @@
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue';
 import {
     makeSemanticValidator,
+    makeTemplateRenderer,
     SemanticResult,
     type CompositeAnswer,
     type EngineValue,
@@ -34,6 +35,8 @@ import {
 import {
     buildEngineSchema,
     buildRenderModel,
+    buildTemplateSources,
+    resolveOptional,
     resolveText,
     toSemanticInput,
     type EngineSchema,
@@ -66,6 +69,12 @@ export interface ErroredItem {
 export interface AttemptResult {
     advanced: boolean;
     errorCount: number;
+}
+
+/** Addresses one repeat instance for a scoped template render (Increment H6b, Doc #26 §3.3 rule 2). */
+export interface RepeatScope {
+    sectionKey: string;
+    index: number;
 }
 
 export interface FormRuntime {
@@ -107,7 +116,16 @@ export interface FormRuntime {
     requiredMarkerFor(field: RenderField): Marker;
     rawErrorsFor(key: string): SemanticError[];
     errorFor(key: string): string | undefined;
-    labelFor(field: RenderField): string;
+
+    // ── Piping (H6b, Doc #26) — locale-resolved THEN hole-filled, in that order ─────────────────
+    // `scope` names the repeat instance a hole resolves against; omit it at flat scope.
+    labelFor(field: RenderField, scope?: RepeatScope): string;
+    hintFor(field: RenderField, scope?: RepeatScope): string | null;
+    placeholderFor(field: RenderField, scope?: RepeatScope): string | null;
+    sectionTitleFor(section: RenderSection): string;
+    sectionDescriptionFor(section: RenderSection): string | null;
+    templateText(base: string, translations: Record<string, string> | null, scope?: RepeatScope): string;
+    templateOptional(base: string | null, translations: Record<string, string> | null, scope?: RepeatScope): string | null;
 
     // ── Repeat groups (G2) ──────────────────────────────────────────────────────────────────────
     membersOf(sectionKey: string): RenderField[];
@@ -153,6 +171,10 @@ function isInstanceObject(value: unknown): value is InstanceAnswers {
 export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions = {}): FormRuntime {
     const renderModel = buildRenderModel(schema);
     const engineSchema: EngineSchema = buildEngineSchema(schema);
+    // Increment H6b — the piping source map. Built ONCE from the frozen snapshot, so it is a plain object
+    // and deliberately never wrapped in `reactive()`: nothing about it can change during a session.
+    const templateSources = buildTemplateSources(schema);
+    const templateRenderer = makeTemplateRenderer();
     const validator = makeSemanticValidator();
 
     // Repeatable-section metadata precomputed from the render model.
@@ -286,6 +308,11 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             steps.push({
                 key: section.key,
                 sectionKey: section.key,
+                // Locale-resolved but NOT piped, deliberately (Increment H6b). `visibleSteps` feeds
+                // `currentStepIndex`, `erroredItems` and the watcher that writes `currentStepKey`, so
+                // rendering holes in here would put the whole answer document into the step model's
+                // dependency graph and couple step NAVIGATION to typing, for a cosmetic gain. Consumers
+                // pipe it at the point of display via `sectionTitleFor()`.
                 title: resolveText(section.label, section.labelTranslations, locale.value),
                 fieldKeys: sectionFields.map((f) => f.key),
                 isRepeat,
@@ -417,8 +444,131 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return undefined;
     }
 
-    function labelFor(field: RenderField): string {
-        return resolveText(field.label, field.labelTranslations, locale.value);
+    // ── Piping (Increment H6b, Doc #26 §3/§4) ────────────────────────────────────────────────────
+    /**
+     * The answer document a hole renders against: the relevance-pruned effective answers OVERLAID with
+     * the engine's `computed` map. The overlay is not a detail — `SemanticResult.computed` is a SEPARATE
+     * map that is never merged into `effectiveAnswers`, and PHP persists
+     * `array_merge($result->effectiveAnswers, $result->computed)` (`SubmissionPipeline.php`), which is the
+     * document `SubmissionInboxPresenter` later renders from. Read `effectiveAnswers` alone here — the
+     * natural, documented choice — and "Your total is ${total}" renders blank in the SPA and correct in
+     * the inbox, silently killing the case §3.1 cites as the REASON `calculated` is pipeable.
+     *
+     * Pruned rather than retained, deliberately: a hidden field's value is kept but never submitted, so
+     * piping it would promise the respondent an answer that will not be recorded. A hole naming a
+     * currently-irrelevant field renders empty and returns intact when relevance does (§3.4).
+     */
+    const renderAnswers = computed<Record<string, unknown>>(() => ({
+        ...result.value.effectiveAnswers,
+        ...result.value.computed,
+    }));
+
+    /**
+     * Per-instance merged answer maps for scoped rendering — the exact shape `SemanticValidator` builds
+     * for a repeat instance's evaluation context and the `array_merge` {@link TemplateRenderer}'s docblock
+     * prescribes, so §3.3 rule 2's "current instance" needs no addressable path.
+     *
+     * A `computed`, for two reasons. It invalidates with `result` for free; and — the important one — it
+     * can never WRITE reactive state from inside a label's getter, which a mutable memo would, and that is
+     * the recursive-update bug this design would otherwise be one refactor away from. Being lazy, a repeat
+     * group with no piping never evaluates it at all. Memoised per INSTANCE, so N instances × M members
+     * costs N merges rather than N×M.
+     */
+    const instanceRenderAnswers = computed<Record<string, Record<string, unknown>[]>>(() => {
+        const base = renderAnswers.value;
+        const out: Record<string, Record<string, unknown>[]> = {};
+
+        for (const sectionKey of repeatSectionKeys) {
+            const instances = base[sectionKey];
+            if (!Array.isArray(instances)) {
+                continue;
+            }
+            out[sectionKey] = (instances as InstanceAnswers[]).map((instance) => ({ ...base, ...instance }));
+        }
+
+        return out;
+    });
+
+    /** The answer map one render resolves against: flat, or one repeat instance's merged view. */
+    function templateAnswers(scope?: RepeatScope): Record<string, unknown> {
+        if (scope === undefined) {
+            return renderAnswers.value;
+        }
+
+        // A missing instance (the section just went irrelevant, or an index raced a removal) falls back to
+        // the flat map, so its same-instance holes render EMPTY rather than throwing — §3.4.
+        return instanceRenderAnswers.value[scope.sectionKey]?.[scope.index] ?? renderAnswers.value;
+    }
+
+    /**
+     * Resolve the locale variant, THEN fill its `${key}` holes — §4's normative order, enforced by
+     * construction here so no call site can invert it (rendering first would fill holes into a string the
+     * respondent is never going to see). The same locale goes to the renderer, so a piped choice answer
+     * resolves its option label into the same language as the sentence around it (amendment A8).
+     *
+     * The `includes('${')` guard is not a micro-optimisation, it is the load-bearing line of this
+     * increment: `templateAnswers()` is only CALLED inside the hole-bearing branch, so a hole-free label
+     * never takes a reactive dependency on `result` at all. Every form authored before H6b is hole-free,
+     * so every one keeps exactly the dependency graph it has today. The predicate is character-identical
+     * to `TemplateParser.scan()`'s own early return, including the deliberate consequence that the `$${`
+     * escape contains `${` and takes the slow path — which is correct; it must emit a literal `${`.
+     */
+    function templateText(base: string, translations: Record<string, string> | null, scope?: RepeatScope): string {
+        const resolved = resolveText(base, translations, locale.value);
+
+        if (!resolved.includes('${')) {
+            return resolved;
+        }
+
+        return templateRenderer.render(resolved, templateSources, templateAnswers(scope), locale.value);
+    }
+
+    /** {@link templateText} for a nullable column (a hint, a placeholder, a section description). */
+    function templateOptional(
+        base: string | null,
+        translations: Record<string, string> | null,
+        scope?: RepeatScope,
+    ): string | null {
+        const resolved = resolveOptional(base, translations, locale.value);
+
+        if (resolved === null || !resolved.includes('${')) {
+            return resolved;
+        }
+
+        return templateRenderer.render(resolved, templateSources, templateAnswers(scope), locale.value);
+    }
+
+    function labelFor(field: RenderField, scope?: RepeatScope): string {
+        return templateText(field.label, field.labelTranslations, scope);
+    }
+
+    /** A field's hint, locale-resolved then piped. `null` stays null — "no hint" is not "an empty hint". */
+    function hintFor(field: RenderField, scope?: RepeatScope): string | null {
+        return templateOptional(field.hint, field.hintTranslations, scope);
+    }
+
+    /**
+     * A field's placeholder. Template-bearing per §6's closed list (the publish gate validates it), but it
+     * has no `*_translations` sibling — no such column exists — so there is no locale variant to resolve.
+     * Before H6b this was passed through RAW, so a published placeholder with a hole put `${key}` on a
+     * respondent's screen, which §3.4 forbids outright.
+     */
+    function placeholderFor(field: RenderField, scope?: RepeatScope): string | null {
+        return templateOptional(field.placeholder, null, scope);
+    }
+
+    /**
+     * A section's own label/description. No scope parameter, and that is provable rather than a shortcut:
+     * a section sits at position `(sequence, -1)` and its members at `(sequence, n >= 0)`, and
+     * `TemplateScopeResolver::precedes()` is strict — so a section label referencing its own member is a
+     * `template_forward_reference` and can never publish. Its holes can only name flat fields.
+     */
+    function sectionTitleFor(section: RenderSection): string {
+        return templateText(section.label, section.labelTranslations);
+    }
+
+    function sectionDescriptionFor(section: RenderSection): string | null {
+        return templateOptional(section.description, section.descriptionTranslations);
     }
 
     const erroredFields = computed(() =>
@@ -624,7 +774,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
                         if (instanceErrorFor(sectionKey, index, field.key) !== undefined) {
                             items.push({
                                 address: instanceAddress(sectionKey, index, field.key),
-                                label: `${sectionLabel} ${index + 1}: ${labelFor(field)}`,
+                                // Scoped, so the error-summary link reads the SAME question text the
+                                // respondent sees on the field it jumps to (Increment H6b).
+                                label: `${sectionLabel} ${index + 1}: ${labelFor(field, { sectionKey, index })}`,
                                 stepKey: sectionKey,
                             });
                         }
@@ -642,8 +794,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return items;
     });
 
+    /** The error-summary banner's section label — piped, so it matches the heading it links to. */
     function sectionTitle(section: RenderSection): string {
-        return resolveText(section.label, section.labelTranslations, locale.value);
+        return sectionTitleFor(section);
     }
 
     // ── Navigation ───────────────────────────────────────────────────────────────────────────────
@@ -725,6 +878,12 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         rawErrorsFor,
         errorFor,
         labelFor,
+        hintFor,
+        placeholderFor,
+        sectionTitleFor,
+        sectionDescriptionFor,
+        templateText,
+        templateOptional,
         membersOf,
         minInstances,
         maxInstances,

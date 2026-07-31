@@ -11,7 +11,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField, type GeoEnvelope, type MediaAttachmentRef } from '@/components/submissions/FieldInput.vue';
-import { resolveCascade, resolveOptional, resolveText } from '../lib/schema-mapping';
+import { resolveCascade, resolveText } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -27,12 +27,21 @@ const relevant = computed(() =>
 const anchorId = computed(() => `field-${runtime.instanceAddress(props.sectionKey, props.index, props.field.key)}`);
 const marker = computed(() => runtime.instanceRequiredMarkerFor(props.sectionKey, props.index, props.field));
 
+/**
+ * Increment H6b — this instance's piping scope. Doc #26 §3.3 rule 2 lets a member's label name a
+ * SAME-INSTANCE sibling ("Age of ${member_name}"), so instance 2's label must read instance 2's answer.
+ * The store merges `{ ...base, ...instance }` behind this, memoised per instance.
+ */
+const scope = computed(() => ({ sectionKey: props.sectionKey, index: props.index }));
+
+const label = computed(() => runtime.labelFor(props.field, scope.value));
+
 const encodeField = computed<EncodeField>(() => ({
     key: props.field.key,
     field_type: props.field.fieldType,
-    label: runtime.labelFor(props.field),
-    hint: resolveOptional(props.field.hint, props.field.hintTranslations, runtime.locale.value),
-    placeholder: props.field.placeholder,
+    label: label.value,
+    hint: runtime.hintFor(props.field, scope.value),
+    placeholder: runtime.placeholderFor(props.field, scope.value),
     required: marker.value === 'required',
     options: props.field.options.map((o) => ({
         value: o.value,
@@ -62,7 +71,9 @@ watch(relevant, (isRelevant, wasRelevant) => {
             void nextTick(rescueFocus);
         }
     } else if (!wasRelevant && isRelevant) {
-        announcer.announce(`New question: ${runtime.labelFor(props.field)}`);
+        // The SCOPED label, so a screen-reader user hears the same question a sighted one reads — and
+        // never a raw `${key}` token, which §3.4 forbids on every surface, this one included.
+        announcer.announce(`New question: ${label.value}`);
     }
 });
 

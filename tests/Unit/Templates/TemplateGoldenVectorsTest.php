@@ -173,7 +173,12 @@ it('matches the golden template vector', function (array $case): void {
         /** @var array<string, mixed> $answers */
         $answers = $case['answers'];
 
-        $rendered = makeTemplateRenderer()->render($template, templateRenderSources($rawSources), $answers);
+        // `locale` (Increment H6b, amendment A8) is optional per vector — absent means "no locale", which
+        // is the pre-H6b behaviour and must stay byte-identical.
+        /** @var string|null $locale */
+        $locale = $case['locale'] ?? null;
+
+        $rendered = makeTemplateRenderer()->render($template, templateRenderSources($rawSources), $answers, $locale);
 
         expect($rendered)->toBe($case['expected']);
 

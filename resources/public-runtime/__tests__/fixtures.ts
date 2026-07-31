@@ -69,6 +69,10 @@ export function schemaResponse(opts: {
             supported_locales: opts.form?.supported_locales ?? ['en'],
             single_page_mode: opts.form?.single_page_mode ?? true,
             save_and_resume: opts.form?.save_and_resume ?? false,
+            // Increment H6b — passed through rather than defaulted, so `undefined` (the absent-key case a
+            // pre-H6a cached manifest produces) stays reachable in tests.
+            confirmation_message: opts.form?.confirmation_message,
+            confirmation_message_translations: opts.form?.confirmation_message_translations,
         },
         version: {
             id: 'ver-1',

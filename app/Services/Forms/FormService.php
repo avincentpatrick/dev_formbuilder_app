@@ -168,8 +168,13 @@ final class FormService
      * the request rule checks grammar only (there is no version to resolve against at edit time), and an
      * edit made AFTER the last publish can introduce a reference that dangles until the next publish
      * refuses it — a hole renders as the empty string in the meantime and never throws (§3.4), so the
-     * failure is cosmetic rather than an outage. Doc #26 §8 records the gap and assigns closing it to H6b,
-     * which owns the confirmation surface.
+     * failure is cosmetic rather than an outage.
+     *
+     * Increment H6b closed the EDIT side of that gap: `FormConfirmationMessageController` now resolves the
+     * saved message against the currently-published version and warns in its toast, without refusing the
+     * write (Doc #26 amendment A3 + A10). What remains open is narrower and belongs with
+     * `SchemaChangeClassifier` hole-diffing: DELETING a field after the message was saved still dangles it
+     * silently, because nothing re-validates this column on a schema change.
      *
      * @param  array<string, string>|null  $translations
      */

@@ -16,6 +16,7 @@ import type {
     ComparisonOperator,
     GridConfig,
     LogicOperator,
+    RenderSources,
     SchemaField,
     SchemaSection,
     SemanticInput,
@@ -489,6 +490,38 @@ export function buildRenderModel(schema: SchemaResponse): RenderModel {
         sections: schema.version.schema.sections.map(toRenderSection).sort(bySequence),
         fields: schema.version.schema.fields.map(toRenderField).sort(bySequence),
     };
+}
+
+/**
+ * The piping SOURCE map (Increment H6b, Doc #26 §3.2) — the TypeScript twin of
+ * `App\Services\Templates\TemplateSources::fromSnapshot()`: field key ⇒ its raw `field_type` and its RAW
+ * `config`, which is what `displayValue()` reads to resolve a choice code to its author-defined label.
+ *
+ * Built from `version.schema.fields` rather than from the render model ON PURPOSE, and this is the trap
+ * Doc #26 §3.2 names by hand: `toRenderField()` has already projected `config` into five presentation
+ * shapes and dropped the original, and `buildOptions()` only runs for `HAS_OPTIONS` types — so a
+ * `cascading_select`'s options are not on `RenderField` at all, and a renderer fed from there would emit
+ * "ncr; manila" where PHP emits "Metro Manila; Manila". Re-deriving `config` would also be a SECOND
+ * normalisation of the one input the two engines must agree on byte for byte.
+ *
+ * TOTAL over the snapshot: `hidden`, `calculated`, `note` and `page_break` are all included. Two of those
+ * matter — `hidden` and `calculated` are PIPEABLE (§3.1, deliberately differing from OCR eligibility), so
+ * filtering by the `SUPPORTED` set above (a different question: "types with a renderer") would silently
+ * break piping's headline cases, a running total and a URL-prefilled name.
+ *
+ * One knowing divergence from the PHP twin: `fromSnapshot()` SKIPS a field whose `field_type` is unknown
+ * to the deployment (`FieldType::tryFrom()` returning null), so its hole renders empty. There is no
+ * `FieldType` enum here, so the entry is kept and `displayValue()`'s total fallback decides. Reachable
+ * only when a cached SPA bundle meets a snapshot from a newer deployment; recorded, not papered over.
+ */
+export function buildTemplateSources(schema: SchemaResponse): RenderSources {
+    const sources: RenderSources = {};
+
+    for (const field of schema.version.schema.fields) {
+        sources[field.key] = { type: field.field_type, config: field.config ?? {} };
+    }
+
+    return sources;
 }
 
 export function buildEngineSchema(schema: SchemaResponse): EngineSchema {

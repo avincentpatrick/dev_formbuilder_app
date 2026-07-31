@@ -33,9 +33,16 @@ final class SchemaValueFormatter
      * Format one answer for display/export. Choice values resolve to their option labels; multi-select /
      * repeat arrays join with "; "; yes/no renders Yes/No; everything else stringifies. Empty → ''.
      *
+     * `$locale` (Increment H6b, Doc #26 amendment A8) resolves a choice option's `label_translations`
+     * variant before falling back to its base label. Null — the default every pre-H6b caller keeps — is
+     * byte-identical to the old behaviour. It exists because §4's normative order (resolve the locale,
+     * THEN render) was only half-honoured: the sentence AROUND a hole resolved, the choice label dropped
+     * INTO it did not, so a Filipino respondent read an English option label mid-Filipino-sentence and
+     * the tenant's inbox disagreed with the respondent's own screen about the same answer.
+     *
      * @param  array<string, mixed>  $config  the field's `config` jsonb (holds `options` for choice types)
      */
-    public function displayValue(FieldType $type, mixed $answer, array $config): string
+    public function displayValue(FieldType $type, mixed $answer, array $config, ?string $locale = null): string
     {
         if ($answer === null || $answer === '' || $answer === []) {
             return '';
@@ -55,18 +62,18 @@ final class SchemaValueFormatter
         // Choice fields resolve values to labels; cascading select does too (its `config.options` carry
         // value+label alongside level/parent, which optionLabels ignores) so an exported cascade reads as
         // "NCR; Manila", not "ncr; manila" (Increment G4a).
-        $labels = ($type->hasOptions() || $type === FieldType::CascadingSelect) ? $this->optionLabels($config) : [];
+        $labels = ($type->hasOptions() || $type === FieldType::CascadingSelect) ? $this->optionLabels($config, $locale) : [];
 
         if (is_array($answer)) {
             $parts = array_map(
-                fn (mixed $v): string => $labels[(string) $this->scalar($v)] ?? (string) $this->scalar($v),
+                fn (mixed $v): string => $labels[$this->scalarString($this->scalar($v))] ?? $this->scalarString($this->scalar($v)),
                 $answer,
             );
 
             return implode('; ', $parts);
         }
 
-        $scalar = (string) $this->scalar($answer);
+        $scalar = $this->scalarString($this->scalar($answer));
 
         return $labels[$scalar] ?? $scalar;
     }
@@ -75,10 +82,15 @@ final class SchemaValueFormatter
      * The author-defined option list for choice fields (stored in `config.options`), normalised to the
      * `{value,label}` pairs a select/checkbox binds to. Empty for non-choice types or a malformed list.
      *
+     * TWO fallbacks at two levels, deliberately different (Increment H6b), each mirroring the runtime:
+     * the LOCALE variant falls back when missing, non-string OR blank — `resolveText()`'s "never blank"
+     * rule (`schema-mapping.ts`), which Doc #26 §4 makes normative; the BASE label falls back to the value
+     * on NULL only, so an author's explicit `"label": ""` still wins (unchanged, and vector-pinned).
+     *
      * @param  array<string, mixed>  $config
      * @return list<array{value: string, label: string}>
      */
-    public function options(array $config): array
+    public function options(array $config, ?string $locale = null): array
     {
         $options = $config['options'] ?? [];
         if (! is_array($options)) {
@@ -90,21 +102,39 @@ final class SchemaValueFormatter
             if (! is_array($option) || ! isset($option['value'])) {
                 continue;
             }
-            $value = (string) $option['value'];
-            $normalized[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+            $value = $this->scalarString($this->scalar($option['value']));
+            $base = isset($option['label']) ? $this->scalarString($this->scalar($option['label'])) : $value;
+            $normalized[] = ['value' => $value, 'label' => $this->variant($option, $locale) ?? $base];
         }
 
         return $normalized;
     }
 
     /**
+     * One option's `label_translations` variant for `$locale`, or null when there is none to use.
+     * Mirrors `resolveText()`: a missing, non-string or BLANK variant is no variant at all.
+     *
+     * @param  array<string, mixed>  $option
+     */
+    private function variant(array $option, ?string $locale): ?string
+    {
+        if ($locale === null || ! is_array($option['label_translations'] ?? null)) {
+            return null;
+        }
+
+        $value = $option['label_translations'][$locale] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
      * @param  array<string, mixed>  $config
      * @return array<string, string> value ⇒ label
      */
-    private function optionLabels(array $config): array
+    private function optionLabels(array $config, ?string $locale = null): array
     {
         $map = [];
-        foreach ($this->options($config) as $option) {
+        foreach ($this->options($config, $locale) as $option) {
             $map[$option['value']] = $option['label'];
         }
 
@@ -122,6 +152,54 @@ final class SchemaValueFormatter
     private function scalar(mixed $value): string|int|float|bool
     {
         return is_scalar($value) ? $value : (string) json_encode($value);
+    }
+
+    /**
+     * Stringify a scalar under a rule BOTH engines can reproduce byte-for-byte (Increment H6b, Doc #26
+     * amendment A7). This replaces the bare `(string)` cast, which was not mirrorable:
+     *
+     *     value        (string)              String()                  here
+     *     true         "1"                   "true"                    "1"
+     *     false        ""                    "false"                   ""
+     *     0.1 + 0.2    "0.3"                 "0.30000000000000004"     "0.3"
+     *     1 / 3        "0.33333333333333"    "0.3333333333333333"      "0.3333333333"
+     *     1e15         "1.0E+15"             "1000000000000000"        "1000000000000000"
+     *     0.00001      "1.0E-5"              "0.00001"                 "0.00001"
+     *
+     * Both of the divergent branches are REACHABLE, not theoretical: `ExpressionEvaluator::normalize()`
+     * passes a native bool straight through, so a `calculated` field holding `${age} >= 18` stores one,
+     * and any `calculated` field doing division holds a non-integral float. H6a's only float vector was
+     * `3.5` — exactly representable in binary, so it concealed the whole problem.
+     *
+     * The rule avoids PHP's `precision`/`serialize_precision` ini entirely (runtime-configurable, so a
+     * cast is not even stable across deployments) and avoids E-notation on both sides. It is
+     * fixed-notation to 10 decimals, trailing zeros trimmed — `sprintf('%.10F')` here, `toFixed(10)` in
+     * `display-value.ts`, verified equal across the reachable range.
+     *
+     * ONE accepted divergence, with a precise boundary: at |v| >= 1e21 JavaScript's `toFixed` falls back
+     * to exponential notation per spec ("1e+21") where `%.10F` does not. Hence the integral branch's
+     * `< 1e21` guard is a documentation of where the mirror stops, not an optimisation. No form
+     * arithmetic reaches it, and no vector may pin a value there.
+     *
+     * `Coercion::toStr()` remains BARRED (§3.2) — this is the pinned primitive it was pointing at.
+     */
+    private function scalarString(string|int|float|bool $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? '1' : '';
+        }
+
+        if (is_float($value)) {
+            if (! is_finite($value)) {
+                return '';
+            }
+
+            return floor($value) === $value && abs($value) < 1e21
+                ? sprintf('%.0F', $value)
+                : rtrim(rtrim(sprintf('%.10F', $value), '0'), '.');
+        }
+
+        return (string) $value;
     }
 
     /**

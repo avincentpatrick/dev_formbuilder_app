@@ -120,6 +120,18 @@ export interface SchemaResponse {
         // Increment H12a/b — the schedule window + response cap. Optional: an older cached manifest may omit
         // it, which the runtime treats as an unconstrained (always-open) form.
         schedule?: ScheduleBlock;
+        // Increment H6a/H6b — the author-editable confirmation copy (Doc #26 §6.2), on the wire RAW: a
+        // TEMPLATE with its `${key}` holes unfilled, plus its locale variants. The SPA resolves the locale
+        // THEN renders the holes at submit time, which is §4's normative order and which only the client
+        // can honour (it picks the locale reactively, and `version.schema` travels under a checksum the
+        // runtime pins against, so server-side interpolation would break that pin).
+        //
+        // Optional for the same reason as the two above: the service worker's schema cache can serve a
+        // manifest minted before H6a shipped, which carries neither key. Absent, null, or rendering to
+        // blank all fall back to `App.vue`'s hardcoded default — which is exactly the pre-H6b behaviour,
+        // so no cache-version bump is owed.
+        confirmation_message?: string | null;
+        confirmation_message_translations?: Record<string, string> | null;
     };
     version: {
         id: string;

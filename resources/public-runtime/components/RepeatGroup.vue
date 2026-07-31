@@ -10,7 +10,6 @@
 import { computed, nextTick, ref } from 'vue';
 import { MdsButton } from '@meridian/design-system';
 import InstanceField from './InstanceField.vue';
-import { resolveText } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderSection } from '../lib/types';
 
@@ -22,7 +21,11 @@ const rootEl = ref<HTMLElement | null>(null);
 const addButton = ref<InstanceType<typeof MdsButton> | null>(null);
 
 const sectionKey = computed(() => props.section.key);
-const label = computed(() => resolveText(props.section.label, props.section.labelTranslations, runtime.locale.value));
+// Increment H6b — piped through the store's seam, and flat-scoped for the same positional reason
+// `SectionView` is: a section's own label precedes its members, so its holes can only name flat fields.
+// It feeds the "Add X" button, each instance legend and the add/remove announcements, so a raw `${key}`
+// leaking here would reach a screen reader as well as the screen.
+const label = computed(() => runtime.sectionTitleFor(props.section));
 const members = computed(() => runtime.membersOf(sectionKey.value));
 const uids = computed(() => runtime.instanceUidsFor(sectionKey.value));
 const count = computed(() => runtime.instanceCount(sectionKey.value));

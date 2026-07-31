@@ -203,7 +203,7 @@ async function loadResume(resumeToken: string): Promise<void> {
     phase.value = 'ready';
 }
 
-function onSubmitted(id: string): void {
+function onSubmitted(id: string, authored: string | null = null): void {
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
     const resolved = resolvingUuid.value !== null;
     if (resolved) {
@@ -211,7 +211,10 @@ function onSubmitted(id: string): void {
         clearResolveState();
     }
     reference.value = deriveReference(id);
-    confirmationMessage.value = resolved ? RESOLVED_MESSAGE : CONFIRM_MESSAGE;
+    // Increment H6b — the author's message (already locale-resolved and hole-filled by RuntimeSession,
+    // which still had the store when it emitted) replaces the hardcoded copy on BOTH terminal success
+    // states. Null — no message, or one whose every hole was unanswered — keeps the default.
+    confirmationMessage.value = authored ?? (resolved ? RESOLVED_MESSAGE : CONFIRM_MESSAGE);
     phase.value = 'confirmation';
 }
 
@@ -225,6 +228,10 @@ function onQueued(clientUuid: string): void {
         clearResolveState();
     }
     reference.value = deriveReference(clientUuid);
+    // Increment H6b deliberately does NOT let an author message replace this one. It is not a thank-you —
+    // it is the only thing telling the respondent their answers have not been delivered yet, and swapping
+    // it for "Thanks, Maria — your response has been recorded." would be a factual lie about delivery
+    // state on the one screen where that truth matters most.
     confirmationMessage.value = QUEUED_MESSAGE;
     phase.value = 'confirmation';
 }

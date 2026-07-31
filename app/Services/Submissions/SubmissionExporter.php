@@ -76,20 +76,20 @@ final class SubmissionExporter
         $userId = TenantContext::currentUserId();
         $filename = Str::slug($form->title ?: 'form').'-submissions-'.now()->format('Ymd-His').'.'.$format;
 
-        return response()->streamDownload(function () use ($form, $filters, $format, $headerRow, $keys, $fieldMeta, $tenantId, $userId): void {
+        return response()->streamDownload(function () use ($form, $filters, $format, $headerRow, $keys, $fieldMeta, $tenantId, $userId, $locale): void {
             $writer = $this->writer($format);
             $writer->openToFile('php://output');
             $writer->addRow(Row::fromValues($headerRow));
 
-            DB::transaction(function () use ($form, $filters, $keys, $fieldMeta, $writer, $tenantId, $userId): void {
+            DB::transaction(function () use ($form, $filters, $keys, $fieldMeta, $writer, $tenantId, $userId, $locale): void {
                 TenantContext::applyLocal($tenantId, $userId);
 
                 $this->baseQuery($form, $filters)
                     ->with(['answers', 'respondent:id,name'])
                     ->orderBy('id')
                     ->lazy()
-                    ->each(function (Submission $submission) use ($keys, $fieldMeta, $writer): void {
-                        $writer->addRow(Row::fromValues($this->row($submission, $keys, $fieldMeta)));
+                    ->each(function (Submission $submission) use ($keys, $fieldMeta, $writer, $locale): void {
+                        $writer->addRow(Row::fromValues($this->row($submission, $keys, $fieldMeta, $locale)));
                     });
             });
 
@@ -172,15 +172,23 @@ final class SubmissionExporter
 
         $label = (string) ($translations[$locale] ?? $field['label'] ?? $key);
 
-        return $this->templates->render($label, $sources, []);
+        return $this->templates->render($label, $sources, [], $locale);
     }
 
     /**
+     * One submission's cells.
+     *
+     * `$locale` is the EXPORT's language (the form's default), not `$submission->locale` — the same one the
+     * headers resolved into (Increment H6b). A spreadsheet is read as one document, so a column of choice
+     * labels in per-respondent languages would be unusable for analysis, and a Filipino header over English
+     * cells is the same defect one row down. The respondent's own locale is still exported, as its own
+     * column.
+     *
      * @param  list<string>  $keys
      * @param  array<string, array<string, array{type: FieldType, config: array<string, mixed>}>>  $fieldMeta
      * @return list<string>
      */
-    private function row(Submission $submission, array $keys, array $fieldMeta): array
+    private function row(Submission $submission, array $keys, array $fieldMeta, string $locale): array
     {
         $rawAnswers = data_get($submission, 'answers.answers');
         /** @var array<string, mixed> $answers */
@@ -200,7 +208,7 @@ final class SubmissionExporter
             $meta = $versionMap[$key] ?? null;
             $row[] = $meta === null
                 ? ''
-                : $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config']);
+                : $this->formatter->displayValue($meta['type'], $answers[$key] ?? null, $meta['config'], $locale);
         }
 
         return $row;

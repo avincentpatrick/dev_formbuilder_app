@@ -111,6 +111,40 @@ final class TemplateValidationGate
     }
 
     /**
+     * The §6.2 confirmation-message check on its own, against an ARBITRARY version, RETURNING its findings
+     * instead of throwing — the seam Doc #26 amendment A3 assigns to H6b.
+     *
+     * {@see assertTemplatesResolve()} runs this against the version being PUBLISHED. The edit path
+     * (`FormConfirmationMessageController`) runs it against the CURRENTLY PUBLISHED one, so an edit that
+     * dangles a reference says so at the moment it is made rather than surfacing weeks later as a
+     * confusing publish failure. Those are deliberately two different versions — see A3 — which is exactly
+     * why the edit path only WARNS: a draft that adds the field makes the reference valid at the next
+     * publish, so refusing the save would block an author for being early.
+     *
+     * @param  ?array<string, mixed>  $translations
+     * @return array<string, array{key: string, slug: string}> column ⇒ the first violation in it
+     */
+    public function confirmationMessageViolations(FormVersion $version, ?string $base, ?array $translations): array
+    {
+        /** @var Collection<int, FormField> $fields */
+        $fields = $version->fields()->get();
+        /** @var Collection<int, FormSection> $sections */
+        $sections = $version->sections()->get();
+
+        [$sources, $sectionKeys] = $this->index($fields, $sections);
+
+        return $this->collectAll(
+            $base,
+            $translations,
+            [PHP_INT_MAX, PHP_INT_MAX],
+            null,
+            $sources,
+            $sectionKeys,
+            'confirmation_message',
+        );
+    }
+
+    /**
      * Build the source map (key ⇒ verdict + position + repeat scope) and the section-key set, once.
      *
      * @param  Collection<int, FormField>  $fields
@@ -160,47 +194,89 @@ final class TemplateValidationGate
         string $ownerKey,
         string $column,
     ): void {
-        $this->check($base, $position, $repeat, $sources, $sectionKeys, $ownerKey, $column);
+        // The collector walks base-then-locales in order and PHP arrays preserve insertion order, so the
+        // first entry is the same violation the pre-H6b early-throw raised. It costs a full walk on the
+        // failure path, which is the path that ends the request anyway.
+        foreach ($this->collectAll($base, $translations, $position, $repeat, $sources, $sectionKeys, $column) as $offending => $violation) {
+            throw PublishValidationException::templateInvalid($ownerKey, $offending, $violation['slug']);
+        }
+    }
+
+    /**
+     * {@see checkAll()}'s returning twin — every violating column, in walk order. The single walk both the
+     * publish gate and A3's edit-time warning share, so the two can never disagree about what resolves.
+     *
+     * @param  array<string, mixed>|null  $translations
+     * @param  array{int, int}  $position
+     * @param  array<string, array{type: PipingEligibility, position: array{int, int}, repeat: ?string}>  $sources
+     * @param  array<string, true>  $sectionKeys
+     * @return array<string, array{key: string, slug: string}>
+     */
+    private function collectAll(
+        ?string $base,
+        ?array $translations,
+        array $position,
+        ?string $repeat,
+        array $sources,
+        array $sectionKeys,
+        string $column,
+    ): array {
+        $violations = [];
+
+        $violation = $this->collect($base, $position, $repeat, $sources, $sectionKeys);
+        if ($violation !== null) {
+            $violations[$column] = $violation;
+        }
 
         foreach ($translations ?? [] as $locale => $variant) {
             if (! is_string($variant)) {
                 continue; // a non-string variant is a shape problem, not a template one — §8 records it
             }
 
-            $this->check($variant, $position, $repeat, $sources, $sectionKeys, $ownerKey, $column.'['.$locale.']');
+            $violation = $this->collect($variant, $position, $repeat, $sources, $sectionKeys);
+            if ($violation !== null) {
+                $violations[$column.'['.$locale.']'] = $violation;
+            }
         }
+
+        return $violations;
     }
 
     /**
+     * The first thing wrong with one template — its offending hole key and a stable snake_case slug — or
+     * null when every hole in it resolves. Never throws: a grammar failure is reported as a violation like
+     * any other, so a caller that wants to warn rather than refuse can.
+     *
      * @param  array{int, int}  $position
      * @param  array<string, array{type: PipingEligibility, position: array{int, int}, repeat: ?string}>  $sources
      * @param  array<string, true>  $sectionKeys
+     * @return array{key: string, slug: string}|null
      */
-    private function check(
+    private function collect(
         ?string $template,
         array $position,
         ?string $repeat,
         array $sources,
         array $sectionKeys,
-        string $ownerKey,
-        string $column,
-    ): void {
+    ): ?array {
         if ($template === null || trim($template) === '') {
-            return; // blank = no template
+            return null; // blank = no template
         }
 
         try {
             $keys = $this->parser->holeKeys($template);
         } catch (TemplateSyntaxException $exception) {
-            throw PublishValidationException::templateInvalid($ownerKey, $column, $exception->slug());
+            return ['key' => '', 'slug' => $exception->slug()];
         }
 
         foreach ($keys as $key) {
             $violation = $this->scope->violationFor($key, $position, $repeat, $sources, $sectionKeys);
 
             if ($violation !== null) {
-                throw PublishValidationException::templateInvalid($ownerKey, $column, $violation);
+                return ['key' => $key, 'slug' => $violation];
             }
         }
+
+        return null;
     }
 }

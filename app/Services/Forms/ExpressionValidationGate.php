@@ -55,7 +55,20 @@ final class ExpressionValidationGate
         }
 
         // Section keys are referenceable too (grammar v2.0): `count(${roster})` counts a repeatable section's
-        // instances. Field and section keys are globally unique per version, so there is no key collision.
+        // instances.
+        //
+        // CORRECTED IN H21a (Doc #27 amendment A7): this comment used to claim field and section keys are
+        // "globally unique per version, so there is no key collision". They are NOT. Uniqueness is two
+        // INDEPENDENT per-table composite indexes — `form_sections` and `form_fields` each carry
+        // `(tenant_id, form_version_id, key)` — and every application-level enforcer is table-scoped too
+        // (`UpdateSectionRequest` / `UpdateFieldRequest` each `Rule::unique` their own table;
+        // `FormBuilderService::uniqueKey()` plucks from one). Only `XlsformImportParser::sanitizeKeys()`
+        // enforces a shared namespace, and it is one of five writers.
+        //
+        // A collision is therefore reachable, and it makes this union LOSSY — the later write wins. That is
+        // harmless for THIS gate, whose only question is "is the key known", but it is not harmless
+        // everywhere: `SemanticValidator::relevanceContext()` carries an explicit collision guard for exactly
+        // this reason, because seeding a colliding section key would re-admit a pruned field's answer.
         foreach ($sections as $section) {
             $knownKeys[$section->key] = true;
         }

@@ -101,7 +101,7 @@ final class TemplateScopeResolver
         // authoring bug the gate can see. Applied uniformly, including to `hidden` and `calculated`:
         // both belong ahead of their consumers anyway (a prefill field at the top, a running total after
         // its operands).
-        if (! $this->precedes($source['position'], $hostPosition)) {
+        if (! self::precedes($source['position'], $hostPosition)) {
             return 'template_forward_reference';
         }
 
@@ -131,10 +131,18 @@ final class TemplateScopeResolver
     /**
      * Strict lexicographic precedence; a tie is NOT precedence (see the class docblock).
      *
+     * Promoted to `public static` in H21a so `StepGraphInspector` can reuse the positional machinery for its
+     * forward-reference notice (Doc #27 §6). It is pure — no state, no I/O — so the promotion widens nothing
+     * this class was relying on. NOTE the two callers apply it in OPPOSITE directions and both are correct:
+     * piping refuses when the source does not precede the host, while the relevance notice fires only when
+     * the host provably precedes the source, so that a positional TIE stays SILENT there. A tie must not warn
+     * on relevance, because `SchemaBlueprintMaterializer` defaults a section's `sequence` to 0 and every
+     * cross-section reference on a template-created form would tie.
+     *
      * @param  array{int, int}  $source
      * @param  array{int, int}  $host
      */
-    private function precedes(array $source, array $host): bool
+    public static function precedes(array $source, array $host): bool
     {
         if ($source[0] !== $host[0]) {
             return $source[0] < $host[0];

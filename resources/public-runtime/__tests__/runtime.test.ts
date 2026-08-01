@@ -437,3 +437,128 @@ describe('createFormRuntime — H10 resume seed (client_submission_uuid)', () =>
         expect(runtime.clientSubmissionUuid).toBe('seeded-uuid-1234');
     });
 });
+
+/**
+ * Increment H21a — predicate 3 of Doc #27 §2.2: a step is emitted only when at least one of its fields is
+ * CURRENTLY relevant, not merely of a type that renders something.
+ *
+ * Predicates 1 and 2 were already here. Predicate 2 consults `rendersNothing(fieldType)`, a STATIC type
+ * test that never looks at `fieldRelevance`, so a relevant section whose every field is individually gated
+ * off rendered a heading, a Next button and zero questions — the grayed-out-skipped step
+ * `form-filling-ux-flow.md` §3.2 explicitly rejected, arriving through a different door. `attemptNext()`
+ * then found `relevantKeys` empty and advanced, so the respondent clicked Next through a dead step.
+ *
+ * The behavioural PHP↔TS parity for the whole projection lives in `steps.test.ts` against a shared fixture;
+ * this suite covers the store-level details that fixture cannot express (the reactive recount, and that
+ * `fieldKeys` is deliberately NOT filtered).
+ */
+describe('createFormRuntime — step visibility predicate 3 (H21a)', () => {
+    it('drops a section whose every field is currently gated off, and restores it reactively', () => {
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [section({ key: 's1', sequence: 1 }), section({ key: 's2', sequence: 2 })],
+                fields: [
+                    field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                    field({ key: 'b', section_key: 's2', sequence: 2, relevant_expression: "${gate} = 'yes'" }),
+                    field({ key: 'c', section_key: 's2', sequence: 3, relevant_expression: "${gate} = 'yes'" }),
+                ],
+            }),
+            { initialAnswers: { gate: 'no' } },
+        );
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+
+        // Step MEMBERSHIP is now answer-reactive — the honest cost §2.2 states rather than hides.
+        runtime.answers.gate = 'yes';
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1', 's2']);
+    });
+
+    it('keeps a section when a single field survives, so the predicate is an any and not an all', () => {
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [section({ key: 's1', sequence: 1 }), section({ key: 's2', sequence: 2 })],
+                fields: [
+                    field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                    field({ key: 'b', section_key: 's2', sequence: 2, relevant_expression: "${gate} = 'yes'" }),
+                    field({ key: 'c', section_key: 's2', sequence: 3 }),
+                ],
+            }),
+            { initialAnswers: { gate: 'no' } },
+        );
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1', 's2']);
+    });
+
+    it('does not filter fieldKeys, so the error summary still addresses the whole step', () => {
+        // Deliberate: `attemptNext()` and `erroredItems` already gate on relevance themselves, and filtering
+        // the key list here would silently change what a jump link addresses. Only the EMPTINESS test moved.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [section({ key: 's1', sequence: 1 })],
+                fields: [
+                    field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                    field({ key: 'sometimes', section_key: 's1', sequence: 2, relevant_expression: "${gate} = 'yes'" }),
+                ],
+            }),
+            { initialAnswers: { gate: 'no' } },
+        );
+
+        expect(runtime.visibleSteps.value[0].fieldKeys).toEqual(['gate', 'sometimes']);
+    });
+
+    it('applies predicate 3 to the synthetic lead block too', () => {
+        // Lead fields are top-level, so the flat mask covers them and a fully-gated lead block is exactly the
+        // dead step predicate 3 abolishes. Missing this is the easiest way to half-implement the predicate.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [section({ key: 's1', sequence: 2 })],
+                fields: [
+                    field({ key: 'lead_only', sequence: 1, relevant_expression: "${gate} = 'yes'" }),
+                    field({ key: 'gate', section_key: 's1', sequence: 2 }),
+                ],
+            }),
+            { initialAnswers: { gate: 'no' } },
+        );
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+    });
+
+    it('keeps a repeatable step with zero instances, because the step is what lets you add one', () => {
+        // The rule that stops predicate 3 annihilating every repeatable step, and the same rule both engines
+        // apply before enforcing `min_instances` (Doc #27 §4.3).
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [section({ key: 'hh', sequence: 1, is_repeatable: true, min_instances: 2 })],
+                fields: [field({ key: 'member_name', section_key: 'hh', sequence: 1 })],
+            }),
+            { initialAnswers: {} },
+        );
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['hh']);
+    });
+
+    it('reads the per-instance masks for a repeatable step, never the flat mask', () => {
+        // A repeat member is ABSENT from `fieldRelevance` (it is not `false` there, it is missing), so a
+        // naive `fieldRelevance[memberKey] === true` would hide every repeatable step that has instances.
+        const build = (gate: string) =>
+            createFormRuntime(
+                schemaResponse({
+                    form: { single_page_mode: false },
+                    sections: [section({ key: 's1', sequence: 1 }), section({ key: 'hh', sequence: 2, is_repeatable: true })],
+                    fields: [
+                        field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                        field({ key: 'member_name', section_key: 'hh', sequence: 2, relevant_expression: "${gate} = 'yes'" }),
+                    ],
+                }),
+                { initialAnswers: { gate, hh: [{ member_name: 'Ana' }] } },
+            );
+
+        expect(build('yes').visibleSteps.value.map((s) => s.key)).toEqual(['s1', 'hh']);
+        expect(build('no').visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+    });
+});

@@ -62,6 +62,9 @@ const props = defineProps<{
     /** Increment H7 — the raw `location.search` to prefill `url`-sourced hidden fields from. App.vue reads
      *  the DOM once and threads it here so the store itself stays DOM-free. */
     search?: string;
+    /** Increment H21a — the session clock `today()`/`now()` evaluate against, in PHP's exact ISO-8601 shape.
+     *  Threaded from App.vue for the same reason `search` is (Doc #27 §3.4). */
+    now?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -86,6 +89,8 @@ const runtime = createFormRuntime(props.schema, {
     initialClientSubmissionUuid: props.resume?.uuid,
     // Increment H7 — hidden-field prefill. Seeded before `initialAnswers`, so a restored draft wins.
     search: props.search,
+    // Increment H21a — the clock, frozen for the life of this session (Doc #27 §3.4).
+    now: props.now,
 });
 const announcer = createAnnouncer();
 

@@ -170,6 +170,17 @@ export interface RuntimeOptions {
      * docblock's invariant); `buildPrefill()` is a pure function of it.
      */
     search?: string;
+    /**
+     * Increment H21a — the ISO-8601 clock `today()` / `now()` read, in PHP's exact `toIso8601String()` shape
+     * (build it with `isoClock()`; Doc #27 §3.4). Passed IN for the same reason `search` is: reading the
+     * device clock here would break this store's pure, unit-testable invariant.
+     *
+     * FROZEN FOR THE SESSION, deliberately. A ticking clock would re-run `safeEvaluate()` on every tick and
+     * invalidate `visibleSteps`, `erroredItems` and the autosave watcher with it. The narrowing is that a
+     * session held open across midnight keeps its opening date; a resume re-mounts and re-stamps. The
+     * server's clock stays authoritative at submit either way.
+     */
+    now?: string | null;
 }
 
 function isInstanceObject(value: unknown): value is InstanceAnswers {
@@ -184,6 +195,9 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     const templateSources = buildTemplateSources(schema);
     const templateRenderer = makeTemplateRenderer();
     const validator = makeSemanticValidator();
+    // Increment H21a — read once, never re-read, so the whole session evaluates `today()`/`now()` against one
+    // clock (see `RuntimeOptions.now`). Undefined stays null, which is exactly the pre-H21a behaviour.
+    const sessionNow = opts.now ?? null;
 
     // Repeatable-section metadata precomputed from the render model.
     const repeatSectionKeys = new Set(renderModel.sections.filter((s) => s.isRepeatable).map((s) => s.key));
@@ -235,7 +249,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     // server stay authoritative at submit; flag it once for the UI.
     function safeEvaluate(): SemanticResult {
         try {
-            return validator.evaluate(toSemanticInput(engineSchema, snapshotAnswers(), locale.value));
+            return validator.evaluate(toSemanticInput(engineSchema, snapshotAnswers(), locale.value, sessionNow));
         } catch {
             engineFailed.value = true;
             const fieldRelevance = Object.fromEntries(engineSchema.fields.map((f) => [f.key, true]));
@@ -289,13 +303,54 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     );
 
     // ── Steps ────────────────────────────────────────────────────────────────────────────────
+    /**
+     * Predicate 3 of Doc #27 §2.2, new in H21a: a step is emitted only when at least one of its fields is
+     * CURRENTLY relevant, not merely of a type that renders something.
+     *
+     * Predicates 1 and 2 are static about answers — `sectionRelevance` moves, but the emptiness test below
+     * consults `rendersNothing(fieldType)`, a TYPE predicate that never looks at `fieldRelevance`. So a
+     * relevant section whose every field is individually gated off renders a heading, a Next button and zero
+     * questions: the grayed-out-skipped step `form-filling-ux-flow.md` §3.2 explicitly rejected, arriving
+     * through a different door. `attemptNext()` then finds `relevantKeys` empty and advances, so the
+     * respondent clicks Next through a dead step. Under branching this stops being an edge case — gating
+     * FIELDS is the more natural authoring style than hoisting the condition onto the section.
+     *
+     * The mask to consult depends on the step, and getting this wrong annihilates every repeatable step:
+     * `fieldRelevance` is dense over TOP-LEVEL fields only (the engine's `fullMask`), so a repeat MEMBER's
+     * key is `undefined` there, not `false` — its relevance lives in `repeatFieldRelevance`, one mask per
+     * instance. Hence the split below.
+     *
+     * ZERO INSTANCES IS VACUOUSLY VISIBLE. The step is what lets the respondent add the first instance, so
+     * an empty group must keep its step — and the server agrees, because `repeatStepIsVisible()` in both
+     * engines applies exactly this rule before enforcing `min_instances` (§4.3, amendment A4).
+     *
+     * The honest cost, stated rather than hidden: step MEMBERSHIP becomes answer-reactive, which is the same
+     * coupling deliberately refused for step TITLES below. No new evaluation is introduced — `fieldRelevance`
+     * and `repeatFieldRelevance` are already computeds off the same `SemanticResult` — only a new dependency
+     * edge, reaching `currentStepIndex`, `erroredItems` and the autosave watcher.
+     */
+    function anyFieldCurrentlyRelevant(fields: RenderField[], sectionKey: string | null, isRepeat: boolean): boolean {
+        if (isRepeat && sectionKey !== null) {
+            const masks = result.value.repeatFieldRelevance[sectionKey] ?? [];
+            if (masks.length === 0) {
+                return true;
+            }
+
+            return masks.some((mask) => fields.some((f) => mask[f.key] === true));
+        }
+
+        return fields.some((f) => fieldRelevance.value[f.key] === true);
+    }
+
     const visibleSteps = computed<RuntimeStep[]>(() => {
         const steps: RuntimeStep[] = [];
 
         const leadFields = renderModel.fields
             .filter((f) => f.sectionKey === null && !rendersNothing(f.fieldType))
             .sort((a, b) => a.sequence - b.sequence);
-        if (leadFields.length > 0) {
+        // The lead block needs predicate 3 too — its fields are top-level, so `fieldRelevance` covers them,
+        // and a fully-gated lead block is exactly the dead step this predicate abolishes.
+        if (leadFields.length > 0 && anyFieldCurrentlyRelevant(leadFields, null, false)) {
             steps.push({
                 key: LEAD_STEP_KEY,
                 sectionKey: null,
@@ -321,6 +376,12 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             // nothing but hidden/calculated fields has no question in it, so it should vanish entirely
             // rather than render a heading over a blank panel.
             if (sectionFields.length === 0) {
+                continue;
+            }
+            // Increment H21a — predicate 3. Deliberately NOT applied to `fieldKeys` below: filtering the key
+            // list would change `erroredItems` and `attemptNext()`'s existing behaviour for no gain, since
+            // both already gate on relevance themselves. Only the emptiness test moves.
+            if (!anyFieldCurrentlyRelevant(sectionFields, section.key, isRepeat)) {
                 continue;
             }
             steps.push({

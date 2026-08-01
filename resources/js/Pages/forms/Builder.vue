@@ -127,6 +127,13 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const importWarnings = computed<string[]>(() => page.props.flash?.xlsformWarnings ?? []);
 const warningsDismissed = ref(false);
 
+// Increment H21a (Doc #27 §6) — branching notices flashed after a publish that SUCCEEDED: a forward
+// reference, a circular condition, or a form that shows nothing until something is answered. Deliberately
+// its own banner rather than a reuse of the import one: the import copy says "Imported with N warnings",
+// which would be a lie here, and the two can legitimately be on screen together.
+const publishWarnings = computed<string[]>(() => page.props.flash?.publishWarnings ?? []);
+const publishWarningsDismissed = ref(false);
+
 function openImport(): void {
     importForm.reset();
     importForm.clearErrors();
@@ -249,6 +256,26 @@ function submitImport(): void {
                 </ul>
             </div>
             <MdsButton variant="tertiary" icon-left="close" @click="warningsDismissed = true">
+                Dismiss
+            </MdsButton>
+        </div>
+
+        <div
+            v-if="publishWarnings.length > 0 && !publishWarningsDismissed"
+            class="builder__warnings"
+            role="status"
+            aria-live="polite"
+        >
+            <div class="builder__warnings-body">
+                <strong class="builder__warnings-title">
+                    Published, with {{ publishWarnings.length }}
+                    {{ publishWarnings.length === 1 ? 'note' : 'notes' }} about your conditions
+                </strong>
+                <ul class="builder__warnings-list">
+                    <li v-for="(warning, i) in publishWarnings" :key="i">{{ warning }}</li>
+                </ul>
+            </div>
+            <MdsButton variant="tertiary" icon-left="close" @click="publishWarningsDismissed = true">
                 Dismiss
             </MdsButton>
         </div>

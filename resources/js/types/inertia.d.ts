@@ -74,6 +74,8 @@ declare module '@inertiajs/core' {
         flash: {
             toast: FlashToast | null;
             xlsformWarnings?: string[] | null;
+            /** Increment H21a — branching notices raised after a publish that SUCCEEDED (Doc #27 §6). */
+            publishWarnings?: string[] | null;
             newSecret?: FlashNewSecret | null;
             testResult?: FlashTestResult | null;
         };

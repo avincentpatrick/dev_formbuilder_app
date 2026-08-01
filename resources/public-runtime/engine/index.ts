@@ -28,6 +28,11 @@ export { displayValue } from './display-value';
 export { TemplateRenderer, makeTemplateRenderer } from './template-renderer';
 export type { RenderSource, RenderSources } from './template-renderer';
 
+// Increment H21a — `rendersNothing()` moved down from `lib/schema-mapping.ts` because the semantic
+// validator gained a second consumer of the same set (the `min_instances` step-visibility narrowing,
+// Doc #27 §4.3). `lib/` re-exports it, so every existing import path still resolves.
+export { rendersNothing } from './field-roles';
+
 export { ABSENT } from './coercion';
 export type { EngineValue, MaybeAbsent, Absent } from './coercion';
 export * as Coercion from './coercion';

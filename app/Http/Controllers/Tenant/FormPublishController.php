@@ -12,6 +12,7 @@ use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Forms\PublishService;
 use App\Services\Forms\RestoreService;
+use App\Services\Forms\StepGraphInspector;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -22,7 +23,7 @@ use Illuminate\Http\Request;
  */
 final class FormPublishController extends Controller
 {
-    public function store(Request $request, Form $form, PublishService $publisher): RedirectResponse
+    public function store(Request $request, Form $form, PublishService $publisher, StepGraphInspector $inspector): RedirectResponse
     {
         $validated = $request->validate(['note' => ['nullable', 'string', 'max:2000']]);
         /** @var User $user */
@@ -34,10 +35,30 @@ final class FormPublishController extends Controller
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         }
 
-        return back()->with('toast', [
-            'type' => 'success',
-            'message' => "Published version {$version->version_number}.",
-        ]);
+        // Increment H21a (Doc #27 §6) — branching NOTICES, never refusals. Computed HERE rather than inside
+        // `PublishService` for two reasons: the service keeps its binary published-or-threw contract, and
+        // `FormVersionApiController` (the other caller) is left untouched, so `openapi.json` stays
+        // drift-free. The publish already happened and stands regardless of what this finds.
+        $warnings = $inspector->warnings($version);
+
+        if ($warnings === []) {
+            return back()->with('toast', [
+                'type' => 'success',
+                'message' => "Published version {$version->version_number}.",
+            ]);
+        }
+
+        // The count rides the toast as well as the banner because publish is reachable from TWO pages —
+        // the builder and the forms list — and `back()` returns to whichever called it. Only the builder
+        // renders the banner, so without this the list-page publish would drop the notices silently.
+        $count = count($warnings);
+
+        return back()
+            ->with('toast', [
+                'type' => 'info',
+                'message' => "Published version {$version->version_number}. {$count} branching ".($count === 1 ? 'warning' : 'warnings').'.',
+            ])
+            ->with('publishWarnings', $warnings);
     }
 
     public function restore(Request $request, Form $form, FormVersion $version, RestoreService $restorer): RedirectResponse

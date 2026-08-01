@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Validation;
 
 use App\Enums\FieldType;
+use App\Enums\PdfFieldRole;
 use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\FormField;
@@ -91,6 +92,17 @@ final class SemanticValidator
             $fieldKeyById[$field->id] = $field->key;
         }
 
+        // Increment H21a — every field key in the version, relevant or not. Sections and fields carry
+        // INDEPENDENT `(tenant_id, form_version_id, key)` unique indexes and every application-level
+        // enforcer is table-scoped, so a section key may collide with a field key; this set is the guard
+        // that keeps {@see relevanceContext()} from re-admitting a pruned field's answer under a section's
+        // name (Doc #27 amendment A7).
+        /** @var array<string, true> $fieldKeys */
+        $fieldKeys = [];
+        foreach ($fieldKeyById as $key) {
+            $fieldKeys[$key] = true;
+        }
+
         $ruleSets = $this->buildRuleSets($input);
         $now = $input->now;
 
@@ -99,7 +111,7 @@ final class SemanticValidator
         // instance is then evaluated in its own scope by processRepeats().
         [$topLevelFields, $repeatMembersBySectionId] = $this->partitionFields($input);
 
-        [$fieldRelevance, $sectionRelevance] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById, $now);
+        [$fieldRelevance, $sectionRelevance] = $this->settleRelevance($input, $topLevelFields, $ruleSets, $fieldKeyById, $fieldKeys, $now);
         $effectiveAnswers = $this->effectiveAnswers($input->answers, $fieldRelevance);
         $errors = $this->collectErrors($topLevelFields, $ruleSets, $fieldRelevance, $effectiveAnswers, $fieldKeyById, $input->locale, $now);
 
@@ -110,6 +122,7 @@ final class SemanticValidator
             $sectionRelevance,
             $effectiveAnswers,
             $fieldKeyById,
+            $fieldKeys,
             $now,
         );
 
@@ -257,9 +270,10 @@ final class SemanticValidator
      * @param  Collection<int, FormField>  $fields  the top-level (non-repeat-member) fields
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
+     * @param  array<string, true>  $fieldKeys  every field key in the version (the section-collision guard)
      * @return array{0: array<string, bool>, 1: array<string, bool>}
      */
-    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById, ?string $now): array
+    private function settleRelevance(SemanticInput $input, Collection $fields, array $ruleSets, array $fieldKeyById, array $fieldKeys, ?string $now): array
     {
         /** @var array<string, bool> $relevant */
         $relevant = [];
@@ -270,17 +284,13 @@ final class SemanticValidator
         $maxIterations = $fields->count() + $input->sections->count() + 2;
         /** @var array<string, bool> $sectionRelevance */
         $sectionRelevance = [];
+        /** @var array<string, bool> $sectionRelevantById */
+        $sectionRelevantById = [];
 
         for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
-            $context = new EvaluationContext(array_intersect_key($input->answers, $relevant), now: $now);
+            $context = new EvaluationContext($this->relevanceContext($input, $relevant, $fieldKeys), now: $now);
 
-            $sectionRelevance = [];
-            $sectionRelevantById = [];
-            foreach ($input->sections as $section) {
-                $ok = $this->evaluateRelevance($section->relevant_expression, $context);
-                $sectionRelevance[$section->key] = $ok;
-                $sectionRelevantById[$section->id] = $ok;
-            }
+            [$sectionRelevance, $sectionRelevantById] = $this->sectionMasks($input, $context);
 
             /** @var array<string, bool> $next */
             $next = [];
@@ -302,7 +312,92 @@ final class SemanticValidator
             $relevant = $next;
         }
 
+        // Increment H21a / Doc #27 §3.2 (amendment A3). The loop assigns the newer FIELD mask while
+        // `$sectionRelevance` still holds the verdict computed from the PREVIOUS one, so on BOUND
+        // EXHAUSTION the two are returned one iteration apart — invisible to every consumer that reads one
+        // of them, and the step model is the first to read both. Recompute the section mask from the FINAL
+        // field mask, then TIGHTEN the field mask by that gate so `field ⊆ section` holds by construction.
+        //
+        // Recomputing alone would NOT be enough: it would pair a fresh section mask with a field mask
+        // derived under the stale one, which flips the inconsistency's sign rather than removing it.
+        //
+        // Both halves are provably no-ops on the fixed-point path, which is why no golden vector moves:
+        // the break fires BEFORE `$relevant = $next`, so `$relevant` is exactly the map this context and
+        // this section mask were already built from, and every key in it already passed the section gate.
+        $context = new EvaluationContext($this->relevanceContext($input, $relevant, $fieldKeys), now: $now);
+        [$sectionRelevance, $sectionRelevantById] = $this->sectionMasks($input, $context);
+
+        foreach ($fields as $field) {
+            if ($field->form_section_id === null) {
+                continue;
+            }
+            if (($sectionRelevantById[$field->form_section_id] ?? true) !== true) {
+                unset($relevant[$field->key]);
+            }
+        }
+
         return [$this->fullMask($fields, $relevant), $sectionRelevance];
+    }
+
+    /**
+     * Every section's relevance under one context, keyed both ways — by `key` for the returned mask that
+     * consumers read, and by `id` for the field loop's section-cascade gate.
+     *
+     * @return array{0: array<string, bool>, 1: array<string, bool>}
+     */
+    private function sectionMasks(SemanticInput $input, EvaluationContext $context): array
+    {
+        /** @var array<string, bool> $byKey */
+        $byKey = [];
+        /** @var array<string, bool> $byId */
+        $byId = [];
+        foreach ($input->sections as $section) {
+            $ok = $this->evaluateRelevance($section->relevant_expression, $context);
+            $byKey[$section->key] = $ok;
+            $byId[$section->id] = $ok;
+        }
+
+        return [$byKey, $byId];
+    }
+
+    /**
+     * The answer map a relevance expression is evaluated against: every CURRENTLY-relevant top-level field's
+     * answer, plus every REPEATABLE section's raw instance array so `count(${roster})` is answerable inside a
+     * `relevant_expression` (Doc #27 §3.3, amendment A2).
+     *
+     * Three things here are deliberate, and each one is a bug if reversed.
+     *
+     * 1. The section keys are unioned into the INTERSECT ARGUMENT, never into `$relevant` itself. `$relevant`
+     *    is what the fixed-point compare tests, and it is built from fields only — seeding a section key into
+     *    it makes `$next === $relevant` unsatisfiable, so every form would run to `$maxIterations` on every
+     *    keystroke and §3.2's exhaustion artifact would become the default rather than the exotic case.
+     * 2. Only REPEATABLE sections are seeded. A non-repeatable section key is never an answer key, so seeding
+     *    it resolves ABSENT and leaves `count()` at 0 forever — the same always-false trap this exists to
+     *    close, wearing the appearance of a fix.
+     * 3. A section key that COLLIDES with a field key is skipped (amendment A7 — the two tables carry
+     *    independent unique indexes, so a collision is reachable and `ExpressionValidationGate`'s claim to
+     *    the contrary is false). Seeding it would re-admit the answer of a field relevance had just pruned.
+     *
+     * `count()` therefore reads the RAW instance array, because repeats are processed after this loop, where
+     * `computeCalculated` runs last and sees the relevance-PRUNED instances. Both engines do exactly this, so
+     * the difference between the two passes is a documented property, not a divergence.
+     *
+     * @param  array<string, bool>  $relevant  currently-relevant top-level field keys
+     * @param  array<string, true>  $fieldKeys
+     * @return array<string, mixed>
+     */
+    private function relevanceContext(SemanticInput $input, array $relevant, array $fieldKeys): array
+    {
+        $keys = $relevant;
+        foreach ($input->sections as $section) {
+            if ($section->is_repeatable === true && ! isset($fieldKeys[$section->key])) {
+                $keys[$section->key] = true;
+            }
+        }
+
+        // array_intersect_key preserves the FIRST argument's order, so the context is ordered by the answer
+        // map — which is what the TypeScript twin's `Object.entries(answers)` walk produces too.
+        return array_intersect_key($input->answers, $keys);
     }
 
     /**
@@ -1035,6 +1130,7 @@ final class SemanticValidator
      * @param  array<string, bool>  $sectionRelevance  section key => relevant
      * @param  array<string, mixed>  $baseEffective  the top-level effective answers (the outside scope)
      * @param  array<string, string>  $fieldKeyById
+     * @param  array<string, true>  $fieldKeys  every field key in the version (the section-collision guard)
      * @return array{0: array<string, list<array<string, mixed>>>, 1: list<SemanticError>, 2: array<string, list<array<string, bool>>>}
      */
     private function processRepeats(
@@ -1044,6 +1140,7 @@ final class SemanticValidator
         array $sectionRelevance,
         array $baseEffective,
         array $fieldKeyById,
+        array $fieldKeys,
         ?string $now,
     ): array {
         /** @var array<string, list<array<string, mixed>>> $effective */
@@ -1070,15 +1167,17 @@ final class SemanticValidator
                 : [];
             $count = count($instances);
 
+            // `max` stays AHEAD of the per-instance settling — it is the abuse guard this method's docblock
+            // names, and moving it below would settle the huge array it exists to reject. It also needs no
+            // step-visibility narrowing: a max violation means instances were submitted, so the respondent
+            // was shown the group.
             $max = $section->max_instances;
             if ($max !== null && $count > $max) {
                 $errors[] = new SemanticError($sectionKey, 'max_instances', $this->maxInstancesMessage($max), $sectionKey, null);
             }
 
-            $min = $section->min_instances;
-            if ($min !== null && $min > 0 && $count < $min) {
-                $errors[] = new SemanticError($sectionKey, 'min_instances', $this->minInstancesMessage($min), $sectionKey, null);
-            }
+            /** @var list<array<string, bool>> $instanceMasks */
+            $instanceMasks = [];
 
             foreach ($instances as $index => $instanceAnswers) {
                 /** @var array<string, mixed> $instanceAnswers */
@@ -1088,6 +1187,9 @@ final class SemanticValidator
                     $baseEffective,
                     $instanceAnswers,
                     $fieldKeyById,
+                    $fieldKeys,
+                    $sectionKey,
+                    $instances,
                     $now,
                 );
 
@@ -1101,10 +1203,63 @@ final class SemanticValidator
 
                 $effective[$sectionKey][] = $instanceEffective;
                 $relevance[$sectionKey][] = $instanceRelevance;
+                $instanceMasks[] = $instanceRelevance;
+            }
+
+            // `min` runs LAST, gated on whether the respondent's step list would show this group at all
+            // (Doc #27 §4.3, amendment A4). It needs the instance masks, which is why it sits here and not
+            // beside `max`. Without the gate a repeatable section that vanished from `visibleSteps` still
+            // demands instances — a permanent blocker that is INVISIBLE, because the error-summary banner
+            // iterates the visible step list and the step is not in it.
+            $min = $section->min_instances;
+            if ($min !== null && $min > 0 && $count < $min && $this->repeatStepIsVisible($members, $instanceMasks)) {
+                $errors[] = new SemanticError($sectionKey, 'min_instances', $this->minInstancesMessage($min), $sectionKey, null);
             }
         }
 
         return [$effective, $errors, $relevance];
+    }
+
+    /**
+     * Whether the respondent's step list would SHOW this repeatable section — the server-side twin of the
+     * guest SPA's `visibleSteps` emptiness test (Doc #27 §2.2 predicates 2 and 3, amendment A4). The TS
+     * mirror is `repeatStepIsVisible()` in `engine/semantic-validator.ts`; the two renders-something sets
+     * are `PdfFieldRole::Omitted` and `RENDERS_NOTHING`, pinned equal in both directions by
+     * `tests/Unit/Forms/PdfFieldRoleTest.php`.
+     *
+     * `PdfFieldRole`'s name is historical — H17 minted it for the PDF — but its content is exactly the
+     * question asked here: does this field type put a question in front of somebody.
+     *
+     * Zero instances is VACUOUSLY visible: the step is what lets the respondent add the first one, so a
+     * `min_instances` of 2 on an empty group is a real, reachable, visible blocker and must still fire.
+     *
+     * @param  list<FormField>  $members
+     * @param  list<array<string, bool>>  $instanceMasks  one member mask per settled instance
+     */
+    private function repeatStepIsVisible(array $members, array $instanceMasks): bool
+    {
+        $rendering = array_values(array_filter(
+            $members,
+            static fn (FormField $member): bool => PdfFieldRole::for($member->field_type) !== PdfFieldRole::Omitted,
+        ));
+
+        if ($rendering === []) {
+            return false; // predicate 2 — nothing in the group renders a question at all
+        }
+
+        if ($instanceMasks === []) {
+            return true;
+        }
+
+        foreach ($instanceMasks as $mask) {
+            foreach ($rendering as $member) {
+                if (($mask[$member->key] ?? false) === true) {
+                    return true; // predicate 3 — at least one instance still asks something
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1118,6 +1273,8 @@ final class SemanticValidator
      * @param  array<string, mixed>  $baseAnswers  the outside (top-level effective) scope
      * @param  array<string, mixed>  $instanceAnswers  this instance's normalised answers
      * @param  array<string, string>  $fieldKeyById
+     * @param  array<string, true>  $fieldKeys
+     * @param  list<array<string, mixed>>  $groupInstances  the whole group, so count(${section}) resolves here too
      * @return array{0: array<string, bool>, 1: array<string, mixed>}
      */
     private function settleInstanceRelevance(
@@ -1126,6 +1283,9 @@ final class SemanticValidator
         array $baseAnswers,
         array $instanceAnswers,
         array $fieldKeyById,
+        array $fieldKeys,
+        string $sectionKey,
+        array $groupInstances,
         ?string $now,
     ): array {
         /** @var array<string, bool> $relevant */
@@ -1134,11 +1294,20 @@ final class SemanticValidator
             $relevant[$field->key] = true; // start optimistic; prune from here
         }
 
+        // Doc #27 §3.3 (amendment A2) at the SECOND scope. `$baseAnswers` is the top-level effective map
+        // captured BEFORE the repeat arrays are merged into it, so without this the group's own key reads
+        // ABSENT and `count(${roster})` inside a MEMBER's relevant_expression is 0 forever — the identical
+        // always-false trap at a second scope, and "ask this only when the household has more than one
+        // member" is the idiom that hits it. Same collision guard as the top-level seed.
+        $groupScope = isset($fieldKeys[$sectionKey]) ? [] : [$sectionKey => $groupInstances];
+
         $maxIterations = count($members) + 2;
 
         for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
             $prunedInstance = array_intersect_key($instanceAnswers, $relevant);
-            $context = new EvaluationContext(array_merge($baseAnswers, $prunedInstance), now: $now);
+            // The group scope sits BENEATH the instance's own answers so a member key that collides with
+            // the section key still shadows it, exactly as it does without this seed.
+            $context = new EvaluationContext(array_merge($baseAnswers, $groupScope, $prunedInstance), now: $now);
 
             /** @var array<string, bool> $next */
             $next = [];

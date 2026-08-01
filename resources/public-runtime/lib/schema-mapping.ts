@@ -62,25 +62,12 @@ const SUPPORTED = new Set<string>([
 /**
  * Field types that render NOTHING on a respondent's form (Increment H7).
  *
- * This set deliberately does NOT mirror `EncodeFormPresenter::OMITTED`, and the divergence is the point.
- * H7 makes the two channels asymmetric: a keyer SHOULD see a hidden field (they are staff, and they may be
- * the only source of an externally-sourced value on a paper form), while a respondent must never see one —
- * that is what the type means.
- *
- * Without this set all three of these fall through `SUPPORTED` below into `controlFor()`'s `'unsupported'`
- * branch and render the encode channel's "Not available for manual entry yet (Phase 2)" notice on a public
- * form. That was live for `hidden`, `calculated` and `page_break` alike before H7; nothing pinned it.
- *
- * Dropping them from the step model is only SAFE because neither engine can produce an error on a hidden or
- * calculated field (`semantic-validator.ts::collectFieldErrors`) — otherwise the error-summary banner could
- * offer a jump link to a row that does not exist. `page_break` carries no answer at all.
+ * The definition MOVED to `engine/field-roles.ts` in H21a — the semantic validator gained a second consumer
+ * of the same set (the `min_instances` step-visibility narrowing, Doc #27 §4.3 amendment A4) and the engine
+ * must not import from `lib/`. It is re-exported here so every existing import path still resolves, and the
+ * PHP parity test (`tests/Unit/Forms/PdfFieldRoleTest.php`) now parses the new home.
  */
-const RENDERS_NOTHING = new Set<string>(['hidden', 'calculated', 'page_break']);
-
-/** Whether a field type is rendered to a respondent at all (Increment H7). */
-export function rendersNothing(fieldType: string): boolean {
-    return RENDERS_NOTHING.has(fieldType);
-}
+export { rendersNothing } from '../engine';
 
 // Field types that carry an author-defined option list (mirror of FieldType::hasOptions()).
 const HAS_OPTIONS = new Set<string>(['single_select', 'multi_select', 'dropdown', 'likert_scale']);
@@ -600,7 +587,38 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
     return { fields, sections, validations };
 }
 
-/** Combine the static engine schema with the live answers + locale into a `SemanticInput`. */
-export function toSemanticInput(engineSchema: EngineSchema, answers: AnswerMap, locale: string): SemanticInput {
-    return { ...engineSchema, answers, locale };
+/**
+ * The ISO-8601 clock string `today()` / `now()` read, in PHP's EXACT shape (Increment H21a, Doc #27 §3.4).
+ *
+ * `Carbon::now()->toIso8601String()` under `config/app.php`'s `'timezone' => 'UTC'` emits
+ * `2026-08-01T12:34:56+00:00` — seconds precision, explicit offset, never `Z`, and every `now` literal in
+ * the golden corpus matches that shape. `new Date().toISOString()` emits `2026-08-01T12:34:56.789Z`, a
+ * DIFFERENT string, and both engines return the injected clock verbatim from `now()` — so the format is
+ * itself a mirror surface and the naive call would have opened a fresh divergence in the increment that
+ * exists to close one.
+ *
+ * STAMPED IN UTC, NOT THE DEVICE OFFSET, and that is the load-bearing choice. The server re-validates at
+ * submit under its own UTC clock (`SemanticValidator::validate()`), so a local offset would make `today()`
+ * disagree across the evening window in every UTC+ zone: the client renders a step the server then prunes,
+ * `passed()` is true because an irrelevant field is never required-checked, and the respondent gets a 201
+ * with silently dropped answers. UTC costs only that `today()` is the machine's calendar day rather than the
+ * respondent's — a narrowing that is visible and arguable, not a silent data fault.
+ */
+export function isoClock(at: Date): string {
+    const pad = (n: number): string => String(n).padStart(2, '0');
+
+    return `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`
+        + `T${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}:${pad(at.getUTCSeconds())}+00:00`;
+}
+
+/**
+ * Combine the static engine schema with the live answers + locale into a `SemanticInput`.
+ *
+ * `now` is OPTIONAL so every pre-H21a caller stays byte-identical (the A8 device H6b and H17 both used).
+ * Before H21a nothing passed it at all, so `SemanticInput.now` fell to null, `hasNow()` was false, and BOTH
+ * clock functions returned ABSENT in the SPA while PHP always stamps a clock — a live PHP/TS divergence the
+ * R3 gate structurally cannot see, because the golden runner supplies `now` from each vector.
+ */
+export function toSemanticInput(engineSchema: EngineSchema, answers: AnswerMap, locale: string, now?: string | null): SemanticInput {
+    return { ...engineSchema, answers, locale, now: now ?? null };
 }

@@ -60,10 +60,14 @@ function pdfTypesWithRole(PdfFieldRole $role): array
  */
 function rendersNothingFromTypescript(): array
 {
-    $path = dirname(__DIR__, 3).'/resources/public-runtime/lib/schema-mapping.ts';
+    // Increment H21a relocated the declaration from `lib/schema-mapping.ts` down into `engine/`, because
+    // the semantic validator became a second consumer of the same set (the `min_instances` step-visibility
+    // narrowing, Doc #27 §4.3) and the engine must not import from `lib/`. `schema-mapping.ts` re-exports
+    // `rendersNothing()`, so nothing else moved.
+    $path = dirname(__DIR__, 3).'/resources/public-runtime/engine/field-roles.ts';
     $source = file_get_contents($path);
 
-    expect($source)->toBeString("schema-mapping.ts must be readable at {$path}");
+    expect($source)->toBeString("field-roles.ts must be readable at {$path}");
 
     $matched = preg_match(
         '/const\s+RENDERS_NOTHING\s*=\s*new\s+Set<string>\(\s*\[(?<members>[^\]]*)\]\s*\)/',
@@ -73,7 +77,7 @@ function rendersNothingFromTypescript(): array
 
     // A rename or a shape change (a frozen array, a union type, a computed set) must FAIL here
     // rather than silently yield an empty list and let the equality assertion pass vacuously.
-    expect($matched)->toBe(1, 'RENDERS_NOTHING is no longer a `new Set<string>([...])` literal in schema-mapping.ts');
+    expect($matched)->toBe(1, 'RENDERS_NOTHING is no longer a `new Set<string>([...])` literal in engine/field-roles.ts');
 
     preg_match_all("/'([a-z_]+)'/", $set['members'], $members);
 

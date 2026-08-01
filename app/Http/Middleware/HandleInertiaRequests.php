@@ -101,6 +101,12 @@ class HandleInertiaRequests extends Middleware
                 // dismissible banner after a destructive import so the author reviews lossy coercions
                 // (dynamic repeat_count, downgraded grids, sanitized keys) before publishing (§6).
                 'xlsformWarnings' => $request->session()->get('xlsformWarnings'),
+                // Non-fatal branching notices raised after a PUBLISH (Increment H21a, Doc #27 §6): a
+                // forward reference, a circular condition, or a form that shows nothing until something is
+                // answered. Its own key rather than a reuse of `xlsformWarnings`, whose banner copy is
+                // hard-coded to "Imported with N warning(s)" — the publish already succeeded and the
+                // wording has to say so.
+                'publishWarnings' => $request->session()->get('publishWarnings'),
                 // Webhook one-shot flashes (H14). `newSecret` carries the plaintext signing secret exactly
                 // once after a create/rotate so the page can reveal + copy it, then it is gone (never a durable
                 // prop; AuditRedactor already strips it from the ledger). `testResult` carries the synchronous

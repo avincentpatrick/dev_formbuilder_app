@@ -18,6 +18,7 @@ import { uuidv7 } from './lib/uuid';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
 import { formatInstantInZone, scheduleStateCopy, type ScheduleStateCopy } from './lib/schedule';
+import { isoClock } from './lib/schema-mapping';
 import type { AnswerMap, Bootstrap, ScheduleAcceptance, ScheduleBlock, SchemaResponse } from './lib/types';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
@@ -75,6 +76,16 @@ const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.
 // `start_url` (`/f/{slug}`, no query), so a prefilled link opened from the home-screen icon prefills
 // nothing. That is inherent to how the manifest scopes a form and is not worth widening the manifest for.
 const initialSearch = typeof window === 'undefined' ? '' : window.location.search;
+
+// Increment H21a (Doc #27 §3.4) — the session clock. Read HERE, once, for the same reason `initialSearch`
+// is: the runtime store is deliberately DOM-free and pure, so a `new Date()` inside it would break its own
+// unit-testability invariant. Before this, `toSemanticInput()` passed no clock at all, so `today()` and
+// `now()` both evaluated to ABSENT in the SPA while PHP always stamps one — a live relevance divergence
+// invisible to the R3 gate, because the golden runner supplies `now` from each vector.
+//
+// Module scope, not per-session, so a version-drift remount or a conflict review keeps the clock the
+// respondent started under rather than silently jumping it mid-session.
+const sessionNow = isoClock(new Date());
 
 // Increment G8b — the offline database + replay driver are created once here and shared with every session
 // (and, via the same DB name, with the service worker's Background-Sync replay). The slug scopes G8c conflict
@@ -351,6 +362,7 @@ function onRestart(): void {
         :resolving="resolveMode"
         :resume="resumeSeed"
         :search="initialSearch"
+        :now="sessionNow"
         @submitted="onSubmitted"
         @queued="onQueued"
         @reschema="onReschema"

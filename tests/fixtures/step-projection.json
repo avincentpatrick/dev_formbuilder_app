@@ -1,0 +1,208 @@
+[
+  {
+    "name": "lead_and_sections_in_sequence_order",
+    "note": "The baseline shape: section-less fields lead, then sections in `sequence` order. Distinct sequences everywhere (Doc #26 A2 makes a positional tie a rejection, and both the field factory and addFormField() default sequence to 0).",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "intro", "sequence": 1 },
+      { "key": "a", "section": "s1", "sequence": 2 },
+      { "key": "b", "section": "s2", "sequence": 3 }
+    ],
+    "answers": {},
+    "expected_steps": ["__lead__", "s1", "s2"]
+  },
+  {
+    "name": "no_section_less_fields_means_no_lead_step",
+    "sections": [{ "key": "s1", "sequence": 1 }],
+    "fields": [{ "key": "a", "section": "s1", "sequence": 1 }],
+    "answers": {},
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "predicate_1_irrelevant_section_is_dropped",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2, "relevant": "${gate} = 'yes'" }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "b", "section": "s2", "sequence": 2 }
+    ],
+    "answers": { "gate": "no" },
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "predicate_1_relevant_section_is_kept",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2, "relevant": "${gate} = 'yes'" }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "b", "section": "s2", "sequence": 2 }
+    ],
+    "answers": { "gate": "yes" },
+    "expected_steps": ["s1", "s2"]
+  },
+  {
+    "name": "predicate_2_section_of_only_non_rendering_fields_is_dropped",
+    "note": "hidden / calculated / page_break render no question, so the section vanishes rather than showing a heading over a blank panel (Increment H7).",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "a", "section": "s1", "sequence": 1 },
+      { "key": "token", "section": "s2", "field_type": "hidden", "sequence": 2 },
+      { "key": "brk", "section": "s2", "field_type": "page_break", "sequence": 3 }
+    ],
+    "answers": {},
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "predicate_2_lead_block_of_only_non_rendering_fields_is_dropped",
+    "sections": [{ "key": "s1", "sequence": 1 }],
+    "fields": [
+      { "key": "token", "field_type": "hidden", "sequence": 1 },
+      { "key": "a", "section": "s1", "sequence": 2 }
+    ],
+    "answers": {},
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "predicate_3_section_whose_every_field_is_gated_off_is_dropped",
+    "note": "The one correctness change H21a asks for. Predicate 2 is a STATIC type test, so without predicate 3 this section renders a heading, a Next button and zero questions — the grayed-out step form-filling-ux-flow.md 3.2 rejects, reached through another door.",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "b", "section": "s2", "sequence": 2, "relevant": "${gate} = 'yes'" },
+      { "key": "c", "section": "s2", "sequence": 3, "relevant": "${gate} = 'yes'" }
+    ],
+    "answers": { "gate": "no" },
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "predicate_3_section_with_one_relevant_field_is_kept",
+    "note": "The anti-vacuity twin of the case above: ONE surviving field is enough, so the predicate is an 'any', not an 'all'.",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "s2", "sequence": 2 }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "b", "section": "s2", "sequence": 2, "relevant": "${gate} = 'yes'" },
+      { "key": "c", "section": "s2", "sequence": 3 }
+    ],
+    "answers": { "gate": "no" },
+    "expected_steps": ["s1", "s2"]
+  },
+  {
+    "name": "predicate_3_applies_to_the_lead_block_too",
+    "note": "Lead fields are top-level, so the flat mask covers them and a fully-gated lead block is exactly the dead step predicate 3 abolishes.",
+    "sections": [{ "key": "s1", "sequence": 2 }],
+    "fields": [
+      { "key": "lead_only", "sequence": 1, "relevant": "${gate} = 'yes'" },
+      { "key": "gate", "section": "s1", "sequence": 2 }
+    ],
+    "answers": { "gate": "no" },
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "repeat_with_zero_instances_is_vacuously_visible",
+    "note": "The step is what lets the respondent add the first instance, so an empty group keeps its step — and the engines' min_instances gate applies exactly this rule before enforcing bounds (Doc #27 4.3).",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "hh", "sequence": 2, "repeatable": true, "min": 2 }
+    ],
+    "fields": [
+      { "key": "a", "section": "s1", "sequence": 1 },
+      { "key": "member_name", "section": "hh", "sequence": 2 }
+    ],
+    "answers": {},
+    "expected_steps": ["s1", "hh"]
+  },
+  {
+    "name": "repeat_whose_every_member_is_gated_off_in_every_instance_is_dropped",
+    "note": "Predicate 3 for a repeatable section reads the PER-INSTANCE masks, never the flat mask — a repeat member is absent from the flat mask entirely, so testing it there would annihilate every repeatable step.",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "hh", "sequence": 2, "repeatable": true }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "member_name", "section": "hh", "sequence": 2, "relevant": "${gate} = 'yes'" }
+    ],
+    "answers": { "gate": "no", "hh": [{ "member_name": "Ana" }, { "member_name": "Ben" }] },
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "repeat_with_one_relevant_member_in_one_instance_is_kept",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "hh", "sequence": 2, "repeatable": true }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "member_name", "section": "hh", "sequence": 2, "relevant": "${gate} = 'yes'" }
+    ],
+    "answers": { "gate": "yes", "hh": [{ "member_name": "Ana" }] },
+    "expected_steps": ["s1", "hh"]
+  },
+  {
+    "name": "irrelevant_repeat_section_is_dropped_by_predicate_1",
+    "sections": [
+      { "key": "s1", "sequence": 1 },
+      { "key": "hh", "sequence": 2, "repeatable": true, "relevant": "${gate} = 'yes'" }
+    ],
+    "fields": [
+      { "key": "gate", "section": "s1", "sequence": 1 },
+      { "key": "member_name", "section": "hh", "sequence": 2 }
+    ],
+    "answers": { "gate": "no", "hh": [{ "member_name": "Ana" }] },
+    "expected_steps": ["s1"]
+  },
+  {
+    "name": "count_of_a_repeat_section_gates_a_later_section",
+    "note": "Doc #27 3.3 — 'branch on whether they added any household members' is a first-rank branching idiom, and it read 0 forever before H21a because the settle context intersected the repeat array away.",
+    "sections": [
+      { "key": "hh", "sequence": 1, "repeatable": true },
+      { "key": "summary", "sequence": 2, "relevant": "count(${hh}) > 0" }
+    ],
+    "fields": [
+      { "key": "member_name", "section": "hh", "sequence": 1 },
+      { "key": "note_text", "section": "summary", "sequence": 2 }
+    ],
+    "answers": { "hh": [{ "member_name": "Ana" }] },
+    "expected_steps": ["hh", "summary"]
+  },
+  {
+    "name": "count_of_an_empty_repeat_section_hides_the_later_section",
+    "sections": [
+      { "key": "hh", "sequence": 1, "repeatable": true },
+      { "key": "summary", "sequence": 2, "relevant": "count(${hh}) > 0" }
+    ],
+    "fields": [
+      { "key": "member_name", "section": "hh", "sequence": 1 },
+      { "key": "note_text", "section": "summary", "sequence": 2 }
+    ],
+    "answers": { "hh": [] },
+    "expected_steps": ["hh"]
+  },
+  {
+    "name": "the_empty_graph_is_reachable",
+    "note": "Doc #27 4.1 — a router form whose only section is gated on an unanswered field projects to nothing at all. H21b owns the terminal-state UI; this only pins that the projection agrees it is empty.",
+    "sections": [{ "key": "s1", "sequence": 1, "relevant": "${token} = 'vip'" }],
+    "fields": [
+      { "key": "token", "field_type": "hidden", "sequence": 1 },
+      { "key": "a", "section": "s1", "sequence": 2 }
+    ],
+    "answers": {},
+    "expected_steps": []
+  }
+]

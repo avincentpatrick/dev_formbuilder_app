@@ -147,7 +147,8 @@ enum FieldType: string
      * object-valued grids and use their own row/column/cell editors; `geo` (Increment G5b2b) is the map
      * config editor (capture/accuracy + default centre/zoom) shared by all three geospatial types;
      * `media` (Increment G6) is the capture config editor (accepted types + size/count caps + capture
-     * source) shared by all five media types.
+     * source) shared by all five media types; `prefill` (Increment H7) is where a `hidden` field's value
+     * comes from, which is the only thing there is to configure about a field nobody fills in.
      */
     public function configEditor(): ?string
     {
@@ -158,6 +159,7 @@ enum FieldType: string
             self::LikertMatrix => 'likert_matrix',
             self::Geopoint, self::Geotrace, self::Geoshape => 'geo',
             self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature => 'media',
+            self::Hidden => 'prefill',
             default => null,
         };
     }

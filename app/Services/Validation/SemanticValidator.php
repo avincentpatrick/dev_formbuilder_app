@@ -414,7 +414,17 @@ final class SemanticValidator
     ): void {
         // A calculated field is a server-computed OUTPUT, never a respondent input — it carries no
         // required/constraint checks (its formula is evaluated in the compute pass instead).
-        if ($field->field_type === FieldType::Calculated) {
+        //
+        // A hidden field (Increment H7) is skipped for a different reason with the same shape: the
+        // respondent can neither see it, reach it, nor repair it, so ANY error on one is an unfixable dead
+        // end — a submit that fails forever, and (in the SPA) an error-summary entry addressing a row that
+        // does not render. The publish gate refuses `required`/`conditional` and any validation rule on a
+        // hidden field so an author learns this at publish; this early return is what makes the rule hold
+        // for a version published BEFORE H7, which that gate can never reach.
+        //
+        // Both are NARROWINGS — they can only remove errors, never invent one — so neither can introduce a
+        // new PHP/TS divergence. Pinned in both engines by tests/golden/validation/hidden.json.
+        if ($field->field_type === FieldType::Calculated || $field->field_type === FieldType::Hidden) {
             return;
         }
 

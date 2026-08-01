@@ -66,6 +66,16 @@ const resolveMode = ref(false);
 
 const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.bootstrap.slug });
 
+// Increment H7 — the query string this form was opened with, read ONCE here (the one DOM touch) and handed
+// to every session below so `url`-sourced hidden fields prefill. Captured at module scope rather than per
+// session because a version-drift remount or a conflict review re-mounts RuntimeSession against the SAME
+// navigation, and the respondent's original link is still what those sessions belong to.
+//
+// Known narrowing, recorded rather than papered over: an INSTALLED PWA launches at the manifest's
+// `start_url` (`/f/{slug}`, no query), so a prefilled link opened from the home-screen icon prefills
+// nothing. That is inherent to how the manifest scopes a form and is not worth widening the manifest for.
+const initialSearch = typeof window === 'undefined' ? '' : window.location.search;
+
 // Increment G8b — the offline database + replay driver are created once here and shared with every session
 // (and, via the same DB name, with the service worker's Background-Sync replay). The slug scopes G8c conflict
 // resolution to rows this form's share-token client can resubmit.
@@ -340,6 +350,7 @@ function onRestart(): void {
         :notice="driftNotice"
         :resolving="resolveMode"
         :resume="resumeSeed"
+        :search="initialSearch"
         @submitted="onSubmitted"
         @queued="onQueued"
         @reschema="onReschema"

@@ -380,7 +380,15 @@ export class SemanticValidator {
         instanceIndex: number | null,
     ): void {
         // A calculated field is a server-computed OUTPUT, never a respondent input — no required/constraint.
-        if (field.field_type === 'calculated') {
+        //
+        // A hidden field (Increment H7) is skipped for a different reason with the same shape: the respondent
+        // can neither see it, reach it, nor repair it, so any error on one is an unfixable dead end — and it
+        // is what makes dropping hidden fields from `visibleSteps` safe rather than merely tidy, since an
+        // error here would put an entry in the summary banner addressing a row that does not render.
+        //
+        // Both are NARROWINGS, so neither can invent a divergence with PHP. Twin of
+        // `SemanticValidator::collectFieldErrors()`; pinned in both engines by golden/validation/hidden.json.
+        if (field.field_type === 'calculated' || field.field_type === 'hidden') {
             return;
         }
 

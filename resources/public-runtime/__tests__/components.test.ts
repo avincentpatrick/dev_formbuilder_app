@@ -551,6 +551,38 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         wrapper.unmount();
     });
 
+    // ── The same obligation for H7's net-new untrusted source ─────────────────────────────────────
+    it('renders a URL-prefilled hidden value containing markup as visible TEXT (Increment H7)', async () => {
+        // A piped ANSWER is untrusted because a respondent typed it; a piped PREFILL is untrusted because
+        // whoever handed out the link chose it — and unlike a typed answer it is present on the very first
+        // paint, before any interaction, on a surface with no `script-src`. Same escaper, different entry
+        // point, so §5 owes this surface its own test rather than assuming the answer test covers it.
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: schemaResponse({
+                    fields: [
+                        field({ key: 'promo', field_type: 'hidden', config: { prefill_source: 'url' }, sequence: 0 }),
+                        field({ key: 'full_name', label: 'Your name (offer ${promo})', sequence: 1 }),
+                    ],
+                }),
+                bootstrap,
+                client: fakeClient(),
+                search: '?promo=%3Cscript%3Ealert(1)%3C%2Fscript%3E',
+            },
+        });
+        const scriptsBefore = document.querySelectorAll('script').length;
+        await settle();
+
+        expect(wrapper.text()).toContain('Your name (offer <script>alert(1)</script>)');
+        expect(wrapper.find('script').exists()).toBe(false);
+        expect(document.querySelectorAll('script').length).toBe(scriptsBefore);
+        expect(wrapper.html()).toContain('&lt;script&gt;');
+        // And the hidden field itself contributed no row of its own.
+        expect(wrapper.text()).not.toContain('Not available for manual entry');
+
+        wrapper.unmount();
+    });
+
     it('emits the author confirmation message, locale-resolved and hole-filled', async () => {
         const wrapper = mount(RuntimeSession, {
             props: { schema: pipedSchema({ confirmation_message: 'Thanks, ${name}!' }), bootstrap, client: fakeClient() },

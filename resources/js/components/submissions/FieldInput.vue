@@ -122,6 +122,13 @@ export interface EncodeField {
     // Media capture config + upload endpoint (Increment G6: file / image / audio / video); null otherwise.
     media?: MediaFieldConfig | null;
     upload?: MediaUploadConfig | null;
+    // Where a hidden field's value comes from (Increment H7); null for every other field type, and absent
+    // entirely on the public runtime, which never passes a hidden field at all. `'url'` is externally
+    // sourced and keyable on this channel (the keyer is the only possible source of it on paper); `'fixed'`
+    // is written by the server from the authored literal and shown read-only.
+    prefill?: 'fixed' | 'url' | 'none' | null;
+    // The server-set value displayed beside a `'fixed'` row, so a blank is never unexplained.
+    prefill_value?: string | null;
     supported: boolean;
 }
 
@@ -184,10 +191,17 @@ const control = computed<
     | 'geo'
     | 'media'
     | 'note'
+    | 'prefilled'
     | 'unsupported'
 >(() => {
     const t = props.field.field_type;
     if (t === 'note') return 'note';
+    // Increment H7 — a hidden field. Externally sourced ⇒ a real text input (this channel has no URL, so a
+    // keyer is the only possible source). Otherwise a read-only row: the server writes the authored literal
+    // over anything this page could send, so an editable control would be a lie. Ordered BEFORE the
+    // `supported` check because a non-`url` hidden field is deliberately `supported: false` and must not
+    // fall through to the "not available for manual entry (Phase 2)" notice, which would be wrong copy.
+    if (t === 'hidden') return props.field.prefill === 'url' ? 'text' : 'prefilled';
     if (!props.field.supported) return 'unsupported';
     if (['short_text', 'email', 'phone', 'url', 'date', 'time', 'datetime'].includes(t)) return 'text';
     if (t === 'long_text') return 'textarea';
@@ -430,6 +444,16 @@ function setCascadeLevel(index: number, value: string): void {
     <!-- Display-only note -->
     <p v-else-if="control === 'note'" class="encode-note">{{ field.label }}</p>
 
+    <!-- Hidden field with a server-set value (Increment H7): shown so the keyer knows it exists and what
+         will be recorded, never editable — the server writes the authored literal regardless. -->
+    <div v-else-if="control === 'prefilled'" class="encode-prefilled">
+        <span class="encode-prefilled__label">{{ field.label }}</span>
+        <span v-if="field.prefill_value" class="encode-prefilled__value">{{ field.prefill_value }}</span>
+        <p class="encode-prefilled__note">
+            {{ field.prefill_value ? 'Set automatically — not editable here.' : 'Set outside this form — nothing to enter here.' }}
+        </p>
+    </div>
+
     <!-- Unsupported (advanced / repeat) — surfaced, not silently dropped -->
     <div v-else class="encode-unsupported">
         <span class="encode-unsupported__label">{{ field.label }}</span>
@@ -569,6 +593,43 @@ function setCascadeLevel(index: number, value: string): void {
 }
 
 .encode-unsupported__note {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+    font-style: italic;
+}
+
+/* Increment H7 — a server-set hidden field. Every token below is already used elsewhere in this file, so
+   none of them is a newly-invented name (the G11 token-references gate). */
+.encode-prefilled {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.encode-prefilled__label {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+.encode-prefilled__value {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
+    /* A prefilled value is untrusted external text of any length — wrap it rather than letting a long one
+       push the encode card into horizontal overflow (the 375px responsive-axe gate, the standing lesson). */
+    overflow-wrap: anywhere;
+}
+
+.encode-prefilled__note {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);

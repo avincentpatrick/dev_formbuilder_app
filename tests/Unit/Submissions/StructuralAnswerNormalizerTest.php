@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Enums\PrefillSource;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\FormField;
 use App\Models\FormSection;
+use App\Services\Submissions\AnswersContentChecksum;
 use App\Services\Submissions\StructuralAnswerNormalizer;
 
 /**
@@ -234,4 +236,134 @@ it('propagates an inner type mismatch with the instance path', function (): void
         expect($e->fieldErrors()[0]['field'])->toBe('hh[0].age')
             ->and($e->fieldErrors()[0]['rule'])->toBe('not_a_number');
     }
+});
+
+// ── Hidden-field prefill (Increment H7) ─────────────────────────────────────────────────────────────
+// The one field type whose value is not the client's to decide. `fixed` is server-authoritative, `url` is
+// untrusted-but-accepted under a byte cap, and an undeclared source holds nothing.
+
+function hiddenField(string $key, ?string $source, ?string $literal = null, ?string $param = null): FormField
+{
+    $config = [];
+    if ($source !== null) {
+        $config['prefill_source'] = $source;
+    }
+    if ($param !== null) {
+        $config['url_param'] = $param;
+    }
+
+    return makeSchemaField([
+        'key' => $key,
+        'field_type' => FieldType::Hidden,
+        'config' => $config,
+        'default_value' => $literal,
+    ]);
+}
+
+it('injects a fixed hidden value the payload never mentioned', function (): void {
+    $fields = [hiddenField('campaign', 'fixed', 'newsletter')];
+
+    expect(normalizeAnswers($fields, []))->toBe(['campaign' => 'newsletter']);
+});
+
+it('overwrites a client-supplied value for a fixed hidden field', function (): void {
+    $fields = [hiddenField('campaign', 'fixed', 'newsletter')];
+
+    // The whole point of `fixed`: no channel, however authenticated, can steer this value.
+    expect(normalizeAnswers($fields, ['campaign' => 'attacker-supplied']))->toBe(['campaign' => 'newsletter']);
+});
+
+it('injects nothing for a fixed hidden field with a blank literal', function (): void {
+    expect(normalizeAnswers([hiddenField('campaign', 'fixed', null)], []))->toBe([])
+        ->and(normalizeAnswers([hiddenField('campaign', 'fixed', '')], []))->toBe([]);
+});
+
+it('keeps a url-sourced hidden value the client submitted', function (): void {
+    $fields = [hiddenField('promo', 'url')];
+
+    expect(normalizeAnswers($fields, ['promo' => 'SPRING']))->toBe(['promo' => 'SPRING']);
+});
+
+it('drops a submitted value for a hidden field with no declared source', function (): void {
+    expect(normalizeAnswers([hiddenField('promo', null)], ['promo' => 'SPRING']))->toBe([])
+        ->and(normalizeAnswers([hiddenField('promo', 'nonsense')], ['promo' => 'SPRING']))->toBe([]);
+});
+
+it('rejects a url-sourced hidden value over the byte cap', function (): void {
+    $fields = [hiddenField('promo', 'url')];
+    $tooLong = str_repeat('x', PrefillSource::MAX_VALUE_BYTES + 1);
+
+    try {
+        normalizeAnswers($fields, ['promo' => $tooLong]);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['field'])->toBe('promo')
+            ->and($e->fieldErrors()[0]['rule'])->toBe('prefill_too_long');
+    }
+});
+
+it('accepts a url-sourced hidden value exactly at the byte cap', function (): void {
+    $fields = [hiddenField('promo', 'url')];
+    $atCap = str_repeat('x', PrefillSource::MAX_VALUE_BYTES);
+
+    expect(normalizeAnswers($fields, ['promo' => $atCap]))->toBe(['promo' => $atCap]);
+});
+
+it('measures the hidden byte cap in BYTES, not characters', function (): void {
+    $fields = [hiddenField('promo', 'url')];
+    // 1000 two-byte characters = 2000 bytes exactly; one more overflows. `mb_strlen` would see 1001 of
+    // 2000 and wave it through, which is the divergence lib/prefill.ts's TextEncoder mirror exists to avoid.
+    $atCap = str_repeat('é', PrefillSource::MAX_VALUE_BYTES / 2);
+
+    expect(normalizeAnswers($fields, ['promo' => $atCap]))->toBe(['promo' => $atCap]);
+
+    try {
+        normalizeAnswers($fields, ['promo' => $atCap.'é']);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['rule'])->toBe('prefill_too_long');
+    }
+});
+
+it('drops rather than rejects a malformed value for a fixed hidden field', function (): void {
+    // The distinction this pins: a `fixed` field's client value is not merely overwritten, it is never
+    // INSPECTED. Routing it through the scalar arm instead would 422 on an array — a rejection triggered by
+    // a value the server was always going to ignore, on a field the client has no say in.
+    $fields = [hiddenField('campaign', 'fixed', 'newsletter')];
+
+    expect(normalizeAnswers($fields, ['campaign' => ['a', 'b']]))->toBe(['campaign' => 'newsletter']);
+});
+
+it('rejects an array for a url-sourced hidden field', function (): void {
+    try {
+        normalizeAnswers([hiddenField('promo', 'url')], ['promo' => ['a', 'b']]);
+        expect(false)->toBeTrue('expected a SubmissionValidationException');
+    } catch (SubmissionValidationException $e) {
+        expect($e->fieldErrors()[0]['rule'])->toBe('expected_scalar');
+    }
+});
+
+it('never writes a fixed hidden value flat when the field belongs to a repeatable section', function (): void {
+    // The publish gate refuses this shape, but it is not retroactive — a version published before H7 can
+    // still carry one, and a flat write would land outside the instance list where nothing reads it.
+    $section = repeatSection('hh');
+    $member = hiddenField('campaign', 'fixed', 'newsletter');
+    $member->form_section_id = 'hh';
+
+    expect(normalizeAnswers([$member], ['hh' => [['campaign' => 'x']]], [$section]))->toBe([]);
+});
+
+it('normalises identically whether or not the payload carries the fixed value', function (): void {
+    // The G8c content checksum is taken over this document, so a replay that omits the injected value and
+    // one that includes it must hash the same or they false-conflict against each other.
+    $fields = [hiddenField('campaign', 'fixed', 'newsletter'), normalizerField('name', FieldType::ShortText)];
+
+    $without = normalizeAnswers($fields, ['name' => 'Maria']);
+    $with = normalizeAnswers($fields, ['name' => 'Maria', 'campaign' => 'newsletter']);
+
+    // Asserting equality ALONE would pass vacuously if injection stopped happening at all (neither document
+    // would carry the key) — found by mutation, so the presence assertion is part of the test, not decoration.
+    expect($without)->toHaveKey('campaign')
+        ->and($with)->toHaveKey('campaign')
+        ->and(AnswersContentChecksum::of($without))->toBe(AnswersContentChecksum::of($with));
 });

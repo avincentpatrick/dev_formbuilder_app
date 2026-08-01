@@ -1,0 +1,110 @@
+[
+  {
+    "name": "hidden_required_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "promo", "field_type": "hidden", "is_required": "required"}]},
+    "answers": {},
+    "expected": {
+      "relevance": {"fields": {"promo": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_conditional_required_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "gate"},
+      {"key": "promo", "field_type": "hidden", "is_required": "conditional", "rules": [{"rule_type": "required_if", "operator": "eq", "related": "gate", "rule_value": "yes"}]}
+    ]},
+    "answers": {"gate": "yes"},
+    "expected": {
+      "relevance": {"fields": {"gate": true, "promo": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"gate": "yes"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_pattern_rule_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "promo", "field_type": "hidden", "rules": [{"rule_type": "pattern", "rule_value": "^[0-9]+$"}]}]},
+    "answers": {"promo": "not-a-number"},
+    "expected": {
+      "relevance": {"fields": {"promo": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"promo": "not-a-number"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_max_length_rule_produces_no_error",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "promo", "field_type": "hidden", "rules": [{"rule_type": "max_length", "rule_value": "3"}]}]},
+    "answers": {"promo": "far-too-long"},
+    "expected": {
+      "relevance": {"fields": {"promo": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"promo": "far-too-long"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_answer_survives_into_effective_answers",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "promo", "field_type": "hidden"}, {"key": "name"}]},
+    "answers": {"promo": "SPRING", "name": "Maria"},
+    "expected": {
+      "relevance": {"fields": {"promo": true, "name": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"promo": "SPRING", "name": "Maria"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_is_still_relevance_pruned",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "gate"},
+      {"key": "promo", "field_type": "hidden", "relevant": "${gate} = 'on'"}
+    ]},
+    "answers": {"gate": "off", "promo": "SPRING"},
+    "expected": {
+      "relevance": {"fields": {"gate": true, "promo": false}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"gate": "off"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "hidden_is_a_usable_expression_operand",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "promo", "field_type": "hidden"},
+      {"key": "code", "relevant": "${promo} = 'SPRING'"}
+    ]},
+    "answers": {"promo": "SPRING"},
+    "expected": {
+      "relevance": {"fields": {"promo": true, "code": true}, "sections": {}},
+      "errors": [],
+      "effective_answers": {"promo": "SPRING"},
+      "computed": {}
+    }
+  },
+  {
+    "name": "a_visible_field_beside_a_hidden_one_still_errors",
+    "grammar_version": "2.0",
+    "schema": {"fields": [
+      {"key": "promo", "field_type": "hidden", "is_required": "required"},
+      {"key": "name", "is_required": "required"}
+    ]},
+    "answers": {},
+    "expected": {
+      "relevance": {"fields": {"promo": true, "name": true}, "sections": {}},
+      "errors": [{"field": "name", "rule": "field_required"}],
+      "effective_answers": {},
+      "computed": {}
+    }
+  }
+]

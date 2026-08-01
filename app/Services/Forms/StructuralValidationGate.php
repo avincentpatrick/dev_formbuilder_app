@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\FieldType;
+use App\Enums\PrefillSource;
+use App\Enums\RequiredMode;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Services\Validation\SemanticValidator;
+use Illuminate\Support\Collection;
 
 /**
  * The pre-publish structural gate (form-versioning-schema-migration.md §4). A draft that fails any check
@@ -27,6 +31,10 @@ final class StructuralValidationGate
 
         $fieldIds = $fields->pluck('id')->flip();
         $fieldKeyById = $fields->pluck('key', 'id');
+
+        // Increment H7 — which fields own at least one validation row, so the hidden-field check below is a
+        // set lookup rather than a per-field query.
+        $fieldIdsWithValidations = $validations->pluck('form_field_id')->flip();
 
         foreach ($fields as $field) {
             // Every field's section, when set, belongs to the same version.
@@ -70,6 +78,16 @@ final class StructuralValidationGate
                 }
                 $this->assertMediaConfigResolves($field);
             }
+            // Increment H7: a hidden field is the one type the respondent can neither see nor repair, so it
+            // must be incapable of producing an error; and neither prefill source can address one instance
+            // of a repeat, so it may not sit in a repeatable section.
+            if ($field->field_type === FieldType::Hidden) {
+                if ($field->form_section_id !== null && $repeatableSectionIds->has($field->form_section_id)) {
+                    throw PublishValidationException::hiddenInRepeatableSection($field->key);
+                }
+                $this->assertHiddenFieldAnswerable($field, $fieldIdsWithValidations);
+                $this->assertPrefillConfigResolves($field);
+            }
         }
 
         // Every validation's owning + comparison field belongs to the same version.
@@ -82,6 +100,55 @@ final class StructuralValidationGate
             if ($validation->related_form_field_id !== null && ! $fieldIds->has($validation->related_form_field_id)) {
                 throw PublishValidationException::validationReferencesForeignVersion($ownerKey);
             }
+        }
+    }
+
+    /**
+     * A `hidden` field (Increment H7) must not be able to generate a respondent-facing error.
+     *
+     * Nobody can see, focus, or answer a hidden field, so a `required`/`conditional` mark or a validation
+     * rule on one produces a submit that fails forever with no repair available — and in the SPA, an
+     * error-summary entry pointing at a row that does not render. The runtime already declines to evaluate
+     * these ({@see SemanticValidator::collectFieldErrors()} and its TS twin), so
+     * shipping such a form would not break anything; it would silently do nothing, which is worse for the
+     * author. Refusing it at publish is how they find out.
+     *
+     * An author who needs a guaranteed value uses a `fixed` prefill source, which is always present because
+     * the server writes it.
+     *
+     * @param  Collection<string, int>  $fieldIdsWithValidations
+     */
+    private function assertHiddenFieldAnswerable(FormField $field, Collection $fieldIdsWithValidations): void
+    {
+        if ($field->is_required !== RequiredMode::Optional) {
+            throw PublishValidationException::hiddenFieldNotAnswerable($field->key, 'hidden_field_required');
+        }
+        if ($fieldIdsWithValidations->has($field->id)) {
+            throw PublishValidationException::hiddenFieldNotAnswerable($field->key, 'hidden_field_has_validations');
+        }
+    }
+
+    /**
+     * A `hidden` field sourced from the link (Increment H7) must declare a usable query-parameter name.
+     *
+     * The name is what an author puts in a shared URL, so it is constrained to the characters that survive
+     * one without encoding, and length-capped so it cannot become a payload in its own right. A blank/absent
+     * name is legal and falls back to the field's own key ({@see PrefillSource::urlParam()}) — the author
+     * already opted in via `prefill_source`, so the fallback widens nothing.
+     */
+    private function assertPrefillConfigResolves(FormField $field): void
+    {
+        if (PrefillSource::for($field->field_type, $field->config) !== PrefillSource::Url) {
+            return;
+        }
+
+        $declared = data_get($field->config, 'url_param');
+        if ($declared === null || $declared === '') {
+            return; // falls back to the field key
+        }
+
+        if (! is_string($declared) || preg_match('/^[A-Za-z_][A-Za-z0-9_-]{0,63}$/', $declared) !== 1) {
+            throw PublishValidationException::prefillConfigInvalid($field->key, 'prefill_param_invalid');
         }
     }
 

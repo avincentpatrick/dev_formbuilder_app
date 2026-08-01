@@ -6,6 +6,7 @@ namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
 use App\Models\FormField;
+use App\Support\Forms\LocaleVariant;
 
 /**
  * Turns a stored answer (from `submission_answers.answers`, keyed by `form_fields.key`) into a single
@@ -114,17 +115,15 @@ final class SchemaValueFormatter
      * One option's `label_translations` variant for `$locale`, or null when there is none to use.
      * Mirrors `resolveText()`: a missing, non-string or BLANK variant is no variant at all.
      *
+     * The rule itself moved to {@see LocaleVariant} in H17, when the submission PDF became its
+     * second PHP caller — behaviour here is unchanged, and this method stays as the option-shaped
+     * adapter so every call site in this class reads the same as it did in H6b.
+     *
      * @param  array<string, mixed>  $option
      */
     private function variant(array $option, ?string $locale): ?string
     {
-        if ($locale === null || ! is_array($option['label_translations'] ?? null)) {
-            return null;
-        }
-
-        $value = $option['label_translations'][$locale] ?? null;
-
-        return is_string($value) && $value !== '' ? $value : null;
+        return LocaleVariant::from($option['label_translations'] ?? null, $locale);
     }
 
     /**

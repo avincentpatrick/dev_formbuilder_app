@@ -47,8 +47,21 @@ final class SemanticValidator
      * the locale, and delegate to the pure {@see evaluate()}.
      *
      * @param  array<string, mixed>  $answers  field key => value (multi-select values already `list<string>`)
+     * @param  ?string  $now  ISO-8601 override for the `today()`/`now()` clock. Null means "right now",
+     *                        which keeps every pre-H17 caller byte-identical — the A8 device H6b used when
+     *                        it threaded `?string $locale` through two already-shipped read surfaces.
+     *
+     *                        Only a REPLAY passes this. H17 renders a submission PDF by re-deriving which
+     *                        fields the respondent actually saw, and relevance is stored nowhere: the
+     *                        `SemanticResult` masks are computed at submit and discarded, and
+     *                        {@see effectiveAnswers()} prunes irrelevant keys, so a pruned key is
+     *                        indistinguishable from an answered-blank one. Re-deriving is therefore the
+     *                        only route — and re-deriving under `Carbon::now()` would evaluate a
+     *                        `relevant_expression` reading `today()` against the day someone asked for a
+     *                        PDF rather than the day the respondent filled the form, silently producing a
+     *                        different mask than the one that actually pruned the document.
      */
-    public function validate(FormVersion $version, array $answers, ?string $locale = null): SemanticResult
+    public function validate(FormVersion $version, array $answers, ?string $locale = null, ?string $now = null): SemanticResult
     {
         $locale ??= $this->defaultLocale($version);
 
@@ -58,7 +71,7 @@ final class SemanticValidator
             $version->validations()->orderBy('sequence')->get(),
             $answers,
             $locale,
-            Carbon::now()->toIso8601String(), // the authoritative clock for today()/now() (Increment G3)
+            $now ?? Carbon::now()->toIso8601String(), // the authoritative clock for today()/now() (Increment G3)
         ));
     }
 

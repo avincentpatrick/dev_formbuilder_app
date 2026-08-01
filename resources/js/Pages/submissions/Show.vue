@@ -19,6 +19,9 @@ type FieldRow = { key: string; label: string; value: string };
  */
 type Block = { id: string | null; label: string | null; fields: FieldRow[] };
 
+/** The submission's generated PDF record (Increment H17), or null if none has been made yet. */
+type PdfArtifact = { id: string; generated_at: string | null; size_bytes: number };
+
 type Submission = {
     id: string;
     form_id: string;
@@ -40,7 +43,38 @@ type Submission = {
     };
 };
 
-const props = defineProps<{ submission: Submission; blocks: Block[]; can: { review: boolean } }>();
+const props = defineProps<{
+    submission: Submission;
+    blocks: Block[];
+    can: { review: boolean };
+    pdf: PdfArtifact | null;
+}>();
+
+/**
+ * Queue a PDF (Increment H17).
+ *
+ * Request → redirect → toast, the H13b "redeliver" shape, which is this application's only
+ * existing affordance for "you enqueued a job". It is NOT the H14/H15b `flash.testResult` modal
+ * pattern: that works only because both testers run synchronously inline, and this genuinely does
+ * not. There is no polling here and none anywhere in the app — the artifact arrives by email, and
+ * a page reload surfaces it in the card below.
+ */
+const pdfQueuing = ref(false);
+
+function generatePdf(): void {
+    pdfQueuing.value = true;
+    router.post(
+        `/submissions/${props.submission.id}/pdf`,
+        {},
+        { preserveScroll: true, onFinish: () => (pdfQueuing.value = false) },
+    );
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // Which transitions are offered, from the current status (the service also guards server-side).
 const actions = computed(() => {
@@ -137,6 +171,46 @@ function formatDate(iso: string | null): string {
                     </div>
                     <div v-if="submission.locale" class="detail__meta-row"><dt>Locale</dt><dd>{{ submission.locale }}</dd></div>
                 </dl>
+            </MdsCard>
+
+            <!--
+                PDF record (Increment H17). Deliberately its own card rather than a fifth button in
+                #actions: the header already carries up to four review-workflow buttons, and this is
+                not a review action — it has state (generated when, how big) that a button cannot
+                express, and its own explanation of why nothing appears immediately.
+            -->
+            <MdsCard>
+                <template #header><h2 class="detail__card-title">PDF record</h2></template>
+
+                <template v-if="pdf">
+                    <dl class="detail__meta">
+                        <div class="detail__meta-row">
+                            <dt>Generated</dt><dd>{{ formatDate(pdf.generated_at) }}</dd>
+                        </div>
+                        <div class="detail__meta-row"><dt>Size</dt><dd>{{ formatBytes(pdf.size_bytes) }}</dd></div>
+                    </dl>
+                    <div class="detail__pdf-actions">
+                        <MdsButton as="a" :href="`/attachments/${pdf.id}`" variant="primary" icon-left="download">
+                            Download
+                        </MdsButton>
+                        <MdsButton variant="tertiary" :loading="pdfQueuing" @click="generatePdf">Regenerate</MdsButton>
+                    </div>
+                    <p class="detail__pdf-hint">
+                        Regenerating replaces this file. Only the questions this respondent was shown are included.
+                    </p>
+                </template>
+
+                <template v-else>
+                    <p class="detail__pdf-hint">
+                        A printable record of this submission, showing only the questions the respondent was
+                        actually shown. We will email you a link when it is ready.
+                    </p>
+                    <div class="detail__pdf-actions">
+                        <MdsButton variant="secondary" icon-left="download" :loading="pdfQueuing" @click="generatePdf">
+                            Generate PDF
+                        </MdsButton>
+                    </div>
+                </template>
             </MdsCard>
 
             <MdsCard v-if="hasReviewInfo">
@@ -261,6 +335,24 @@ function formatDate(iso: string | null): string {
 .detail__empty {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/* PDF record card (Increment H17). `flex-wrap` is not decoration: this is the third instance of the
+   standing shared-primitive lesson (H14 `.page-header__actions`, H15b `.mds-table__scroll`, H7
+   `.palette`) — a non-wrapping row of buttons is a 375px horizontal-overflow failure waiting for the
+   first viewport narrow enough, and that gate only runs in CI. */
+.detail__pdf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-3);
+}
+
+.detail__pdf-hint {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-text-secondary);
 }
 

@@ -95,6 +95,10 @@ const EXEMPT_JOBS = [
     'App\Notifications\ResumeLinkNotification',
     'App\Notifications\Webhooks\WebhookAutoDisabledNotification',
     'App\Notifications\Connectors\ConnectionRevokedNotification',
+    // H17. Same shape as its six siblings above, with one payload difference worth noting: it also
+    // carries a BACKED ENUM (SubmissionPdfOutcome), which R3 admits explicitly. It is the first of
+    // these to report a SUCCESS rather than a failure, which changes nothing about the payload rules.
+    'App\Notifications\Submissions\SubmissionPdfReadyNotification',
 ];
 
 $root = dirname(__DIR__);

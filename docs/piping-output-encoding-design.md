@@ -150,12 +150,30 @@ Every respondent-facing text column has a `{column}_translations` sibling (`docs
 | Guest SPA + encode page | DOM text | Vue text interpolation / prop binding — already correct throughout | ✅ **H6b (holds)** | ✅ `components.test.ts` — a piped answer of `<script>alert(1)</script>` renders as visible text, adds no `<script>` node, and appears HTML-escaped in the markup |
 | Blade shells (`app.blade.php`, `public-runtime.blade.php`) | HTML text + attribute | `{{ }}` only. Zero `{!!` exists in application code today; attribute values follow `app.blade.php`'s **whitelist** precedent rather than blind interpolation | — (holds) | existing header/shell tests |
 | Inertia `data-page` | `<script type="application/json">` | **A dependency to preserve, not a defect.** Inertia's directive emits `{!! json_encode($page) !!}`, and it is safe *because* `json_encode` escapes forward slashes by default, so `</script>` serialises as `<\/script>`. Any future `JSON_UNESCAPED_SLASHES` on that path opens a breakout | — (holds) | H6a: assert a `</script>`-bearing answer cannot close the block |
-| Queued PDF (H17) | HTML text + attribute | `htmlspecialchars(ENT_QUOTES, 'UTF-8')` at every interpolation. dompdf is **not installed** — this contract predates the engine, and also pins `isRemoteEnabled = false` and `isPhpEnabled = false` when it lands | **H17** | H17: markup answer renders as visible text in the PDF |
+| Queued PDF (H17) | HTML text + attribute | `htmlspecialchars(ENT_QUOTES, 'UTF-8')` at every interpolation — delivered as Blade `{{ }}`, which *is* that call. `isRemoteEnabled = false` + `isPhpEnabled = false` as pinned, plus `isJavascriptEnabled = false` and a `chroot` to the view directory | ✅ **H17 (as-built)** | ✅ `tests/Feature/Submissions/SubmissionPdfRendererTest.php` — a markup answer renders as visible text; the form title, section heading and a **piped** label are each asserted separately; an attribute-breaking `" onload="` payload covers the `ENT_QUOTES` half; the engine flags are asserted through dompdf's own getters; and a structural guard scans every `resources/views/pdf/*.blade.php` for a raw-output directive |
 | Queued mail (H3/H23) | Markdown → HTML | Enable `Markdown::withSecuredEncoding()`. Script execution is currently blocked only *incidentally*, by `EncodedHtmlString`'s `htmlspecialchars`; secured encoding is what neutralises **markdown syntax** | **H3/H23** | H3/H23: a form named `[click](https://evil.example)` renders as literal text, not a link |
 | Slack Block Kit (H6a) | `mrkdwn` | Escape `&`, `<`, `>` per Slack's own rules before interpolation | **H6a** | H6a: a form titled `<https://evil.example\|click>` is not a live link |
 | CSV / XLSX export | spreadsheet cell | Prefix a cell whose first character is `=`, `+`, `-`, `@`, TAB or CR | **its own row** | that increment: `=HYPERLINK(…)` is inert on open |
 | Webhook body | JSON | JSON encoding, which is already the only transform applied. Payloads carry ids and metadata, never answers; `include_answers` stays deferred | — (holds) | existing signature/payload tests |
 | Plain-text mail · a11y announcer | plain text | None — and no HTML either. Recorded so a later increment does not silently "upgrade" one of them to an HTML context | — (holds) | — |
+
+**As-built note (H17) — the two pinned dompdf flags turned out to be the whole mitigation.** When
+this table was written the engine had not been chosen and the flags were defence-in-depth. Choosing
+it made them load-bearing: of the **20 published advisories against `dompdf/dompdf`**, essentially
+every one is an SVG parse, a remote font fetch, a remote file inclusion or an image-handling path,
+and all of them require remote loading. `isRemoteEnabled = false` closes that entire class. Two
+supporting facts recorded so a later increment does not undo them by accident:
+
+- **The version floor is a gate, not a preference.** `composer.json` pins `^3.1.6` because 3.1.6 is
+  the first release above every published advisory bound (the highest is `<3.1.6`), and CI runs
+  `composer audit` **full-tree, with no severity floor and no `--omit`** — so loosening the
+  constraint is a hard merge block rather than a silent downgrade. Its sub-dependencies are the
+  *renamed* `dompdf/php-font-lib` and `dompdf/php-svg-lib`, which carry **zero** advisories; the
+  legacy `phenx/*` packages of the same name do carry them and are **not** what 3.1.6 installs.
+- **`ext-gd` is absent from the application container**, so raster image embedding is unreachable
+  regardless of configuration. The "no images in the PDF" narrowing is therefore an environment
+  fact, not only a design choice — and adding gd later re-opens the image-handling advisory class
+  that `isRemoteEnabled = false` currently makes moot.
 
 **Three of those rows describe live defects, not hypotheticals** — the Slack `mrkdwn`, mail-markdown and spreadsheet rows are unescaped **today**, for the form title and tenant name, before piping adds a single character. Piping raises their severity from "a tenant can garble their own notification" to "a respondent can inject into a tenant's channel", which is why each carries a named owner here rather than an observation.
 

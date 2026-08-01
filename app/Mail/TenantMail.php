@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Notifications\ResumeLinkNotification;
+use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -26,6 +28,24 @@ use Illuminate\Queue\SerializesModels;
  * where a Mailable with a Blade view earns its keep over a MailMessage. Global "from" stays
  * config('mail.from'); branded per-tenant envelopes/templates layer in at H23, and the H1h output-encoding
  * contract governs any tenant-controlled value a subclass interpolates into HTML.
+ *
+ * ── AMENDMENT (H17): BOTH predicted consumers declined, and the prediction is the thing that was wrong ──
+ * The resume email shipped in H9b as {@see ResumeLinkNotification}, a queued
+ * Notification with a MailMessage. The submission-PDF receipt shipped in H17 as
+ * {@see SubmissionPdfReadyNotification}, likewise. So this class STILL has
+ * no subclass, and the paragraph above should be read as a hypothesis the evidence has since gone against
+ * rather than a plan someone forgot to execute.
+ *
+ * H17's reasoning, recorded here so the next increment does not re-derive it: all EIGHT outbound emails in
+ * the application are Notifications with a MailMessage; there is no Blade mail layout, no
+ * `resources/views/mail`, no published vendor mail views and no `lang/` directory — so a `TenantMail`
+ * subclass is not "one class", it is the first of all of those. And because a TenantMail is not
+ * ShouldQueue it is invisible to job-payload-lint (see above), where a queued Notification is bound by R2
+ * and R3. For a one-link message that trade is the wrong way round.
+ *
+ * This base is still worth keeping: the case it was written for — a genuinely designed, multi-section
+ * branded email — is H23's branding work, not a receipt. What is NOT true any more is that H9/H10 or H17
+ * will be the consumer that proves it.
  *
  * Subclasses implement envelope()/content()/attachments() (the Laravel 11 Mailable API) and, because they
  * are constructed inside a job, carry only scalars/arrays as public properties.

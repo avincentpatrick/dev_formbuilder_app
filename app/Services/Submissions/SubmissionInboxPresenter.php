@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AttachmentKind;
 use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -141,6 +143,37 @@ final class SubmissionInboxPresenter
             ],
             'blocks' => $version !== null ? $this->answerBlocks($version, $answers, $submission->locale) : [],
             'can' => ['review' => $user->can('review', $submission)],
+            'pdf' => $this->pdfArtifact($submission),
+        ];
+    }
+
+    /**
+     * The submission's current PDF, if one has been generated (Increment H17).
+     *
+     * This is the ONLY in-app surface for the artifact. There is no notification bell, no polling
+     * and no broadcast anywhere in this application, so the flow is deliberately plain: a toast
+     * confirms the job was queued, an email carries the link, and this prop means a user who
+     * simply reloads the page also finds it. H17 does not invent an async-completion surface —
+     * `NotificationType::export_ready` is specified in the data dictionary and remains unbuilt.
+     *
+     * @return array{id: string, generated_at: ?string, size_bytes: int}|null
+     */
+    private function pdfArtifact(Submission $submission): ?array
+    {
+        $attachment = Attachment::query()
+            ->where('attachable_type', 'submission')
+            ->where('attachable_id', $submission->getKey())
+            ->where('kind', AttachmentKind::ExportArtifact)
+            ->first();
+
+        if ($attachment === null) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $attachment->getKey(),
+            'generated_at' => $attachment->updated_at?->toIso8601String(),
+            'size_bytes' => (int) $attachment->size_bytes,
         ];
     }
 

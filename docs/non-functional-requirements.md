@@ -25,6 +25,8 @@ Response-time targets are stated as **p50/p95**, measured server-side (excluding
 
 ---
 
+**Queued PDF generation (H17) holds a database transaction open for the whole render.** `TenantAwareJob` wraps `handleForTenant()` in `DB::transaction` — that is how RLS context is established for a worker, and the base class exposes no seam to render outside it — so a dompdf render is an *idle-in-transaction* hold for its duration. Bounded rather than eliminated: `GeneratePdfJob` raises `$timeout` from the base class's 60s to **110s**, which is the largest value permitted by the base class's own invariant that `$timeout` stay strictly below `queue.connections.database.retry_after` (120s), beyond which the queue can hand the same job to a second worker. At Phase-3 volumes (a per-tenant ceiling of 12 exports/minute, `config/queue-fairness.php`) this is acceptable; it is recorded here because a long idle-in-transaction hold blocks vacuum, so it is a real cost if PDF volume ever grows or if a future increment renders something much larger.
+
 ## 2. Availability & Reliability Targets
 
 | Metric | Phase 1 (MVP) target | Later-phase aspiration |

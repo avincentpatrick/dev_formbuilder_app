@@ -272,6 +272,13 @@ Route::middleware([
         ->middleware('can:review,submission')->name('submissions.review');
     Route::get('/forms/{form}/submissions/export', [SubmissionInboxController::class, 'export'])
         ->middleware('can:export,'.Submission::class.',form')->name('forms.submissions.export');
+    // Queued single-submission PDF (Increment H17). POST, not GET: it has side effects (an audit row, a
+    // metered export, a queued job). Gates on `can:view` rather than the per-form `can:export` used
+    // above — the file contains exactly the one submission the user is already permitted to read on
+    // this page, so requiring the form-wide export capability would be a stricter gate than the data
+    // warrants. Returns a redirect + toast; the artifact arrives by email and on the detail page.
+    Route::post('/submissions/{submission}/pdf', [SubmissionInboxController::class, 'generatePdf'])
+        ->middleware('can:view,submission')->name('submissions.pdf');
 
     // Attachments (Increment G6) — the shared polymorphic media write path. `store` stages an uploaded file
     // against the form's published version (SubmissionPipeline re-points it to the submission at persist),

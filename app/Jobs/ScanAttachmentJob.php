@@ -7,7 +7,9 @@ namespace App\Jobs;
 use App\Enums\QueueName;
 use App\Enums\ScanStatus;
 use App\Models\Attachment;
+use App\Services\Attachments\AttachmentScanner;
 use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Virus-scans a freshly uploaded {@see Attachment} (Increment G6) — the project's first queued job,
@@ -33,6 +35,16 @@ final class ScanAttachmentJob extends TenantAwareJob
         public readonly string $tenantId,
     ) {}
 
+    /**
+     * Resolved out of the container rather than injected, because `scripts/job-payload-lint.php`
+     * R3 admits only scalars and backed enums as constructor parameters — a service in the
+     * signature would be serialised into the queue payload, which is the whole class of bug that
+     * linter exists to stop.
+     */
+    private AttachmentScanner $scanner {
+        get => app(AttachmentScanner::class);
+    }
+
     protected function handleForTenant(): void
     {
         $attachment = Attachment::query()->whereKey($this->attachmentId)->first();
@@ -41,12 +53,29 @@ final class ScanAttachmentJob extends TenantAwareJob
             return; // already resolved, or hidden by RLS — nothing to do
         }
 
-        // No scanner configured (Phase-1) ⇒ mark skipped. Real ClamAV later sets clean|infected here.
-        $status = config('attachments.scanner_enabled') === true
-            ? $this->scan($attachment)
-            : ScanStatus::Skipped;
+        // No scanner configured (Phase-1) ⇒ mark skipped. Real ClamAV later sets clean|infected.
+        // The decision itself moved to AttachmentScanner in H17 so the submission-PDF job could
+        // reach it too; the behaviour here is unchanged, which this job's existing tests pin.
+        $attachment->update(['virus_scan_status' => $this->scanner->scanBytes(
+            $this->contentsOf($attachment),
+            (string) ($attachment->original_filename ?? $attachment->id),
+        )]);
+    }
 
-        $attachment->update(['virus_scan_status' => $status]);
+    /**
+     * The stored bytes, or an empty string when the object is unreadable.
+     *
+     * Reading the object is new in H17 and is what lets one seam serve both channels. Failing
+     * SOFT is deliberate: the Phase-1 scanner ignores the content entirely, and a missing object
+     * is a storage fault, not a malware verdict — turning it into `Infected` would quarantine a
+     * clean upload because a disk hiccuped. When a real engine lands it will need its own
+     * decision here, which is why this is a named method rather than an inline expression.
+     */
+    private function contentsOf(Attachment $attachment): string
+    {
+        $disk = Storage::disk($attachment->disk);
+
+        return $disk->exists($attachment->path) ? (string) $disk->get($attachment->path) : '';
     }
 
     /**
@@ -55,15 +84,5 @@ final class ScanAttachmentJob extends TenantAwareJob
     protected function failureContext(): array
     {
         return ['attachment_id' => $this->attachmentId];
-    }
-
-    /**
-     * Placeholder for the real scanner integration. Until ClamAV is wired, `scanner_enabled` is false
-     * and this is never reached; when enabled it must return {@see ScanStatus::Clean} or
-     * {@see ScanStatus::Infected}.
-     */
-    private function scan(Attachment $attachment): ScanStatus
-    {
-        return ScanStatus::Clean;
     }
 }

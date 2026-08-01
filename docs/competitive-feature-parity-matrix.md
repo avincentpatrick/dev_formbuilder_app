@@ -54,6 +54,8 @@
 | Basic per-form dashboard | ✓ | ✓ | ✓ | ✓ | 1 | #4 |
 | Org-wide cross-form dashboard | ◐ (project-level, not deeply cross-form) | ✓ | ✗ (legacy's own roadmap: "never fully built") | ✓ | 1 (basic) → 3 (advanced) | #4 |
 | Streamed/chunked large exports | ✓ | ✓ | ✓ (memory-safe pattern, confirmed-good) | ✓ | 1 | — |
+| Per-submission PDF record | ◐ (per-submission print view; no queued artifact, no storage accounting) | ✓ | ✗ | ✓ — **SHIPPED H17**: queued (`GeneratePdfJob` on the exports queue), stored as an `export_artifact` attachment against the tenant's storage quota, emailed to the requester, superseded in place on regenerate | 3 | #26 |
+| PDF shows only the questions the respondent was SHOWN | ✗ | ✗ (renders the whole form) | ✗ | ✓ — **SHIPPED H17**, and the differentiator of this row: relevance is re-derived with the clock pinned to the submission's finalisation, so a skipped branch is ABSENT rather than a page of blanks, while a shown-and-skipped question still appears with an em-dash | 3 | #26 |
 | Cursor-based paginated API exports | ✓ (v2 API) | ◐ | ✗ | ✓ | 1 | — |
 
 ## 4. Platform, Access & Commercial

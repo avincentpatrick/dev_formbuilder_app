@@ -688,6 +688,34 @@ describe('createFormRuntime — rescue by identity, not by index (H21b §4.2)', 
         expect(runtime.currentStepKey.value).toBe('s1');
     });
 
+    it('walks FORWARD when the vanished step had no surviving predecessor', async () => {
+        // §4.2 says walk OUTWARD, and both directions are load-bearing: the respondent is on the FIRST step
+        // when it removes itself, so there is nothing behind them to walk back to. Found by mutation —
+        // deleting the forward arm reddened nothing until this test existed.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [
+                    section({ key: 's1', label: 'One', sequence: 1, relevant_expression: "${leave} != 'stop'" }),
+                    section({ key: 's2', label: 'Two', sequence: 2 }),
+                ],
+                fields: [
+                    field({ key: 'leave', section_key: 's1', sequence: 1 }),
+                    field({ key: 'two', section_key: 's2', sequence: 2 }),
+                ],
+            }),
+        );
+        expect(runtime.currentStepKey.value).toBe('s1');
+
+        runtime.setAnswer('leave', 'stop');
+        await nextTick();
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s2']);
+        expect(runtime.currentStepKey.value).toBe('s2');
+        expect(runtime.lastStepChange.value?.rescuedFrom).toBe('s1');
+        expect(runtime.lastStepChange.value?.rescuedTo).toBe('s2');
+    });
+
     it('publishes the rescue on lastStepChange so a component can announce the REASON', async () => {
         const runtime = await onStepFour();
 
@@ -846,6 +874,26 @@ describe('createFormRuntime — resume drift resolution (H21b §5.3)', () => {
         // moved. This used to be a guarded no-op, leaving them on step 1 with no explanation at all.
         expect(runtime.goToStep('s2')).toBe('nearest');
         expect(runtime.currentStepKey.value).toBe('s1');
+    });
+
+    it('resolves a stored FIRST step forward when it is the one that is irrelevant', () => {
+        // The other half of §4.2's outward walk, on the resume path: nothing precedes the stored key.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [
+                    section({ key: 's1', label: 'One', sequence: 1, relevant_expression: "${gate} = 'go'" }),
+                    section({ key: 's2', label: 'Two', sequence: 2 }),
+                ],
+                fields: [
+                    field({ key: 'gate', sequence: 0, field_type: 'hidden' }),
+                    field({ key: 'one', section_key: 's1', sequence: 1 }),
+                    field({ key: 'two', section_key: 's2', sequence: 2 }),
+                ],
+            }),
+        );
+        expect(runtime.goToStep('s1')).toBe('nearest');
+        expect(runtime.currentStepKey.value).toBe('s2');
     });
 
     it('falls back to the first INCOMPLETE step for a key this version no longer has', () => {

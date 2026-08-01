@@ -140,9 +140,12 @@ describe('RuntimeSession (component wiring)', () => {
         });
         await settle();
 
-        // The welcome-back banner reports progress + the reconciliation note, and the answers are restored.
+        // The welcome-back banner confirms the restore + carries the reconciliation note, and the answers are
+        // back. Increment H21b, Doc #27 §5.2 — it no longer quotes a percentage: `completeness_percent` is
+        // coverage of the AUTHORED form and stays relevance-unaware, which makes it false for a respondent on
+        // a branch. Asserted as an absence so a re-added "%" cannot slip back in unnoticed.
         expect(wrapper.text()).toContain('Welcome back');
-        expect(wrapper.text()).toContain('64%');
+        expect(wrapper.text()).not.toContain('64%');
         expect(wrapper.text()).toContain('more recent answers saved on this device');
         expect((wrapper.find('input').element as HTMLInputElement).value).toBe('Ada');
 
@@ -661,6 +664,391 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         expect(instances[0].text()).toContain('Age of Ana');
         expect(instances[1].text()).toContain('Age of Beni');
         expect(instances[0].text()).not.toContain('Beni');
+
+        wrapper.unmount();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Increment H21b — non-linear execution, through the RENDERED DOM.
+//
+// Doc #27 §9 requires the view half explicitly: "the store and the view fail differently", and warns that the
+// empty-graph assertions in particular "pass trivially against a component that renders nothing at all". Each
+// empty-graph case therefore pairs its absences with a POSITIVE (the Submit control, by its exact label) and
+// with a non-empty control.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The single aria-live region every announcement lands in (`RuntimeShell`). */
+function announced(wrapper: ReturnType<typeof mount>): string {
+    return wrapper.find('.runtime__sr-live').text();
+}
+
+describe('RuntimeSession — the empty graph renders a terminal state (H21b §4.1)', () => {
+    /** A router form: the only section is gated on a hidden field that is never set. */
+    const emptySchema = () =>
+        schemaResponse({
+            form: { single_page_mode: false },
+            sections: [section({ key: 's1', label: 'Only section', sequence: 1, relevant_expression: "${gate} = 'go'" })],
+            fields: [
+                field({ key: 'gate', sequence: 0, field_type: 'hidden' }),
+                field({ key: 'one', section_key: 's1', label: 'Only question', sequence: 1 }),
+            ],
+        });
+
+    it('suppresses the counter, renders no section, and offers a labelled Submit', () => {
+        const wrapper = mount(RuntimeSession, { props: { schema: emptySchema(), bootstrap, client: fakeClient() } });
+
+        // 1. No "Step 1 of 0" — the whole progress nav is gone, not merely re-worded.
+        expect(wrapper.find('nav[aria-label="Form progress"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Step 1 of');
+        // 2. No section renders.
+        expect(wrapper.find('[data-section]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Only question');
+        // 3. The POSITIVE half — a terminal explanation and Submit as the single action, explicitly labelled
+        //    as submitting what has been answered. Without this the test would pass against a blank component.
+        expect(wrapper.text()).toContain('Nothing further to complete');
+        expect(wrapper.find('button[type="submit"]').text()).toBe('Submit my answers');
+        expect(wrapper.text()).not.toContain('Next');
+        expect(wrapper.text()).not.toContain('Back');
+
+        wrapper.unmount();
+    });
+
+    it('renders the ordinary step machinery as soon as one step exists (the control)', async () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: emptySchema(), bootstrap, client: fakeClient(), initialAnswers: { gate: 'go' } },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('nav[aria-label="Form progress"]').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Step 1 of 1');
+        expect(wrapper.text()).toContain('Only question');
+        expect(wrapper.find('button[type="submit"]').text()).toBe('Submit');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — predicate 3 through the DOM (H21b, Doc #27 §2.2)', () => {
+    /** A relevant section whose every field is individually gated off — the grayed-out step §3.2 rejects. */
+    const schema = () =>
+        schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2 }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', label: 'Gate', sequence: 1 }),
+                field({ key: 'inner', section_key: 's2', label: 'Inner', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+            ],
+        });
+
+    it('does not render a heading over zero questions, and does not count the step', async () => {
+        const wrapper = mount(RuntimeSession, { props: { schema: schema(), bootstrap, client: fakeClient() } });
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Step 1 of 1');
+        expect(wrapper.text()).not.toContain('Second');
+
+        wrapper.unmount();
+    });
+
+    it('renders and counts the step once one of its fields becomes relevant', async () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: schema(), bootstrap, client: fakeClient(), initialAnswers: { gate: 'go' } },
+        });
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Step 1 of 2');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — Submit is no longer a silent dead-end (H21b §5.5)', () => {
+    it('shows the off-step failure in the banner and announces the real count', async () => {
+        // The shape §5.5 says branching makes routine: an answer on the LAST step makes a field on an
+        // already-passed step relevant and required. A backward reference, entirely legal (§3.1).
+        const schema = schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2 }),
+            ],
+            fields: [
+                // An always-relevant companion, so predicate 3 does not drop step 1 outright while `detail`
+                // is gated off — that would make this a test of predicate 3 rather than of §5.5.
+                field({ key: 'always', section_key: 's1', label: 'Always here', sequence: 1 }),
+                field({
+                    key: 'detail',
+                    section_key: 's1',
+                    label: 'First answer',
+                    is_required: 'required',
+                    relevant_expression: "${trigger} = 'yes'",
+                    sequence: 2,
+                }),
+                field({ key: 'trigger', section_key: 's2', label: 'Second answer', sequence: 3 }),
+            ],
+        });
+        const client = fakeClient();
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client } });
+        await flushPromises();
+
+        // Step 1 passes: `detail` is irrelevant while `trigger` is unanswered, so nothing is required yet.
+        await wrapper.findAll('button').filter((b) => b.text() === 'Next')[0].trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Step 2 of 2');
+
+        // Answering here reaches back and makes the step-1 field relevant, required and empty.
+        await wrapper.find('input').setValue('yes');
+        await flushPromises();
+
+        await wrapper.find('form').trigger('submit');
+        await settle();
+
+        // Before H21b: `bannerItems` was step-scoped, so nothing rendered and the announcement was literally
+        // "0 fields need your attention before submitting." Submit did nothing and said nothing, permanently.
+        expect(wrapper.find('.summary-banner').exists()).toBe(true);
+        // The failing field lives on step 1 while the respondent is on step 2 — the exact case that used to
+        // render nothing at all.
+        expect(wrapper.find('.summary-banner').text()).toContain('First answer');
+        expect(announced(wrapper)).toContain('1 field needs your attention before submitting.');
+        expect(client.submit).not.toHaveBeenCalled();
+
+        // And the jump link crosses the step boundary: navigate first, then land on the field (§5.5).
+        await wrapper.find('.summary-banner__link').trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Step 1 of 2');
+
+        wrapper.unmount();
+    });
+
+    it('keeps a blocked Next scoped to the current step', async () => {
+        const schema = schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2 }),
+            ],
+            fields: [
+                field({ key: 'first', section_key: 's1', label: 'First answer', is_required: 'required', sequence: 1 }),
+                field({ key: 'second', section_key: 's2', label: 'Second answer', is_required: 'required', sequence: 2 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await flushPromises();
+
+        await wrapper.findAll('button').filter((b) => b.text() === 'Next')[0].trigger('click');
+        await flushPromises();
+
+        // Both fields are failing, but Next is a statement about THIS step: one item, not two (§5.5).
+        expect(wrapper.find('.summary-banner').text()).toContain('First answer');
+        expect(wrapper.find('.summary-banner').text()).not.toContain('Second answer');
+        expect(announced(wrapper)).toContain('1 field needs your attention before continuing.');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — a step that changes behind the respondent (H21b §3.1, §4.4)', () => {
+    it('announces the new count and does not offer a done dot for a step never seen', async () => {
+        // The gate lives on the LAST step and controls the middle one — a forward reference at authoring time
+        // and, at fill time, exactly §3.1's "a step becomes relevant behind the respondent".
+        const schema = schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+                section({ key: 's3', label: 'Third', sequence: 3 }),
+            ],
+            fields: [
+                field({ key: 'one', section_key: 's1', label: 'First answer', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', label: 'Second answer', sequence: 2 }),
+                field({ key: 'gate', section_key: 's3', label: 'Gate', sequence: 3 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await flushPromises();
+
+        await wrapper.findAll('button').filter((b) => b.text() === 'Next')[0].trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Step 2 of 2'); // on s3; s2 is hidden
+
+        await wrapper.find('input').setValue('go');
+        await flushPromises();
+
+        expect(wrapper.text()).toContain('Step 3 of 3');
+        expect(announced(wrapper)).toContain('This form now has 3 steps.');
+        // "Done" dots are buttons inside the progress nav. Only s1 has actually been visited, so exactly one
+        // is offered — `index < currentIndex` would have offered two, one of them for a step never seen.
+        expect(wrapper.findAll('nav[aria-label="Form progress"] button')).toHaveLength(1);
+
+        wrapper.unmount();
+    });
+
+    it('announces the reason when the respondent’s own step vanishes, and says where they went', async () => {
+        // s2 is gated on a field INSIDE s2, so answering it removes the step under the respondent.
+        const schema = schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2, relevant_expression: "${leave} != 'stop'" }),
+                section({ key: 's3', label: 'Third', sequence: 3 }),
+            ],
+            fields: [
+                field({ key: 'one', section_key: 's1', label: 'First answer', sequence: 1 }),
+                field({ key: 'leave', section_key: 's2', label: 'Second answer', sequence: 2 }),
+                field({ key: 'three', section_key: 's3', label: 'Third answer', sequence: 3 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, { props: { schema, bootstrap, client: fakeClient() } });
+        await flushPromises();
+
+        await wrapper.findAll('button').filter((b) => b.text() === 'Next')[0].trigger('click');
+        await flushPromises();
+        expect(wrapper.text()).toContain('Step 2 of 3');
+
+        await wrapper.find('input').setValue('stop');
+        await flushPromises();
+        await flushPromises();
+
+        // §4.2 — the rescue walks to the nearest surviving PREDECESSOR (s1), the announcement says WHY they
+        // moved rather than merely naming a destination, and the retained answer on the vanished step is
+        // acknowledged (§4.4) rather than silently dropped.
+        expect(wrapper.text()).toContain('Step 1 of 2');
+        expect(announced(wrapper)).toContain('The step you were on no longer applies');
+        expect(wrapper.find('.relevance-note').text()).toContain('Second');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — single-page section removal (H21b §4.4)', () => {
+    const schema = () =>
+        schemaResponse({
+            form: { single_page_mode: true },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', label: 'Gate', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', label: 'Second answer', sequence: 2 }),
+            ],
+        });
+
+    it('announces the removal and rescues focus to a reachable element', async () => {
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: schema(), bootstrap, client: fakeClient(), initialAnswers: { gate: 'go' } },
+            attachTo: document.body,
+        });
+        await flushPromises();
+        expect(wrapper.text()).toContain('Second answer');
+
+        // Put the caret inside the section that is about to vanish, then close its gate.
+        const inner = wrapper.findAll('input')[1];
+        inner.element.focus();
+        inner.element.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+        expect(document.activeElement).toBe(inner.element);
+
+        await wrapper.findAll('input')[0].setValue('stop');
+        await flushPromises();
+        await flushPromises();
+
+        expect(wrapper.text()).not.toContain('Second answer');
+        // An axe pass cannot catch a focus reset to <body>; assert the landing spot explicitly.
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.hasAttribute('data-section-heading')).toBe(true);
+        expect(announced(wrapper)).toContain('no longer applies');
+
+        wrapper.unmount();
+    });
+
+    it('says the retained answers are kept when the removed section held one', async () => {
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema: schema(),
+                bootstrap,
+                client: fakeClient(),
+                initialAnswers: { gate: 'go', two: 'already typed' },
+            },
+        });
+        await flushPromises();
+
+        await wrapper.findAll('input')[0].setValue('stop');
+        await flushPromises();
+        await flushPromises();
+
+        expect(wrapper.find('.relevance-note').text()).toContain('won’t be included');
+        expect(wrapper.find('.relevance-note').text()).toContain('Second');
+        expect(announced(wrapper)).toContain('saved in case');
+
+        wrapper.unmount();
+    });
+});
+
+describe('RuntimeSession — resume drift explains itself (H21b §5.3)', () => {
+    it('says the stored step no longer applies and names where the respondent landed', async () => {
+        const schema = schemaResponse({
+            form: { single_page_mode: false, save_and_resume: true },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', label: 'Gate', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', label: 'Second answer', sequence: 2 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema,
+                bootstrap,
+                client: fakeClient(),
+                initialAnswers: {},
+                // The cursor was saved on s2; the replayed answers put this respondent on a branch without it.
+                resume: { uuid: 'draft-1', locale: null, stepKey: 's2', completeness: 40, note: null },
+            },
+        });
+        await settle();
+
+        // `goToStep` used to be a guarded no-op here, so the respondent silently got step 1 under a banner
+        // claiming a percentage. A test asserting only "did not throw" would be vacuously green.
+        expect(wrapper.text()).toContain('Welcome back');
+        expect(wrapper.text()).toContain('no longer applies to your answers');
+        expect(wrapper.text()).toContain('First');
+        expect(wrapper.text()).toContain('Step 1 of 1');
+
+        wrapper.unmount();
+    });
+
+    it('says nothing extra when the stored step resolves exactly', async () => {
+        const schema = schemaResponse({
+            form: { single_page_mode: false, save_and_resume: true },
+            sections: [
+                section({ key: 's1', label: 'First', sequence: 1 }),
+                section({ key: 's2', label: 'Second', sequence: 2 }),
+            ],
+            fields: [
+                field({ key: 'one', section_key: 's1', label: 'First answer', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', label: 'Second answer', sequence: 2 }),
+            ],
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: {
+                schema,
+                bootstrap,
+                client: fakeClient(),
+                initialAnswers: {},
+                resume: { uuid: 'draft-1', locale: null, stepKey: 's2', completeness: 40, note: null },
+            },
+        });
+        await settle();
+
+        expect(wrapper.text()).toContain('Welcome back');
+        expect(wrapper.text()).not.toContain('no longer applies to your answers');
+        expect(wrapper.text()).toContain('Step 2 of 2');
 
         wrapper.unmount();
     });

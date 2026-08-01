@@ -130,3 +130,43 @@ test('Public runtime — submit reaches an accessible confirmation', async ({ pa
     await expect(page.getByText(/Reference:/)).toBeVisible();
     await assertClean(page, 'Public runtime confirmation');
 });
+
+// The branching runtime (Increment H21b, Doc #27). "Branching Router" (E2eSeeder) puts a URL-prefilled hidden
+// field in a section of its own, so predicate 2 drops that section and every remaining section is gated on it.
+// Visited bare, the entire step graph is EMPTY — §4.1's specified terminal state, which before H21b rendered
+// "Step 1 of 0" over a live Submit. Scanned in light and dark, and asserted positively (the panel + the
+// explicitly-labelled Submit) as well as negatively, because an empty-graph assertion passes trivially against
+// a page that renders nothing at all.
+for (const theme of themes) {
+    test(`Public runtime empty step graph (${theme}) — accessible terminal state`, async ({ page }) => {
+        await page.goto('/f/branching-router', { waitUntil: 'networkidle' });
+        await page
+            .getByRole('heading', { name: 'Branching Router', level: 1 })
+            .waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        await expect(page.getByRole('heading', { name: 'Nothing further to complete' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Submit my answers' })).toBeVisible();
+        await expect(page.getByRole('navigation', { name: 'Form progress' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
+
+        await assertClean(page, 'Public runtime empty step graph');
+    });
+}
+
+// The same form taken down one branch: `?role=staff` prefills the hidden gate (Increment H7), so exactly one
+// section becomes relevant and the ordinary step machinery returns — the control that stops the scan above
+// from passing against a runtime that can only ever render a terminal panel.
+test('Public runtime — a URL-prefilled gate opens exactly one branch', async ({ page }) => {
+    await page.goto('/f/branching-router?role=staff', { waitUntil: 'networkidle' });
+    await page
+        .getByRole('heading', { name: 'Branching Router', level: 1 })
+        .waitFor({ state: 'visible', timeout: 15_000 });
+
+    await expect(page.getByRole('heading', { name: 'Staff details' })).toBeVisible();
+    await expect(page.getByText('Step 1 of 1')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Nothing further to complete' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Visitor details' })).toHaveCount(0);
+
+    await assertClean(page, 'Public runtime single branch');
+});

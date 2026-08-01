@@ -17,7 +17,7 @@ import StepView from './StepView.vue';
 import WelcomeBackBanner from './WelcomeBackBanner.vue';
 import { createAnnouncer } from '../composables/useAnnouncer';
 import { createAutosave } from '../composables/useAutosave';
-import { createFormRuntime } from '../composables/useFormRuntime';
+import { createFormRuntime, type StepResolution } from '../composables/useFormRuntime';
 import { useOnline } from '../composables/useOnline';
 import {
     AnnouncerKey,
@@ -124,7 +124,10 @@ onMounted(async () => {
     // only restore the saved step (the server draft's, or the local draft's when it won the reconciliation).
     if (props.resume) {
         if (props.resume.stepKey) {
-            runtime.goToStep(props.resume.stepKey);
+            // Increment H21b, Doc #27 §5.3 — this used to be a guarded no-op, so a stored step that no longer
+            // resolved dropped the respondent on step 1 in silence. Now it reports HOW it resolved, and the
+            // welcome-back banner says so.
+            stepResolution.value = runtime.goToStep(props.resume.stepKey);
         }
         return;
     }
@@ -137,6 +140,10 @@ onMounted(async () => {
         }
     }
 });
+
+// Increment H21b — where the resume cursor landed, and the step it landed on, for the banner's explanation.
+const stepResolution = ref<StepResolution | null>(null);
+const resumeStepTitle = computed(() => runtime.currentStep.value?.title ?? null);
 
 onBeforeUnmount(() => autosave.dispose());
 
@@ -341,7 +348,12 @@ const description = computed(() => runtime.renderModel.form.description);
         :saved-at="autosave.savedAt.value"
     >
         <template #notice>
-            <WelcomeBackBanner v-if="resume" :completeness="resume.completeness" :note="resume.note" />
+            <WelcomeBackBanner
+                v-if="resume"
+                :resolution="stepResolution"
+                :step-title="resumeStepTitle"
+                :note="resume.note"
+            />
             <OfflineIndicator v-if="!online" />
             <SyncStatus v-if="!resolving" />
             <div

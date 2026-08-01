@@ -3,6 +3,7 @@ import { openDb, type MeridianDb } from '../lib/db';
 import { enqueue, type EnqueueInput } from '../lib/outbox';
 import { attachToSubmission, localMediaRefId, stash } from '../lib/media-queue';
 import { replayOutbox } from '../lib/replay';
+import { field, schemaResponse } from './fixtures';
 
 let n = 0;
 let db: MeridianDb;
@@ -23,11 +24,18 @@ function res(status: number, body: unknown, headers: Record<string, string> = {}
 interface Handlers {
     submit?: () => Response; // may throw to simulate a network failure
     attachment?: () => Response;
+    /**
+     * The version id the freshly-minted token's schema reports. Defaults to the `form_version_id` `input()`
+     * enqueues, so the ordinary cases replay unchanged; a drift test raises it (Increment H21b, Doc #27 §5.4).
+     */
+    schemaVersionId?: string;
 }
 
 function makeFetch(h: Handlers = {}) {
     const submitBodies: Array<Record<string, unknown>> = [];
+    const schemaReads: string[] = [];
     const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+        // The mint is `/f/{slug}`; the schema read is `/api/v1/public/f/{token}` — hence startsWith, not includes.
         if (url.startsWith('/f/')) {
             return res(200, { shareToken: 'tok', expiresAt: '', form: { id: 'f', title: 'T' } });
         }
@@ -40,9 +48,15 @@ function makeFetch(h: Handlers = {}) {
             }
             return h.submit ? h.submit() : res(201, { data: { id: 'srv-1', status: 'submitted' } });
         }
+        if (url.startsWith('/api/v1/public/f/')) {
+            schemaReads.push(url);
+            return res(200, {
+                data: schemaResponse({ fields: [field({ key: 'a' })], versionId: h.schemaVersionId ?? 'v1' }),
+            });
+        }
         throw new Error(`unexpected url ${url}`);
     });
-    return { fetchFn: fetchFn as unknown as typeof fetch, submitBodies };
+    return { fetchFn: fetchFn as unknown as typeof fetch, submitBodies, schemaReads };
 }
 
 function input(uuid: string, over: Partial<EnqueueInput> = {}): EnqueueInput {
@@ -106,6 +120,66 @@ describe('replayOutbox', () => {
         const { fetchFn } = makeFetch({ submit: () => res(409, errorBody('form_updated')) });
         expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1 });
         expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'form_updated' });
+    });
+
+    // ── Increment H21b, Doc #27 §5.4 — the version guard that was already sitting unused in the row ──────
+    //
+    // Replay re-mints a token before posting, and a fresh token pins the form's CURRENT published version, so
+    // the server's own guard compares that column against itself and can never fire. A submission pruned
+    // client-side against version N was validated and persisted against N+1's relevance graph, returned 201,
+    // and the row was marked `synced`: silent data loss behind a green badge.
+
+    it('parks a row captured against an older version as a conflict, and never POSTs it', async () => {
+        await enqueue(db, input('u1')); // captured at v1
+        const { fetchFn, submitBodies } = makeFetch({ schemaVersionId: 'v2' }); // the form has moved on
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1, synced: 0 });
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'form_updated' });
+        // The half that makes this non-vacuous against the 409 case above: the guard fires BEFORE the network
+        // write, so the stale answers never reach N+1's validator at all.
+        expect(submitBodies).toHaveLength(0);
+    });
+
+    it('checks the version BEFORE uploading media, so queued blobs never land under the new version', async () => {
+        vi.stubGlobal('FormData', FakeFormData);
+        await enqueue(db, input('u1', { answers: { photo: [{ id: localMediaRefId('m1') }] } }));
+        await stash(db, { attachment_local_id: 'm1', field_key: 'photo', name: 'a.jpg', type: 'image/jpeg', blob: new Blob(['x']) });
+        await attachToSubmission(db, ['m1'], 'u1');
+
+        const { fetchFn } = makeFetch({ schemaVersionId: 'v2' });
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1 });
+        // `GuestAttachmentController` carries the identical current-version guard against the same fresh
+        // token, so uploading first would have written the blobs under N+1 before the submission was parked.
+        expect(fetchFn).not.toHaveBeenCalledWith(expect.stringContaining('/attachments'), expect.anything());
+    });
+
+    it('still syncs when the captured version is the current one', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies } = makeFetch({ schemaVersionId: 'v1' });
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ synced: 1, conflict: 0 });
+        expect(submitBodies).toHaveLength(1);
+    });
+
+    it('reads the schema once per form per pass, not once per row', async () => {
+        await enqueue(db, input('u1'));
+        await enqueue(db, input('u2'));
+        const { fetchFn, schemaReads } = makeFetch();
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ synced: 2 });
+        expect(schemaReads).toHaveLength(1);
+    });
+
+    it('retries rather than dropping the row when the schema read fails transiently', async () => {
+        await enqueue(db, input('u1'));
+        const fetchFn = vi.fn(async (url: string) => {
+            if (url.startsWith('/f/')) {
+                return res(200, { shareToken: 'tok', expiresAt: '', form: { id: 'f', title: 'T' } });
+            }
+            throw new Error('offline again');
+        }) as unknown as typeof fetch;
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ retry: 1 });
+        expect((await db.outbox.get('u1'))?.status).toBe('pending');
     });
 
     it('records a content-conflict 409 code (Increment G8c)', async () => {

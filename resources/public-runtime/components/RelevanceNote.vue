@@ -3,14 +3,19 @@
  * The one-time, dismissible note shown where a field used to be when it becomes irrelevant while already
  * holding a respondent-entered value (UX §4.1). The value itself is retained in the store and restored if
  * relevance returns — this note only explains, non-blockingly, that the answer won't be submitted.
+ *
+ * Increment H21b — `text` overrides the composed field sentence so the same primitive carries Doc #27 §4.4's
+ * STEP-level twin, which needs its own wording (a whole step's answers, named by section title). Kept as one
+ * component rather than two so the markup, role and dismiss affordance cannot drift apart.
  */
-defineProps<{ label: string }>();
+const props = defineProps<{ label: string; text?: string }>();
 defineEmits<{ dismiss: [] }>();
 </script>
 
 <template>
     <div class="relevance-note" role="note">
-        <span class="relevance-note__text">
+        <span v-if="props.text" class="relevance-note__text">{{ props.text }}</span>
+        <span v-else class="relevance-note__text">
             Your answer to “{{ label }}” won’t be included because it’s no longer relevant.
         </span>
         <button type="button" class="relevance-note__dismiss" aria-label="Dismiss" @click="$emit('dismiss')">

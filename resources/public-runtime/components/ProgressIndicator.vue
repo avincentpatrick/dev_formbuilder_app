@@ -2,7 +2,15 @@
 /**
  * Multi-step progress (UX §3.2). Shows "Step X of N" + the current section title, where N is DYNAMIC — it
  * recomputes from the store's `visibleSteps` as sections become (ir)relevant, so a respondent never sees a
- * "skipped" step. Already-completed steps are clickable to revise an earlier answer.
+ * "skipped" step. Already-VISITED steps are clickable to revise an earlier answer.
+ *
+ * Increment H21b, Doc #27 §4.1 — the whole nav is suppressed at zero visible steps. Without that guard the
+ * `Math.max(index, 0)` clamp below turns `findIndex`'s -1 into 0 and prints "Step 1 of 0" over a form with
+ * nothing in it; §4.1 specifies suppression plus StepView's terminal panel instead.
+ *
+ * §3.1 — "done" comes from the store's VISITED SET, not from `index < currentIndex`. Under branching a step
+ * can become relevant BEHIND the respondent, and an index comparison would hand a step they have never seen a
+ * clickable "done" dot the moment it appeared.
  */
 import { computed } from 'vue';
 import { useRuntime } from '../composables/context';
@@ -15,14 +23,14 @@ const currentTitle = computed(() => runtime.currentStep.value?.title ?? null);
 </script>
 
 <template>
-    <nav class="progress" aria-label="Form progress">
+    <nav v-if="steps.length > 0" class="progress" aria-label="Form progress">
         <p class="progress__label">
             Step {{ currentIndex + 1 }} of {{ steps.length }}<span v-if="currentTitle">: {{ currentTitle }}</span>
         </p>
         <ol class="progress__steps">
             <li v-for="(step, index) in steps" :key="step.key" class="progress__step">
                 <button
-                    v-if="index < currentIndex"
+                    v-if="index !== currentIndex && runtime.hasVisited(step.key)"
                     type="button"
                     class="progress__dot progress__dot--done"
                     :aria-label="`Go to step ${index + 1}${step.title ? `: ${step.title}` : ''}`"

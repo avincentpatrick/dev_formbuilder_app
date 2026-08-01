@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Schema;
  * `current_step_key` (a `form_sections` key, or the synthetic lead-step sentinel) through the draft-save and
  * back on the resume-read, so a resumed session lands where the respondent left off.
  *
- * Single-page forms never set it (there are no steps) and leave it null. No RLS re-emit: `submissions` already
+ * Single-page forms DO set it, contrary to this docblock's original claim (corrected in Increment H21b, Doc #27
+ * §5.3): the SPA seeds `currentStepKey` from the first visible step in both presentation modes and sends the
+ * column unconditionally. It is simply unused on resume there. No RLS re-emit: `submissions` already
  * carries strict RLS and policies are row predicates — the same reasoning as 2026_07_23_000006. Alter-only, so
  * the migration linter skips it.
  */

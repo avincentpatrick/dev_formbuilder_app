@@ -1,13 +1,15 @@
 # Workflow Branching & Step-Graph Design Doc
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
-**Status:** **v1.3 — the design entry for H21a/H21b/H21c → H21d.** Ratifies the step model that already exists as an emergent property of the guest runtime, pins the four behaviours it leaves undefined (the empty graph, the reappearing step, resume drift, and "% of what"), and sets the publish-gate posture. Records nine defects found while writing it and assigns each to an H21 slice; fixed none, because that increment was docs-only. **All nine are now closed — the last of them by H21c.**
+**Status:** **v1.4 — the design entry for H21a/H21b/H21c/H21d1 → H21d2.** Ratifies the step model that already exists as an emergent property of the guest runtime, pins the four behaviours it leaves undefined (the empty graph, the reappearing step, resume drift, and "% of what"), and sets the publish-gate posture. Records nine defects found while writing it and assigns each to an H21 slice; fixed none, because that increment was docs-only. **All nine are now closed — the last of them by H21c.**
 
 > **A count corrected, because it was checkable.** v1.2 claimed all nine were closed by H21a and H21b. Eight were. The ninth is §7's — the encode path accepting a keyer's answers, pruning them at Stage 3 and reporting `'Submission recorded.'` — and it was still live at `app/Http/Controllers/Tenant/SubmissionController.php:42`, a bare `$pipeline->submit(...)` with its `SubmissionResult` discarded, when H21c opened. It was always assigned to H21c (H1f's own defect table), so the assignment was right and only the tally was wrong. H21c closes it.
 
 **v1.1 (H21a as-built) carries amendments A1–A7**, each recorded inline beside the clause it corrects rather than collected at the end, following Doc #26's house form. Two of them (**A1**, **A7**) correct statements this document made that turned out to be false; the rest record where the implementation had to go further than the design said.
 
 **v1.2 (H21b as-built) carries amendments B1–B7**, same house form. H21b took the whole §9 obligation rather than only the five defects, so §4.2, §5.2, §5.3 and §4.4's step-level notice ship with it and **H21c inherits nothing from H1f but its own defect (b)**. That widened the increment past the H-map's `ui, M` to **M/L**, recorded here rather than hidden, on the H6b/H21a precedent. One amendment (**B2**) corrects a specification this document got wrong, and one (**B6**) records a narrowing accepted with the user rather than designed around.
+
+**v1.4 (H21d1 as-built) carries amendments D1–D5**, same house form. H21d is the H-map's only **XL** row and was split by H1f into **H21d1** (the read-derived canvas, which writes nothing) and **H21d2** (the condition editor, which owns the write path and must ship the serializer §8 says does not exist); **only H21d1 ships in v1.4**, and every §8 obligation belonging to the editor is left standing rather than quietly narrowed. D1 records where the canvas lives and why the rail is derived client-side while the graph analysis stays on the server. D2 records the classifier that decides which conditions can be read in plain English — the predicate H21d2 inverts into "representable", so it is built once rather than twice. **D3 records a live defect this increment had to fix on its way in**, because H21d1 is the first caller to run `StepGraphInspector` against an unvalidated draft and only one of its three checks was safe there. D4 corrects a claim in this document's own §6. D5 records the two failures the gates caught late — one of them a real dark-mode contrast violation in new copy, the other an undefined design token that the known full-suite flake would have hidden.
 
 **v1.3 (H21c as-built) carries amendments C1–C5**, same house form. C1 records that the Inertia app's "client relevance engine it has never had" did not need writing — `createFormRuntime()` was already pure enough to import — which is why §7's `full-stack, M` resized to **L** in scope and not in code volume. C2 and C3 record two decisions locked with the user before any of it was written: the keyable-hidden asymmetry resolved outside the step list, and a Next that never blocks. C4 records why the parity suite asserts the two channels' INPUT rather than running one projection twice and calling the comparison a cross-channel test. **C5 records three defects an adversarial pre-merge review found**, each a consequence of C1's own decision rather than a slip — and the methodological note that the first regression test written for one of them passed against the broken code.
 **Phase**: 3, per `docs/PRD.md`'s roadmap — the design row the PRD calls the "visual multi-step logic/workflow builder" (`docs/PRD.md:405`, `:461`).
@@ -247,6 +249,45 @@ Nothing, and that is itself the finding worth recording. H12a's grace window pro
 >
 > **Where they are computed:** in `FormPublishController::store()` **after** `publish()` returns, not inside `PublishService`. That keeps the service's contract binary, leaves `FormVersionApiController` untouched (so `openapi.json` stays drift-free), and means an exception from the real gates can never reach the inspector. Delivery is a new `flash.publishWarnings` list rendered as a dismissible banner on the builder — deliberately not a reuse of `flash.xlsformWarnings`, whose banner copy is hard-coded "Imported with N warning(s)" — plus the count folded into the toast, because publish is reachable from TWO pages and `back()` returns to whichever called it while only the builder renders a banner.
 
+> **Amendment D3 (H21d1, as-built) — the notices got a SECOND caller, and it found a live defect in the first.**
+>
+> H21d1's canvas reuses these three checks against a **draft**, which this document specified and which
+> `StepGraphInspector`'s own docblock anticipated — but only in one of the three checks. `referencesIn()`
+> catches `Throwable` with a comment naming H21d1 as the reason; **`emptyAtOpen()` did not**, and it reaches
+> the parser by a longer road: `SemanticValidator::validate()` → `evaluateRelevance()` →
+> `ExpressionEvaluator::evaluateBoolean()` → `ExpressionParser::parse()`, which raises
+> `ExpressionSyntaxException` on malformed input. On the publish path that is **unreachable** —
+> `ExpressionValidationGate` runs inside `publish()` and refuses first — which is why it never fired in H21a
+> and why no test caught it. Against a draft it is the **ordinary** case: a half-typed condition is what an
+> author has most of the time, and an uncaught throw 500s the builder's sidecar.
+>
+> Fixed by catching `ExpressionException` (the abstract base, so syntax *and* evaluation failures) around the
+> whole evaluation rather than one arm — **both settle loops can raise it**, because sections are swept
+> separately from fields, and a guard over only the first would still let a field-level expression through.
+> A graph that cannot be evaluated yields **no** empty-at-open notice: "empty at open" is a claim about what
+> a respondent would see, and nobody sees anything through an expression that does not parse. The truer thing
+> to say about that node is the syntax error, and the canvas says it client-side, between keystrokes.
+>
+> Both regression tests were **run against the unfixed code first** and both threw the predicted exception —
+> the H21c standing lesson, applied to a defect found while planning rather than while reviewing.
+>
+> **The notices are now addressable.** `notices()` returns `GraphNotice` records naming the nodes each is
+> about, and `warnings()` is the flash-shaped grouping wrapper over it, reproducing H21a's three sentences
+> byte-for-byte (now pinned in FULL, not by needle — the H21a tests assert with `toContain`, which cannot see
+> a dropped clause). The record carries **two** strings, and that is the design rather than a convenience:
+> the banner wants one line per kind joining every instance, because it appears once above a page the author
+> is leaving; the canvas wants each instance under the node it names. The cycle case proves one string cannot
+> be both — its joining fragment is `“a” ⇄ “b”`, which reads as nothing on its own.
+
+> **Amendment D4 (H21d1, as-built) — a correction to this section's own framing.** §6 says the checks are
+> "publish-time", and as of H21d1 that is no longer true: the same three run on demand against the draft,
+> which is the point of the canvas — an author meets them while there is still something to do about it,
+> rather than in a banner after a publish that has already succeeded. The **posture** is unchanged and is
+> what the section is really about: they are still warnings, never refusals, and nothing about H21d1 makes
+> any of them bite. A **fourth** notice kind — a per-node *syntax error* — exists only on the canvas and only
+> client-side, and it is deliberately not in `GraphNoticeKind`: server-side, an unparseable expression is
+> simply the publish gate's refusal, said by a different class at a different time.
+
 **The retro-gate argument, stated once and referenced from §3.1, §3.2, §3.3 and §4.1.** Every one of these checks would run at `PublishService.php:62-64` against the **draft**, and step 9 of `publish()` clones the just-published structure forward into a new draft. So any form already live with a cycle, a forward reference or a `count(${section})` condition could never be republished — its author locked out of editing a live form for a property that was legal when they published it. That is the shape H5c had to answer for entitlements, and its answer was to grandfather indefinitely with zero merge-day regression. The seam for doing the same here already exists and was built for exactly this purpose: `TemplateValidationGate::confirmationMessageViolations()` is the **returning, non-throwing twin** of its throwing check, added by H6a's amendment A3 so a caller can warn instead of refuse. H21a follows that shape. Where a check must eventually bite, the rule is: **warn when the currently-published version already violates it; refuse only a violation introduced in the draft** — and even that is deferred out of H21 (§10).
 
 **What is deliberately not checked.** Unreachable sections (a constant-false relevance) — cheap but heuristic, and a heuristic that fires on a deliberately-parked section is a warning nobody will read twice. And the asymmetry between the two reference media stands: piping is strictly positional and refuses; relevance is positionally free and warns. §3.1 gives the reason; this document **ratifies the asymmetry rather than removing it**.
@@ -292,6 +333,73 @@ Nothing, and that is itself the finding worth recording. H12a's grace window pro
 **The canvas draws a rail with predicates, not a flow chart.** §2 leaves nothing else to draw: nodes are sections in `sequence` order, the edges between them are implied by that order and are not editable, and the only editable object is a predicate hanging off a node (a section's `relevant_expression`) or off a field inside it. An author who expects to drag an arrow from section 3 to section 7 will not find one, and H21d must be designed to say so rather than to imply otherwise.
 
 **H21d1 (canvas) is read-derived and writes nothing.** It parses the existing `relevant_expression` strings and renders the rail, the per-node predicates and the inline graph warnings from §6. It is, in effect, the "logic testing / preview / logic-map tool" the backlog has carried since Phase 2, and it discharges most of that row.
+
+> **Amendment D1 (H21d1, as-built) — where it lives, and the one architectural decision worth stating twice.**
+>
+> **It is a second view of the builder's centre pane**, not a page. An `MdsSegmentedControl` swaps
+> `BuilderCanvas.vue` for `LogicRail.vue`; both stay mounted, both read the same `useBuilderStore`, and
+> selecting a node on the rail drives the same `ConfigPanel` the Structure view does — so an author reads the
+> map and edits in place rather than moving between two editors that would each need their own copy of the
+> draft. No new page, no route for the view, no `BuilderPresenter` change, and the existing ≤1024px pane
+> linearization is inherited rather than re-solved.
+>
+> **THE RAIL IS CLIENT-DERIVED AND LIVE; THE GRAPH ANALYSIS IS SERVER-DERIVED AND FLUSH-SCOPED.** Two sources,
+> one fact each:
+>
+> - *Client, live* — node order, each raw predicate, its plain-English reading, its `${key}` chips and its
+>   syntax-error state, parsed with the TypeScript `ExpressionParser` off the engine barrel. An author must
+>   see the rail change as they type; a round-trip per keystroke is the wrong shape for any of it.
+> - *Server, flush-scoped* — the three §6 notices, over a read-only `GET /forms/{form}/graph` sidecar on the
+>   ScopeNode `impact`/`grants` precedent, refetched after `store.whenIdle()` settles and debounced. A forward
+>   reference, a cycle and an empty-at-open form are facts about the WHOLE graph; none can be decided from the
+>   node being edited.
+>
+> **Mirroring `StepGraphInspector` in TypeScript was rejected**: it would be a sixth R3-style mirror pair with
+> no corpus standing over it — the hazard §9 and amendment A6 argue at length. The price is that the notices
+> lag the rail by one save, and that price is **shown** (a "rechecking" line, and a failed check that says so)
+> rather than hidden, because a stale clean bill of health that looks current is the failure worth avoiding.
+> The refetch is gated on `whenIdle()` and not on a timer for the same reason: the endpoint reads the
+> persisted draft, so a fetch that overtakes an in-flight PATCH reports notices about text the author has
+> already changed. It is also keyed on a **logic fingerprint** (keys, sequences, containment, expressions) and
+> not on the whole store — a label edit cannot create or clear a cycle, and re-asking on every character typed
+> into a placeholder would be a request per keystroke for an answer that cannot have moved.
+>
+> **The `${key}` chips are a display affordance, not an authority.** The client collects references by walking
+> its own parsed AST. That resembles `ExpressionParser::referencedKeys()` and is deliberately **not** its
+> twin: nothing behavioural rests on it, and whether a reference resolves is still decided by
+> `ExpressionValidationGate`, at publish, in PHP. Recorded here so a later reader does not count it as an R3
+> pair and go looking for the vectors that would pin it.
+>
+> **One static fact from the step model is carried onto the rail**, because an author will otherwise find the
+> absence baffling: a section whose every field satisfies `rendersNothing()` can never be a step at all
+> (§2.2's predicate 2), and no condition they write will change that. It is H21c's keyer-only "Reference
+> fields" block seen from the authoring side, and the set is imported from `engine/field-roles.ts` rather than
+> hand-copied. What the rail does **not** carry is the taken path: it is not built on `StepProjection` /
+> `visibleSteps`, because there are no answers when an author is editing a form. A simulator is the residue
+> `docs/feature-backlog.md` keeps after this increment.
+
+> **Amendment D2 (H21d1, as-built) — the reading, and why the classifier belongs to H21d2.**
+>
+> Each node shows its `relevant_expression` **verbatim** and, where the shape can be expressed in full, a
+> sentence beside it ("Shown when *Your age* is more than 18"). There is no partial reading and no
+> "…and 2 more conditions": one operand this module cannot express makes the WHOLE reading opaque, and the
+> author gets their own text back unannotated. Grouping is preserved rather than flattened — `(A or B) and C`
+> and `A or (B and C)` are different conditions, and rendering both as "A or B and C" would be a confident
+> wrong answer about a form that decides who is asked what.
+>
+> The describable set is small and closed by decision: a comparison of bare references and literals,
+> `selected()` and its `not()` negation, `count(${section})` against a number literal, and `and`/`or` chains
+> of those at any depth. Arithmetic, `if()`, `int()`, the clock functions and a `not()` over a whole chain are
+> **opaque**, each because its reading would be either wrong or longer than the expression it explains.
+> `${key} = ''` reads as "is blank", tested on the AST node rather than on the rendered string.
+>
+> **This is the predicate H21d2 needs, one increment early and in its harmless direction.** The editor must
+> render anything it cannot represent read-only and never rewrite it, which requires a "can this shape be
+> represented?" test; `status: 'opaque'` here becomes `read-only` there. Building the classification twice —
+> once for prose, once for editing — is exactly how the two would come to disagree about which expressions are
+> safe to touch. And nothing here **prints** an expression: prose is not syntax and cannot be fed back to a
+> parser, which is why it is safe to run over text that will never be rewritten. The AST→text printer H21d2
+> owes still does not exist.
 
 **H21d2 (condition editor) owns the write path, and it has no printer to reuse.** `relevant_expression` is a `text` column, frozen into the snapshot as a **string**, and re-parsed at publish — and **there is no AST→expression-string printer anywhere in this repository** (verified: every occurrence of `unparse`, `toExpressionString`, `printAst` or `astToString` in the tree is the word "unparseable" in an unrelated docblock). The H-map's line for this row — "emit ASTs via `StructuredRuleLowering`" — **is not implementable as written**: that class lowers structured `form_field_validations` rows into the AST the evaluator consumes, one-directionally, and never touches relevance at all. So H21d2 must choose:
 
@@ -341,6 +449,15 @@ H21d also inherits two existing contracts it must not break: `builderClient`'s t
 >
 > The client half is `resources/js/Pages/submissions/encode.test.ts` (16 cases). It is **not** a fourth driver of the fixture, for C4's reason; what is new on that side is the JOIN — the store's step list against `blocks`, and against H7's keyable-hidden rows, which the step list deliberately does not contain. Five mutations, each reddening a distinct set; the field-level relevance case was added *because* the section-level one passed against a page that only filtered steps. The e2e half is two new `Branching Router` encode journeys in `responsive-axe.spec.ts` — the terminal state and one routed branch, light + dark, three viewports — which are the only encode scans that see the stepped flow, `Clinic Intake` projecting to a single step and `Household Roster` being `single_page_mode: true`.
 - **H21d** — if the serializer ships, a round-trip test over every condition shape the editor can author, plus an explicit test that a non-representable expression is rendered **read-only and never rewritten**; a `builderClient` 409 test on the new write path; and axe plus keyboard traversal at 375 px. The responsive-overflow lesson applies pre-emptively: a non-wrapping flex row or an `overflow` container in a shared primitive has reddened the a11y gate three times (H12b, H14, H15b), and a canvas is the largest such surface yet built.
+> **Amendment D5 (H21d1, as-built) — the half of that obligation this increment owes, discharged; the other half still stands.** H21d1 writes nothing, so the serializer round-trip and the `builderClient` 409 test belong to **H21d2** and are not narrowed here. What H21d1 owed is axe plus keyboard traversal at 375 px, and the read-derived guarantees underneath it.
+>
+> The suites are `resources/js/components/builder/condition-describer.test.ts` (every describable shape → its sentence; every non-describable one → `opaque` with the raw text preserved byte-identically; malformed → `invalid` carrying the engine's own slug), `logic-rail.test.ts` (the projection: authored order, the dropped-when-empty lead bucket, only predicate-carrying fields listed, notice attachment by key including a cycle under every member, and a notice naming a node that no longer exists ignored quietly), `LogicRail.test.ts` (the same shapes through the rendered DOM, plus the fetch driver: it waits for `whenIdle()`, re-asks on a changed condition and on a re-order but NOT on a changed label, does not ask at all while the view is closed, and says the check FAILED rather than showing a clean form), and on the server `BuilderGraphSidecarTest.php` + the extended `StepGraphInspectorTest.php`.
+>
+> The sidecar suite's load-bearing case is the anti-vacuity one: it publishes a **clean** form and dirties only the draft `publish()` step 9 clones forward, so an implementation reading `currentPublishedVersion` passes every other test in the file and fails that one.
+>
+> **The e2e half is a seeded `Logic Notices Demo` draft** carrying every state the rail can draw at once — a described condition, an opaque one (arithmetic), an invalid one at FIELD level, a forward reference that only the server can find, and a section holding only `hidden`/`calculated` fields — so one scan is worth six. `builder-axe` drives the toggle, waits for the server notice, asserts each reading state and then traverses the rail by keyboard into the config panel; `responsive-axe` scans it at all three viewports in light and dark. Twelve scans, all green.
+>
+> **Two gate findings worth carrying, both caught late and both real.** (a) `.rail__summary--invalid` used `--mds-color-danger-text`, which is `danger-300` in dark — **4.22:1** on `bg-surface` at 13 px, a genuine `color-contrast` violation the dark scan caught; the `status-*-fg` family is the on-surface pair (8.43:1 light, 6.39:1 dark) and is what the scale is for. (b) **CI found a third and a fourth, and between them they corrected a standing lesson.** The harness first: `builder-axe.spec.ts` carried its own copy of `forceTheme` that skipped the shared helper's `emulateMedia({ reducedMotion: 'reduce' })`: `builder-axe.spec.ts` carried its own copy of `forceTheme` that skipped the shared helper's `emulateMedia({ reducedMotion: 'reduce' })`, so axe could sample an element MID theme-flip — the `Structure ⇄ Logic` label measured **1.82:1** (the LIGHT foreground on the DARK surface) where the settled node measures **6.96:1**. H21d1's toggle is the first always-mounted transitioning element in the builder's chrome, so it made a latent race reproducible; the race was never its own. The spec now uses the shared helper — **a dark-mode contrast failure naming a foreground colour from the LIGHT palette is a transition race, not a palette defect**. Fixing it then exposed the fourth, which was a genuine one and had been hiding behind it: `--mds-color-action-primary-bg-hover` was `primary-400` (**3.96:1** against the white `text-on-primary`) and `-bg-active` was `primary-300` (**2.52:1**), because the dark theme LIGHTENED the primary fill on hover — the opposite of what a white-on-fill control needs, and the opposite of what the light theme does. The teal accent had carried per-token verification in a comment since G11; the default accent never did. Both now darken (9.14:1 / 13.00:1) and a **test** guards every primary fill in every dark block, because a comment is not a guard. **This also corrects `PROGRESS.md`'s standing gotcha**, which had recorded the same failure as "a local-environment divergence in the rendered dark palette" to be distrusted: it was two real defects stacked, and with both fixed `builder-axe` is 10/10 locally in dark. A reproducible local a11y failure is evidence, not noise — reproducing it on `main` proves it is not the branch's, not that it is not real. (c) A `var(--mds-type-body-font-size)` reference that does not exist was reported by `token-references` — **which fails as a timeout in the full Vitest run**, the known flake PROGRESS.md records, so it was only visible when the suite was re-run in isolation. That is the whole reason the standing practice says to re-run it there rather than waving the flake through: a dangling token with no fallback makes the whole declaration invalid, and the element then scales by inheritance under `[data-font-size]`.
 
 **PR note.** `gitleaks` scans the whole tree on every CI run, so no fixture or example may resemble a credential — keep them markup and formulae, never token-shaped strings.
 

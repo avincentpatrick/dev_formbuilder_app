@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { forceTheme } from './support/axe';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
 // surface. Unlike the goto-only responsive-axe spec, this DRIVES the builder's real interactive states:
@@ -10,12 +11,14 @@ import AxeBuilder from '@axe-core/playwright';
 
 const themes = ['light', 'dark'] as const;
 
-async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-    await page.evaluate((t) => {
-        if (t === 'dark') document.documentElement.setAttribute('data-theme-mode', 'dark');
-        else document.documentElement.removeAttribute('data-theme-mode');
-    }, theme);
-}
+// `forceTheme` is the SHARED helper (tests/e2e/support/axe.ts), not a local copy — corrected in H21d1.
+// This file had carried its own, and the difference was the whole failure: the shared one emulates
+// reduced motion first, which collapses the design system's durations to 1ms centrally, and without that
+// axe can sample an element MID theme-flip. A `color`-transitioned label inside a container whose
+// `background-color` is not transitioned reads as the LIGHT foreground on the DARK surface — 1.82:1, a
+// serious `color-contrast` violation that vanishes the moment the transition settles (the same node
+// measures 6.96:1). H21d1's `Structure ⇄ Logic` control is the first always-mounted transitioning element
+// in the builder's chrome, so it made a latent race in this file reproducible; the race was never its own.
 
 async function scan(page: Page, label: string): Promise<void> {
     const overflows = await page.evaluate(
@@ -123,5 +126,46 @@ for (const theme of themes) {
             await fieldTabs.nth(i).click();
             await scan(page, `geo demo tab ${i}`);
         }
+    });
+
+    // The LOGIC view (Increment H21d1) — the builder's second centre-pane view, and the largest read-only
+    // surface in the app. `Logic Notices Demo` is seeded to carry every state the rail can draw at once: a
+    // described condition, an opaque one, an invalid one, a forward-reference notice from the server, and a
+    // section that can never be a step. Doc #27 §9 makes axe + keyboard traversal at 375px this row's
+    // obligation, and the responsive-overflow lesson (H12b/H14/H15b) applies to it pre-emptively — hence the
+    // `scan()` helper's own horizontal-overflow assertion at all three viewports.
+    test(`Builder — logic view (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Logic Notices Demo');
+        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+
+        await page.locator('.builder__centre-tabs').getByText('Logic').click();
+
+        // Wait for the server-derived notices to land, so the scan sees the rail in its FULL state rather
+        // than mid-check — the forward reference is the one thing on this page the client cannot derive.
+        await expect(page.getByText(/comes later in the form/)).toBeVisible({ timeout: 15_000 });
+
+        // Every reading state is on screen at once, which is what makes one scan worth six.
+        await expect(page.getByText('Shown when Your age is more than 18.')).toBeVisible();
+        await expect(page.getByText(/can’t be read/)).toBeVisible();
+        await expect(page.getByText(/Nobody filling the form sees this section/)).toBeVisible();
+
+        await scan(page, 'builder logic view');
+
+        // Keyboard traversal: every node heading is reachable, and activating one drives the SAME config
+        // panel the Structure view does — the property that keeps this a read-only view rather than a
+        // second editor.
+        const headings = page.locator('button.rail__head');
+        expect(await headings.count()).toBeGreaterThan(1);
+        await headings.first().focus();
+        await expect(headings.first()).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(page.locator('button.rail__head').first()).toHaveAttribute('aria-pressed', 'true');
+        await scan(page, 'logic view after selection');
+
+        // …and back, with the structure canvas intact.
+        await page.locator('.builder__centre-tabs').getByText('Structure').click();
+        await expect(page.locator('.canvas').first()).toBeVisible();
+        await scan(page, 'back to structure');
     });
 }

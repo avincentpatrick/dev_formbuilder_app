@@ -105,6 +105,81 @@ describe('teal accent', () => {
     });
 });
 
+/**
+ * Increment H21d1 — the guard that would have caught a real WCAG 1.4.3 failure sitting in this file.
+ *
+ * Every primary-action FILL carries `--mds-color-text-on-primary` (white in dark) on top of it, so its
+ * contrast is a property of the token, not of any one component. The dark block lightened on hover and
+ * active — primary-400 at 3.96:1 and primary-300 at 2.52:1 against white — which is the opposite of what a
+ * dark ground needs and the opposite of what the light block does. It survived because nothing checked:
+ * the teal accent had per-token verification in a comment, the default accent had none, and a transition
+ * race in `builder-axe`'s local `forceTheme` meant axe was sampling those buttons mid-flip rather than
+ * settled. A comment is not a guard, which is why this is a test.
+ */
+describe('primary-action fills carry their own text', () => {
+    /** #RRGGBB → relative luminance (WCAG 2.x). */
+    function luminance(hex: string): number {
+        const channel = (v: number): number => {
+            const c = v / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        };
+        const n = hex.replace('#', '');
+        const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    }
+
+    function contrast(a: string, b: string): number {
+        const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (hi + 0.05) / (lo + 0.05);
+    }
+
+    /** `var(--mds-primary-600)` → the hex primitive.json defines for it. */
+    function resolve(declaration: string): string | null {
+        const ref = declaration.match(/var\(--mds-([a-z-]+?)-(\d+)\)/);
+        if (!ref) return null;
+        const [, scale, step] = ref;
+        const family = scale === 'accent-teal' ? primitives['accent-teal'] : primitives[scale];
+
+        return family?.[step]?.value ?? null;
+    }
+
+    const DARK_BLOCKS = [
+        `:root\\[data-theme-mode='dark'\\]`,
+        `:root:not\\(\\[data-theme-mode='light'\\]\\):not\\(\\[data-theme-mode='dark'\\]\\)`,
+    ];
+
+    it.each(DARK_BLOCKS)('keeps white legible on every primary fill in %s', (selector) => {
+        const declarations = block(selector).filter((d) =>
+            d.startsWith('--mds-color-action-primary-bg'),
+        );
+
+        // Anti-vacuity: a selector typo or a renamed token would otherwise assert over an empty list.
+        expect(declarations.length).toBeGreaterThanOrEqual(3);
+
+        for (const declaration of declarations) {
+            const fill = resolve(declaration);
+            expect(fill, `${declaration} does not resolve to a primitive`).not.toBeNull();
+            expect(
+                contrast('#ffffff', fill!),
+                `${declaration} → ${fill} is below 4.5:1 against white`,
+            ).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+
+    it('pins the dark accent fills too, which is where the verification already existed', () => {
+        const teal = block(`:root\\[data-accent='teal'\\]`).filter((d) =>
+            d.startsWith('--mds-color-action-primary-bg'),
+        );
+        expect(teal.length).toBeGreaterThanOrEqual(3);
+
+        for (const declaration of teal) {
+            const fill = resolve(declaration);
+            if (fill === null) continue; // an alias to a private custom is covered by the dark block above
+            expect(contrast('#ffffff', fill), `${declaration} → ${fill}`).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+});
+
 describe('dyslexia font', () => {
     it('re-points only the body family alias, never display or mono', () => {
         const rule = block(`:root\\[data-dyslexia-font='true'\\]`);

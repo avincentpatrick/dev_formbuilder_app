@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
+use App\Enums\GraphNoticeKind;
 use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Tenant;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Forms\StepGraphInspector;
+use App\Support\Forms\GraphNotice;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -65,6 +67,20 @@ function inspectorPublish(object $test, Closure $author): FormVersion
     expect($published->status)->toBe(FormVersionStatus::Published);
 
     return $published;
+}
+
+/**
+ * Author a draft and return it WITHOUT publishing — the H21d1 shape. Everything above runs against a
+ * published version, where `ExpressionValidationGate` has already refused anything that does not parse; a
+ * draft carries whatever the author has typed so far, which is the state this class must now survive.
+ */
+function inspectorDraft(object $test, Closure $author): FormVersion
+{
+    $form = $test->forms->create($test->tenant, $test->user, 'Survey');
+    $draft = $form->draftVersion;
+    $author($draft, $test->user);
+
+    return $draft->refresh();
 }
 
 it('says nothing about a form whose conditions are all straightforward', function (): void {
@@ -203,4 +219,161 @@ it('does not call an H7 router form empty, because its entry condition is prefil
     $warnings = $this->inspector->warnings($version);
 
     expect(array_values(array_filter($warnings, fn (string $w): bool => str_contains($w, 'shows no questions at all'))))->toBe([]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| H21d1 — the same class, now run against an UNVALIDATED DRAFT.
+|--------------------------------------------------------------------------
+| The canvas reuses these notices while the author is still typing, so for the first time this class sees
+| expressions that `ExpressionValidationGate` has never approved. `referencesIn()` already caught that (its
+| docblock names H21d1 as the reason); `emptyAtOpen()` did not, and it reaches the parser through
+| SemanticValidator → ExpressionEvaluator::evaluateBoolean() → ExpressionParser::parse(), which THROWS.
+*/
+
+it('survives a draft whose condition does not parse, instead of throwing', function (): void {
+    $draft = inspectorDraft($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'gated', 1, ['relevant_expression' => '${gate} = = \'yes\'']);
+        addFormField($draft, $user, 'gate', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+    });
+
+    // The contract is only that it comes back with something sayable. WHICH notices fire on a graph that
+    // cannot be evaluated is not the point — the point is that a half-typed condition does not 500 the
+    // builder, and the per-node syntax error is reported client-side, live, where the author is looking.
+    expect($this->inspector->warnings($draft))->toBeArray();
+});
+
+it('keeps the three flash sentences byte-identical through the H21d1 restructure', function (): void {
+    // `warnings()` stopped building its strings directly in H21d1 and became a grouping wrapper over
+    // `notices()`. These are the sentences H21a shipped, pinned in FULL rather than by needle — the
+    // existing tests above assert with `toContain`, which would not notice a dropped clause. (And Pest's
+    // `toContain` takes VARARGS NEEDLES, so a second argument is a second needle, not a failure message —
+    // the H17 lesson that turned a passing assertion into a vacuous one.)
+    $forward = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'early', 1, ['relevant_expression' => '${answered_later} = \'yes\'']);
+        $s2 = inspectorSection($draft->id, 'late', 2);
+        addFormField($draft, $user, 'early_field', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+        addFormField($draft, $user, 'answered_later', FieldType::ShortText, 2, ['form_section_id' => $s2->id]);
+    });
+
+    expect($this->inspector->warnings($forward))->toBe([
+        'Forward reference: “early” depends on “answered_later”, which comes later in the form. '
+        .'That condition stays false until the respondent reaches the later question.',
+    ]);
+
+    $cycle = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'first', 1);
+        $s2 = inspectorSection($draft->id, 'second', 2, ['relevant_expression' => '${later} = \'x\'']);
+        addFormField($draft, $user, 'here', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+        addFormField($draft, $user, 'later', FieldType::ShortText, 2, [
+            'form_section_id' => $s2->id,
+            'relevant_expression' => '${here} = \'y\'',
+        ]);
+    });
+
+    expect($this->inspector->warnings($cycle))->toBe([
+        'Circular condition: “second” ⇄ “later”. '
+        .'These conditions depend on each other, so the result depends on the order they settle in.',
+    ]);
+
+    $empty = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'gated', 1, ['relevant_expression' => '${gate} = \'yes\'']);
+        addFormField($draft, $user, 'gate', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+    });
+
+    // TWO lines, and the assertion is written as an exact array precisely because of the second one: this
+    // fixture — the one §4.1 uses — is ALSO a containment cycle (the section is gated on a field it holds),
+    // which the existing needle-based test above could not see. It also pins the BANNER ORDER, which
+    // `warnings()` now sets from an explicit list rather than from the order the enum's cases are declared.
+    expect($this->inspector->warnings($empty))->toBe([
+        'This form shows no questions at all until something is answered, so a respondent opening it sees an empty form.',
+        'Circular condition: “gated” ⇄ “gate”. '
+        .'These conditions depend on each other, so the result depends on the order they settle in.',
+    ]);
+});
+
+it('joins several forward references into ONE banner line, but keeps them separate as notices', function (): void {
+    // The reason `GraphNotice` carries two strings. Three forward references are one banner line — it
+    // appears once, above a page the author is leaving — and three notices, because on the canvas each one
+    // hangs under a different node.
+    $version = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'one', 1, ['relevant_expression' => '${late_a} = \'y\'']);
+        $s2 = inspectorSection($draft->id, 'two', 2, ['relevant_expression' => '${late_b} = \'y\'']);
+        $s3 = inspectorSection($draft->id, 'three', 3);
+        addFormField($draft, $user, 'anchor', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+        addFormField($draft, $user, 'filler', FieldType::ShortText, 2, ['form_section_id' => $s2->id]);
+        addFormField($draft, $user, 'late_a', FieldType::ShortText, 3, ['form_section_id' => $s3->id]);
+        addFormField($draft, $user, 'late_b', FieldType::ShortText, 4, ['form_section_id' => $s3->id]);
+    });
+
+    $forward = array_values(array_filter(
+        $this->inspector->notices($version),
+        fn (GraphNotice $n): bool => $n->kind === GraphNoticeKind::ForwardReference,
+    ));
+
+    expect($forward)->toHaveCount(2);
+    expect($forward[0]->nodes)->toBe(['one', 'late_a']);
+    expect($forward[1]->nodes)->toBe(['two', 'late_b']);
+
+    // …and exactly one banner line carrying both.
+    $banner = array_values(array_filter(
+        $this->inspector->warnings($version),
+        fn (string $w): bool => str_starts_with($w, 'Forward reference'),
+    ));
+    expect($banner)->toHaveCount(1);
+    expect($banner[0])->toContain('“one” depends on “late_a”');
+    expect($banner[0])->toContain('“two” depends on “late_b”');
+});
+
+it('names EVERY member of a cycle, not just the one the walk entered it from', function (): void {
+    // A cycle is a property of the SET. An author standing on either member needs to be told, so the canvas
+    // needs both keys — and a notice that named only the entry point would attach to one node and leave its
+    // partner looking innocent.
+    $version = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'alpha', 1, ['relevant_expression' => '${y} = \'1\'']);
+        $s2 = inspectorSection($draft->id, 'beta', 2, ['relevant_expression' => '${x} = \'1\'']);
+        addFormField($draft, $user, 'x', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+        addFormField($draft, $user, 'y', FieldType::ShortText, 2, ['form_section_id' => $s2->id]);
+    });
+
+    $cycles = array_values(array_filter(
+        $this->inspector->notices($version),
+        fn (GraphNotice $n): bool => $n->kind === GraphNoticeKind::Cycle,
+    ));
+
+    expect($cycles)->not->toBeEmpty();
+    expect(count($cycles[0]->nodes))->toBeGreaterThan(1);
+});
+
+it('gives the empty-at-open notice NO node, because emptiness belongs to the graph', function (): void {
+    $version = inspectorPublish($this, function ($draft, $user): void {
+        $s1 = inspectorSection($draft->id, 'gated', 1, ['relevant_expression' => '${gate} = \'yes\'']);
+        addFormField($draft, $user, 'gate', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+    });
+
+    $empty = array_values(array_filter(
+        $this->inspector->notices($version),
+        fn (GraphNotice $n): bool => $n->kind === GraphNoticeKind::EmptyAtOpen,
+    ));
+
+    expect($empty)->toHaveCount(1);
+    expect($empty[0]->nodes)->toBe([]);
+    // The wire shape the canvas consumes — `fragment` is deliberately absent from it.
+    expect($empty[0]->toArray())->toBe([
+        'kind' => 'empty_at_open',
+        'nodes' => [],
+        'message' => 'This form shows no questions at all until something is answered, so a respondent opening it sees an empty form.',
+    ]);
+});
+
+it('survives a draft whose FIELD condition does not parse either', function (): void {
+    // The section-level arm above and this one reach `evaluateRelevance()` from two different loops in the
+    // settle (sections are swept separately from fields), so one catch that covers only the first would
+    // still let this through.
+    $draft = inspectorDraft($this, function ($draft, $user): void {
+        addFormField($draft, $user, 'gate', FieldType::ShortText, 1);
+        addFormField($draft, $user, 'shown', FieldType::ShortText, 2, ['relevant_expression' => 'selected(${gate}']);
+    });
+
+    expect($this->inspector->warnings($draft))->toBeArray();
 });

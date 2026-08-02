@@ -20,6 +20,8 @@ use App\Models\FormSection;
 use App\Models\User;
 use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormBuilderService;
+use App\Services\Forms\StepGraphInspector;
+use App\Support\Forms\GraphNotice;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -138,6 +140,38 @@ final class FormBuilderController extends Controller
     public function libraryItems(Form $form): JsonResponse
     {
         return response()->json($this->presenter->libraryList());
+    }
+
+    // ── Relevance graph (Increment H21d1) ────────────────────────────────────────
+
+    /**
+     * The DRAFT's relevance-graph notices, for the builder's Logic view (Doc #27 §6/§8).
+     *
+     * A read, so it does not go through {@see self::respond()} — nothing here mutates, there is no
+     * optimistic-concurrency token to drift and no `FormException` to map. It reads the DRAFT and never a
+     * published version: the Logic view sits inside the editor, and what an author needs to see is the graph
+     * they are editing, not the one their respondents are currently walking.
+     *
+     * `['notices' => []]` with no draft rather than a 404 — that is the page's existing read-only state
+     * (`Builder.vue`'s `readOnly`), and an empty result reads correctly there while an error would not.
+     *
+     * These are the SAME notices `FormPublishController` flashes after a successful publish, which is the
+     * whole point: the author now meets them while there is still something to do about it.
+     */
+    public function graph(Form $form, StepGraphInspector $inspector): JsonResponse
+    {
+        $draft = $form->draftVersion;
+
+        if ($draft === null) {
+            return response()->json(['notices' => []]);
+        }
+
+        return response()->json([
+            'notices' => array_map(
+                static fn (GraphNotice $notice): array => $notice->toArray(),
+                $inspector->notices($draft),
+            ),
+        ]);
     }
 
     // ── Reorder (structural) ──────────────────────────────────────────────────────

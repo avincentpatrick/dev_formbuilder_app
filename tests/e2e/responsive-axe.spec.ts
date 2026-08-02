@@ -51,6 +51,24 @@ for (const theme of themes) {
     });
 }
 
+// The builder's LOGIC view (H21d1) — the read-derived branching rail, scanned at all three viewports in
+// light + dark. The 375px pass is the one that matters and is Doc #27 §9's explicit obligation for this
+// row: an author's own expression is the widest thing on the page and it must WRAP, never scroll, so the
+// `assertClean` horizontal-overflow check is doing real work here rather than being a formality.
+for (const theme of themes) {
+    test(`Builder logic view (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
+        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.builder__centre-tabs').getByText('Logic').click();
+        // The server-derived notice, so the widest state of the card is on screen when the scan runs.
+        await page.getByText(/comes later in the form/).waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Builder logic view');
+    });
+}
+
 // The manual-encoding page (F4b). Reached via the "New submission" row action of the all-scalar published
 // "Clinic Intake" form (no id in the URL). A CSS `tr` locator scoped by row text is used rather than
 // getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.

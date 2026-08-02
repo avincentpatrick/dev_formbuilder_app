@@ -69,6 +69,27 @@ for (const theme of themes) {
     });
 }
 
+// The structured CONDITION EDITOR (H21d2) in its widest state — a nested group, whose rows carry five
+// controls each and whose nesting adds an indent rule per level. At 375px the config pane is full width
+// (the builder's ≤1024px pane linearization) and the rows stack to one control per line; above 640px they
+// become a wrapping flex row. Both sides of that breakpoint are covered by the three-viewport matrix, and
+// the overflow assertion is the point: a non-wrapping row in a shared primitive has reddened this gate
+// three times (H12b, H14, H15b), and this is the deepest control nesting the builder has.
+for (const theme of themes) {
+    test(`Builder condition editor (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
+        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.builder__centre-tabs').getByText('Logic').click();
+        await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();
+        await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
+        await page.getByLabel('Condition 1.1 subject').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Builder condition editor');
+    });
+}
+
 // The manual-encoding page (F4b). Reached via the "New submission" row action of the all-scalar published
 // "Clinic Intake" form (no id in the URL). A CSS `tr` locator scoped by row text is used rather than
 // getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.

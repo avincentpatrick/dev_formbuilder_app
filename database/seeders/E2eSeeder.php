@@ -486,6 +486,31 @@ class E2eSeeder extends Seeder
                     'key' => 'campaign', 'label' => 'Campaign', 'config' => ['prefill_source' => 'url'],
                 ]);
 
+                // Increment H21d2 extends this form with the two states the structured CONDITION EDITOR
+                // adds to the config panel, so the same scan covers the write half as well as the read one:
+                //
+                //  - a MULTI-SELECT with real options, so a `selected()` row offers a dropdown of choices
+                //    rather than a text box (the two arms render different controls);
+                //  - a NESTED-GROUP condition, `(A or B) and selected(...)`, which is the only shape that
+                //    draws the recursive group control, its indent rule and a "Condition 1.2 …" ordinal.
+                $prefs = $lb->addSection($logicDemo);
+                $prefs->update(['label' => 'Preferences']);
+                $lb->addField($logicDemo, $owner, FieldType::MultiSelect, $prefs->id)->update([
+                    'key' => 'colours',
+                    'label' => 'Favourite colours',
+                    'config' => ['options' => [
+                        ['value' => 'red', 'label' => 'Red'],
+                        ['value' => 'blue', 'label' => 'Blue'],
+                    ]],
+                ]);
+
+                $nested = $lb->addSection($logicDemo);
+                $nested->update([
+                    'label' => 'Grouped gate',
+                    'relevant_expression' => "(\${age} > 18 or \${age} < 5) and selected(\${colours}, 'red')",
+                ]);
+                $lb->addField($logicDemo, $owner, FieldType::ShortText, $nested->id)->update(['label' => 'Tell us more']);
+
                 // Left as a DRAFT, and it could not be published anyway — the invalid expression is exactly
                 // what `ExpressionValidationGate` refuses, which is the point the rail makes on the card.
             }

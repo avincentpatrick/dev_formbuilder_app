@@ -1,7 +1,7 @@
 # Workflow Branching & Step-Graph Design Doc
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
-**Status:** **v1.4 — the design entry for H21a/H21b/H21c/H21d1 → H21d2.** Ratifies the step model that already exists as an emergent property of the guest runtime, pins the four behaviours it leaves undefined (the empty graph, the reappearing step, resume drift, and "% of what"), and sets the publish-gate posture. Records nine defects found while writing it and assigns each to an H21 slice; fixed none, because that increment was docs-only. **All nine are now closed — the last of them by H21c.**
+**Status:** **v1.5 — the design entry for H21a/H21b/H21c/H21d1/H21d2. The H21 arc is complete.** Ratifies the step model that already exists as an emergent property of the guest runtime, pins the four behaviours it leaves undefined (the empty graph, the reappearing step, resume drift, and "% of what"), and sets the publish-gate posture. Records nine defects found while writing it and assigns each to an H21 slice; fixed none, because that increment was docs-only. **All nine are now closed — the last of them by H21c.**
 
 > **A count corrected, because it was checkable.** v1.2 claimed all nine were closed by H21a and H21b. Eight were. The ninth is §7's — the encode path accepting a keyer's answers, pruning them at Stage 3 and reporting `'Submission recorded.'` — and it was still live at `app/Http/Controllers/Tenant/SubmissionController.php:42`, a bare `$pipeline->submit(...)` with its `SubmissionResult` discarded, when H21c opened. It was always assigned to H21c (H1f's own defect table), so the assignment was right and only the tally was wrong. H21c closes it.
 
@@ -10,6 +10,8 @@
 **v1.2 (H21b as-built) carries amendments B1–B7**, same house form. H21b took the whole §9 obligation rather than only the five defects, so §4.2, §5.2, §5.3 and §4.4's step-level notice ship with it and **H21c inherits nothing from H1f but its own defect (b)**. That widened the increment past the H-map's `ui, M` to **M/L**, recorded here rather than hidden, on the H6b/H21a precedent. One amendment (**B2**) corrects a specification this document got wrong, and one (**B6**) records a narrowing accepted with the user rather than designed around.
 
 **v1.4 (H21d1 as-built) carries amendments D1–D5**, same house form. H21d is the H-map's only **XL** row and was split by H1f into **H21d1** (the read-derived canvas, which writes nothing) and **H21d2** (the condition editor, which owns the write path and must ship the serializer §8 says does not exist); **only H21d1 ships in v1.4**, and every §8 obligation belonging to the editor is left standing rather than quietly narrowed. D1 records where the canvas lives and why the rail is derived client-side while the graph analysis stays on the server. D2 records the classifier that decides which conditions can be read in plain English — the predicate H21d2 inverts into "representable", so it is built once rather than twice. **D3 records a live defect this increment had to fix on its way in**, because H21d1 is the first caller to run `StepGraphInspector` against an unvalidated draft and only one of its three checks was safe there. D4 corrects a claim in this document's own §6. D5 records the two failures the gates caught late — one of them a real dark-mode contrast violation in new copy, the other an undefined design token that the known full-suite flake would have hidden.
+
+**v1.5 (H21d2 as-built) carries amendments E1–E5**, same house form, and closes H-map row 254. **E1** records the serializer §8 asked for, its canonical form, the three literal shapes grammar v2.0 cannot express, and the self-check that turns each of them into a refusal at the source. **E2** records that the classifier was made ONE by construction rather than by treaty — the describer now renders its sentence from the structured model — and states the price that follows. **E3** records that no write endpoint was added, and why §9's "409 test on the new write path" is discharged as a `builderClient` unit test plus a store-level conflict test rather than narrowed. **E4** records the `ConfigPanel` replacement and the reading of "read-only" it encodes. **E5** records the gate findings, including a mutation that reddened nothing and the real, untested code path it indicted.
 
 **v1.3 (H21c as-built) carries amendments C1–C5**, same house form. C1 records that the Inertia app's "client relevance engine it has never had" did not need writing — `createFormRuntime()` was already pure enough to import — which is why §7's `full-stack, M` resized to **L** in scope and not in code volume. C2 and C3 record two decisions locked with the user before any of it was written: the keyable-hidden asymmetry resolved outside the step list, and a Next that never blocks. C4 records why the parity suite asserts the two channels' INPUT rather than running one projection twice and calling the comparison a cross-channel test. **C5 records three defects an adversarial pre-merge review found**, each a consequence of C1's own decision rather than a slip — and the methodological note that the first regression test written for one of them passed against the broken code.
 **Phase**: 3, per `docs/PRD.md`'s roadmap — the design row the PRD calls the "visual multi-step logic/workflow builder" (`docs/PRD.md:405`, `:461`).
@@ -406,9 +408,116 @@ Nothing, and that is itself the finding worth recording. H12a's grace window pro
 - **(a) A serializer** — structured condition → canonical expression text, written into the existing `text` column. One new component, no schema change; but a *third* place expression syntax is constructed, and therefore a new drift surface against the two parsers. **Recommended.**
 - **(b) A structured sibling** — a column or config key holding the structured condition, with the text derived from it. No round-trip risk; but a new snapshot key, a new publish-gate clause, and two representations that can disagree. **Recorded as the revisit trigger** if the serializer's canonical output ever surprises an author.
 
+> **Amendment E1 (H21d2, as-built) — the serializer, and the three things grammar v2.0 cannot say.**
+>
+> Option (a) shipped, as `resources/js/components/builder/condition-model.ts`: `serialize(Condition)` →
+> canonical expression text, written into the existing `text` column. No schema change, no migration, no
+> `/api/v1` change. The canonical form is one space around binary operators, `, ` between call arguments,
+> `${key}` references, `''` for the emptiness idiom, `'…'` for strings, and a child group parenthesised iff
+> its operator differs from its parent's — **the describer's own rule**, so the sentence on the rail and the
+> syntax in the column agree about grouping. Same-operator nesting is flattened first, which is safe because
+> the parser is left-associative and the describer already renders it flat.
+>
+> **THREE SHAPES ARE REFUSED RATHER THAN MANGLED, and each is a real limit of the language.** (a) A string
+> containing BOTH `'` and `"`: `lexString` (`resources/public-runtime/engine/lexer.ts:151`) has **no escape
+> sequences at all** — a backslash is an ordinary character and a literal ends at the first matching
+> delimiter — so a value carrying both quote characters is not expressible, and printing it with either one
+> would produce a *different string*, silently. (b) A number whose shortest decimal form needs exponent
+> notation: `String(1e21)` is `"1e+21"`, and `lexNumber` reads digits and at most one fractional part. (c) A
+> key outside `[A-Za-z_][A-Za-z0-9_]*`. Each surfaces as an inline message on the offending row, and nothing
+> is written while it stands.
+>
+> **THE PRINTER CHECKS ITSELF.** `serialize()` re-parses its own output and returns the text only if it
+> classifies back to a structurally equal `Condition`. That is what turns the engine's budgets — 2000 UTF-8
+> bytes, 500 tokens, 64 levels of parse depth — into one refusal rather than three hand-maintained limits
+> that would drift from the lexer the day either moved. It matters because **nothing validates a
+> `relevant_expression` on WRITE**: `UpdateFieldRequest` is shape-only and says so, so text the printer got
+> wrong would save cleanly and meet the author at publish, in a refusal naming an expression they never
+> typed.
+>
+> **The drift surface §8 names is guarded by a shared fixture, not by hope.**
+> `tests/fixtures/condition-serializer.json` carries 27 `(condition, text)` cases and is driven THREE ways:
+> the TypeScript suite asserts `serialize(c) === text` and `toCondition(parse(text)) === c` and that a second
+> pass is idempotent; and **`tests/Unit/Expressions/ConditionSerializerParityTest.php` parses every `text`
+> with PHP's `ExpressionParser`** and checks the references land where the structured condition says they do.
+> That third driver is the one that catches text only the TypeScript parser accepts. It sits outside
+> `tests/golden/`, carries no `grammar_version` key and no manifest — the `step-projection.json` precedent
+> (amendment A6) — so it moves neither the 296-site count nor the 114-vector total. **It is NOT a sixth R3
+> mirror pair**: there is one printer, in one language, and PHP never prints. What is pinned is that one
+> implementation's output is legible to both parsers.
+
 > **Why not a bidirectional canvas over free-text expressions.** Round-tripping author-typed text through a structured model and back is lossy in parenthesisation, whitespace and operand order; and an author who typed something the canvas cannot represent — arithmetic, `count(${roster})`, `if(...)`, all legal at grammar v2.0 — would either have it silently rewritten or be locked out of the canvas on their own form. Both failures are silent, which is the disqualifier. **Specify: a non-representable expression renders read-only and is never rewritten.**
 
+> **Amendment E2 (H21d2, as-built) — the classifier was made ONE by construction, and the price is stated.**
+>
+> D2 recorded that `status: 'opaque'` is the predicate the editor needs and that building it twice is how the
+> two halves would come to disagree. Reusing it turned out to require more than calling it: H21d1's
+> classification was **fused into the prose** — `say()` returning `null` *was* "opaque" — and every helper
+> below it was module-private, so the only reachable predicate took raw text, re-parsed it, and computed a
+> sentence as a side effect. There was no `isDescribable(node)` to call.
+>
+> So the classification moved rather than being copied. `condition-model.ts`'s `toCondition(Node) → Condition
+> | null` is now THE classifier, and `condition-describer.ts` renders its sentence FROM the `Condition` that
+> returns; `say()` is consequently **total** — there is no shape it can meet and refuse, because a shape it
+> could refuse would be a shape the editor believes it can edit. Describable and representable are one set
+> definitionally.
+>
+> **THE PRICE, WHICH IS THE INTERESTING PART: the model has to be exactly as expressive as the set H21d1
+> shipped, quirks included.** A reversed comparison (`18 < ${age}`), a field-vs-field one
+> (`${end} > ${start}`, which H21d1 deliberately corrected INTO the described set), a literal-vs-literal one
+> (`1 = 1`). A tidier model — subject always a field, value always a literal — would have been a smaller
+> editor and would have **silently narrowed the RAIL's prose**, which is not this increment's to change. That
+> is why both sides of a comparison are the same control in the UI: the symmetry is not decoration, it is
+> what the shared classifier costs.
+>
+> The guarantee that the move changed nothing is that **`condition-describer.test.ts` passes byte-unchanged**
+> — all 27 cases, including the grouping-preservation pair and every opaque case its own header calls "a
+> specification, not a TODO".
+
 H21d also inherits two existing contracts it must not break: `builderClient`'s typed 409 conflict result, which is the builder's optimistic-concurrency contract and which any new write endpoint is the obvious place to lose; and the free-text relevance inputs in `ConfigPanel.vue`, which a structured editor must either replace outright or coexist with — and coexistence means answering which one wins when they disagree.
+
+> **Amendment E3 (H21d2, as-built) — the 409 is inherited because no endpoint was added.**
+>
+> The cheapest way not to lose a contract at a new write endpoint is not to have one. `relevant_expression`
+> is already a key on both existing PATCH payloads (`fieldPayload`, `sectionPayload`), both `FormRequest`s
+> accept it, and both rows already carry their `version` token. So the editor writes the way every other
+> config control does — `target.relevant_expression = text; store.touch(uid, kind)` — and inherits the 600 ms
+> debounce, the snapshot dirty-check, the serialized queue, the version bump, the `ConflictDialog` routing
+> and one undo entry per burst, with **zero store changes**. `FormBuilderController::respond()` remains the
+> single place a 409 is minted.
+>
+> §9's "a `builderClient` 409 test on the new write path" is therefore **redirected rather than narrowed**,
+> and the redirection is recorded here rather than left for a reader to infer. What it now proves is that the
+> new editor is genuinely ON the existing path: `builderClient.test.ts` — **the first JavaScript-side
+> coverage `builderClient` has ever had**, the 409 having been pinned only server-side until now — asserts
+> that a 409 is RETURNED as `{conflict, current, message}` and not thrown, that every other failure throws a
+> typed error carrying the validation map, and that the CSRF/credentials contract is intact; and a
+> store-level group drives a condition edit through the real `useBuilderStore` with a stubbed 409 and asserts
+> the conflict lands with **both** sides of the condition and the stale token NOT adopted.
+>
+> **Amendment E4 (H21d2, as-built) — `ConfigPanel` is replaced, and "which one wins" is answered by
+> construction.**
+>
+> Both free-text textareas are gone, replaced in place by `ConditionEditor.vue` on `ValidationEditor.vue`'s
+> derived-mode precedent: the mode is computed from the value on every render and never stored. Blank or
+> describable renders the structured rows with an "Edit as text" escape; opaque or invalid renders the raw
+> text alone and does not mount the tree at all. There is one stored value and one editor on screen, so the
+> two **cannot** disagree — which is a stronger answer than a precedence rule, because a precedence rule has
+> to be remembered.
+>
+> **One reading of §8 is worth stating, because it goes the other way to the obvious one.** "Renders
+> read-only and is never rewritten" constrains the STRUCTURED editor, not the author: an opaque condition
+> keeps a fully editable textarea, because taking away the only way to edit `${age} + 1 > 18` would be a
+> regression dressed as a safety measure. What is guaranteed is that nothing parses it, re-prints it or
+> touches a byte of it — and that guarantee is mechanical rather than careful. `update:expression` is emitted
+> only from a user mutation, never from a watcher and never on mount, and `publish()` refuses a value equal
+> to the one already stored. **Opening a node cannot write to it**, and that is asserted over every canonical
+> string the printer can produce, plus two describable-but-untidy shapes (`${age}   >   18` and
+> `(${age} > 18)`) that a canonicalize-on-open implementation would quietly reformat.
+>
+> A half-built row is held on screen and **not** written: `isComplete()` gates the write, so adding a row
+> writes nothing until the author has actually said something. The alternative — writing the complete subtree
+> and dropping the rest — would be a silent partial save.
 
 ---
 
@@ -455,6 +564,40 @@ H21d also inherits two existing contracts it must not break: `builderClient`'s t
 >
 > The sidecar suite's load-bearing case is the anti-vacuity one: it publishes a **clean** form and dirties only the draft `publish()` step 9 clones forward, so an implementation reading `currentPublishedVersion` passes every other test in the file and fails that one.
 >
+> **Amendment E5 (H21d2, as-built) — the other half discharged, and what the gates found.**
+>
+> The four owed tests are `condition-model.test.ts` (the round trip, over the shared fixture, in both
+> directions plus idempotence), `ConditionEditor.test.ts` (the read-only-never-rewritten group, asserted over
+> every canonical string the printer can emit rather than over the opaque case alone), `builderClient.test.ts`
+> (the 409, per E3) and the axe/keyboard pass at 375 px — plus `ConditionSerializerParityTest.php`, which §9
+> did not ask for and E1 explains. `Logic Notices Demo` gains a multi-select with real options and a
+> nested-group condition `(${age} > 18 or ${age} < 5) and selected(${colours}, 'red')`, so one scan sees the
+> choice dropdown, the recursive group control and its indent rule; `builder-axe` drives both editor modes
+> and traverses the tree by keyboard, `responsive-axe` scans the nested state at all three viewports in light
+> and dark. Twelve new tests carrying eighteen axe scans, all green — and the full `builder-axe` matrix is
+> **36/36**, clean end to end for the first time since H21d1 fixed the dark primary-fill palette.
+>
+> **SIX MUTATIONS WERE RUN, AND THE ONE THAT REDDENED NOTHING WAS THE USEFUL ONE.** Deleting the printer's
+> deep-equality self-check left all 106 tests green — because the length-budget case that appears to exercise
+> it is actually caught by the re-parse *throwing*, one branch earlier. The comparison arm had no test, and
+> it is reachable: `compare eq <field> <empty text>` prints as `${a} = ''`, which the parser reads back as
+> the **emptiness idiom** — a different condition with a different reading. Without the check, `serialize()`
+> would hand back text meaning something other than what it was given, which is the silent rewrite §8 calls
+> the disqualifier. A test now pins it, paired with the `blank` condition that legitimately prints the same
+> string, so the refusal is a discrimination rather than a blanket rejection. **The standing lesson holds
+> exactly as H21b and H21c wrote it: a green mutation means no test reaches that path, not that the path is
+> redundant.**
+>
+> **The `token-references` flake hid a real failure again, and the practice paid for itself a second time.**
+> The full Vitest run showed its usual two timeouts; the isolated re-run reported a dangling
+> `--mds-color-text-primary` in the new fieldset legend — there is no such token, the family is
+> `text-body`/`-heading`/`-secondary`/`-muted`, and an undefined custom property with no fallback invalidates
+> the whole declaration. One `npx vitest run <that file>`, one real defect. **Two component-test findings were
+> also real rather than test bugs:** the editor was reading its own sentence with `describe(expression)` and
+> no `LabelLookup`, so it said "age is more than 18" where the rail says "Your age is more than 18" — one
+> reading rendered two ways, which is the exact divergence the shared classifier exists to prevent; it now
+> builds the same lookup, sections-then-fields, matching `logic-rail.ts`'s collision order.
+>
 > **The e2e half is a seeded `Logic Notices Demo` draft** carrying every state the rail can draw at once — a described condition, an opaque one (arithmetic), an invalid one at FIELD level, a forward reference that only the server can find, and a section holding only `hidden`/`calculated` fields — so one scan is worth six. `builder-axe` drives the toggle, waits for the server notice, asserts each reading state and then traverses the rail by keyboard into the config panel; `responsive-axe` scans it at all three viewports in light and dark. Twelve scans, all green.
 >
 > **Two gate findings worth carrying, both caught late and both real.** (a) `.rail__summary--invalid` used `--mds-color-danger-text`, which is `danger-300` in dark — **4.22:1** on `bg-surface` at 13 px, a genuine `color-contrast` violation the dark scan caught; the `status-*-fg` family is the on-surface pair (8.43:1 light, 6.39:1 dark) and is what the scale is for. (b) **CI found a third and a fourth, and between them they corrected a standing lesson.** The harness first: `builder-axe.spec.ts` carried its own copy of `forceTheme` that skipped the shared helper's `emulateMedia({ reducedMotion: 'reduce' })`: `builder-axe.spec.ts` carried its own copy of `forceTheme` that skipped the shared helper's `emulateMedia({ reducedMotion: 'reduce' })`, so axe could sample an element MID theme-flip — the `Structure ⇄ Logic` label measured **1.82:1** (the LIGHT foreground on the DARK surface) where the settled node measures **6.96:1**. H21d1's toggle is the first always-mounted transitioning element in the builder's chrome, so it made a latent race reproducible; the race was never its own. The spec now uses the shared helper — **a dark-mode contrast failure naming a foreground colour from the LIGHT palette is a transition race, not a palette defect**. Fixing it then exposed the fourth, which was a genuine one and had been hiding behind it: `--mds-color-action-primary-bg-hover` was `primary-400` (**3.96:1** against the white `text-on-primary`) and `-bg-active` was `primary-300` (**2.52:1**), because the dark theme LIGHTENED the primary fill on hover — the opposite of what a white-on-fill control needs, and the opposite of what the light theme does. The teal accent had carried per-token verification in a comment since G11; the default accent never did. Both now darken (9.14:1 / 13.00:1) and a **test** guards every primary fill in every dark block, because a comment is not a guard. **This also corrects `PROGRESS.md`'s standing gotcha**, which had recorded the same failure as "a local-environment divergence in the rendered dark palette" to be distrusted: it was two real defects stacked, and with both fixed `builder-axe` is 10/10 locally in dark. A reproducible local a11y failure is evidence, not noise — reproducing it on `main` proves it is not the branch's, not that it is not real. (c) A `var(--mds-type-body-font-size)` reference that does not exist was reported by `token-references` — **which fails as a timeout in the full Vitest run**, the known flake PROGRESS.md records, so it was only visible when the suite was re-run in isolation. That is the whole reason the standing practice says to re-run it there rather than waving the flake through: a dangling token with no fallback makes the whole declaration invalid, and the element then scales by inheritance under `[data-font-size]`.
@@ -469,7 +612,12 @@ H21d also inherits two existing contracts it must not break: `builderClient`'s t
 - **True goto / author-drawn edges.** §2's rejected alternative. The revisit trigger is external and specific: a customer asking for a jump the predicate form cannot express in a reasonable number of conditions — not an internal preference, and not a competitor comparison.
 - **The O(N) authoring burden that follows from §2.** A twenty-section form where section 3 skips to section 18 needs fourteen predicates, each independently editable and independently wrong. The canvas makes this *visible*; it does not make it *cheaper*. Recorded, and deliberately not solved with a "skip to" sugar, which would be an edge in disguise.
 - **Refusing anything at publish.** §6. A future increment may promote a warning to a draft-introduced-violations-only refusal; H21 does not.
-- **Structured storage for relevance conditions** — §8's option (b).
+- **Structured storage for relevance conditions** — §8's option (b). Still deferred after H21d2, and it gains
+  a concrete argument against it that was not visible when §8 was written: `form_sections` has **no `config`
+  column at all**, so a structured sibling for a SECTION condition would need a migration and a new snapshot
+  key rather than riding an existing jsonb. The revisit trigger is unchanged — the first time the
+  serializer's canonical output surprises an author — and the round-trip fixture is where that surprise would
+  be recorded.
 - **Collapsing `EncodeFormPresenter`'s render normalizers onto the client's `buildRenderModel()`** (H21c, amendment C1). `geo()`, `media()`, `cascade()`, `matrix()` and `options()` are hand-mirrors of `schema-mapping.ts`'s `buildGeo`/`buildMedia`/etc. — each documented as such in its own docblock — and since H21c the encode payload ships the frozen snapshot the client builds from anyway, so `blocks` could shrink to a per-key overlay carrying only `supported`, `prefill`, `prefill_value` and `upload.url`. Deferred deliberately: it is a render-model change, not a step-model one, and it would put every G4a/G4b/G5b2/G6/H7 encode test in the blast radius of an increment already resized to L. The revisit trigger is specific — the first time the two normalizers are found to disagree about a control's config, which is a drift surface with no test standing over it today.
 - **`SchemaChangeClassifier` does not diff relevance**, so a change that alters *which respondents are asked what* currently classifies as ordinary non-breaking metadata. Doc #26 §6.1 deferred hole-diffing on the same grounds; this is strictly higher-stakes and is recorded here so the next classifier change starts from the right list.
 - **The R5 DB-level immutability trigger** — H25, per §1.

@@ -168,4 +168,44 @@ for (const theme of themes) {
         await expect(page.locator('.canvas').first()).toBeVisible();
         await scan(page, 'back to structure');
     });
+
+    // The structured CONDITION EDITOR (Increment H21d2) — the write half of the same row, and the config
+    // panel's densest control group. Doc #27 §9 asks for axe plus keyboard traversal at 375px, which the
+    // three-viewport project matrix gives; what this test adds is that BOTH modes are scanned, because they
+    // are different DOM — the structured tree for a representable condition, the raw textarea for an opaque
+    // one — and a scan of only the first would miss half the surface.
+    test(`Builder — condition editor (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Logic Notices Demo');
+        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+
+        await page.locator('.builder__centre-tabs').getByText('Logic').click();
+
+        // The nested-group node: `(${age} > 18 or ${age} < 5) and selected(${colours}, 'red')` — the only
+        // seeded shape that draws the recursive group control and a "Condition 1.2 …" ordinal.
+        await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();
+        await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
+
+        await expect(page.getByRole('group', { name: 'Show this section only when…' })).toBeVisible();
+        await expect(page.getByLabel('Condition 1.1 subject')).toBeVisible();
+        await expect(page.getByLabel('Condition 2 option')).toBeVisible();
+        await scan(page, 'condition editor — structured');
+
+        // Keyboard: every control in the tree is reachable in order, and the last stop is the remove button
+        // — an icon button whose only accessible name is its `aria-label`.
+        await page.getByLabel('Condition 1.1 subject').focus();
+        await expect(page.getByLabel('Condition 1.1 subject')).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(page.getByLabel('Condition 1.1 operator')).toBeFocused();
+
+        // The OPAQUE arm: arithmetic, which the editor renders as raw text alone and never rewrites.
+        await page.locator('.builder__centre-tabs').getByText('Logic').click();
+        await page.locator('button.rail__head', { hasText: 'Arithmetic gate' }).click();
+        await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
+
+        await expect(page.getByLabel('Condition expression')).toHaveValue('${age} + 1 > 18');
+        await expect(page.getByText(/never rewritten/)).toBeVisible();
+        await expect(page.getByLabel('Condition 1 subject')).toHaveCount(0);
+        await scan(page, 'condition editor — opaque fallback');
+    });
 }

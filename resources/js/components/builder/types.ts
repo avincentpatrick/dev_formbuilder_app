@@ -58,6 +58,27 @@ export interface LocalSection extends ServerSection {
     uid: Uid;
 }
 
+// What the structured condition editor is allowed to offer an author (Increment H21d2). Assembled by
+// ConfigPanel from the store, because the editor itself takes no store — the sub-editor house contract.
+// `fields` and `repeatables` are kept APART rather than merged: section and field keys are not globally
+// unique (Doc #27 amendment A7, independent per-table indexes), so one flat list would silently prefer one
+// table's `roster` over the other's.
+export interface ConditionFieldOption {
+    key: string;
+    label: string;
+    // integer / decimal / calculated / likert_scale — decides whether a NEW fixed value defaults to a number
+    // literal or a string one, which is a real semantic difference (Eq rule 5 vs rule 4), not a display one.
+    numeric: boolean;
+    // The field's own choices, so a `selected()` row offers a dropdown instead of asking an author to
+    // retype an option value. Empty for a field that has none.
+    options: EnumOption[];
+}
+
+export interface ConditionCatalogue {
+    fields: ConditionFieldOption[];
+    repeatables: { key: string; label: string }[];
+}
+
 export interface PaletteType {
     value: string;
     label: string;

@@ -1,0 +1,225 @@
+[
+  {
+    "name": "compare_field_more_than_number",
+    "note": "The baseline shape, and the one the seeded `Logic Notices Demo` carries.",
+    "condition": { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 18 } },
+    "text": "${age} > 18"
+  },
+  {
+    "name": "compare_field_is_text",
+    "condition": { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "tier" }, "right": { "kind": "text", "value": "gold" } },
+    "text": "${tier} = 'gold'"
+  },
+  {
+    "name": "compare_field_is_not_text",
+    "condition": { "kind": "compare", "op": "neq", "left": { "kind": "field", "key": "tier" }, "right": { "kind": "text", "value": "gold" } },
+    "text": "${tier} != 'gold'"
+  },
+  {
+    "name": "compare_field_less_than_number",
+    "condition": { "kind": "compare", "op": "lt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 65 } },
+    "text": "${age} < 65"
+  },
+  {
+    "name": "compare_field_at_least_number",
+    "note": "`>=` and `<=` are the grammar v2.0 additions; a serializer that emitted `=>` would still lex, as two tokens, and fail differently.",
+    "condition": { "kind": "compare", "op": "gte", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 21 } },
+    "text": "${age} >= 21"
+  },
+  {
+    "name": "compare_field_at_most_number",
+    "condition": { "kind": "compare", "op": "lte", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 12 } },
+    "text": "${age} <= 12"
+  },
+  {
+    "name": "compare_operands_reversed",
+    "note": "The describable set does not constrain operand order for an ordinary comparison, so the model must not either — see condition-model.ts's docblock on why narrowing it would narrow the rail's prose.",
+    "condition": { "kind": "compare", "op": "lt", "left": { "kind": "number", "value": 18 }, "right": { "kind": "field", "key": "age" } },
+    "text": "18 < ${age}"
+  },
+  {
+    "name": "compare_field_against_field",
+    "note": "The ordinary date-range shape, corrected INTO the described set in H21d1 (condition-describer.test.ts:59).",
+    "condition": { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "end" }, "right": { "kind": "field", "key": "start" } },
+    "text": "${end} > ${start}"
+  },
+  {
+    "name": "compare_literal_against_literal",
+    "note": "Nonsense in a form and describable anyway. It is here because the editor must be able to LOAD it without rewriting it, not because anything should author it.",
+    "condition": { "kind": "compare", "op": "eq", "left": { "kind": "number", "value": 1 }, "right": { "kind": "number", "value": 1 } },
+    "text": "1 = 1"
+  },
+  {
+    "name": "compare_negative_number",
+    "note": "`-5` folds back into a negative Number literal via the parser's unary-minus rule, so it needs no parentheses and round-trips exactly.",
+    "condition": { "kind": "compare", "op": "lt", "left": { "kind": "field", "key": "balance" }, "right": { "kind": "number", "value": -5 } },
+    "text": "${balance} < -5"
+  },
+  {
+    "name": "compare_decimal_number",
+    "note": "`lexNumber` reads digits and AT MOST ONE fractional part — no exponent, no sign, no bare dot.",
+    "condition": { "kind": "compare", "op": "gte", "left": { "kind": "field", "key": "score" }, "right": { "kind": "number", "value": 7.5 } },
+    "text": "${score} >= 7.5"
+  },
+  {
+    "name": "text_containing_an_apostrophe_switches_to_double_quotes",
+    "note": "The lexer has NO escape sequences (lexer.ts:151) — a string runs to the first matching delimiter. So the quote character the value contains decides the delimiter the printer uses.",
+    "condition": { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "surname" }, "right": { "kind": "text", "value": "O'Brien" } },
+    "text": "${surname} = \"O'Brien\""
+  },
+  {
+    "name": "text_containing_a_double_quote_stays_single_quoted",
+    "condition": { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "note" }, "right": { "kind": "text", "value": "say \"hi\"" } },
+    "text": "${note} = 'say \"hi\"'"
+  },
+  {
+    "name": "empty_text_on_the_LEFT_is_a_comparison_not_an_emptiness_test",
+    "note": "The emptiness idiom is tested on the RIGHT operand only, exactly as the describer tests it. This case is the anti-vacuity twin of the two `blank` cases below: it proves `blank` is a shape and not merely 'an empty string appeared'.",
+    "condition": { "kind": "compare", "op": "eq", "left": { "kind": "text", "value": "" }, "right": { "kind": "field", "key": "age" } },
+    "text": "'' = ${age}"
+  },
+  {
+    "name": "blank_is_empty",
+    "condition": { "kind": "blank", "op": "eq", "subject": { "kind": "field", "key": "notes" } },
+    "text": "${notes} = ''"
+  },
+  {
+    "name": "blank_is_not_empty",
+    "condition": { "kind": "blank", "op": "neq", "subject": { "kind": "field", "key": "notes" } },
+    "text": "${notes} != ''"
+  },
+  {
+    "name": "count_more_than",
+    "note": "The repeat-group branch H21a made work (Doc #27 §3.3). The count must be on the LEFT and the other operand a number — authoring the mirror image is impossible by construction, which is what keeps the editor inside the describable set.",
+    "condition": { "kind": "count", "op": "gt", "section": "roster", "n": 0 },
+    "text": "count(${roster}) > 0"
+  },
+  {
+    "name": "count_exactly_one",
+    "condition": { "kind": "count", "op": "eq", "section": "roster", "n": 1 },
+    "text": "count(${roster}) = 1"
+  },
+  {
+    "name": "count_at_most",
+    "condition": { "kind": "count", "op": "lte", "section": "roster", "n": 3 },
+    "text": "count(${roster}) <= 3"
+  },
+  {
+    "name": "selected_includes",
+    "condition": { "kind": "selected", "field": "colours", "value": "red", "negated": false },
+    "text": "selected(${colours}, 'red')"
+  },
+  {
+    "name": "selected_does_not_include",
+    "note": "The ONLY negation form in the language of representable shapes — `not()` over anything but `selected/2` is opaque.",
+    "condition": { "kind": "selected", "field": "colours", "value": "red", "negated": true },
+    "text": "not(selected(${colours}, 'red'))"
+  },
+  {
+    "name": "group_and_of_two",
+    "condition": {
+      "kind": "group",
+      "op": "and",
+      "children": [
+        { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 18 } },
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "tier" }, "right": { "kind": "text", "value": "gold" } }
+      ]
+    },
+    "text": "${age} > 18 and ${tier} = 'gold'"
+  },
+  {
+    "name": "group_or_of_three_stays_flat",
+    "note": "The parser is left-associative, so a three-member chain is a comb of pairs on the way in and a flat list on the way back. Round-tripping it is what pins the flattening.",
+    "condition": {
+      "kind": "group",
+      "op": "or",
+      "children": [
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "a" }, "right": { "kind": "number", "value": 1 } },
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "b" }, "right": { "kind": "number", "value": 2 } },
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "c" }, "right": { "kind": "number", "value": 3 } }
+      ]
+    },
+    "text": "${a} = 1 or ${b} = 2 or ${c} = 3"
+  },
+  {
+    "name": "group_or_inside_and_keeps_its_parentheses",
+    "note": "`(A or B) and C` and `A or (B and C)` are different conditions. The AST has no paren node, so the printer re-inserts them — by the describer's own rule, so the sentence and the syntax agree about grouping.",
+    "condition": {
+      "kind": "group",
+      "op": "and",
+      "children": [
+        {
+          "kind": "group",
+          "op": "or",
+          "children": [
+            { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 18 } },
+            { "kind": "compare", "op": "lt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 5 } }
+          ]
+        },
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "tier" }, "right": { "kind": "text", "value": "gold" } }
+      ]
+    },
+    "text": "(${age} > 18 or ${age} < 5) and ${tier} = 'gold'"
+  },
+  {
+    "name": "group_and_inside_or_keeps_its_parentheses",
+    "note": "The other direction. `and` binds tighter than `or`, so these parentheses are redundant to the parser and load-bearing to the reader — the printer emits them anyway, because the rail's prose does.",
+    "condition": {
+      "kind": "group",
+      "op": "or",
+      "children": [
+        { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 18 } },
+        {
+          "kind": "group",
+          "op": "and",
+          "children": [
+            { "kind": "compare", "op": "lt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 5 } },
+            { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "tier" }, "right": { "kind": "text", "value": "gold" } }
+          ]
+        }
+      ]
+    },
+    "text": "${age} > 18 or (${age} < 5 and ${tier} = 'gold')"
+  },
+  {
+    "name": "group_nested_three_levels_deep",
+    "condition": {
+      "kind": "group",
+      "op": "and",
+      "children": [
+        { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "a" }, "right": { "kind": "number", "value": 1 } },
+        {
+          "kind": "group",
+          "op": "or",
+          "children": [
+            { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "b" }, "right": { "kind": "number", "value": 2 } },
+            {
+              "kind": "group",
+              "op": "and",
+              "children": [
+                { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "c" }, "right": { "kind": "number", "value": 3 } },
+                { "kind": "compare", "op": "eq", "left": { "kind": "field", "key": "d" }, "right": { "kind": "number", "value": 4 } }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "text": "${a} = 1 and (${b} = 2 or (${c} = 3 and ${d} = 4))"
+  },
+  {
+    "name": "group_mixing_every_condition_kind",
+    "note": "One chain carrying a comparison, an emptiness test, a count and a membership predicate — the shape a real branching form reaches soonest.",
+    "condition": {
+      "kind": "group",
+      "op": "and",
+      "children": [
+        { "kind": "compare", "op": "gt", "left": { "kind": "field", "key": "age" }, "right": { "kind": "number", "value": 18 } },
+        { "kind": "blank", "op": "neq", "subject": { "kind": "field", "key": "notes" } },
+        { "kind": "count", "op": "gt", "section": "roster", "n": 0 },
+        { "kind": "selected", "field": "colours", "value": "red", "negated": true }
+      ]
+    },
+    "text": "${age} > 18 and ${notes} != '' and count(${roster}) > 0 and not(selected(${colours}, 'red'))"
+  }
+]

@@ -8,18 +8,31 @@
  * does not understand gets their own text back, unchanged and unannotated, and that is the correct outcome
  * rather than a degraded one.
  *
- * The reason is §8's, and it is about H21d2 rather than about prose: round-tripping author-typed text
- * through a structured model and back is lossy in parenthesisation, whitespace and operand order, so the
- * condition editor must render anything it cannot represent READ-ONLY and never rewrite it. That decision
- * needs a predicate — "can this shape be represented?" — and this module is it, one increment early and in
- * its harmless direction. `status: 'opaque'` here becomes `read-only` there. Building the classifier twice,
- * once for prose and once for editing, is how the two would come to disagree about which expressions are
- * safe to touch.
+ * ── WHERE THE CLASSIFICATION LIVES (Increment H21d2) ────────────────────────────────────────────────
+ * It is no longer here. H21d1 built the "can this shape be understood?" test fused into the prose — `say()`
+ * returning null WAS "opaque" — and recorded that H21d2's editor needed the same predicate in its other
+ * direction: render anything it cannot represent read-only, and never rewrite it. Building that twice is
+ * exactly how the rail and the editor would come to disagree about which expressions are safe to touch.
+ *
+ * So `condition-model.ts` now owns it. `toCondition()` is the classifier; everything below renders a
+ * SENTENCE from the `Condition` it returns, and `say()` is therefore total — there is no shape it can meet
+ * and refuse, because a shape it could refuse would be a shape the editor thinks it can edit. Describable
+ * and representable are one set by construction rather than by treaty.
+ *
+ * The describable set itself is UNCHANGED by that move, and `condition-describer.test.ts` passing
+ * byte-unchanged is the guarantee. It stays deliberately small and closed:
+ *  - a comparison whose operands are each a bare reference or a literal, in either order;
+ *  - `selected()` and its `not()` negation — the membership predicates;
+ *  - `count(${section})` compared to a number, which is the repeat-group branch H21a made work;
+ *  - `and` / `or` chains of the above, at any depth, with grouping preserved rather than flattened.
+ * Arithmetic, `if()`, `int()`, the clock functions and a `not()` over a whole chain are opaque BY DECISION
+ * rather than by omission: each has a reading that is either wrong or longer than the expression it
+ * explains, and the author already has the expression.
  *
  * ── WHAT IT DOES NOT DO ─────────────────────────────────────────────────────────────────────────────
- * It never PRINTS an expression. There is no AST→text path anywhere in this repository (H1f verified it),
- * and H21d2 is the increment that must ship one. Prose is not syntax: nothing here can be fed back into a
- * parser, which is exactly why it is safe to run over expressions that will never be rewritten.
+ * It never PRINTS an expression. Prose is not syntax and cannot be fed back into a parser, which is exactly
+ * why it is safe to run over expressions that will never be rewritten. The AST→text path is
+ * `condition-model.ts`'s `serialize()`, which prints from the MODEL and never from a sentence.
  *
  * It is also not a mirror of any PHP class. The reference walk below resembles
  * `ExpressionParser::referencedKeys()` and is deliberately NOT presented as its twin (R3): nothing
@@ -27,13 +40,8 @@
  * resolves remains `ExpressionValidationGate`, at publish, in PHP.
  */
 
-import {
-    ExpressionLexer,
-    ExpressionParser,
-    ExpressionSyntaxError,
-    FunctionRegistry,
-    type Node,
-} from '../../../public-runtime/engine';
+import { ExpressionSyntaxError, type Node } from '../../../public-runtime/engine';
+import { parseExpression, toCondition, type Comparator, type Condition, type Operand } from './condition-model';
 
 /** A field/section key → the label an author would recognise. Keys with no entry render as themselves. */
 export type LabelLookup = Record<string, string>;
@@ -48,8 +56,6 @@ export type ConditionReading =
     /** Does not parse. `slug` is the engine's stable error slug; `reason` is its message. */
     | { status: 'invalid'; slug: string; reason: string };
 
-const parser = new ExpressionParser(new ExpressionLexer(), new FunctionRegistry());
-
 export function describe(expression: string | null, labels: LabelLookup = {}): ConditionReading {
     if (expression === null || expression.trim() === '') {
         return { status: 'blank' };
@@ -57,7 +63,7 @@ export function describe(expression: string | null, labels: LabelLookup = {}): C
 
     let ast: Node;
     try {
-        ast = parser.parse(expression);
+        ast = parseExpression(expression);
     } catch (error) {
         if (error instanceof ExpressionSyntaxError) {
             return { status: 'invalid', slug: error.slug, reason: error.message };
@@ -67,10 +73,14 @@ export function describe(expression: string | null, labels: LabelLookup = {}): C
         return { status: 'invalid', slug: 'unknown', reason: 'This condition could not be read.' };
     }
 
+    // The references are collected from the RAW AST, not from the model: an opaque condition still gets its
+    // `${key}` chips, and that is the one thing the canvas can honestly say about a shape it cannot read.
     const references = collectReferences(ast);
-    const prose = say(ast, labels);
+    const condition = toCondition(ast);
 
-    return prose === null ? { status: 'opaque', references } : { status: 'described', prose, references };
+    return condition === null
+        ? { status: 'opaque', references }
+        : { status: 'described', prose: say(condition, labels), references };
 }
 
 /** Every `${key}` the expression names, in first-appearance order and without duplicates. */
@@ -96,7 +106,7 @@ function collectReferences(node: Node): string[] {
                 return;
             default:
                 // literal / self — nothing to collect. `self` cannot appear in a relevance expression at
-                // all (the parser rejects a `.` outside a constraint), so it is not a case worth naming.
+                // all (it is refused at publish outside a constraint), so it is not a case worth naming.
         }
     };
 
@@ -105,56 +115,11 @@ function collectReferences(node: Node): string[] {
     return found;
 }
 
-/**
- * The describable shapes, and nothing else. Returns null the moment it meets anything it cannot render in
- * full — including one bad operand deep inside an otherwise readable `and` chain.
- *
- * The set is deliberately small and closed:
- *  - a comparison whose operands are each a bare reference or a literal;
- *  - `selected(${key}, 'value')` and its `not(...)` negation — the membership predicates;
- *  - `count(${section})` compared to a number, which is the repeat-group branch H21a made work;
- *  - `and` / `or` chains of the above, at any depth.
- *
- * Everything else — arithmetic operands, `if(...)`, `int(...)`, `today()`/`now()`, a comparison of two
- * function calls, a `not()` of a whole chain — is opaque BY DECISION rather than by omission. Each of those
- * has a reading that is either wrong or longer than the expression it explains, and the author already has
- * the expression.
- */
-function say(node: Node, labels: LabelLookup): string | null {
-    const clause = clauseOf(node, labels);
-
-    return clause === null ? null : `Shown when ${clause}.`;
+function say(condition: Condition, labels: LabelLookup): string {
+    return `Shown when ${clauseOf(condition, labels)}.`;
 }
 
-function clauseOf(node: Node, labels: LabelLookup): string | null {
-    switch (node.type) {
-        case 'logical': {
-            const left = clauseOf(node.left, labels);
-            const right = clauseOf(node.right, labels);
-            if (left === null || right === null) return null;
-
-            // Grouping is PRESERVED, not flattened. `(A or B) and C` and `A or (B and C)` are different
-            // conditions and a reading that renders both as "A or B and C" is worse than no reading — it is
-            // a confident wrong answer, which is the one failure mode §8 calls the disqualifier.
-            const group = (child: Node, rendered: string): string =>
-                child.type === 'logical' && child.op !== node.op ? `(${rendered})` : rendered;
-
-            return `${group(node.left, left)} ${node.op} ${group(node.right, right)}`;
-        }
-        case 'comparison':
-            return comparisonClause(node.op, node.left, node.right, labels);
-        case 'call':
-            return callClause(node, labels, false);
-        case 'not':
-            // Only a negated membership predicate reads cleanly. "not (A and B)" is a sentence about
-            // sentences, and the honest rendering of it is the expression itself.
-            return node.operand.type === 'call' ? callClause(node.operand, labels, true) : null;
-        default:
-            return null;
-    }
-}
-
-const COMPARATORS: Record<string, string> = {
+const COMPARATORS: Record<Comparator, string> = {
     eq: 'is',
     neq: 'is not',
     gt: 'is more than',
@@ -164,7 +129,7 @@ const COMPARATORS: Record<string, string> = {
 };
 
 /** The same six operators against a COUNT, where "is more than 0 entries" is not English. */
-const COUNT_COMPARATORS: Record<string, string> = {
+const COUNT_COMPARATORS: Record<Comparator, string> = {
     eq: 'has exactly',
     neq: 'does not have exactly',
     gt: 'has more than',
@@ -173,75 +138,45 @@ const COUNT_COMPARATORS: Record<string, string> = {
     lte: 'has at most',
 };
 
-function comparisonClause(op: string, left: Node, right: Node, labels: LabelLookup): string | null {
-    const comparator = COMPARATORS[op];
-    if (comparator === undefined) return null;
+function clauseOf(condition: Condition, labels: LabelLookup): string {
+    switch (condition.kind) {
+        case 'group':
+            // Grouping is PRESERVED, not flattened. `(A or B) and C` and `A or (B and C)` are different
+            // conditions and a reading that renders both as "A or B and C" is worse than no reading — it is
+            // a confident wrong answer, which is the one failure mode §8 calls the disqualifier. A child
+            // group always carries the OTHER operator (`normalize` flattens same-operator nesting), so it
+            // always needs its parentheses.
+            return condition.children
+                .map((child) => (child.kind === 'group' ? `(${clauseOf(child, labels)})` : clauseOf(child, labels)))
+                .join(` ${condition.op} `);
+        case 'compare':
+            return `${operandOf(condition.left, labels)} ${COMPARATORS[condition.op]} ${operandOf(condition.right, labels)}`;
+        case 'blank':
+            // `${key} = ''` is the emptiness test, and "is blank" is what the author means by it — rendering
+            // it as «is “”» would be technically faithful and practically useless.
+            return `${operandOf(condition.subject, labels)} ${condition.op === 'eq' ? 'is blank' : 'is not blank'}`;
+        case 'count': {
+            // `count(${roster}) > 0` — the repeat-group branch, which read 0 in every relevance expression
+            // until H21a fixed it (Doc #27 §3.3) and is therefore the shape an author is least likely to
+            // recognise on sight.
+            const n = condition.n;
 
-    const counted = countClause(op, left, right, labels);
-    if (counted !== null) return counted;
-
-    const subject = operandOf(left, labels);
-    if (subject === null) return null;
-
-    // `${key} = ''` is the emptiness test, and "is blank" is what the author means by it — rendering it as
-    // «is “”» would be technically faithful and practically useless. Tested on the NODE rather than on the
-    // rendered string, so it cannot be spoofed by a literal that happens to render the same way.
-    if (right.type === 'literal' && right.literalKind === 'string' && right.value === '') {
-        return op === 'eq' ? `${subject} is blank` : op === 'neq' ? `${subject} is not blank` : null;
+            return `${labelFor(condition.section, labels)} ${COUNT_COMPARATORS[condition.op]} ${n} ${n === 1 ? 'entry' : 'entries'}`;
+        }
+        case 'selected':
+            return `${labelFor(condition.field, labels)} ${condition.negated ? 'does not include' : 'includes'} “${condition.value}”`;
     }
-
-    const object = operandOf(right, labels);
-
-    return object === null ? null : `${subject} ${comparator} ${object}`;
 }
 
-/**
- * `count(${roster}) > 0` — the repeat-group branch, which read 0 in every relevance expression until H21a
- * fixed it (Doc #27 §3.3) and is therefore the shape an author is least likely to recognise on sight.
- *
- * Narrow on purpose. The count must be on the LEFT (the only side an author writes it, and inventing a
- * reading for the mirror image is guesswork) and the other operand must be a NUMBER LITERAL — "has more
- * than Membership tier entries" is not a sentence. Anything else falls through to the generic path, where
- * `operandOf` refuses a call and the whole clause goes opaque, which is the right degradation.
- *
- * Returns null to mean "not this shape", NOT "undescribable" — the caller continues rather than giving up.
- */
-function countClause(op: string, left: Node, right: Node, labels: LabelLookup): string | null {
-    if (left.type !== 'call' || left.name !== 'count' || left.args.length !== 1) return null;
-
-    const counted = left.args[0];
-    if (counted.type !== 'field') return null;
-    if (right.type !== 'literal' || right.literalKind !== 'number') return null;
-
-    const comparator = COUNT_COMPARATORS[op];
-    if (comparator === undefined) return null;
-
-    const n = Number(right.value);
-
-    return `${labelFor(counted.key, labels)} ${comparator} ${n} ${n === 1 ? 'entry' : 'entries'}`;
-}
-
-/** A bare reference or a literal. Anything else (arithmetic, a nested call) makes the clause opaque. */
-function operandOf(node: Node, labels: LabelLookup): string | null {
-    if (node.type === 'field') return labelFor(node.key, labels);
-    if (node.type !== 'literal') return null;
-
-    return node.literalKind === 'number' ? String(node.value) : `“${String(node.value)}”`;
-}
-
-function callClause(node: Node, labels: LabelLookup, negated: boolean): string | null {
-    if (node.type !== 'call') return null;
-
-    // `selected(${key}, 'value')` — the only function that IS a condition on its own. `contains` is
-    // internal to structured-rule lowering and never parseable, so it cannot appear in authored text.
-    if (node.name !== 'selected' || node.args.length !== 2) return null;
-
-    const [subject, choice] = node.args;
-    if (subject.type !== 'field' || choice.type !== 'literal') return null;
-
-    const verb = negated ? 'does not include' : 'includes';
-
-    return `${labelFor(subject.key, labels)} ${verb} “${String(choice.value)}”`;
+function operandOf(operand: Operand, labels: LabelLookup): string {
+    switch (operand.kind) {
+        case 'field':
+            return labelFor(operand.key, labels);
+        case 'number':
+            return String(operand.value);
+        case 'text':
+            return `“${operand.value}”`;
+    }
 }
 
 /**

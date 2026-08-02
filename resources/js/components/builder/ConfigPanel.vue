@@ -19,6 +19,7 @@ import {
 } from '@meridian/design-system';
 import CascadingEditor from './CascadingEditor.vue';
 import ChoicesEditor from './ChoicesEditor.vue';
+import ConditionEditor from './ConditionEditor.vue';
 import GeoEditor from './GeoEditor.vue';
 import LikertMatrixEditor from './LikertMatrixEditor.vue';
 import MatrixEditor from './MatrixEditor.vue';
@@ -26,7 +27,7 @@ import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
-import type { BuilderValidation, EnumOption, LocalField, LocalSection } from './types';
+import type { BuilderValidation, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 
 interface Choice {
     value: string;
@@ -153,6 +154,44 @@ const mediaCaptureSource = computed<string | null>(() => (field.value?.config.ca
 // existing `default_value` column rather than a second config key.
 const prefillSource = computed<string | null>(() => (field.value?.config.prefill_source as string | undefined) ?? null);
 const prefillUrlParam = computed<string | null>(() => (field.value?.config.url_param as string | undefined) ?? null);
+
+// What the structured condition editor may offer (Increment H21d2). Assembled here because the editor takes
+// no store — the sub-editor house contract — and because only the panel knows which row is being edited.
+//
+// Every key is offered, including keys that come LATER in the form: a forward reference is legal at publish
+// and warned rather than refused (Doc #27 §3.1), so hiding them would enforce a rule the engine does not
+// have. What IS excluded is the row's own key, which can only ever be a self-cycle — and excluding it from
+// the PICKER never rewrites an expression that already names it.
+const NUMERIC_TYPES = new Set(['integer', 'decimal', 'calculated', 'likert_scale']);
+
+function choicesOf(target: LocalField): EnumOption[] {
+    const options = target.config.options;
+    if (!Array.isArray(options)) return [];
+
+    return options
+        .filter((option): option is Choice => typeof option === 'object' && option !== null && 'value' in option)
+        .map((option) => ({ value: String(option.value), label: String(option.label ?? option.value) }));
+}
+
+const catalogue = computed<ConditionCatalogue>(() => {
+    const ownKey = field.value?.key ?? section.value?.key ?? null;
+
+    return {
+        fields: props.store.fields.value
+            .filter((f) => f.key !== '' && f.key !== ownKey)
+            .map((f) => ({
+                key: f.key,
+                label: f.label.trim() === '' ? f.key : f.label,
+                numeric: NUMERIC_TYPES.has(f.field_type),
+                options: choicesOf(f),
+            })),
+        // `count()` is only meaningful against a repeatable section — a non-repeating one has no instances
+        // to count, and H21a seeds the reference at both scopes for repeatables only.
+        repeatables: props.store.sections.value
+            .filter((s) => s.is_repeatable && s.key !== '' && s.key !== ownKey)
+            .map((s) => ({ key: s.key, label: s.label.trim() === '' ? s.key : s.label })),
+    };
+});
 
 function setField<K extends keyof LocalField>(key: K, value: LocalField[K]): void {
     const target = field.value;
@@ -381,15 +420,13 @@ watch(librarySaved, (value) => {
                             @update:model-value="reparent($event)"
                         />
                     </MdsFormField>
-                    <MdsFormField label="Relevant (display) expression" help="Shown only when this holds. Supports ${field} refs, and/or/not, = != > < >= <=, arithmetic, and selected()/count(). Checked when you publish." v-slot="{ id, describedby }">
-                        <MdsTextarea
-                            :id="id"
-                            :describedby="describedby"
-                            :model-value="field.relevant_expression ?? ''"
-                            :rows="2"
-                            @update:model-value="setField('relevant_expression', $event || null)"
-                        />
-                    </MdsFormField>
+                    <ConditionEditor
+                        :key="`field-${field.uid}`"
+                        :expression="field.relevant_expression"
+                        :catalogue="catalogue"
+                        legend="Show this question only when…"
+                        @update:expression="setField('relevant_expression', $event)"
+                    />
                     <MdsFormField label="Appearance hint" v-slot="{ id }">
                         <MdsTextInput
                             :id="id"
@@ -504,15 +541,13 @@ watch(librarySaved, (value) => {
                             />
                         </MdsFormField>
                     </div>
-                    <MdsFormField label="Relevant (display) expression" help="Shown only when this holds. Supports ${field} refs, and/or/not, = != > < >= <=, arithmetic, and selected()/count(). Checked when you publish." v-slot="{ id, describedby }">
-                        <MdsTextarea
-                            :id="id"
-                            :describedby="describedby"
-                            :model-value="section.relevant_expression ?? ''"
-                            :rows="2"
-                            @update:model-value="setSection('relevant_expression', $event || null)"
-                        />
-                    </MdsFormField>
+                    <ConditionEditor
+                        :key="`section-${section.uid}`"
+                        :expression="section.relevant_expression"
+                        :catalogue="catalogue"
+                        legend="Show this section only when…"
+                        @update:expression="setSection('relevant_expression', $event)"
+                    />
                 </template>
             </div>
         </template>

@@ -597,7 +597,7 @@ Merged H10 (squash → PR #59 `934fff6`, all 6 CI jobs green); branched `h11-das
 
 ## 2026-08-02 — H21d2 (the structured condition editor) — H-map row 254 CLOSED, the H21 arc complete
 
-**The write half of the logic canvas**, and the increment that had to ship the AST→text printer three prior increments verified does not exist. Doc #27 → **v1.5**, amendments **E1–E5**. Branch `h21d2-condition-editor`.
+**The write half of the logic canvas**, and the increment that had to ship the AST→text printer three prior increments verified does not exist. Doc #27 → **v1.5**, amendments **E1–E5**. **MERGED PR #84 `af31026`, 6/6 CI green on the first run.**
 
 **Three decisions locked with the user before any code.** (1) **ONE classifier, by construction** rather than two held together by a test. (2) **`ConfigPanel` replaced**, one control in two derived modes. (3) **One PR** for the whole write path, because §9's round-trip obligation is "every shape the editor can author" and a model-only PR would owe a test it could not write.
 

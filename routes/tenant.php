@@ -218,6 +218,13 @@ Route::middleware([
     Route::get('/forms/{form}/library-items', [FormBuilderController::class, 'libraryItems'])
         ->middleware(['can:update,form', 'feature:field_library'])->name('forms.library-items');
 
+    // The builder's relevance-graph sidecar (Increment H21d1, Doc #27 §8) — the Logic view's read-only JSON
+    // feed of the DRAFT's branching notices, consumed by builderClient like the ScopeNode impact/grants
+    // reads above. A read that WRITES NOTHING, so no 409 and no `respond()` mapping; gated `can:update,form`
+    // like every other builder route, not `can:view` — this surface exists only inside the editor.
+    Route::get('/forms/{form}/graph', [FormBuilderController::class, 'graph'])
+        ->middleware('can:update,form')->name('forms.graph');
+
     // Assign a form to the scoping hierarchy (Increment G10b2). Deliberately NOT part of PATCH /forms/{form}:
     // writing scope_node_id confers capacity on the form — and via SubmissionPolicy on its whole submission
     // history — to every holder of a grant on that node and on any includes_descendants ancestor. `can:update,form`

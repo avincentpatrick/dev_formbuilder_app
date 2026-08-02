@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\GraphNoticeKind;
 use App\Enums\PrefillSource;
 use App\Enums\ValidationRuleType;
+use App\Exceptions\Expressions\ExpressionException;
 use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
@@ -13,6 +15,7 @@ use App\Services\Expressions\ExpressionParser;
 use App\Services\Submissions\StructuralAnswerNormalizer;
 use App\Services\Templates\TemplateScopeResolver;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\GraphNotice;
 use App\Support\Forms\StepProjection;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -36,6 +39,16 @@ use Throwable;
  *
  * Everything is decided from the two `relevant_expression` columns plus `ExpressionParser::referencedKeys()`,
  * which the expression gate already calls. No new parsing machinery.
+ *
+ * ── H21d1: A SECOND CALLER, AND AN UNVALIDATED ONE ──────────────────────────────────────────────────
+ * The logic canvas reuses these notices against a **draft**, so this class now runs over expressions
+ * `ExpressionValidationGate` has never seen. Two consequences, both load-bearing:
+ *
+ *  1. {@see notices()} is the primary method and {@see warnings()} the flash-shaped wrapper over it. The
+ *     canvas needs each notice attached to the node it names; the flash wants one joined sentence per kind.
+ *  2. NOTHING HERE MAY THROW ON A HALF-TYPED EXPRESSION. `referencesIn()` has always caught (its docblock
+ *     named this increment as the reason), but {@see emptyAtOpen()} reached the parser through
+ *     `SemanticValidator` and did not — see its own note.
  */
 final class StepGraphInspector
 {
@@ -46,25 +59,78 @@ final class StepGraphInspector
     ) {}
 
     /**
-     * Every notice for a version, as finished sentences ready to flash.
+     * Every notice for a version, each addressable to the nodes it names (Increment H21d1).
      *
-     * Shaping lives here rather than in the controller deliberately: `scripts/controller-gate.php` caps a
-     * controller at 250 code lines and complexity 10, and message-building is all `foreach` + `??`.
-     *
-     * @return list<string>
+     * @return list<GraphNotice>
      */
-    public function warnings(FormVersion $version): array
+    public function notices(FormVersion $version): array
     {
         /** @var Collection<int, FormField> $fields */
         $fields = $version->fields()->orderBy('sequence')->orderBy('key')->get();
         /** @var Collection<int, FormSection> $sections */
         $sections = $version->sections()->orderBy('sequence')->orderBy('key')->get();
 
-        return array_values(array_filter([
+        // The order is H21a's, and `warnings()` re-derives it from an explicit list rather than depending
+        // on this one — two callers, neither reading the other's mind.
+        return array_merge(
             $this->emptyAtOpen($version, $fields, $sections),
             $this->forwardReferences($fields, $sections),
             $this->cycles($version, $fields, $sections),
-        ], static fn (?string $notice): bool => $notice !== null));
+        );
+    }
+
+    /**
+     * The same notices as finished sentences ready to flash — one per KIND, joining every instance of it.
+     *
+     * Shaping lives here rather than in the controller deliberately: `scripts/controller-gate.php` caps a
+     * controller at 250 code lines and complexity 10, and message-building is all `foreach` + `??`.
+     *
+     * The grouping is what makes this different from `array_map(message)`: three forward references are one
+     * banner line, not three, because the banner appears once on a page the author is leaving. Beside a node
+     * on the canvas the opposite is true, which is why {@see GraphNotice} carries both strings.
+     *
+     * @return list<string>
+     */
+    public function warnings(FormVersion $version): array
+    {
+        /** @var array<string, list<string>> $byKind */
+        $byKind = [];
+        foreach ($this->notices($version) as $notice) {
+            $byKind[$notice->kind->value][] = $notice->fragment;
+        }
+
+        // Explicit, not `GraphNoticeKind::cases()`: this is H21a's emission order, which the banner has
+        // shipped with, and it must not become a function of how the enum's cases happen to be declared.
+        $order = [GraphNoticeKind::EmptyAtOpen, GraphNoticeKind::ForwardReference, GraphNoticeKind::Cycle];
+
+        $sentences = [];
+        foreach ($order as $kind) {
+            $fragments = $byKind[$kind->value] ?? [];
+            if ($fragments === []) {
+                continue;
+            }
+            $sentences[] = $this->flashSentence($kind, $fragments);
+        }
+
+        return $sentences;
+    }
+
+    /**
+     * The flash copy for one kind. Pinned verbatim: these three sentences shipped in H21a and are asserted
+     * by `StepGraphInspectorTest`, so the H21d1 restructure must reproduce them byte-for-byte.
+     *
+     * @param  list<string>  $fragments
+     */
+    private function flashSentence(GraphNoticeKind $kind, array $fragments): string
+    {
+        return match ($kind) {
+            GraphNoticeKind::ForwardReference => 'Forward reference: '.implode('; ', $fragments)
+                .'. That condition stays false until the respondent reaches the later question.',
+            GraphNoticeKind::Cycle => 'Circular condition: '.implode('; ', $fragments)
+                .'. These conditions depend on each other, so the result depends on the order they settle in.',
+            // Form-level and singular by construction — there is exactly one graph to be empty.
+            GraphNoticeKind::EmptyAtOpen => $fragments[0],
+        };
     }
 
     /**
@@ -83,33 +149,58 @@ final class StepGraphInspector
      *
      * The clock is pinned to the version's own `published_at`, the H17 device: a `today()`-dependent
      * `relevant_expression` must be judged against publication, not against the moment someone happened to
-     * ask.
+     * ask. On a DRAFT that column is null, which `SemanticValidator` reads as "stamp your own clock" — the
+     * only honest answer for a version that has no publication instant yet.
+     *
+     * ── H21D1 DEFECT, FIXED HERE: THIS WAS THE ONE CHECK THAT COULD THROW ───────────────────────────
+     * `evaluateRelevance()` → `ExpressionEvaluator::evaluateBoolean()` → `ExpressionParser::parse()`, which
+     * raises `ExpressionSyntaxException` on malformed input. On the publish path that is unreachable —
+     * `ExpressionValidationGate` runs inside `publish()` and refuses first — which is why it never fired in
+     * H21a. Against a draft it is the ORDINARY case: a half-typed condition is what an author has most of
+     * the time, and an uncaught throw here 500s the canvas's sidecar.
+     *
+     * Both settle loops can raise it (sections are swept separately from fields), so the guard wraps the
+     * whole evaluation rather than one arm. A graph that cannot be evaluated yields NO empty-at-open notice:
+     * "empty at open" is a claim about what a respondent would see, and nobody can see anything through an
+     * expression that does not parse. The truer thing to say about that node is the syntax error itself, and
+     * the canvas already says it client-side, between keystrokes, where the author is looking.
      *
      * @param  Collection<int, FormField>  $fields
      * @param  Collection<int, FormSection>  $sections
+     * @return list<GraphNotice>
      */
-    private function emptyAtOpen(FormVersion $version, Collection $fields, Collection $sections): ?string
+    private function emptyAtOpen(FormVersion $version, Collection $fields, Collection $sections): array
     {
         foreach ($fields as $field) {
             if (PrefillSource::for($field->field_type, $field->config) === PrefillSource::Url) {
-                return null;
+                return [];
             }
         }
 
-        $normalized = $this->normalizer->normalize($fields, $sections, []);
-        $result = $this->semantic->validate($version, $normalized, null, $version->published_at?->toIso8601String());
+        try {
+            $normalized = $this->normalizer->normalize($fields, $sections, []);
+            $result = $this->semantic->validate($version, $normalized, null, $version->published_at?->toIso8601String());
 
-        $empty = StepProjection::isEmpty(
-            $sections,
-            $fields,
-            $result->sectionRelevance,
-            $result->fieldRelevance,
-            $result->repeatFieldRelevance,
-        );
+            $empty = StepProjection::isEmpty(
+                $sections,
+                $fields,
+                $result->sectionRelevance,
+                $result->fieldRelevance,
+                $result->repeatFieldRelevance,
+            );
+        } catch (ExpressionException) {
+            return [];
+        }
 
-        return $empty
-            ? 'This form shows no questions at all until something is answered, so a respondent opening it sees an empty form.'
-            : null;
+        if (! $empty) {
+            return [];
+        }
+
+        $message = 'This form shows no questions at all until something is answered, so a respondent opening it sees an empty form.';
+
+        // No node: emptiness is a property of the graph, not of any one section — naming one would point the
+        // author at an arbitrary member of the set of conditions that are jointly responsible.
+        return [new GraphNotice(GraphNoticeKind::EmptyAtOpen, [], $message, $message)];
     }
 
     /**
@@ -132,11 +223,13 @@ final class StepGraphInspector
      *
      * @param  Collection<int, FormField>  $fields
      * @param  Collection<int, FormSection>  $sections
+     * @return list<GraphNotice>
      */
-    private function forwardReferences(Collection $fields, Collection $sections): ?string
+    private function forwardReferences(Collection $fields, Collection $sections): array
     {
         [$positions, $ownerSectionKey] = $this->positions($fields, $sections);
 
+        /** @var array<string, GraphNotice> $pairs  keyed by fragment, which dedupes as the old array_unique did */
         $pairs = [];
 
         foreach ($this->relevanceNodes($fields, $sections) as [$nodeKey, $expression, $hostPosition, $containedIn]) {
@@ -152,16 +245,20 @@ final class StepGraphInspector
                 }
 
                 if (TemplateScopeResolver::precedes($hostPosition, $target)) {
-                    $pairs[] = '“'.$nodeKey.'” depends on “'.$referenced.'”, which comes later in the form';
+                    $fragment = '“'.$nodeKey.'” depends on “'.$referenced.'”, which comes later in the form';
+                    // The HOST is named first: it is the node the canvas hangs this on, because it is the
+                    // node whose condition is the late one and therefore the node the author would edit.
+                    $pairs[$fragment] = new GraphNotice(
+                        GraphNoticeKind::ForwardReference,
+                        [$nodeKey, $referenced],
+                        'This depends on “'.$referenced.'”, which comes later in the form, so it stays false until the respondent reaches that question.',
+                        $fragment,
+                    );
                 }
             }
         }
 
-        $pairs = array_values(array_unique($pairs));
-
-        return $pairs === []
-            ? null
-            : 'Forward reference: '.implode('; ', $pairs).'. That condition stays false until the respondent reaches the later question.';
+        return array_values($pairs);
     }
 
     /**
@@ -189,23 +286,27 @@ final class StepGraphInspector
      *
      * @param  Collection<int, FormField>  $fields
      * @param  Collection<int, FormSection>  $sections
+     * @return list<GraphNotice>
      */
-    private function cycles(FormVersion $version, Collection $fields, Collection $sections): ?string
+    private function cycles(FormVersion $version, Collection $fields, Collection $sections): array
     {
         $edges = $this->dependencyEdges($version, $fields, $sections);
-        $cycles = $this->findCycles($edges);
 
-        if ($cycles === []) {
-            return null;
-        }
+        return array_map(
+            static function (array $members): GraphNotice {
+                $described = '“'.implode('” ⇄ “', $members).'”';
 
-        $described = array_map(
-            static fn (array $members): string => '“'.implode('” ⇄ “', $members).'”',
-            $cycles,
+                // EVERY member is a node, not just the one the DFS happened to enter the cycle from: a cycle
+                // is a property of the set, and an author standing on any member needs to be told.
+                return new GraphNotice(
+                    GraphNoticeKind::Cycle,
+                    $members,
+                    'Circular condition — '.$described.' depend on each other, so the result depends on the order they settle in.',
+                    $described,
+                );
+            },
+            $this->findCycles($edges),
         );
-
-        return 'Circular condition: '.implode('; ', $described)
-            .'. These conditions depend on each other, so the result depends on the order they settle in.';
     }
 
     /**

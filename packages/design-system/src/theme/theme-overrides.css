@@ -34,9 +34,16 @@
     --mds-color-bg-sunken: var(--mds-neutral-50);
     --mds-color-text-on-primary: #ffffff;
     --mds-color-text-on-warning: #16212b;
-    --mds-color-action-primary-bg: var(--mds-primary-500);
-    --mds-color-action-primary-bg-hover: var(--mds-primary-400);
-    --mds-color-action-primary-bg-active: var(--mds-primary-300);
+    /* White-on-fill, verified (H21d1). The dark hover/active DARKEN rather than lighten, which is the
+       opposite of a light-mode instinct and the reason this was wrong: --mds-color-text-on-primary is
+       #ffffff here, so a lighter fill destroys the very contrast the fill exists to carry. primary-400 is
+       3.96:1 and primary-300 is 2.52:1 against white — both real WCAG 1.4.3 failures in the hover and
+       active states of every primary button in dark mode. There is no ramp step between 400 and 500 that
+       clears 4.5:1, so the affordance moves the other way rather than inventing a colour. The teal accent
+       already carried per-token verification (see below); the default accent never did. */
+    --mds-color-action-primary-bg: var(--mds-primary-500); /* white on it     6.14:1 */
+    --mds-color-action-primary-bg-hover: var(--mds-primary-600); /*           9.14:1 */
+    --mds-color-action-primary-bg-active: var(--mds-primary-700); /*         13.00:1 */
     --mds-color-action-primary-fg: var(--mds-primary-300);
     --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
     --mds-color-action-danger-bg: var(--mds-danger-500);
@@ -82,9 +89,10 @@
         --mds-color-bg-sunken: var(--mds-neutral-50);
         --mds-color-text-on-primary: #ffffff;
         --mds-color-text-on-warning: #16212b;
-        --mds-color-action-primary-bg: var(--mds-primary-500);
-        --mds-color-action-primary-bg-hover: var(--mds-primary-400);
-        --mds-color-action-primary-bg-active: var(--mds-primary-300);
+        /* Must not drift from the explicit dark block above — see H21d1's note there. */
+        --mds-color-action-primary-bg: var(--mds-primary-500); /* white on it     6.14:1 */
+        --mds-color-action-primary-bg-hover: var(--mds-primary-600); /*           9.14:1 */
+        --mds-color-action-primary-bg-active: var(--mds-primary-700); /*         13.00:1 */
         --mds-color-action-primary-fg: var(--mds-primary-300);
         --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
         --mds-color-action-danger-bg: var(--mds-danger-500);

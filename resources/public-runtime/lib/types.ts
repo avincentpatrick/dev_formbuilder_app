@@ -338,7 +338,16 @@ export interface SaveDraftPayload {
     answers: AnswerMap;
     clientSubmissionUuid: string;
     locale: string;
-    /** The SPA's current step key, restored verbatim on resume; omitted for single-page forms. */
+    /**
+     * The SPA's current step key, resolved on resume by `goToStep()` (Increment H21b, Doc #27 §5.3 — an
+     * unresolvable key walks to the nearest surviving predecessor, then to the first incomplete step).
+     *
+     * SENT IN BOTH PRESENTATION MODES. An earlier version of this comment claimed it was "omitted for
+     * single-page forms"; that was never true — `RuntimeSession` sends it unconditionally, `currentStepKey` is
+     * seeded from `visibleSteps[0]` regardless of mode, and the wire guard suppresses only an empty string. It
+     * is harmless there, but planning against the old wording plans against a column that does not behave as
+     * documented.
+     */
     draftCurrentStep?: string | null;
     /** When set, "Save and finish later" also emails the resume link to this address. */
     guestContactEmail?: string | null;

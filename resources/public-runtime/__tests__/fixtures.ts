@@ -58,6 +58,8 @@ export function schemaResponse(opts: {
     sections?: RawSection[];
     form?: Partial<SchemaResponse['form']>;
     checksum?: string;
+    /** Increment H21b — the replay version guard compares against `version.id`, so tests must be able to move it. */
+    versionId?: string;
 }): SchemaResponse {
     const schema: RawSchemaSnapshot = { sections: opts.sections ?? [], fields: opts.fields };
     return {
@@ -75,7 +77,7 @@ export function schemaResponse(opts: {
             confirmation_message_translations: opts.form?.confirmation_message_translations,
         },
         version: {
-            id: 'ver-1',
+            id: opts.versionId ?? 'ver-1',
             version_number: 1,
             checksum: opts.checksum ?? 'checksum-abc',
             schema,

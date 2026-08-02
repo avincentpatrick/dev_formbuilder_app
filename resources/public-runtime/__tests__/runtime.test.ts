@@ -562,3 +562,350 @@ describe('createFormRuntime — step visibility predicate 3 (H21a)', () => {
         expect(build('no').visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Increment H21b — non-linear execution (Doc #27 §3.1, §4.1, §4.2, §4.4, §5.3).
+//
+// All five shapes below were recorded by H1f and left live by construction. Each asserts the mechanism
+// directly rather than "did not throw": §9's standing caution is that an expectation reachable by more than
+// one path pins nothing, and every one of these has a trivially-passing impostor.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Every section gated on a hidden field, so nothing renders until it is set — the §4.1 router-form shape. */
+function gatedSchema(sections: string[], gate = 'gate') {
+    return schemaResponse({
+        form: { single_page_mode: false },
+        sections: sections.map((key, i) =>
+            section({ key, label: key.toUpperCase(), sequence: i + 1, relevant_expression: `\${${gate}} = 'go'` }),
+        ),
+        fields: [
+            field({ key: gate, sequence: 0, field_type: 'hidden' }),
+            ...sections.map((key, i) => field({ key: `${key}_q`, section_key: key, sequence: i + 1 })),
+        ],
+    });
+}
+
+describe('createFormRuntime — the empty graph is a terminal state (H21b §4.1)', () => {
+    it('reports zero steps as terminal, and NOT as being on the last step', () => {
+        const runtime = createFormRuntime(gatedSchema(['s1']));
+
+        expect(runtime.visibleSteps.value).toEqual([]);
+        expect(runtime.currentStepIndex.value).toBe(-1);
+        // The defect: `findIndex` over [] is -1 and `length - 1` is also -1, so the old `index === length - 1`
+        // was TRUE. The view rendered Submit over an empty form, nothing was relevant so nothing was required,
+        // `passed` was true, and one click created a real submission with an empty answer document.
+        expect(runtime.isLastStep.value).toBe(false);
+        expect(runtime.isTerminal.value).toBe(true);
+    });
+
+    it('is not terminal, and IS on the last step, once a single step exists (the control)', async () => {
+        const runtime = createFormRuntime(gatedSchema(['s1']));
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+        expect(runtime.isTerminal.value).toBe(false);
+        expect(runtime.isLastStep.value).toBe(true);
+    });
+
+    it('seeds currentStepKey when the first step appears, so Next is not dead forever', async () => {
+        const runtime = createFormRuntime(gatedSchema(['s1']));
+        // Empty at CONSTRUCTION, so the eager seed never ran.
+        expect(runtime.currentStepKey.value).toBe('');
+
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+
+        // The old membership-boolean watcher was false at t=0 and STAYED false when steps appeared, so it
+        // never fired at all: the index stayed -1, `attemptNext()` failed its `idx >= 0` guard, and Next did
+        // nothing on every click, permanently.
+        expect(runtime.currentStepKey.value).toBe('s1');
+        expect(runtime.currentStepIndex.value).toBe(0);
+    });
+
+    it('advances off the newly-seeded step instead of silently doing nothing', async () => {
+        const runtime = createFormRuntime(gatedSchema(['s1', 's2']));
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+
+        expect(runtime.attemptNext()).toEqual({ advanced: true, errorCount: 0 });
+        expect(runtime.currentStepKey.value).toBe('s2');
+    });
+});
+
+describe('createFormRuntime — rescue by identity, not by index (H21b §4.2)', () => {
+    /** [s1 .. s4] where s1 always shows, `gate` controls s2/s3 and `tail` controls s4 independently. */
+    function cascadeSchema() {
+        return schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'One', sequence: 1 }),
+                section({ key: 's2', label: 'Two', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+                section({ key: 's3', label: 'Three', sequence: 3, relevant_expression: "${gate} = 'go'" }),
+                section({ key: 's4', label: 'Four', sequence: 4, relevant_expression: "${tail} = 'go'" }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                field({ key: 'tail', section_key: 's1', sequence: 2 }),
+                field({ key: 'two', section_key: 's2', sequence: 3 }),
+                field({ key: 'three', section_key: 's3', sequence: 4 }),
+                field({ key: 'four', section_key: 's4', sequence: 5 }),
+            ],
+        });
+    }
+
+    async function onStepFour() {
+        const runtime = createFormRuntime(cascadeSchema());
+        runtime.setAnswer('gate', 'go');
+        runtime.setAnswer('tail', 'go');
+        await nextTick();
+        runtime.goToStep('s4');
+        await nextTick();
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1', 's2', 's3', 's4']);
+        expect(runtime.currentStepKey.value).toBe('s4');
+        return runtime;
+    }
+
+    it('lands on the nearest surviving PREDECESSOR when only the current step vanishes', async () => {
+        const runtime = await onStepFour();
+
+        runtime.setAnswer('tail', 'stop'); // s4 alone disappears
+        await nextTick();
+
+        expect(runtime.currentStepKey.value).toBe('s3');
+    });
+
+    it('walks past a whole vanished tail rather than clamping the index', async () => {
+        const runtime = await onStepFour();
+
+        // s2, s3 and s4 all hide at once. The old rule was `min(lastValidIndex, length - 1)` = `min(3, 0)` = 0.
+        // Identity walks outward from s4 — past s3 and s2, both now gone — and lands on s1.
+        runtime.setAnswer('gate', 'stop');
+        runtime.setAnswer('tail', 'stop');
+        await nextTick();
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1']);
+        expect(runtime.currentStepKey.value).toBe('s1');
+    });
+
+    it('walks FORWARD when the vanished step had no surviving predecessor', async () => {
+        // §4.2 says walk OUTWARD, and both directions are load-bearing: the respondent is on the FIRST step
+        // when it removes itself, so there is nothing behind them to walk back to. Found by mutation —
+        // deleting the forward arm reddened nothing until this test existed.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [
+                    section({ key: 's1', label: 'One', sequence: 1, relevant_expression: "${leave} != 'stop'" }),
+                    section({ key: 's2', label: 'Two', sequence: 2 }),
+                ],
+                fields: [
+                    field({ key: 'leave', section_key: 's1', sequence: 1 }),
+                    field({ key: 'two', section_key: 's2', sequence: 2 }),
+                ],
+            }),
+        );
+        expect(runtime.currentStepKey.value).toBe('s1');
+
+        runtime.setAnswer('leave', 'stop');
+        await nextTick();
+
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s2']);
+        expect(runtime.currentStepKey.value).toBe('s2');
+        expect(runtime.lastStepChange.value?.rescuedFrom).toBe('s1');
+        expect(runtime.lastStepChange.value?.rescuedTo).toBe('s2');
+    });
+
+    it('publishes the rescue on lastStepChange so a component can announce the REASON', async () => {
+        const runtime = await onStepFour();
+
+        runtime.setAnswer('tail', 'stop');
+        await nextTick();
+
+        const change = runtime.lastStepChange.value;
+        expect(change?.rescuedFrom).toBe('s4');
+        expect(change?.rescuedTo).toBe('s3');
+        expect(change?.removed).toEqual(['s4']);
+        expect(change?.previousCount).toBe(4);
+        expect(change?.count).toBe(3);
+    });
+
+    it('leaves rescuedFrom null when the respondent’s own step survived (§3.1)', async () => {
+        const runtime = createFormRuntime(cascadeSchema());
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+        expect(runtime.currentStepKey.value).toBe('s1');
+
+        // The count changes BEHIND the respondent; nobody is moved, but N went 3 → 1 in silence.
+        runtime.setAnswer('gate', 'stop');
+        await nextTick();
+
+        expect(runtime.currentStepKey.value).toBe('s1');
+        expect(runtime.lastStepChange.value?.rescuedFrom).toBeNull();
+        expect(runtime.lastStepChange.value?.previousCount).toBe(3);
+        expect(runtime.lastStepChange.value?.count).toBe(1);
+    });
+
+    it('reports a rescue with no destination when the graph empties under the respondent', async () => {
+        const runtime = createFormRuntime(gatedSchema(['s1']));
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+        expect(runtime.currentStepKey.value).toBe('s1');
+
+        runtime.setAnswer('gate', 'stop');
+        await nextTick();
+
+        expect(runtime.isTerminal.value).toBe(true);
+        expect(runtime.lastStepChange.value?.rescuedFrom).toBe('s1');
+        expect(runtime.lastStepChange.value?.rescuedTo).toBeNull();
+    });
+});
+
+describe('createFormRuntime — the notice a step can give and a field cannot (H21b §4.4)', () => {
+    function notedSchema() {
+        return schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'One', sequence: 1 }),
+                section({ key: 's2', label: 'Two', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', sequence: 2 }),
+            ],
+        });
+    }
+
+    it('names a removed step that still holds an answer', async () => {
+        const runtime = createFormRuntime(notedSchema());
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+        runtime.setAnswer('two', 'typed something');
+
+        runtime.setAnswer('gate', 'stop');
+        await nextTick();
+
+        expect(runtime.lastStepChange.value?.removed).toEqual(['s2']);
+        expect(runtime.lastStepChange.value?.removedWithAnswers).toEqual(['s2']);
+        // The data is safe; this is about SAYING so, which no `FieldRow` can do for an unmounted step.
+        expect(runtime.answers.two).toBe('typed something');
+    });
+
+    it('stays silent about a removed step that holds nothing', async () => {
+        const runtime = createFormRuntime(notedSchema());
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+
+        runtime.setAnswer('gate', 'stop');
+        await nextTick();
+
+        expect(runtime.lastStepChange.value?.removed).toEqual(['s2']);
+        expect(runtime.lastStepChange.value?.removedWithAnswers).toEqual([]);
+    });
+});
+
+describe('createFormRuntime — the visited set (H21b §3.1)', () => {
+    function reappearSchema() {
+        return schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'One', sequence: 1 }),
+                section({ key: 's2', label: 'Two', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+                section({ key: 's3', label: 'Three', sequence: 3 }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', sequence: 2 }),
+                field({ key: 'three', section_key: 's3', sequence: 3 }),
+            ],
+        });
+    }
+
+    it('does not mark a step the respondent was never on, even when it sits behind them', async () => {
+        const runtime = createFormRuntime(reappearSchema());
+        runtime.attemptNext(); // s1 → s3, because s2 is hidden
+        expect(runtime.currentStepKey.value).toBe('s3');
+        expect(runtime.hasVisited('s1')).toBe(true);
+        expect(runtime.hasVisited('s3')).toBe(true);
+
+        // s2 appears BEHIND the respondent. `index < currentIndex` would call it done from this moment on and
+        // offer a clickable "go to step 2" dot for a step they have never seen.
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+        expect(runtime.visibleSteps.value.map((s) => s.key)).toEqual(['s1', 's2', 's3']);
+        expect(runtime.hasVisited('s2')).toBe(false);
+    });
+
+    it('marks a step visited once the respondent actually navigates to it', async () => {
+        const runtime = createFormRuntime(reappearSchema());
+        runtime.setAnswer('gate', 'go');
+        await nextTick();
+        runtime.goToStep('s2');
+        expect(runtime.hasVisited('s2')).toBe(true);
+    });
+});
+
+describe('createFormRuntime — resume drift resolution (H21b §5.3)', () => {
+    function resumeSchema() {
+        return schemaResponse({
+            form: { single_page_mode: false },
+            sections: [
+                section({ key: 's1', label: 'One', sequence: 1 }),
+                section({ key: 's2', label: 'Two', sequence: 2, relevant_expression: "${gate} = 'go'" }),
+                section({ key: 's3', label: 'Three', sequence: 3 }),
+            ],
+            fields: [
+                field({ key: 'gate', section_key: 's1', sequence: 1 }),
+                field({ key: 'two', section_key: 's2', sequence: 2 }),
+                field({ key: 'three', section_key: 's3', sequence: 3 }),
+            ],
+        });
+    }
+
+    it('reports an exact hit and adopts the key', () => {
+        const runtime = createFormRuntime(resumeSchema());
+        expect(runtime.goToStep('s3')).toBe('exact');
+        expect(runtime.currentStepKey.value).toBe('s3');
+    });
+
+    it('walks a known-but-irrelevant key to its nearest surviving predecessor — the H21 case', () => {
+        const runtime = createFormRuntime(resumeSchema());
+        // s2 is authored but currently gated off: the respondent saved their cursor there and the branch then
+        // moved. This used to be a guarded no-op, leaving them on step 1 with no explanation at all.
+        expect(runtime.goToStep('s2')).toBe('nearest');
+        expect(runtime.currentStepKey.value).toBe('s1');
+    });
+
+    it('resolves a stored FIRST step forward when it is the one that is irrelevant', () => {
+        // The other half of §4.2's outward walk, on the resume path: nothing precedes the stored key.
+        const runtime = createFormRuntime(
+            schemaResponse({
+                form: { single_page_mode: false },
+                sections: [
+                    section({ key: 's1', label: 'One', sequence: 1, relevant_expression: "${gate} = 'go'" }),
+                    section({ key: 's2', label: 'Two', sequence: 2 }),
+                ],
+                fields: [
+                    field({ key: 'gate', sequence: 0, field_type: 'hidden' }),
+                    field({ key: 'one', section_key: 's1', sequence: 1 }),
+                    field({ key: 'two', section_key: 's2', sequence: 2 }),
+                ],
+            }),
+        );
+        expect(runtime.goToStep('s1')).toBe('nearest');
+        expect(runtime.currentStepKey.value).toBe('s2');
+    });
+
+    it('falls back to the first INCOMPLETE step for a key this version no longer has', () => {
+        const runtime = createFormRuntime(resumeSchema());
+        runtime.setAnswer('gate', 'answered'); // s1 is now complete, so the fallback must skip past it
+        expect(runtime.goToStep('s_removed_by_a_republish')).toBe('first-incomplete');
+        expect(runtime.currentStepKey.value).toBe('s3');
+    });
+
+    it('reports `none` and adopts nothing when the graph is empty', () => {
+        const runtime = createFormRuntime(gatedSchema(['s1']));
+        expect(runtime.goToStep('s1')).toBe('none');
+        expect(runtime.currentStepKey.value).toBe('');
+    });
+});

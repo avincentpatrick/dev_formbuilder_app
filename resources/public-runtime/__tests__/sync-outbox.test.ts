@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDb, type MeridianDb } from '../lib/db';
 import { enqueue, markConflict, type EnqueueInput } from '../lib/outbox';
 import { createSyncOutbox, type SyncOutbox } from '../composables/useSyncOutbox';
+import { field, schemaResponse } from './fixtures';
 
 let n = 0;
 let db: MeridianDb;
@@ -16,6 +17,11 @@ function okFetch(): typeof fetch {
     const fetchFn = vi.fn(async (url: string) => {
         if (url.startsWith('/f/')) {
             return res(200, { shareToken: 'tok', expiresAt: '', form: { id: 'f', title: 'T' } });
+        }
+        // The schema read replay does before posting (Increment H21b) — `v1` matches what `input()` enqueues,
+        // so these rows replay rather than parking as version conflicts.
+        if (url.startsWith('/api/v1/public/f/') && !url.includes('/submissions')) {
+            return res(200, { data: schemaResponse({ fields: [field({ key: 'a' })], versionId: 'v1' }) });
         }
         return res(201, { data: { id: 'srv-1', status: 'submitted' } });
     });

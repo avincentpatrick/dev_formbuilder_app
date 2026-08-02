@@ -35,7 +35,9 @@ const fields = computed(() =>
 </script>
 
 <template>
-    <section class="section" data-section>
+    <!-- `data-section-key` (Increment H21b) lets single-page mode identify WHICH section held focus before a
+         relevance change removed it — the rescue runs after the unmount, so it cannot ask the component. -->
+    <section class="section" data-section :data-section-key="step.key">
         <header v-if="title" class="section__head">
             <h2 class="section__title" tabindex="-1" data-section-heading>{{ title }}</h2>
             <p v-if="description" class="section__desc">{{ description }}</p>

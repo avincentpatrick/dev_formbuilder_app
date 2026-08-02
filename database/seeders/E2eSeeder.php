@@ -368,6 +368,46 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // A guest-enabled BRANCHING form (Increment H21b, Doc #27) — reached at /f/branching-router.
+            // This is §4.1's own worked example, built literally: a routing section holding NOTHING but a
+            // URL-prefilled `hidden` field (so predicate 2 drops the section itself), gating every other
+            // section. Visited bare, the whole graph is empty and the runtime must render §4.1's terminal
+            // state — suppressed counter, terminal panel, one explicitly-labelled Submit. Visited as
+            // `?role=staff` it renders an ordinary single-step branch. Both get axe coverage, and the empty
+            // case is the one no other seeded form can reach.
+            if (Form::query()->where('title', 'Branching Router')->doesntExist()) {
+                $router = app(FormService::class)->create(
+                    $tenant, $owner, 'Branching Router', 'Relevance-derived step skipping (H21b demo).'
+                );
+                $rb = app(FormBuilderService::class);
+
+                $routing = $rb->addSection($router);
+                $routing->update(['label' => 'Routing']);
+                $rb->addField($router, $owner, FieldType::Hidden, $routing->id)->update([
+                    'key' => 'role',
+                    'label' => 'Role',
+                    // Increment H7 — `url` is the only client-fillable source; the param name defaults to the key.
+                    'config' => ['prefill_source' => 'url'],
+                ]);
+
+                $staff = $rb->addSection($router);
+                $staff->update(['label' => 'Staff details', 'relevant_expression' => "\${role} = 'staff'"]);
+                $rb->addField($router, $owner, FieldType::ShortText, $staff->id)->update(['label' => 'Staff number']);
+
+                $visitor = $rb->addSection($router);
+                $visitor->update(['label' => 'Visitor details', 'relevant_expression' => "\${role} = 'visitor'"]);
+                $rb->addField($router, $owner, FieldType::ShortText, $visitor->id)->update(['label' => 'Who are you visiting?']);
+
+                app(PublishService::class)->publish($router->refresh(), $owner);
+
+                $router->update([
+                    'public_slug' => 'branching-router',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => false,
+                ]);
+            }
+
             // A DRAFT form whose first field is a matrix (Increment G4b), so the builder auto-selects it on
             // load and the builder-axe tab-walk mounts + scans the MatrixEditor's Grid tab (rows/columns/cells)
             // — the composite config editors — at all viewports in light + dark, with no palette interaction.

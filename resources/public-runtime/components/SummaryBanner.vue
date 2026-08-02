@@ -5,16 +5,33 @@
  * touched inline. The banner itself is the focus target on a failed attempt (`focus()` is exposed to the
  * parent flow).
  */
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 
-// `address` is the field/instance/section address (`field`, `section[i].field`, or `section`), matching both
-// the jump-anchor id `field-<address>` and the 422-envelope key (Increment G2).
-const props = defineProps<{ items: { address: string; label: string }[] }>();
+interface BannerItem {
+    // The field/instance/section address (`field`, `section[i].field`, or `section`), matching both the
+    // jump-anchor id `field-<address>` and the 422-envelope key (Increment G2).
+    address: string;
+    label: string;
+    /** The visible step this error belongs to (Increment H21b — a submit-time list can span steps). */
+    stepKey: string;
+}
+
+const props = defineProps<{
+    items: BannerItem[];
+    /**
+     * Increment H21b, Doc #27 §5.5 — run before the jump, so a multi-step parent can navigate to the item's
+     * step first. Without it `getElementById` cannot resolve a field on an unmounted step and the link is
+     * dead. Single-page mode renders everything, so it passes nothing and the behaviour is unchanged.
+     */
+    beforeJump?: (item: BannerItem) => void;
+}>();
 
 const rootEl = ref<HTMLElement | null>(null);
 
-function jumpTo(address: string): void {
-    const el = document.getElementById(`field-${address}`);
+async function jumpTo(item: BannerItem): Promise<void> {
+    props.beforeJump?.(item);
+    await nextTick();
+    const el = document.getElementById(`field-${item.address}`);
     if (el === null) {
         return;
     }
@@ -34,7 +51,7 @@ defineExpose({ focus: () => rootEl.value?.focus() });
         </p>
         <ul class="summary-banner__list">
             <li v-for="item in props.items" :key="item.address">
-                <button type="button" class="summary-banner__link" @click="jumpTo(item.address)">
+                <button type="button" class="summary-banner__link" @click="jumpTo(item)">
                     {{ item.label }}
                 </button>
             </li>

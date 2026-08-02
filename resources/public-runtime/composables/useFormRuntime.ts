@@ -21,6 +21,7 @@
 
 import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue';
 import {
+    Coercion,
     makeSemanticValidator,
     makeTemplateRenderer,
     SemanticResult,
@@ -73,6 +74,46 @@ export interface AttemptResult {
     errorCount: number;
 }
 
+/**
+ * Increment H21b — one record of what the step list just did, published by the store for components to act
+ * on. Doc #27 §4.4 makes the shape a constraint rather than a preference: the store is DOM-free and
+ * announcer-free, so the step-level equivalents of the field-level focus rescue, retain-and-restore note and
+ * "new question" announcement must arrive as a VALUE the component reads — the shape `attemptNext()` already
+ * uses — and never as an announcer call from in here.
+ */
+export interface StepChange {
+    /** Newly visible step keys, in document order (§3.1 — a step can appear BEHIND the respondent). */
+    added: string[];
+    /** Step keys that are no longer visible. */
+    removed: string[];
+    /**
+     * The subset of `removed` that still holds a respondent-entered answer (§4.4). The data is safe — answers
+     * are never deleted on hide — but in multi-step mode no `FieldRow` for an off-screen step is mounted, so
+     * the field-level note cannot fire and today NOTHING is said. This is what a component says it with.
+     */
+    removedWithAnswers: string[];
+    /** The step the respondent was on when it vanished, or null if the current step survived (§4.2). */
+    rescuedFrom: string | null;
+    /** Where they were moved to; null when the graph emptied out entirely (§4.1's terminal state). */
+    rescuedTo: string | null;
+    previousCount: number;
+    count: number;
+}
+
+/**
+ * How `goToStep()` resolved a requested key (Increment H21b, Doc #27 §5.3). It used to be a silent no-op on
+ * an unresolvable key, which is why all three resume-drift cases landed on step 1 with no explanation.
+ */
+export type StepResolution =
+    /** The key was visible and was adopted as-is. */
+    | 'exact'
+    /** The key is known but not currently visible; resolved to the nearest surviving predecessor (§4.2). */
+    | 'nearest'
+    /** No surviving predecessor (or the key is unknown to this version); resolved to the first incomplete step. */
+    | 'first-incomplete'
+    /** There are no visible steps at all — the §4.1 terminal state; nothing was adopted. */
+    | 'none';
+
 /** Addresses one repeat instance for a scoped template render (Increment H6b, Doc #26 §3.3 rule 2). */
 export interface RepeatScope {
     sectionKey: string;
@@ -105,6 +146,10 @@ export interface FormRuntime {
     readonly currentStep: ComputedRef<RuntimeStep | null>;
     readonly isFirstStep: ComputedRef<boolean>;
     readonly isLastStep: ComputedRef<boolean>;
+    /** True with zero visible steps — Doc #27 §4.1's specified TERMINAL state, not an error (H21b). */
+    readonly isTerminal: ComputedRef<boolean>;
+    /** What the step list last did, for the component-side announcements and focus rescue (H21b, §3.1/§4.2/§4.4). */
+    readonly lastStepChange: Ref<StepChange | null>;
 
     setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | MediaAnswer | null): void;
     restoreAnswers(map: AnswerMap): void;
@@ -149,8 +194,14 @@ export interface FormRuntime {
 
     attemptNext(): AttemptResult;
     goPrev(): void;
-    goToStep(key: string): void;
+    goToStep(key: string): StepResolution;
     reconcileCurrentStep(): void;
+    /**
+     * Has the respondent actually BEEN on this step? Increment H21b — `ProgressIndicator` marks "done" from
+     * this rather than from `index < currentIndex`, because under branching a step can become relevant BEHIND
+     * the respondent (§3.1) and an index comparison hands it a clickable "done" dot it never earned.
+     */
+    hasVisited(key: string): boolean;
 }
 
 export interface RuntimeOptions {
@@ -402,8 +453,25 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     });
 
     const currentStepKey = ref<string>('');
+    /** Steps the respondent has actually been ON — see `hasVisited()` on the interface for why not an index. */
+    const visitedStepKeys = ref<ReadonlySet<string>>(new Set());
+    const lastStepChange = ref<StepChange | null>(null);
+
+    function hasVisited(key: string): boolean {
+        return visitedStepKeys.value.has(key);
+    }
+
+    function setCurrentStep(key: string): void {
+        currentStepKey.value = key;
+        if (key !== '' && !visitedStepKeys.value.has(key)) {
+            const next = new Set(visitedStepKeys.value);
+            next.add(key);
+            visitedStepKeys.value = next;
+        }
+    }
+
     if (visibleSteps.value.length > 0) {
-        currentStepKey.value = visibleSteps.value[0].key;
+        setCurrentStep(visibleSteps.value[0].key);
     }
 
     const currentStepIndex = computed(() => visibleSteps.value.findIndex((s) => s.key === currentStepKey.value));
@@ -415,33 +483,121 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return visibleSteps.value.length > 0 ? visibleSteps.value[0] : null;
     });
     const isFirstStep = computed(() => currentStepIndex.value <= 0);
-    const isLastStep = computed(() => currentStepIndex.value === visibleSteps.value.length - 1);
+    // Increment H21b, Doc #27 §4.1 — the length guard is the whole fix. `findIndex` over an empty list is -1
+    // and `length - 1` is also -1, so the old `index === length - 1` was TRUE on an empty graph: the view
+    // rendered Submit over no questions, nothing was relevant so nothing was required, `passed` was true, and
+    // one click created a real submission with an empty answer document under a false step count.
+    const isLastStep = computed(
+        () => visibleSteps.value.length > 0 && currentStepIndex.value === visibleSteps.value.length - 1,
+    );
+    const isTerminal = computed(() => visibleSteps.value.length === 0);
 
-    let lastValidIndex = 0;
-    watch(currentStepIndex, (index) => {
-        if (index >= 0) {
-            lastValidIndex = index;
-        }
-    });
-
-    function reconcileCurrentStep(): void {
-        if (visibleSteps.value.length === 0) {
-            return;
-        }
-        if (!visibleSteps.value.some((s) => s.key === currentStepKey.value)) {
-            const target = Math.min(lastValidIndex, visibleSteps.value.length - 1);
-            currentStepKey.value = visibleSteps.value[Math.max(target, 0)].key;
-        }
+    /** The field-level retain-and-restore rule, lifted verbatim from `FieldRow.vue` so the two cannot drift. */
+    function holdsValue(key: string): boolean {
+        const raw = answers[key] ?? null;
+        return raw !== null && typeof raw === 'object' && !Array.isArray(raw)
+            ? Object.keys(raw).length > 0
+            : !Coercion.isEmpty(raw as EngineValue);
     }
 
-    watch(
-        () => visibleSteps.value.some((s) => s.key === currentStepKey.value),
-        (exists) => {
-            if (!exists) {
-                reconcileCurrentStep();
+    function stepHoldsAnswer(step: RuntimeStep): boolean {
+        if (step.isRepeat && step.sectionKey !== null) {
+            const instances = answers[step.sectionKey];
+            return Array.isArray(instances) && instances.length > 0;
+        }
+        return step.fieldKeys.some(holdsValue);
+    }
+
+    function isVisibleStep(key: string): boolean {
+        return visibleSteps.value.some((s) => s.key === key);
+    }
+
+    /**
+     * The step list as of the last change — the identity anchor the §4.2 rescue needs and the current list
+     * cannot supply, because rescuing a vanished step means knowing where that step USED to sit.
+     */
+    let previousSteps: RuntimeStep[] = visibleSteps.value.slice();
+
+    /**
+     * Doc #27 §4.2 — walk OUTWARD from the vanished step's old position: backwards to the nearest surviving
+     * predecessor first (the respondent's own history), then forwards.
+     *
+     * The rule this replaces was index arithmetic — `min(lastValidIndex, length - 1)` — and it knew a NUMBER
+     * where it needed to know WHICH step vanished: on `[Lead, A, B, C]` with the respondent on C, an answer that
+     * hid C, B and A at once clamped to `min(3, 0) = 0` and threw them back to step 1.
+     *
+     * Returns null when the walk finds nothing — either the graph is now empty (§4.1's terminal state) or the
+     * key has no position in the order it was given. Each caller applies its own fallback, deliberately: the
+     * rescue watcher falls back to the first step, while `goToStep()` falls through to §5.3's first-incomplete
+     * rule. Folding one fallback in here would make the other unreachable.
+     */
+    function nearestSurvivor(vanishedKey: string, order: RuntimeStep[]): string | null {
+        if (visibleSteps.value.length === 0) {
+            return null;
+        }
+        const from = order.findIndex((s) => s.key === vanishedKey);
+        if (from < 0) {
+            return null;
+        }
+        for (let i = from - 1; i >= 0; i--) {
+            if (isVisibleStep(order[i].key)) {
+                return order[i].key;
             }
-        },
-    );
+        }
+        for (let i = from + 1; i < order.length; i++) {
+            if (isVisibleStep(order[i].key)) {
+                return order[i].key;
+            }
+        }
+        return null;
+    }
+
+    function reconcileCurrentStep(): void {
+        if (visibleSteps.value.length === 0 || isVisibleStep(currentStepKey.value)) {
+            return;
+        }
+        setCurrentStep(nearestSurvivor(currentStepKey.value, previousSteps) ?? visibleSteps.value[0].key);
+    }
+
+    /**
+     * ONE watcher over the step list itself, replacing the membership boolean this used to watch. The boolean
+     * was the second, worse shape of Doc #27 §4.1: on a form empty at CONSTRUCTION the seed above never runs,
+     * so `currentStepKey` stays `''`, the boolean is false at t=0 and STAYS false when steps appear — a Vue
+     * watcher fires on change, so it never fired at all. The index then stayed -1, `attemptNext()` failed its
+     * `idx >= 0` guard and fell through to `advanced: true` with no key change: Next did nothing, forever.
+     *
+     * Watching the list fires in both shapes, and Vue hands the handler the previous value for free — which is
+     * exactly the identity anchor `nearestSurvivor()` needs.
+     */
+    watch(visibleSteps, (next, prev) => {
+        const nextKeys = new Set(next.map((s) => s.key));
+        const prevKeys = new Set(prev.map((s) => s.key));
+        const gone = prev.filter((s) => !nextKeys.has(s.key));
+
+        const vanished = currentStepKey.value !== '' && !nextKeys.has(currentStepKey.value) ? currentStepKey.value : null;
+
+        let rescuedTo: string | null = null;
+        if (vanished !== null) {
+            rescuedTo = nearestSurvivor(vanished, prev);
+            if (rescuedTo !== null) {
+                setCurrentStep(rescuedTo);
+            }
+        } else if (currentStepIndex.value < 0 && next.length > 0) {
+            // The never-seeded form, self-healing the moment its first step appears.
+            setCurrentStep(next[0].key);
+        }
+
+        previousSteps = next.slice();
+        lastStepChange.value = {
+            added: next.filter((s) => !prevKeys.has(s.key)).map((s) => s.key),
+            removed: gone.map((s) => s.key),
+            removedWithAnswers: gone.filter(stepHoldsAnswer).map((s) => s.key),
+            rescuedFrom: vanished,
+            rescuedTo,
+            previousCount: prev.length,
+            count: next.length,
+        };
+    });
 
     // ── Flat interaction ───────────────────────────────────────────────────────────────────────
     function setAnswer(key: string, value: EngineValue | CompositeAnswer | GeoAnswer | null): void {
@@ -902,9 +1058,13 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             }
         }
 
+        // The `idx >= 0` guard can no longer fall through: Increment H21b's list watcher guarantees a seeded,
+        // resolvable key whenever there is at least one visible step, and `currentStep` above already returned
+        // on an empty graph. Before that, a form empty at construction fell through here on EVERY click —
+        // `advanced: true` with no key change, so the caller announced nothing and Next was dead forever.
         const idx = currentStepIndex.value;
         if (idx >= 0 && idx < visibleSteps.value.length - 1) {
-            currentStepKey.value = visibleSteps.value[idx + 1].key;
+            setCurrentStep(visibleSteps.value[idx + 1].key);
             return { advanced: true, errorCount: 0 };
         }
         return { advanced: true, errorCount: 0 };
@@ -913,14 +1073,73 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
     function goPrev(): void {
         const idx = currentStepIndex.value;
         if (idx > 0) {
-            currentStepKey.value = visibleSteps.value[idx - 1].key;
+            setCurrentStep(visibleSteps.value[idx - 1].key);
         }
     }
 
-    function goToStep(key: string): void {
-        if (visibleSteps.value.some((s) => s.key === key)) {
-            currentStepKey.value = key;
+    /**
+     * The first visible step still holding an unanswered, currently-relevant question — §5.3's fallback when a
+     * stored resume cursor cannot be resolved by position at all.
+     *
+     * "Unanswered" is the FIELD-LEVEL rule (`holdsValue`, lifted from `FieldRow.vue`), deliberately NOT
+     * `DraftCompleteness`'s key-presence numerator. The server counts coverage of the authored form for a
+     * reviewer's column; this answers a respondent's "where do I carry on", and a field they explicitly cleared
+     * answers that with "here". The two numbers are separate by decision (Doc #27 §5.2) — do not converge them.
+     */
+    function firstIncompleteStepKey(): string | null {
+        for (const step of visibleSteps.value) {
+            if (step.isRepeat && step.sectionKey !== null) {
+                if (instanceCount(step.sectionKey) === 0) {
+                    return step.key;
+                }
+                continue;
+            }
+            if (step.fieldKeys.some((k) => fieldRelevance.value[k] === true && !holdsValue(k))) {
+                return step.key;
+            }
         }
+        return null;
+    }
+
+    /**
+     * Increment H21b, Doc #27 §5.3 — resolve a requested step key and REPORT how. This used to swallow an
+     * unresolvable key silently, which is why all three resume-drift cases (the key is gone from this version;
+     * the key exists but its branch is now irrelevant; `__lead__` after a republish moved those fields into a
+     * section) landed the respondent on step 1 with no explanation, under a banner claiming 60% done.
+     */
+    function goToStep(key: string): StepResolution {
+        if (visibleSteps.value.length === 0) {
+            return 'none';
+        }
+        if (isVisibleStep(key)) {
+            setCurrentStep(key);
+            return 'exact';
+        }
+        // Known to this version but not currently visible → §4.2's nearest surviving predecessor, over the
+        // FULL authored order rather than the visible one (the visible list is precisely what it fell out of).
+        //
+        // `__lead__` is included only when this version still HAS section-less fields. That is what degrades
+        // §5.3's case (c) — a stored `__lead__` after a republish moved those fields into a section — into
+        // case (a), an unknown key, exactly as the section specifies: there is no position left to walk from.
+        const authoredOrder: RuntimeStep[] = [
+            ...(renderModel.fields.some((f) => f.sectionKey === null)
+                ? [{ key: LEAD_STEP_KEY, sectionKey: null, title: null, fieldKeys: [], isRepeat: false }]
+                : []),
+            ...renderModel.sections.map((s) => ({
+                key: s.key,
+                sectionKey: s.key,
+                title: null,
+                fieldKeys: [],
+                isRepeat: s.isRepeatable,
+            })),
+        ];
+        const survivor = nearestSurvivor(key, authoredOrder);
+        if (survivor !== null) {
+            setCurrentStep(survivor);
+            return 'nearest';
+        }
+        setCurrentStep(firstIncompleteStepKey() ?? visibleSteps.value[0].key);
+        return 'first-incomplete';
     }
 
     return {
@@ -945,6 +1164,8 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         currentStep,
         isFirstStep,
         isLastStep,
+        isTerminal,
+        lastStepChange,
         setAnswer,
         restoreAnswers,
         markTouched,
@@ -983,5 +1204,6 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         goPrev,
         goToStep,
         reconcileCurrentStep,
+        hasVisited,
     };
 }

@@ -9,6 +9,7 @@ use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
 use App\Models\Form;
+use App\Models\FormSection;
 use App\Models\Submission;
 use App\Models\Tenant;
 use App\Models\User;
@@ -389,4 +390,141 @@ it('does not restamp the draft expiry on a later save (stamp-once)', function ()
 
     enterTenant($f->tenant->id);
     expect(Submission::query()->firstOrFail()->draft_expires_at->toIso8601String())->toBe($originalExpiry);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment H21b — branch drift under H12a's grace window (Doc #27 §5.4).
+|--------------------------------------------------------------------------
+| §5.4's finding is that branching adds NOTHING to the close and expiry policies, and that this is itself
+| worth recording: the grace window promotes a pre-close draft without re-examining the respondent's path,
+| and H10's reconciliation handles a VERSION change on resume. Neither had ever been exercised against a
+| GRAPH change. §9 therefore assigns H21b a test rather than a code change — these are it. A test that only
+| asserted "the request did not 500" would be vacuous, so both pin the pruning outcome.
+*/
+
+/** A guest form whose second section is gated on a first-section answer, with save-and-resume on. */
+function branchingDraftForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Branching intake');
+    $draft = $form->draftVersion;
+
+    $s1 = FormSection::create(['form_version_id' => $draft->id, 'key' => 'basics', 'label' => 'Basics', 'sequence' => 1]);
+    $s2 = FormSection::create([
+        'form_version_id' => $draft->id, 'key' => 'details', 'label' => 'Details', 'sequence' => 2,
+        'relevant_expression' => '${gate} = \'yes\'',
+    ]);
+    addFormField($draft, $owner, 'gate', FieldType::ShortText, 1, ['form_section_id' => $s1->id]);
+    addFormField($draft, $owner, 'detail', FieldType::ShortText, 2, ['form_section_id' => $s2->id]);
+
+    app(PublishService::class)->publish($form->refresh(), $owner);
+    $form->refresh()->update([
+        'public_slug' => 'branching', 'allow_guest_submissions' => true, 'save_and_resume' => true,
+    ]);
+
+    return $form->refresh();
+}
+
+it('promotes a pre-close draft under the grace window and prunes against the path its own answers take', function (): void {
+    $tenant = draftTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = branchingDraftForm($tenant, $owner);
+    $token = draftShareToken($form);
+    $uuid = Uuid::uuid7()->toString();
+
+    // The respondent is on the branch: `gate = yes` makes the Details section relevant, and they answer it.
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/draft", [
+        'answers' => ['gate' => 'yes', 'detail' => 'on the branch'],
+        'client_submission_uuid' => $uuid,
+        'draft_current_step' => 'details',
+    ])->assertCreated();
+
+    // The form closes AFTER the draft was started — H12a's grace window is exactly this case.
+    // The close instant must fall AFTER the draft was created — that is the whole grace-window predicate
+    // (`assertCanPromote` refuses a draft created at/after close as one that should never have started).
+    $this->travel(1)->hours();
+    enterTenant($tenant->id, $owner->id);
+    $form->update(['closes_at' => now()->subMinute()]);
+
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['gate' => 'yes', 'detail' => 'on the branch'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    enterTenant($tenant->id);
+    $submission = Submission::query()->firstOrFail();
+    expect($submission->status)->toBe(SubmissionStatus::Submitted);
+    // The taken path is honoured: the gated section was relevant, so its answer survives the promote-time prune.
+    expect($submission->answers()->firstOrFail()->answers)->toMatchArray(['gate' => 'yes', 'detail' => 'on the branch']);
+});
+
+it('prunes the off-branch answer at promote time, after close, exactly as it would before', function (): void {
+    $tenant = draftTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = branchingDraftForm($tenant, $owner);
+    $token = draftShareToken($form);
+    $uuid = Uuid::uuid7()->toString();
+
+    // The respondent answered the branch, then went back and closed the gate — the retained-but-irrelevant
+    // shape §4.4 describes. The stored draft keeps `detail`; the promote must drop it.
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/draft", [
+        'answers' => ['gate' => 'no', 'detail' => 'typed before the branch closed'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    // The close instant must fall AFTER the draft was created — that is the whole grace-window predicate
+    // (`assertCanPromote` refuses a draft created at/after close as one that should never have started).
+    $this->travel(1)->hours();
+    enterTenant($tenant->id, $owner->id);
+    $form->update(['closes_at' => now()->subMinute()]);
+
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['gate' => 'no', 'detail' => 'typed before the branch closed'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    enterTenant($tenant->id);
+    $answers = Submission::query()->firstOrFail()->answers()->firstOrFail()->answers;
+    expect($answers)->toHaveKey('gate')->and($answers)->not->toHaveKey('detail');
+});
+
+it('refuses loudly, rather than promoting against a different graph, when the branch is republished', function (): void {
+    $tenant = draftTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = branchingDraftForm($tenant, $owner);
+    $token = draftShareToken($form);
+    $uuid = Uuid::uuid7()->toString();
+
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/draft", [
+        'answers' => ['gate' => 'yes', 'detail' => 'on the branch'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    // The author moves the branch and republishes. The draft stays pinned to the version it was captured
+    // against, and `promote()` re-asserts that version is still published — so this is the ONE drift the
+    // server catches by itself. §5.4's offline-replay hole is the twin it could not see, and H21b closes
+    // that one client-side.
+    enterTenant($tenant->id, $owner->id);
+    $newDraft = $form->refresh()->draftVersion;
+    $newDraft->sections()->where('key', 'details')->update(['relevant_expression' => '${gate} = \'never\'']);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    TenantContext::flush();
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['gate' => 'yes', 'detail' => 'on the branch'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_version_superseded');
+
+    enterTenant($tenant->id);
+    expect(Submission::query()->firstOrFail()->status)->toBe(SubmissionStatus::Draft);
 });

@@ -5,15 +5,17 @@
  * `createApiClient` (token mint + remint + error normalization), so replay speaks exactly the same guest
  * protocol as a live submit; idempotency (`client_submission_uuid`) makes a duplicated replay a 200 no-op.
  *
- * Per row: mint a fresh token → upload any queued media first (rewriting `local:` placeholder refs to real
- * attachment ids) → POST the submission → map the outcome. Structured answers are NEVER dropped: a rejected
- * payload (422) or 5 exhausted network retries become `needs_attention` (a human decides), a version conflict
- * (409) becomes `conflict` (the G8c UX resolves it), and a transient failure stays `pending` for the next pass.
+ * Per row: mint a fresh token → CHECK THE VERSION (Increment H21b) → upload any queued media first (rewriting
+ * `local:` placeholder refs to real attachment ids) → POST the submission → map the outcome. Structured answers
+ * are NEVER dropped: a rejected payload (422) or 5 exhausted network retries become `needs_attention` (a human
+ * decides), a version conflict (409) becomes `conflict` (the G8c UX resolves it), and a transient failure stays
+ * `pending` for the next pass.
  */
 
 import { createApiClient } from './api-client';
 import { ApiError, normalizeError } from './error-normalizer';
 import type { MeridianDb, MediaQueueRow, OutboxRow } from './db';
+import type { SchemaResponse } from './types';
 import { listPending, markConflict, markNeedsAttention, markSynced, recordAttempt, setAnswers } from './outbox';
 import {
     collectLocalMediaIds,
@@ -53,14 +55,22 @@ export function replayOutbox(db: MeridianDb, fetchFn: typeof fetch = fetch): Pro
 async function run(db: MeridianDb, fetchFn: typeof fetch): Promise<ReplayResult> {
     const rows = await listPending(db);
     const result: ReplayResult = { ...EMPTY };
+    // Per-PASS, not module-level, so a republish between two drains is always seen. Several queued rows for
+    // one form therefore cost one schema read, not one each.
+    const schemas = new Map<string, SchemaResponse>();
     for (const row of rows) {
-        const outcome = await replayRow(db, fetchFn, row);
+        const outcome = await replayRow(db, fetchFn, row, schemas);
         result[outcome] += 1;
     }
     return result;
 }
 
-async function replayRow(db: MeridianDb, fetchFn: typeof fetch, row: OutboxRow): Promise<RowOutcome> {
+async function replayRow(
+    db: MeridianDb,
+    fetchFn: typeof fetch,
+    row: OutboxRow,
+    schemas: Map<string, SchemaResponse>,
+): Promise<RowOutcome> {
     const uuid = row.client_submission_uuid;
     const client = createApiClient({ token: '', slug: row.slug, fetch: fetchFn });
 
@@ -75,7 +85,48 @@ async function replayRow(db: MeridianDb, fetchFn: typeof fetch, row: OutboxRow):
         return backoff(db, uuid, error);
     }
 
-    // 2. Upload queued media first, mapping each local id → its real attachment id, then rewrite the answers.
+    // 2. Increment H21b, Doc #27 §5.4 — the guard that was already sitting unused in the row.
+    //
+    // The row records the `form_version_id` its answers were captured against, and until now replay read it
+    // never. Step 1 above re-mints, and a fresh token pins the form's CURRENT published version, so the
+    // server's own guard (`GuestSubmissionController` — `current_published_version_id !== $token->formVersionId`)
+    // compares that column against itself and can never fire. Answers pruned client-side against version N were
+    // then validated and persisted against N+1's relevance graph: if N+1 makes a branch irrelevant the server
+    // silently prunes those answers, returns 201, and the row is marked `synced` — unattributable data loss
+    // behind a green sync badge. Branching makes republishing the graph the routine authoring act.
+    //
+    // Checked BEFORE the media leg on purpose: `GuestAttachmentController` carries the identical guard against
+    // the same fresh token, so uploading first would land the blobs under N+1 too.
+    //
+    // `row.checksum` stays deliberately unread. The server compares the version ID, and matching the server's
+    // rule exactly is the point of the guard — a checksum comparison here would park rows the server accepts.
+    //
+    // NARROWING, recorded: a row queued by a RESUMED draft session carries its pinned version, and the server's
+    // draft path skips its own version guard (that path is version-safe by construction, since `promote()`
+    // re-asserts the draft's version). Such a row now parks for review where it would have promoted. It fails
+    // safe and costs one review click, and the alternative — a `from_draft` flag on `OutboxRow` read by exactly
+    // one branch — buys back less than it complicates.
+    let current: SchemaResponse;
+    try {
+        const cached = schemas.get(row.slug);
+        current = cached ?? (await client.fetchSchema());
+        schemas.set(row.slug, current);
+    } catch (error) {
+        if (error instanceof ApiError && error.normalized.kind === 'terminal') {
+            await markNeedsAttention(db, uuid, error.normalized.message);
+            return 'needsAttention';
+        }
+        return backoff(db, uuid, error);
+    }
+
+    if (row.form_version_id !== current.version.id) {
+        // The same landing point a live 409 uses, so the G8c review-and-resubmit UX picks it up unchanged:
+        // `SyncStatus`'s Review CTA → `beginConflictReview()` → the drift notice keyed off `conflict_code`.
+        await markConflict(db, uuid, 'This form has been updated. Please reload and try again.', 'form_updated');
+        return 'conflict';
+    }
+
+    // 3. Upload queued media first, mapping each local id → its real attachment id, then rewrite the answers.
     let answers = row.answers;
     if (collectLocalMediaIds(answers).length > 0) {
         const mediaRows = await listForSubmission(db, uuid);
@@ -108,7 +159,7 @@ async function replayRow(db: MeridianDb, fetchFn: typeof fetch, row: OutboxRow):
         await setAnswers(db, uuid, answers);
     }
 
-    // 3. POST the submission (idempotent by client_submission_uuid).
+    // 4. POST the submission (idempotent by client_submission_uuid).
     try {
         await client.submit({
             answers,

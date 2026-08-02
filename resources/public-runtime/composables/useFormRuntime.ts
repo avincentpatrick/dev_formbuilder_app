@@ -47,7 +47,16 @@ import { buildPrefill } from '../lib/prefill';
 import { randomUuid, uuidv7 } from '../lib/uuid';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../lib/types';
 
-const LEAD_STEP_KEY = '__lead__';
+/**
+ * The synthetic leading step holding every renderable field with no section — the twin of PHP's
+ * `StepProjection::LEAD_STEP_KEY`, and the one step that can never carry a `relevant_expression` of its own
+ * because it has no `form_sections` row to hang one on.
+ *
+ * EXPORTED since H21c: the Inertia encode page mounts this same store and has to recognise the lead step to
+ * decide where a keyer-only row belongs. Re-declaring the literal there would have made it a THIRD copy of a
+ * string whose whole job is to be identical in two places.
+ */
+export const LEAD_STEP_KEY = '__lead__';
 
 export type Marker = 'required' | 'optional' | 'none';
 

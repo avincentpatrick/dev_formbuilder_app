@@ -88,6 +88,45 @@ for (const theme of themes) {
     });
 }
 
+// The BRANCHING encode page (Increment H21c). The seeded "Branching Router" is Doc #27 §4.1's own example —
+// a URL-prefilled `hidden` gate alone in its section, routing to two branches — and it is `single_page_mode:
+// false`, so this is the only encode scan that sees the stepped flow at all.
+//
+// Two states, and both are new surfaces: bare, the whole graph is empty, so §4.1's TERMINAL panel renders
+// with no step counter and one labelled Submit, above the keyer-only "Reference fields" block that is the
+// only way to reach the gate on this channel. Keying the gate turns it into an ordinary one-step branch with
+// its Back/Next row mounted. An axe pass alone would not tell the two apart, so each waits on the control
+// that distinguishes it.
+for (const theme of themes) {
+    test(`Encode branching — terminal (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Branching Router' })
+            .getByRole('button', { name: 'New submission' })
+            .click();
+        await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+        await page.getByText('No questions to answer').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Encode branching (terminal)');
+    });
+
+    test(`Encode branching — routed (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Branching Router' })
+            .getByRole('button', { name: 'New submission' })
+            .click();
+        await page.waitForURL('**/submissions/create', { timeout: 30_000 });
+        // The gate lives in the reference block — not shown to a respondent, and the keyer's only way in.
+        await page.getByLabel('Role').fill('staff');
+        await page.getByText('Staff details').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Encode branching (routed)');
+    });
+}
+
 // The submission detail + reviewer workflow (F7). Reached from the inbox by opening the first row's "View
 // submission" action (no id in the URL). The seeded submissions render answers + a review action bar; the
 // scan covers the read-only answer blocks and the review buttons at all three viewports.

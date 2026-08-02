@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { forceTheme } from './support/axe';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
 // surface. Unlike the goto-only responsive-axe spec, this DRIVES the builder's real interactive states:
@@ -10,12 +11,14 @@ import AxeBuilder from '@axe-core/playwright';
 
 const themes = ['light', 'dark'] as const;
 
-async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-    await page.evaluate((t) => {
-        if (t === 'dark') document.documentElement.setAttribute('data-theme-mode', 'dark');
-        else document.documentElement.removeAttribute('data-theme-mode');
-    }, theme);
-}
+// `forceTheme` is the SHARED helper (tests/e2e/support/axe.ts), not a local copy — corrected in H21d1.
+// This file had carried its own, and the difference was the whole failure: the shared one emulates
+// reduced motion first, which collapses the design system's durations to 1ms centrally, and without that
+// axe can sample an element MID theme-flip. A `color`-transitioned label inside a container whose
+// `background-color` is not transitioned reads as the LIGHT foreground on the DARK surface — 1.82:1, a
+// serious `color-contrast` violation that vanishes the moment the transition settles (the same node
+// measures 6.96:1). H21d1's `Structure ⇄ Logic` control is the first always-mounted transitioning element
+// in the builder's chrome, so it made a latent race in this file reproducible; the race was never its own.
 
 async function scan(page: Page, label: string): Promise<void> {
     const overflows = await page.evaluate(

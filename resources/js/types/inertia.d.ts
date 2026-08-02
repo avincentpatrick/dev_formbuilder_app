@@ -76,6 +76,12 @@ declare module '@inertiajs/core' {
             xlsformWarnings?: string[] | null;
             /** Increment H21a — branching notices raised after a publish that SUCCEEDED (Doc #27 §6). */
             publishWarnings?: string[] | null;
+            /**
+             * Increment H21c — the answers relevance dropped on the manual-encode channel, labelled as the
+             * keyer saw them (Doc #27 §7). Flashed only when the list is non-empty, and only after a
+             * submission that was actually created.
+             */
+            prunedAnswers?: string[] | null;
             newSecret?: FlashNewSecret | null;
             testResult?: FlashTestResult | null;
         };

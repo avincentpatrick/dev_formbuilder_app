@@ -22,6 +22,15 @@ Per Product Principle 3.1 and PRD §2.4/§5 Feature #7, **manual encoding by an 
 - No guest token is minted; the authenticated Public Runtime session uses a Sanctum personal access token (Technical Architecture §7.2) instead of a signed share token.
 - The post-submit experience (§9) differs slightly — an authenticated encoder gets a link back into the tenant's submissions inbox that a guest, having no account, cannot be given.
 
+> **As built (H21c) — this claim was ASPIRATIONAL until Increment H21c, and Doc #27 §7 is where that was first written down.** For the whole of Phase 1 and most of Phase 3 the encode page rendered a flat `blocks` list with no step model, no `single_page_mode` read and no relevance at all: the keyer saw every branch, and the pipeline pruned what they typed at submit without telling them. H21c makes the sentence true by mounting the guest runtime's own store (`createFormRuntime()`) on the encode page, so the two channels now share one implementation of the step list rather than agreeing by construction.
+>
+> **Three differences remain, and they are the list above plus two more, both deliberate:**
+>
+> - **A keyer-only "Reference fields" block.** A `url`-sourced `hidden` field is invisible to a respondent by definition, but a keyer transcribing paper is the only possible source of its value (H7; `data-dictionary.md`'s read/render asymmetry). Where such a field's whole section is absent from the step list — which is always, if the section holds nothing else — the encode page renders it in a labelled block outside the steps. The STEP LIST itself stays byte-identical to the guest's, which is what lets Doc #27 §9's parity suite assert a clean equality.
+> - **The encode channel is single-locale.** It resolves no `*_translations` and emits its form's default locale alone, so the language switcher never appears. The guest channel gets the full `supported_locales`.
+>
+> And one behaviour that reads like a difference but is the same rule reached from the other side: **Next never blocks on the encode channel.** The guest's `attemptNext()` refuses to advance past a step holding errors, which is right for someone answering about themselves and wrong for staff transcribing a document that may simply be incomplete. The pipeline stays the sole validation authority (the F4b contract), and Submit raises the same **form-wide** error summary §5.5 requires, whose jump links change step before they focus.
+
 Everywhere else in this document, "respondent" means both the guest filling a public link and the authenticated user doing manual encoding, unless a subsection explicitly calls out a guest-only or authenticated-only behaviour.
 
 This document also does not cover: the OCR-single or OCR-linelist review-and-correct screens (Doc #17 — these are a *reviewer* correcting extracted data, not a respondent filling a live form, even though both ultimately pass through the same Submission Pipeline); the builder's live-preview pane (Doc #19 / Feature #8); or the tenant-admin submissions inbox/review UX.

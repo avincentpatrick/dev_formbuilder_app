@@ -574,7 +574,8 @@ H21d also inherits two existing contracts it must not break: `builderClient`'s t
 > nested-group condition `(${age} > 18 or ${age} < 5) and selected(${colours}, 'red')`, so one scan sees the
 > choice dropdown, the recursive group control and its indent rule; `builder-axe` drives both editor modes
 > and traverses the tree by keyboard, `responsive-axe` scans the nested state at all three viewports in light
-> and dark. Twenty-four scans, all green.
+> and dark. Twelve new tests carrying eighteen axe scans, all green — and the full `builder-axe` matrix is
+> **36/36**, clean end to end for the first time since H21d1 fixed the dark primary-fill palette.
 >
 > **SIX MUTATIONS WERE RUN, AND THE ONE THAT REDDENED NOTHING WAS THE USEFUL ONE.** Deleting the printer's
 > deep-equality self-check left all 106 tests green — because the length-budget case that appears to exercise

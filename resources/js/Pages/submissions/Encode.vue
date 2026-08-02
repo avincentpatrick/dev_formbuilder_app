@@ -12,8 +12,8 @@
  * field binds to `answers[sectionKey][i][fieldKey]` and its 422 keys `answers.<sectionKey>[i].<fieldKey>`; a
  * min/max count failure keys the bare `answers.<sectionKey>`.
  */
-import { computed } from 'vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsCard } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
@@ -47,6 +47,14 @@ const props = defineProps<{
     version: { id: string; version_number: number };
     blocks: Block[];
 }>();
+
+// Increment H21c (Doc #27 §7) — the answers RELEVANCE dropped, flashed by the controller after a submit that
+// SUCCEEDED. Until this shipped, a keyer who filled a branch the respondent's own answers exclude was told
+// "Submission recorded." over a document missing everything they typed into it. Its own banner rather than a
+// toast: a toast cannot list them, and the page resets itself underneath the message.
+const page = usePage();
+const prunedAnswers = computed<string[]>(() => page.props.flash?.prunedAnswers ?? []);
+const prunedDismissed = ref(false);
 
 // Increment H12b — pre-warn the encoder when the form isn't accepting fresh responses. The write path is
 // already blocked server-side (FormAcceptanceGuard); the banner + disabled submit spare a doomed POST. The
@@ -270,6 +278,29 @@ function submit(): void {
             Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
         </p>
 
+        <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
+             naming what relevance removed from it. -->
+        <div
+            v-if="prunedAnswers.length > 0 && !prunedDismissed"
+            class="encode__pruned"
+            role="status"
+            aria-live="polite"
+        >
+            <div class="encode__pruned-body">
+                <strong class="encode__pruned-title">
+                    Recorded, but {{ prunedAnswers.length }}
+                    {{ prunedAnswers.length === 1 ? 'answer was' : 'answers were' }} not saved
+                </strong>
+                <p class="encode__pruned-lede">
+                    These questions did not apply to the answers given, so they were left out of the response:
+                </p>
+                <ul class="encode__pruned-list">
+                    <li v-for="(entry, i) in prunedAnswers" :key="i">{{ entry }}</li>
+                </ul>
+            </div>
+            <MdsButton variant="tertiary" icon-left="close" @click="prunedDismissed = true">Dismiss</MdsButton>
+        </div>
+
         <!-- Scheduled-form pre-warning (H12b): the form is visible for reference, but submitting is blocked. -->
         <div v-if="scheduleNotice" class="encode__schedule-banner" role="alert">
             <strong class="encode__schedule-title">{{ scheduleNotice.title }}</strong>
@@ -398,6 +429,49 @@ function submit(): void {
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
     color: var(--mds-color-text-secondary);
+}
+
+/* Pruned-answer report (H21c) — border-accent rather than colour alone (WCAG 1.4.1), and a WARNING accent
+   rather than a danger one: the submission succeeded, it is just narrower than what was typed. */
+.encode__pruned {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--mds-space-4);
+    margin: 0 0 var(--mds-space-6);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    border: 1px solid var(--mds-color-border-default);
+    border-left: 4px solid var(--mds-color-status-warning-fg);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-surface);
+    flex-wrap: wrap;
+}
+
+.encode__pruned-body {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.encode__pruned-title {
+    display: block;
+    margin-bottom: var(--mds-space-1);
+    color: var(--mds-color-text-heading);
+    font-size: var(--mds-type-body-md-font-size);
+}
+
+.encode__pruned-lede {
+    margin: 0 0 var(--mds-space-2);
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.encode__pruned-list {
+    margin: 0;
+    padding-left: var(--mds-space-5);
+    color: var(--mds-color-text-secondary);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
 }
 
 /* Scheduled-form pre-warning (H12b) — an alert banner, border-accent (never color alone, WCAG 1.4.1). */

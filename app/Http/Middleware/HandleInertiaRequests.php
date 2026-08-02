@@ -107,6 +107,11 @@ class HandleInertiaRequests extends Middleware
                 // hard-coded to "Imported with N warning(s)" — the publish already succeeded and the
                 // wording has to say so.
                 'publishWarnings' => $request->session()->get('publishWarnings'),
+                // The answers RELEVANCE dropped on the manual-encode channel (Increment H21c, Doc #27 §7):
+                // the keyer typed them, Stage 3 masked them off, and the page used to say "Submission
+                // recorded." over the loss. Its own key for the same reason `publishWarnings` is: this one is
+                // an outcome report on a write that SUCCEEDED, so it must not borrow copy that says otherwise.
+                'prunedAnswers' => $request->session()->get('prunedAnswers'),
                 // Webhook one-shot flashes (H14). `newSecret` carries the plaintext signing secret exactly
                 // once after a create/rotate so the page can reveal + copy it, then it is gone (never a durable
                 // prop; AuditRedactor already strips it from the ledger). `testResult` carries the synchronous

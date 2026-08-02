@@ -10,11 +10,17 @@ use App\Enums\RequiredMode;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Forms\StepGraphInspector;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
+use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\FormScheduleView;
+use App\Support\Forms\StepDescriptor;
+use App\Support\Forms\StepProjection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -39,6 +45,26 @@ use Illuminate\Support\Collection;
  * Repeat groups (Increment G2): a repeatable section is now emitted with its `min_instances`/`max_instances`
  * bounds; its member fields render exactly like any other (a scalar type is supported), and the page renders
  * an add/remove-instance loop over them (the pipeline persists the nested per-instance answer document, G1).
+ *
+ * THE STEP MODEL (Increment H21c, Doc #27 §7). Until this increment the payload had "no step key, no
+ * `single_page_mode` read, and zero occurrences of `relevant_expression`" — the encode channel applied
+ * relevance server-side at submit and nowhere else, so a keyer saw every branch and was told nothing when
+ * half of what they typed was pruned. Three things are ADDED here, and `blocks` is deliberately unchanged:
+ *
+ *  - `version.schema` (the frozen `schema_snapshot`) + `version.checksum` + the `form.*` runtime flags, which
+ *    together are exactly the {@see PublicFormPresenter} envelope the guest SPA's store consumes. `Encode.vue`
+ *    mounts the SAME `createFormRuntime()` on it, so the two channels' step lists are equal BY CONSTRUCTION
+ *    rather than by a hand-copied predicate list.
+ *  - `version.now`, the session clock, stamped ONCE by the server (see {@see clock()}).
+ *  - `steps`, this version's projection under an EMPTY answer document, via {@see StepProjection}. Doc #27 §9
+ *    and the `StepProjection` docblock both name `EncodeFormPresenter` as the class that must consume it.
+ *
+ * `blocks` STAYS, and the duplication it carries is recorded rather than quietly tolerated: `geo()`,
+ * `media()`, `cascade()`, `matrix()` and `options()` below are hand-mirrors of `schema-mapping.ts`'s
+ * `buildGeo`/`buildMedia`/etc., and collapsing them onto the client's `buildRenderModel(snapshot)` is a real
+ * simplification this increment deliberately declines (Doc #27 §10). §9's parity obligation is about the STEP
+ * LIST, not the field render model, and the collapse would put every G4a/G4b/G5b2/G6/H7 encode test into the
+ * blast radius of an increment that is already an L.
  */
 final class EncodeFormPresenter
 {
@@ -74,6 +100,10 @@ final class EncodeFormPresenter
     public function __construct(
         private readonly SchemaValueFormatter $formatter,
         private readonly TemplateRenderer $templates,
+        // Increment H21c — the relevance masks the step projection consumes. The projection itself evaluates
+        // nothing (it is pure and static); this is the only thing on this page that runs the engine.
+        private readonly SemanticValidator $semantic,
+        private readonly StructuralAnswerNormalizer $normalizer,
     ) {}
 
     /**
@@ -140,11 +170,23 @@ final class EncodeFormPresenter
             ];
         }
 
+        $now = $this->clock();
+
         return [
             'form' => [
                 'id' => $form->id,
                 'title' => $form->title,
                 'description' => $form->description,
+                // Increment H21c — the presentation mode this channel never read. `false` (the column
+                // default) is the STEPPED flow; a one-section form still projects to exactly one step, so
+                // the difference is invisible until a form actually has branches.
+                'single_page_mode' => $form->single_page_mode,
+                // Required by the runtime store's `SchemaResponse`. The encode channel is SINGLE-LOCALE — a
+                // recorded narrowing, not an oversight: `blocks` above resolves no `*_translations` either
+                // (a keyer transcribes the paper form in front of them, and the language switcher is a
+                // respondent affordance). Emitting the default alone is what keeps that switcher absent.
+                'default_locale' => $form->default_locale,
+                'supported_locales' => [$form->default_locale],
                 // Scheduled-form window + cap (Increment H12b) — the encode page pre-warns (banner + disabled
                 // submit) when `acceptance` != 'open'. Enforcement stays authoritative in the pipeline
                 // ({@see FormAcceptanceGuard}); this is advisory, the twin of PublicFormPresenter's block.
@@ -153,9 +195,84 @@ final class EncodeFormPresenter
             'version' => [
                 'id' => $version->id,
                 'version_number' => $version->version_number,
+                // Increment H21c — the engine's input, verbatim. `checksum` travels with it for the same
+                // reason it does on the guest channel: the snapshot is the frozen contract, and the pair
+                // must be read together.
+                'checksum' => $version->checksum,
+                'schema' => $version->schema_snapshot,
+                'now' => $now,
             ],
             'blocks' => $blocks,
+            // Increment H21c — the step list under an EMPTY answer document: the first paint, and the value
+            // the parity suite and the PDF cross-check compare.
+            'steps' => $this->steps($version, $sections, $allFields, $now),
         ];
+    }
+
+    /**
+     * The session clock, in Carbon's exact `toIso8601String()` shape — `2026-08-01T12:34:56+00:00`, never a
+     * `Z`, never milliseconds (Doc #27 §3.4, amendment A1).
+     *
+     * STAMPED BY THE SERVER, and that is the one place this channel deliberately diverges from the guest
+     * runtime, which stamps its own with `isoClock(new Date())` at `App.vue`. The encode page hands this
+     * string straight to `RuntimeOptions.now`, so the `steps` computed below and the client's first
+     * `visibleSteps` evaluate `today()`/`now()` against ONE clock. Let the client stamp its own and a keyer
+     * working near midnight — or on a machine with a skewed clock — gets a step list that disagrees with the
+     * one the server just rendered, on a page whose entire purpose is that the two agree.
+     */
+    private function clock(): string
+    {
+        return Carbon::now()->toIso8601String();
+    }
+
+    /**
+     * This version's step projection under an empty answer document — the recipe
+     * {@see StepGraphInspector::emptyAtOpen()} already uses, reused rather than
+     * re-derived.
+     *
+     * `$allFields` rather than the OMITTED-filtered `$fields`, and the reason is a CONTRACT rather than an
+     * observable difference — recorded that way because a mutation proved it. The projection's emptiness
+     * predicate is `PdfFieldRole::Omitted`, the RESPONDENT's "renders nothing" set, which is deliberately not
+     * `self::OMITTED` (H7 makes the two channels asymmetric on `hidden`). Passing the pre-filtered list is a
+     * NO-OP today and reddens nothing: `self::OMITTED` = {`page_break`, `calculated`} is a strict SUBSET of
+     * `PdfFieldRole::Omitted` = {`hidden`, `calculated`, `page_break`}, so the projection simply re-drops what
+     * the filter already dropped.
+     *
+     * That subset relation is an accident of the current lists, it is enforced nowhere, and the two answer
+     * DIFFERENT questions — `self::OMITTED` is "never a manually-entered answer", `PdfFieldRole::Omitted` is
+     * "the respondent sees nothing". Add a type to `self::OMITTED` that the respondent does see (a future
+     * `signature`, say, keyed from paper by nobody) and the pre-filtered list would start hiding a step the
+     * respondent was shown, silently. `EncodeStepParityTest` pins the subset relation directly so that day is
+     * a red test rather than a divergence, and passing the complete list keeps the respondent's rule the only
+     * one this projection ever applies.
+     *
+     * The `errors` from the validate call are ignored on purpose. An empty encode form is full of
+     * required-field errors and not one of them is being reported here — only the three masks are wanted.
+     *
+     * @param  Collection<int, FormSection>  $sections
+     * @param  Collection<int, FormField>  $fields
+     * @return list<array{key: string, section_key: ?string, field_keys: list<string>, is_repeat: bool}>
+     */
+    private function steps(FormVersion $version, Collection $sections, Collection $fields, string $now): array
+    {
+        $normalized = $this->normalizer->normalize($fields, $sections, []);
+        $result = $this->semantic->validate($version, $normalized, null, $now);
+
+        return array_map(
+            static fn (StepDescriptor $step): array => [
+                'key' => $step->key,
+                'section_key' => $step->sectionKey,
+                'field_keys' => $step->fieldKeys,
+                'is_repeat' => $step->isRepeat,
+            ],
+            StepProjection::of(
+                $sections,
+                $fields,
+                $result->sectionRelevance,
+                $result->fieldRelevance,
+                $result->repeatFieldRelevance,
+            ),
+        );
     }
 
     /**

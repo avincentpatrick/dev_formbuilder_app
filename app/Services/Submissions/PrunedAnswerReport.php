@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Submissions;
 
 use App\Enums\FieldType;
+use App\Enums\PrefillSource;
 use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormVersion;
-use App\Services\Expressions\Coercion;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticResult;
@@ -36,11 +36,12 @@ use Illuminate\Support\Collection;
  * a republish, and a direct POST that never rendered the page at all. A silent report is the success case,
  * not dead code.
  *
- * RELEVANCE PRUNES ONLY, deliberately. A Stage-1 drop is a different animal and is not reported here: an
- * unknown or misplaced key already throws, an empty answer was never an answer, and a `fixed`-prefill hidden
- * field's client-sent value is dropped by `coerce()` on purpose (H7 — the server writes the authored literal
- * on every channel, and the encode page renders those rows read-only and never submits them). The only thing
- * this names is what RELEVANCE removed, which is the only silent loss.
+ * RELEVANCE PRUNES ONLY, AND ONLY OF THINGS THE KEYER COULD HAVE TYPED. A Stage-1 drop is a different animal
+ * and is not reported here: an unknown or misplaced key already throws, and an empty answer was never an
+ * answer. Neither is a `fixed`-prefill hidden field, whose value is server-authored on every channel and
+ * whose encode row is read-only — see {@see keyerContributed()}, which exists because the first cut of this
+ * class asserted that such a value "never reaches the payload" and H21c made that false. The only thing this
+ * names is what RELEVANCE removed from what a person entered, which is the only silent loss.
  *
  * NOT pure and static like {@see DraftCompleteness} / {@see StepProjection}, and the
  * departure is deliberate: the report must name each answer the way the KEYER saw it on screen, which means
@@ -51,16 +52,29 @@ use Illuminate\Support\Collection;
  */
 final class PrunedAnswerReport
 {
-    public function __construct(private readonly TemplateRenderer $templates) {}
+    public function __construct(
+        private readonly TemplateRenderer $templates,
+        private readonly StructuralAnswerNormalizer $normalizer,
+    ) {}
 
     /**
      * The dropped answers, labelled, in document order. Empty when nothing was pruned — the caller flashes
      * nothing rather than an empty banner.
      *
-     * `$submitted` is the RAW request map, not the Stage-1 output: the normalizer renames no keys (it coerces
-     * values and nests repeat instances under the same section key), so the raw map shares its key space with
-     * the masks, and taking it raw means the report sees exactly what the keyer sent — including a value
-     * Stage 1 would have coerced away.
+     * IT RE-RUNS STAGE 1, AND THAT IS NOT AN OPTIMISATION IT SKIPPED — IT IS THE ONLY WAY THE MASKS LINE UP.
+     * The first cut of this class walked the RAW request map, on the reasoning that the normalizer renames no
+     * keys. True for flat keys, and WRONG for repeat instances: `normalizeRepeatSection()` DROPS an empty
+     * instance and re-indexes with `$instances[] =`, while `processRepeats()` appends one mask per SURVIVING
+     * instance. So every dropped instance shifts every later mask by one, and the report then reads a
+     * neighbour's mask — naming an answer that was persisted while missing the one that was actually pruned.
+     * That is reachable on the ordinary encode flow, not in theory: `addInstance()` pushes a literal `{}`,
+     * H21c seeds `min_instances` starter rows, and clearing a row's last value deletes the key, so a blank
+     * row among filled ones is a normal state rather than an edge case.
+     *
+     * Re-normalising costs one pure pass over an array the pipeline has already accepted — it cannot throw
+     * here, because a structural fault would have aborted the submit long before this is reached — and it
+     * buys exact index alignment plus the emptiness rule for free, instead of this class keeping a second
+     * copy of "what counts as unanswered" that could drift from the one Stage 1 actually applies.
      *
      * @param  array<string, mixed>  $submitted  the raw `answers` map as posted
      * @return list<string>
@@ -71,6 +85,9 @@ final class PrunedAnswerReport
         $fields = $version->fields()->orderBy('sequence')->get();
         /** @var Collection<int, FormSection> $sections */
         $sections = $version->sections()->orderBy('sequence')->get();
+
+        // The document the masks were computed against, byte for byte.
+        $normalized = $this->normalizer->normalize($fields, $sections, $submitted);
 
         // Built from EVERY field, the way both encode-channel presenters do it: a source need not have a row
         // of its own for a consumer's label to be correct (Doc #26 §3.1).
@@ -92,7 +109,7 @@ final class PrunedAnswerReport
 
         $dropped = [];
 
-        foreach ($submitted as $key => $value) {
+        foreach ($normalized as $key => $value) {
             $key = (string) $key;
 
             $repeatSection = $repeatSectionByKey[$key] ?? null;
@@ -109,8 +126,10 @@ final class PrunedAnswerReport
                 continue; // an unknown key never reaches here — Stage 1 throws on it
             }
 
-            if (Coercion::isEmpty($value)) {
-                continue; // never typed, so nothing was taken away
+            // Stage 1 already dropped every empty answer, so a key present here was typed. No second
+            // emptiness rule lives in this class.
+            if (! $this->keyerContributed($field)) {
+                continue;
             }
 
             if (($semantic->fieldRelevance[$key] ?? true) !== true) {
@@ -119,6 +138,32 @@ final class PrunedAnswerReport
         }
 
         return $dropped;
+    }
+
+    /**
+     * Whether a value under this field could have come from the KEYER at all — the question this report is
+     * actually asking, and the one the first cut got wrong by asking "was it in the payload".
+     *
+     * A `fixed`-prefill hidden field fails it. Its value is the authored literal, written by
+     * `StructuralAnswerNormalizer::applyFixedPrefills()` on EVERY channel whether the client sent it or not,
+     * and `EncodeFormPresenter` renders its row read-only precisely because nobody keys it. Naming one in
+     * this banner tells a keyer that something they never saw, never typed and cannot act on "was not saved"
+     * — noise on the one alarm that has to stay believable.
+     *
+     * H21c is what made this reachable, so it is fixed here rather than left as a latent oddity: before it,
+     * `Encode.vue` seeded an answer slot only for `supported` rows and a `fixed` hidden row is not one, so
+     * the value never entered the payload. Now `createFormRuntime()` seeds it through `buildPrefill()` (which
+     * is CORRECT — a label piping `${batch_id}` has to resolve on the first paint) and the page posts the
+     * full map. The server was always going to write its own copy; this only stops the report from claiming
+     * the keyer lost something.
+     *
+     * A `url`-prefill hidden field is the opposite case and is deliberately NOT excluded: on this channel the
+     * keyer IS its source (H7 — they render in the "Reference fields" block), so a relevance prune there is
+     * exactly the loss worth naming.
+     */
+    private function keyerContributed(FormField $field): bool
+    {
+        return PrefillSource::for($field->field_type, $field->config) !== PrefillSource::Fixed;
     }
 
     /**
@@ -131,6 +176,13 @@ final class PrunedAnswerReport
      * PER-MEMBER: the section survived, so each instance has its own mask and a member can be gated off
      * inside one instance and not another. Report those individually, numbered exactly as the page numbered
      * them for the keyer (the `label N` shape {@see SubmissionPdfPresenter} uses).
+     *
+     * `$value` is the NORMALIZED instance list, which is what makes `$masks[$index]` the right mask rather
+     * than a neighbour's — see the note on {@see of()}. It also means the numbering here is the PERSISTED
+     * instance number: a blank row the keyer left among filled ones is gone from both lists, so "Household
+     * members 2" names the second row that survived, not the second row on screen. That is the honest label
+     * for a message about what was stored, and the alternative — numbering by screen position — would need
+     * this class to reconstruct which rows Stage 1 dropped, which is the duplicated-rule trap `of()` avoids.
      *
      * @param  array<string, FormField>  $fieldByKey
      * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
@@ -152,20 +204,6 @@ final class PrunedAnswerReport
             return [];
         }
 
-        $holdsAnything = false;
-        foreach ($instances as $instance) {
-            foreach ($instance as $memberValue) {
-                if (! Coercion::isEmpty($memberValue)) {
-                    $holdsAnything = true;
-                    break 2;
-                }
-            }
-        }
-
-        if (! $holdsAnything) {
-            return [];
-        }
-
         $sectionLabel = $this->templates->render($section->label, $sources, []);
 
         if (($semantic->sectionRelevance[$section->key] ?? true) !== true) {
@@ -180,7 +218,7 @@ final class PrunedAnswerReport
             foreach ($instance as $memberKey => $memberValue) {
                 $memberKey = (string) $memberKey;
                 $member = $fieldByKey[$memberKey] ?? null;
-                if ($member === null || Coercion::isEmpty($memberValue)) {
+                if ($member === null || ! $this->keyerContributed($member)) {
                     continue;
                 }
                 if (($mask[$memberKey] ?? true) !== true) {

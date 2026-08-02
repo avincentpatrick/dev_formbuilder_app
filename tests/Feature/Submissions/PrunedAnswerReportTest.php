@@ -253,6 +253,138 @@ it('reports a repeat MEMBER gated off inside one instance and not another', func
         ->assertSessionHas('prunedAnswers', ['Household members 2 · Employer']);
 });
 
+it('reads the right instance mask when a BLANK row sits among filled ones', function (): void {
+    $tenant = prunedTenant();
+    $admin = prunedEncoder($tenant);
+
+    // THE REGRESSION. `SemanticResult::$repeatFieldRelevance` is index-aligned to the NORMALIZED instance
+    // list, and Stage 1 DROPS an empty instance and re-indexes — so a report walking the RAW list reads a
+    // neighbour's mask from the first blank row onward. It named an answer that was persisted and stayed
+    // silent about the one that was actually pruned: a false alarm and the exact loss the class exists to
+    // prevent, in one payload.
+    //
+    // The shape is ordinary, not contrived: `addInstance()` seeds a literal `{}`, H21c seeds `min_instances`
+    // starter rows, and clearing a row's last value deletes the key.
+    $form = app(FormService::class)->create($tenant, $admin, 'Roster');
+    $draft = $form->draftVersion;
+    $section = FormSection::create([
+        'form_version_id' => $draft->id,
+        'key' => 'hh',
+        'label' => 'Household members',
+        'sequence' => 1,
+        'is_repeatable' => true,
+    ]);
+    addFormField($draft, $admin, 'is_adult', FieldType::ShortText, 2, ['form_section_id' => $section->id, 'label' => 'Is an adult?']);
+    addFormField($draft, $admin, 'employer', FieldType::ShortText, 3, [
+        'form_section_id' => $section->id,
+        'label' => 'Employer',
+        'relevant_expression' => "\${is_adult} = 'yes'",
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $admin);
+    $form->refresh();
+
+    // THE PAYLOAD IS CHOSEN SO THE TWO IMPLEMENTATIONS DISAGREE OUT LOUD, and the first draft of this test
+    // was not: with one surviving row and one pruned row, the broken code names the SURVIVOR against its
+    // neighbour's mask and the fixed code names the PRUNED row, and both render the identical string
+    // "Household members 2 · Employer" — a test that passes for opposite reasons. Two pruned rows separate
+    // them by COUNT: the shift silently swallows the last one behind `$masks[2] ?? []` and the `?? true`
+    // fail-open, so the broken code reports one and the fixed code reports both.
+    $this->actingAs($admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/submissions", [
+            'answers' => [
+                'hh' => [
+                    [],                                          // a blank starter row — dropped by Stage 1
+                    ['is_adult' => 'no', 'employer' => 'Ana'],   // `employer` pruned
+                    ['is_adult' => 'no', 'employer' => 'Ben'],   // `employer` pruned
+                ],
+            ],
+        ])
+        ->assertRedirect()
+        // Numbered by the PERSISTED position, which is what a message about what was stored should say: the
+        // blank row is gone from the document, so these are rows 1 and 2 of what was saved.
+        ->assertSessionHas('prunedAnswers', [
+            'Household members 1 · Employer',
+            'Household members 2 · Employer',
+        ]);
+});
+
+it('does not name a fixed-prefill hidden field the keyer never typed', function (): void {
+    $tenant = prunedTenant();
+    $admin = prunedEncoder($tenant);
+
+    // THE REGRESSION. H21c made the page post the store's FULL answer map, and `buildPrefill()` seeds every
+    // `fixed` hidden field's literal into it — correctly, so a label piping `${origin}` resolves on the first
+    // paint. But the value is server-authored on every channel and its encode row is read-only, so when its
+    // section is irrelevant the report was telling a keyer that something they never saw, never typed and
+    // cannot act on "was not saved".
+    $form = app(FormService::class)->create($tenant, $admin, 'Fixed');
+    $draft = $form->draftVersion;
+    addFormField($draft, $admin, 'role', FieldType::ShortText, 1);
+    $gated = FormSection::create([
+        'form_version_id' => $draft->id,
+        'key' => 'staff',
+        'label' => 'Staff details',
+        'sequence' => 2,
+        'relevant_expression' => "\${role} = 'staff'",
+    ]);
+    addFormField($draft, $admin, 'origin', FieldType::Hidden, 3, [
+        'form_section_id' => $gated->id,
+        'label' => 'Origin',
+        'config' => ['prefill_source' => 'fixed'],
+        'default_value' => 'paper',
+    ]);
+    addFormField($draft, $admin, 'staff_number', FieldType::ShortText, 4, [
+        'form_section_id' => $gated->id,
+        'label' => 'Staff number',
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $admin);
+    $form->refresh();
+
+    $this->actingAs($admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/submissions", [
+            // Exactly what the page posts now: the fixed literal rides along with what was actually keyed.
+            'answers' => ['role' => 'visitor', 'origin' => 'paper', 'staff_number' => 'S-1234'],
+        ])
+        ->assertRedirect()
+        // `Staff number` WAS keyed and IS named; `Origin` was not and is not. Paired deliberately — asserting
+        // only the absence would pass against a report that had stopped working altogether.
+        ->assertSessionHas('prunedAnswers', ['Staff number']);
+});
+
+it('still names a URL-prefilled hidden field, because the keyer IS its source', function (): void {
+    $tenant = prunedTenant();
+    $admin = prunedEncoder($tenant);
+
+    // The other side of the same exclusion, and the reason it is written as "could the keyer have typed
+    // this" rather than "is it hidden". On this channel a `url`-sourced field renders in the Reference
+    // fields block and the keyer is the only possible source of its value (H7), so losing it to a condition
+    // is a real loss worth naming.
+    $form = app(FormService::class)->create($tenant, $admin, 'Url');
+    $draft = $form->draftVersion;
+    addFormField($draft, $admin, 'role', FieldType::ShortText, 1);
+    $gated = FormSection::create([
+        'form_version_id' => $draft->id,
+        'key' => 'staff',
+        'label' => 'Staff details',
+        'sequence' => 2,
+        'relevant_expression' => "\${role} = 'staff'",
+    ]);
+    addFormField($draft, $admin, 'batch_id', FieldType::Hidden, 3, [
+        'form_section_id' => $gated->id,
+        'label' => 'Batch id',
+        'config' => ['prefill_source' => 'url'],
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $admin);
+    $form->refresh();
+
+    $this->actingAs($admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/submissions", [
+            'answers' => ['role' => 'visitor', 'batch_id' => 'LL-2026'],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('prunedAnswers', ['Batch id']);
+});
+
 it('reports a piped label the way the keyer saw it, with its holes empty', function (): void {
     $tenant = prunedTenant();
     $admin = prunedEncoder($tenant);

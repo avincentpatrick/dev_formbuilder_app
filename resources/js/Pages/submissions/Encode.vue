@@ -352,18 +352,38 @@ function goPrev(): void {
 }
 
 /**
+ * The anchor a summary jump lands on. `FieldInput` emits no id of its own — `MdsFormField` derives the input
+ * id from Vue's `useId()`, a `v-0`-style token that has nothing to do with the field key — so this page has
+ * to stamp its own wrapper, exactly as the guest runtime's `FieldRow`/`InstanceField` do.
+ *
+ * The prefix is `encode-field-` rather than the runtime's `field-` on purpose: these anchors are this page's,
+ * and borrowing the guest's prefix would make a future shared helper silently resolve the wrong element on a
+ * page that happened to mount both.
+ */
+function anchorFor(address: string): string {
+    return `encode-field-${address}`;
+}
+
+/**
  * Jump to the field an error summary entry addresses. The step has to change FIRST and the DOM has to settle
  * before the anchor exists — in stepped mode the field is on an unmounted step, which is the trap H21b's
  * `SummaryBanner` `beforeJump` prop was added for.
+ *
+ * Focus goes to the first focusable INSIDE the anchor, not to the anchor: the wrapper is a plain `div` with
+ * no `tabindex`, so `.focus()` on it is a silent no-op — the same reason `SummaryBanner.vue` reaches for
+ * `querySelector('input, select, textarea, button, [tabindex]')`.
  */
 async function jumpTo(item: { address: string; stepKey: string }): Promise<void> {
     if (!props.form.single_page_mode && item.stepKey !== runtime.currentStepKey.value) {
         runtime.goToStep(item.stepKey);
         await nextTick();
     }
-    const target = document.getElementById(`field-${item.address}`) ?? document.getElementById(item.address);
-    target?.scrollIntoView({ block: 'center' });
-    target?.focus();
+    const target = document.getElementById(anchorFor(item.address));
+    if (target === null) {
+        return;
+    }
+    target.scrollIntoView({ block: 'center' });
+    target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]')?.focus();
 }
 
 // ── Submit ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -491,14 +511,14 @@ function submit(): void {
                         </p>
                     </div>
                     <div class="encode__fields">
-                        <FieldInput
-                            v-for="field in referenceRows"
-                            :key="field.key"
-                            :field="field"
-                            :model-value="flatValue(field.key)"
-                            :error="fieldError(field.key)"
-                            @update:model-value="setFlatValue(field.key, $event)"
-                        />
+                        <div v-for="field in referenceRows" :key="field.key" :id="anchorFor(field.key)">
+                            <FieldInput
+                                :field="field"
+                                :model-value="flatValue(field.key)"
+                                :error="fieldError(field.key)"
+                                @update:model-value="setFlatValue(field.key, $event)"
+                            />
+                        </div>
                     </div>
                 </div>
             </MdsCard>
@@ -553,13 +573,17 @@ function submit(): void {
                                         </legend>
                                         <div class="encode__fields">
                                             <template v-for="field in rowsOf(step)" :key="field.key">
-                                                <FieldInput
+                                                <div
                                                     v-if="runtime.instanceFieldRelevant(step.sectionKey, index, field.key)"
-                                                    :field="field"
-                                                    :model-value="instanceValue(step.sectionKey, index, field.key)"
-                                                    :error="instanceError(step.sectionKey, index, field.key)"
-                                                    @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
-                                                />
+                                                    :id="anchorFor(runtime.instanceAddress(step.sectionKey, index, field.key))"
+                                                >
+                                                    <FieldInput
+                                                        :field="field"
+                                                        :model-value="instanceValue(step.sectionKey, index, field.key)"
+                                                        :error="instanceError(step.sectionKey, index, field.key)"
+                                                        @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
+                                                    />
+                                                </div>
                                             </template>
                                         </div>
                                         <div class="encode__instance-actions">
@@ -600,14 +624,14 @@ function submit(): void {
 
                         <!-- Flat step (or the synthetic lead block): relevant fields render directly. -->
                         <div v-else class="encode__fields">
-                            <FieldInput
-                                v-for="field in rowsOf(step)"
-                                :key="field.key"
-                                :field="field"
-                                :model-value="flatValue(field.key)"
-                                :error="fieldError(field.key)"
-                                @update:model-value="setFlatValue(field.key, $event)"
-                            />
+                            <div v-for="field in rowsOf(step)" :key="field.key" :id="anchorFor(field.key)">
+                                <FieldInput
+                                    :field="field"
+                                    :model-value="flatValue(field.key)"
+                                    :error="fieldError(field.key)"
+                                    @update:model-value="setFlatValue(field.key, $event)"
+                                />
+                            </div>
                         </div>
                     </div>
                 </MdsCard>

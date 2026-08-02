@@ -444,6 +444,41 @@ describe('encode page — the server error summary', () => {
         expect(visibleLabels(wrapper)).toContain('Staff number');
     });
 
+    it('actually focuses the field it jumped to', async () => {
+        // THE REGRESSION. The first cut looked up `field-<address>` — the id the GUEST runtime's `FieldRow`
+        // stamps — but this page renders `FieldInput` directly and `MdsFormField` derives its input id from
+        // Vue's `useId()`, a `v-0` token with nothing to do with the field key. `getElementById` returned
+        // null every time, so the link changed step and then did nothing at all; in single-page mode, where
+        // there is no step to change, it was completely inert. The step-swap assertion above passed happily
+        // with the anchor lookup permanently dead, which is why THIS test asserts the focus.
+        //
+        // `attachTo` is required: `document.getElementById` cannot see a wrapper that was never in the
+        // document, so a detached mount would make this pass for the wrong reason too.
+        mocks.pageProps.errors = { 'answers.comments': 'Comments is required.' };
+        const wrapper = mount(Encode, {
+            props: routerPayload({ singlePage: true }) as never,
+            attachTo: document.body,
+        });
+
+        expect(wrapper.text()).toContain('1 answer needs attention');
+
+        const before = document.activeElement;
+        await wrapper.findAll('button').find((b) => b.text().trim() === 'Comments')!.trigger('click');
+        await nextTick();
+
+        const anchor = document.getElementById('encode-field-comments');
+        expect(anchor, 'the page must stamp its own anchor — FieldInput emits no key-derived id').not.toBeNull();
+
+        const focused = document.activeElement as HTMLElement | null;
+        expect(focused).not.toBe(before);
+        // Focus lands on the CONTROL, not the wrapper: the wrapper is a plain div with no tabindex, so
+        // calling .focus() on it is a silent no-op.
+        expect(focused?.tagName).toBe('INPUT');
+        expect(anchor!.contains(focused)).toBe(true);
+
+        wrapper.unmount();
+    });
+
     it('says nothing when the pipeline raised nothing', async () => {
         const wrapper = mountEncode(routerPayload({ singlePage: false }));
         await typeInto(wrapper, 'Role', 'staff');

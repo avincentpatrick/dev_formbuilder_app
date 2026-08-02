@@ -10,10 +10,11 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCheckbox, MdsModal } from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsModal, MdsSegmentedControl } from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
+import LogicRail from '@/components/builder/LogicRail.vue';
 import ConfigPanel from '@/components/builder/ConfigPanel.vue';
 import ConflictDialog from '@/components/builder/ConflictDialog.vue';
 import ConfirmationModal from '@/components/builder/ConfirmationModal.vue';
@@ -33,6 +34,16 @@ const { feature } = useEntitlements();
 
 // Left-pane view: add a fresh field type (palette) or insert a reusable question (library, Increment G9b).
 const leftTab = ref<'fields' | 'library'>('fields');
+
+// Centre-pane view (Increment H21d1): the structure the author edits, or the branching it produces. The
+// Logic view is READ-DERIVED — it writes nothing, and selecting a node there drives the same config panel,
+// so an author reads the rail and edits in place rather than moving between two editors. Both views share
+// one store, which is why the rail updates as conditions are typed.
+const centreView = ref<'structure' | 'logic'>('structure');
+const centreViews = [
+    { value: 'structure', label: 'Structure', icon: 'layout' as const },
+    { value: 'logic', label: 'Logic', icon: 'filter' as const },
+];
 
 const readOnly = computed(() => props.draft === null);
 
@@ -331,7 +342,30 @@ function submitImport(): void {
                 </div>
             </div>
             <div class="builder__pane builder__pane--canvas">
-                <BuilderCanvas :store="store" :field-type-labels="fieldTypeLabels" />
+                <div class="builder__centre-tabs">
+                    <MdsSegmentedControl
+                        :model-value="centreView"
+                        :options="centreViews"
+                        ariaLabel="Centre pane view"
+                        compact
+                        @update:model-value="centreView = $event === 'logic' ? 'logic' : 'structure'"
+                    />
+                </div>
+                <div class="builder__centre-body">
+                    <!-- Both views stay MOUNTED: the Logic rail keeps its fetched notices across a toggle,
+                         and the structure canvas keeps any in-progress keyboard reorder. -->
+                    <BuilderCanvas
+                        v-show="centreView === 'structure'"
+                        :store="store"
+                        :field-type-labels="fieldTypeLabels"
+                    />
+                    <LogicRail
+                        v-show="centreView === 'logic'"
+                        :store="store"
+                        :form-id="form.id"
+                        :active="centreView === 'logic'"
+                    />
+                </div>
             </div>
             <div class="builder__pane builder__pane--config">
                 <ConfigPanel :store="store" />
@@ -584,6 +618,25 @@ function submitImport(): void {
 .builder__pane--config {
     border-left: 1px solid var(--mds-color-border-default);
     background-color: var(--mds-color-bg-surface);
+}
+
+/* Structure ⇄ Logic (Increment H21d1) — a fixed header over the scrolling centre body, the same shape as
+   the left pane's Fields ⇄ Library toggle. */
+.builder__pane--canvas {
+    display: flex;
+    flex-direction: column;
+}
+
+.builder__centre-tabs {
+    flex-shrink: 0;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border-bottom: 1px solid var(--mds-color-border-default);
+    background-color: var(--mds-color-bg-surface);
+}
+
+.builder__centre-body {
+    flex: 1;
+    min-height: 0;
 }
 
 /* Below the tablet ceiling the three panes linearize into one scrolling column (no horizontal

@@ -432,6 +432,64 @@ class E2eSeeder extends Seeder
                 // Left as a DRAFT (not published) so it opens straight into the builder.
             }
 
+            // A DRAFT form built to exercise every visual state of the builder's LOGIC view (Increment H21d1).
+            // `Branching Router` above is the CLEAN case — real conditions, no notices — and this is the
+            // opposite: one form carrying each state the rail can render, so the axe scan sees all of them.
+            //
+            //  - a described condition (`${age} > 18`), the ordinary case;
+            //  - an OPAQUE one (`${age} + 1 > 18`) — arithmetic, which the describer refuses to paraphrase,
+            //    so the card falls back to the raw text alone;
+            //  - an INVALID one (`${age} = = 1`) — the state that used to 500 the sidecar before H21d1 made
+            //    `StepGraphInspector::emptyAtOpen()` syntax-safe, and the reason this form is never published;
+            //  - a FORWARD REFERENCE (the `Summary` section is gated on a field in the section AFTER it), so
+            //    a server-derived notice hangs on a node;
+            //  - a section holding only `hidden`/`calculated` fields, which can never be a step at all.
+            if (Form::query()->where('title', 'Logic Notices Demo')->doesntExist()) {
+                $logicDemo = app(FormService::class)->create(
+                    $tenant, $owner, 'Logic Notices Demo', 'Every state the logic rail can draw (H21d1).'
+                );
+                $lb = app(FormBuilderService::class);
+
+                $intake = $lb->addSection($logicDemo);
+                $intake->update(['label' => 'Intake']);
+                $lb->addField($logicDemo, $owner, FieldType::Integer, $intake->id)->update([
+                    'key' => 'age', 'label' => 'Your age',
+                ]);
+
+                $adults = $lb->addSection($logicDemo);
+                $adults->update(['label' => 'Adults only', 'relevant_expression' => '${age} > 18']);
+                $lb->addField($logicDemo, $owner, FieldType::ShortText, $adults->id)->update(['label' => 'Occupation']);
+
+                $odd = $lb->addSection($logicDemo);
+                $odd->update(['label' => 'Arithmetic gate', 'relevant_expression' => '${age} + 1 > 18']);
+                $lb->addField($logicDemo, $owner, FieldType::ShortText, $odd->id)->update([
+                    'label' => 'Anything else?',
+                    // A FIELD-level condition that does not parse — the field arm of the rail, not the
+                    // section one, and the pair is deliberate: they render through different code paths.
+                    'relevant_expression' => '${age} = = 1',
+                ]);
+
+                $summary = $lb->addSection($logicDemo);
+                $summary->update(['label' => 'Summary', 'relevant_expression' => "\${late_answer} = 'yes'"]);
+                $lb->addField($logicDemo, $owner, FieldType::ShortText, $summary->id)->update(['label' => 'Confirm']);
+
+                // …declared AFTER Summary, which is what makes the reference above a forward one.
+                $tail = $lb->addSection($logicDemo);
+                $tail->update(['label' => 'Tail']);
+                $lb->addField($logicDemo, $owner, FieldType::ShortText, $tail->id)->update([
+                    'key' => 'late_answer', 'label' => 'Answered later',
+                ]);
+
+                $refs = $lb->addSection($logicDemo);
+                $refs->update(['label' => 'Reference values']);
+                $lb->addField($logicDemo, $owner, FieldType::Hidden, $refs->id)->update([
+                    'key' => 'campaign', 'label' => 'Campaign', 'config' => ['prefill_source' => 'url'],
+                ]);
+
+                // Left as a DRAFT, and it could not be published anyway — the invalid expression is exactly
+                // what `ExpressionValidationGate` refuses, which is the point the rail makes on the card.
+            }
+
             // A DRAFT form whose first field is a geopoint (Increment G5b2b), so the builder auto-selects it on
             // load and the builder-axe tab-walk mounts + scans the GeoEditor's "Map" tab (capture options +
             // default map view) — the geospatial config editor — at all viewports in light + dark, with no

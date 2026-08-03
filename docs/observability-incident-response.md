@@ -48,6 +48,8 @@ Distributed tracing (e.g., via OpenTelemetry, vendor-agnostic per this project's
 
 **Dashboards** (the three the architecture plan names by name, plus the additions this document adds): webhook delivery success rate, queue depth (per-priority-tier), submission ingest latency (per-channel) — **plus** an expression-evaluator-drift dashboard, a per-tenant usage dashboard (super-admin-facing, built on `usage_counters`), and an error-rate dashboard (5xx rate by endpoint).
 
+**One measurement is load-bearing on a design decision, not just on operations (added 2026-08-03, ADR-0011 §D7).** Phase-3 analytics computes live under RLS with no rollup table and no cache, and the pre-authorised fallback — materializing aggregates as a `MaintenanceJob` fan-out — opens on a **measured** breach, not on suspicion. What must therefore be measured is the **p95 latency of the tenant-analytics query path**, per tenant, against `docs/non-functional-requirements.md` §1's `< 400ms` target and `< 1.5s` maximum. Sustained p95 above the maximum on a real tenant is the trigger that authorises the rollup; below it, the live posture stands. This is also the first read path to aggregate over `submissions` at range under the RLS predicate, which is the open Risk **R9**'s exact area, so the same measurement is R9's first real evidence.
+
 **Alert thresholds**, tied directly to the NFR doc's targets rather than arbitrary numbers:
 
 | Alert | Condition | Severity |

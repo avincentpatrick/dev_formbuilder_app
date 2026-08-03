@@ -110,6 +110,14 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `feedback.view` | ✓ | ✓ | | | |
 | `scopes.manage` *(G10a — author the tenant's `scope_nodes` hierarchy)* | ✓ | ✓ | | | |
 
+> **Design Note (ADR-0011 / H1e, 2026-08-03) — advanced analytics coins no permission.** The Phase-3
+> analytics surface (H24a/H24b) authorizes on `dashboard.org.view` and `dashboard.form.view` exactly as
+> shipped: the org-wide-versus-own-forms split those two already encode *is* the visibility split an
+> analytics read needs, so the matrix does not grow. Two adjacent gates are deliberately not permissions
+> and belong elsewhere: the new API ability `read:analytics` is a token-scoping concern
+> (`docs/api-specification.md` — new rather than a widening, so already-minted tokens gain nothing), and
+> `advanced_analytics` is a plan entitlement, orthogonal to every role in this table.
+
 > **Design Note (G10a)**: `scopes.manage` is the 28th permission, and is deliberately Owner/Admin only
 > for the same reason as `forms.collaborators.manage` below — a `scope_nodes` node is something a grant
 > can be made *against*, so authoring the hierarchy is authoring authorization structure. It is a new

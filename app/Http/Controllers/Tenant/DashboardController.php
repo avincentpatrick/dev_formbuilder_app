@@ -26,6 +26,9 @@ final class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'kpis' => $metrics->forUser($user),
+            // H24a: the four docs/PRD.md:197 criteria H11 left "partially shipped", ungated for every tier.
+            // H24b renders them; until then the prop is inert and pinned by a Pest assertion.
+            'trends' => $metrics->trendsForUser($user),
         ]);
     }
 }

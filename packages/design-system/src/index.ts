@@ -21,6 +21,16 @@ export { default as MdsToastHost } from './components/Toast/ToastHost.vue';
 export { default as MdsDataTable } from './components/DataTable/DataTable.vue';
 export type { DataTableColumn } from './components/DataTable/DataTable.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';
+export { default as MdsTimeSeriesChart } from './components/TimeSeriesChart/TimeSeriesChart.vue';
+export { default as MdsBarChart } from './components/BarChart/BarChart.vue';
+export { default as MdsChartLegend } from './components/ChartLegend/ChartLegend.vue';
+export {
+    MAX_CHART_SERIES,
+    type BarDatum,
+    type ChartLegendItem,
+    type ChartPoint,
+    type ChartSeries,
+} from './charts/types';
 export { statusVariant, type BadgeVariant, type StatusDescriptor } from './components/Badge/status-variant';
 export { type ToastType, type ToastItem } from './components/Toast/toast';
 export { icons, type IconName } from './components/Icon/icons';

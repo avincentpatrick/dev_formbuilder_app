@@ -12,6 +12,32 @@
  * "system" = the ABSENCE of data-theme-mode: prefers-color-scheme decides (costs nothing).
  */
 
+/* ── The dark-ground CHART payload, defined ONCE (§3.11, ADR-0011 §D11) ────────────────
+   Same device as the dark teal payload further down, for the same reason: the two dark
+   selectors below would otherwise repeat five literals each and could drift apart.
+
+   Why a dark re-point at all — this is derived, not stylistic. Charts sit on
+   --mds-color-bg-surface, which is #FFFFFF in light and #123350 in dark. A data mark is a
+   "meaningful graphical object" under WCAG 1.4.11 and takes 3:1 against its ground. One token
+   set satisfying 3:1 against BOTH grounds is confined to a narrow luminance band with no room
+   left for five marks to stay distinguishable from each other, so the scale is re-pointed per
+   theme instead. That is also why five is the cap.
+
+   Hue identity is preserved per index across the flip (1 blue, 2 vermilion, 3 green, 4 purple,
+   5 ochre) — the anchors are the Okabe-Ito colour-vision-deficiency-safe set, darkened for the
+   white ground and lightened for the drafting-blue one. Ratios below are measured against
+   #123350; the full table (both themes) is DSR §4.1. NOTE these alias no primary/success/
+   warning/danger/accent scale and NO [data-accent] rule may touch them: a data series encodes
+   meaning, and two colleagues reading one screenshot must see the same series in the same
+   colour. That rule is enforced by a test, not by this comment. */
+:root {
+    --mds-_chart-dark-1: #7cc9f1; /* vs #123350   7.11:1 */
+    --mds-_chart-dark-2: #e4813f; /*              4.65:1 */
+    --mds-_chart-dark-3: #37b98c; /*              5.25:1 */
+    --mds-_chart-dark-4: #c077ad; /*              4.01:1 */
+    --mds-_chart-dark-5: #f0cb6d; /*              8.34:1 */
+}
+
 /* ── Dark: explicit opt-in ─────────────────────────────────────────────── */
 :root[data-theme-mode='dark'] {
     /* Neutral ramp → deep drafting-blue ground (low steps dark, high steps pale) */
@@ -66,6 +92,14 @@
     --mds-color-status-info-fg: var(--mds-primary-200);
     --mds-color-status-neutral-bg: var(--mds-neutral-200);
     --mds-color-status-neutral-fg: var(--mds-neutral-800);
+
+    /* Chart series (§3.11): the mandatory dark re-point. --mds-chart-other/-grid/-axis are absent
+       on purpose — they alias neutral primitives, which this block already flipped. */
+    --mds-chart-series-1: var(--mds-_chart-dark-1);
+    --mds-chart-series-2: var(--mds-_chart-dark-2);
+    --mds-chart-series-3: var(--mds-_chart-dark-3);
+    --mds-chart-series-4: var(--mds-_chart-dark-4);
+    --mds-chart-series-5: var(--mds-_chart-dark-5);
 }
 
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
@@ -113,6 +147,14 @@
         --mds-color-status-info-fg: var(--mds-primary-200);
         --mds-color-status-neutral-bg: var(--mds-neutral-200);
         --mds-color-status-neutral-fg: var(--mds-neutral-800);
+
+        /* Chart series (§3.11): the mandatory dark re-point. --mds-chart-other/-grid/-axis are absent
+           on purpose — they alias neutral primitives, which this block already flipped. */
+        --mds-chart-series-1: var(--mds-_chart-dark-1);
+        --mds-chart-series-2: var(--mds-_chart-dark-2);
+        --mds-chart-series-3: var(--mds-_chart-dark-3);
+        --mds-chart-series-4: var(--mds-_chart-dark-4);
+        --mds-chart-series-5: var(--mds-_chart-dark-5);
     }
 }
 

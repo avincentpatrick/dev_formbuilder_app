@@ -76,7 +76,7 @@ final class DashboardMetricsService
      * No new permission and no new gate — the existing `dashboard.org.view` split flows through
      * `AnalyticsFormSet`, so a Form Editor's trend covers exactly the forms their KPI tiles already count.
      *
-     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
+     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
      */
     public function trendsForUser(User $user): array
     {
@@ -88,6 +88,8 @@ final class DashboardMetricsService
             axis: AnalyticsAxis::Form,
         );
 
+        $topForms = $this->analytics->breakdown($query, $user);
+
         return [
             // Echoed so the page can label the tiles honestly — "last 30 days", not an unqualified total —
             // and so the UTC bucketing is visible rather than assumed.
@@ -98,10 +100,52 @@ final class DashboardMetricsService
             ],
             'total' => $this->analytics->total($query, $user),
             'series' => $this->analytics->series($query, $user),
-            'top_forms' => $this->analytics->breakdown($query, $user),
+            'top_forms' => [
+                ...$topForms,
+                'rows' => $this->labelFormRows($topForms['rows']),
+            ],
             'forms_accepting' => $this->analytics->acceptingFormsCount($user),
             'drafts' => $this->analytics->draftMetrics($query, $user),
         ];
+    }
+
+    /**
+     * Attach a human title to each `axis=form` breakdown row.
+     *
+     * **Resolved HERE and not inside {@see AnalyticsMetricsService::breakdown()}** — that method's shape is
+     * the `/api/v1/analytics/report` response, byte-diffed against the committed `openapi.json` by the
+     * contract-tests job and asserted key-by-key by `AnalyticsApiTest`. A label is a presentation concern of
+     * one surface; widening the API's aggregate row to carry it would make every API consumer pay for it and
+     * would put a second definition of "the row's name" in the aggregator.
+     *
+     * `withTrashed()` is load-bearing, not defensive. {@see AnalyticsFormSet::visible()} roots an org-wide
+     * reader's set on `Form::withTrashed()`, so a soft-deleted form legitimately appears in a breakdown whose
+     * submissions are still countable — and a plain lookup would return no row for it, leaving a bar with a
+     * number and no name. The fallback below is for a HARD-deleted form only, which is genuinely unnamed.
+     *
+     * @param  list<array{key: string|null, count: int}>  $rows
+     * @return list<array{key: string|null, label: string, count: int}>
+     */
+    private function labelFormRows(array $rows): array
+    {
+        $ids = array_values(array_filter(array_column($rows, 'key')));
+
+        /** @var array<string, string> $titles */
+        $titles = $ids === []
+            ? []
+            : Form::withTrashed()
+                ->whereIn('id', $ids)
+                ->pluck('title', 'id')
+                ->all();
+
+        return array_map(
+            static fn (array $row): array => [
+                'key' => $row['key'],
+                'label' => $row['key'] === null ? 'Unassigned' : ($titles[$row['key']] ?? 'Deleted form'),
+                'count' => $row['count'],
+            ],
+            $rows,
+        );
     }
 
     /** Active (non-archived) forms the user may reach — org-wide, or scoped to granted forms. */

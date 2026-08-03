@@ -1,0 +1,17 @@
+{
+    "chart": {
+        "series-1": { "value": "#0072B2" },
+        "series-2": { "value": "#E15A14" },
+        "series-3": { "value": "#00654A" },
+        "series-4": { "value": "#7A3468" },
+        "series-5": { "value": "#96700A" },
+        "other": { "value": "{neutral.500}" },
+        "grid": { "value": "{neutral.200}" },
+        "axis": { "value": "{neutral.600}" },
+        "pattern-1": { "value": "none" },
+        "pattern-2": { "value": "7 4" },
+        "pattern-3": { "value": "2 3" },
+        "pattern-4": { "value": "11 4 2 4" },
+        "pattern-5": { "value": "1 4" }
+    }
+}

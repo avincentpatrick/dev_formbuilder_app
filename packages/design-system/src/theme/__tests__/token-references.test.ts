@@ -120,6 +120,20 @@ function referencedTokens(): Map<string, string[]> {
     return referenced;
 }
 
+/**
+ * Both cases below carry an explicit timeout, because Vitest's 5s default is the wrong budget for what
+ * they actually do: a synchronous walk of `resources/` and `packages/design-system/src/` reading every
+ * `.vue`/`.css`/`.ts` off disk, twice. That has been a recorded intermittent timeout since H21b — and it
+ * is a genuinely dangerous flake, because H21d1 found a REAL dangling token behind one of these
+ * timeouts, which means "it timed out again" is not safe to wave through.
+ *
+ * H24b1 is why it is fixed rather than tolerated: this increment adds files to the very tree being
+ * walked, so leaving a marginal budget in place would push an already-flaky job toward failing on load
+ * rather than on a defect. The walk itself is ~2s in isolation and ~4-8s under a loaded container; 30s
+ * is far above either and still fails fast if the scan ever hangs.
+ */
+const WALK_TIMEOUT_MS = 30_000;
+
 describe('design token references', () => {
     it('resolves every var(--mds-*) reference to a defined token', () => {
         const defined = definedTokens();
@@ -131,12 +145,12 @@ describe('design token references', () => {
             .sort();
 
         expect(dangling, `Undefined --mds-* tokens referenced:\n${dangling.join('\n')}`).toEqual([]);
-    });
+    }, WALK_TIMEOUT_MS);
 
     it('finds a non-trivial number of tokens on both sides (the scan is actually working)', () => {
         // Guards against a silent regression where a path change makes both sets empty and the
         // assertion above passes vacuously.
         expect(definedTokens().size).toBeGreaterThan(100);
         expect(referencedTokens().size).toBeGreaterThan(50);
-    });
+    }, WALK_TIMEOUT_MS);
 });

@@ -92,6 +92,7 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `manage:settings` | `tenant.settings.manage` |
 | `manage:scopes` *(G10b)* | `scopes.manage` / `forms.collaborators.manage` |
 | `manage:integrations` *(H15a)* | `integrations.manage` |
+| `read:analytics` *(H24a — specified by ADR-0011 §D9, not yet minted)* | `dashboard.org.view` / `dashboard.form.view` |
 
 > **Increment G10b note.** `manage:scopes` covers both authoring the `scope_nodes` hierarchy and granting
 > access on it. It is a **new** ability rather than a reuse of `manage:settings`, which preserves the
@@ -114,6 +115,16 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > deliberately does **not** offer: there is no `POST /connections` and no `PATCH /connections/{id}` — a
 > grant can only be created by the interactive OAuth flow, and an API that accepted a token as input would
 > be a path to writing a credential the platform then acts with.
+
+> **ADR-0011 note (H1e, 2026-08-03) — `read:analytics` is specified but not yet minted.** H24a adds it as a
+> **new** ability rather than serving aggregates under `read:submissions` or `export:submissions`, for the
+> same reason as the two notes above: folding it in would retroactively grant analytics access to every
+> token already issued. It differs from those two in one respect worth recording — it needs **no new RBAC
+> permission**. `dashboard.org.view` and `dashboard.form.view` are already seeded and already in the role
+> matrix, and the org-wide/scoped split they encode is exactly the visibility split an analytics read needs,
+> so the ability maps onto existing permissions instead of coining a thirtieth. The analytics routes also
+> carry `feature:advanced_analytics`, which is a plan gate rather than an authorization one.
+
 | `read:audit_log` | `audit_log.view` |
 
 An API key (personal access token) is issued with an explicit subset of these abilities, independent of — but never exceeding — the issuing user's own RBAC permissions (a key can be narrower than its issuer's own access, never broader; enforced by intersecting the requested ability set against the issuer's actual permissions at token-creation time).

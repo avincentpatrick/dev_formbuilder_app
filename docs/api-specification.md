@@ -92,7 +92,7 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `manage:settings` | `tenant.settings.manage` |
 | `manage:scopes` *(G10b)* | `scopes.manage` / `forms.collaborators.manage` |
 | `manage:integrations` *(H15a)* | `integrations.manage` |
-| `read:analytics` *(H24a — specified by ADR-0011 §D9, not yet minted)* | `dashboard.org.view` / `dashboard.form.view` |
+| `read:analytics` *(H24a)* | `dashboard.org.view` / `dashboard.form.view` |
 
 > **Increment G10b note.** `manage:scopes` covers both authoring the `scope_nodes` hierarchy and granting
 > access on it. It is a **new** ability rather than a reuse of `manage:settings`, which preserves the
@@ -116,7 +116,7 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > grant can only be created by the interactive OAuth flow, and an API that accepted a token as input would
 > be a path to writing a credential the platform then acts with.
 
-> **ADR-0011 note (H1e, 2026-08-03) — `read:analytics` is specified but not yet minted.** H24a adds it as a
+> **ADR-0011 note (H1e) — `read:analytics`, minted by H24a (2026-08-03).** It is a
 > **new** ability rather than serving aggregates under `read:submissions` or `export:submissions`, for the
 > same reason as the two notes above: folding it in would retroactively grant analytics access to every
 > token already issued. It differs from those two in one respect worth recording — it needs **no new RBAC
@@ -124,6 +124,21 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > matrix, and the org-wide/scoped split they encode is exactly the visibility split an analytics read needs,
 > so the ability maps onto existing permissions instead of coining a thirtieth. The analytics routes also
 > carry `feature:advanced_analytics`, which is a plan gate rather than an authorization one.
+>
+> **As built.** Eight routes under `/analytics`: `report`, `report/export`, `questions`,
+> `questions/{key}` and the five `views` verbs. Every one carries the standing triplet
+> `ability:read:analytics` + a `can:` gate + `feature:advanced_analytics`. The report and question routes
+> have no model of their own and gate on `can:viewAny,SavedReportView` — whose policy predicate IS this
+> ability map, so the token scope and the permission check agree by construction;
+> `can:viewAny,Submission::class` was rejected there because it authorizes on `submissions.view`, a widening
+> of a different capability. One consequence worth stating: a **Viewer** holds `dashboard.org.view`, so
+> `read:analytics` is the broadest-issuable read ability in the catalog — intended, since a Viewer already
+> sees every submission in the inbox.
+>
+> A declaration that violates one of ADR-0011 §D7's bounds (missing range, span over 366 days, unknown IANA
+> zone, form list over 100) returns **422 `invalid_analytics_query`** with a machine-readable `reason`. The
+> bounds live in the query object's constructor rather than only in validator rules, so the saved-view and
+> export paths inherit them.
 
 | `read:audit_log` | `audit_log.view` |
 

@@ -623,7 +623,7 @@ Merged H10 (squash → PR #59 `934fff6`, all 6 CI jobs green); branched `h11-das
 
 **Docs: no new number** — Doc #27 → **v1.5** with amendments E1–E5, plus reconciliations to `testing-strategy.md`, `architecture/technical-architecture.md` (R3's third kind of drift surface), `feature-backlog.md` (the logic-map row's write half) and `competitive-feature-parity-matrix.md` (the workflow/branching-canvas row goes ◐ → ✓).
 
-## 2026-08-03 — H1e (ADR-0011, the analytics substrate) — the ADR wave's last unblocked row
+## 2026-08-03 — H1e (ADR-0011, the analytics substrate) — MERGED PR #85 `3d8f1f3`, 6/6 CI green first try
 
 **Named by applying the H-map blockers, not picked.** H21d2 closed row 254 and the whole H21 arc, leaving four eligible rows once the blocked ones fell out (H22b needs H22a, H23b needs H23a): H1e, H22a, H23a, H25. H1e was the only one blocking a vertical — H24a's other three dependencies (H2, H5a, H11) were already merged — and the map's own rule front-loads docs precisely because each can reshape the increment behind it. It did.
 

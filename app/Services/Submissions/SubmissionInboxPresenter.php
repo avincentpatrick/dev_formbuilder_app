@@ -59,7 +59,12 @@ final class SubmissionInboxPresenter
             // Hide in-progress drafts (H10) unless the status filter explicitly asks for them. The inbox is a
             // review surface for completed responses; a half-filled guest draft is not something a reviewer
             // acts on. Selecting the "Draft" status option surfaces them (the option is already in the catalog).
-            ->when(empty($filters['status']), fn ($q) => $q->where('status', '!=', SubmissionStatus::Draft->value))
+            //
+            // Spelled as ADR-0011 §D2's countable predicate because D2's headline risk is exactly "a dashboard
+            // and an inbox disagree in front of a customer", and this is the inbox. Note what it is, though: a
+            // DISPLAY DEFAULT the user overrides, not an assertion that a submission is countable — so a future
+            // change to Submission::scopeCountable() changes what a reviewer sees by default.
+            ->when(empty($filters['status']), fn ($q) => $q->countable())
             ->when($filters['source'] ?? null, fn ($q, $v) => $q->where('source', $v))
             ->orderByDesc('id') // uuidv7 → recency without a dedicated submitted_at index
             ->paginate(self::PER_PAGE)

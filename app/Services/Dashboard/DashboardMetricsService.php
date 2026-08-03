@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Dashboard;
 
 use App\Enums\FormStatus;
-use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\Submission;
@@ -65,12 +64,17 @@ final class DashboardMetricsService
         return $query->count();
     }
 
-    /** Finalized submissions (drafts excluded, mirroring the inbox default) visible to `$user`. */
+    /**
+     * Finalized submissions (drafts excluded, mirroring the inbox default) visible to `$user`.
+     *
+     * The predicate is {@see Submission::scopeCountable()} — ADR-0011 §D2 names it once so this tile and
+     * H24a's analytics cannot drift into two definitions of "a response".
+     */
     private function submissionsCount(User $user): int
     {
         return Submission::query()
             ->visibleTo($user)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->countable()
             ->count();
     }
 

@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 
 /**
@@ -141,6 +143,60 @@ class Submission extends Model implements TenantScoped
     public function answerIndex(): HasMany
     {
         return $this->hasMany(SubmissionAnswerIndex::class);
+    }
+
+    /**
+     * THE countable-submission predicate (ADR-0011 §D2): a submission counts when its `status` is not
+     * `draft` and it is not soft-deleted. Named once here and binding on H11's dashboard and H24a's
+     * analytics alike, so the two surfaces cannot drift into two definitions of "a response" — the failure
+     * that makes a dashboard and an inbox disagree in front of a customer.
+     *
+     * The `deleted_at IS NULL` half comes from the {@see SoftDeletes} global scope, not from this method.
+     * That is why {@see applyCountableJoin()} exists as a separate artefact: a local scope only applies when
+     * `Submission` is the query ROOT, so a query rooted on `submission_answer_index` gets neither this
+     * predicate nor the global scope on the joined table.
+     *
+     * Visibility is deliberately NOT embedded — {@see scopeVisibleTo()} is a different axis, and three of the
+     * non-adopters below are public/guest paths that must not consult it.
+     *
+     * ── Deliberate non-adopters, so nobody "finishes the refactor" ───────────────────────────────────────
+     * Three sites spell this predicate identically today and answer a DIFFERENT question — "how many
+     * responses have consumed the paid `max_responses` cap?": `FormAcceptanceGuard::assertCapacity()`
+     * (enforcement, under `lockForUpdate()` on the ingest path) and its two display twins,
+     * `PublicFormPresenter::finalizedCount()` and `EncodeFormPresenter::finalizedCount()`. Binding a
+     * purchased capacity cap to the analytics definition of a response would mean a later analytics change
+     * — excluding `returned`, say — silently changing what a customer bought, in two places that must agree
+     * with the guard or the public banner lies.
+     *
+     * A fourth, `ReconcileTenantUsageJob`, is a metering COUNT with no status predicate at all (drafts fall
+     * out only incidentally, because their `submitted_at` is NULL). Same decoupling argument: it is billing.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeCountable(Builder $query): Builder
+    {
+        return $query->where('status', '!=', SubmissionStatus::Draft->value);
+    }
+
+    /**
+     * The join-side spelling of {@see scopeCountable()}, for a query whose root is NOT `submissions`.
+     *
+     * ADR-0011 §D2's second clause — "analytics may never read `submission_answer_index` without joining
+     * `submissions`" — is about a JOIN, and a join inherits neither a local scope nor the joined model's
+     * global scopes. The soft-delete half is therefore spelled out here: `submission_answer_index`'s FK
+     * cascade fires on HARD delete only, so its rows outlive a soft-deleted submission and a query that
+     * forgets this returns the right shape with the wrong number.
+     *
+     * Also emits the predicate the partial indexes on `submissions` are built over, so a join through this
+     * helper stays index-eligible.
+     *
+     * @param  JoinClause|Builder<Submission>|QueryBuilder  $join
+     */
+    public static function applyCountableJoin(JoinClause|Builder|QueryBuilder $join, string $alias = 'submissions'): void
+    {
+        $join->where($alias.'.status', '!=', SubmissionStatus::Draft->value)
+            ->whereNull($alias.'.deleted_at');
     }
 
     /**

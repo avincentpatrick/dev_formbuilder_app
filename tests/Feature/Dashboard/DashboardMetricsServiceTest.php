@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\FormStatus;
+use App\Enums\PlanTier;
 use App\Enums\SubmissionStatus;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\PermissionRegistrar;
@@ -79,4 +83,70 @@ it('scopes a Form Editor to their own forms and withholds the Members count', fu
     expect($kpis['forms'])->toBe(1)          // only 'Mine'
         ->and($kpis['submissions'])->toBe(1) // only Mine's submitted; 'Theirs' hidden, draft excluded
         ->and($kpis['members'])->toBeNull(); // no dashboard.org.view
+});
+
+/*
+|--------------------------------------------------------------------------
+| H24a -- the four docs/PRD.md:197 criteria H11 left "partially shipped".
+|
+| UNGATED, for every tier. These are Phase-1 acceptance criteria, and the Phase-3 decomposition's own
+| "H11 vs H24" note unbundles the basic dashboard from the advanced_analytics gate. What that gate covers is
+| the Phase-3 surface: arbitrary cross-form grouping, saved views, answer-value aggregation, the export.
+*/
+
+/** @return array{owner: User, tenant: Tenant} */
+function trendFixture(): array
+{
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = publishedInboxForm($tenant, $owner, 'Intake');
+    seedCountableAt($form, CarbonImmutable::now()->subDays(2));
+
+    return ['owner' => $owner, 'tenant' => $tenant];
+}
+
+it('serves the trend props on a FREE plan, because they are Phase-1 criteria', function (): void {
+    ['owner' => $owner] = trendFixture();
+    assignPlanTier(PlanTier::Free);
+
+    $trends = app(DashboardMetricsService::class)->trendsForUser($owner);
+
+    // No 402, no null-shaped "upgrade to see this" -- real numbers on the lowest tier.
+    expect($trends['total'])->toHaveKeys(['current', 'prior', 'change'])
+        ->and($trends['total']['current'])->toBe(1)
+        ->and($trends['top_forms'])->toHaveKeys(['rows', 'other', 'unassigned'])
+        ->and($trends['drafts'])->toHaveKey('suppressed')
+        ->and($trends['forms_accepting'])->toBe(1);
+});
+
+it('states the range it covers, so a tile cannot be labelled as an all-time total', function (): void {
+    ['owner' => $owner] = trendFixture();
+
+    $trends = app(DashboardMetricsService::class)->trendsForUser($owner);
+
+    // The window is echoed rather than implied -- "last 30 days" is a different claim from "total", and the
+    // bucketing timezone is visible rather than assumed to be the server's.
+    expect($trends['range']['timezone'])->toBe('UTC')
+        ->and($trends['series'])->toHaveCount(30)
+        ->and($trends['range']['from'])->toBe(CarbonImmutable::now()->subDays(29)->toDateString())
+        ->and($trends['range']['to'])->toBe(CarbonImmutable::now()->toDateString());
+});
+
+it('scopes the trends to the same forms the KPI tiles count', function (): void {
+    // One shared query layer, two entry points: the trend goes through AnalyticsFormSet, which applies the
+    // same dashboard.org.view split scopeVisibleTo() does. A trend wider than the tiles beside it would be
+    // the D2 disagreement in miniature.
+    ['owner' => $owner] = trendFixture();
+
+    $editor = User::factory()->create();
+    makeActiveMember($editor, 'form_editor');
+    app(ResourceGrantResolver::class)->forget();
+
+    $metrics = app(DashboardMetricsService::class);
+
+    expect($metrics->trendsForUser($editor)['total']['current'])->toBe(0)
+        ->and($metrics->trendsForUser($owner)['total']['current'])->toBe(1);
 });

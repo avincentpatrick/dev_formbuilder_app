@@ -10,6 +10,7 @@ use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
 use App\Policies\SubmissionPolicy;
+use App\Services\Analytics\AnswerValueAggregator;
 use App\Services\Authorization\ResourceGrantResolver;
 use Database\Factories\SubmissionFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -141,6 +142,47 @@ class Submission extends Model implements TenantScoped
     public function answerIndex(): HasMany
     {
         return $this->hasMany(SubmissionAnswerIndex::class);
+    }
+
+    /**
+     * THE countable-submission predicate (ADR-0011 §D2): a submission counts when its `status` is not
+     * `draft` and it is not soft-deleted. Named once here and binding on H11's dashboard and H24a's
+     * analytics alike, so the two surfaces cannot drift into two definitions of "a response" — the failure
+     * that makes a dashboard and an inbox disagree in front of a customer.
+     *
+     * The `deleted_at IS NULL` half comes from the {@see SoftDeletes} global scope, not from this method —
+     * which means **this scope only carries D2 when `Submission` is the query ROOT.** A query rooted on
+     * `submission_answer_index` and joined back to `submissions` would inherit neither, and since that
+     * table's FK cascade fires on HARD delete only, its rows outlive a soft-deleted submission. That is why
+     * {@see AnswerValueAggregator} is deliberately rooted here and joins OUTWARD to
+     * the index rather than the other way round: it makes D2 structural rather than remembered.
+     *
+     * Visibility is deliberately NOT embedded — {@see scopeVisibleTo()} is a different axis, and three of the
+     * non-adopters below are public/guest paths that must not consult it.
+     *
+     * ── Deliberate non-adopters, so nobody "finishes the refactor" ───────────────────────────────────────
+     * Three sites spell this predicate identically today and answer a DIFFERENT question — "how many
+     * responses have consumed the paid `max_responses` cap?": `FormAcceptanceGuard::assertCapacity()`
+     * (enforcement, under `lockForUpdate()` on the ingest path) and its two display twins,
+     * `PublicFormPresenter::finalizedCount()` and `EncodeFormPresenter::finalizedCount()`. Binding a
+     * purchased capacity cap to the analytics definition of a response would mean a later analytics change
+     * — excluding `returned`, say — silently changing what a customer bought, in two places that must agree
+     * with the guard or the public banner lies.
+     *
+     * A fourth, `ReconcileTenantUsageJob`, is a metering COUNT with no status predicate at all (drafts fall
+     * out only incidentally, because their `submitted_at` is NULL). Same decoupling argument: it is billing.
+     *
+     * The column is QUALIFIED. `status` is unqualified-ambiguous the moment a caller joins `forms`, which
+     * also has one — and H24a's scope-node breakdown does exactly that. An unqualified scope would work
+     * everywhere it is used today and fail on the first join, which is the kind of latent break a shared
+     * predicate must not carry.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeCountable(Builder $query): Builder
+    {
+        return $query->where('submissions.status', '!=', SubmissionStatus::Draft->value);
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Forms\FormService;
+use App\Services\Scoping\ScopeNodeService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -290,4 +291,63 @@ it('does not let a % or _ in a path widen a prefix match', function (): void {
     grantOnNode($root, $this->user, ResourceCapacity::Editor, descendants: true);
 
     expect(reachable($form, ResourceCapacity::Editor))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| subtreeFormIdsQuery() — the shared subtree predicate extracted in H24a (ADR-0011 §D6). nodeReach() is its
+| second CALL SITE, not its second copy, and the tests above already pin that arm. These pin the arm
+| nodeReach() never exercises: `includeSelf: true`, which is the shape cross-form analytics selects with.
+*/
+
+it('includes the node itself when asked, which nodeReach never does', function (): void {
+    $root = makeScopeNode(name: 'Region I');
+    $child = makeScopeNode($root, name: 'Province A');
+
+    $onRoot = assignTo(unownedForm('On root'), $root->id);
+    $onChild = assignTo(unownedForm('On child'), $child->id);
+
+    $ids = $this->resolver->subtreeFormIdsQuery($root)->pluck('id');
+
+    expect($ids)->toHaveCount(2)
+        ->and($ids->contains($onRoot->id))->toBeTrue()
+        ->and($ids->contains($onChild->id))->toBeTrue();
+
+    // The descendant-only sense nodeReach() reports with, for contrast.
+    expect($this->resolver->subtreeFormIdsQuery($root, includeSelf: false)->pluck('id')->all())
+        ->toBe([$onChild->id]);
+});
+
+it('excludes a deactivated node and its whole branch, adopting nodeReach semantics', function (): void {
+    // ADR-0011 §D6 picks THIS semantics over ScopeNodeService::deletionImpact()'s, which does not filter
+    // is_active. The reason is stated there: an analytics total that counted branches the authorization
+    // layer treats as gone would disagree with every other number on the screen.
+    $root = makeScopeNode(name: 'Region I');
+    $live = makeScopeNode($root, name: 'Province A');
+    $dead = makeScopeNode($root, name: 'Province B');
+    $underDead = makeScopeNode($dead, name: 'City B1');
+
+    $liveForm = assignTo(unownedForm('Live'), $live->id);
+    assignTo(unownedForm('Dead'), $dead->id);
+    assignTo(unownedForm('Under dead'), $underDead->id);
+
+    app(ScopeNodeService::class)->setActive($dead, false);
+    $this->resolver->forget();
+
+    // The deactivated node's own form AND its descendant's form are both gone — a branch is cut at the
+    // deactivation, not just the one node.
+    expect($this->resolver->subtreeFormIdsQuery($root)->pluck('id')->all())->toBe([$liveForm->id]);
+});
+
+it('returns an explicit empty set for a node under a deactivated branch, never an unconstrained query', function (): void {
+    // `whereIn('id', [])` degenerating to a bare select would mean "everything" — the same trap
+    // grantedFormIdsQuery() guards with whereRaw('false').
+    $root = makeScopeNode(name: 'Region I');
+    $child = makeScopeNode($root, name: 'Province A');
+    assignTo(unownedForm('Hidden'), $child->id);
+
+    app(ScopeNodeService::class)->setActive($root, false);
+    $this->resolver->forget();
+
+    expect($this->resolver->subtreeFormIdsQuery($child)->count())->toBe(0);
 });

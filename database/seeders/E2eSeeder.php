@@ -102,19 +102,31 @@ class E2eSeeder extends Seeder
             TenantContext::applyLocal((string) $tenant->id, $owner->id);
             app(PermissionRegistrar::class)->setPermissionsTeamId((string) $tenant->id);
 
-            // Give acme a Professional plan (H5b) so the hard-block quota guards are inert for the demo/e2e
-            // fixture — Professional's forms_count is unlimited and every other quota is far above what this
-            // seeder creates, so the ~10 seeded forms don't trip the Free cap of 3. Idempotent.
-            if (! Subscription::query()->where('name', 'default')->exists()) {
-                $professionalId = Plan::query()->where('code', PlanTier::Professional->value)->value('id');
-                if ($professionalId !== null) {
-                    Subscription::create([
-                        'plan_id' => $professionalId,
-                        'name' => 'default',
+            // Give acme a BUSINESS plan (H24a / ADR-0011 §D9). Business is the only tier carrying
+            // `advanced_analytics`, and it is seeded `is_active: false` — held from sale until the production
+            // host is stood up (ADR-0008 §D6) — so a super-admin assignment like this one is the ONLY way a
+            // tenant reaches it. Without it H24b's merge-blocking axe spec would stay green over a page it
+            // could never load, which §D9 names as a blocking obligation on this fixture.
+            //
+            // Strictly additive over the Professional plan this replaced: PlanCatalog defines
+            // `$business = [...$professional, 'custom_domain', 'advanced_analytics']` and Business quotas are
+            // unlimited, so every quota guard stays as inert as before and no seeded artifact changes.
+            //
+            // UPSERT, not create-if-absent. The previous shape was guarded by
+            // `if (! Subscription::where('name','default')->exists())`, so on any already-seeded database a
+            // tier change here would SILENTLY NO-OP: CI (a fresh database) would go green while every
+            // developer's box stayed on Professional and the analytics routes 402'd. PROGRESS.md records the
+            // same trap for this seeder's doesntExist()-guarded blocks generally.
+            $businessId = Plan::query()->where('code', PlanTier::Business->value)->value('id');
+            if ($businessId !== null) {
+                Subscription::updateOrCreate(
+                    ['name' => 'default'],
+                    [
+                        'plan_id' => $businessId,
                         'stripe_status' => 'active',
                         'billing_interval' => BillingInterval::Monthly,
-                    ]);
-                }
+                    ],
+                );
             }
 
             if (! TenantUser::query()->where('user_id', $owner->id)->exists()) {
@@ -611,8 +623,8 @@ class E2eSeeder extends Seeder
 
     /**
      * Webhook fixtures (Increment H14) — so the /webhooks list + a populated /webhooks/{id} delivery log
-     * render for the responsive-axe scan (acme is Professional, so the `webhooks` feature + endpoint quota are
-     * available). One active tenant-wide endpoint with a spread of deliveries across every status (Badge
+     * render for the responsive-axe scan (acme is on BUSINESS since H24a, which inherits every Professional
+     * feature, so the `webhooks` feature + endpoint quota are available). One active tenant-wide endpoint with a spread of deliveries across every status (Badge
      * variety), and one breaker-paused endpoint so the Show page's paused notice + failure metadata are covered.
      * Endpoints go through WebhookEndpointService (the same writer the UI uses); idempotent on the endpoint name.
      */
@@ -668,7 +680,8 @@ class E2eSeeder extends Seeder
 
     /**
      * Native-connector fixtures (Increment H15b) — so /integrations and a populated /integrations/rules/{id}
-     * render for the responsive-axe scan (acme is Professional, so `native_connectors` is available).
+     * render for the responsive-axe scan (acme is on BUSINESS since H24a, which inherits Professional, so
+     * `native_connectors` is available).
      *
      * Grants go through the FACTORY, not ConnectionService: a real grant can only come from an OAuth exchange,
      * and there is no provider to call in e2e. That is also why nothing here triggers an outbound request —

@@ -11,6 +11,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\PersonalAccessToken;
 use App\Models\ResourceGrant;
+use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\WebhookDelivery;
@@ -21,9 +22,12 @@ use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\ResourceGrantPolicy;
+use App\Policies\SavedReportViewPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Policies\WebhookEndpointPolicy;
+use App\Services\Analytics\AnalyticsFormSet;
+use App\Services\Analytics\AnalyticsMetricsService;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
@@ -107,6 +111,12 @@ class AppServiceProvider extends ServiceProvider
         // (its per-user grant memo, used to scope a Form Editor/Reviewer's counts), the same reason the
         // resolvers above are scoped — never `singleton`, which would leak that memo across requests.
         $this->app->scoped(DashboardMetricsService::class);
+
+        // The cross-form analytics aggregators (H24a, ADR-0011). Scoped for exactly the reason above —
+        // AnalyticsFormSet resolves every query through the request's one ResourceGrantResolver memo, so a
+        // singleton would leak one user's grant set into the next request.
+        $this->app->scoped(AnalyticsFormSet::class);
+        $this->app->scoped(AnalyticsMetricsService::class);
     }
 
     /**
@@ -144,6 +154,12 @@ class AppServiceProvider extends ServiceProvider
         // Webhook endpoints (H13a). Owner/Admin only, via `webhooks.manage`. Registered explicitly for the
         // same fail-OPEN reason as the policies above.
         Gate::policy(WebhookEndpoint::class, WebhookEndpointPolicy::class);
+
+        // Saved analytics reports (H24a, ADR-0011 §D8/§D9). Registered explicitly for the same fail-OPEN
+        // reason. This policy does double duty: its `viewAny` is also the `can:` gate on the analytics report
+        // and question routes, which have no model of their own — see SavedReportViewPolicy's docblock for
+        // why `can:viewAny,Submission::class` was rejected there.
+        Gate::policy(SavedReportView::class, SavedReportViewPolicy::class);
 
         // Native-connector OAuth grants (H15a). Owner/Admin only, via the new `integrations.manage`
         // permission. Registered explicitly for the same fail-OPEN reason as the policies above. The /api/v1

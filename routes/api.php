@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AnalyticsQuestionController;
+use App\Http\Controllers\Api\V1\AnalyticsReportController;
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\AuditApiController;
 use App\Http\Controllers\Api\V1\ConnectionController;
@@ -12,6 +14,7 @@ use App\Http\Controllers\Api\V1\FormTemplateApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
 use App\Http\Controllers\Api\V1\ResourceGrantApiController;
+use App\Http\Controllers\Api\V1\SavedReportViewController;
 use App\Http\Controllers\Api\V1\ScopeNodeApiController;
 use App\Http\Controllers\Api\V1\SubmissionPromoteController;
 use App\Http\Controllers\Api\V1\SyncManifestController;
@@ -34,6 +37,7 @@ use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
+use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\WebhookEndpoint;
 use App\Support\Api\ApiAbilities;
@@ -313,6 +317,49 @@ Route::prefix('api/v1')
         Route::delete('connections/{connection}', [ConnectionController::class, 'destroy'])
             ->middleware(['ability:'.ApiAbilities::MANAGE_INTEGRATIONS, 'can:delete,connection', 'feature:native_connectors'])
             ->name('connections.destroy');
+
+        // Cross-form analytics (H24a / ADR-0011). Standing triplet on every route: `ability:read:analytics`
+        // (scopes the TOKEN — a NEW ability, never a widening, so no already-minted token gains analytics
+        // access) + a SavedReportViewPolicy `can:` gate (re-checks the acting user's real permission) + the
+        // `feature:advanced_analytics` plan gate (Business+, held from sale per ADR-0008 §D6).
+        //
+        // The report and question routes have NO model of their own, so they gate on
+        // `can:viewAny,SavedReportView` — whose predicate is exactly the read:analytics ability map, so the
+        // token scope and the permission check agree by construction. `can:viewAny,Submission::class` was
+        // rejected: it authorizes on `submissions.view`, a widening of a different capability.
+        //
+        // Static + more-specific segments precede the {savedReportView} patterns. Regenerate openapi.json.
+        Route::get('analytics/report', [AnalyticsReportController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.report');
+        Route::get('analytics/report/export', [AnalyticsReportController::class, 'export'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.report.export');
+        Route::get('analytics/questions', [AnalyticsQuestionController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.questions.index');
+        Route::get('analytics/questions/{key}', [AnalyticsQuestionController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.questions.show');
+
+        Route::get('analytics/views', [SavedReportViewController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.views.index');
+        Route::post('analytics/views', [SavedReportViewController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:create,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.views.store');
+        // The bound-model gates below are load-bearing rather than ceremonial: saved_report_views carries
+        // `strict` RLS, which scopes to the TENANT only, so the policy's owner check is the ONLY thing
+        // stopping one member reading or deleting a colleague's view.
+        Route::get('analytics/views/{savedReportView}', [SavedReportViewController::class, 'show'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:view,savedReportView', 'feature:advanced_analytics'])
+            ->name('analytics.views.show');
+        Route::patch('analytics/views/{savedReportView}', [SavedReportViewController::class, 'update'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:update,savedReportView', 'feature:advanced_analytics'])
+            ->name('analytics.views.update');
+        Route::delete('analytics/views/{savedReportView}', [SavedReportViewController::class, 'destroy'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:delete,savedReportView', 'feature:advanced_analytics'])
+            ->name('analytics.views.destroy');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

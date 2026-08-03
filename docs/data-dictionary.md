@@ -84,7 +84,10 @@ This document is the source of truth for column-level shape; it will be kept in 
 21. [feedback_reports](#21-feedback_reports) *(added for PRD Feature #11)*
 22. [notifications](#22-notifications) *(added for PRD Feature #13)*
 23. [notification_preferences](#23-notification_preferences) *(added for PRD Feature #13)*
-24. [Foreign Key Relationship Summary](#foreign-key-relationship-summary)
+24. [connections](#24-connections) *(added for H15a / ADR-0009)*
+25. [connection_subscriptions](#25-connection_subscriptions) *(added for H15a)*
+26. [saved_report_views](#26-saved_report_views) *(added for H24a / ADR-0011)*
+27. [Foreign Key Relationship Summary](#foreign-key-relationship-summary)
 
 ---
 
@@ -889,6 +892,31 @@ One "send these events to this destination" rule on a connection (H15a; ADR-0009
 
 ---
 
+## 26. `saved_report_views`
+
+A user's saved cross-form analytics report (H24a; ADR-0011 §D8; `docs/PRD.md:204`).
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `user_id` | `uuid` | No | — | No | FK to `users.id`, `ON DELETE CASCADE`. Single-column, not composite: `users` is a tenant-free global table, so ADR-0002 §D5's composite rule (which protects tenant-scoped parents) does not apply — the same shape `resource_grants` uses. |
+| `name` | `varchar(150)` | No | — | No | Unique per `(tenant_id, user_id)`. A duplicate raises SQLSTATE 23505, mapped to a 422 rather than pre-checked, because two tabs racing on the same name is a real race. |
+| `definition` | `jsonb` | No | `'{}'` | No | An `AnalyticsQuery` **declaration**, carrying its own `v` schema tag — never a materialized result. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Indexes:** `unique (tenant_id, user_id, name)`; `(tenant_id, user_id)`. **RLS:** `strict`.
+
+**Design notes.**
+
+- **`strict`, not `belongs_to_user`, and the distinction is a leak** (§D8). The obvious variant — given the `user_id` and the PRD's "per user" — emits policies keyed *only* on `user_id = current_setting('app.current_user_id')`, **with no tenant predicate at all**. For a consultant who belongs to two tenants that is a cross-tenant metadata leak: their Acme report definitions readable while acting for Globex. `scripts/migration-lint.php` cannot catch the mistake — it checks only that *some* isolation call exists, never which variant.
+- **Per-user privacy is an APPLICATION predicate.** `strict` scopes to the tenant, so an Owner's bare `SELECT` returns every member's rows. "Per user" is enforced by `SavedReportView::scopeOwnedBy()` on list reads and by `SavedReportViewPolicy`'s owner check on single-row actions — including *from* an Owner; an admin override would need its own decision and its own permission, and neither exists.
+- **The row is resolved at read time, not at write time.** That is what lets a view naming a form, a scope node or a `field_key` that has since gone degrade to a **stated refusal** rendered beside the working views, rather than to a wrong number or a page that fails to load. The resolution result rides on every API representation.
+- **No soft delete**, deliberately: user-owned convenience metadata with no audit claim on it, and a `deleted_at` every read path must remember to filter is a landmine (the argument `scope_nodes` records for itself).
+- **No admin/tenant-wide sharing.** Sharing a view is a new authorization question (who may see whose report?) and is not in Phase 3.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -997,6 +1025,9 @@ notifications.user_id                  -> users.id           (external)
 
 notification_preferences.tenant_id     -> tenants.id
 notification_preferences.user_id       -> users.id           (external)
+
+saved_report_views.tenant_id           -> tenants.id
+saved_report_views.user_id             -> users.id           (external)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

@@ -22,6 +22,3016 @@
         }
     ],
     "paths": {
+        "/analytics/questions": {
+            "get": {
+                "operationId": "v1.analytics.questions.index",
+                "description": "This is what lets H24b's field picker ENCODE \u00a7D3's three properties rather than discover them: a grid\nor a media field can be flagged \"Indexed for reporting\" and publish successfully while never producing\na row, so the picker must be able to say \"this question cannot be reported on\" instead of offering it.",
+                "summary": "List the questions in scope, each marked reportable or refused with a reason",
+                "tags": [
+                    "AnalyticsQuestion"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Mandatory: \u00a7D7(a). There is no \"all time\" \u2014 an unbounded range is the shape this whole\ndecision exists to prevent.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "timezone",
+                        "in": "query",
+                        "description": "Bound into date_trunc's zone argument, so it is checked against the real IANA list rather than\nby pattern.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Africa/Abidjan",
+                                "Africa/Accra",
+                                "Africa/Addis_Ababa",
+                                "Africa/Algiers",
+                                "Africa/Asmara",
+                                "Africa/Bamako",
+                                "Africa/Bangui",
+                                "Africa/Banjul",
+                                "Africa/Bissau",
+                                "Africa/Blantyre",
+                                "Africa/Brazzaville",
+                                "Africa/Bujumbura",
+                                "Africa/Cairo",
+                                "Africa/Casablanca",
+                                "Africa/Ceuta",
+                                "Africa/Conakry",
+                                "Africa/Dakar",
+                                "Africa/Dar_es_Salaam",
+                                "Africa/Djibouti",
+                                "Africa/Douala",
+                                "Africa/El_Aaiun",
+                                "Africa/Freetown",
+                                "Africa/Gaborone",
+                                "Africa/Harare",
+                                "Africa/Johannesburg",
+                                "Africa/Juba",
+                                "Africa/Kampala",
+                                "Africa/Khartoum",
+                                "Africa/Kigali",
+                                "Africa/Kinshasa",
+                                "Africa/Lagos",
+                                "Africa/Libreville",
+                                "Africa/Lome",
+                                "Africa/Luanda",
+                                "Africa/Lubumbashi",
+                                "Africa/Lusaka",
+                                "Africa/Malabo",
+                                "Africa/Maputo",
+                                "Africa/Maseru",
+                                "Africa/Mbabane",
+                                "Africa/Mogadishu",
+                                "Africa/Monrovia",
+                                "Africa/Nairobi",
+                                "Africa/Ndjamena",
+                                "Africa/Niamey",
+                                "Africa/Nouakchott",
+                                "Africa/Ouagadougou",
+                                "Africa/Porto-Novo",
+                                "Africa/Sao_Tome",
+                                "Africa/Tripoli",
+                                "Africa/Tunis",
+                                "Africa/Windhoek",
+                                "America/Adak",
+                                "America/Anchorage",
+                                "America/Anguilla",
+                                "America/Antigua",
+                                "America/Araguaina",
+                                "America/Argentina/Buenos_Aires",
+                                "America/Argentina/Catamarca",
+                                "America/Argentina/Cordoba",
+                                "America/Argentina/Jujuy",
+                                "America/Argentina/La_Rioja",
+                                "America/Argentina/Mendoza",
+                                "America/Argentina/Rio_Gallegos",
+                                "America/Argentina/Salta",
+                                "America/Argentina/San_Juan",
+                                "America/Argentina/San_Luis",
+                                "America/Argentina/Tucuman",
+                                "America/Argentina/Ushuaia",
+                                "America/Aruba",
+                                "America/Asuncion",
+                                "America/Atikokan",
+                                "America/Bahia",
+                                "America/Bahia_Banderas",
+                                "America/Barbados",
+                                "America/Belem",
+                                "America/Belize",
+                                "America/Blanc-Sablon",
+                                "America/Boa_Vista",
+                                "America/Bogota",
+                                "America/Boise",
+                                "America/Cambridge_Bay",
+                                "America/Campo_Grande",
+                                "America/Cancun",
+                                "America/Caracas",
+                                "America/Cayenne",
+                                "America/Cayman",
+                                "America/Chicago",
+                                "America/Chihuahua",
+                                "America/Ciudad_Juarez",
+                                "America/Costa_Rica",
+                                "America/Coyhaique",
+                                "America/Creston",
+                                "America/Cuiaba",
+                                "America/Curacao",
+                                "America/Danmarkshavn",
+                                "America/Dawson",
+                                "America/Dawson_Creek",
+                                "America/Denver",
+                                "America/Detroit",
+                                "America/Dominica",
+                                "America/Edmonton",
+                                "America/Eirunepe",
+                                "America/El_Salvador",
+                                "America/Fort_Nelson",
+                                "America/Fortaleza",
+                                "America/Glace_Bay",
+                                "America/Goose_Bay",
+                                "America/Grand_Turk",
+                                "America/Grenada",
+                                "America/Guadeloupe",
+                                "America/Guatemala",
+                                "America/Guayaquil",
+                                "America/Guyana",
+                                "America/Halifax",
+                                "America/Havana",
+                                "America/Hermosillo",
+                                "America/Indiana/Indianapolis",
+                                "America/Indiana/Knox",
+                                "America/Indiana/Marengo",
+                                "America/Indiana/Petersburg",
+                                "America/Indiana/Tell_City",
+                                "America/Indiana/Vevay",
+                                "America/Indiana/Vincennes",
+                                "America/Indiana/Winamac",
+                                "America/Inuvik",
+                                "America/Iqaluit",
+                                "America/Jamaica",
+                                "America/Juneau",
+                                "America/Kentucky/Louisville",
+                                "America/Kentucky/Monticello",
+                                "America/Kralendijk",
+                                "America/La_Paz",
+                                "America/Lima",
+                                "America/Los_Angeles",
+                                "America/Lower_Princes",
+                                "America/Maceio",
+                                "America/Managua",
+                                "America/Manaus",
+                                "America/Marigot",
+                                "America/Martinique",
+                                "America/Matamoros",
+                                "America/Mazatlan",
+                                "America/Menominee",
+                                "America/Merida",
+                                "America/Metlakatla",
+                                "America/Mexico_City",
+                                "America/Miquelon",
+                                "America/Moncton",
+                                "America/Monterrey",
+                                "America/Montevideo",
+                                "America/Montserrat",
+                                "America/Nassau",
+                                "America/New_York",
+                                "America/Nome",
+                                "America/Noronha",
+                                "America/North_Dakota/Beulah",
+                                "America/North_Dakota/Center",
+                                "America/North_Dakota/New_Salem",
+                                "America/Nuuk",
+                                "America/Ojinaga",
+                                "America/Panama",
+                                "America/Paramaribo",
+                                "America/Phoenix",
+                                "America/Port-au-Prince",
+                                "America/Port_of_Spain",
+                                "America/Porto_Velho",
+                                "America/Puerto_Rico",
+                                "America/Punta_Arenas",
+                                "America/Rankin_Inlet",
+                                "America/Recife",
+                                "America/Regina",
+                                "America/Resolute",
+                                "America/Rio_Branco",
+                                "America/Santarem",
+                                "America/Santiago",
+                                "America/Santo_Domingo",
+                                "America/Sao_Paulo",
+                                "America/Scoresbysund",
+                                "America/Sitka",
+                                "America/St_Barthelemy",
+                                "America/St_Johns",
+                                "America/St_Kitts",
+                                "America/St_Lucia",
+                                "America/St_Thomas",
+                                "America/St_Vincent",
+                                "America/Swift_Current",
+                                "America/Tegucigalpa",
+                                "America/Thule",
+                                "America/Tijuana",
+                                "America/Toronto",
+                                "America/Tortola",
+                                "America/Vancouver",
+                                "America/Whitehorse",
+                                "America/Winnipeg",
+                                "America/Yakutat",
+                                "Antarctica/Casey",
+                                "Antarctica/Davis",
+                                "Antarctica/DumontDUrville",
+                                "Antarctica/Macquarie",
+                                "Antarctica/Mawson",
+                                "Antarctica/McMurdo",
+                                "Antarctica/Palmer",
+                                "Antarctica/Rothera",
+                                "Antarctica/Syowa",
+                                "Antarctica/Troll",
+                                "Antarctica/Vostok",
+                                "Arctic/Longyearbyen",
+                                "Asia/Aden",
+                                "Asia/Almaty",
+                                "Asia/Amman",
+                                "Asia/Anadyr",
+                                "Asia/Aqtau",
+                                "Asia/Aqtobe",
+                                "Asia/Ashgabat",
+                                "Asia/Atyrau",
+                                "Asia/Baghdad",
+                                "Asia/Bahrain",
+                                "Asia/Baku",
+                                "Asia/Bangkok",
+                                "Asia/Barnaul",
+                                "Asia/Beirut",
+                                "Asia/Bishkek",
+                                "Asia/Brunei",
+                                "Asia/Chita",
+                                "Asia/Colombo",
+                                "Asia/Damascus",
+                                "Asia/Dhaka",
+                                "Asia/Dili",
+                                "Asia/Dubai",
+                                "Asia/Dushanbe",
+                                "Asia/Famagusta",
+                                "Asia/Gaza",
+                                "Asia/Hebron",
+                                "Asia/Ho_Chi_Minh",
+                                "Asia/Hong_Kong",
+                                "Asia/Hovd",
+                                "Asia/Irkutsk",
+                                "Asia/Jakarta",
+                                "Asia/Jayapura",
+                                "Asia/Jerusalem",
+                                "Asia/Kabul",
+                                "Asia/Kamchatka",
+                                "Asia/Karachi",
+                                "Asia/Kathmandu",
+                                "Asia/Khandyga",
+                                "Asia/Kolkata",
+                                "Asia/Krasnoyarsk",
+                                "Asia/Kuala_Lumpur",
+                                "Asia/Kuching",
+                                "Asia/Kuwait",
+                                "Asia/Macau",
+                                "Asia/Magadan",
+                                "Asia/Makassar",
+                                "Asia/Manila",
+                                "Asia/Muscat",
+                                "Asia/Nicosia",
+                                "Asia/Novokuznetsk",
+                                "Asia/Novosibirsk",
+                                "Asia/Omsk",
+                                "Asia/Oral",
+                                "Asia/Phnom_Penh",
+                                "Asia/Pontianak",
+                                "Asia/Pyongyang",
+                                "Asia/Qatar",
+                                "Asia/Qostanay",
+                                "Asia/Qyzylorda",
+                                "Asia/Riyadh",
+                                "Asia/Sakhalin",
+                                "Asia/Samarkand",
+                                "Asia/Seoul",
+                                "Asia/Shanghai",
+                                "Asia/Singapore",
+                                "Asia/Srednekolymsk",
+                                "Asia/Taipei",
+                                "Asia/Tashkent",
+                                "Asia/Tbilisi",
+                                "Asia/Tehran",
+                                "Asia/Thimphu",
+                                "Asia/Tokyo",
+                                "Asia/Tomsk",
+                                "Asia/Ulaanbaatar",
+                                "Asia/Urumqi",
+                                "Asia/Ust-Nera",
+                                "Asia/Vientiane",
+                                "Asia/Vladivostok",
+                                "Asia/Yakutsk",
+                                "Asia/Yangon",
+                                "Asia/Yekaterinburg",
+                                "Asia/Yerevan",
+                                "Atlantic/Azores",
+                                "Atlantic/Bermuda",
+                                "Atlantic/Canary",
+                                "Atlantic/Cape_Verde",
+                                "Atlantic/Faroe",
+                                "Atlantic/Madeira",
+                                "Atlantic/Reykjavik",
+                                "Atlantic/South_Georgia",
+                                "Atlantic/St_Helena",
+                                "Atlantic/Stanley",
+                                "Australia/Adelaide",
+                                "Australia/Brisbane",
+                                "Australia/Broken_Hill",
+                                "Australia/Darwin",
+                                "Australia/Eucla",
+                                "Australia/Hobart",
+                                "Australia/Lindeman",
+                                "Australia/Lord_Howe",
+                                "Australia/Melbourne",
+                                "Australia/Perth",
+                                "Australia/Sydney",
+                                "Europe/Amsterdam",
+                                "Europe/Andorra",
+                                "Europe/Astrakhan",
+                                "Europe/Athens",
+                                "Europe/Belgrade",
+                                "Europe/Berlin",
+                                "Europe/Bratislava",
+                                "Europe/Brussels",
+                                "Europe/Bucharest",
+                                "Europe/Budapest",
+                                "Europe/Busingen",
+                                "Europe/Chisinau",
+                                "Europe/Copenhagen",
+                                "Europe/Dublin",
+                                "Europe/Gibraltar",
+                                "Europe/Guernsey",
+                                "Europe/Helsinki",
+                                "Europe/Isle_of_Man",
+                                "Europe/Istanbul",
+                                "Europe/Jersey",
+                                "Europe/Kaliningrad",
+                                "Europe/Kirov",
+                                "Europe/Kyiv",
+                                "Europe/Lisbon",
+                                "Europe/Ljubljana",
+                                "Europe/London",
+                                "Europe/Luxembourg",
+                                "Europe/Madrid",
+                                "Europe/Malta",
+                                "Europe/Mariehamn",
+                                "Europe/Minsk",
+                                "Europe/Monaco",
+                                "Europe/Moscow",
+                                "Europe/Oslo",
+                                "Europe/Paris",
+                                "Europe/Podgorica",
+                                "Europe/Prague",
+                                "Europe/Riga",
+                                "Europe/Rome",
+                                "Europe/Samara",
+                                "Europe/San_Marino",
+                                "Europe/Sarajevo",
+                                "Europe/Saratov",
+                                "Europe/Simferopol",
+                                "Europe/Skopje",
+                                "Europe/Sofia",
+                                "Europe/Stockholm",
+                                "Europe/Tallinn",
+                                "Europe/Tirane",
+                                "Europe/Ulyanovsk",
+                                "Europe/Vaduz",
+                                "Europe/Vatican",
+                                "Europe/Vienna",
+                                "Europe/Vilnius",
+                                "Europe/Volgograd",
+                                "Europe/Warsaw",
+                                "Europe/Zagreb",
+                                "Europe/Zurich",
+                                "Indian/Antananarivo",
+                                "Indian/Chagos",
+                                "Indian/Christmas",
+                                "Indian/Cocos",
+                                "Indian/Comoro",
+                                "Indian/Kerguelen",
+                                "Indian/Mahe",
+                                "Indian/Maldives",
+                                "Indian/Mauritius",
+                                "Indian/Mayotte",
+                                "Indian/Reunion",
+                                "Pacific/Apia",
+                                "Pacific/Auckland",
+                                "Pacific/Bougainville",
+                                "Pacific/Chatham",
+                                "Pacific/Chuuk",
+                                "Pacific/Easter",
+                                "Pacific/Efate",
+                                "Pacific/Fakaofo",
+                                "Pacific/Fiji",
+                                "Pacific/Funafuti",
+                                "Pacific/Galapagos",
+                                "Pacific/Gambier",
+                                "Pacific/Guadalcanal",
+                                "Pacific/Guam",
+                                "Pacific/Honolulu",
+                                "Pacific/Kanton",
+                                "Pacific/Kiritimati",
+                                "Pacific/Kosrae",
+                                "Pacific/Kwajalein",
+                                "Pacific/Majuro",
+                                "Pacific/Marquesas",
+                                "Pacific/Midway",
+                                "Pacific/Nauru",
+                                "Pacific/Niue",
+                                "Pacific/Norfolk",
+                                "Pacific/Noumea",
+                                "Pacific/Pago_Pago",
+                                "Pacific/Palau",
+                                "Pacific/Pitcairn",
+                                "Pacific/Pohnpei",
+                                "Pacific/Port_Moresby",
+                                "Pacific/Rarotonga",
+                                "Pacific/Saipan",
+                                "Pacific/Tahiti",
+                                "Pacific/Tarawa",
+                                "Pacific/Tongatapu",
+                                "Pacific/Wake",
+                                "Pacific/Wallis",
+                                "UTC"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsGranularity"
+                        }
+                    },
+                    {
+                        "name": "selection",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsFormSelection"
+                        }
+                    },
+                    {
+                        "name": "form_ids[]",
+                        "in": "query",
+                        "description": "`exists` runs on the RLS-scoped connection, so a form id from another tenant simply is not\nthere \u2014 cross-tenant safety without a hand-written predicate.",
+                        "schema": {
+                            "type": "array",
+                            "format": "uuid",
+                            "items": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        }
+                    },
+                    {
+                        "name": "scope_node_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "axis",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsAxis"
+                        }
+                    },
+                    {
+                        "name": "statuses[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionStatus"
+                            }
+                        }
+                    },
+                    {
+                        "name": "sources[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionSource"
+                            }
+                        }
+                    },
+                    {
+                        "name": "locales[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "maxLength": 10
+                            }
+                        }
+                    },
+                    {
+                        "name": "top_n",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Export only; ignored by the JSON report. Same two formats as the submission export.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "string"
+                                                    },
+                                                    "field_type": {
+                                                        "type": "string"
+                                                    },
+                                                    "indexed_data_type": {
+                                                        "type": "string"
+                                                    },
+                                                    "reportable": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "refusal": {
+                                                        "type": "string"
+                                                    },
+                                                    "refusal_label": {
+                                                        "type": "string"
+                                                    },
+                                                    "first_indexed_version": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "description": "\u00a7D3's coverage disclosure: the version from which this question became reportable at all.\nNull means it never was, which is the ordinary state of almost every form."
+                                                    },
+                                                    "type_changed_at_version": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "key",
+                                                    "label",
+                                                    "field_type",
+                                                    "indexed_data_type",
+                                                    "reportable",
+                                                    "refusal",
+                                                    "refusal_label",
+                                                    "first_indexed_version",
+                                                    "type_changed_at_version"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/analytics/questions/{key}": {
+            "get": {
+                "operationId": "v1.analytics.questions.show",
+                "description": "A key whose `indexed_data_type` changed between versions is a REFUSAL naming that version, never an\naverage over whichever rows survived the type filter \u2014 the silently-partial answer\n`docs/form-versioning-schema-migration.md` \u00a77 predicted and \u00a7D4 now forbids.",
+                "summary": "Aggregate one question's answers, or state why it cannot be aggregated",
+                "tags": [
+                    "AnalyticsQuestion"
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Mandatory: \u00a7D7(a). There is no \"all time\" \u2014 an unbounded range is the shape this whole\ndecision exists to prevent.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "timezone",
+                        "in": "query",
+                        "description": "Bound into date_trunc's zone argument, so it is checked against the real IANA list rather than\nby pattern.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Africa/Abidjan",
+                                "Africa/Accra",
+                                "Africa/Addis_Ababa",
+                                "Africa/Algiers",
+                                "Africa/Asmara",
+                                "Africa/Bamako",
+                                "Africa/Bangui",
+                                "Africa/Banjul",
+                                "Africa/Bissau",
+                                "Africa/Blantyre",
+                                "Africa/Brazzaville",
+                                "Africa/Bujumbura",
+                                "Africa/Cairo",
+                                "Africa/Casablanca",
+                                "Africa/Ceuta",
+                                "Africa/Conakry",
+                                "Africa/Dakar",
+                                "Africa/Dar_es_Salaam",
+                                "Africa/Djibouti",
+                                "Africa/Douala",
+                                "Africa/El_Aaiun",
+                                "Africa/Freetown",
+                                "Africa/Gaborone",
+                                "Africa/Harare",
+                                "Africa/Johannesburg",
+                                "Africa/Juba",
+                                "Africa/Kampala",
+                                "Africa/Khartoum",
+                                "Africa/Kigali",
+                                "Africa/Kinshasa",
+                                "Africa/Lagos",
+                                "Africa/Libreville",
+                                "Africa/Lome",
+                                "Africa/Luanda",
+                                "Africa/Lubumbashi",
+                                "Africa/Lusaka",
+                                "Africa/Malabo",
+                                "Africa/Maputo",
+                                "Africa/Maseru",
+                                "Africa/Mbabane",
+                                "Africa/Mogadishu",
+                                "Africa/Monrovia",
+                                "Africa/Nairobi",
+                                "Africa/Ndjamena",
+                                "Africa/Niamey",
+                                "Africa/Nouakchott",
+                                "Africa/Ouagadougou",
+                                "Africa/Porto-Novo",
+                                "Africa/Sao_Tome",
+                                "Africa/Tripoli",
+                                "Africa/Tunis",
+                                "Africa/Windhoek",
+                                "America/Adak",
+                                "America/Anchorage",
+                                "America/Anguilla",
+                                "America/Antigua",
+                                "America/Araguaina",
+                                "America/Argentina/Buenos_Aires",
+                                "America/Argentina/Catamarca",
+                                "America/Argentina/Cordoba",
+                                "America/Argentina/Jujuy",
+                                "America/Argentina/La_Rioja",
+                                "America/Argentina/Mendoza",
+                                "America/Argentina/Rio_Gallegos",
+                                "America/Argentina/Salta",
+                                "America/Argentina/San_Juan",
+                                "America/Argentina/San_Luis",
+                                "America/Argentina/Tucuman",
+                                "America/Argentina/Ushuaia",
+                                "America/Aruba",
+                                "America/Asuncion",
+                                "America/Atikokan",
+                                "America/Bahia",
+                                "America/Bahia_Banderas",
+                                "America/Barbados",
+                                "America/Belem",
+                                "America/Belize",
+                                "America/Blanc-Sablon",
+                                "America/Boa_Vista",
+                                "America/Bogota",
+                                "America/Boise",
+                                "America/Cambridge_Bay",
+                                "America/Campo_Grande",
+                                "America/Cancun",
+                                "America/Caracas",
+                                "America/Cayenne",
+                                "America/Cayman",
+                                "America/Chicago",
+                                "America/Chihuahua",
+                                "America/Ciudad_Juarez",
+                                "America/Costa_Rica",
+                                "America/Coyhaique",
+                                "America/Creston",
+                                "America/Cuiaba",
+                                "America/Curacao",
+                                "America/Danmarkshavn",
+                                "America/Dawson",
+                                "America/Dawson_Creek",
+                                "America/Denver",
+                                "America/Detroit",
+                                "America/Dominica",
+                                "America/Edmonton",
+                                "America/Eirunepe",
+                                "America/El_Salvador",
+                                "America/Fort_Nelson",
+                                "America/Fortaleza",
+                                "America/Glace_Bay",
+                                "America/Goose_Bay",
+                                "America/Grand_Turk",
+                                "America/Grenada",
+                                "America/Guadeloupe",
+                                "America/Guatemala",
+                                "America/Guayaquil",
+                                "America/Guyana",
+                                "America/Halifax",
+                                "America/Havana",
+                                "America/Hermosillo",
+                                "America/Indiana/Indianapolis",
+                                "America/Indiana/Knox",
+                                "America/Indiana/Marengo",
+                                "America/Indiana/Petersburg",
+                                "America/Indiana/Tell_City",
+                                "America/Indiana/Vevay",
+                                "America/Indiana/Vincennes",
+                                "America/Indiana/Winamac",
+                                "America/Inuvik",
+                                "America/Iqaluit",
+                                "America/Jamaica",
+                                "America/Juneau",
+                                "America/Kentucky/Louisville",
+                                "America/Kentucky/Monticello",
+                                "America/Kralendijk",
+                                "America/La_Paz",
+                                "America/Lima",
+                                "America/Los_Angeles",
+                                "America/Lower_Princes",
+                                "America/Maceio",
+                                "America/Managua",
+                                "America/Manaus",
+                                "America/Marigot",
+                                "America/Martinique",
+                                "America/Matamoros",
+                                "America/Mazatlan",
+                                "America/Menominee",
+                                "America/Merida",
+                                "America/Metlakatla",
+                                "America/Mexico_City",
+                                "America/Miquelon",
+                                "America/Moncton",
+                                "America/Monterrey",
+                                "America/Montevideo",
+                                "America/Montserrat",
+                                "America/Nassau",
+                                "America/New_York",
+                                "America/Nome",
+                                "America/Noronha",
+                                "America/North_Dakota/Beulah",
+                                "America/North_Dakota/Center",
+                                "America/North_Dakota/New_Salem",
+                                "America/Nuuk",
+                                "America/Ojinaga",
+                                "America/Panama",
+                                "America/Paramaribo",
+                                "America/Phoenix",
+                                "America/Port-au-Prince",
+                                "America/Port_of_Spain",
+                                "America/Porto_Velho",
+                                "America/Puerto_Rico",
+                                "America/Punta_Arenas",
+                                "America/Rankin_Inlet",
+                                "America/Recife",
+                                "America/Regina",
+                                "America/Resolute",
+                                "America/Rio_Branco",
+                                "America/Santarem",
+                                "America/Santiago",
+                                "America/Santo_Domingo",
+                                "America/Sao_Paulo",
+                                "America/Scoresbysund",
+                                "America/Sitka",
+                                "America/St_Barthelemy",
+                                "America/St_Johns",
+                                "America/St_Kitts",
+                                "America/St_Lucia",
+                                "America/St_Thomas",
+                                "America/St_Vincent",
+                                "America/Swift_Current",
+                                "America/Tegucigalpa",
+                                "America/Thule",
+                                "America/Tijuana",
+                                "America/Toronto",
+                                "America/Tortola",
+                                "America/Vancouver",
+                                "America/Whitehorse",
+                                "America/Winnipeg",
+                                "America/Yakutat",
+                                "Antarctica/Casey",
+                                "Antarctica/Davis",
+                                "Antarctica/DumontDUrville",
+                                "Antarctica/Macquarie",
+                                "Antarctica/Mawson",
+                                "Antarctica/McMurdo",
+                                "Antarctica/Palmer",
+                                "Antarctica/Rothera",
+                                "Antarctica/Syowa",
+                                "Antarctica/Troll",
+                                "Antarctica/Vostok",
+                                "Arctic/Longyearbyen",
+                                "Asia/Aden",
+                                "Asia/Almaty",
+                                "Asia/Amman",
+                                "Asia/Anadyr",
+                                "Asia/Aqtau",
+                                "Asia/Aqtobe",
+                                "Asia/Ashgabat",
+                                "Asia/Atyrau",
+                                "Asia/Baghdad",
+                                "Asia/Bahrain",
+                                "Asia/Baku",
+                                "Asia/Bangkok",
+                                "Asia/Barnaul",
+                                "Asia/Beirut",
+                                "Asia/Bishkek",
+                                "Asia/Brunei",
+                                "Asia/Chita",
+                                "Asia/Colombo",
+                                "Asia/Damascus",
+                                "Asia/Dhaka",
+                                "Asia/Dili",
+                                "Asia/Dubai",
+                                "Asia/Dushanbe",
+                                "Asia/Famagusta",
+                                "Asia/Gaza",
+                                "Asia/Hebron",
+                                "Asia/Ho_Chi_Minh",
+                                "Asia/Hong_Kong",
+                                "Asia/Hovd",
+                                "Asia/Irkutsk",
+                                "Asia/Jakarta",
+                                "Asia/Jayapura",
+                                "Asia/Jerusalem",
+                                "Asia/Kabul",
+                                "Asia/Kamchatka",
+                                "Asia/Karachi",
+                                "Asia/Kathmandu",
+                                "Asia/Khandyga",
+                                "Asia/Kolkata",
+                                "Asia/Krasnoyarsk",
+                                "Asia/Kuala_Lumpur",
+                                "Asia/Kuching",
+                                "Asia/Kuwait",
+                                "Asia/Macau",
+                                "Asia/Magadan",
+                                "Asia/Makassar",
+                                "Asia/Manila",
+                                "Asia/Muscat",
+                                "Asia/Nicosia",
+                                "Asia/Novokuznetsk",
+                                "Asia/Novosibirsk",
+                                "Asia/Omsk",
+                                "Asia/Oral",
+                                "Asia/Phnom_Penh",
+                                "Asia/Pontianak",
+                                "Asia/Pyongyang",
+                                "Asia/Qatar",
+                                "Asia/Qostanay",
+                                "Asia/Qyzylorda",
+                                "Asia/Riyadh",
+                                "Asia/Sakhalin",
+                                "Asia/Samarkand",
+                                "Asia/Seoul",
+                                "Asia/Shanghai",
+                                "Asia/Singapore",
+                                "Asia/Srednekolymsk",
+                                "Asia/Taipei",
+                                "Asia/Tashkent",
+                                "Asia/Tbilisi",
+                                "Asia/Tehran",
+                                "Asia/Thimphu",
+                                "Asia/Tokyo",
+                                "Asia/Tomsk",
+                                "Asia/Ulaanbaatar",
+                                "Asia/Urumqi",
+                                "Asia/Ust-Nera",
+                                "Asia/Vientiane",
+                                "Asia/Vladivostok",
+                                "Asia/Yakutsk",
+                                "Asia/Yangon",
+                                "Asia/Yekaterinburg",
+                                "Asia/Yerevan",
+                                "Atlantic/Azores",
+                                "Atlantic/Bermuda",
+                                "Atlantic/Canary",
+                                "Atlantic/Cape_Verde",
+                                "Atlantic/Faroe",
+                                "Atlantic/Madeira",
+                                "Atlantic/Reykjavik",
+                                "Atlantic/South_Georgia",
+                                "Atlantic/St_Helena",
+                                "Atlantic/Stanley",
+                                "Australia/Adelaide",
+                                "Australia/Brisbane",
+                                "Australia/Broken_Hill",
+                                "Australia/Darwin",
+                                "Australia/Eucla",
+                                "Australia/Hobart",
+                                "Australia/Lindeman",
+                                "Australia/Lord_Howe",
+                                "Australia/Melbourne",
+                                "Australia/Perth",
+                                "Australia/Sydney",
+                                "Europe/Amsterdam",
+                                "Europe/Andorra",
+                                "Europe/Astrakhan",
+                                "Europe/Athens",
+                                "Europe/Belgrade",
+                                "Europe/Berlin",
+                                "Europe/Bratislava",
+                                "Europe/Brussels",
+                                "Europe/Bucharest",
+                                "Europe/Budapest",
+                                "Europe/Busingen",
+                                "Europe/Chisinau",
+                                "Europe/Copenhagen",
+                                "Europe/Dublin",
+                                "Europe/Gibraltar",
+                                "Europe/Guernsey",
+                                "Europe/Helsinki",
+                                "Europe/Isle_of_Man",
+                                "Europe/Istanbul",
+                                "Europe/Jersey",
+                                "Europe/Kaliningrad",
+                                "Europe/Kirov",
+                                "Europe/Kyiv",
+                                "Europe/Lisbon",
+                                "Europe/Ljubljana",
+                                "Europe/London",
+                                "Europe/Luxembourg",
+                                "Europe/Madrid",
+                                "Europe/Malta",
+                                "Europe/Mariehamn",
+                                "Europe/Minsk",
+                                "Europe/Monaco",
+                                "Europe/Moscow",
+                                "Europe/Oslo",
+                                "Europe/Paris",
+                                "Europe/Podgorica",
+                                "Europe/Prague",
+                                "Europe/Riga",
+                                "Europe/Rome",
+                                "Europe/Samara",
+                                "Europe/San_Marino",
+                                "Europe/Sarajevo",
+                                "Europe/Saratov",
+                                "Europe/Simferopol",
+                                "Europe/Skopje",
+                                "Europe/Sofia",
+                                "Europe/Stockholm",
+                                "Europe/Tallinn",
+                                "Europe/Tirane",
+                                "Europe/Ulyanovsk",
+                                "Europe/Vaduz",
+                                "Europe/Vatican",
+                                "Europe/Vienna",
+                                "Europe/Vilnius",
+                                "Europe/Volgograd",
+                                "Europe/Warsaw",
+                                "Europe/Zagreb",
+                                "Europe/Zurich",
+                                "Indian/Antananarivo",
+                                "Indian/Chagos",
+                                "Indian/Christmas",
+                                "Indian/Cocos",
+                                "Indian/Comoro",
+                                "Indian/Kerguelen",
+                                "Indian/Mahe",
+                                "Indian/Maldives",
+                                "Indian/Mauritius",
+                                "Indian/Mayotte",
+                                "Indian/Reunion",
+                                "Pacific/Apia",
+                                "Pacific/Auckland",
+                                "Pacific/Bougainville",
+                                "Pacific/Chatham",
+                                "Pacific/Chuuk",
+                                "Pacific/Easter",
+                                "Pacific/Efate",
+                                "Pacific/Fakaofo",
+                                "Pacific/Fiji",
+                                "Pacific/Funafuti",
+                                "Pacific/Galapagos",
+                                "Pacific/Gambier",
+                                "Pacific/Guadalcanal",
+                                "Pacific/Guam",
+                                "Pacific/Honolulu",
+                                "Pacific/Kanton",
+                                "Pacific/Kiritimati",
+                                "Pacific/Kosrae",
+                                "Pacific/Kwajalein",
+                                "Pacific/Majuro",
+                                "Pacific/Marquesas",
+                                "Pacific/Midway",
+                                "Pacific/Nauru",
+                                "Pacific/Niue",
+                                "Pacific/Norfolk",
+                                "Pacific/Noumea",
+                                "Pacific/Pago_Pago",
+                                "Pacific/Palau",
+                                "Pacific/Pitcairn",
+                                "Pacific/Pohnpei",
+                                "Pacific/Port_Moresby",
+                                "Pacific/Rarotonga",
+                                "Pacific/Saipan",
+                                "Pacific/Tahiti",
+                                "Pacific/Tarawa",
+                                "Pacific/Tongatapu",
+                                "Pacific/Wake",
+                                "Pacific/Wallis",
+                                "UTC"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsGranularity"
+                        }
+                    },
+                    {
+                        "name": "selection",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsFormSelection"
+                        }
+                    },
+                    {
+                        "name": "form_ids[]",
+                        "in": "query",
+                        "description": "`exists` runs on the RLS-scoped connection, so a form id from another tenant simply is not\nthere \u2014 cross-tenant safety without a hand-written predicate.",
+                        "schema": {
+                            "type": "array",
+                            "format": "uuid",
+                            "items": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        }
+                    },
+                    {
+                        "name": "scope_node_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "axis",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsAxis"
+                        }
+                    },
+                    {
+                        "name": "statuses[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionStatus"
+                            }
+                        }
+                    },
+                    {
+                        "name": "sources[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionSource"
+                            }
+                        }
+                    },
+                    {
+                        "name": "locales[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "maxLength": 10
+                            }
+                        }
+                    },
+                    {
+                        "name": "top_n",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Export only; ignored by the JSON report. Same two formats as the submission export.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "refused": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "reason": {
+                                                            "type": "null"
+                                                        },
+                                                        "message": {
+                                                            "type": "null"
+                                                        },
+                                                        "indexed_data_type": {
+                                                            "type": "string"
+                                                        },
+                                                        "first_indexed_version": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "type_changed_at_version": {
+                                                            "type": "null"
+                                                        },
+                                                        "coverage": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "indexed": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "countable": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "indexed",
+                                                                "countable"
+                                                            ]
+                                                        },
+                                                        "indexed_column": {
+                                                            "type": "boolean",
+                                                            "description": "`value_boolean` is the one value column with no B-tree (recorded in ADR-0011's Consequences and\ndeliberately not fixed \u2014 \u00a7D7 authorises ONE index addendum). Declared so the cost is visible\nrather than mysterious."
+                                                        },
+                                                        "rows": {
+                                                            "type": "null"
+                                                        },
+                                                        "other": {
+                                                            "type": "null"
+                                                        },
+                                                        "summary": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "count": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "min": {
+                                                                    "type": [
+                                                                        "number",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "max": {
+                                                                    "type": [
+                                                                        "number",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "average": {
+                                                                    "type": [
+                                                                        "number",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "median": {
+                                                                    "type": [
+                                                                        "number",
+                                                                        "null"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "count",
+                                                                "min",
+                                                                "max",
+                                                                "average",
+                                                                "median"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "key",
+                                                        "refused",
+                                                        "reason",
+                                                        "message",
+                                                        "indexed_data_type",
+                                                        "first_indexed_version",
+                                                        "type_changed_at_version",
+                                                        "coverage",
+                                                        "indexed_column",
+                                                        "rows",
+                                                        "other",
+                                                        "summary"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "refused": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "reason": {
+                                                            "type": "null"
+                                                        },
+                                                        "message": {
+                                                            "type": "null"
+                                                        },
+                                                        "indexed_data_type": {
+                                                            "type": "string"
+                                                        },
+                                                        "first_indexed_version": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "type_changed_at_version": {
+                                                            "type": "null"
+                                                        },
+                                                        "coverage": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "indexed": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "countable": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "indexed",
+                                                                "countable"
+                                                            ]
+                                                        },
+                                                        "indexed_column": {
+                                                            "type": "boolean",
+                                                            "description": "`value_boolean` is the one value column with no B-tree (recorded in ADR-0011's Consequences and\ndeliberately not fixed \u2014 \u00a7D7 authorises ONE index addendum). Declared so the cost is visible\nrather than mysterious."
+                                                        },
+                                                        "rows": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "other": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "count": {
+                                                                    "anyOf": [
+                                                                        {
+                                                                            "type": "integer"
+                                                                        },
+                                                                        {
+                                                                            "type": "number"
+                                                                        }
+                                                                    ]
+                                                                },
+                                                                "categories": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "count",
+                                                                "categories"
+                                                            ]
+                                                        },
+                                                        "summary": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "key",
+                                                        "refused",
+                                                        "reason",
+                                                        "message",
+                                                        "indexed_data_type",
+                                                        "first_indexed_version",
+                                                        "type_changed_at_version",
+                                                        "coverage",
+                                                        "indexed_column",
+                                                        "rows",
+                                                        "other",
+                                                        "summary"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "refused": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "reason": {
+                                                            "type": "string",
+                                                            "const": "type_changed"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "indexed_data_type": {
+                                                            "type": "null"
+                                                        },
+                                                        "first_indexed_version": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "type_changed_at_version": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "coverage": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "indexed": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "countable": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "indexed",
+                                                                "countable"
+                                                            ]
+                                                        },
+                                                        "indexed_column": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "rows": {
+                                                            "type": "null"
+                                                        },
+                                                        "other": {
+                                                            "type": "null"
+                                                        },
+                                                        "summary": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "key",
+                                                        "refused",
+                                                        "reason",
+                                                        "message",
+                                                        "indexed_data_type",
+                                                        "first_indexed_version",
+                                                        "type_changed_at_version",
+                                                        "coverage",
+                                                        "indexed_column",
+                                                        "rows",
+                                                        "other",
+                                                        "summary"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "refused": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "reason": {
+                                                            "type": "string",
+                                                            "const": "not_indexed"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "indexed_data_type": {
+                                                            "type": "null"
+                                                        },
+                                                        "first_indexed_version": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "type_changed_at_version": {
+                                                            "type": "string"
+                                                        },
+                                                        "coverage": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "indexed": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "countable": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "indexed",
+                                                                "countable"
+                                                            ]
+                                                        },
+                                                        "indexed_column": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "rows": {
+                                                            "type": "null"
+                                                        },
+                                                        "other": {
+                                                            "type": "null"
+                                                        },
+                                                        "summary": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "key",
+                                                        "refused",
+                                                        "reason",
+                                                        "message",
+                                                        "indexed_data_type",
+                                                        "first_indexed_version",
+                                                        "type_changed_at_version",
+                                                        "coverage",
+                                                        "indexed_column",
+                                                        "rows",
+                                                        "other",
+                                                        "summary"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/analytics/report": {
+            "get": {
+                "operationId": "v1.analytics.report",
+                "description": "The response carries the resolved query back verbatim, because a saved view resolves at read time and a\nclient must be able to tell which declaration produced these numbers \u2014 including the timezone the\nbuckets were computed in, which is never the server's session zone.",
+                "summary": "Aggregate submissions across forms for a bounded date range",
+                "tags": [
+                    "AnalyticsReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Mandatory: \u00a7D7(a). There is no \"all time\" \u2014 an unbounded range is the shape this whole\ndecision exists to prevent.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "timezone",
+                        "in": "query",
+                        "description": "Bound into date_trunc's zone argument, so it is checked against the real IANA list rather than\nby pattern.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Africa/Abidjan",
+                                "Africa/Accra",
+                                "Africa/Addis_Ababa",
+                                "Africa/Algiers",
+                                "Africa/Asmara",
+                                "Africa/Bamako",
+                                "Africa/Bangui",
+                                "Africa/Banjul",
+                                "Africa/Bissau",
+                                "Africa/Blantyre",
+                                "Africa/Brazzaville",
+                                "Africa/Bujumbura",
+                                "Africa/Cairo",
+                                "Africa/Casablanca",
+                                "Africa/Ceuta",
+                                "Africa/Conakry",
+                                "Africa/Dakar",
+                                "Africa/Dar_es_Salaam",
+                                "Africa/Djibouti",
+                                "Africa/Douala",
+                                "Africa/El_Aaiun",
+                                "Africa/Freetown",
+                                "Africa/Gaborone",
+                                "Africa/Harare",
+                                "Africa/Johannesburg",
+                                "Africa/Juba",
+                                "Africa/Kampala",
+                                "Africa/Khartoum",
+                                "Africa/Kigali",
+                                "Africa/Kinshasa",
+                                "Africa/Lagos",
+                                "Africa/Libreville",
+                                "Africa/Lome",
+                                "Africa/Luanda",
+                                "Africa/Lubumbashi",
+                                "Africa/Lusaka",
+                                "Africa/Malabo",
+                                "Africa/Maputo",
+                                "Africa/Maseru",
+                                "Africa/Mbabane",
+                                "Africa/Mogadishu",
+                                "Africa/Monrovia",
+                                "Africa/Nairobi",
+                                "Africa/Ndjamena",
+                                "Africa/Niamey",
+                                "Africa/Nouakchott",
+                                "Africa/Ouagadougou",
+                                "Africa/Porto-Novo",
+                                "Africa/Sao_Tome",
+                                "Africa/Tripoli",
+                                "Africa/Tunis",
+                                "Africa/Windhoek",
+                                "America/Adak",
+                                "America/Anchorage",
+                                "America/Anguilla",
+                                "America/Antigua",
+                                "America/Araguaina",
+                                "America/Argentina/Buenos_Aires",
+                                "America/Argentina/Catamarca",
+                                "America/Argentina/Cordoba",
+                                "America/Argentina/Jujuy",
+                                "America/Argentina/La_Rioja",
+                                "America/Argentina/Mendoza",
+                                "America/Argentina/Rio_Gallegos",
+                                "America/Argentina/Salta",
+                                "America/Argentina/San_Juan",
+                                "America/Argentina/San_Luis",
+                                "America/Argentina/Tucuman",
+                                "America/Argentina/Ushuaia",
+                                "America/Aruba",
+                                "America/Asuncion",
+                                "America/Atikokan",
+                                "America/Bahia",
+                                "America/Bahia_Banderas",
+                                "America/Barbados",
+                                "America/Belem",
+                                "America/Belize",
+                                "America/Blanc-Sablon",
+                                "America/Boa_Vista",
+                                "America/Bogota",
+                                "America/Boise",
+                                "America/Cambridge_Bay",
+                                "America/Campo_Grande",
+                                "America/Cancun",
+                                "America/Caracas",
+                                "America/Cayenne",
+                                "America/Cayman",
+                                "America/Chicago",
+                                "America/Chihuahua",
+                                "America/Ciudad_Juarez",
+                                "America/Costa_Rica",
+                                "America/Coyhaique",
+                                "America/Creston",
+                                "America/Cuiaba",
+                                "America/Curacao",
+                                "America/Danmarkshavn",
+                                "America/Dawson",
+                                "America/Dawson_Creek",
+                                "America/Denver",
+                                "America/Detroit",
+                                "America/Dominica",
+                                "America/Edmonton",
+                                "America/Eirunepe",
+                                "America/El_Salvador",
+                                "America/Fort_Nelson",
+                                "America/Fortaleza",
+                                "America/Glace_Bay",
+                                "America/Goose_Bay",
+                                "America/Grand_Turk",
+                                "America/Grenada",
+                                "America/Guadeloupe",
+                                "America/Guatemala",
+                                "America/Guayaquil",
+                                "America/Guyana",
+                                "America/Halifax",
+                                "America/Havana",
+                                "America/Hermosillo",
+                                "America/Indiana/Indianapolis",
+                                "America/Indiana/Knox",
+                                "America/Indiana/Marengo",
+                                "America/Indiana/Petersburg",
+                                "America/Indiana/Tell_City",
+                                "America/Indiana/Vevay",
+                                "America/Indiana/Vincennes",
+                                "America/Indiana/Winamac",
+                                "America/Inuvik",
+                                "America/Iqaluit",
+                                "America/Jamaica",
+                                "America/Juneau",
+                                "America/Kentucky/Louisville",
+                                "America/Kentucky/Monticello",
+                                "America/Kralendijk",
+                                "America/La_Paz",
+                                "America/Lima",
+                                "America/Los_Angeles",
+                                "America/Lower_Princes",
+                                "America/Maceio",
+                                "America/Managua",
+                                "America/Manaus",
+                                "America/Marigot",
+                                "America/Martinique",
+                                "America/Matamoros",
+                                "America/Mazatlan",
+                                "America/Menominee",
+                                "America/Merida",
+                                "America/Metlakatla",
+                                "America/Mexico_City",
+                                "America/Miquelon",
+                                "America/Moncton",
+                                "America/Monterrey",
+                                "America/Montevideo",
+                                "America/Montserrat",
+                                "America/Nassau",
+                                "America/New_York",
+                                "America/Nome",
+                                "America/Noronha",
+                                "America/North_Dakota/Beulah",
+                                "America/North_Dakota/Center",
+                                "America/North_Dakota/New_Salem",
+                                "America/Nuuk",
+                                "America/Ojinaga",
+                                "America/Panama",
+                                "America/Paramaribo",
+                                "America/Phoenix",
+                                "America/Port-au-Prince",
+                                "America/Port_of_Spain",
+                                "America/Porto_Velho",
+                                "America/Puerto_Rico",
+                                "America/Punta_Arenas",
+                                "America/Rankin_Inlet",
+                                "America/Recife",
+                                "America/Regina",
+                                "America/Resolute",
+                                "America/Rio_Branco",
+                                "America/Santarem",
+                                "America/Santiago",
+                                "America/Santo_Domingo",
+                                "America/Sao_Paulo",
+                                "America/Scoresbysund",
+                                "America/Sitka",
+                                "America/St_Barthelemy",
+                                "America/St_Johns",
+                                "America/St_Kitts",
+                                "America/St_Lucia",
+                                "America/St_Thomas",
+                                "America/St_Vincent",
+                                "America/Swift_Current",
+                                "America/Tegucigalpa",
+                                "America/Thule",
+                                "America/Tijuana",
+                                "America/Toronto",
+                                "America/Tortola",
+                                "America/Vancouver",
+                                "America/Whitehorse",
+                                "America/Winnipeg",
+                                "America/Yakutat",
+                                "Antarctica/Casey",
+                                "Antarctica/Davis",
+                                "Antarctica/DumontDUrville",
+                                "Antarctica/Macquarie",
+                                "Antarctica/Mawson",
+                                "Antarctica/McMurdo",
+                                "Antarctica/Palmer",
+                                "Antarctica/Rothera",
+                                "Antarctica/Syowa",
+                                "Antarctica/Troll",
+                                "Antarctica/Vostok",
+                                "Arctic/Longyearbyen",
+                                "Asia/Aden",
+                                "Asia/Almaty",
+                                "Asia/Amman",
+                                "Asia/Anadyr",
+                                "Asia/Aqtau",
+                                "Asia/Aqtobe",
+                                "Asia/Ashgabat",
+                                "Asia/Atyrau",
+                                "Asia/Baghdad",
+                                "Asia/Bahrain",
+                                "Asia/Baku",
+                                "Asia/Bangkok",
+                                "Asia/Barnaul",
+                                "Asia/Beirut",
+                                "Asia/Bishkek",
+                                "Asia/Brunei",
+                                "Asia/Chita",
+                                "Asia/Colombo",
+                                "Asia/Damascus",
+                                "Asia/Dhaka",
+                                "Asia/Dili",
+                                "Asia/Dubai",
+                                "Asia/Dushanbe",
+                                "Asia/Famagusta",
+                                "Asia/Gaza",
+                                "Asia/Hebron",
+                                "Asia/Ho_Chi_Minh",
+                                "Asia/Hong_Kong",
+                                "Asia/Hovd",
+                                "Asia/Irkutsk",
+                                "Asia/Jakarta",
+                                "Asia/Jayapura",
+                                "Asia/Jerusalem",
+                                "Asia/Kabul",
+                                "Asia/Kamchatka",
+                                "Asia/Karachi",
+                                "Asia/Kathmandu",
+                                "Asia/Khandyga",
+                                "Asia/Kolkata",
+                                "Asia/Krasnoyarsk",
+                                "Asia/Kuala_Lumpur",
+                                "Asia/Kuching",
+                                "Asia/Kuwait",
+                                "Asia/Macau",
+                                "Asia/Magadan",
+                                "Asia/Makassar",
+                                "Asia/Manila",
+                                "Asia/Muscat",
+                                "Asia/Nicosia",
+                                "Asia/Novokuznetsk",
+                                "Asia/Novosibirsk",
+                                "Asia/Omsk",
+                                "Asia/Oral",
+                                "Asia/Phnom_Penh",
+                                "Asia/Pontianak",
+                                "Asia/Pyongyang",
+                                "Asia/Qatar",
+                                "Asia/Qostanay",
+                                "Asia/Qyzylorda",
+                                "Asia/Riyadh",
+                                "Asia/Sakhalin",
+                                "Asia/Samarkand",
+                                "Asia/Seoul",
+                                "Asia/Shanghai",
+                                "Asia/Singapore",
+                                "Asia/Srednekolymsk",
+                                "Asia/Taipei",
+                                "Asia/Tashkent",
+                                "Asia/Tbilisi",
+                                "Asia/Tehran",
+                                "Asia/Thimphu",
+                                "Asia/Tokyo",
+                                "Asia/Tomsk",
+                                "Asia/Ulaanbaatar",
+                                "Asia/Urumqi",
+                                "Asia/Ust-Nera",
+                                "Asia/Vientiane",
+                                "Asia/Vladivostok",
+                                "Asia/Yakutsk",
+                                "Asia/Yangon",
+                                "Asia/Yekaterinburg",
+                                "Asia/Yerevan",
+                                "Atlantic/Azores",
+                                "Atlantic/Bermuda",
+                                "Atlantic/Canary",
+                                "Atlantic/Cape_Verde",
+                                "Atlantic/Faroe",
+                                "Atlantic/Madeira",
+                                "Atlantic/Reykjavik",
+                                "Atlantic/South_Georgia",
+                                "Atlantic/St_Helena",
+                                "Atlantic/Stanley",
+                                "Australia/Adelaide",
+                                "Australia/Brisbane",
+                                "Australia/Broken_Hill",
+                                "Australia/Darwin",
+                                "Australia/Eucla",
+                                "Australia/Hobart",
+                                "Australia/Lindeman",
+                                "Australia/Lord_Howe",
+                                "Australia/Melbourne",
+                                "Australia/Perth",
+                                "Australia/Sydney",
+                                "Europe/Amsterdam",
+                                "Europe/Andorra",
+                                "Europe/Astrakhan",
+                                "Europe/Athens",
+                                "Europe/Belgrade",
+                                "Europe/Berlin",
+                                "Europe/Bratislava",
+                                "Europe/Brussels",
+                                "Europe/Bucharest",
+                                "Europe/Budapest",
+                                "Europe/Busingen",
+                                "Europe/Chisinau",
+                                "Europe/Copenhagen",
+                                "Europe/Dublin",
+                                "Europe/Gibraltar",
+                                "Europe/Guernsey",
+                                "Europe/Helsinki",
+                                "Europe/Isle_of_Man",
+                                "Europe/Istanbul",
+                                "Europe/Jersey",
+                                "Europe/Kaliningrad",
+                                "Europe/Kirov",
+                                "Europe/Kyiv",
+                                "Europe/Lisbon",
+                                "Europe/Ljubljana",
+                                "Europe/London",
+                                "Europe/Luxembourg",
+                                "Europe/Madrid",
+                                "Europe/Malta",
+                                "Europe/Mariehamn",
+                                "Europe/Minsk",
+                                "Europe/Monaco",
+                                "Europe/Moscow",
+                                "Europe/Oslo",
+                                "Europe/Paris",
+                                "Europe/Podgorica",
+                                "Europe/Prague",
+                                "Europe/Riga",
+                                "Europe/Rome",
+                                "Europe/Samara",
+                                "Europe/San_Marino",
+                                "Europe/Sarajevo",
+                                "Europe/Saratov",
+                                "Europe/Simferopol",
+                                "Europe/Skopje",
+                                "Europe/Sofia",
+                                "Europe/Stockholm",
+                                "Europe/Tallinn",
+                                "Europe/Tirane",
+                                "Europe/Ulyanovsk",
+                                "Europe/Vaduz",
+                                "Europe/Vatican",
+                                "Europe/Vienna",
+                                "Europe/Vilnius",
+                                "Europe/Volgograd",
+                                "Europe/Warsaw",
+                                "Europe/Zagreb",
+                                "Europe/Zurich",
+                                "Indian/Antananarivo",
+                                "Indian/Chagos",
+                                "Indian/Christmas",
+                                "Indian/Cocos",
+                                "Indian/Comoro",
+                                "Indian/Kerguelen",
+                                "Indian/Mahe",
+                                "Indian/Maldives",
+                                "Indian/Mauritius",
+                                "Indian/Mayotte",
+                                "Indian/Reunion",
+                                "Pacific/Apia",
+                                "Pacific/Auckland",
+                                "Pacific/Bougainville",
+                                "Pacific/Chatham",
+                                "Pacific/Chuuk",
+                                "Pacific/Easter",
+                                "Pacific/Efate",
+                                "Pacific/Fakaofo",
+                                "Pacific/Fiji",
+                                "Pacific/Funafuti",
+                                "Pacific/Galapagos",
+                                "Pacific/Gambier",
+                                "Pacific/Guadalcanal",
+                                "Pacific/Guam",
+                                "Pacific/Honolulu",
+                                "Pacific/Kanton",
+                                "Pacific/Kiritimati",
+                                "Pacific/Kosrae",
+                                "Pacific/Kwajalein",
+                                "Pacific/Majuro",
+                                "Pacific/Marquesas",
+                                "Pacific/Midway",
+                                "Pacific/Nauru",
+                                "Pacific/Niue",
+                                "Pacific/Norfolk",
+                                "Pacific/Noumea",
+                                "Pacific/Pago_Pago",
+                                "Pacific/Palau",
+                                "Pacific/Pitcairn",
+                                "Pacific/Pohnpei",
+                                "Pacific/Port_Moresby",
+                                "Pacific/Rarotonga",
+                                "Pacific/Saipan",
+                                "Pacific/Tahiti",
+                                "Pacific/Tarawa",
+                                "Pacific/Tongatapu",
+                                "Pacific/Wake",
+                                "Pacific/Wallis",
+                                "UTC"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsGranularity"
+                        }
+                    },
+                    {
+                        "name": "selection",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsFormSelection"
+                        }
+                    },
+                    {
+                        "name": "form_ids[]",
+                        "in": "query",
+                        "description": "`exists` runs on the RLS-scoped connection, so a form id from another tenant simply is not\nthere \u2014 cross-tenant safety without a hand-written predicate.",
+                        "schema": {
+                            "type": "array",
+                            "format": "uuid",
+                            "items": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        }
+                    },
+                    {
+                        "name": "scope_node_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "axis",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsAxis"
+                        }
+                    },
+                    {
+                        "name": "statuses[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionStatus"
+                            }
+                        }
+                    },
+                    {
+                        "name": "sources[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionSource"
+                            }
+                        }
+                    },
+                    {
+                        "name": "locales[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "maxLength": 10
+                            }
+                        }
+                    },
+                    {
+                        "name": "top_n",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Export only; ignored by the JSON report. Same two formats as the submission export.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "current": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "prior": {
+                                                            "type": "integer",
+                                                            "minimum": 0
+                                                        },
+                                                        "change": {
+                                                            "type": [
+                                                                "number",
+                                                                "null"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "current",
+                                                        "prior",
+                                                        "change"
+                                                    ]
+                                                },
+                                                "series": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "bucket": {
+                                                                "type": "string"
+                                                            },
+                                                            "count": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "bucket",
+                                                            "count"
+                                                        ]
+                                                    }
+                                                },
+                                                "breakdown": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "rows": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "other": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "count": {
+                                                                    "anyOf": [
+                                                                        {
+                                                                            "type": "integer"
+                                                                        },
+                                                                        {
+                                                                            "type": "number"
+                                                                        }
+                                                                    ]
+                                                                },
+                                                                "categories": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "count",
+                                                                "categories"
+                                                            ]
+                                                        },
+                                                        "unassigned": {
+                                                            "type": "integer",
+                                                            "description": "Always present, never folded into `rows` \u2014 \u00a7D6 requires an EXPLICIT bucket, because\nscope_node_id is NULL for every form until assigned and a silently short total is the failure."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "rows",
+                                                        "other",
+                                                        "unassigned"
+                                                    ]
+                                                },
+                                                "drafts": {
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "suppressed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "reason": {
+                                                                    "type": "null"
+                                                                },
+                                                                "denominator": {
+                                                                    "type": "string"
+                                                                },
+                                                                "converted": {
+                                                                    "type": "string"
+                                                                },
+                                                                "conversion_rate": {
+                                                                    "type": "number"
+                                                                },
+                                                                "median_seconds": {
+                                                                    "type": [
+                                                                        "integer",
+                                                                        "null"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "suppressed",
+                                                                "reason",
+                                                                "denominator",
+                                                                "converted",
+                                                                "conversion_rate",
+                                                                "median_seconds"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "suppressed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "reason": {
+                                                                    "type": "string",
+                                                                    "const": "no_saved_drafts"
+                                                                },
+                                                                "denominator": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "converted": {
+                                                                    "type": "null"
+                                                                },
+                                                                "conversion_rate": {
+                                                                    "type": "null"
+                                                                },
+                                                                "median_seconds": {
+                                                                    "type": "null"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "suppressed",
+                                                                "reason",
+                                                                "denominator",
+                                                                "converted",
+                                                                "conversion_rate",
+                                                                "median_seconds"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "suppressed": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "reason": {
+                                                                    "type": "string",
+                                                                    "const": "beyond_draft_retention"
+                                                                },
+                                                                "denominator": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "converted": {
+                                                                    "type": "null"
+                                                                },
+                                                                "conversion_rate": {
+                                                                    "type": "null"
+                                                                },
+                                                                "median_seconds": {
+                                                                    "type": "null"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "suppressed",
+                                                                "reason",
+                                                                "denominator",
+                                                                "converted",
+                                                                "conversion_rate",
+                                                                "median_seconds"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "forms_accepting": {
+                                                    "type": "integer",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "series",
+                                                "breakdown",
+                                                "drafts",
+                                                "forms_accepting"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "query": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "v": {
+                                                            "type": "integer",
+                                                            "const": 1
+                                                        },
+                                                        "from": {
+                                                            "type": "string"
+                                                        },
+                                                        "to": {
+                                                            "type": "string"
+                                                        },
+                                                        "timezone": {
+                                                            "type": "string"
+                                                        },
+                                                        "granularity": {
+                                                            "type": "string"
+                                                        },
+                                                        "selection": {
+                                                            "type": "string"
+                                                        },
+                                                        "form_ids": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "scope_node_id": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "axis": {
+                                                            "type": "string"
+                                                        },
+                                                        "statuses": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "sources": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "locales": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "top_n": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "v",
+                                                        "from",
+                                                        "to",
+                                                        "timezone",
+                                                        "granularity",
+                                                        "selection",
+                                                        "form_ids",
+                                                        "scope_node_id",
+                                                        "axis",
+                                                        "statuses",
+                                                        "sources",
+                                                        "locales",
+                                                        "top_n"
+                                                    ]
+                                                },
+                                                "week_starts_on": {
+                                                    "type": "string",
+                                                    "description": "Stated on every response: `date_trunc('week', \u2026)` is ISO Monday-start and not\nconfigurable, and buckets are computed in the query's zone rather than the server's.",
+                                                    "const": "monday"
+                                                }
+                                            },
+                                            "required": [
+                                                "query",
+                                                "week_starts_on"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/analytics/report/export": {
+            "get": {
+                "operationId": "v1.analytics.report.export",
+                "description": "The body is deliberately NOT the chart's shape: the breakdown is emitted un-collapsed, with no\ntop-N and no \"Other (N)\" bucket, because \u00a7D11's argument for that bucket is that nothing is hidden \u2014\nonly un-plotted \u2014 and the export is where the full set lives.",
+                "summary": "Stream the same report as CSV or XLSX",
+                "tags": [
+                    "AnalyticsReport"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Mandatory: \u00a7D7(a). There is no \"all time\" \u2014 an unbounded range is the shape this whole\ndecision exists to prevent.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "timezone",
+                        "in": "query",
+                        "description": "Bound into date_trunc's zone argument, so it is checked against the real IANA list rather than\nby pattern.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Africa/Abidjan",
+                                "Africa/Accra",
+                                "Africa/Addis_Ababa",
+                                "Africa/Algiers",
+                                "Africa/Asmara",
+                                "Africa/Bamako",
+                                "Africa/Bangui",
+                                "Africa/Banjul",
+                                "Africa/Bissau",
+                                "Africa/Blantyre",
+                                "Africa/Brazzaville",
+                                "Africa/Bujumbura",
+                                "Africa/Cairo",
+                                "Africa/Casablanca",
+                                "Africa/Ceuta",
+                                "Africa/Conakry",
+                                "Africa/Dakar",
+                                "Africa/Dar_es_Salaam",
+                                "Africa/Djibouti",
+                                "Africa/Douala",
+                                "Africa/El_Aaiun",
+                                "Africa/Freetown",
+                                "Africa/Gaborone",
+                                "Africa/Harare",
+                                "Africa/Johannesburg",
+                                "Africa/Juba",
+                                "Africa/Kampala",
+                                "Africa/Khartoum",
+                                "Africa/Kigali",
+                                "Africa/Kinshasa",
+                                "Africa/Lagos",
+                                "Africa/Libreville",
+                                "Africa/Lome",
+                                "Africa/Luanda",
+                                "Africa/Lubumbashi",
+                                "Africa/Lusaka",
+                                "Africa/Malabo",
+                                "Africa/Maputo",
+                                "Africa/Maseru",
+                                "Africa/Mbabane",
+                                "Africa/Mogadishu",
+                                "Africa/Monrovia",
+                                "Africa/Nairobi",
+                                "Africa/Ndjamena",
+                                "Africa/Niamey",
+                                "Africa/Nouakchott",
+                                "Africa/Ouagadougou",
+                                "Africa/Porto-Novo",
+                                "Africa/Sao_Tome",
+                                "Africa/Tripoli",
+                                "Africa/Tunis",
+                                "Africa/Windhoek",
+                                "America/Adak",
+                                "America/Anchorage",
+                                "America/Anguilla",
+                                "America/Antigua",
+                                "America/Araguaina",
+                                "America/Argentina/Buenos_Aires",
+                                "America/Argentina/Catamarca",
+                                "America/Argentina/Cordoba",
+                                "America/Argentina/Jujuy",
+                                "America/Argentina/La_Rioja",
+                                "America/Argentina/Mendoza",
+                                "America/Argentina/Rio_Gallegos",
+                                "America/Argentina/Salta",
+                                "America/Argentina/San_Juan",
+                                "America/Argentina/San_Luis",
+                                "America/Argentina/Tucuman",
+                                "America/Argentina/Ushuaia",
+                                "America/Aruba",
+                                "America/Asuncion",
+                                "America/Atikokan",
+                                "America/Bahia",
+                                "America/Bahia_Banderas",
+                                "America/Barbados",
+                                "America/Belem",
+                                "America/Belize",
+                                "America/Blanc-Sablon",
+                                "America/Boa_Vista",
+                                "America/Bogota",
+                                "America/Boise",
+                                "America/Cambridge_Bay",
+                                "America/Campo_Grande",
+                                "America/Cancun",
+                                "America/Caracas",
+                                "America/Cayenne",
+                                "America/Cayman",
+                                "America/Chicago",
+                                "America/Chihuahua",
+                                "America/Ciudad_Juarez",
+                                "America/Costa_Rica",
+                                "America/Coyhaique",
+                                "America/Creston",
+                                "America/Cuiaba",
+                                "America/Curacao",
+                                "America/Danmarkshavn",
+                                "America/Dawson",
+                                "America/Dawson_Creek",
+                                "America/Denver",
+                                "America/Detroit",
+                                "America/Dominica",
+                                "America/Edmonton",
+                                "America/Eirunepe",
+                                "America/El_Salvador",
+                                "America/Fort_Nelson",
+                                "America/Fortaleza",
+                                "America/Glace_Bay",
+                                "America/Goose_Bay",
+                                "America/Grand_Turk",
+                                "America/Grenada",
+                                "America/Guadeloupe",
+                                "America/Guatemala",
+                                "America/Guayaquil",
+                                "America/Guyana",
+                                "America/Halifax",
+                                "America/Havana",
+                                "America/Hermosillo",
+                                "America/Indiana/Indianapolis",
+                                "America/Indiana/Knox",
+                                "America/Indiana/Marengo",
+                                "America/Indiana/Petersburg",
+                                "America/Indiana/Tell_City",
+                                "America/Indiana/Vevay",
+                                "America/Indiana/Vincennes",
+                                "America/Indiana/Winamac",
+                                "America/Inuvik",
+                                "America/Iqaluit",
+                                "America/Jamaica",
+                                "America/Juneau",
+                                "America/Kentucky/Louisville",
+                                "America/Kentucky/Monticello",
+                                "America/Kralendijk",
+                                "America/La_Paz",
+                                "America/Lima",
+                                "America/Los_Angeles",
+                                "America/Lower_Princes",
+                                "America/Maceio",
+                                "America/Managua",
+                                "America/Manaus",
+                                "America/Marigot",
+                                "America/Martinique",
+                                "America/Matamoros",
+                                "America/Mazatlan",
+                                "America/Menominee",
+                                "America/Merida",
+                                "America/Metlakatla",
+                                "America/Mexico_City",
+                                "America/Miquelon",
+                                "America/Moncton",
+                                "America/Monterrey",
+                                "America/Montevideo",
+                                "America/Montserrat",
+                                "America/Nassau",
+                                "America/New_York",
+                                "America/Nome",
+                                "America/Noronha",
+                                "America/North_Dakota/Beulah",
+                                "America/North_Dakota/Center",
+                                "America/North_Dakota/New_Salem",
+                                "America/Nuuk",
+                                "America/Ojinaga",
+                                "America/Panama",
+                                "America/Paramaribo",
+                                "America/Phoenix",
+                                "America/Port-au-Prince",
+                                "America/Port_of_Spain",
+                                "America/Porto_Velho",
+                                "America/Puerto_Rico",
+                                "America/Punta_Arenas",
+                                "America/Rankin_Inlet",
+                                "America/Recife",
+                                "America/Regina",
+                                "America/Resolute",
+                                "America/Rio_Branco",
+                                "America/Santarem",
+                                "America/Santiago",
+                                "America/Santo_Domingo",
+                                "America/Sao_Paulo",
+                                "America/Scoresbysund",
+                                "America/Sitka",
+                                "America/St_Barthelemy",
+                                "America/St_Johns",
+                                "America/St_Kitts",
+                                "America/St_Lucia",
+                                "America/St_Thomas",
+                                "America/St_Vincent",
+                                "America/Swift_Current",
+                                "America/Tegucigalpa",
+                                "America/Thule",
+                                "America/Tijuana",
+                                "America/Toronto",
+                                "America/Tortola",
+                                "America/Vancouver",
+                                "America/Whitehorse",
+                                "America/Winnipeg",
+                                "America/Yakutat",
+                                "Antarctica/Casey",
+                                "Antarctica/Davis",
+                                "Antarctica/DumontDUrville",
+                                "Antarctica/Macquarie",
+                                "Antarctica/Mawson",
+                                "Antarctica/McMurdo",
+                                "Antarctica/Palmer",
+                                "Antarctica/Rothera",
+                                "Antarctica/Syowa",
+                                "Antarctica/Troll",
+                                "Antarctica/Vostok",
+                                "Arctic/Longyearbyen",
+                                "Asia/Aden",
+                                "Asia/Almaty",
+                                "Asia/Amman",
+                                "Asia/Anadyr",
+                                "Asia/Aqtau",
+                                "Asia/Aqtobe",
+                                "Asia/Ashgabat",
+                                "Asia/Atyrau",
+                                "Asia/Baghdad",
+                                "Asia/Bahrain",
+                                "Asia/Baku",
+                                "Asia/Bangkok",
+                                "Asia/Barnaul",
+                                "Asia/Beirut",
+                                "Asia/Bishkek",
+                                "Asia/Brunei",
+                                "Asia/Chita",
+                                "Asia/Colombo",
+                                "Asia/Damascus",
+                                "Asia/Dhaka",
+                                "Asia/Dili",
+                                "Asia/Dubai",
+                                "Asia/Dushanbe",
+                                "Asia/Famagusta",
+                                "Asia/Gaza",
+                                "Asia/Hebron",
+                                "Asia/Ho_Chi_Minh",
+                                "Asia/Hong_Kong",
+                                "Asia/Hovd",
+                                "Asia/Irkutsk",
+                                "Asia/Jakarta",
+                                "Asia/Jayapura",
+                                "Asia/Jerusalem",
+                                "Asia/Kabul",
+                                "Asia/Kamchatka",
+                                "Asia/Karachi",
+                                "Asia/Kathmandu",
+                                "Asia/Khandyga",
+                                "Asia/Kolkata",
+                                "Asia/Krasnoyarsk",
+                                "Asia/Kuala_Lumpur",
+                                "Asia/Kuching",
+                                "Asia/Kuwait",
+                                "Asia/Macau",
+                                "Asia/Magadan",
+                                "Asia/Makassar",
+                                "Asia/Manila",
+                                "Asia/Muscat",
+                                "Asia/Nicosia",
+                                "Asia/Novokuznetsk",
+                                "Asia/Novosibirsk",
+                                "Asia/Omsk",
+                                "Asia/Oral",
+                                "Asia/Phnom_Penh",
+                                "Asia/Pontianak",
+                                "Asia/Pyongyang",
+                                "Asia/Qatar",
+                                "Asia/Qostanay",
+                                "Asia/Qyzylorda",
+                                "Asia/Riyadh",
+                                "Asia/Sakhalin",
+                                "Asia/Samarkand",
+                                "Asia/Seoul",
+                                "Asia/Shanghai",
+                                "Asia/Singapore",
+                                "Asia/Srednekolymsk",
+                                "Asia/Taipei",
+                                "Asia/Tashkent",
+                                "Asia/Tbilisi",
+                                "Asia/Tehran",
+                                "Asia/Thimphu",
+                                "Asia/Tokyo",
+                                "Asia/Tomsk",
+                                "Asia/Ulaanbaatar",
+                                "Asia/Urumqi",
+                                "Asia/Ust-Nera",
+                                "Asia/Vientiane",
+                                "Asia/Vladivostok",
+                                "Asia/Yakutsk",
+                                "Asia/Yangon",
+                                "Asia/Yekaterinburg",
+                                "Asia/Yerevan",
+                                "Atlantic/Azores",
+                                "Atlantic/Bermuda",
+                                "Atlantic/Canary",
+                                "Atlantic/Cape_Verde",
+                                "Atlantic/Faroe",
+                                "Atlantic/Madeira",
+                                "Atlantic/Reykjavik",
+                                "Atlantic/South_Georgia",
+                                "Atlantic/St_Helena",
+                                "Atlantic/Stanley",
+                                "Australia/Adelaide",
+                                "Australia/Brisbane",
+                                "Australia/Broken_Hill",
+                                "Australia/Darwin",
+                                "Australia/Eucla",
+                                "Australia/Hobart",
+                                "Australia/Lindeman",
+                                "Australia/Lord_Howe",
+                                "Australia/Melbourne",
+                                "Australia/Perth",
+                                "Australia/Sydney",
+                                "Europe/Amsterdam",
+                                "Europe/Andorra",
+                                "Europe/Astrakhan",
+                                "Europe/Athens",
+                                "Europe/Belgrade",
+                                "Europe/Berlin",
+                                "Europe/Bratislava",
+                                "Europe/Brussels",
+                                "Europe/Bucharest",
+                                "Europe/Budapest",
+                                "Europe/Busingen",
+                                "Europe/Chisinau",
+                                "Europe/Copenhagen",
+                                "Europe/Dublin",
+                                "Europe/Gibraltar",
+                                "Europe/Guernsey",
+                                "Europe/Helsinki",
+                                "Europe/Isle_of_Man",
+                                "Europe/Istanbul",
+                                "Europe/Jersey",
+                                "Europe/Kaliningrad",
+                                "Europe/Kirov",
+                                "Europe/Kyiv",
+                                "Europe/Lisbon",
+                                "Europe/Ljubljana",
+                                "Europe/London",
+                                "Europe/Luxembourg",
+                                "Europe/Madrid",
+                                "Europe/Malta",
+                                "Europe/Mariehamn",
+                                "Europe/Minsk",
+                                "Europe/Monaco",
+                                "Europe/Moscow",
+                                "Europe/Oslo",
+                                "Europe/Paris",
+                                "Europe/Podgorica",
+                                "Europe/Prague",
+                                "Europe/Riga",
+                                "Europe/Rome",
+                                "Europe/Samara",
+                                "Europe/San_Marino",
+                                "Europe/Sarajevo",
+                                "Europe/Saratov",
+                                "Europe/Simferopol",
+                                "Europe/Skopje",
+                                "Europe/Sofia",
+                                "Europe/Stockholm",
+                                "Europe/Tallinn",
+                                "Europe/Tirane",
+                                "Europe/Ulyanovsk",
+                                "Europe/Vaduz",
+                                "Europe/Vatican",
+                                "Europe/Vienna",
+                                "Europe/Vilnius",
+                                "Europe/Volgograd",
+                                "Europe/Warsaw",
+                                "Europe/Zagreb",
+                                "Europe/Zurich",
+                                "Indian/Antananarivo",
+                                "Indian/Chagos",
+                                "Indian/Christmas",
+                                "Indian/Cocos",
+                                "Indian/Comoro",
+                                "Indian/Kerguelen",
+                                "Indian/Mahe",
+                                "Indian/Maldives",
+                                "Indian/Mauritius",
+                                "Indian/Mayotte",
+                                "Indian/Reunion",
+                                "Pacific/Apia",
+                                "Pacific/Auckland",
+                                "Pacific/Bougainville",
+                                "Pacific/Chatham",
+                                "Pacific/Chuuk",
+                                "Pacific/Easter",
+                                "Pacific/Efate",
+                                "Pacific/Fakaofo",
+                                "Pacific/Fiji",
+                                "Pacific/Funafuti",
+                                "Pacific/Galapagos",
+                                "Pacific/Gambier",
+                                "Pacific/Guadalcanal",
+                                "Pacific/Guam",
+                                "Pacific/Honolulu",
+                                "Pacific/Kanton",
+                                "Pacific/Kiritimati",
+                                "Pacific/Kosrae",
+                                "Pacific/Kwajalein",
+                                "Pacific/Majuro",
+                                "Pacific/Marquesas",
+                                "Pacific/Midway",
+                                "Pacific/Nauru",
+                                "Pacific/Niue",
+                                "Pacific/Norfolk",
+                                "Pacific/Noumea",
+                                "Pacific/Pago_Pago",
+                                "Pacific/Palau",
+                                "Pacific/Pitcairn",
+                                "Pacific/Pohnpei",
+                                "Pacific/Port_Moresby",
+                                "Pacific/Rarotonga",
+                                "Pacific/Saipan",
+                                "Pacific/Tahiti",
+                                "Pacific/Tarawa",
+                                "Pacific/Tongatapu",
+                                "Pacific/Wake",
+                                "Pacific/Wallis",
+                                "UTC"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsGranularity"
+                        }
+                    },
+                    {
+                        "name": "selection",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsFormSelection"
+                        }
+                    },
+                    {
+                        "name": "form_ids[]",
+                        "in": "query",
+                        "description": "`exists` runs on the RLS-scoped connection, so a form id from another tenant simply is not\nthere \u2014 cross-tenant safety without a hand-written predicate.",
+                        "schema": {
+                            "type": "array",
+                            "format": "uuid",
+                            "items": {
+                                "type": "string",
+                                "format": "uuid"
+                            }
+                        }
+                    },
+                    {
+                        "name": "scope_node_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "axis",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/AnalyticsAxis"
+                        }
+                    },
+                    {
+                        "name": "statuses[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionStatus"
+                            }
+                        }
+                    },
+                    {
+                        "name": "sources[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/SubmissionSource"
+                            }
+                        }
+                    },
+                    {
+                        "name": "locales[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "maxLength": 10
+                            }
+                        }
+                    },
+                    {
+                        "name": "top_n",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Export only; ignored by the JSON report. Same two formats as the submission export.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "text/html": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Transfer-Encoding": {
+                                "required": true,
+                                "schema": {
+                                    "type": "string",
+                                    "enum": [
+                                        "chunked"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/auth/tokens": {
             "post": {
                 "operationId": "v1.tokens.store",
@@ -2283,6 +5293,216 @@
                 }
             }
         },
+        "/analytics/views": {
+            "get": {
+                "operationId": "v1.analytics.views.index",
+                "summary": "The requesting user's saved reports, newest name order, each with its resolution state",
+                "tags": [
+                    "SavedReportView"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SavedReportViewResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.analytics.views.store",
+                "summary": "Save a report declaration under a name",
+                "tags": [
+                    "SavedReportView"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedReportViewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`SavedReportViewResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/SavedReportViewResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/analytics/views/{savedReportView}": {
+            "get": {
+                "operationId": "v1.analytics.views.show",
+                "summary": "One saved report, with its declaration resolved (or the reason it cannot be)",
+                "tags": [
+                    "SavedReportView"
+                ],
+                "parameters": [
+                    {
+                        "name": "savedReportView",
+                        "in": "path",
+                        "required": true,
+                        "description": "The saved report view ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`SavedReportViewResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/SavedReportViewResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "v1.analytics.views.update",
+                "summary": "Rename a saved report, replace its declaration, or both",
+                "tags": [
+                    "SavedReportView"
+                ],
+                "parameters": [
+                    {
+                        "name": "savedReportView",
+                        "in": "path",
+                        "required": true,
+                        "description": "The saved report view ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedReportViewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`SavedReportViewResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/SavedReportViewResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1.analytics.views.destroy",
+                "summary": "Delete a saved report",
+                "tags": [
+                    "SavedReportView"
+                ],
+                "parameters": [
+                    {
+                        "name": "savedReportView",
+                        "in": "path",
+                        "required": true,
+                        "description": "The saved report view ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/scopes": {
             "get": {
                 "operationId": "v1.scopes.index",
@@ -3393,6 +6613,38 @@
             }
         },
         "schemas": {
+            "AnalyticsAxis": {
+                "type": "string",
+                "description": "The axes cross-form analytics may group by (ADR-0011 \u00a7D6, Increment H24a). \u00a7D6 settles the headline question \u2014 **the grouping axis is `forms.scope_node_id` and no tag model is coined** \u2014 and names the secondary axes that already exist and may be offered alongside it. This enum is that list, closed: an axis not here is a decision, not an omission.  `docs/PRD.md:203` asks for \"all forms tagged to one program or campaign\", and \u00a7D6 records why a tag model is not built: it would be a new tenant table plus a new authorization question (\"can a Form Editor see a  * tag's aggregate?\"), invented inside an already-large increment to satisfy one word of an example, when an indexed, grant-integrated, subtree-queryable axis already exists. A tag earns its migration when a tenant needs a grouping ORTHOGONAL to authorization \u2014 one form in two campaigns \u2014 and not before.  Lives in an enum rather than in a controller `match` for a mechanical reason as well as a tidiness one: `scripts/controller-gate.php` counts every `match` arm toward a method's cyclomatic complexity and caps it at 10, and it does not scan `app/Enums`.\n| |\n|---|\n| `form` <br/> `submissions.form_id`. The PRD's \"top forms by submission volume\". |\n| `source` <br/> `submissions.source` \u2014 manual / guest / ocr_single / ocr_linelist / offline_sync / api_import. Six values, which is why \u00a7D12 notes this breakdown never strains the five-series categorical palette: a single-series chart uses no categorical colour at all. |\n| `status` <br/> `submissions.status`, within the countable set (so never `draft`). |\n| `scope_node` <br/> `forms.scope_node_id`, resolved through the form. \u00a7D6 states three properties of this column that the service must honour rather than assume: it is **single-valued**, so it cannot express the multi-membership \"tagged\" implies; it is **NULL for every form** until explicitly assigned; and analytics adopts `nodeReach()`'s semantics, so a deactivated node and its branch are excluded. |\n| `locale` <br/> `submissions.locale` \u2014 the locale the response was actually filled in. |",
+                "enum": [
+                    "form",
+                    "source",
+                    "status",
+                    "scope_node",
+                    "locale"
+                ],
+                "title": "AnalyticsAxis"
+            },
+            "AnalyticsFormSelection": {
+                "type": "string",
+                "description": "How an analytics query bounds itself to a set of forms (ADR-0011 \u00a7D7(b), Increment H24a). D7 requires every analytics query to be form-bounded. {@see self::All} is spelled as an EXPLICIT mode rather than an omitted parameter so that tenant-wide selection is a stated choice a reader can see in the saved view's stored definition \u2014 `docs/PRD.md:197`'s org-wide criteria (total submissions this period vs prior, the volume trend, top forms) require it, and an absent parameter meaning \"everything\" is the shape that makes an unbounded query look like an oversight rather than a decision.  Boundedness for `All` comes from the other two rules, which apply to every mode: the mandatory date range with its maximum span, and the fixed-cardinality result.\n| |\n|---|\n| `all` <br/> Every form the requesting user may see. Bounded by the date range and the result cardinality. |\n| `forms` <br/> An explicit list, capped at `AnalyticsQuery::MAX_FORM_IDS`. The cap is not decorative: `ResourceGrantResolver`'s docblock records that PostgreSQL caps bind parameters at 65535, which is why that class returns subqueries rather than materialized id arrays. |\n| `scope_node` <br/> A `scope_nodes` subtree (\u00a7D6's grouping axis). Resolved through {@see ResourceGrantResolver::subtreeFormIdsQuery()}, so a deactivated node and its whole branch are excluded \u2014 the same semantics `nodeReach()` reports with, chosen because an analytics total that counted branches the authorization layer treats as gone would disagree with every other number on the screen. |",
+                "enum": [
+                    "all",
+                    "forms",
+                    "scope_node"
+                ],
+                "title": "AnalyticsFormSelection"
+            },
+            "AnalyticsGranularity": {
+                "type": "string",
+                "description": "The time-bucket width of an analytics series (ADR-0011 \u00a7D7, Increment H24a). Paired with `AnalyticsQuery::MAX_RANGE_DAYS = 366`, this is what makes D7's \"fixed-cardinality result\" enforceable rather than aspirational: the widest permitted range at the finest granularity is 366 points, so no series can grow unbounded regardless of how much data a tenant has.  The value is bound straight into PostgreSQL's `date_trunc(field, source, zone)` \u2014 hence a closed enum rather than a string: an unvalidated field name would be a raw fragment reaching a SQL function.\n",
+                "enum": [
+                    "day",
+                    "week",
+                    "month"
+                ],
+                "title": "AnalyticsGranularity"
+            },
             "AuditResource": {
                 "type": "object",
                 "properties": {
@@ -4158,6 +7410,82 @@
                 ],
                 "title": "ResourceGrantResource"
             },
+            "SavedReportViewRequest": {
+                "type": "object",
+                "description": "Create or update a saved analytics report (ADR-0011 \u00a7D8, Increment H24a).\n\n`definition` is validated only for SHAPE here \u2014 that it is an array. Its CONTENT is validated by\n{@see AnalyticsQuery::fromArray()} inside `SavedReportViewService`, which is the\none place that knows what a legal declaration is. Duplicating those rules as a nested validator would be\na second implementation of \u00a7D7's bounds, and the two could disagree \u2014 which is precisely the drift the VO\nexists to prevent.\n\nThe name's uniqueness is NOT a rule either: `(tenant_id, user_id, name)` is a real race between two tabs,\nso the unique index is the authority and the service maps SQLSTATE 23505 to a 422. A `unique` rule here\nwould give a nicer message most of the time and a 500 the rest.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "definition": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "name",
+                    "definition"
+                ],
+                "title": "SavedReportViewRequest"
+            },
+            "SavedReportViewResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "definition": {
+                        "type": "object"
+                    },
+                    "resolution": {
+                        "type": "object",
+                        "properties": {
+                            "refused": {
+                                "type": "string"
+                            },
+                            "reason": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "refused",
+                            "reason",
+                            "message"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "resolution",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "SavedReportViewResource"
+            },
             "ScopeNodeResource": {
                 "type": "object",
                 "properties": {
@@ -4255,7 +7583,8 @@
                                 "manage:settings",
                                 "read:audit_log",
                                 "manage:scopes",
-                                "manage:integrations"
+                                "manage:integrations",
+                                "read:analytics"
                             ]
                         },
                         "minItems": 1
@@ -4565,6 +7894,32 @@
                     "event_types"
                 ],
                 "title": "StoreWebhookEndpointRequest"
+            },
+            "SubmissionSource": {
+                "type": "string",
+                "description": "The channel a submission entered through (data-dictionary \u00a77) \u2014 the six ingest channels named in plan \u00a72.2/\u00a72.4, all funneled through the single `SubmissionPipeline`. Phase 1 lands `manual` and `guest`; `ocr_single`/`ocr_linelist` (Phase 3), `offline_sync` (Phase 2), and `api_import` are the later channels the same pipeline already accommodates by design.\n",
+                "enum": [
+                    "manual",
+                    "guest",
+                    "ocr_single",
+                    "ocr_linelist",
+                    "offline_sync",
+                    "api_import"
+                ],
+                "title": "SubmissionSource"
+            },
+            "SubmissionStatus": {
+                "type": "string",
+                "description": "Submission review lifecycle (data-dictionary \u00a77). `draft` = started but not yet finalized (the Phase-1 in-session save path and the resting state of a new row); `submitted` = the respondent finalized it and it entered the review queue; `under_review`/`approved`/`returned` are the reviewer transitions (renaming legacy's \"Pending Validation\" to `under_review`); `archived` is a terminal retention state. Every channel funnels into one `SubmissionPipeline`, so this enum is source-agnostic.\n",
+                "enum": [
+                    "draft",
+                    "submitted",
+                    "under_review",
+                    "approved",
+                    "returned",
+                    "archived"
+                ],
+                "title": "SubmissionStatus"
             },
             "SyncManifestResource": {
                 "type": "object",

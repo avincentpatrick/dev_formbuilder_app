@@ -74,6 +74,13 @@ enum AnalyticsAxis: string
     /**
      * The qualified column the aggregate groups by. `scope_node` reads off the joined `forms` row; every
      * other axis is a `submissions` column, which is what keeps the common cases off the join entirely.
+     *
+     * Typed `literal-string` deliberately, not `string`: this value is concatenated into a `selectRaw()`
+     * fragment, and PHPStan's `literal-string` requirement on that parameter is the static guarantee that no
+     * request-derived text can ever reach it. A closed enum of literal arms satisfies it by construction —
+     * which is the real reason the axis is an enum rather than a validated string.
+     *
+     * @return literal-string
      */
     public function column(): string
     {

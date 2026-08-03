@@ -24,6 +24,8 @@ use App\Policies\ResourceGrantPolicy;
 use App\Policies\ScopeNodePolicy;
 use App\Policies\SubmissionPolicy;
 use App\Policies\WebhookEndpointPolicy;
+use App\Services\Analytics\AnalyticsFormSet;
+use App\Services\Analytics\AnalyticsMetricsService;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
@@ -107,6 +109,12 @@ class AppServiceProvider extends ServiceProvider
         // (its per-user grant memo, used to scope a Form Editor/Reviewer's counts), the same reason the
         // resolvers above are scoped — never `singleton`, which would leak that memo across requests.
         $this->app->scoped(DashboardMetricsService::class);
+
+        // The cross-form analytics aggregators (H24a, ADR-0011). Scoped for exactly the reason above —
+        // AnalyticsFormSet resolves every query through the request's one ResourceGrantResolver memo, so a
+        // singleton would leak one user's grant set into the next request.
+        $this->app->scoped(AnalyticsFormSet::class);
+        $this->app->scoped(AnalyticsMetricsService::class);
     }
 
     /**

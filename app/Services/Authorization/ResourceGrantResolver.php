@@ -19,6 +19,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The single answer to "does this user hold capacity C on this form" (Increment G10a) — the one place
@@ -204,6 +205,29 @@ final class ResourceGrantResolver
                     $sub->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
                 }
             });
+    }
+
+    /**
+     * The nodes this authorization layer still honours: active, and not under a deactivated ancestor.
+     *
+     * The same rule {@see subtreeFormIdsQuery()} applies, in the one other shape it is needed in — a joinable
+     * id set rather than a correlated `EXISTS`. H24a's scope-node breakdown uses it as a LEFT JOIN condition
+     * so that a form on an unreachable node simply fails to match and falls into the *Unassigned* bucket,
+     * which is ADR-0011 §D6's required fold expressed without a second copy of the predicate.
+     *
+     * Two shapes of one rule, both here rather than one of them in an analytics service, and both fed by the
+     * same {@see inactivePaths()} memo and {@see escapeLike()}. The correlated form is kept for the two
+     * existing callers because it is on the hot authorization path and its plan is known; this one is not.
+     */
+    public function reachableNodeIdsQuery(): QueryBuilder
+    {
+        $query = DB::table('scope_nodes')->select('scope_nodes.id')->where('scope_nodes.is_active', true);
+
+        foreach ($this->inactivePaths() as $path) {
+            $query->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
+        }
+
+        return $query;
     }
 
     /**

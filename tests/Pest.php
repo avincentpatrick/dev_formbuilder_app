@@ -36,7 +36,9 @@ use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Database\Seeders\PlanSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
@@ -435,4 +437,44 @@ function workOneJob(string $queue = 'submissions'): int
         // and §D7's whole point is that those live on the class. --once returns after one job
         // regardless, so there is no hang to guard against.
     ], new NullOutput);
+}
+
+/**
+ * A countable submission stamped at a chosen instant, for H24a's bucketed aggregates.
+ *
+ * {@see seedInboxSubmission()} stamps `submitted_at => now()` for every row, which is adversarially useful
+ * (a draft it creates lands inside any range, so a query that forgets the countable predicate fails loudly)
+ * but useless for a multi-bucket series: every row would share one bucket. This helper is the time-aware
+ * twin, and it deliberately takes the draft columns too, because ADR-0011 §D5's two metrics are derived from
+ * `created_at`/`last_saved_at` and cannot be exercised without setting them.
+ *
+ * `forceFill` on the timestamps: `created_at` is not mass-assignable and Eloquent would otherwise overwrite
+ * it with the insert time, which is exactly the column §D5 reads as "first save".
+ */
+function seedCountableAt(
+    Form $form,
+    CarbonImmutable|Carbon $submittedAt,
+    SubmissionStatus $status = SubmissionStatus::Submitted,
+    SubmissionSource $source = SubmissionSource::Guest,
+    CarbonImmutable|Carbon|null $createdAt = null,
+    CarbonImmutable|Carbon|null $lastSavedAt = null,
+    ?string $locale = null,
+): Submission {
+    $version = FormVersion::findOrFail($form->current_published_version_id);
+
+    $submission = Submission::factory()->forVersion($version)->create([
+        'status' => $status,
+        'source' => $source,
+        'respondent_user_id' => null,
+        'submitted_at' => $submittedAt,
+        'last_saved_at' => $lastSavedAt,
+        'locale' => $locale,
+    ]);
+
+    $submission->forceFill([
+        'created_at' => $createdAt ?? $submittedAt,
+        'submitted_at' => $status === SubmissionStatus::Draft ? null : $submittedAt,
+    ])->saveQuietly();
+
+    return $submission->refresh();
 }

@@ -171,12 +171,17 @@ class Submission extends Model implements TenantScoped
      * A fourth, `ReconcileTenantUsageJob`, is a metering COUNT with no status predicate at all (drafts fall
      * out only incidentally, because their `submitted_at` is NULL). Same decoupling argument: it is billing.
      *
+     * The column is QUALIFIED. `status` is unqualified-ambiguous the moment a caller joins `forms`, which
+     * also has one — and H24a's scope-node breakdown does exactly that. An unqualified scope would work
+     * everywhere it is used today and fail on the first join, which is the kind of latent break a shared
+     * predicate must not carry.
+     *
      * @param  Builder<Submission>  $query
      * @return Builder<Submission>
      */
     public function scopeCountable(Builder $query): Builder
     {
-        return $query->where('status', '!=', SubmissionStatus::Draft->value);
+        return $query->where('submissions.status', '!=', SubmissionStatus::Draft->value);
     }
 
     /**

@@ -332,6 +332,9 @@ Route::prefix('api/v1')
         Route::get('analytics/report', [AnalyticsReportController::class, 'show'])
             ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
             ->name('analytics.report');
+        Route::get('analytics/report/export', [AnalyticsReportController::class, 'export'])
+            ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
+            ->name('analytics.report.export');
         Route::get('analytics/questions', [AnalyticsQuestionController::class, 'index'])
             ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])
             ->name('analytics.questions.index');

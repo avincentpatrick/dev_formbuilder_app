@@ -68,6 +68,9 @@ final class AnalyticsReportRequest extends FormRequest
             'locales.*' => ['string', 'max:10'],
 
             'top_n' => ['sometimes', 'integer', 'min:1', 'max:'.AnalyticsQuery::MAX_TOP_N],
+
+            // Export only; ignored by the JSON report. Same two formats as the submission export.
+            'format' => ['sometimes', Rule::in(['csv', 'xlsx'])],
         ];
     }
 

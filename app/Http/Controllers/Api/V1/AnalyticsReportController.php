@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AnalyticsReportRequest;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsExporter;
 use App\Services\Analytics\AnalyticsMetricsService;
 use App\Support\Analytics\AnalyticsQuery;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Cross-form submission aggregates (ADR-0011, `docs/PRD.md:203`, Increment H24a).
@@ -24,7 +26,10 @@ use Illuminate\Http\JsonResponse;
  */
 final class AnalyticsReportController extends Controller
 {
-    public function __construct(private readonly AnalyticsMetricsService $metrics) {}
+    public function __construct(
+        private readonly AnalyticsMetricsService $metrics,
+        private readonly AnalyticsExporter $exporter,
+    ) {}
 
     /**
      * Aggregate submissions across forms for a bounded date range.
@@ -58,5 +63,24 @@ final class AnalyticsReportController extends Controller
                 'week_starts_on' => 'monday',
             ],
         ]);
+    }
+
+    /**
+     * Stream the same report as CSV or XLSX.
+     *
+     * The body is deliberately NOT the chart's shape: the breakdown is emitted un-collapsed, with no
+     * top-N and no "Other (N)" bucket, because §D11's argument for that bucket is that nothing is hidden —
+     * only un-plotted — and the export is where the full set lives.
+     */
+    public function export(AnalyticsReportRequest $request): StreamedResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $this->exporter->stream(
+            $request->toQuery(),
+            $user,
+            $request->string('format', 'csv')->toString() === 'xlsx' ? 'xlsx' : 'csv',
+        );
     }
 }

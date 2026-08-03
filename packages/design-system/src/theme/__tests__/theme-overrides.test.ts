@@ -103,6 +103,120 @@ describe('teal accent', () => {
             expect(property).not.toMatch(/--mds-color-(status|text|bg|border|input)-/);
         }
     });
+
+    /**
+     * H24b1 — the same separation argument, extended to the chart scale, which the assertion above
+     * would NOT have caught: `--mds-chart-series-3` matches none of the five `--mds-color-*` families
+     * it tests for, so an accent rule could silently recolour a data series.
+     *
+     * ADR-0011 §D11 states the rule this pins: a data series encodes MEANING, so two colleagues
+     * looking at one screenshot must see the same series in the same colour. That is the same reason
+     * Moss and Brass are excluded from the accent whitelist, applied one layer further out — a
+     * personal preference may repaint the primary-action hue, never the data.
+     */
+    it('never remaps a chart series (ADR-0011 §D11 — a series encodes meaning, not preference)', () => {
+        const light = block(`:root\\[data-accent='teal'\\]`);
+        const dark = block(`:root\\[data-theme-mode='dark'\\]\\[data-accent='teal'\\]`);
+
+        for (const declaration of [...light, ...dark]) {
+            expect(declaration.split(':')[0].trim()).not.toMatch(/^--mds-chart-/);
+        }
+    });
+});
+
+/**
+ * H24b1 — the chart scale's own contrast guard.
+ *
+ * A chart mark is a "meaningful graphical object" under WCAG 1.4.11 and takes 3:1 against the surface
+ * it sits on, which is #FFFFFF in light and #123350 in dark. The five-token cap and the mandatory dark
+ * re-point both fall out of that arithmetic (ADR-0011 §D11), so the arithmetic is asserted rather than
+ * recorded in a comment — the H21d1 lesson, applied before the defect rather than after it.
+ *
+ * Gridlines are deliberately EXEMPT and deliberately below 3:1: they are decorative scaffolding, and a
+ * gridline that competes with the data is a defect in the other direction. That is asserted too, so a
+ * later "fix" that darkens them is caught.
+ */
+describe('chart series contrast (ADR-0011 §D11)', () => {
+    function luminance(hex: string): number {
+        const channel = (v: number): number => {
+            const c = v / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        };
+        const n = hex.replace('#', '');
+        const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    }
+
+    function contrast(a: string, b: string): number {
+        const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+        return (hi + 0.05) / (lo + 0.05);
+    }
+
+    const chart = JSON.parse(readFileSync(here('../../../tokens/chart.json'), 'utf8')) as {
+        chart: Record<string, { value: string }>;
+    };
+
+    /** `--mds-_chart-dark-3: #37b98c;` → `#37b98c`, read from the single definition site. */
+    function darkSeries(index: number): string {
+        const match = css.match(new RegExp(`--mds-_chart-dark-${index}:\\s*(#[0-9a-fA-F]{6})`));
+        expect(match, `--mds-_chart-dark-${index} is not defined in theme-overrides.css`).not.toBeNull();
+
+        return match![1];
+    }
+
+    /**
+     * The dark neutral ramp lives in the CSS, not in primitive.json — primitive.json holds the LIGHT
+     * column. Reading `neutral-100` out of primitive.json here would silently measure against #E8EAE4
+     * and pass everything, which is the whole hazard this suite exists for.
+     */
+    function darkNeutral(step: number): string {
+        const declaration = block(`:root\\[data-theme-mode='dark'\\]`).find((d) =>
+            d.startsWith(`--mds-neutral-${step}:`),
+        );
+        expect(declaration, `--mds-neutral-${step} is not re-pointed in the dark block`).toBeDefined();
+
+        return declaration!.split(':')[1].trim();
+    }
+
+    const LIGHT_SURFACE = primitives['neutral']['0'].value; // --mds-color-bg-surface → --mds-neutral-0
+    const DARK_SURFACE = darkNeutral(100); // the dark flip re-points bg-surface to neutral-100
+
+    it.each([1, 2, 3, 4, 5])('keeps light series %i at 3:1 against the light surface', (i) => {
+        const hex = chart.chart[`series-${i}`].value;
+        expect(hex, `series-${i} must be a literal hex, not an alias`).toMatch(/^#[0-9a-fA-F]{6}$/);
+        expect(contrast(hex, LIGHT_SURFACE), `series-${i} (${hex}) vs ${LIGHT_SURFACE}`).toBeGreaterThanOrEqual(3);
+    });
+
+    it.each([1, 2, 3, 4, 5])('keeps dark series %i at 3:1 against the dark surface', (i) => {
+        const hex = darkSeries(i);
+        expect(contrast(hex, DARK_SURFACE), `_chart-dark-${i} (${hex}) vs ${DARK_SURFACE}`).toBeGreaterThanOrEqual(3);
+    });
+
+    it('caps the categorical scale at five (§D11 — five is derived, not chosen)', () => {
+        const series = Object.keys(chart.chart).filter((k) => k.startsWith('series-'));
+        expect(series).toHaveLength(5);
+    });
+
+    it('keeps gridlines BELOW 3:1 in both themes — they are scaffolding, not data', () => {
+        // `{neutral.200}`, so it flips with the ramp; each end is measured at its own surface.
+        expect(chart.chart['grid'].value).toBe('{neutral.200}');
+        expect(contrast(primitives['neutral']['200'].value, LIGHT_SURFACE)).toBeLessThan(3);
+        expect(contrast(darkNeutral(200), DARK_SURFACE)).toBeLessThan(3);
+    });
+
+    it('keeps the axis/tick-label colour at 4.5:1 in both themes — tick labels are TEXT', () => {
+        expect(chart.chart['axis'].value).toBe('{neutral.600}');
+        expect(contrast(primitives['neutral']['600'].value, LIGHT_SURFACE)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(darkNeutral(600), DARK_SURFACE)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('keeps the Other bucket at 3:1 in both themes without recycling a series hue', () => {
+        // §D11: "Other" is painted a NEUTRAL so it never reads as a peer category. Aliasing the
+        // neutral ramp is what makes it correct in both themes with no re-point of its own.
+        expect(chart.chart['other'].value).toBe('{neutral.500}');
+        expect(contrast(primitives['neutral']['500'].value, LIGHT_SURFACE)).toBeGreaterThanOrEqual(3);
+        expect(contrast(darkNeutral(500), DARK_SURFACE)).toBeGreaterThanOrEqual(3);
+    });
 });
 
 /**

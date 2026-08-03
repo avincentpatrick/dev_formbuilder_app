@@ -45,6 +45,9 @@ export const icons = {
 
     // ── Metrics & data ───────────────────────────────────────────────────────
     'trend-up': 'M3 17l6-6 4 4 8-8 M16 7h5v5',
+    // The mirror of trend-up, added by H24b1: a period-over-period delta needs both directions, and
+    // colour alone must never be what tells them apart (WCAG 1.4.1).
+    'trend-down': 'M3 7l6 6 4-4 8 8 M16 17h5v-5',
     activity: 'M3 12h4l2.5 7 4-15 2.5 8H21',
     inbox: 'M4 13l2.5-8h11L20 13v6H4z M4 13h5a3 3 0 0 0 6 0h5',
 

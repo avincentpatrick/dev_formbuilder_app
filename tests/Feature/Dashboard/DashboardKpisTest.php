@@ -113,3 +113,27 @@ it('serves the ungated trend props alongside the KPI tiles', function (): void {
             ->has('trends.forms_accepting')
             ->has('trends.drafts'));
 });
+
+// H24b1 — the aggregate row carries a form UUID and nothing else, so the page had no name to put on a
+// bar. The title is resolved in DashboardMetricsService rather than in AnalyticsMetricsService::breakdown(),
+// whose shape is the /api/v1 response byte-diffed against openapi.json; pinning it here is what keeps the
+// two from being "fixed" in the wrong file later.
+it('labels each top-forms row with its title, so a bar is never a bare uuid', function (): void {
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = publishedInboxForm($tenant, $owner, 'Clinic Intake');
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('trends.top_forms.rows', 1)
+            ->where('trends.top_forms.rows.0.key', (string) $form->id)
+            ->where('trends.top_forms.rows.0.label', 'Clinic Intake')
+            ->where('trends.top_forms.rows.0.count', 1));
+});

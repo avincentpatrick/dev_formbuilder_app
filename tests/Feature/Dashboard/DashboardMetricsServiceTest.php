@@ -135,6 +135,36 @@ it('states the range it covers, so a tile cannot be labelled as an all-time tota
         ->and($trends['range']['to'])->toBe(CarbonImmutable::now()->toDateString());
 });
 
+// H24b1 -- the aggregate row is a form UUID and a count; the page needs a name for the bar.
+it('labels every top-forms row with its title', function (): void {
+    ['owner' => $owner] = trendFixture();
+
+    $trends = app(DashboardMetricsService::class)->trendsForUser($owner);
+
+    expect($trends['top_forms']['rows'])->toHaveCount(1)
+        ->and($trends['top_forms']['rows'][0]['label'])->toBe('Intake')
+        // The API-shaped keys survive alongside it -- the label is added, nothing is replaced.
+        ->and($trends['top_forms']['rows'][0])->toHaveKeys(['key', 'label', 'count']);
+});
+
+it('still names a SOFT-DELETED form, which an org-wide breakdown legitimately still counts', function (): void {
+    // AnalyticsFormSet::visible() roots an org-wide reader on Form::withTrashed(), so a deleted form's
+    // countable submissions stay in the total. A lookup without withTrashed() returns no row for it and the
+    // bar renders with a number and no name -- a hole nobody would think to test for.
+    ['owner' => $owner, 'tenant' => $tenant] = trendFixture();
+
+    $second = publishedInboxForm($tenant, $owner, 'Retired Intake');
+    seedCountableAt($second, CarbonImmutable::now()->subDay());
+    $second->delete();
+
+    $rows = app(DashboardMetricsService::class)->trendsForUser($owner)['top_forms']['rows'];
+    $labels = array_column($rows, 'label');
+
+    expect($rows)->toHaveCount(2)
+        ->and($labels)->toContain('Retired Intake')
+        ->and($labels)->not->toContain('Deleted form');
+});
+
 it('scopes the trends to the same forms the KPI tiles count', function (): void {
     // One shared query layer, two entry points: the trend goes through AnalyticsFormSet, which applies the
     // same dashboard.org.view split scopeVisibleTo() does. A trend wider than the tiles beside it would be

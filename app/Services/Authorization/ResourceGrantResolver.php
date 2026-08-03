@@ -154,6 +154,59 @@ final class ResourceGrantResolver
     }
 
     /**
+     * Forms under `$node`'s subtree, as a subquery of `forms.id`, with **deactivated nodes and their whole
+     * branches excluded**.
+     *
+     * Extracted in H24a rather than copied a third time. The `EXISTS (scope_nodes … is_active … path LIKE
+     * prefix% … AND NOT LIKE inactive%)` shape already lived twice in this class — inside
+     * {@see grantedFormIdsQuery()} and inside {@see nodeReach()} — and ADR-0011 Context 8 records that the
+     * repository's two *other* subtree queries already disagree about deactivated nodes
+     * (`ScopeNodeService::deletionImpact()` does not filter `is_active`). A third hand-written copy inside
+     * an analytics service is exactly the hazard ADR-0011 §D6 closes by picking one semantics, and it was
+     * not even expressible from outside: {@see inactivePaths()} is private.
+     *
+     * §D6's reasoning for choosing THIS semantics: an analytics total that counted branches the
+     * authorization layer treats as gone would disagree with every other number on the screen.
+     *
+     * `$includeSelf` is what lets {@see nodeReach()} keep its descendant-only count — that figure is a
+     * "what ELSE does this grant reach" preview, so the node's own directly-assigned forms are reported
+     * separately.
+     *
+     * Resolved through the same `formScope()` (`withTrashed()`) as every other reader here, so a caller
+     * cannot end up with a form set that disagrees with `grantedFormIdsQuery()` about soft-deleted forms.
+     *
+     * @return Builder<Form>
+     */
+    public function subtreeFormIdsQuery(ScopeNode $node, bool $includeSelf = true): Builder
+    {
+        // A deactivated node — or one anywhere under a deactivated branch — reaches nothing. An explicit
+        // empty set, never an unconstrained query, for the same reason grantedFormIdsQuery() says so.
+        if ($this->isUnderInactiveBranch($node->path)) {
+            return $this->formScope()->select('forms.id')->whereRaw('false');
+        }
+
+        $inactive = $this->inactivePaths();
+        $prefix = self::escapeLike($node->path);
+
+        return $this->formScope()->select('forms.id')
+            ->whereExists(function (QueryBuilder $sub) use ($node, $prefix, $inactive, $includeSelf): void {
+                $sub->selectRaw('1')
+                    ->from('scope_nodes')
+                    ->whereColumn('scope_nodes.id', 'forms.scope_node_id')
+                    ->where('scope_nodes.is_active', true)
+                    ->where('scope_nodes.path', 'like', $prefix.'%');
+
+                if (! $includeSelf) {
+                    $sub->where('scope_nodes.id', '!=', $node->getKey());
+                }
+
+                foreach ($inactive as $path) {
+                    $sub->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
+                }
+            });
+    }
+
+    /**
      * Warm the form => node-path memo for a whole page in one query. Wired into `FormPresenter::list()`.
      *
      * @param  iterable<Form>  $forms
@@ -208,23 +261,9 @@ final class ResourceGrantResolver
             return ['direct' => 0, 'descendant' => 0];
         }
 
-        $inactive = $this->inactivePaths();
-        $prefix = self::escapeLike($node->path);
-
-        $descendant = $this->formScope()
-            ->whereExists(function (QueryBuilder $sub) use ($node, $prefix, $inactive): void {
-                $sub->selectRaw('1')
-                    ->from('scope_nodes')
-                    ->whereColumn('scope_nodes.id', 'forms.scope_node_id')
-                    ->where('scope_nodes.id', '!=', $node->getKey())
-                    ->where('scope_nodes.is_active', true)
-                    ->where('scope_nodes.path', 'like', $prefix.'%');
-
-                foreach ($inactive as $path) {
-                    $sub->where('scope_nodes.path', 'not like', self::escapeLike($path).'%');
-                }
-            })
-            ->count();
+        // The subtree predicate now has ONE definition (H24a); this is its second call site rather than its
+        // second copy. `includeSelf: false` preserves the descendant-only sense of this figure.
+        $descendant = $this->subtreeFormIdsQuery($node, includeSelf: false)->count();
 
         return [
             'direct' => $this->formScope()->where('scope_node_id', $node->getKey())->count(),

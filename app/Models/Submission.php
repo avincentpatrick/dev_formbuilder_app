@@ -10,6 +10,7 @@ use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
 use App\Policies\SubmissionPolicy;
+use App\Services\Analytics\AnswerValueAggregator;
 use App\Services\Authorization\ResourceGrantResolver;
 use Database\Factories\SubmissionFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,8 +20,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 
 /**
@@ -151,10 +150,12 @@ class Submission extends Model implements TenantScoped
      * analytics alike, so the two surfaces cannot drift into two definitions of "a response" — the failure
      * that makes a dashboard and an inbox disagree in front of a customer.
      *
-     * The `deleted_at IS NULL` half comes from the {@see SoftDeletes} global scope, not from this method.
-     * That is why {@see applyCountableJoin()} exists as a separate artefact: a local scope only applies when
-     * `Submission` is the query ROOT, so a query rooted on `submission_answer_index` gets neither this
-     * predicate nor the global scope on the joined table.
+     * The `deleted_at IS NULL` half comes from the {@see SoftDeletes} global scope, not from this method —
+     * which means **this scope only carries D2 when `Submission` is the query ROOT.** A query rooted on
+     * `submission_answer_index` and joined back to `submissions` would inherit neither, and since that
+     * table's FK cascade fires on HARD delete only, its rows outlive a soft-deleted submission. That is why
+     * {@see AnswerValueAggregator} is deliberately rooted here and joins OUTWARD to
+     * the index rather than the other way round: it makes D2 structural rather than remembered.
      *
      * Visibility is deliberately NOT embedded — {@see scopeVisibleTo()} is a different axis, and three of the
      * non-adopters below are public/guest paths that must not consult it.
@@ -182,26 +183,6 @@ class Submission extends Model implements TenantScoped
     public function scopeCountable(Builder $query): Builder
     {
         return $query->where('submissions.status', '!=', SubmissionStatus::Draft->value);
-    }
-
-    /**
-     * The join-side spelling of {@see scopeCountable()}, for a query whose root is NOT `submissions`.
-     *
-     * ADR-0011 §D2's second clause — "analytics may never read `submission_answer_index` without joining
-     * `submissions`" — is about a JOIN, and a join inherits neither a local scope nor the joined model's
-     * global scopes. The soft-delete half is therefore spelled out here: `submission_answer_index`'s FK
-     * cascade fires on HARD delete only, so its rows outlive a soft-deleted submission and a query that
-     * forgets this returns the right shape with the wrong number.
-     *
-     * Also emits the predicate the partial indexes on `submissions` are built over, so a join through this
-     * helper stays index-eligible.
-     *
-     * @param  JoinClause|Builder<Submission>|QueryBuilder  $join
-     */
-    public static function applyCountableJoin(JoinClause|Builder|QueryBuilder $join, string $alias = 'submissions'): void
-    {
-        $join->where($alias.'.status', '!=', SubmissionStatus::Draft->value)
-            ->whereNull($alias.'.deleted_at');
     }
 
     /**

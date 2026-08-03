@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\Admin\SuperAdminException;
+use App\Exceptions\Analytics\InvalidAnalyticsQueryException;
 use App\Exceptions\Authorization\GrantException;
 use App\Exceptions\Connectors\InvalidConnectorStateException;
 use App\Exceptions\Connectors\UnknownConnectorProviderException;
@@ -245,6 +246,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
+
+        // An analytics declaration that violates one of ADR-0011 §D7's bounds, or a saved view's stored
+        // definition that can no longer be read (H24a). A 422, never a 500: the bounds are enforced in
+        // AnalyticsQuery's CONSTRUCTOR rather than only as validator rules — deliberately, so the saved-view
+        // and export paths inherit them — which means a bad range arrives here as an exception rather than as
+        // a field error. `reason` is machine-readable so a client can branch without parsing prose.
+        $exceptions->render(fn (InvalidAnalyticsQueryException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(422, 'invalid_analytics_query', $e->getMessage(), ['reason' => $e->reason()])
+            : null);
 
         // Per-month usage-quota rate limit (H5c / ADR-0008 §D4) — the metered api_requests (and, when H13
         // ships webhook dispatch, webhook_deliveries) current-period usage reached the plan quota. 429 with a

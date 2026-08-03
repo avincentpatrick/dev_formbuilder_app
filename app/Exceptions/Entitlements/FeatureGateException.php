@@ -37,6 +37,9 @@ final class FeatureGateException extends RuntimeException
             'api_access' => 'the REST API',
             'webhooks' => 'webhooks',
             'native_connectors' => 'native integrations like Slack',
+            // ADR-0011 §D9 assigns this arm to H24a by name: without it a 402 body renders the raw
+            // snake_case key in user-facing copy.
+            'advanced_analytics' => 'advanced cross-form analytics',
             default => $key,
         };
 

@@ -49,6 +49,16 @@ const STATUS: Record<string, StatusDescriptor> = {
     // `revoked` is neutral because the tenant disconnected it on purpose and nothing is wrong.
     refresh_failed: { variant: 'danger', label: 'Reconnect needed' },
     revoked: { variant: 'neutral', label: 'Disconnected' },
+    // Custom-domain lifecycle (Increment H22b / ADR-0012): pending → verified → live. `pending` reuses the
+    // shared neutral descriptor above, exactly as `draft`/`archived` are shared.
+    //
+    // `verified` is labelled "Awaiting setup", NOT "Verified", and the difference is the whole point of the
+    // H15b rule about labelling by what happens next: the tenant HAS finished its part, and a badge reading
+    // "Verified" beside a hostname that serves nothing is the single most misleading thing this page could
+    // say. INFO rather than success for the same reason — success would claim the job is done. ADR-0012 §D6
+    // makes the remaining step an operator's, so the badge names the wait rather than the achievement.
+    verified: { variant: 'info', label: 'Awaiting setup' },
+    live: { variant: 'success', label: 'Live' },
 };
 
 /** Resolve a status string to its badge {variant,label}. Unknown values fall back to a neutral pill

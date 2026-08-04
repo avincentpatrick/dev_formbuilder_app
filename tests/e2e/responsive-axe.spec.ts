@@ -31,6 +31,15 @@ const pages = [
     // "Reconnect needed" state) and their rules tables. The connect button renders DISABLED here because e2e
     // has no Slack credentials, which is exactly the state a fresh deployment shows.
     { name: 'Integrations', path: '/integrations' },
+    // Custom domains (H22b) — Business-gated, reachable because E2eSeeder upserts acme onto a Business
+    // plan. Two seeded cards: one pending, one verified-and-awaiting-the-operator.
+    //
+    // THIS PAGE IS AN OVERFLOW TRAP AND THAT IS WHY IT IS HERE. Every card carries a 64-hex verification
+    // token and a fully-qualified challenge name, neither of which has a natural break opportunity — at
+    // 375px they are the widest unbreakable strings anywhere in the authenticated app. The DNS block's
+    // `minmax(0, 1fr)` column and `overflow-wrap: anywhere` are what keep the body from scrolling
+    // sideways, and this scan is the only thing that checks they still do.
+    { name: 'Domains', path: '/domains' },
     { name: 'Settings', path: '/settings' },
 ];
 

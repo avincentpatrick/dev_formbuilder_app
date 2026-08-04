@@ -146,6 +146,7 @@ it('404s another tenants domain rather than acting on it', function (string $met
 })->with([
     'verify' => ['POST', '/verify'],
     'destroy' => ['DELETE', ''],
+    'primary' => ['POST', '/primary'],
 ]);
 
 it('releases a custom domain but refuses to delete the tenant subdomain', function (): void {
@@ -180,6 +181,13 @@ it('gates writes on the Business plan feature but leaves reads and deletes open'
 
     $this->withToken($token)
         ->postJson('http://acme.meridian.test/api/v1/domains/forms.acme-example.com/verify')
+        ->assertStatus(402);
+
+    // H22b's write joins the gated side, not the open one: choosing which host serves respondent links is
+    // a use of the feature, while seeing and removing a host that is already resolving is the stranding
+    // case §D9 exists to prevent.
+    $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/domains/forms.acme-example.com/primary')
         ->assertStatus(402);
 
     $this->withToken($token)
@@ -217,6 +225,44 @@ it('refuses a member whose role lacks tenant.settings.manage', function (): void
         ->getJson('http://acme.meridian.test/api/v1/domains')
         ->assertForbidden();
 });
+
+it('makes a live domain primary and demotes the previous one', function (): void {
+    // H22b. `domains_primary_per_tenant_unique` is a PARTIAL unique index, so the clear-then-set pair is
+    // one transaction; a demotion that did not happen would surface here as a 23505 rather than as two
+    // primaries, which is the point of putting the constraint underneath the service.
+    $token = domainApiToken();
+    $tenant = Tenant::query()->where('slug', 'acme')->sole();
+    $first = customDomain($tenant, 'forms.acme-example.com');
+    $second = customDomain($tenant, 'apply.acme-example.com');
+    app(CustomDomainService::class)->makePrimary($first);
+
+    $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/domains/apply.acme-example.com/primary')
+        ->assertOk()
+        ->assertJsonPath('data.is_primary', true);
+
+    expect($first->fresh()->is_primary)->toBeFalse()
+        ->and($second->fresh()->is_primary)->toBeTrue();
+});
+
+it('refuses to make a domain primary before an operator has put it into service', function (string $state, bool $verified): void {
+    // THE assertion that keeps this endpoint off the activation path. ADR-0012 §D6 leaves
+    // `php artisan domains:activate` as the only thing that can set `activated_at`, so a write a tenant CAN
+    // reach must be unable to make an inert hostname serve anything — 422, and the row is untouched.
+    $token = domainApiToken();
+    $tenant = Tenant::query()->where('slug', 'acme')->sole();
+    $domain = customDomain($tenant, 'forms.acme-example.com', verified: $verified, activated: false);
+
+    $this->withToken($token)
+        ->postJson('http://acme.meridian.test/api/v1/domains/forms.acme-example.com/primary')
+        ->assertStatus(422);
+
+    expect($domain->fresh()->is_primary)->toBeFalse()
+        ->and($domain->fresh()->activated_at)->toBeNull();
+})->with([
+    'pending' => ['pending', false],
+    'verified but awaiting the operator' => ['verified', true],
+]);
 
 it('exposes no activate endpoint', function (): void {
     // Putting a verified domain into service is `php artisan domains:activate`, run by whoever installed

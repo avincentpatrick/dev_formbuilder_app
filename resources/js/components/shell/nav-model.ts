@@ -36,5 +36,14 @@ export const navItems: NavItem[] = [
     // so a tier without `webhooks` never sees the item (a direct visit still bounces off `feature:webhooks`).
     { key: 'webhooks', label: 'Webhooks', icon: 'activity', href: '/webhooks', enabled: true, gate: 'manageWebhooks', feature: 'webhooks' },
     { key: 'integrations', label: 'Integrations', icon: 'plug', href: '/integrations', enabled: true, gate: 'manageIntegrations', feature: 'native_connectors' },
+    // Custom domains (H22b) — Owner/Admin (gate) AND a Business+ plan feature (feature). Hidden rather than
+    // locked, the ADR-0011 §D9 posture: Business is seeded is_active:false, so an upgrade CTA would point at
+    // a plan nobody can buy.
+    //
+    // ⚠️ THE FEATURE GATE HERE IS NARROWER THAN THE ROUTE'S, deliberately. /domains itself carries NO
+    // `feature:` middleware on its read and delete (ADR-0012 §D9 — a tenant downgraded off Business keeps a
+    // live, resolving hostname and must be able to take it down). Losing the nav item on downgrade is
+    // therefore not the end of the path: Settings/Index.vue links the page once the tenant holds a domain.
+    { key: 'domains', label: 'Domains', icon: 'globe', href: '/domains', enabled: true, gate: 'manageDomains', feature: 'custom_domain' },
     { key: 'settings', label: 'Settings', icon: 'settings', href: '/settings', enabled: true },
 ];

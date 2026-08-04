@@ -38,6 +38,7 @@ function allAbilities(overrides: Record<string, boolean> = {}): Record<string, b
         manageWebhooks: true,
         manageIntegrations: true,
         viewAnalytics: true,
+        manageDomains: true,
         ...overrides,
     };
 }
@@ -98,6 +99,52 @@ describe('Sidebar — the Analytics destination', () => {
         const text = labels(wrapper).join(' ');
         expect(text).toContain('Dashboard');
         expect(text).toContain('Settings');
+        wrapper.unmount();
+    });
+});
+
+/**
+ * The Domains destination (Increment H22b).
+ *
+ * ⚠️ HIDING THE NAV ITEM IS NOT THE SAME AS CLOSING THE SURFACE, and that asymmetry is the reason these
+ * tests are worth their lines. ADR-0012 §D9 leaves `/domains`' read and delete UNGATED on the plan feature,
+ * because a tenant downgraded off Business keeps a LIVE, resolving hostname and must be able to remove it.
+ * So a reader who sees this item disappear on downgrade must not conclude the page went with it — the
+ * Settings card (pinned in DomainWebTest) is the remaining path, and Playwright covers the positive on the
+ * seeded Business tenant.
+ */
+describe('Sidebar — the Domains destination', () => {
+    it('shows Domains to an entitled tenant whose user may manage settings', () => {
+        const wrapper = render(allAbilities(), { custom_domain: true });
+
+        expect(labels(wrapper).join(' ')).toContain('Domains');
+        wrapper.unmount();
+    });
+
+    it('HIDES Domains from a tenant whose plan lacks custom_domain', () => {
+        // Business is seeded is_active:false (ADR-0008 §D6), so a visible-but-locked item would offer an
+        // upgrade to a plan nobody can buy — the same reasoning that hides Analytics.
+        const wrapper = render(allAbilities(), { custom_domain: false });
+
+        expect(labels(wrapper).join(' ')).not.toContain('Domains');
+        wrapper.unmount();
+    });
+
+    it('hides Domains from a user without manageDomains even on an entitled plan', () => {
+        const wrapper = render(allAbilities({ manageDomains: false }), { custom_domain: true });
+
+        expect(labels(wrapper).join(' ')).not.toContain('Domains');
+        wrapper.unmount();
+    });
+
+    it('hides it when there is no entitlement snapshot at all — fail closed', () => {
+        mocks.pageProps.props = {
+            auth: { user: { name: 'Demo Owner' }, can: allAbilities() },
+            entitlements: null,
+        };
+        const wrapper = mount(Sidebar);
+
+        expect(labels(wrapper).join(' ')).not.toContain('Domains');
         wrapper.unmount();
     });
 });

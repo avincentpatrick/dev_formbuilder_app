@@ -9,7 +9,7 @@
  * The top-nav quick toggle is a deliberately narrow additional surface for theme mode only
  * (exceptions-log #3) — the other three axes live here and nowhere else.
  */
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from '@inertiajs/vue3';
 import {
     MdsButton,
@@ -33,6 +33,10 @@ const props = defineProps<{
     // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
     // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
     draftSettings: { draft_ttl_days: number; is_default: boolean; can_manage: boolean };
+    // Increment H22b — a LINK to /domains, shown only once the tenant actually holds a custom domain. This
+    // is ADR-0012 §D9's escape hatch: the sidebar item requires the `custom_domain` plan feature, so a
+    // tenant downgraded off Business would otherwise lose every path to a hostname that is still resolving.
+    customDomains: { count: number };
 }>();
 
 const page = usePage();
@@ -227,6 +231,30 @@ function savePassword(): void {
                     <span v-if="draftForm.recentlySuccessful" class="settings-form__saved" role="status">Saved</span>
                 </div>
             </form>
+        </MdsCard>
+
+        <!-- Custom domains (Increment H22b) — a signpost, not a control. Only rendered once the tenant
+             holds a domain, so it never advertises a Business feature to a tenant that cannot buy it. -->
+        <MdsCard v-if="customDomains.count > 0" class="settings-card">
+            <template #header>
+                <div class="settings-card__head">
+                    <MdsIcon name="globe" size="sm" aria-hidden="true" />
+                    <h2 class="settings-card__title">Custom domains</h2>
+                </div>
+            </template>
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">
+                        {{ customDomains.count }} domain{{ customDomains.count === 1 ? '' : 's' }}
+                    </p>
+                    <p class="settings-row__hint">
+                        Serve your public forms on your own hostname, with the DNS records and setup status.
+                    </p>
+                </div>
+                <MdsButton variant="secondary" icon-left="globe" @click="router.visit('/domains')">
+                    Manage domains
+                </MdsButton>
+            </div>
         </MdsCard>
 
         <!-- Security -->

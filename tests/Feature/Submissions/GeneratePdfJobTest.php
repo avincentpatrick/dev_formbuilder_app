@@ -399,15 +399,31 @@ it('leaves an already-qualified custom domain alone', function (): void {
     // The shape H22 introduces. Gluing the central host onto `forms.acme.com` would corrupt it, so
     // a stored value containing a dot is used verbatim.
     //
-    // H22a: the token is now required by `domains_custom_requires_token_chk` — a dotted row must have
-    // been minted by the verification service, not hand-written. The assertion itself is unchanged here
-    // and is revisited once TenantUrl grows its app/public arms.
+    // H22a: the row must now be LIVE to be seen at all. ResolvableDomainScope hides a pending or
+    // verified-but-not-activated custom domain from every ordinary read, so a half-provisioned hostname
+    // can never reach an outbound link — and with the fixture unactivated this assertion falls back to
+    // `beta.meridian.test`, which is the scope working, not a regression.
     $other = Tenant::create(['name' => 'Beta', 'slug' => 'beta', 'default_locale' => 'en']);
-    $other->domains()->create(['domain' => 'forms.acme.com', 'verification_token' => str_repeat('c', 64)]);
+    customDomain($other, 'forms.acme.com');
     config(['app.url' => 'https://meridian.test']);
 
     expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://forms.acme.com/attachments/x');
 });
+
+it('will not put a half-provisioned custom domain in an outbound link', function (bool $verified, bool $activated): void {
+    // The complement, and the reason the scope is global rather than a filter at each call site: an
+    // emailed link is built on a queued worker, far from any request, by code that has no idea a
+    // `domains` row can be in an unusable state.
+    $other = Tenant::create(['name' => 'Gamma', 'slug' => 'gamma', 'default_locale' => 'en']);
+    $other->domains()->create(['domain' => 'gamma']);
+    customDomain($other, 'forms.gamma-example.com', $verified, $activated);
+    config(['app.url' => 'https://meridian.test']);
+
+    expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://gamma.meridian.test/attachments/x');
+})->with([
+    'pending' => [false, false],
+    'verified but not activated' => [true, false],
+]);
 
 it('surfaces the stored PDF on the submission detail page', function (): void {
     // The only in-app surface for the artifact — there is no notification bell, so a user who

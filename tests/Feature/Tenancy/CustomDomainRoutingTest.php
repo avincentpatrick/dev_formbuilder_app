@@ -92,6 +92,39 @@ it('refuses an unregistered third-party host', function (): void {
         ->assertRedirect(config('app.url'));
 });
 
+/*
+| ── The custom-domain state machine, at the routing layer ────────────────────────────────────────────
+*/
+
+it('serves the guest runtime on a live custom domain', function (): void {
+    // The feature, end to end at this layer: identification succeeded on a host that is not a subdomain
+    // of any central domain, and the request reached the controller under that tenant's RLS context.
+    customDomain(inboxTenant('acme'), 'forms.acme-example.com');
+
+    $this->withoutVite()->get('http://forms.acme-example.com/f/no-such-form')->assertNotFound();
+});
+
+it('refuses the guest runtime on a custom domain that is not live yet', function (bool $verified, bool $activated): void {
+    // `pending` is the obvious case. `verified` is the one that matters: control of the hostname has
+    // been proven, but no certificate exists for it until an operator installs one, so the row must
+    // still route nowhere. That is the whole content of the fail-closed TLS posture.
+    customDomain(inboxTenant('acme'), 'forms.acme-example.com', $verified, $activated);
+
+    $this->withoutVite()->get('http://forms.acme-example.com/f/no-such-form')
+        ->assertRedirect(config('app.url'));
+})->with([
+    'pending' => [false, false],
+    'verified but not activated' => [true, false],
+]);
+
+it('keeps serving the subdomain while a custom domain is live', function (): void {
+    // Two rows for one tenant. The label row is not superseded — it stays the tenant's app host, and
+    // every authenticated surface still lives there.
+    customDomain(inboxTenant('acme'), 'forms.acme-example.com');
+
+    $this->withoutVite()->get('http://acme.meridian.test/f/no-such-form')->assertNotFound();
+});
+
 it('keeps the authenticated app off the public-host identifier', function (string $path): void {
     // The ADR-0009 §D2 scoping, pinned: only the guest group was swapped. This group still carries
     // InitializeTenancyBySubdomain, so a third-party host throws NotASubdomainException there with no

@@ -9,6 +9,7 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
+use App\Models\Domain;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
@@ -288,13 +289,52 @@ function makeSchemaSection(array $attributes): FormSection
 |--------------------------------------------------------------------------
 */
 
-/** A tenant reachable at {slug}.meridian.test (its subdomain is the {slug} domain). */
+/**
+ * A tenant reachable at {slug}.meridian.test — its `domains` row holds the SUBDOMAIN LABEL ({$slug}),
+ * which is what tenant identification looks up on its subdomain arm (any host ending in a
+ * `tenancy.central_domains` entry).
+ *
+ * H22a swapped the identification middleware on the guest runtime, NOT this shape: the label row is
+ * still the identity of every subdomain tenant, which is why the ~60 call sites across the suite are
+ * unchanged. Rewriting them to FQDNs would be actively wrong — `acme.meridian.test` takes the SUBDOMAIN
+ * arm and is looked up as `acme` — and it would be silently right on a box where CENTRAL_DOMAIN is
+ * something else, which is the worst shape a fixture can have.
+ */
 function inboxTenant(string $slug = 'acme'): Tenant
 {
     $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
     $tenant->domains()->create(['domain' => $slug]);
 
     return $tenant;
+}
+
+/**
+ * Add the SECOND kind of `domains` row H22a introduces — a custom domain, taken by the full-host arm.
+ *
+ * Opt-in and never part of inboxTenant(), deliberately: a tenant with two rows makes every "which host
+ * is this tenant's" question answerable two ways, so only a test that actually exercises the custom
+ * host should create one.
+ *
+ * `$host` MUST NOT end with a central domain. Identification classifies the host BEFORE any database
+ * read, so `forms.meridian.test` would be routed to the subdomain arm and looked up as the label
+ * `forms`, never reaching this row — and App\Rules\ClaimableDomain refuses such a hostname for exactly
+ * that reason. Use a genuinely third-party name such as `forms.acme-example.com`.
+ *
+ * States, matching App\Models\Domain: both null = pending; verified only = control proven but no
+ * certificate installed, so it still routes nowhere; both set = live.
+ */
+function customDomain(Tenant $tenant, string $host, bool $verified = true, bool $activated = true): Domain
+{
+    /** @var Domain $domain */
+    $domain = $tenant->domains()->create([
+        'domain' => $host,
+        'verification_token' => bin2hex(random_bytes(32)),
+        'token_issued_at' => now(),
+        'verified_at' => $verified ? now() : null,
+        'activated_at' => $activated ? now() : null,
+    ]);
+
+    return $domain;
 }
 
 /**

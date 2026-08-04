@@ -39,6 +39,10 @@ afterEach(function (): void {
 it('queues the invitation as an on-demand mail notification carrying only scalars', function (): void {
     Notification::fake();
 
+    // Pinned rather than inherited from .env, so the assertion is environment-independent (the
+    // GeneratePdfJobTest precedent) — locally app.url is http://localhost:8080.
+    config(['app.url' => 'https://meridian.test']);
+
     $tenant = inboxTenant('acme'); // creates the tenant + a `domains` row, so the accept URL resolves
     $admin = User::factory()->create();
     enterTenant($tenant->id, $admin->id);
@@ -55,8 +59,33 @@ it('queues the invitation as an on-demand mail notification carrying only scalar
                 && $notification->tenantName === 'Acme'
                 // The accept URL was resolved IN-REQUEST from the tenant's domain row (RLS-exempt read),
                 // carried as a scalar — no Tenant model rode the queue.
-                && str_starts_with($notification->acceptUrl, 'https://acme/invitations/');
+                //
+                // H22a: this asserted `https://acme/invitations/` — a URL that resolves NOWHERE, because
+                // domains.domain holds the subdomain LABEL. Every invitation email ever sent carried it.
+                // The builder now goes through TenantUrl::to(), which composes the label with the
+                // deployment host and takes the scheme from app.url instead of hard-coding https.
+                && str_starts_with($notification->acceptUrl, 'https://acme.meridian.test/invitations/');
         }
+    );
+});
+
+it('keeps the invite link on the app host even when the tenant has a live custom domain', function (): void {
+    // TenantUrl::to(), not toPublic(). /invitations/{token} is served by a route group that still
+    // identifies by subdomain (ADR-0009 §D2 scopes custom domains to public forms), so an invite link on
+    // a custom host would 302 the invitee to the central app instead of letting them accept.
+    Notification::fake();
+    config(['app.url' => 'https://meridian.test']);
+
+    $tenant = inboxTenant('acme');
+    customDomain($tenant, 'forms.acme-example.com');
+    $admin = User::factory()->create();
+    enterTenant($tenant->id, $admin->id);
+
+    app(TenantMembershipService::class)->invite($tenant, 'newbie@membertest.local', 'form_editor', $admin);
+
+    Notification::assertSentOnDemand(
+        TenantInvitationNotification::class,
+        fn (TenantInvitationNotification $notification): bool => str_starts_with($notification->acceptUrl, 'https://acme.meridian.test/invitations/')
     );
 });
 
@@ -65,7 +94,7 @@ it('lands the invitation on the mail queue with a scalar-only payload and drains
     config()->set('mail.default', 'array'); // no external transport when the worker sends
 
     Notification::route('mail', 'recipient@membertest.local')
-        ->notify(new TenantInvitationNotification('Acme', 'https://acme/invitations/plain-token'));
+        ->notify(new TenantInvitationNotification('Acme', 'https://acme.meridian.test/invitations/plain-token'));
 
     // ── anti-vacuity: a real row, on the mail queue, unreserved ────────────────────────────────────
     $row = DB::table('jobs')->where('queue', QueueName::Mail->value)->first();

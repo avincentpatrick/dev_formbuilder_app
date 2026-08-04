@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Connectors;
 
 use App\Enums\ConnectorProviderKey;
+use App\Models\Domain;
 use App\Models\Tenant;
+use App\Support\Tenancy\TenantUrl;
 
 /**
  * Builds the two absolute URLs the OAuth flow crosses hosts on (ADR-0009 §D2/§D5, H15a) — kept in one class
@@ -20,6 +22,12 @@ use App\Models\Tenant;
  * state payload, so even a validly-signed state cannot steer the browser anywhere but the tenant's own app.
  * Only the path is configurable. The outcome rides a query parameter because the central host cannot write
  * the tenant host's session cookie, so an Inertia flash is not available across this boundary.
+ *
+ * H22a made that claim structurally true rather than merely intended. Once a tenant can write its own
+ * hostname into `domains`, "looked up from the tenant's own row" would otherwise have become the attack
+ * rather than the control. Two things close it: {@see tenantHost()} reads only the DOTLESS row, and
+ * {@see Domain}'s global scope hides any custom domain that is not live from every query in the
+ * application. A tenant cannot steer this redirect even by claiming a domain it does control.
  */
 final class ConnectorRedirector
 {
@@ -75,11 +83,19 @@ final class ConnectorRedirector
      * The tenant's absolute host. `tenants`/`domains` are RLS-exempt central tables, so this resolves under
      * any context (or none) — which matters, since the callback runs on the central domain.
      *
-     * `domains.domain` holds the SUBDOMAIN LABEL that stancl/tenancy identifies on (`acme`), not a full host,
-     * so a label is expanded against the central domain here. A stored value that already contains a dot is
-     * treated as a complete host, so a future custom-domain tenant needs no change. (The invite and resume
-     * URL builders predate this and use the bare label directly — a defect in those, not a convention this
-     * increment should copy.)
+     * `domains.domain` holds the SUBDOMAIN LABEL that tenancy identifies on (`acme`), not a full host, so
+     * the label is expanded against the central domain here.
+     *
+     * H22a: this reads the DOTLESS row explicitly rather than whichever row came back first. Two reasons,
+     * both load-bearing. (1) The landing page is `/integrations` — the AUTHENTICATED app, which ADR-0009
+     * §D2 keeps off custom domains, so returning a custom host here would 302 the user to the central app
+     * at the end of a successful OAuth flow. (2) `value('domain')` is `first()` with no ORDER BY, so once a
+     * tenant has two rows the answer depended on physical row order.
+     *
+     * This deliberately does NOT delegate to {@see TenantUrl}: that class composes
+     * from `app.url` (which carries the port), while the OAuth return URL must be built from
+     * `tenancy.central_domain` to match what is registered in the provider's console. The two genuinely
+     * differ in this environment and merging them would rewrite the flow's asserted redirects.
      */
     public function tenantHost(string $tenantId): ?string
     {
@@ -89,10 +105,10 @@ final class ConnectorRedirector
             return null;
         }
 
-        $domain = $tenant->domains()->value('domain');
+        $domain = $tenant->domains()->whereRaw("position('.' in domain) = 0")->orderBy('domain')->value('domain');
         $label = is_string($domain) && $domain !== '' ? $domain : $tenant->slug;
 
-        return str_contains($label, '.') ? $label : $label.'.'.$this->centralHost();
+        return $label.'.'.$this->centralHost();
     }
 
     private function centralHost(): string

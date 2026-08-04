@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AnalyticsAxis;
 use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
@@ -23,9 +24,11 @@ use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Plan;
 use App\Models\Role;
+use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
+use App\Models\SubmissionAnswerIndex;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantUser;
@@ -37,8 +40,11 @@ use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
+use App\Services\Submissions\AnswerIndexProjector;
 use App\Services\Webhooks\WebhookEndpointService;
+use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -571,6 +577,8 @@ class E2eSeeder extends Seeder
                 // Left as a DRAFT (not published) so it opens straight into the builder.
             }
 
+            $this->seedAnalyticsFixture($owner, $tenant);
+
             // A handful of submissions against Clinic Intake so the inbox (Increment F7) has rows in a spread
             // of review states (Badge variety) and the detail page has answers to render for the axe gate.
             $intakeForm = Form::query()->where('title', 'Clinic Intake')->first();
@@ -829,6 +837,328 @@ class E2eSeeder extends Seeder
     private function roleId(string $name): string
     {
         return (string) Role::query()->whereNull('tenant_id')->where('name', $name)->value('id');
+    }
+
+    /**
+     * The H24b2 analytics fixture — a time-spread, multi-form, multi-source, `last_saved_at`-marked
+     * submission set, plus the one flagged-for-reporting form the question explorer needs.
+     *
+     * ── Why this is not the Clinic Intake block below ───────────────────────────────────────────────────
+     * That block is guarded `Submission::where('form_id', $intakeForm->id)->doesntExist()`, so writing a
+     * single Clinic Intake row HERE would trip it on a fresh database and its three status-varied rows
+     * would never be created — silently deleting the Badge-variety fixture `responsive-axe`'s "Submission
+     * detail" scan depends on. This block therefore writes nothing on Clinic Intake, and runs BEFORE it so
+     * those rows keep the highest uuidv7 ids and stay the inbox's first page (it orders by id, not by
+     * `submitted_at`), leaving that spec on exactly the row it opens today.
+     *
+     * ── NO doesntExist() GUARD, deliberately ────────────────────────────────────────────────────────────
+     * Every write is an UPSERT keyed on a deterministic `client_submission_uuid` (its per-tenant partial
+     * unique index is the natural key), so a re-seed CONVERGES this fixture rather than skipping it. That
+     * is the same trap the Business-plan upsert above already records, and it is the whole reason
+     * "re-seeding does not heal Playwright fixture drift" was ever true of this file.
+     *
+     * ── The dates are RELATIVE, and that is the feature ─────────────────────────────────────────────────
+     * `/analytics` opens on a rolling window. A fixed calendar date would fall out of it and the page would
+     * go empty the day after this was written. What is deterministic here is the SHAPE — the per-form,
+     * per-source, per-status and per-locale distributions below, and the four genuinely empty days that
+     * make zero-filling visible as a floor rather than as a plausible line.
+     *
+     * ── PUBLIC, as a seam for the idempotency test ──────────────────────────────────────────────────────
+     * `E2eSeederIdempotencyTest` re-runs THIS rather than the whole seeder, because {@see run()} resolves
+     * identities on the separate `pgsql_auth` connection and a second run inside `RefreshDatabase`'s
+     * uncommitted transaction cannot see the first run's user — a 23505 that says nothing about whether the
+     * fixture converges. This method touches no identity, so it re-runs cleanly and proves exactly the
+     * obligation ("upsert-safe") that was otherwise only prose.
+     */
+    public function seedAnalyticsFixture(User $owner, Tenant $tenant): void
+    {
+        $uptake = $this->seedProgrammeUptakeForm($owner, $tenant);
+
+        foreach (self::analyticsFixtureRows() as $index => $row) {
+            $form = Form::query()
+                ->where('title', $row['form'])
+                ->whereNotNull('current_published_version_id')
+                ->first();
+
+            if ($form === null) {
+                continue; // a database seeded before this form existed — degrade, never fatal
+            }
+
+            $version = FormVersion::findOrFail($form->current_published_version_id);
+            $draft = $row['status'] === SubmissionStatus::Draft;
+            $createdAt = now()->utc()->subDays($row['back'])->setTime($row['hour'], 0);
+            $submittedAt = $createdAt->copy()->addSeconds($row['fill_seconds'] ?? 0);
+
+            $submission = Submission::updateOrCreate(
+                ['client_submission_uuid' => self::fixtureUuid("h24b2:{$row['form']}:{$row['back']}:{$index}")],
+                [
+                    'form_id' => $form->id,
+                    'form_version_id' => $version->id,
+                    'respondent_user_id' => $row['source'] === SubmissionSource::Manual ? $owner->id : null,
+                    'status' => $row['status'],
+                    'source' => $row['source'],
+                    'locale' => $row['locale'],
+                    'submitted_at' => $draft ? null : $submittedAt,
+                    // ADR-0011 §D5's durable marker: set only on rows that were once explicitly saved as a
+                    // draft. It survives promotion, which is what makes the denominator computable at all.
+                    'last_saved_at' => $row['saved'] ? $createdAt : null,
+                    'draft_expires_at' => $draft ? $createdAt->copy()->addDays(30) : null,
+                ],
+            );
+
+            // `created_at` is NOT mass-assignable and Eloquent would stamp the insert time over it — which
+            // is exactly the column §D5 reads as "first save". The tests/Pest.php seedCountableAt() device.
+            $submission->forceFill(['created_at' => $createdAt])->saveQuietly();
+
+            SubmissionAnswer::updateOrCreate(
+                ['submission_id' => $submission->id],
+                [
+                    'form_version_id' => $version->id,
+                    'answers' => $this->sampleAnswers($version),
+                    'attachment_refs' => [],
+                ],
+            );
+
+            if ($form->is($uptake)) {
+                $this->projectUptakeIndex($submission, $version, $index);
+            }
+        }
+
+        $this->seedSavedReportViews($owner, $tenant);
+    }
+
+    /**
+     * The seventh PUBLISHED form, and the only one carrying `is_queryable` fields.
+     *
+     * Two jobs, both load-bearing for the axe gate. **(a)** Six published forms make the `form` axis
+     * overflow the default top-5 by exactly one, so `other.categories` is 1 and only the SINGULAR copy
+     * branch is ever rendered; a seventh reaches 2 and exercises the plural. **(b)** No seeded form has a
+     * field flagged for reporting, so without this the question explorer could only ever render refusals
+     * — the populated chart, the numeric summary and the coverage disclosure would go unscanned.
+     *
+     * `notes` is deliberately left UNFLAGGED so the picker's two groups are both non-empty on one screen.
+     */
+    private function seedProgrammeUptakeForm(User $owner, Tenant $tenant): Form
+    {
+        $existing = Form::query()->where('title', 'Programme Uptake')->first();
+
+        if ($existing !== null) {
+            return $existing; // once-only: re-publishing would grow version history without end
+        }
+
+        $form = app(FormService::class)->create(
+            $tenant, $owner, 'Programme Uptake', 'Field-team uptake reporting (H24b2 analytics demo).'
+        );
+        $b = app(FormBuilderService::class);
+        $section = $b->addSection($form); // non-repeatable — a field inside a repeat can never project
+
+        // StructuralValidationGate enforces `is_queryable ⇒ indexed_data_type` at publish, so both are set
+        // together. The four types below are the four the explorer renders differently: text and date are
+        // categorical, number takes the min/max/average/median summary, and boolean is the one value column
+        // with no B-tree — which is the `indexed_column: false` disclosure the page has to be able to show.
+        $b->addField($form, $owner, FieldType::ShortText, $section->id)
+            ->update(['label' => 'District', 'key' => 'district', 'is_queryable' => true, 'indexed_data_type' => 'text']);
+        $b->addField($form, $owner, FieldType::Integer, $section->id)
+            ->update(['label' => 'Households reached', 'key' => 'households_reached', 'is_queryable' => true, 'indexed_data_type' => 'number']);
+        $b->addField($form, $owner, FieldType::Date, $section->id)
+            ->update(['label' => 'Visited on', 'key' => 'visited_on', 'is_queryable' => true, 'indexed_data_type' => 'date']);
+        $b->addField($form, $owner, FieldType::YesNo, $section->id)
+            ->update(['label' => 'Follow-up needed', 'key' => 'follow_up_needed', 'is_queryable' => true, 'indexed_data_type' => 'boolean']);
+        $b->addField($form, $owner, FieldType::LongText, $section->id)
+            ->update(['label' => 'Notes', 'key' => 'notes']);
+
+        app(PublishService::class)->publish($form->refresh(), $owner);
+
+        // The fixture seeds `fil` submissions, and the locale FILTER is derived from what forms declare
+        // (never from a DISTINCT over `submissions`, which is unbounded and free-text on the ingest paths).
+        // Without this the locale breakdown would show a `fil` bar that the filter beside it cannot select
+        // — a chart and its own control disagreeing about which languages exist.
+        $form->update(['supported_locales' => ['en', 'es', 'fil']]);
+
+        return $form->refresh();
+    }
+
+    /**
+     * Project the four flagged answers into `submission_answer_index` through the REAL mapper.
+     *
+     * ── Why not SubmissionPipeline ──────────────────────────────────────────────────────────────────────
+     * Five reasons, and the first one alone settles it. **(1)** `SubmissionPipeline::persist()` hard-codes
+     * `submitted_at => now()`, so every row would land in ONE bucket — the exact degeneracy this fixture
+     * exists to remove. **(2)** It fires `SubmissionCreated`, whose two deliberately-synchronous listeners
+     * create delivery rows and enqueue jobs; the e2e job runs `QUEUE_CONNECTION: sync`, so those would
+     * attempt real outbound HTTPS during `db:seed` AND pollute the delivery ledgers the webhook/connector
+     * axe scans assert on. **(3)** `FormAcceptanceGuard` refuses the closed form outright. **(4)** Stages 1
+     * and 3 would refuse synthetic payloads against the branching, repeat and geo forms. **(5)**
+     * `MeterSubmissionUsage` would inflate the `entitlements.quotas` every page renders.
+     *
+     * Only the INSERT is hand-rolled: the coercion is {@see AnswerIndexProjector}, the production writer's
+     * own collaborator, so this fixture cannot drift from what `SubmissionFinalizer::projectIndex()` does.
+     *
+     * One row's `district` is deliberately LEFT EMPTY, so coverage reads 4 of 5. A 100% coverage figure
+     * proves nothing about §D3(iii)'s disclosure, which is the thing the page must be able to render.
+     */
+    private function projectUptakeIndex(Submission $submission, FormVersion $version, int $index): void
+    {
+        $projector = app(AnswerIndexProjector::class);
+
+        /** @var array<int, array<string, mixed>> $values */
+        $values = [
+            ['district' => 'Malate', 'households_reached' => 12, 'visited_on' => '2026-06-02', 'follow_up_needed' => true],
+            ['district' => 'Sampaloc', 'households_reached' => 34, 'visited_on' => '2026-06-09', 'follow_up_needed' => false],
+            ['district' => null, 'households_reached' => 34, 'visited_on' => '2026-06-16', 'follow_up_needed' => true],
+            ['district' => 'Tondo', 'households_reached' => 51, 'visited_on' => '2026-06-23', 'follow_up_needed' => true],
+            ['district' => 'Sampaloc', 'households_reached' => 88, 'visited_on' => '2026-06-30', 'follow_up_needed' => false],
+        ];
+
+        $answers = $values[$index % count($values)];
+
+        foreach ($version->fields()->get() as $field) {
+            $projected = $projector->project($field, $answers[$field->key] ?? null);
+
+            if ($projected === null) {
+                continue; // `notes` is unflagged, and the null district projects nothing — both intended
+            }
+
+            SubmissionAnswerIndex::updateOrCreate(
+                ['submission_id' => $submission->id, 'form_field_id' => $field->id],
+                [
+                    'tenant_id' => $submission->tenant_id,
+                    'form_version_id' => $version->id,
+                    'field_key' => $field->key,
+                    $projected['column'] => $projected['value'],
+                ],
+            );
+        }
+    }
+
+    /**
+     * Two saved reports for the Owner, so `/analytics` has a non-empty list for the axe scan WITHOUT any
+     * spec having to create one — which under `workers: 1` across three viewport projects would leave a
+     * row behind on any run that died mid-way and collide on the unique name the next time round.
+     *
+     * The second is written DIRECTLY rather than through the service, because the service would refuse it.
+     * That is the point: a `v: 99` definition can only arise from an older build, and ADR-0011 §D8 requires
+     * it to render as a stated refusal beside the working one. Seeding it is what puts that state inside a
+     * merge-blocking scan.
+     */
+    private function seedSavedReportViews(User $owner, Tenant $tenant): void
+    {
+        $today = now()->utc();
+
+        SavedReportView::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Field team — last 30 days'],
+            ['definition' => (new AnalyticsQuery(
+                from: CarbonImmutable::parse($today->copy()->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS)->toDateString()),
+                to: CarbonImmutable::parse($today->toDateString()),
+                axis: AnalyticsAxis::Source,
+            ))->toArray()],
+        );
+
+        SavedReportView::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Legacy monthly rollup'],
+            ['definition' => ['v' => 99, 'from' => '2026-01-01', 'to' => '2026-01-31']],
+        );
+    }
+
+    /**
+     * The fixture's shape, as data.
+     *
+     * Reconciles to: form 9/6/5/4/3(legacy)/2/1 → top-5 plus `other{count: 3, categories: 2}`;
+     * source guest 14 / manual 8 / offline_sync 4 / api_import 2 / ocr_single 2 (five categories, NO
+     * overflow — so `other === null` and `other !== null` are BOTH reachable from real seeded data);
+     * locale en / es / fil plus five NULLs, giving one axis both a multi-bucket breakdown and a non-zero
+     * Unassigned at once.
+     *
+     * §D5's denominator is `last_saved_at IS NOT NULL` AND `source IN (guest, manual)`: five converted plus
+     * three unconverted drafts → denominator 8, converted 5, 62.5%, median 900s. The `offline_sync` row at
+     * d-22 ALSO carries `last_saved_at` and must NOT enter it — an adversarial row, and the only reason
+     * deleting that source restriction is a detectable mutation.
+     *
+     * @return list<array{form: string, back: int, hour: int, status: SubmissionStatus, source: SubmissionSource, locale: ?string, saved: bool, fill_seconds: ?int}>
+     */
+    private static function analyticsFixtureRows(): array
+    {
+        $s = SubmissionStatus::Submitted;
+        $a = SubmissionStatus::Approved;
+        $r = SubmissionStatus::Returned;
+        $u = SubmissionStatus::UnderReview;
+        $x = SubmissionStatus::Archived;
+        $d = SubmissionStatus::Draft;
+
+        $chs = 'Community Health Survey';
+        $hr = 'Household Roster';
+        $pu = 'Programme Uptake';
+        $fts = 'Field Types Showcase';
+        $br = 'Branching Router';
+        $cs = 'Closed Survey';
+
+        $g = SubmissionSource::Guest;
+        $m = SubmissionSource::Manual;
+        $o = SubmissionSource::OfflineSync;
+        $api = SubmissionSource::ApiImport;
+        $ocr = SubmissionSource::OcrSingle;
+
+        return [
+            // ── Community Health Survey ×9 ────────────────────────────────────────────────────────────
+            ['form' => $chs, 'back' => 27, 'hour' => 9, 'status' => $s, 'source' => $g, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 24, 'hour' => 10, 'status' => $a, 'source' => $g, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 240],
+            ['form' => $chs, 'back' => 24, 'hour' => 14, 'status' => $s, 'source' => $g, 'locale' => 'es', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 19, 'hour' => 11, 'status' => $s, 'source' => $ocr, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 15, 'hour' => 8, 'status' => $a, 'source' => $g, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 5700],
+            ['form' => $chs, 'back' => 15, 'hour' => 12, 'status' => $s, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 15, 'hour' => 16, 'status' => $u, 'source' => $g, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 8, 'hour' => 9, 'status' => $s, 'source' => $g, 'locale' => 'es', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $chs, 'back' => 3, 'hour' => 15, 'status' => $s, 'source' => $api, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            // ── Household Roster ×6 ───────────────────────────────────────────────────────────────────
+            ['form' => $hr, 'back' => 26, 'hour' => 9, 'status' => $s, 'source' => $g, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $hr, 'back' => 21, 'hour' => 13, 'status' => $a, 'source' => $g, 'locale' => 'fil', 'saved' => true, 'fill_seconds' => 540],
+            ['form' => $hr, 'back' => 16, 'hour' => 10, 'status' => $r, 'source' => $g, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $hr, 'back' => 11, 'hour' => 11, 'status' => $s, 'source' => $o, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $hr, 'back' => 6, 'hour' => 14, 'status' => $s, 'source' => $o, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
+            ['form' => $hr, 'back' => 1, 'hour' => 9, 'status' => $s, 'source' => $g, 'locale' => 'es', 'saved' => false, 'fill_seconds' => null],
+            // ── Programme Uptake ×5 (the only index-projecting form) ──────────────────────────────────
+            ['form' => $pu, 'back' => 25, 'hour' => 9, 'status' => $s, 'source' => $m, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $pu, 'back' => 20, 'hour' => 10, 'status' => $a, 'source' => $m, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 900],
+            ['form' => $pu, 'back' => 14, 'hour' => 11, 'status' => $s, 'source' => $m, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $pu, 'back' => 9, 'hour' => 12, 'status' => $s, 'source' => $m, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $pu, 'back' => 2, 'hour' => 13, 'status' => $r, 'source' => $m, 'locale' => 'es', 'saved' => false, 'fill_seconds' => null],
+            // ── Field Types Showcase ×4 ───────────────────────────────────────────────────────────────
+            ['form' => $fts, 'back' => 23, 'hour' => 9, 'status' => $s, 'source' => $ocr, 'locale' => 'en', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $fts, 'back' => 17, 'hour' => 10, 'status' => $a, 'source' => $g, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 1260],
+            ['form' => $fts, 'back' => 10, 'hour' => 11, 'status' => $s, 'source' => $o, 'locale' => 'es', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $fts, 'back' => 4, 'hour' => 15, 'status' => $x, 'source' => $api, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
+            // ── Branching Router ×2. The d-22 row is the ADVERSARIAL one: offline_sync WITH last_saved_at,
+            //    which §D5's `source IN (guest, manual)` restriction must keep out of the denominator.
+            ['form' => $br, 'back' => 22, 'hour' => 9, 'status' => $s, 'source' => $o, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 1800],
+            ['form' => $br, 'back' => 5, 'hour' => 16, 'status' => $u, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
+            // ── Closed Survey ×1 — capacity-closed, but a direct write is not the ingest path. ────────
+            ['form' => $cs, 'back' => 12, 'hour' => 10, 'status' => $s, 'source' => $g, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
+            // ── Three UNCONVERTED drafts. Excluded from every countable aggregate by scopeCountable(), so
+            //    any chart that forgot ->countable() jumps by exactly 3, visibly, on the page.
+            ['form' => $chs, 'back' => 13, 'hour' => 9, 'status' => $d, 'source' => $g, 'locale' => 'en', 'saved' => true, 'fill_seconds' => null],
+            ['form' => $hr, 'back' => 7, 'hour' => 10, 'status' => $d, 'source' => $g, 'locale' => 'es', 'saved' => true, 'fill_seconds' => null],
+            ['form' => $pu, 'back' => 2, 'hour' => 8, 'status' => $d, 'source' => $m, 'locale' => 'en', 'saved' => true, 'fill_seconds' => null],
+        ];
+    }
+
+    /**
+     * A stable UUID from a human-readable fixture key, so a row is greppable and a re-seed converges.
+     *
+     * Hand-rolled rather than `Ramsey\Uuid::uuid5()`: that package is only a transitive dependency here,
+     * and `Str::uuid()`/`orderedUuid()` are both random, which is exactly what an upsert key must not be.
+     */
+    private static function fixtureUuid(string $key): string
+    {
+        $hash = hash('sha256', $key);
+
+        return sprintf(
+            '%s-%s-5%s-%s-%s',
+            substr($hash, 0, 8),
+            substr($hash, 8, 4),
+            substr($hash, 13, 3),
+            dechex((hexdec(substr($hash, 16, 2)) & 0x3F) | 0x80).substr($hash, 18, 2),
+            substr($hash, 20, 12),
+        );
     }
 
     /**

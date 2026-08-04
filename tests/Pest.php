@@ -102,11 +102,32 @@ function makeActiveMember(User $user, string $roleName): void
 |--------------------------------------------------------------------------
 */
 
-/** Seed all 5 tiers (idempotent, default connection) and give the current tenant an active subscription on `$tier`. */
+/**
+ * Seed all 5 tiers (idempotent, default connection) and give the current tenant an active subscription on
+ * `$tier` — REPLACING any it already has.
+ *
+ * ── Why the delete is load-bearing (found in H24b2) ─────────────────────────────────────────────────────
+ * This helper used to APPEND, so calling it twice on one tenant — a `beforeEach` setting a baseline tier
+ * and then a test overriding it, which is how several suites are written — left TWO active subscriptions.
+ * {@see EntitlementService::resolvePlan()} picks with `latest('created_at')`, and two rows written inside
+ * the same second are a TIE: PostgreSQL breaks it by physical row order, which shifts with how much else
+ * the run has written. So which tier "won" depended on how many tests had run before, and a suite could go
+ * from green to red purely because a file was added somewhere else in the tree.
+ *
+ * It surfaced as `ConnectorOAuthFlowTest`'s "refuses to start a flow on a plan without native connectors":
+ * with the Starter baseline winning over the Free override the feature gate never fired, so the controller
+ * redirected to the provider — a 302 with no toast, which passes `assertRedirect()` and fails only on the
+ * assertion after it. A test that fails OPEN proves nothing, and this one had been proving nothing on
+ * whichever orderings happened to hit it.
+ *
+ * Production is unaffected: a tenant has one subscription, and real ones are not created in the same second.
+ */
 function assignPlanTier(PlanTier $tier): Subscription
 {
     app(PlanSeeder::class)->run();
     $plan = Plan::query()->where('code', $tier->value)->firstOrFail();
+    // RLS scopes this to the current tenant, so it can only ever clear the one under test.
+    Subscription::query()->delete();
     $subscription = Subscription::factory()->forPlan($plan)->create();
 
     // Drop any plan the scoped EntitlementService memoized before this assignment — in production the

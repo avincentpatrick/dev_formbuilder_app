@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Form;
+use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
@@ -77,6 +78,14 @@ class HandleInertiaRequests extends Middleware
                     // manageWebhooks the nav item ALSO requires the `native_connectors` plan feature
                     // (Sidebar.vue), so a tier without it never sees a destination it would only bounce off.
                     'manageIntegrations' => (bool) $user?->can('integrations.manage'),
+                    // Gates the Analytics nav item, the /analytics page and the Dashboard's view-switcher
+                    // (H24b2). The POLICY, not a bare permission string: SavedReportViewPolicy::viewAny is
+                    // the `dashboard.org.view || dashboard.form.view` composition, and re-spelling that here
+                    // would put a second definition of "may read analytics" in a second file. Like the two
+                    // above, every consumer ALSO requires the `advanced_analytics` plan feature, so a tier
+                    // without it never sees a destination it would only bounce off (ADR-0011 §D9 — hidden,
+                    // never locked-with-upsell, because Business is held from sale).
+                    'viewAnalytics' => (bool) $user?->can('viewAny', SavedReportView::class),
                 ],
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the

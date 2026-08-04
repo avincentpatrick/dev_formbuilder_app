@@ -24,7 +24,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     pageProps: {
-        auth: { user: { name: 'Demo Owner' }, can: { manageForms: true } },
+        auth: { user: { name: 'Demo Owner' }, can: { manageForms: true, viewAnalytics: false } },
+        entitlements: { features: { advanced_analytics: false } },
     },
     visit: vi.fn(),
 }));
@@ -239,6 +240,47 @@ describe('Dashboard — the breakdown', () => {
 
         expect(wrapper.find('.mds-bar__plot').exists()).toBe(false);
         expect(wrapper.text()).toContain('No responses in this period');
+        wrapper.unmount();
+    });
+});
+
+describe('Dashboard — the analytics view-switcher (H24b2)', () => {
+    /**
+     * ADR-0011 §D9: the surface is HIDDEN for an unentitled tenant, never rendered locked with an upgrade
+     * call-to-action. Business is seeded `is_active: false` — held from sale until the production host is
+     * stood up — so an upgrade CTA would point at a plan that cannot be bought: a dead end presented as an
+     * offer. There must be no "Upgrade" branch anywhere on this control, and these three cases are what
+     * stop one being added later "to drive conversion".
+     */
+    function withGates(canView: boolean, entitled: boolean): VueWrapper {
+        mocks.pageProps.auth.can.viewAnalytics = canView;
+        mocks.pageProps.entitlements.features.advanced_analytics = entitled;
+
+        return render();
+    }
+
+    it('shows the switcher when the plan carries advanced_analytics and the user may read it', () => {
+        const wrapper = withGates(true, true);
+
+        expect(wrapper.find('.mds-segmented').exists()).toBe(true);
+        expect(wrapper.text()).toContain('Analytics');
+        wrapper.unmount();
+    });
+
+    it('HIDES it when unentitled — never a locked control, never an upgrade prompt', () => {
+        const wrapper = withGates(true, false);
+
+        expect(wrapper.find('.mds-segmented').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Upgrade');
+        wrapper.unmount();
+    });
+
+    it('hides it when the user lacks viewAnalytics even on an entitled plan', () => {
+        // The two gates are ANDed, exactly as Sidebar.vue ANDs a NavItem's `gate` and `feature`, so the
+        // switcher and the nav item can never disagree about whether the destination exists.
+        const wrapper = withGates(false, true);
+
+        expect(wrapper.find('.mds-segmented').exists()).toBe(false);
         wrapper.unmount();
     });
 });

@@ -49,6 +49,10 @@ export const icons = {
     // colour alone must never be what tells them apart (WCAG 1.4.1).
     'trend-down': 'M3 7l6 6 4-4 8 8 M16 17h5v-5',
     activity: 'M3 12h4l2.5 7 4-15 2.5 8H21',
+    // H24b2 — the /analytics destination. `activity` is already the Webhooks nav item, and below 1024px
+    // the sidebar collapses to icons only, where the glyph is the SOLE signifier: two destinations sharing
+    // one mark is a real navigation defect there, not a tidiness question.
+    'chart-bar': 'M4 20h16 M7.5 20v-8 M12 20V5 M16.5 20v-5',
     inbox: 'M4 13l2.5-8h11L20 13v6H4z M4 13h5a3 3 0 0 0 6 0h5',
 
     // ── Comms & time ─────────────────────────────────────────────────────────

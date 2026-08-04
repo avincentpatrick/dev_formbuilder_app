@@ -35,9 +35,6 @@ use Carbon\CarbonImmutable;
  */
 final class DashboardMetricsService
 {
-    /** The default window for the trend tiles — a rolling month, wide enough to show shape, cheap to scan. */
-    private const int TREND_DAYS = 29;
-
     public function __construct(
         private readonly ResourceGrantResolver $grants,
         private readonly AnalyticsMetricsService $analytics,
@@ -82,8 +79,11 @@ final class DashboardMetricsService
     {
         $today = CarbonImmutable::now();
 
+        // H24b2 — the window constant moved to AnalyticsQuery so `/analytics` opens on the SAME range this
+        // page shows. It was private here, which is exactly how two surfaces come to mean two different
+        // things by "the last 30 days"; the constant's docblock records why the number is 29 and not 30.
         $query = new AnalyticsQuery(
-            from: $today->subDays(self::TREND_DAYS),
+            from: $today->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS),
             to: $today,
             axis: AnalyticsAxis::Form,
         );

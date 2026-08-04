@@ -62,6 +62,23 @@ final readonly class AnalyticsQuery
     public const int DEFAULT_TOP_N = 5;
 
     /**
+     * The rolling window both surfaces open on: `from = today - 29`, `to = today` — thirty days INCLUSIVE,
+     * because {@see self::spanInDays()} counts both ends.
+     *
+     * **29, never 30, and the difference is not cosmetic.**
+     * {@see AnalyticsMetricsService::draftMetrics()} suppresses §D5's two tiles when
+     * `fromUtc() < now()->subDays($retentionDays)`, and the default draft retention is 30 days. At 29 the
+     * range opens at local midnight of `today - 29`, which is `now - 29d - timeOfDay` and therefore always
+     * strictly inside the horizon. At 30 it is `now - 30d - timeOfDay`, which is always OUTSIDE it — so both
+     * draft tiles would render "suppressed" on every request, forever, at the surface's own default range,
+     * with every gate green over a dead feature.
+     *
+     * Named here rather than on either consumer so the dashboard and `/analytics` cannot come to mean two
+     * different things by "the last 30 days" — §D2's argument about one countable predicate, one layer out.
+     */
+    public const int DEFAULT_RANGE_DAYS = 29;
+
+    /**
      * @param  list<string>  $formIds
      * @param  list<string>  $statuses
      * @param  list<string>  $sources

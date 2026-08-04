@@ -10,6 +10,15 @@ import { assertClean, forceTheme } from './support/axe';
 
 const pages = [
     { name: 'Dashboard', path: '/dashboard' },
+    // Cross-form analytics (H24b2) — Business-gated, and reachable here only because E2eSeeder upserts
+    // acme onto a Business plan (ADR-0011 §D9 names seeding that tenant as a blocking obligation, precisely
+    // so this gate cannot stay green over a page it never loads).
+    //
+    // This is the WHOLE-PAGE scan, so it owns the horizontal-overflow assertion for the charts — and that
+    // is where it bites: a non-wrapping legend row, a fixed-width SVG, or a long form title in a bar label
+    // at 375px is the failure this gate has already caught three times on other pages. The filter rail's
+    // eight controls and three checkbox groups are the other half of that risk.
+    { name: 'Analytics', path: '/analytics' },
     { name: 'Forms', path: '/forms' },
     { name: 'Submissions', path: '/submissions' },
     { name: 'Members', path: '/members' },

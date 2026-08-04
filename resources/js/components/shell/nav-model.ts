@@ -22,6 +22,12 @@ export const navItems: NavItem[] = [
     { key: 'forms', label: 'Forms', icon: 'forms', href: '/forms', enabled: true, gate: 'manageForms' },
     { key: 'submissions', label: 'Submissions', icon: 'submissions', href: '/submissions', enabled: true, gate: 'viewSubmissions' },
     { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard', enabled: true },
+    // Cross-form analytics (H24b2) — a permission (gate) AND a Business+ plan feature (feature). ADR-0011
+    // §D9 makes the hiding load-bearing rather than tidy: Business is seeded is_active:false, so a locked
+    // item with an upgrade CTA would point at a plan that cannot be bought. Its own glyph, not `activity`
+    // — below 1024px the sidebar is icons only, and there the mark is the only thing distinguishing it
+    // from Webhooks.
+    { key: 'analytics', label: 'Analytics', icon: 'chart-bar', href: '/analytics', enabled: true, gate: 'viewAnalytics', feature: 'advanced_analytics' },
     { key: 'members', label: 'Members', icon: 'users', href: '/members', enabled: true, gate: 'manageMembers' },
     // Scoping hierarchy (G10b2) — sits beside Members because both are Owner/Admin administration of WHO
     // can reach what, rather than authoring surfaces.

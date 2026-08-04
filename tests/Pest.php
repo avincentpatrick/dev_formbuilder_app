@@ -36,6 +36,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PlanSeeder;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
+use Tests\Support\FakeDnsTxtResolver;
 use Tests\TestCase;
 
 /*
@@ -323,6 +325,24 @@ function inboxTenant(string $slug = 'acme'): Tenant
  * States, matching App\Models\Domain: both null = pending; verified only = control proven but no
  * certificate installed, so it still routes nowhere; both set = live.
  */
+/**
+ * Bind a recording, in-memory DNS resolver for the custom-domain tests (H22a).
+ *
+ * `$records` maps a challenge NAME to the TXT strings published there; an unlisted name resolves to
+ * NOTHING, which the verification service must treat as "not verified yet" and never as an error. Set
+ * `->failing = true` on the returned object for the SERVFAIL/timeout case, which is a different thing and
+ * must not consume a claim's TTL.
+ *
+ * @param  array<string, list<string>>  $records
+ */
+function fakeDns(array $records = []): FakeDnsTxtResolver
+{
+    $fake = new FakeDnsTxtResolver($records);
+    app()->instance(DnsTxtResolver::class, $fake);
+
+    return $fake;
+}
+
 function customDomain(Tenant $tenant, string $host, bool $verified = true, bool $activated = true): Domain
 {
     /** @var Domain $domain */

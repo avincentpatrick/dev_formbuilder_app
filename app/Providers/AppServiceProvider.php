@@ -34,6 +34,8 @@ use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\Tenancy\DnsTxtResolver;
+use App\Support\Tenancy\SystemDnsTxtResolver;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
@@ -117,6 +119,17 @@ class AppServiceProvider extends ServiceProvider
         // singleton would leak one user's grant set into the next request.
         $this->app->scoped(AnalyticsFormSet::class);
         $this->app->scoped(AnalyticsMetricsService::class);
+
+        // Custom-domain TXT lookup (H22a / ADR-0012). `singleton`, NOT `scoped`, and the difference is
+        // deliberate rather than incidental: every `scoped` binding above is scoped BECAUSE it memoizes
+        // per-request state (a user's grants, a tenant's plan) that must not leak across requests under
+        // Octane. This one is stateless — it holds no tenant, no user and no cache — so a singleton is
+        // correct and cheaper.
+        //
+        // An interface at all because DNS is not HTTP: Http::fake() cannot reach dns_get_record(), so
+        // this seam is the only way the verification sweep is testable. It is also the swap point if the
+        // Windows host's DNS_TXT support proves inadequate — see SystemDnsTxtResolver.
+        $this->app->singleton(DnsTxtResolver::class, SystemDnsTxtResolver::class);
     }
 
     /**

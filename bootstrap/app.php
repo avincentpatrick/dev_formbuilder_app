@@ -27,6 +27,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
 use App\Support\Api\ApiErrorResponse;
 use Illuminate\Auth\AuthenticationException;
@@ -119,6 +120,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // (so the strict RLS on personal_access_tokens reveals only this tenant's token), and the
         // route-bound model must resolve with the now-known user. It is deliberately NOT the
         // `auth:sanctum` alias, which (implementing AuthenticatesRequests) would sort ahead of tenancy.
+        //
+        // InitializeTenancyByPublicHost (H22a) MUST BE LISTED HERE, and its slot is load-bearing.
+        // TenancyServiceProvider::makeTenancyMiddlewareHighestPriority() calls
+        // Kernel::prependToMiddlewarePriority() for six stancl classes, and that method is
+        // membership-guarded (`if (! in_array($middleware, $this->middlewarePriority))`) — so a class
+        // already in THIS array is skipped, while one that is absent is unshifted to index 0, ahead of
+        // EncryptCookies, StartSession and AuthenticatesRequests. Naming it here is what keeps the
+        // guest group's identification in the same slot InitializeTenancyBySubdomain occupies, rather
+        // than silently promoting it to run before the session exists. Nothing about that promotion
+        // would fail a test — the guest and invitation groups carry no `auth` at all — which is
+        // exactly why TenancyMiddlewarePriorityTest asserts the resolved order instead of trusting
+        // this comment. (The four stancl classes the provider does unshift stay inert: priority only
+        // reorders middleware a route already carries, and no route carries them.)
         $middleware->priority([
             HandlePrecognitiveRequests::class,
             EncryptCookies::class,
@@ -129,6 +143,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
             AuthenticatesSessions::class,
+            InitializeTenancyByPublicHost::class,
             InitializeTenancyBySubdomain::class,
             PreventAccessFromCentralDomains::class,
             EstablishTenantDatabaseContext::class,

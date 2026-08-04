@@ -395,15 +395,43 @@ it('composes the host from the deployment, defaulting the scheme CLOSED', functi
     expect(TenantUrl::to($this->tenant, '/attachments/x'))->toStartWith('https://alpha.');
 });
 
-it('leaves an already-qualified custom domain alone', function (): void {
-    // The shape H22 introduces. Gluing the central host onto `forms.acme.com` would corrupt it, so
-    // a stored value containing a dot is used verbatim.
+it('keeps a pdf download link on the app host, never on a custom domain', function (): void {
+    // ⚠️ THIS ASSERTION IS THE INVERSE OF WHAT H17 WROTE, AND THE INVERSION IS THE POINT.
+    //
+    // H17 pinned `it leaves an already-qualified custom domain alone` — any dotted value used verbatim,
+    // "the shape H22 will introduce". That guess was right about the STORAGE and wrong about the
+    // CONSEQUENCE. ADR-0009 §D2 scopes custom domains to public forms, not the admin app, so H22a swapped
+    // the identification middleware on the guest-runtime group ONLY. A pdf download lands on
+    // /attachments/{...} — an AUTHENTICATED route — so a link built on the custom host would 302 its
+    // recipient to the central app. TenantUrl::to() is the app arm and must never reach for a custom row.
+    //
+    // TenantUrl::toPublic() is where a custom domain is used verbatim; TenantHostTest covers both arms.
     $other = Tenant::create(['name' => 'Beta', 'slug' => 'beta', 'default_locale' => 'en']);
-    $other->domains()->create(['domain' => 'forms.acme.com']);
+    $other->domains()->create(['domain' => 'beta']);
+    customDomain($other, 'forms.acme.com');
     config(['app.url' => 'https://meridian.test']);
 
-    expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://forms.acme.com/attachments/x');
+    expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://beta.meridian.test/attachments/x')
+        // …and the same tenant's respondent-facing links DO use it, so this is a routing decision rather
+        // than the custom domain being ignored everywhere.
+        ->and(TenantUrl::toPublic($other, 'f/resume/tok'))->toBe('https://forms.acme.com/f/resume/tok');
 });
+
+it('will not put a half-provisioned custom domain in an outbound link', function (bool $verified, bool $activated): void {
+    // The complement, and the reason the scope is global rather than a filter at each call site: an
+    // emailed link is built on a queued worker, far from any request, by code that has no idea a
+    // `domains` row can be in an unusable state.
+    $other = Tenant::create(['name' => 'Gamma', 'slug' => 'gamma', 'default_locale' => 'en']);
+    $other->domains()->create(['domain' => 'gamma']);
+    customDomain($other, 'forms.gamma-example.com', $verified, $activated);
+    config(['app.url' => 'https://meridian.test']);
+
+    expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://gamma.meridian.test/attachments/x')
+        ->and(TenantUrl::toPublic($other, 'f/resume/tok'))->toBe('https://gamma.meridian.test/f/resume/tok');
+})->with([
+    'pending' => [false, false],
+    'verified but not activated' => [true, false],
+]);
 
 it('surfaces the stored PDF on the submission detail page', function (): void {
     // The only in-app surface for the artifact — there is no notification bell, so a user who

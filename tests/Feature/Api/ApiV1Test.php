@@ -51,16 +51,10 @@ function apiTenant(string $slug = 'acme'): Tenant
     return $tenant;
 }
 
-/** An active member of the current-context tenant with the given role (requires enterTenant already called). */
-function apiMember(string $roleName): User
-{
-    $user = User::factory()->create();
-    $tenantId = TenantContext::currentTenantId();
-    enterTenant((string) $tenantId, $user->id);
-    makeActiveMember($user, $roleName);
-
-    return $user;
-}
+// apiMember() moved to tests/Pest.php in H22a. It lived here, and a single-file run of any OTHER API test
+// therefore died with "Call to undefined function apiMember()" — Pest loads every test file into one
+// process, so it only ever resolved when this file happened to be loaded too. That is the exact failure
+// tests/Pest.php's own header exists to prevent.
 
 // ── Auth path ─────────────────────────────────────────────────────────────────────────
 

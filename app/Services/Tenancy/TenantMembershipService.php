@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
+use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -333,13 +334,21 @@ final class TenantMembershipService
      * The invitation accept URL — built in-request under live tenant context so the queued mail
      * notification (H3) carries a scalar string, never a Tenant model (§D5). Invitations are accepted on
      * the tenant's own subdomain (which is what establishes tenant context so the invite row is even
-     * visible under RLS); fall back to the slug if no domain row exists.
+     * visible under RLS).
+     *
+     * H22a fixed two live defects here. This used to be
+     * `$tenant->domains()->value('domain') ?? $tenant->slug` interpolated into `"https://{$domain}/…"`,
+     * and both halves were wrong: `domains.domain` holds the SUBDOMAIN LABEL, so every invitation email
+     * ever sent carried `https://acme/invitations/…`, a URL that resolves nowhere; and the hard-coded
+     * scheme is wrong in local development, which serves on http.
+     *
+     * {@see TenantUrl::to()} — the APP arm, deliberately not toPublic(). `/invitations/{token}` lives in
+     * a route group that still identifies by subdomain (ADR-0009 §D2 scopes custom domains to public
+     * forms), so an invite link on a custom host would 302 the invitee to the central app.
      */
     private function buildInviteAcceptUrl(Tenant $tenant, string $plainToken): string
     {
-        $domain = $tenant->domains()->value('domain') ?? $tenant->slug;
-
-        return "https://{$domain}/invitations/{$plainToken}";
+        return TenantUrl::to($tenant, "invitations/{$plainToken}");
     }
 
     /** Resolve an existing global identity by email (cross-RLS via pgsql_auth), or create a placeholder. */

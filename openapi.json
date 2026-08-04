@@ -3765,6 +3765,179 @@
                 }
             }
         },
+        "/domains": {
+            "get": {
+                "operationId": "v1.domains.index",
+                "summary": "List the current tenant's custom domains",
+                "tags": [
+                    "DomainApi"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1.domains.store",
+                "summary": "Claim a custom domain and mint its DNS verification challenge",
+                "tags": [
+                    "DomainApi"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreDomainRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/domains/{domain}/verify": {
+            "post": {
+                "operationId": "v1.domains.verify",
+                "summary": "Check the DNS challenge for a claimed domain immediately, without waiting for the sweep",
+                "tags": [
+                    "DomainApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "domain",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/domains/{domain}": {
+            "delete": {
+                "operationId": "v1.domains.destroy",
+                "summary": "Release a custom domain, freeing the hostname for any tenant to claim",
+                "tags": [
+                    "DomainApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "domain",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "422": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "example": ""
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/field-library": {
             "get": {
                 "operationId": "v1.field-library.index",
@@ -7584,7 +7757,8 @@
                                 "read:audit_log",
                                 "manage:scopes",
                                 "manage:integrations",
-                                "read:analytics"
+                                "read:analytics",
+                                "manage:domains"
                             ]
                         },
                         "minItems": 1
@@ -7671,6 +7845,20 @@
                     "config"
                 ],
                 "title": "StoreConnectionSubscriptionRequest"
+            },
+            "StoreDomainRequest": {
+                "type": "object",
+                "description": "Claim a custom domain for the current tenant (H22a / ADR-0012).\n\n`domain` is the ONLY accepted field, and that is a security property rather than tidiness: stancl's\nDomain model is `$guarded = []`, so a request permitted to carry `verified_at` or `activated_at` and\nhanded to `create()` would let a tenant mark its own hostname live. The service builds its attribute\narray explicitly and never passes request data through, and CustomDomainClaimTest asserts that a store\nrequest carrying those fields still lands pending \u2014 belt and braces, because either alone would be\nenough and neither alone is obviously enough to a future reader.\n\nAuthorization is on the route ({@see ApiAbilities::MANAGE_DOMAINS} +\n`can:tenant.settings.manage`), not here, matching every other Group-B request in this namespace.",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "maxLength": 253
+                    }
+                },
+                "required": [
+                    "domain"
+                ],
+                "title": "StoreDomainRequest"
             },
             "StoreFieldLibraryRequest": {
                 "type": "object",

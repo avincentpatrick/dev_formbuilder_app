@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Domain;
 use App\Models\Tenant;
 use App\Support\Tenancy\Uuid7Generator;
-use Stancl\Tenancy\Database\Models\Domain;
 use Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager;
 use Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager;
 use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
@@ -14,6 +14,9 @@ return [
     'tenant_model' => Tenant::class,
     'id_generator' => Uuid7Generator::class,
 
+    // H22a — our own Domain model (extends stancl's base). This one key repoints BOTH
+    // HasDomains::domains() and stancl's DomainTenantResolver, which is what lets the verification casts
+    // and the ResolvableDomainScope reach every reader in the app without touching a single call site.
     'domain_model' => Domain::class,
 
     /**
@@ -33,6 +36,33 @@ return [
      * rather than env() directly in the route file so it survives `route:cache`.
      */
     'central_domain' => env('CENTRAL_DOMAIN', 'meridian.test'),
+
+    /**
+     * Custom domains (H22a / ADR-0012). A tenant proves control of a hostname by publishing a TXT
+     * record; an OPERATOR then activates it, by policy only after installing a certificate by hand,
+     * because per-domain TLS issuance is structurally Track B and Track B is deferred.
+     */
+    'custom_domains' => [
+        // RFC 8552 underscore-prefixed leaf. A `_`-prefixed name cannot collide with a real hostname,
+        // and it keeps the challenge out of the apex TXT set, which registrar UIs are prone to merging
+        // or replacing wholesale (SPF, DMARC, other vendors' *-site-verification records live there).
+        'txt_record_name' => env('CUSTOM_DOMAIN_TXT_NAME', '_meridian-challenge'),
+
+        // Prefixed so a TXT set shared with other vendors stays unambiguous.
+        'txt_value_prefix' => 'meridian-domain-verification=',
+
+        // How long an unverified claim reserves its hostname before the sweep releases it. `domain` is
+        // globally unique, so without expiry one tenant could squat a name it does not control forever.
+        'claim_ttl_hours' => (int) env('CUSTOM_DOMAIN_CLAIM_TTL_HOURS', 168),
+
+        // Bounds the sweep. dns_get_record() takes NO timeout, so a batch of dead nameservers is the
+        // one way this job can blow its 300s budget; with $tries = 1 that means failed_jobs every tick,
+        // forever. Oldest-checked-first ordering makes the bound fair rather than starving.
+        'sweep_batch' => (int) env('CUSTOM_DOMAIN_SWEEP_BATCH', 50),
+
+        // A verified/live domain is re-checked no more often than this — the dangling-DNS re-read.
+        'recheck_minutes' => (int) env('CUSTOM_DOMAIN_RECHECK_MINUTES', 60),
+    ],
 
     /**
      * SINGLE-DATABASE MODE (ADR-0002 §D4): tenant isolation is enforced by PostgreSQL Row-Level

@@ -33,6 +33,7 @@ use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
+use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Connection;
 use App\Models\Form;
@@ -54,7 +55,15 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 |   2. PreventAccessFromCentralDomains — 404 tenant routes on the central domain.
 |   3. EstablishTenantDatabaseContext — set the RLS session vars (app.current_tenant_id +
 |      app.current_user_id) now that both the tenant and the authenticated user are known.
-|   4. auth — require a logged-in user (session established centrally; SESSION_DOMAIN spans subdomains).
+|   4. auth — require a logged-in user.
+|
+| Correction (H22a, from ADR-0012's PreventAccessFromCentralDomains/central_domains audit): step 4 used to
+| read "session established centrally; SESSION_DOMAIN spans subdomains". That was never true here.
+| SESSION_DOMAIN is null in both .env and .env.example, so the session cookie is HOST-ONLY — a login on
+| acme.meridian.test is not visible on beta.meridian.test. It works because Fortify's routes carry no domain
+| constraint, so a user logs in on the tenant host itself, not because a cookie spans hosts. That property is
+| what makes the guest group below safe to serve on a second host: there is no ambient authenticated session
+| to carry across origins.
 |
 | EstablishTenantDatabaseContext also sets Spatie's permissions team id to this tenant (Increment B2a),
 | so RBAC resolves roles against the same tenant RLS isolates by. Real authenticated pages (dashboard,
@@ -429,9 +438,21 @@ Route::middleware([
 // tenancy group: it streams a tenant-agnostic build artifact and needs no tenant/session context.
 Route::get('/sw.js', ServiceWorkerController::class)->name('pwa.sw');
 
+// H22a — THE ONLY GROUP A TENANT'S OWN CUSTOM DOMAIN MAY SERVE. ADR-0009 §D2 already fixed the scope:
+// "Business-tier `custom_domain` covers public forms, not the admin app", with moving the app itself onto
+// custom domains recorded there as a future revisit trigger. So identification here is
+// InitializeTenancyByPublicHost (subdomain arm for platform hosts, full-host lookup for a verified custom
+// domain) while every other group below and in routes/api.php keeps InitializeTenancyBySubdomain — a custom
+// host on those throws NotASubdomainException, which bootstrap/app.php renders as a redirect to the central
+// app. That is what keeps the authenticated app a single origin, and it is why this increment has no
+// cross-host session, CSRF, OAuth-return or bearer-token surface to defend.
+//
+// A custom domain reaches this group only once it is `live` (verified by DNS TXT *and* activated by an
+// operator after a certificate was installed by hand) — enforced by the ResolvableDomainScope on
+// App\Models\Domain, so stancl's own resolver query cannot see any other row.
 Route::middleware([
     'web',
-    InitializeTenancyBySubdomain::class,
+    InitializeTenancyByPublicHost::class,
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
     // The guest SPA shell hosts the G5b2 geo control's Leaflet map → allow the OSM tile origin (ADR-0006 D3).

@@ -4,60 +4,98 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use App\Http\Middleware\InitializeTenancyByPublicHost;
+use App\Models\Domain;
 use App\Models\Tenant;
 
 /**
- * Absolute URLs on a tenant's own host, for links that leave the application (Increment H17).
+ * Absolute URLs on a tenant's own host, for links that leave the application (Increment H17, split in H22a).
  *
  * `route()` cannot be used: a queued job has no request, so the URL generator has no host to build
  * against and would emit the central domain — which is exactly the host a tenant-scoped link must
- * NOT use, since tenancy resolves by subdomain and `PreventAccessFromCentralDomains` rejects it.
+ * NOT use, since tenancy resolves by host and `PreventAccessFromCentralDomains` rejects it.
  *
- * ── Two defects in the existing precedents that this deliberately does NOT inherit ──────────────
- * `TenantMembershipService::buildInviteAcceptUrl()` and `GuestDraftController::resumeUrl()` both do
- * `$tenant->domains()->value('domain') ?? $tenant->slug` and interpolate it straight into
- * `"https://{$domain}/…"`. Both halves of that are wrong:
+ * ── TWO ARMS, AND CHOOSING BETWEEN THEM IS A SECURITY DECISION (H22a) ───────────────────────────
+ * {@see to()} is the APP arm and never returns a custom domain. {@see toPublic()} is the PUBLIC arm and
+ * prefers one. The split exists because ADR-0009 §D2 scopes the Business-tier `custom_domain` feature to
+ * "public forms, not the admin app": only routes/tenant.php's guest-runtime group carries
+ * {@see InitializeTenancyByPublicHost}. Every other group still identifies by
+ * subdomain, so an authenticated link built on a custom host would 302 the recipient to the central app.
  *
- *   1. THE HOST IS NOT A HOST. Under `InitializeTenancyBySubdomain` the `domains` table stores the
- *      SUBDOMAIN LABEL, not an FQDN — every seeder and test in the repo writes `'domain' => 'acme'`
- *      (`E2eSeeder.php:91`, `tests/Pest.php:272`). So those two builders emit `https://acme/…`,
- *      which resolves nowhere. The label has to be composed with the deployment's own host.
- *   2. THE SCHEME IS HARD-CODED. `https://` is wrong in local development, where the app serves on
- *      `http://acme.localhost:8080`.
+ *   to()        /attachments/…  (H17 pdf downloads)  ·  /invitations/{token}  (H3)
+ *   toPublic()  /f/resume/{token}  (H9b) — the only one a RESPONDENT receives
  *
- * Both are fixed here by taking scheme, host AND port from `config('app.url')` and prefixing the
- * tenant's label — which yields `https://acme.meridian.test/…` in production and
- * `http://acme.localhost:8080/…` locally, with no branch on environment.
+ * ⚠️ THIS CORRECTS A GUESS H17 MADE ABOUT H22's SHAPE. The previous implementation treated any stored
+ * value containing a dot as a complete host and used it verbatim, "the shape H22 will introduce". That
+ * turned out to be right about the storage and wrong about the consequence: a custom domain does not
+ * serve the authenticated app, so `to()` must NOT reach for it.
  *
- * The two older call sites are deliberately NOT retrofitted. They mint invitation and resume links
- * covered by their own tests, and changing live URL construction is a bigger change than H17 should
- * make in passing — but the defect is now written down and the helper exists for whoever fixes it.
+ * ── THE TWO DEFECTS THIS FIXES IN THE OLDER PRECEDENTS (recorded in H17, closed in H22a) ─────────
+ * `TenantMembershipService::buildInviteAcceptUrl()` and `GuestDraftController::resumeUrl()` both did
+ * `$tenant->domains()->value('domain') ?? $tenant->slug` and interpolated it into `"https://{$domain}/…"`.
+ * Both halves were wrong: `domains.domain` holds the SUBDOMAIN LABEL, so they emitted `https://acme/…`,
+ * which resolves nowhere; and the hard-coded `https://` is wrong in local development, which serves on
+ * `http://acme.localhost:8080`. Both now delegate here, so every outbound tenant link in the application
+ * is composed in exactly one place.
+ *
+ * ── DETERMINISM ─────────────────────────────────────────────────────────────────────────────────
+ * `$tenant->domains()->value('domain')` is `first()` with NO ORDER BY, so once a tenant has two rows the
+ * host depended on physical row order — the same class of defect as the double-subscription tie that made
+ * a suite flip green-to-red because a file was added elsewhere in the tree. Both arms now select their row
+ * by an explicit predicate and an explicit order.
+ *
+ * Visibility is not this class's job: {@see Domain}'s global scope already hides every custom domain that
+ * is not live, so a half-provisioned hostname cannot reach an outbound link even through toPublic().
  */
 final class TenantUrl
 {
-    /** An absolute URL on the tenant's host. `$path` is appended verbatim and must be pre-encoded. */
+    /**
+     * An absolute URL on the tenant's APP host — always `{label}.{deployment host}`, never a custom
+     * domain. `$path` is appended verbatim and must be pre-encoded.
+     */
     public static function to(Tenant $tenant, string $path): string
     {
-        return self::scheme().'://'.self::host($tenant).'/'.ltrim($path, '/');
+        return self::scheme().'://'.self::appHost($tenant).'/'.ltrim($path, '/');
     }
 
     /**
-     * The tenant's fully-qualified host.
-     *
-     * A stored value CONTAINING A DOT is treated as an already-complete custom domain and used
-     * verbatim — that is the shape H22 will introduce, and silently gluing the central host onto
-     * `forms.acme.com` would corrupt it. Anything else is a subdomain label to compose.
+     * An absolute URL on the tenant's PUBLIC host — its live custom domain if it has one, else the app
+     * host. For links a respondent receives, which is the only audience the custom domain serves.
      */
-    private static function host(Tenant $tenant): string
+    public static function toPublic(Tenant $tenant, string $path): string
     {
-        $stored = $tenant->domains()->value('domain');
+        return self::scheme().'://'.self::publicHost($tenant).'/'.ltrim($path, '/');
+    }
+
+    /**
+     * The tenant's authenticated-app host: the DOTLESS `domains` row composed with the deployment's own
+     * host, falling back to the slug if no row exists (which is the shape a freshly created tenant has).
+     */
+    private static function appHost(Tenant $tenant): string
+    {
+        $stored = $tenant->domains()->whereRaw("position('.' in domain) = 0")->orderBy('domain')->value('domain');
         $label = is_string($stored) && $stored !== '' ? $stored : (string) $tenant->slug;
 
-        if (str_contains($label, '.')) {
-            return $label;
-        }
-
         return $label.'.'.self::centralHost();
+    }
+
+    /**
+     * The tenant's respondent-facing host. Only live custom domains are visible here at all (the model's
+     * global scope), so this is a preference, not a filter.
+     *
+     * Ordered by activation, oldest first, then by name: a tenant with two live custom domains gets a
+     * STABLE answer, because a resume link already in a respondent's inbox must keep pointing at the same
+     * origin. Choosing the newest would silently repoint every outstanding link.
+     */
+    private static function publicHost(Tenant $tenant): string
+    {
+        $custom = $tenant->domains()
+            ->whereRaw("position('.' in domain) > 0")
+            ->orderBy('activated_at')
+            ->orderBy('domain')
+            ->value('domain');
+
+        return is_string($custom) && $custom !== '' ? $custom : self::appHost($tenant);
     }
 
     /**

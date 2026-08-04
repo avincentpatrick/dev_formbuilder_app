@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Http\Controllers\Api\V1\AuditApiController;
 use App\Http\Controllers\Api\V1\ConnectionController;
 use App\Http\Controllers\Api\V1\ConnectionSubscriptionController;
+use App\Http\Controllers\Api\V1\DomainApiController;
 use App\Http\Controllers\Api\V1\FieldLibraryApiController;
 use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
@@ -360,6 +361,39 @@ Route::prefix('api/v1')
         Route::delete('analytics/views/{savedReportView}', [SavedReportViewController::class, 'destroy'])
             ->middleware(['ability:'.ApiAbilities::READ_ANALYTICS, 'can:delete,savedReportView', 'feature:advanced_analytics'])
             ->name('analytics.views.destroy');
+
+        // Custom domains (H22a / ADR-0012). `manage:domains` is a NEW ability — an already-minted
+        // `manage:settings` token must not retroactively gain the power to point the hostname a tenant's
+        // respondents visit somewhere else — mapped onto the EXISTING `tenant.settings.manage` permission,
+        // whose audience (Owner + Admin) is already exactly right. The `can:` gate is that bare permission
+        // rather than a policy: there is no per-instance authorization question here, and the resource has
+        // no policy (see below).
+        //
+        // `feature:custom_domain` (Business+) gates the WRITES ONLY. index/destroy stay ungated, verbatim
+        // the api_access precedent above — and it matters more here: a tenant downgraded off Business keeps
+        // a LIVE, resolving hostname, so it must still be able to see it and take it down.
+        //
+        // {domain} IS NOT A BOUND MODEL. `domains` is RLS-exempt, so implicit binding would resolve any
+        // tenant's row with no database backstop under the policy; the controller resolves the hostname
+        // with an explicit tenant_id filter instead. The parameter is constrained to a hostname shape so a
+        // path segment carrying a slash or a scheme 404s at the router rather than reaching the query.
+        //
+        // THERE IS DELIBERATELY NO ACTIVATE ROUTE — putting a verified domain into service is
+        // `php artisan domains:activate`, run by whoever installed the TLS certificate (ADR-0012).
+        Route::get('domains', [DomainApiController::class, 'index'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage'])
+            ->name('domains.index');
+        Route::post('domains', [DomainApiController::class, 'store'])
+            ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage', 'feature:custom_domain'])
+            ->name('domains.store');
+        Route::post('domains/{domain}/verify', [DomainApiController::class, 'verify'])
+            ->where('domain', '[A-Za-z0-9.-]+')
+            ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage', 'feature:custom_domain'])
+            ->name('domains.verify');
+        Route::delete('domains/{domain}', [DomainApiController::class, 'destroy'])
+            ->where('domain', '[A-Za-z0-9.-]+')
+            ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage'])
+            ->name('domains.destroy');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

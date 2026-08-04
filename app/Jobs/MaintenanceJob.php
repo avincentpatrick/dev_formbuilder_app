@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Enums\QueueName;
+use App\Jobs\Maintenance\VerifyCustomDomainsJob;
 use App\Models\Tenant;
 use App\Support\Tenancy\TenantContext;
 use Generator;
@@ -32,7 +33,12 @@ use Throwable;
  *      when it exists. A tenant-scoped query here returns ZERO ROWS rather than failing, which is why
  *      scripts/job-payload-lint.php checks this structurally instead of trusting review.
  *   3. Its sole tenant-touching side effect is dispatching one {@see TenantAwareJob} per active
- *      tenant — see {@see activeTenants()}.
+ *      tenant — see {@see activeTenants()}. A write confined to the rule-2 exempt tables is NOT a
+ *      tenant-touching side effect, so a sweep whose entire subject matter lives there satisfies this
+ *      rule vacuously and correctly does its work INLINE rather than fanning out. H22a's
+ *      {@see VerifyCustomDomainsJob} is the first of that shape (it operates on
+ *      `domains`); a fan-out there would queue a job per tenant to re-read a table no tenant GUC
+ *      affects. Stated here because otherwise every future reader flags it as a violation.
  *
  * WHY A CROSS-TENANT TRANSACTION IS NOT AN OPTION. It is not merely discouraged, it is INEXPRESSIBLE
  * in this architecture: the RLS context is a scalar GUC and TenantIsolation::tenantMatch() is flat

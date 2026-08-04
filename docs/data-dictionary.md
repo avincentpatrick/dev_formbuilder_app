@@ -62,6 +62,7 @@ This document is the source of truth for column-level shape; it will be kept in 
 ## Table of Contents
 
 1. [tenants](#1-tenants)
+1a. [domains](#1a-domains)
 2. [forms](#2-forms)
 3. [form_versions](#3-form_versions)
 4. [form_sections](#4-form_sections)
@@ -100,7 +101,7 @@ The durable record for one customer organization — the root of every tenant-sc
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key; also the value stamped into the RLS session variable and into every queued job payload (plan §2.1). |
 | `name` | `varchar(150)` | No | — | No | Organization display name. |
 | `slug` | `varchar(100)` | No | — | No | Unique, used to resolve the tenant from a subdomain (plan §2.1 "tenant resolved from subdomain via early middleware"). |
-| `domain` | `varchar(255)` | Yes | `NULL` | No | ⚠️ **This column does not exist — corrected 2026-07-21.** The row previously claimed it "exists from day one so the schema doesn't need a later migration"; the create-`tenants` migration declares `name`/`slug`/`status` only. Domain resolution is served by the separate **`domains`** table (RLS-exempt, driven by stancl's `HasDomains` on `App\Models\Tenant`), which has a live consumer in `TenantInvitationNotification`. Phase 3's custom-domains feature (H22) therefore builds on `domains`, and **will** need its own migration — plan for it rather than assuming a dormant column is waiting. |
+| `domain` | `varchar(255)` | Yes | `NULL` | No | ⚠️ **This column does not exist — corrected 2026-07-21.** The row previously claimed it "exists from day one so the schema doesn't need a later migration"; the create-`tenants` migration declares `name`/`slug`/`status` only. Domain resolution is served by the separate **`domains`** table (RLS-exempt, driven by stancl's `HasDomains` on `App\Models\Tenant`). **The migration that row predicted has now landed — H22a, 2026-08-04; see §1a.** Do not reinstate this column: two places to look up a host is the defect the correction was about. |
 | `status` | `varchar(20)` — PHP enum: `TenantStatus` | No | `'trial'` | No | Lifecycle state of the whole account. |
 | `owner_user_id` | `uuid` | No | — | No | FK to `users.id` (external — see RBAC doc). The account's primary owner/billing contact. |
 | `billing_email` | `varchar(255)` | Yes | `NULL` | **Yes** | Invoice/billing contact address; may differ from any individual user's login email. |
@@ -124,6 +125,59 @@ The durable record for one customer organization — the root of every tenant-sc
 > - `users.is_super_admin` (plan §2.1's explicit fix for legacy's fragile `id === 1` convention) lives on the out-of-scope `users` table, not here — a tenant has no "super admin" concept of its own, super-admin is a platform-wide flag on a person.
 > - No `plan_id` column here on purpose: current plan/tier is derived through `subscriptions` (a tenant's *current* plan is "the plan of its active subscription"), avoiding two sources of truth for billing state.
 > - `status` is intentionally coarser than `subscriptions.stripe_status` — this column answers "can this org sign in and use the app," Stripe's finer billing states live one table over.
+
+---
+
+## 1a. `domains`
+
+**Added to this document 2026-08-04 (H22a).** The table has existed since Increment A and had never been
+documented here — the omission the `tenants.domain` correction above was really about.
+
+The host → tenant lookup. It is read **before** any tenant context exists, because it is what *decides*
+which tenant a request belongs to, so it is deliberately **RLS-EXEMPT** (`scripts/migration-lint.php`
+`EXEMPT_TABLES`) — scoping it by the tenant would be circular. There is therefore **no database backstop
+on queries against it**: every application query that acts on a tenant's behalf must carry its own
+`where('tenant_id', …)`, which is why all of them live in `App\Services\Tenancy\CustomDomainService`.
+
+**One table, two kinds of row, discriminated by the DOT** (ADR-0012 §D3 — an exact partition of the two
+producers, not a heuristic, and pinned by a CHECK constraint):
+
+| `domain` value | What it is |
+|---|---|
+| `acme` | The tenant's platform **subdomain label**. What the subdomain arm of tenant identification looks up (stancl passes the first label only). Always resolvable; never verified; never swept. |
+| `forms.acme.com` | A **custom domain**. Resolvable only once *live* — DNS-verified **and** activated by an operator who has installed a certificate (see `deployment-infrastructure.md` §8.1). |
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `integer` | No | auto-increment | No | Primary key. The one non-uuid PK in the tenant-facing schema, inherited from stancl's own migration. Not used as a route key — the API addresses a domain by hostname. |
+| `domain` | `varchar(255)` | No | — | No | The subdomain label or the FQDN. **Globally UNIQUE**, which is what makes a claim a reservation: no two tenants can hold the same hostname, even while one is still pending. Lowercased on save by stancl's `ConvertsDomainsToLowercase`. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, cascade on update and delete. |
+| `verification_token` | `varchar(64)` | Yes | `NULL` | No | 256-bit CSPRNG hex, per row, random and never derived. Published by the tenant in public DNS, so it is **deliberately not a secret and deliberately not in `AuditRedactor::SECRETS`** (ADR-0012 §D11). NULL on subdomain rows; a partial unique index makes reuse a database error. |
+| `token_issued_at` | `timestamptz` | Yes | `NULL` | No | When the challenge was minted. With the claim TTL, this is what expires an abandoned claim. |
+| `verified_at` | `timestamptz` | Yes | `NULL` | No | Control of the hostname was proven. **Does not imply the domain serves anything.** |
+| `activated_at` | `timestamptz` | Yes | `NULL` | No | An operator put it into service, by policy only after installing its certificate. **This is the only column that makes a custom domain routable**, and only `php artisan domains:activate` writes it — there is no API endpoint (ADR-0012 §D6). |
+| `verification_checked_at` | `timestamptz` | Yes | `NULL` | No | Last DNS lookup. Drives both the sweep's fair ordering and its re-check cadence. |
+| `verification_failure_reason` | `varchar(40)` — PHP enum: `DomainVerificationFailure` | Yes | `NULL` | No | `not_found` / `mismatch` / `lookup_failed`. The last split is load-bearing: `lookup_failed` means *we* could not ask (SERVFAIL/timeout) and is never evidence about the tenant, so it never demotes a verified domain. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | |
+
+**Constraints and indexes beyond the PK/FK:** `UNIQUE(domain)` (global, from the original migration);
+`domains_custom_requires_token_chk` — a dotted row must carry a token, so a hand-written or mass-assigned
+FQDN cannot exist in a state the verification service never minted; `domains_verification_token_unique`
+(partial, `WHERE verification_token IS NOT NULL`); `domains_custom_sweep_idx` (partial, custom rows only,
+ordered `verification_checked_at NULLS FIRST` to match the sweep's access path).
+
+> **Design Notes**
+> - **State is derived from three nullable timestamps, not a `status` column** (ADR-0012 §D4): every
+>   possible default for such a column would be fail-open, and there is no sensible default for "has this
+>   hostname been proven".
+> - **`App\Models\Domain` carries a global scope that hides any custom domain which is not live.** That
+>   single scope is what makes "an unverified row cannot be routed to and cannot appear in any link" a
+>   property of the model rather than a rule five call sites have to remember — including stancl's own
+>   resolver and `ConnectorRedirector`, neither of which was edited. Use `Domain::unscopedQuery()` only in
+>   the service and the sweep, which exist to act on rows that are not yet usable.
+> - **`$guarded = []` is inherited from stancl and deliberately not narrowed** (sixty test fixtures depend
+>   on it), so anything writing here must build its attribute array explicitly rather than passing request
+>   data through.
 
 ---
 

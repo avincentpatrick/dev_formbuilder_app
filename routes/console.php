@@ -6,6 +6,7 @@ use App\Jobs\Maintenance\RefreshConnectorTokensJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use App\Jobs\Maintenance\SweepWebhookRetriesJob;
+use App\Jobs\Maintenance\VerifyCustomDomainsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -75,3 +76,15 @@ Schedule::job(SweepWebhookRetriesJob::class)->everyFiveMinutes();
 // it inside a delivery attempt would put a second outbound call in the delivery transaction and let a
 // provider outage stampede every queued delivery at once.
 Schedule::job(RefreshConnectorTokensJob::class)->hourly();
+
+// Custom-domain DNS verification (H22a / ADR-0012). Cross-tenant, and the FIRST MaintenanceJob here that
+// does its work INLINE instead of fanning out — its whole subject matter is `domains`, one of the
+// RLS-exempt tables §D3's rule 2 permits, so a per-tenant child would only re-read a table no tenant GUC
+// affects (see the base class's rule 3, amended in H22a to say so).
+//
+// everyFifteenMinutes(), not everyFiveMinutes(): a tenant that has just published its TXT record can
+// trigger an immediate check from POST /api/v1/domains/{domain}/verify rather than waiting, so the sweep
+// only has to cover the unattended cases — the propagation tail, expired claims, and the periodic
+// re-read that notices a domain whose DNS has lapsed. Fifteen also keeps its query volume clear of the
+// two five-minute sweeps above.
+Schedule::job(VerifyCustomDomainsJob::class)->everyFifteenMinutes();

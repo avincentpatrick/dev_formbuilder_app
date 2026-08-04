@@ -90,6 +90,25 @@ final class ApiAbilities
     public const READ_ANALYTICS = 'read:analytics';
 
     /**
+     * Managing the tenant's custom domains — claim, verify, release (H22a / ADR-0012).
+     *
+     * A NEW ability, never a widening of `manage:settings`, for the fourth time and the sharpest instance
+     * of the same reason: an already-minted `manage:settings` token would otherwise retroactively gain the
+     * power to point the hostname a tenant's respondents visit at somewhere else. No issuer of those
+     * tokens agreed to that, and a new ability cannot be held retroactively because no token was ever
+     * minted with it.
+     *
+     * Like `read:analytics`, it needs NO new RBAC permission. `tenant.settings.manage` is already seeded,
+     * already in the role matrix, and its audience (Owner + Admin) is exactly the audience that should be
+     * able to move a tenant's domain — so this maps onto it rather than coining a thirtieth permission and
+     * touching RolePermissionSeeder, the 5xN role matrix and multi-tenancy-rbac-design.md §5 for nothing.
+     *
+     * ACTIVATION IS DELIBERATELY NOT REACHABLE THROUGH ANY ABILITY. Putting a verified domain into service
+     * is `php artisan domains:activate`, run by whoever installed the TLS certificate — see ADR-0012.
+     */
+    public const MANAGE_DOMAINS = 'manage:domains';
+
+    /**
      * ability => the RBAC permissions that entitle a user to hold it (holding ANY one grants the ability).
      * `read:forms` mirrors FormPolicy::viewAny exactly, so a token's ability and the route policy agree.
      *
@@ -108,6 +127,7 @@ final class ApiAbilities
         self::MANAGE_SCOPES => ['scopes.manage', 'forms.collaborators.manage'],
         self::MANAGE_INTEGRATIONS => ['integrations.manage'],
         self::READ_ANALYTICS => ['dashboard.org.view', 'dashboard.form.view'],
+        self::MANAGE_DOMAINS => ['tenant.settings.manage'],
     ];
 
     /**

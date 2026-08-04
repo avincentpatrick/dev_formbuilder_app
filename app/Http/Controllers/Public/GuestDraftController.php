@@ -16,6 +16,7 @@ use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Support\Api\ApiErrorResponse;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\Tenancy\TenantUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Notification;
 
@@ -109,17 +110,26 @@ final class GuestDraftController extends Controller
     }
 
     /**
-     * Build the absolute resume URL on the tenant's own public-runtime host — the {@see
-     * \App\Services\Tenancy\TenantMembershipService} invite-URL precedent (the `tenants`/`domains` tables are
-     * RLS-exempt, so this reads under the guest tenant context). The web shell at `/f/resume/{token}` opens the SPA.
+     * Build the absolute resume URL on the tenant's own public-runtime host (the `tenants`/`domains` tables
+     * are RLS-exempt, so this reads under the guest tenant context). The web shell at `/f/resume/{token}`
+     * opens the SPA.
+     *
+     * {@see TenantUrl::toPublic()} — the PUBLIC arm, and the ONLY caller of it. A resume link is the one
+     * outbound URL in the application that a RESPONDENT receives, and the guest runtime is the one route
+     * group a tenant's custom domain serves (ADR-0009 §D2), so this is exactly where a tenant's own
+     * hostname should appear. Every other builder uses the app arm.
+     *
+     * H22a fixed two live defects here: this used to interpolate `domains.domain` — the SUBDOMAIN LABEL —
+     * straight into `"https://{$host}/…"`, emitting `https://acme/f/resume/…` in every resume email, with
+     * a hard-coded scheme that is wrong locally. A custom domain that is not yet live is invisible to the
+     * model's global scope, so this can never hand a respondent a half-provisioned origin.
      */
     private function resumeUrl(string $tenantId, string $resumeToken): string
     {
         // The tenant always exists here — it was resolved from the verified share token and its RLS context
         // is live — so firstOrFail (not a nullable first) keeps the host resolution total.
         $tenant = Tenant::query()->whereKey($tenantId)->firstOrFail();
-        $host = $tenant->domains()->value('domain') ?? $tenant->slug;
 
-        return "https://{$host}/f/resume/{$resumeToken}";
+        return TenantUrl::toPublic($tenant, "f/resume/{$resumeToken}");
     }
 }

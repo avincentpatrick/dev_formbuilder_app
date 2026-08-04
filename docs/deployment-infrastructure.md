@@ -99,9 +99,52 @@ The concrete pieces to stand the box up (companion to `deploy.ps1`):
 5. **php-cgi FastCGI backend** — one or more `php-cgi.exe -b 127.0.0.1:9000` instances as Windows services via NSSM (auto-restart). *If php-cgi supervision proves fragile under load, switch to **IIS + the PHP FastCGI module** — the documented fallback (ADR-0005).*
 6. **Queue worker & Reverb** — `php artisan queue:work` (with the §6 `--queue=` ordering; **not** Horizon, per ADR-0007 §D1) and `php artisan reverb:start`, each a Windows service via NSSM. **Gap: `deploy.ps1` does not create this worker service** — it only restarts `meridian-horizon`/`meridian-reverb` if they happen to exist, so provisioning it is a manual step of this runbook, and `php artisan queue:restart` should be added to the deploy script at the same time (§3).
 7. **Scheduler** — a Windows Task Scheduler task running `php artisan schedule:run` every minute (Windows has no cron). **The application-side half now EXISTS** (H2, 2026-07-22): `routes/console.php` declares `Schedule::job(PruneFailedJobsJob::class)->dailyAt('03:10')` per ADR-0007, and locally a `scheduler` compose service runs `schedule:work`. **Gap, narrowed to the host side: `deploy.ps1` still provisions no Task Scheduler task**, so provisioning it remains a manual step of this runbook. Until it exists, nothing periodic runs in production — the declarations are there, but nothing ticks them. *Never create `app/Console/Kernel.php`*: `Kernel::shouldDiscoverCommands()` is `get_class($this) === __CLASS__`, so any console-kernel subclass silently stops `routes/console.php` loading and every schedule disappears with no error.
-8. **TLS** — **win-acme** for a Let's Encrypt certificate (auto-renew via its scheduled task); terminate TLS at nginx.
+8. **TLS** — **win-acme** for a Let's Encrypt certificate (auto-renew via its scheduled task); terminate TLS at nginx. Covers the central host and the tenant-subdomain wildcard. **Tenant custom domains are NOT covered by this step and are not automated — see §8.1.**
 9. **GitHub Actions self-hosted runner** — register against the repo and install as a Windows service (`config.cmd` → run as service). It executes the deploy workflow (§3). Then set the repo **Variables** (Settings → Secrets and variables → Actions → Variables): **`MERIDIAN_APP_PATH`** (e.g. `C:\meridian\app`) and **`DEPLOY_ENABLED=true`**. Until `DEPLOY_ENABLED` is `true`, `.github/workflows/deploy.yml` stays dormant (skipped) — so it can be committed safely before the runner exists.
 10. **App directory** — a git clone at a fixed path (e.g. `C:\meridian\app`) whose `public/` is nginx's root; create the server `.env` (§4, DB host `127.0.0.1`, real secrets); run `deploy.ps1` once to prime it.
+
+### 8.1 Custom-domain certificates — the manual runbook (H22a / ADR-0012)
+
+A tenant on the Business tier can point its own hostname (`forms.acme.com`) at this box. **Per-domain
+certificate issuance is not automated, and until it is, nothing a tenant does can put its hostname into
+service.** That is enforced in the application, not by convention: `activated_at` on `domains` can only
+be set by the artisan command below, and until it is set the host resolves to no tenant and appears in no
+link a respondent receives.
+
+The ordering below is the whole point of choosing a TXT record as the proof of control rather than a
+CNAME: the tenant proves ownership **out of band**, we install the certificate, and the tenant repoints
+live traffic **last** — so there is no window in which their traffic arrives here and we cannot serve it.
+
+1. **The tenant claims the domain** (`POST /api/v1/domains`, or H22b's settings page) and publishes the
+   TXT record it returns: `_meridian-challenge.forms.acme.com` → `meridian-domain-verification=<token>`.
+2. **Verification happens on its own** — on demand via `POST /api/v1/domains/{domain}/verify`, or within
+   fifteen minutes from `VerifyCustomDomainsJob`. The domain reaches `verified`. **It still serves
+   nothing.** An unverified or verified-but-not-activated domain is invisible to tenant resolution.
+3. **Add the hostname to the nginx server block** for the app's `public/` root. It must be a `server_name`
+   on the same block that serves tenant subdomains — the application distinguishes hosts, nginx does not
+   need to.
+4. **Issue the certificate by hand**, for that hostname only:
+   `wacs.exe --target manual --host forms.acme.com --installation iis` (or the nginx/script installer this
+   box uses). win-acme will register its own renewal task for it. **The tenant's DNS must already point
+   here for the HTTP-01 challenge to succeed** — so in practice steps 3-4 are done together with the
+   tenant, in a scheduled window.
+5. **Reload nginx** and confirm the certificate serves: `curl -sSI https://forms.acme.com/` .
+6. **Only now, activate:** `php artisan domains:activate forms.acme.com`. The command refuses a domain
+   that is not verified, and prints the TXT record still needed if so. `--deactivate` takes a host back
+   out of service without losing its verification, so re-activating later needs no new DNS record.
+7. **Removing a domain**: `php artisan domains:activate <host> --deactivate` first (routing stops
+   immediately), then let the tenant release it through the API. Retire the win-acme renewal and the
+   nginx `server_name` afterwards, in that order.
+
+**Fail-closed properties worth knowing before you deviate.** A domain whose DNS later lapses keeps
+serving — the sweep records the failure but does not withdraw routing, because a transient resolver
+outage must not take a paying tenant's forms offline, and the globally-unique `domains.domain` prevents a
+new owner of the lapsed name from claiming the row. A domain that has never been activated is unreachable
+no matter what nginx is configured to do, because tenant resolution will not match it.
+
+**When Track B automates issuance**, this section is what gets deleted, and ADR-0012's *When to Revisit*
+records what else changes with it (the operator gate can become an API action, and an
+N-consecutive-failures demotion becomes worth building).
 
 ---
 

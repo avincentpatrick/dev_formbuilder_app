@@ -9,6 +9,7 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
+use App\Models\Domain;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
@@ -35,6 +36,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PlanSeeder;
@@ -43,6 +45,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
+use Tests\Support\FakeDnsTxtResolver;
 use Tests\TestCase;
 
 /*
@@ -78,6 +81,25 @@ function enterTenant(string $tenantId, ?string $userId = null): void
 function catalogRole(string $name): string
 {
     return (string) DB::connection('pgsql_privileged')->table('roles')->where('name', $name)->value('id');
+}
+
+/**
+ * A NEW user, made an active member of the current-context tenant with the given role, and left as the
+ * acting user in the RLS context (requires enterTenant already called).
+ *
+ * Moved here from tests/Feature/Api/ApiV1Test.php in H22a. It was a top-level function in that one test
+ * file, so it only resolved when that file happened to be loaded into the process — a single-file run of
+ * any other API test died with "Call to undefined function apiMember()". That is precisely the failure
+ * this section's header describes.
+ */
+function apiMember(string $roleName): User
+{
+    $user = User::factory()->create();
+    $tenantId = TenantContext::currentTenantId();
+    enterTenant((string) $tenantId, $user->id);
+    makeActiveMember($user, $roleName);
+
+    return $user;
 }
 
 /** Create an active membership + assign its tenant-scoped role (requires enterTenant already called). */
@@ -288,13 +310,70 @@ function makeSchemaSection(array $attributes): FormSection
 |--------------------------------------------------------------------------
 */
 
-/** A tenant reachable at {slug}.meridian.test (its subdomain is the {slug} domain). */
+/**
+ * A tenant reachable at {slug}.meridian.test — its `domains` row holds the SUBDOMAIN LABEL ({$slug}),
+ * which is what tenant identification looks up on its subdomain arm (any host ending in a
+ * `tenancy.central_domains` entry).
+ *
+ * H22a swapped the identification middleware on the guest runtime, NOT this shape: the label row is
+ * still the identity of every subdomain tenant, which is why the ~60 call sites across the suite are
+ * unchanged. Rewriting them to FQDNs would be actively wrong — `acme.meridian.test` takes the SUBDOMAIN
+ * arm and is looked up as `acme` — and it would be silently right on a box where CENTRAL_DOMAIN is
+ * something else, which is the worst shape a fixture can have.
+ */
 function inboxTenant(string $slug = 'acme'): Tenant
 {
     $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
     $tenant->domains()->create(['domain' => $slug]);
 
     return $tenant;
+}
+
+/**
+ * Add the SECOND kind of `domains` row H22a introduces — a custom domain, taken by the full-host arm.
+ *
+ * Opt-in and never part of inboxTenant(), deliberately: a tenant with two rows makes every "which host
+ * is this tenant's" question answerable two ways, so only a test that actually exercises the custom
+ * host should create one.
+ *
+ * `$host` MUST NOT end with a central domain. Identification classifies the host BEFORE any database
+ * read, so `forms.meridian.test` would be routed to the subdomain arm and looked up as the label
+ * `forms`, never reaching this row — and App\Rules\ClaimableDomain refuses such a hostname for exactly
+ * that reason. Use a genuinely third-party name such as `forms.acme-example.com`.
+ *
+ * States, matching App\Models\Domain: both null = pending; verified only = control proven but no
+ * certificate installed, so it still routes nowhere; both set = live.
+ */
+/**
+ * Bind a recording, in-memory DNS resolver for the custom-domain tests (H22a).
+ *
+ * `$records` maps a challenge NAME to the TXT strings published there; an unlisted name resolves to
+ * NOTHING, which the verification service must treat as "not verified yet" and never as an error. Set
+ * `->failing = true` on the returned object for the SERVFAIL/timeout case, which is a different thing and
+ * must not consume a claim's TTL.
+ *
+ * @param  array<string, list<string>>  $records
+ */
+function fakeDns(array $records = []): FakeDnsTxtResolver
+{
+    $fake = new FakeDnsTxtResolver($records);
+    app()->instance(DnsTxtResolver::class, $fake);
+
+    return $fake;
+}
+
+function customDomain(Tenant $tenant, string $host, bool $verified = true, bool $activated = true): Domain
+{
+    /** @var Domain $domain */
+    $domain = $tenant->domains()->create([
+        'domain' => $host,
+        'verification_token' => bin2hex(random_bytes(32)),
+        'token_issued_at' => now(),
+        'verified_at' => $verified ? now() : null,
+        'activated_at' => $activated ? now() : null,
+    ]);
+
+    return $domain;
 }
 
 /**

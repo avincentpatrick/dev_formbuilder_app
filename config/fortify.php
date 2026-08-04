@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RequirePlatformHost;
 use Laravel\Fortify\Features;
 
 return [
@@ -101,7 +102,13 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // RequirePlatformHost (H22a / ADR-0012) is appended deliberately. Fortify registers /login,
+    // /register and /forgot-password with 'domain' => null, and `auth` is priority-ordered AHEAD of the
+    // tenancy pipeline, so an unauthenticated request to any tenant route redirects to /login on
+    // WHATEVER host it arrived at — including a tenant's custom domain, where the platform's credential
+    // form would then render. It allows the central host and its subdomains (tenant users legitimately
+    // log in at acme.meridian.test/login) and 404s exactly one class of host: a custom domain.
+    'middleware' => ['web', RequirePlatformHost::class],
 
     /*
     |--------------------------------------------------------------------------

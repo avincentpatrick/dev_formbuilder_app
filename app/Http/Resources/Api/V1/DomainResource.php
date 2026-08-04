@@ -55,6 +55,10 @@ final class DomainResource extends JsonResource
             // Stated in the payload because it is the single most-asked question about this feature and
             // the answer is counter-intuitive: proving control does NOT put the domain into service.
             'awaiting_operator' => $domain->verified_at !== null && $domain->activated_at === null,
+            // H22b — the tenant's chosen respondent-facing host among its live domains. Always false on a
+            // domain that is not live; `domains_primary_requires_live_chk` makes that a database property
+            // rather than a convention this resource has to restate.
+            'is_primary' => (bool) $domain->is_primary,
         ];
     }
 }

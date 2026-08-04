@@ -38,3 +38,21 @@ describe('statusVariant — native-connector tokens (H15b)', () => {
         expect(statusVariant('disabled')).toEqual({ variant: 'neutral', label: 'Disabled' });
     });
 });
+
+describe('statusVariant — custom-domain tokens (H22b)', () => {
+    it('does NOT label a verified domain "Verified", because it does not serve anything yet', () => {
+        // The single most consequential label in this map. ADR-0012 §D6 leaves activation to an operator
+        // who has installed a TLS certificate by hand, so a domain that has proven control still serves
+        // nothing — and a tenant reading "Verified" beside its hostname will reasonably repoint live
+        // traffic at an origin holding no certificate for it. INFO rather than SUCCESS for the same
+        // reason: success would claim the job is finished.
+        expect(statusVariant('verified')).toEqual({ variant: 'info', label: 'Awaiting setup' });
+        expect(statusVariant('live')).toEqual({ variant: 'success', label: 'Live' });
+    });
+
+    it('reuses the shared neutral pending descriptor rather than coining a second one', () => {
+        // The domain lifecycle's first state shares its word with webhook deliveries, exactly as
+        // draft/archived are shared across the form and submission lifecycles.
+        expect(statusVariant('pending')).toEqual({ variant: 'neutral', label: 'Pending' });
+    });
+});

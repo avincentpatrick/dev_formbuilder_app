@@ -28,7 +28,9 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  * service is `php artisan domains:activate`, run by whoever installed the TLS certificate. Per-domain
  * TLS issuance is structurally Track B and Track B is deferred, so a tenant able to activate its own
  * domain could put its respondents on an origin with no certificate — and the resume link they receive
- * would carry that origin.
+ * would carry that origin. H22b's {@see primary()} is NOT a weakening of that: it refuses
+ * any domain that is not already live, so it chooses among hosts an operator activated and cannot
+ * produce one.
  *
  * Gating (routes/api.php): `ability:manage:domains` scopes the TOKEN, `can:tenant.settings.manage`
  * re-checks the acting user's real permission, and `feature:custom_domain` gates the WRITES only.
@@ -69,6 +71,26 @@ final class DomainApiController extends Controller
         abort_if($row === null, 404);
 
         $this->domains->verify($row);
+
+        return response()->json(['data' => (new DomainResource($row->refresh()))->resolve($request)]);
+    }
+
+    /**
+     * Choose which live custom domain the tenant's respondent-facing links are built on.
+     *
+     * NOT an activation path, and the distinction is the whole reason this route can exist at all: it
+     * refuses any domain that is not already live, so it chooses AMONG hosts an operator put into service
+     * and can never put one there. `domains_primary_requires_live_chk` states the same rule in DDL.
+     */
+    public function primary(Request $request, string $domain): JsonResponse
+    {
+        $row = $this->domains->findForTenant($this->tenant(), $domain);
+
+        abort_if($row === null, 404);
+
+        // 422 rather than 409: the request named a real row of this tenant's, but one whose state makes the
+        // instruction unsatisfiable — the same shape as destroy()'s refusal of a subdomain row.
+        abort_unless($this->domains->makePrimary($row), 422);
 
         return response()->json(['data' => (new DomainResource($row->refresh()))->resolve($request)]);
     }

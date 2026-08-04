@@ -8,6 +8,7 @@ use App\Enums\AnalyticsAxis;
 use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
+use App\Enums\DomainVerificationFailure;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
 use App\Enums\PlanTier;
@@ -19,6 +20,7 @@ use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
+use App\Models\Domain;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -620,6 +622,8 @@ class E2eSeeder extends Seeder
 
             $this->seedConnections($owner);
 
+            $this->seedCustomDomains($tenant);
+
             $this->seedScopingHierarchy($owner, $reviewer);
         });
 
@@ -761,6 +765,68 @@ class E2eSeeder extends Seeder
                 'response_body_excerpt' => $spec['body'],
                 'last_attempted_at' => $spec['status'] === WebhookDeliveryStatus::Pending ? null : now(),
             ]);
+        }
+    }
+
+    /**
+     * Custom-domain fixtures (Increment H22b / ADR-0012) — so /domains renders real cards for the
+     * responsive-axe scan rather than an empty state. acme is on BUSINESS since H24a, which is the tier
+     * carrying `custom_domain`, so the write affordances render too.
+     *
+     * ⚠️ NEITHER ROW IS ACTIVATED, AND THAT IS A CONSTRAINT ON THIS FIXTURE RATHER THAN A GAP IN IT. An
+     * activated row becomes visible to {@see Domain}'s global scope, which is what
+     * `TenantUrl::toPublic()` reads — so seeding one would repoint every resume link in the e2e database
+     * onto a hostname the browser cannot resolve, breaking the guest-runtime specs in a way that would look
+     * like a public-runtime defect. The `live` state is covered in Pest (DomainWebTest, CustomDomainApiTest)
+     * and the badge in Vitest; do not "improve" this by activating one here.
+     *
+     * UPSERT-KEYED ON THE HOSTNAME, so a re-seed CONVERGES — the H24b2 analytics-block precedent. Every
+     * other block in this seeder is `doesntExist()`-guarded and therefore drifts: change a field here and a
+     * developer's already-seeded box silently keeps the old row while CI, which provisions a fresh database
+     * every run, goes green. `created_at` is stamped explicitly because `forTenant()` orders by it and two
+     * rows written in the same instant would otherwise render in an arbitrary order.
+     *
+     * PUBLIC for the same reason {@see seedAnalyticsFixture()} is: `run()` cannot be re-run under
+     * `RefreshDatabase` (its `pgsql_auth` identity lookup cannot see the uncommitted transaction), so the
+     * convergence claim above is only testable through this seam. `domains` is RLS-exempt, so unlike the
+     * analytics fixture this one needs no tenant context to re-run.
+     */
+    public function seedCustomDomains(Tenant $tenant): void
+    {
+        $rows = [
+            // Pending: the tenant has claimed it and not yet published the TXT record. Exercises the DNS
+            // block, the "check DNS" affordance and the neutral badge.
+            ['domain' => 'forms.acme-example.com', 'verified' => false, 'age' => 2],
+            // Verified but AWAITING THE OPERATOR — the honest manual-TLS state, and the one card on the page
+            // whose whole purpose is to say that the tenant is done and the hostname still serves nothing.
+            ['domain' => 'apply.acme-example.com', 'verified' => true, 'age' => 1],
+        ];
+
+        foreach ($rows as $row) {
+            /** @var Domain|null $existing */
+            $existing = Domain::unscopedQuery()->where('domain', $row['domain'])->first();
+
+            $attributes = [
+                'tenant_id' => $tenant->id,
+                // Deterministic rather than random: a re-seed must converge on the same record, and the
+                // token is public by design (ADR-0012 §D11) so there is nothing to protect here.
+                'verification_token' => str_repeat(substr(md5($row['domain']), 0, 8), 8),
+                'token_issued_at' => now()->subDays($row['age']),
+                'verified_at' => $row['verified'] ? now()->subDays($row['age']) : null,
+                'activated_at' => null,
+                'verification_checked_at' => now()->subMinutes(20),
+                'verification_failure_reason' => $row['verified'] ? null : DomainVerificationFailure::NotFound,
+                'is_primary' => false,
+                'created_at' => now()->subDays($row['age']),
+            ];
+
+            if ($existing !== null) {
+                $existing->forceFill($attributes)->save();
+
+                continue;
+            }
+
+            Domain::query()->forceCreate([...$attributes, 'domain' => $row['domain']]);
         }
     }
 

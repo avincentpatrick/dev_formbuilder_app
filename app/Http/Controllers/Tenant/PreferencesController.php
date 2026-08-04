@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Submissions\SubmissionDraftService;
+use App\Services\Tenancy\CustomDomainService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,6 +30,8 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  */
 final class PreferencesController extends Controller
 {
+    public function __construct(private readonly CustomDomainService $domains) {}
+
     public function show(Request $request): Response
     {
         /** @var User $user */
@@ -48,6 +51,19 @@ final class PreferencesController extends Controller
                 'draft_ttl_days' => $tenant->draft_ttl_days ?? SubmissionDraftService::DRAFT_TTL_DAYS,
                 'is_default' => $tenant->draft_ttl_days === null,
                 'can_manage' => $user->can('tenant.settings.manage'),
+            ],
+            // Custom domains (H22b) — a LINK, not a control. The /domains page owns the surface; this is the
+            // escape hatch that makes ADR-0012 §D9 real: the nav item requires the `custom_domain` feature,
+            // so a tenant downgraded off Business would otherwise have no path to a hostname that is still
+            // resolving. The card renders only when `count > 0`, which is what keeps it from advertising an
+            // unbuyable plan (Business is seeded is_active:false) to everyone else.
+            //
+            // One query, on THIS page only — deliberately not a shared prop, which would put a `domains`
+            // read on every Inertia render in the application for one card.
+            'customDomains' => [
+                'count' => $user->can('tenant.settings.manage')
+                    ? $this->domains->forTenant($tenant)->count()
+                    : 0,
             ],
         ]);
     }

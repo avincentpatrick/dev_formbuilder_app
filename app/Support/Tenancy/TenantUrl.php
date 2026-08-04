@@ -70,8 +70,11 @@ final class TenantUrl
     /**
      * The tenant's authenticated-app host: the DOTLESS `domains` row composed with the deployment's own
      * host, falling back to the slug if no row exists (which is the shape a freshly created tenant has).
+     *
+     * PUBLIC alongside {@see publicHost()} (H22b), for the same reason: the admin page has to name the host
+     * respondents reach today — which, before any custom domain goes live, is this one.
      */
-    private static function appHost(Tenant $tenant): string
+    public static function appHost(Tenant $tenant): string
     {
         $stored = $tenant->domains()->whereRaw("position('.' in domain) = 0")->orderBy('domain')->value('domain');
         $label = is_string($stored) && $stored !== '' ? $stored : (string) $tenant->slug;
@@ -83,14 +86,25 @@ final class TenantUrl
      * The tenant's respondent-facing host. Only live custom domains are visible here at all (the model's
      * global scope), so this is a preference, not a filter.
      *
-     * Ordered by activation, oldest first, then by name: a tenant with two live custom domains gets a
-     * STABLE answer, because a resume link already in a respondent's inbox must keep pointing at the same
-     * origin. Choosing the newest would silently repoint every outstanding link.
+     * PUBLIC because H22b's admin page has to tell the tenant which of its hosts this actually is, and the
+     * one thing that must not happen is a presenter re-deriving the answer. A second implementation of
+     * "which host do respondents get" would be right until the day it wasn't, and the symptom would be a
+     * page confidently labelling the wrong row.
+     *
+     * ── THE ORDER IS THREE RULES, EACH LOAD-BEARING ─────────────────────────────────────────────────
+     * `is_primary` DESC first (H22b): the tenant's explicit choice wins. Then activation, oldest first,
+     * then name — the pre-H22b tiebreak, kept rather than replaced, so a tenant that has expressed no
+     * preference gets exactly the host it got yesterday. `is_primary` defaults to false, so that fallback
+     * is the behaviour for every row that existed before the column did.
+     *
+     * A STABLE answer is the point: a resume link already sitting in a respondent's inbox must keep
+     * pointing at the same origin, so neither newest-wins nor an unordered `first()` is acceptable here.
      */
-    private static function publicHost(Tenant $tenant): string
+    public static function publicHost(Tenant $tenant): string
     {
         $custom = $tenant->domains()
             ->whereRaw("position('.' in domain) > 0")
+            ->orderByDesc('is_primary')
             ->orderBy('activated_at')
             ->orderBy('domain')
             ->value('domain');

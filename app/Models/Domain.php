@@ -42,6 +42,7 @@ use Stancl\Tenancy\Database\Models\Domain as StanclDomain;
  * @property Carbon|null $activated_at
  * @property Carbon|null $verification_checked_at
  * @property DomainVerificationFailure|null $verification_failure_reason
+ * @property bool $is_primary
  */
 final class Domain extends StanclDomain
 {
@@ -101,6 +102,7 @@ final class Domain extends StanclDomain
             'activated_at' => 'datetime',
             'verification_checked_at' => 'datetime',
             'verification_failure_reason' => DomainVerificationFailure::class,
+            'is_primary' => 'boolean',
         ];
     }
 

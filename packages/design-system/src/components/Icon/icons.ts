@@ -83,6 +83,12 @@ export const icons = {
     // The post-submit confirmation message (Increment H6a) — the `feedback` speech bubble with a check
     // inside. Distinct from bare `check`, which the builder's Publish action already owns.
     'message-check': 'M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z M8.5 10l2.5 2.5 4.5-4.5',
+
+    // ── Custom domains (H22b) ─────────────────────────────────────────────────
+    // A globe: circle, equator, and one meridian drawn as opposing arcs. Its OWN glyph rather than a
+    // borrowed `external-link` or `building`, because below 1024px the sidebar is icons only and there the
+    // mark is the only thing telling this destination apart from Integrations and Scopes.
+    globe: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M3 12h18 M12 3c2.5 2.4 3.8 5.4 3.8 9s-1.3 6.6-3.8 9 M12 3c-2.5 2.4-3.8 5.4-3.8 9s1.3 6.6 3.8 9',
 } as const;
 
 export type IconName = keyof typeof icons;

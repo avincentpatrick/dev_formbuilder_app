@@ -158,13 +158,21 @@ producers, not a heuristic, and pinned by a CHECK constraint):
 | `activated_at` | `timestamptz` | Yes | `NULL` | No | An operator put it into service, by policy only after installing its certificate. **This is the only column that makes a custom domain routable**, and only `php artisan domains:activate` writes it — there is no API endpoint (ADR-0012 §D6). |
 | `verification_checked_at` | `timestamptz` | Yes | `NULL` | No | Last DNS lookup. Drives both the sweep's fair ordering and its re-check cadence. |
 | `verification_failure_reason` | `varchar(40)` — PHP enum: `DomainVerificationFailure` | Yes | `NULL` | No | `not_found` / `mismatch` / `lookup_failed`. The last split is load-bearing: `lookup_failed` means *we* could not ask (SERVFAIL/timeout) and is never evidence about the tenant, so it never demotes a verified domain. |
+| `is_primary` | `boolean` | No | `false` | No | **H22b.** Which of the tenant's LIVE custom domains its respondent-facing links are built on (`TenantUrl::publicHost()` orders `is_primary DESC` ahead of the pre-existing oldest-activated tiebreak). A **preference, not state** — unlike every column above it, nothing about it is derivable, because both candidate rows are equally live. `false` is safe as a default precisely because it is the fail-**closed** value: it means "no preference expressed", so the fallback applies and rows that predate the column emit exactly the host they emitted before. Set by the tenant (`POST /domains/{domain}/primary`, web or API) and by the FIRST activation of a tenant's first live domain; **cleared by `deactivate()`**, which it must be — see the CHECK below. |
 | `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | |
 
 **Constraints and indexes beyond the PK/FK:** `UNIQUE(domain)` (global, from the original migration);
 `domains_custom_requires_token_chk` — a dotted row must carry a token, so a hand-written or mass-assigned
 FQDN cannot exist in a state the verification service never minted; `domains_verification_token_unique`
 (partial, `WHERE verification_token IS NOT NULL`); `domains_custom_sweep_idx` (partial, custom rows only,
-ordered `verification_checked_at NULLS FIRST` to match the sweep's access path).
+ordered `verification_checked_at NULLS FIRST` to match the sweep's access path);
+**`domains_primary_requires_live_chk`** — `is_primary = false OR activated_at IS NOT NULL`, which is what
+keeps H22b's tenant-reachable write off the activation path: a tenant may choose **among** hosts an
+operator put into service and can never produce one (ADR-0012 §D6, amended). Its direct consequence is that
+`deactivate()` has to clear `is_primary` in the same write, or taking a host out of service becomes a
+constraint violation rather than a deactivation. **`domains_primary_per_tenant_unique`** (partial,
+`WHERE is_primary`) — one primary per tenant, enforced by the database rather than by a service that could
+race two concurrent clicks into two winners; the clear-then-set pair therefore runs in one transaction.
 
 > **Design Notes**
 > - **State is derived from three nullable timestamps, not a `status` column** (ADR-0012 §D4): every

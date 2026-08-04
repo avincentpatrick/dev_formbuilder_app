@@ -115,11 +115,16 @@ The ordering below is the whole point of choosing a TXT record as the proof of c
 CNAME: the tenant proves ownership **out of band**, we install the certificate, and the tenant repoints
 live traffic **last** — so there is no window in which their traffic arrives here and we cannot serve it.
 
-1. **The tenant claims the domain** (`POST /api/v1/domains`, or H22b's settings page) and publishes the
-   TXT record it returns: `_meridian-challenge.forms.acme.com` → `meridian-domain-verification=<token>`.
-2. **Verification happens on its own** — on demand via `POST /api/v1/domains/{domain}/verify`, or within
-   fifteen minutes from `VerifyCustomDomainsJob`. The domain reaches `verified`. **It still serves
-   nothing.** An unverified or verified-but-not-activated domain is invisible to tenant resolution.
+1. **The tenant claims the domain** — on the **`/domains` page** (H22b), or `POST /api/v1/domains` — and
+   publishes the TXT record it is shown: `_meridian-challenge.forms.acme.com` →
+   `meridian-domain-verification=<token>`. The page shows that record on every state, so a tenant who lost
+   it at the registrar can copy it again without a support conversation.
+2. **Verification happens on its own** — on demand via the page's **Check DNS** button or
+   `POST /api/v1/domains/{domain}/verify`, or within fifteen minutes from `VerifyCustomDomainsJob`. The
+   domain reaches `verified`. **It still serves nothing.** An unverified or verified-but-not-activated
+   domain is invisible to tenant resolution. The page labels this state **"Awaiting setup"** rather than
+   "Verified", and says in words that the next step is ours — so a tenant does not repoint live traffic
+   here on the strength of a green tick.
 3. **Add the hostname to the nginx server block** for the app's `public/` root. It must be a `server_name`
    on the same block that serves tenant subdomains — the application distinguishes hosts, nginx does not
    need to.
@@ -132,9 +137,15 @@ live traffic **last** — so there is no window in which their traffic arrives h
 6. **Only now, activate:** `php artisan domains:activate forms.acme.com`. The command refuses a domain
    that is not verified, and prints the TXT record still needed if so. `--deactivate` takes a host back
    out of service without losing its verification, so re-activating later needs no new DNS record.
+   **If this is the tenant's first live custom domain the command also makes it primary**, so respondent
+   links move to it without the tenant having to choose between one host and none; a second activation
+   leaves the existing primary alone, because repointing outstanding links is the tenant's call to make on
+   `/domains` (H22b).
 7. **Removing a domain**: `php artisan domains:activate <host> --deactivate` first (routing stops
-   immediately), then let the tenant release it through the API. Retire the win-acme renewal and the
-   nginx `server_name` afterwards, in that order.
+   immediately, and the primary flag is cleared — `domains_primary_requires_live_chk` requires that, and
+   respondent links fall back to the next-oldest live domain or to the tenant's subdomain), then let the
+   tenant release it from `/domains` or through the API. Retire the win-acme renewal and the nginx
+   `server_name` afterwards, in that order.
 
 **Fail-closed properties worth knowing before you deviate.** A domain whose DNS later lapses keeps
 serving — the sweep records the failure but does not withdraw routing, because a transient resolver

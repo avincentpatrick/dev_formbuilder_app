@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Domain;
 use App\Models\Form;
 use App\Models\SavedReportView;
 use App\Models\Submission;
@@ -112,4 +113,49 @@ it('converges on exactly the shape the analytics page needs, however many times 
     // all three status-varied rows, and responsive-axe's "Submission detail" scan opens the inbox's FIRST
     // row — which is one of these, since the inbox orders by uuidv7 rather than by submitted_at.
     expect($first['intake_statuses'])->toBe(['approved', 'returned', 'submitted']);
+});
+
+it('converges the custom-domain fixture too, and never activates one', function (): void {
+    // H22b. Same upsert-keyed shape as the analytics block, and the same reason: every OTHER block in the
+    // seeder is doesntExist()-guarded, so a change here would go green on CI's fresh database while every
+    // developer's box kept the old rows.
+    $seeder = new E2eSeeder;
+    $seeder->run();
+
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+
+    // The projection is deliberately TIMESTAMP-FREE except for whether each stamp is set. The fixture's
+    // dates are RELATIVE ("checked 20 minutes ago") and are re-stamped on every re-seed on purpose, so the
+    // page keeps reading sensibly on a box seeded weeks ago — comparing them byte-for-byte would assert
+    // the opposite of the intended behaviour. What must converge is the SHAPE: which hostnames exist, what
+    // state each is in, and that there are still two of them rather than four.
+    /** @return array<int, array<string, mixed>> */
+    $shape = fn (): array => Domain::unscopedQuery()
+        ->where('tenant_id', $tenant->id)
+        ->whereRaw("position('.' in domain) > 0")
+        ->orderBy('domain')
+        ->get()
+        ->map(fn (Domain $d): array => [
+            'domain' => $d->domain,
+            'token' => $d->verification_token,
+            'verified' => $d->verified_at !== null,
+            'activated' => $d->activated_at !== null,
+            'is_primary' => $d->is_primary,
+        ])
+        ->all();
+
+    $first = $shape();
+
+    $seeder->seedCustomDomains($tenant);
+
+    expect($shape())->toBe($first)
+        ->and($first)->toHaveCount(2);
+
+    // ⚠️ THE LOAD-BEARING ASSERTION. An activated row is visible to Domain's global scope, so it would
+    // become the host TenantUrl::toPublic() builds every resume link on — and in e2e that is a hostname
+    // the browser cannot resolve. The guest-runtime specs would fail looking like a public-runtime defect.
+    expect(collect($first)->where('activated', true)->all())->toBe([]);
+
+    // One pending, one verified-awaiting-operator: the two states the page has to render honestly.
+    expect(collect($first)->where('verified', true)->count())->toBe(1);
 });

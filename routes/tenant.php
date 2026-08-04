@@ -12,6 +12,7 @@ use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
+use App\Http\Controllers\Tenant\DomainController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
@@ -333,6 +334,39 @@ Route::middleware([
         ->middleware(['can:update,webhookEndpoint', 'feature:webhooks'])->name('webhooks.update');
     Route::delete('/webhooks/{webhookEndpoint}', [WebhookController::class, 'destroy'])
         ->middleware(['can:delete,webhookEndpoint', 'feature:webhooks'])->name('webhooks.destroy');
+
+    // Custom-domain admin UI (Increment H22b / ADR-0012) — the session-authed Inertia surface over the H22a
+    // lifecycle, delegating to the SAME CustomDomainService as the /api/v1 twins (routes/api.php). Gates
+    // mirror those twins MINUS `ability:manage:domains`, which is Sanctum token-scope middleware a session
+    // request cannot carry; `can:tenant.settings.manage` IS the authorization here (the H14 convention). It
+    // is a bare permission rather than a policy because there is no per-instance authorization question —
+    // and the resource deliberately has no policy at all (see the API block for why).
+    //
+    // ⚠️ index AND destroy CARRY NO `feature:` GATE, AND THAT IS NOT AN OVERSIGHT. ADR-0012 §D9: a tenant
+    // downgraded off Business keeps a LIVE, resolving hostname, so gating the read would strand it with a
+    // domain it can see nowhere and remove nowhere. The nav item still requires the feature, so an
+    // unentitled tenant does not see a destination — it reaches this page from the Settings link that
+    // appears only once it actually holds a domain.
+    //
+    // {domain} IS NOT A BOUND MODEL — `domains` is RLS-exempt, so implicit binding would resolve any
+    // tenant's row with no database backstop; the controller filters by tenant_id explicitly. Static action
+    // segments precede the bare DELETE {domain} route (the H14 rule).
+    //
+    // THERE IS DELIBERATELY NO ACTIVATE ROUTE. /primary is not one: it refuses any domain that is not
+    // already live, so it chooses among hosts an operator activated and can never produce one.
+    Route::get('/domains', [DomainController::class, 'index'])
+        ->middleware('can:tenant.settings.manage')->name('domains.index');
+    Route::post('/domains', [DomainController::class, 'store'])
+        ->middleware(['can:tenant.settings.manage', 'feature:custom_domain'])->name('domains.store');
+    Route::post('/domains/{domain}/verify', [DomainController::class, 'verify'])
+        ->where('domain', '[A-Za-z0-9.-]+')
+        ->middleware(['can:tenant.settings.manage', 'feature:custom_domain'])->name('domains.verify');
+    Route::post('/domains/{domain}/primary', [DomainController::class, 'primary'])
+        ->where('domain', '[A-Za-z0-9.-]+')
+        ->middleware(['can:tenant.settings.manage', 'feature:custom_domain'])->name('domains.primary');
+    Route::delete('/domains/{domain}', [DomainController::class, 'destroy'])
+        ->where('domain', '[A-Za-z0-9.-]+')
+        ->middleware('can:tenant.settings.manage')->name('domains.destroy');
 
     // Native-connector management UI (Increment H15b) — the session-authed Inertia surface over the H15a
     // framework, delegating to the SAME ConnectionService / ConnectionSubscriptionService as the /api/v1 twins

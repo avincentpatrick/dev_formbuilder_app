@@ -86,6 +86,15 @@ class HandleInertiaRequests extends Middleware
                     // without it never sees a destination it would only bounce off (ADR-0011 §D9 — hidden,
                     // never locked-with-upsell, because Business is held from sale).
                     'viewAnalytics' => (bool) $user?->can('viewAny', SavedReportView::class),
+                    // Gates the Domains nav item + the /domains page (H22b). The BARE PERMISSION, not a
+                    // policy: `domains` is RLS-exempt and has no model policy at all (ADR-0012 — there is no
+                    // per-instance authorization question, and a policy over an unscoped table would invite
+                    // one), so `tenant.settings.manage` is the whole authorization. It is the same
+                    // permission the Drafts card on /settings uses; the two surfaces are both Owner/Admin
+                    // tenant administration. The nav item ALSO requires the `custom_domain` plan feature
+                    // (Sidebar.vue) — but the PAGE deliberately does not, because ADR-0012 §D9 keeps reads
+                    // and deletes open so a tenant downgraded off Business can still remove a live host.
+                    'manageDomains' => (bool) $user?->can('tenant.settings.manage'),
                 ],
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the

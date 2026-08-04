@@ -390,6 +390,13 @@ Route::prefix('api/v1')
             ->where('domain', '[A-Za-z0-9.-]+')
             ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage', 'feature:custom_domain'])
             ->name('domains.verify');
+        // H22b — choose which LIVE host respondent links are built on. Read the paragraph above before
+        // reading this as the activate endpoint that deliberately does not exist: it refuses anything not
+        // already live, so it selects among hosts an operator put into service and cannot produce one.
+        Route::post('domains/{domain}/primary', [DomainApiController::class, 'primary'])
+            ->where('domain', '[A-Za-z0-9.-]+')
+            ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage', 'feature:custom_domain'])
+            ->name('domains.primary');
         Route::delete('domains/{domain}', [DomainApiController::class, 'destroy'])
             ->where('domain', '[A-Za-z0-9.-]+')
             ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage'])

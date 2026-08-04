@@ -66,10 +66,11 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/connections/{connection}/subscriptions',
         '/connections/{connection}/subscriptions/{subscription}',
         '/connections/{connection}/subscriptions/{subscription}/deliveries',
-        // H22a — custom domains: claim, list, on-demand verify, release.
+        // H22a — custom domains: claim, list, on-demand verify, release. H22b adds /primary.
         '/domains',
         '/domains/{domain}',
         '/domains/{domain}/verify',
+        '/domains/{domain}/primary',
     );
 
     // The connector surface deliberately exposes no create/update for a grant: a credential may only arrive
@@ -88,6 +89,11 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
     //    `php artisan domains:activate`, run by whoever installed the TLS certificate. Per-domain TLS is
     //    structurally Track B and Track B is deferred, so a tenant able to activate its own domain could
     //    put its respondents on an origin with no certificate for it (ADR-0012).
+    //
+    // H22b's `/domains/{domain}/primary` is NOT that endpoint arriving under another name, and the reason
+    // it is safe to add beside this assertion is mechanical rather than editorial: it refuses any domain
+    // that is not ALREADY live, and `domains_primary_requires_live_chk` refuses it again underneath. It
+    // chooses among hosts an operator activated; it cannot produce one.
     expect($spec['paths']['/domains/{domain}'])->not->toHaveKey('patch')
         ->and($spec['paths']['/domains/{domain}'])->not->toHaveKey('put')
         ->and(array_keys($spec['paths']))->not->toContain('/domains/{domain}/activate');

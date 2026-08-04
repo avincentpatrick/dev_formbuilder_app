@@ -3888,6 +3888,73 @@
                 }
             }
         },
+        "/domains/{domain}/primary": {
+            "post": {
+                "operationId": "v1.domains.primary",
+                "description": "NOT an activation path, and the distinction is the whole reason this route can exist at all: it\nrefuses any domain that is not already live, so it chooses AMONG hosts an operator put into service\nand can never put one there. `domains_primary_requires_live_chk` states the same rule in DDL.",
+                "summary": "Choose which live custom domain the tenant's respondent-facing links are built on",
+                "tags": [
+                    "DomainApi"
+                ],
+                "parameters": [
+                    {
+                        "name": "domain",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "example": ""
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/domains/{domain}": {
             "delete": {
                 "operationId": "v1.domains.destroy",

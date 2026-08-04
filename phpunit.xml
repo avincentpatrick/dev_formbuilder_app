@@ -23,6 +23,21 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!--
+            Pin the tenancy central domain for the test suite, the same way DB_DATABASE below pins the
+            database. Every host-based test drives `http://{slug}.meridian.test/...`, and stancl's
+            identification middleware rejects any host that does not end with a `tenancy.central_domains`
+            entry. `.env` sets CENTRAL_DOMAIN=localhost so the docker stack can serve acme.localhost:8080
+            for Playwright, which meant a plain `vendor/bin/pest` failed 344 tests with
+            NotASubdomainException and every local run needed `docker exec -e CENTRAL_DOMAIN=meridian.test`.
+
+            Setting it here decouples Pest from Playwright: PHPUnit populates the env before the app
+            boots, and Laravel's Dotenv is immutable, so `.env` cannot overwrite it. `force` is deliberate
+            — the suite's central domain is an invariant, not a knob, and it must survive a stray
+            `docker exec -e`. NO CI BEHAVIOUR CHANGE: CI loads `.env.example`, which has no CENTRAL_DOMAIN
+            line, so config already defaulted to meridian.test there.
+        -->
+        <env name="CENTRAL_DOMAIN" value="meridian.test" force="true"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="meridian_testing"/>
         <env name="DB_URL" value=""/>

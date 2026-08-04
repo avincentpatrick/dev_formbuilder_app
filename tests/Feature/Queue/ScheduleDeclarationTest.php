@@ -9,6 +9,7 @@ use App\Jobs\Maintenance\RefreshConnectorTokensJob;
 use App\Jobs\Maintenance\RollUpUsageCountersJob;
 use App\Jobs\Maintenance\SweepScheduledFormsJob;
 use App\Jobs\Maintenance\SweepWebhookRetriesJob;
+use App\Jobs\Maintenance\VerifyCustomDomainsJob;
 use App\Jobs\MaintenanceJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -93,11 +94,26 @@ it('registers the connector token-refresh sweep on the expected cadence', functi
         ->and($match->expression)->toBe('0 * * * *');
 });
 
+it('registers the custom-domain verification sweep on the expected cadence', function (): void {
+    $events = app(Schedule::class)->events();
+
+    $match = collect($events)->first(
+        fn ($event): bool => str_contains($event->getSummaryForDisplay(), VerifyCustomDomainsJob::class),
+    );
+
+    // everyFifteenMinutes(), not five: an impatient tenant can trigger a check on demand from
+    // POST /api/v1/domains/{domain}/verify, so the sweep only covers the unattended cases — the
+    // propagation tail, expired claims, and the periodic re-read of a domain whose DNS has lapsed
+    // (H22a / ADR-0012).
+    expect($match)->not->toBeNull()
+        ->and($match->expression)->toBe('*/15 * * * *');
+});
+
 it('keeps every scheduled job queueable rather than inline', function (): void {
     // Schedule::job() silently falls back to dispatchNow() for a non-ShouldQueue object. A job that
     // lost its interface would then run INSIDE the scheduler process — synchronously, without the
     // §D4 listener's worker edges and without the fairness limiter, while blocking the next tick.
-    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class, SweepScheduledFormsJob::class, SweepWebhookRetriesJob::class, RefreshConnectorTokensJob::class] as $job) {
+    foreach ([PruneFailedJobsJob::class, RollUpUsageCountersJob::class, ReapExpiredDraftsJob::class, SweepScheduledFormsJob::class, SweepWebhookRetriesJob::class, RefreshConnectorTokensJob::class, VerifyCustomDomainsJob::class] as $job) {
         expect(is_subclass_of($job, ShouldQueue::class))->toBeTrue()
             ->and(is_subclass_of($job, MaintenanceJob::class))->toBeTrue();
     }

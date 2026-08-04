@@ -66,6 +66,10 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/connections/{connection}/subscriptions',
         '/connections/{connection}/subscriptions/{subscription}',
         '/connections/{connection}/subscriptions/{subscription}/deliveries',
+        // H22a — custom domains: claim, list, on-demand verify, release.
+        '/domains',
+        '/domains/{domain}',
+        '/domains/{domain}/verify',
     );
 
     // The connector surface deliberately exposes no create/update for a grant: a credential may only arrive
@@ -74,6 +78,19 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
     expect($spec['paths']['/connections'])->not->toHaveKey('post')
         ->and($spec['paths']['/connections/{connection}'])->not->toHaveKey('patch')
         ->and($spec['paths']['/connections/{connection}'])->not->toHaveKey('put');
+
+    // H22a — the same shape of deliberate absence, twice over, both worth asserting because a resource-route
+    // reflex would add them without anyone noticing what they mean:
+    //
+    //  · A DOMAIN IS IMMUTABLE. Editing the hostname would silently invalidate the verification that was
+    //    granted for the old one, so there is no patch/put — you release and re-claim.
+    //  · THERE IS NO ACTIVATE ENDPOINT ANYWHERE ON THE API. Putting a verified domain into service is
+    //    `php artisan domains:activate`, run by whoever installed the TLS certificate. Per-domain TLS is
+    //    structurally Track B and Track B is deferred, so a tenant able to activate its own domain could
+    //    put its respondents on an origin with no certificate for it (ADR-0012).
+    expect($spec['paths']['/domains/{domain}'])->not->toHaveKey('patch')
+        ->and($spec['paths']['/domains/{domain}'])->not->toHaveKey('put')
+        ->and(array_keys($spec['paths']))->not->toContain('/domains/{domain}/activate');
 
     // The guest endpoints are unauthenticated (@unauthenticated → security: []), overriding the global
     // sanctumToken requirement — a Sanctum bearer must never be advertised on the public share-token routes.

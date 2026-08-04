@@ -150,3 +150,26 @@ it('keeps the no-auth invitation group off the public-host identifier', function
     $this->withoutVite()->get('http://forms.acme-example.com/invitations/whatever')
         ->assertRedirect(config('app.url'));
 });
+
+/*
+| ── RequirePlatformHost: the platform's own surfaces are not the tenant's to serve ───────────────────
+*/
+
+it('404s the platform auth surface and landing page on a custom domain', function (string $path): void {
+    // The gap the block above surfaced. `auth` is priority-ordered AHEAD of the tenancy pipeline, so an
+    // unauthenticated request to a tenant route never reaches identification — it redirects to /login on
+    // whatever host it arrived at. Fortify registers /login, /register and /forgot-password with
+    // 'domain' => null and routes/web.php serves '/' host-agnostically, so without RequirePlatformHost
+    // the platform's CREDENTIAL FORM would render on a hostname the tenant controls.
+    customDomain(inboxTenant('acme'), 'forms.acme-example.com');
+
+    $this->withoutVite()->get("http://forms.acme-example.com{$path}")->assertNotFound();
+})->with(['/login', '/forgot-password', '/']);
+
+it('still serves the platform auth surface on the central host and its subdomains', function (string $host): void {
+    // The predicate allows the central host AND its subdomains, which is not incidental: tenant users log
+    // in at acme.meridian.test/login, so refusing anything but the apex would lock every tenant out.
+    inboxTenant('acme');
+
+    $this->withoutVite()->get("http://{$host}/login")->assertOk();
+})->with(['meridian.test', 'acme.meridian.test', 'localhost', 'acme.localhost']);

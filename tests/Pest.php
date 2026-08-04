@@ -83,6 +83,25 @@ function catalogRole(string $name): string
     return (string) DB::connection('pgsql_privileged')->table('roles')->where('name', $name)->value('id');
 }
 
+/**
+ * A NEW user, made an active member of the current-context tenant with the given role, and left as the
+ * acting user in the RLS context (requires enterTenant already called).
+ *
+ * Moved here from tests/Feature/Api/ApiV1Test.php in H22a. It was a top-level function in that one test
+ * file, so it only resolved when that file happened to be loaded into the process — a single-file run of
+ * any other API test died with "Call to undefined function apiMember()". That is precisely the failure
+ * this section's header describes.
+ */
+function apiMember(string $roleName): User
+{
+    $user = User::factory()->create();
+    $tenantId = TenantContext::currentTenantId();
+    enterTenant((string) $tenantId, $user->id);
+    makeActiveMember($user, $roleName);
+
+    return $user;
+}
+
 /** Create an active membership + assign its tenant-scoped role (requires enterTenant already called). */
 function makeActiveMember(User $user, string $roleName): void
 {

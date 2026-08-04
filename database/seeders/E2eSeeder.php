@@ -840,11 +840,6 @@ class E2eSeeder extends Seeder
     }
 
     /**
-     * A plausible answer document keyed by each field's `key`, for the inbox detail demo.
-     *
-     * @return array<string, mixed>
-     */
-    /**
      * The H24b2 analytics fixture — a time-spread, multi-form, multi-source, `last_saved_at`-marked
      * submission set, plus the one flagged-for-reporting form the question explorer needs.
      *
@@ -1166,6 +1161,11 @@ class E2eSeeder extends Seeder
         );
     }
 
+    /**
+     * A plausible answer document keyed by each field's `key`, for the inbox detail demo.
+     *
+     * @return array<string, mixed>
+     */
     private function sampleAnswers(FormVersion $version): array
     {
         $answers = [];

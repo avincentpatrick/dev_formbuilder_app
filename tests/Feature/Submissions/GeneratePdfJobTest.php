@@ -398,8 +398,12 @@ it('composes the host from the deployment, defaulting the scheme CLOSED', functi
 it('leaves an already-qualified custom domain alone', function (): void {
     // The shape H22 introduces. Gluing the central host onto `forms.acme.com` would corrupt it, so
     // a stored value containing a dot is used verbatim.
+    //
+    // H22a: the token is now required by `domains_custom_requires_token_chk` — a dotted row must have
+    // been minted by the verification service, not hand-written. The assertion itself is unchanged here
+    // and is revisited once TenantUrl grows its app/public arms.
     $other = Tenant::create(['name' => 'Beta', 'slug' => 'beta', 'default_locale' => 'en']);
-    $other->domains()->create(['domain' => 'forms.acme.com']);
+    $other->domains()->create(['domain' => 'forms.acme.com', 'verification_token' => str_repeat('c', 64)]);
     config(['app.url' => 'https://meridian.test']);
 
     expect(TenantUrl::to($other, 'attachments/x'))->toBe('https://forms.acme.com/attachments/x');

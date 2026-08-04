@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -104,7 +105,7 @@ it('keeps the authenticated app off the public-host identifier', function (strin
     // `it 404s the platform auth surface on a custom host` below is the assertion for that.
     inboxTenant('acme');
 
-    $this->actingAs(App\Models\User::factory()->create())->withoutVite()
+    $this->actingAs(User::factory()->create())->withoutVite()
         ->get("http://forms.acme-example.com{$path}")
         ->assertRedirect(config('app.url'));
 })->with(['/dashboard', '/settings']);

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Domain;
 use App\Models\Tenant;
 use App\Support\Tenancy\Uuid7Generator;
-use Stancl\Tenancy\Database\Models\Domain;
 use Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager;
 use Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager;
 use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
@@ -14,6 +14,9 @@ return [
     'tenant_model' => Tenant::class,
     'id_generator' => Uuid7Generator::class,
 
+    // H22a — our own Domain model (extends stancl's base). This one key repoints BOTH
+    // HasDomains::domains() and stancl's DomainTenantResolver, which is what lets the verification casts
+    // and the ResolvableDomainScope reach every reader in the app without touching a single call site.
     'domain_model' => Domain::class,
 
     /**

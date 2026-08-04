@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Rules\ClaimableDomain;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain;
+use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 
 /**
  * Tenant identification for the PUBLIC GUEST RUNTIME only (H22a / ADR-0012) — the one route group a
  * tenant's own custom domain may serve. Everything else (the authenticated app, invitations, both
- * /api/v1 groups) keeps {@see \Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain}, per ADR-0009
+ * /api/v1 groups) keeps {@see InitializeTenancyBySubdomain}, per ADR-0009
  * §D2: "Business-tier `custom_domain` covers public forms, not the admin app". A custom host on those
  * groups therefore throws NotASubdomainException, which bootstrap/app.php already renders as a
  * redirect to the central app — fail-closed with no new code.
@@ -31,7 +33,7 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain;
  *      getHost() is the raw header). Routing dotless hosts to the subdomain arm restores stancl's
  *      own `count($parts) === 1` rejection instead of inventing a second one.
  *
- * The predicate is deliberately the SAME one {@see \App\Rules\ClaimableDomain} refuses a claim with,
+ * The predicate is deliberately the SAME one {@see ClaimableDomain} refuses a claim with,
  * so what routes and what may be claimed cannot drift apart.
  *
  * Every host the suite exercises behaves byte-identically to InitializeTenancyBySubdomain:

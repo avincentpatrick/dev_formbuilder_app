@@ -39,6 +39,10 @@ export interface AppAbilities {
     manageScopes: boolean;
     manageWebhooks: boolean;
     manageIntegrations: boolean;
+    // H24b2 — SavedReportViewPolicy::viewAny (dashboard.org.view || dashboard.form.view). Every consumer
+    // combines it with the `advanced_analytics` entitlement, which is what makes the surface HIDDEN rather
+    // than locked for a tier that does not have it (ADR-0011 §D9).
+    viewAnalytics: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

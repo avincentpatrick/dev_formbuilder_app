@@ -252,9 +252,34 @@ return Application::configure(basePath: dirname(__DIR__))
         // AnalyticsQuery's CONSTRUCTOR rather than only as validator rules — deliberately, so the saved-view
         // and export paths inherit them — which means a bad range arrives here as an exception rather than as
         // a field error. `reason` is machine-readable so a client can branch without parsing prose.
-        $exceptions->render(fn (InvalidAnalyticsQueryException $e, Request $request) => $isApi($request)
-            ? ApiErrorResponse::make(422, 'invalid_analytics_query', $e->getMessage(), ['reason' => $e->reason()])
-            : null);
+        //
+        // H24b2 adds the WEB arm. Until it existed a hand-edited or bookmarked `/analytics?from=2024-01-01`
+        // was a 500, because the 366-day span is deliberately NOT a validator rule (AnalyticsReportRequest's
+        // docblock: expressing it there would be a second implementation of a bound that already has an
+        // owner) and the exception extends InvalidArgumentException, not an HttpException.
+        //
+        // Scoped to `analytics.*`: everywhere else on the web the VO is built from hard-coded arguments
+        // (DashboardMetricsService::trendsForUser), so reaching here off-surface is a server bug and keeps
+        // its 500 rather than being dressed up as a user error.
+        //
+        // NOT `back()` on a GET. A bookmarked bad URL carries no referer, and `back()` would land on the
+        // tenant subdomain's unrouted "/" — a 404 in place of the message. The bare index always builds a
+        // valid default window, so redirecting to it cannot loop.
+        $exceptions->render(function (InvalidAnalyticsQueryException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make(422, 'invalid_analytics_query', $e->getMessage(), ['reason' => $e->reason()]);
+            }
+
+            if (! $request->routeIs('analytics.*')) {
+                return null;
+            }
+
+            $toast = ['type' => 'error', 'message' => $e->getMessage()];
+
+            return $request->isMethod('GET')
+                ? to_route('analytics.index')->with('toast', $toast)
+                : back()->with('toast', $toast);
+        });
 
         // Per-month usage-quota rate limit (H5c / ADR-0008 §D4) — the metered api_requests (and, when H13
         // ships webhook dispatch, webhook_deliveries) current-period usage reached the plan quota. 429 with a

@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
+use App\Http\Controllers\Tenant\AnalyticsController;
+use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
 use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
@@ -35,6 +37,7 @@ use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
+use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\Submission;
 use App\Models\WebhookEndpoint;
@@ -363,6 +366,36 @@ Route::middleware([
     Route::get('/integrations/{provider}/connect', [ConnectorAuthController::class, 'redirect'])
         ->middleware(['can:create,'.Connection::class, 'feature:native_connectors'])
         ->name('integrations.connect');
+
+    // Cross-form analytics (ADR-0011, Increment H24b2) — the Business-gated page over H24a's substrate.
+    // Gates mirror the /api/v1 twins (routes/api.php) key for key MINUS `ability:read:analytics`, which is
+    // Sanctum token-scope middleware a session request cannot carry; the policy `can:` gate IS the
+    // authorization here. `viewAny` is doing real work on the read routes: SavedReportViewPolicy's docblock
+    // records that it doubles as the gate for the report/question surfaces, which have no model of their own.
+    //
+    // §D9: the surface is HIDDEN for a tenant without `advanced_analytics`, never locked-with-upsell —
+    // Business is seeded is_active:false, so an upgrade CTA would point at a plan nobody can buy. A direct
+    // visit still bounces off `feature:` with a toast.
+    //
+    // Filters are QUERY PARAMS on the index route, re-fetched as Inertia partial reloads — there is no JSON
+    // sidecar here. The question aggregate would be the obvious candidate, but it can raise a domain
+    // exception, and on a web route that returns a 302 with a flash even to an XHR (the integrationsClient
+    // trap); it is also a function of the whole declaration, which already lives in the URL.
+    //
+    // Static segments precede the binding (the H14 rule): /analytics/export and /analytics/views are declared
+    // before /analytics/views/{savedReportView}, and there is no /analytics/{binding} route at all.
+    Route::get('/analytics', [AnalyticsController::class, 'index'])
+        ->middleware(['can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])->name('analytics.index');
+    Route::get('/analytics/export', [AnalyticsController::class, 'export'])
+        ->middleware(['can:viewAny,'.SavedReportView::class, 'feature:advanced_analytics'])->name('analytics.export');
+    Route::post('/analytics/views', [AnalyticsViewController::class, 'store'])
+        ->middleware(['can:create,'.SavedReportView::class, 'feature:advanced_analytics'])->name('analytics.views.store');
+    // update/delete gate on the BOUND INSTANCE, where the policy's owner check runs: saved_report_views is
+    // `strict` RLS, which scopes to the tenant only, so without it any co-tenant could edit a colleague's view.
+    Route::patch('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'update'])
+        ->middleware(['can:update,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.update');
+    Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
+        ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
 });
 
 /*

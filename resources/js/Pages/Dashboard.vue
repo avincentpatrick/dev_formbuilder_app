@@ -16,8 +16,14 @@
 //     suppressed rate rendered as "0%" is the same defect the suppression exists to prevent.
 //   · `top_forms.other === null` means nothing overflowed the top-N, and `unassigned` is always present
 //     even at 0 and is NOT inside `rows`.
-//   · The two draft tiles reach "unavailable" by DIFFERENT routes and must not share a sentence — see
-//     the note above `draftsUnavailable`.
+//   · The two draft tiles reach "unavailable" by DIFFERENT routes and must not share a sentence — the
+//     reasoning now lives with the code, in `components/analytics/draft-metrics.ts`.
+//
+// H24b2 moved four derivations OUT of this file and into `components/analytics/` — the bucket formatter,
+// the breakdown-bar builder and the two draft tiles. Not for tidiness: /analytics renders the same tile
+// pair from the same prop shape, and a second copy over there would be the one that regresses, silently,
+// exactly as the fourth trap above did the first time. Nothing about what this page RENDERS changed, which
+// is why `dashboard.test.ts` still passes byte-unchanged.
 import { computed } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import {
@@ -27,11 +33,15 @@ import {
     MdsEmptyState,
     MdsStatTile,
     MdsTimeSeriesChart,
-    type BarDatum,
     type ChartSeries,
     type IconName,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import AnalyticsViewSwitcher from '@/components/analytics/AnalyticsViewSwitcher.vue';
+import { bucketFormatter, rangeLabel as formatRange } from '@/components/analytics/bucket-label';
+import { breakdownBars } from '@/components/analytics/breakdown-bars';
+import { conversionTile, medianTile } from '@/components/analytics/draft-metrics';
+import type { Breakdown, DraftMetrics } from '@/components/analytics/types';
 
 interface Trends {
     range: { from: string; to: string; timezone: string };
@@ -43,14 +53,7 @@ interface Trends {
         unassigned: number;
     };
     forms_accepting: number;
-    drafts: {
-        suppressed: boolean;
-        reason: string | null;
-        denominator: number;
-        converted: number | null;
-        conversion_rate: number | null;
-        median_seconds: number | null;
-    };
+    drafts: DraftMetrics;
 }
 
 const props = defineProps<{
@@ -65,34 +68,13 @@ const canCreate = computed(() => page.props.auth.can.manageForms);
 
 const number = (value: number): string => value.toLocaleString();
 
-/**
- * Every bucket is a `YYYY-MM-DD` string in the QUERY's timezone, which the prop states (UTC today).
- * `new Date('2026-08-03')` parses as UTC midnight, so formatting it without an explicit `timeZone`
- * renders the PREVIOUS day for any viewer west of Greenwich — an off-by-one that is invisible to
- * whoever writes the code and wrong for half the planet.
- */
-const dayLabel = computed(() => {
-    const format = new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-        timeZone: props.trends.range.timezone,
-    });
+// The bucket-timezone trap now lives in `bucket-label.ts` with its explanation and its own test — this
+// page's trend is always daily, so it asks for the daily formatter.
+const dayLabel = computed(() => bucketFormatter('day'));
 
-    return (bucket: string): string => format.format(new Date(`${bucket}T00:00:00Z`));
-});
-
-const rangeLabel = computed(() => {
-    const format = new Intl.DateTimeFormat(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        timeZone: props.trends.range.timezone,
-    });
-    const from = format.format(new Date(`${props.trends.range.from}T00:00:00Z`));
-    const to = format.format(new Date(`${props.trends.range.to}T00:00:00Z`));
-
-    return `${from} – ${to} (${props.trends.range.timezone})`;
-});
+const rangeLabel = computed(() =>
+    formatRange(props.trends.range.from, props.trends.range.to, props.trends.range.timezone),
+);
 
 const tiles = computed(() => {
     const list: { label: string; value: string; icon: IconName; caption?: string }[] = [
@@ -125,90 +107,25 @@ const responseSeries = computed<ChartSeries[]>(() => [
     },
 ]);
 
-const topForms = computed<BarDatum[]>(() => {
-    const bars: BarDatum[] = props.trends.top_forms.rows.map((row) => ({
-        key: row.key ?? 'unassigned-row',
-        label: row.label,
-        value: row.count,
-    }));
+// `top_forms` IS a breakdown on the `form` axis — the same shape /analytics renders, minus the two keys
+// the API's axis-agnostic response carries. Naming them here rather than widening the dashboard's prop
+// keeps one bar-builder honest across both pages: `form_id` is NOT NULL, so the axis has no Unassigned
+// bucket and the builder drops the always-zero value on its own.
+const topFormsBreakdown = computed<Breakdown>(() => ({
+    axis: 'form',
+    rows: props.trends.top_forms.rows,
+    other: props.trends.top_forms.other,
+    unassigned: props.trends.top_forms.unassigned,
+    unassigned_label: 'Unassigned',
+    has_unassigned_bucket: false,
+}));
 
-    // Always present, never inside `rows`, and only worth a bar when it holds something.
-    if (props.trends.top_forms.unassigned > 0) {
-        bars.push({ key: 'unassigned', label: 'Unassigned', value: props.trends.top_forms.unassigned });
-    }
+const topForms = computed(() => breakdownBars(topFormsBreakdown.value));
 
-    // `null` means nothing overflowed the top-N. When it does, the bucket is NEUTRAL, never a recycled
-    // hue, so "Other" cannot read as a peer category (ADR-0011 §D11).
-    const other = props.trends.top_forms.other;
-    if (other !== null) {
-        bars.push({
-            key: 'other',
-            label: `Other (${other.categories} ${other.categories === 1 ? 'form' : 'forms'})`,
-            value: other.count,
-            neutral: true,
-        });
-    }
-
-    return bars;
-});
-
-const RETENTION_NOTE =
-    'This period reaches past the draft retention window, and expired drafts are deleted — a rate computed over what survived would rise every night.';
-const NO_DRAFTS_NOTE = 'No drafts were explicitly saved in this period.';
-
-/**
- * THE TWO TILES ARE UNAVAILABLE FOR DIFFERENT REASONS AND MUST SAY SO SEPARATELY.
- *
- * Found by looking at the real screen rather than by a gate: with six saved drafts and none of them yet
- * submitted, the conversion tile correctly read "0% — of 6 saved drafts" while the median tile, sharing
- * one note, read "No drafts were explicitly saved in this period." Two tiles side by side, disagreeing
- * about whether any drafts exist.
- *
- * The states are not the same shape. `conversion_rate` is null only when the denominator is zero;
- * `median_seconds` is additionally null when the denominator is POSITIVE but nothing in it converted —
- * `percentile_cont` over an empty set returns NULL. That third state needs its own sentence, which is
- * §D5's "suppression has three states, never two" landing on the UI side of the same line.
- */
-const draftsUnavailable = computed(
-    () => props.trends.drafts.suppressed || props.trends.drafts.conversion_rate === null,
-);
-
-const medianUnavailable = computed(
-    () => props.trends.drafts.suppressed || props.trends.drafts.median_seconds === null,
-);
-
-const conversionNote = computed(() => (props.trends.drafts.suppressed ? RETENTION_NOTE : NO_DRAFTS_NOTE));
-
-const medianNote = computed(() => {
-    if (props.trends.drafts.suppressed) return RETENTION_NOTE;
-    if (props.trends.drafts.denominator === 0) return NO_DRAFTS_NOTE;
-
-    return 'None of the drafts saved in this period have been submitted yet, so there is no first-save-to-submit time to measure.';
-});
-
-const draftDenominator = computed(() => {
-    const n = props.trends.drafts.denominator;
-
-    return `of ${number(n)} saved ${n === 1 ? 'draft' : 'drafts'}`;
-});
-
-function formatDuration(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
-    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-    if (seconds < 86400) {
-        const hours = Math.floor(seconds / 3600);
-
-        return `${hours}h ${Math.round((seconds - hours * 3600) / 60)}m`;
-    }
-
-    const days = Math.floor(seconds / 86400);
-
-    return `${days}d ${Math.round((seconds - days * 86400) / 3600)}h`;
-}
-
-const medianValue = computed(() =>
-    props.trends.drafts.median_seconds === null ? null : formatDuration(props.trends.drafts.median_seconds),
-);
+// ADR-0011 §D5's three states, and the reason the two tiles never share a sentence, live in
+// `draft-metrics.ts` — /analytics renders the identical pair from the identical prop shape.
+const conversion = computed(() => conversionTile(props.trends.drafts));
+const median = computed(() => medianTile(props.trends.drafts));
 
 // The create-form flow is the "New form" modal on the Forms page; land there rather than duplicate it.
 const goToForms = () => router.visit('/forms');
@@ -217,8 +134,13 @@ const goToForms = () => router.visit('/forms');
 <template>
     <div>
         <PageHeader title="Dashboard" icon="dashboard">
-            <template v-if="canCreate" #actions>
-                <MdsButton variant="primary" icon-left="plus" @click="goToForms">Create form</MdsButton>
+            <template #actions>
+                <!-- Renders NOTHING unless the tenant is entitled AND the user may read analytics. §D9:
+                     hidden, never a locked control with an upgrade CTA — Business cannot be bought. -->
+                <AnalyticsViewSwitcher current="overview" />
+                <MdsButton v-if="canCreate" variant="primary" icon-left="plus" @click="goToForms">
+                    Create form
+                </MdsButton>
             </template>
         </PageHeader>
 
@@ -263,18 +185,18 @@ const goToForms = () => router.visit('/forms');
                 <MdsStatTile
                     label="Draft conversion"
                     icon="activity"
-                    :value="trends.drafts.conversion_rate === null ? null : `${trends.drafts.conversion_rate}%`"
-                    :unavailable="draftsUnavailable"
-                    :unavailable-note="draftsUnavailable ? conversionNote : undefined"
-                    :caption="draftsUnavailable ? undefined : draftDenominator"
+                    :value="conversion.value"
+                    :unavailable="conversion.unavailable"
+                    :unavailable-note="conversion.note"
+                    :caption="conversion.caption"
                 />
                 <MdsStatTile
                     label="Median time to submit"
                     icon="clock"
-                    :value="medianValue"
-                    :unavailable="medianUnavailable"
-                    :unavailable-note="medianUnavailable ? medianNote : undefined"
-                    :caption="medianUnavailable ? undefined : `${draftDenominator}, first save to submit`"
+                    :value="median.value"
+                    :unavailable="median.unavailable"
+                    :unavailable-note="median.note"
+                    :caption="median.caption"
                 />
             </div>
 

@@ -572,6 +572,35 @@ Contrast, colour-channel and text-alternative obligations are in §4.1.
 > - **The bar chart's category label is HTML beside a one-`<rect>` SVG**, not an SVG `<text>`: SVG text has no wrapping and no ellipsis, so a long form title at 375px would run off the plot — the non-wrapping-row failure `responsive-axe` has already caught three times.
 > - **Past five series the extras are tabulated but not plotted**, which is §D11's own wording ("nothing is hidden, only un-plotted"). Folding them into an *Other* bucket is the caller's decision, not a silent truncation inside the primitive.
 
+> **As-built (H24b2) — the first page assembled from these primitives.** `/analytics` is the Business-gated
+> cross-form surface (ADR-0011), and five shapes it settled are page-level rather than primitive-level, so
+> they belong here rather than in the block above.
+>
+> - **Four derivations are SHARED with `/dashboard`, not re-implemented** — `resources/js/components/analytics/`
+>   holds the bucket formatter, the breakdown-bar builder and the two draft tiles. Both pages render the same
+>   tile pair from the same prop shape, and the "0% of 6 saved drafts" beside "No drafts were explicitly
+>   saved" contradiction H24b1 found by looking was a *single shared sentence*: a second hand-rolled copy on
+>   the second page would have reintroduced it silently. The modules carry the tests too.
+> - **A bucket label is formatted at UTC, never at the query's timezone — and that is not a shortcut.** The
+>   server cuts buckets with `date_trunc(…, <zone>)`, so a `YYYY-MM-DD` bucket is *already* in the query's
+>   zone; applying a zone again shifts it. H24b1 passed the query zone and got away with it only because the
+>   dashboard's zone is hard-coded to UTC. Generalising to a user-chosen zone exposed the bug, and
+>   `bucket-label.test.ts` catches it by putting the *runner* in a negative-offset zone — under a UTC runner
+>   a formatter that dropped the option would still look correct. The zone is **named** in the range banner
+>   instead, so two readers in different places can agree they are looking at the same thirty days.
+> - **The chart's own data table is not always enough.** `MdsBarChart` tabulates what it is *given*, and the
+>   plot legitimately drops a zero *Unassigned* bucket — so §D11's "nothing is hidden" is only true if the
+>   page renders a fuller `MdsDataTable` beside it. The page gives the table more rows than the plot.
+> - **Multi-valued filters are `MdsCheckbox` groups inside a page-owned `<fieldset>`/`<legend>`, plus a chip
+>   picker for forms.** `MdsSelect` is a native single `<select>`; adding a combobox primitive would put the
+>   hardest ARIA pattern there is under the merge-blocking axe job. Native grouping gives the semantics for
+>   free — and `getByRole('group', { name })` matches an accessible name by *substring*, which is how the
+>   e2e spec discovered that "Available" also matches "Not available for reporting".
+> - **A pending aggregate says so.** With a question selected and its summary still in flight, the card
+>   read "Pick a question" — the radio and the card disagreeing about whether a question had been picked.
+>   Found by looking at the running page, exactly as H24b1's draft tiles were, and pinned by two Vitest
+>   cases that each redden under a different one-line mutation.
+
 ---
 
 ## 4. Accessibility Specification (WCAG AA baseline)

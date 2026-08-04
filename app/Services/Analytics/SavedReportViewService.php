@@ -11,6 +11,7 @@ use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -114,6 +115,14 @@ final class SavedReportViewService
      * SQLSTATE 23505; catching the CODE rather than matching the message keeps this independent of the
      * server's locale.
      *
+     * ── The write is wrapped, and that is not ceremony (H24b2) ──────────────────────────────────────────
+     * PostgreSQL aborts the CURRENT TRANSACTION on a constraint violation: every statement after it fails
+     * with SQLSTATE 25P02 until the block ends. Catching 23505 and carrying on therefore only works while
+     * this happens to be the outermost transaction — true on a bare API call, false the moment a caller
+     * wraps it, and false under `RefreshDatabase`, where the poisoned transaction takes down the redirect
+     * that was supposed to carry the field error. `DB::transaction()` opens a SAVEPOINT when nested, so the
+     * violation rolls back to it and the caller's transaction survives to render the 422.
+     *
      * @template T of SavedReportView
      *
      * @param  callable(): T  $write
@@ -122,7 +131,10 @@ final class SavedReportViewService
     private function guardName(callable $write): SavedReportView
     {
         try {
-            return $write();
+            // Wrapped in a Closure that ignores the Connection argument `transaction()` passes: the
+            // callable here is a zero-arg factory, and handing it over directly loses the template return
+            // type PHPStan needs to see `T` come back out.
+            return DB::transaction(static fn (): SavedReportView => $write());
         } catch (QueryException $e) {
             if ($e->getCode() === '23505') {
                 // ValidationException::withMessages, not a bespoke type: the framework already renders it as

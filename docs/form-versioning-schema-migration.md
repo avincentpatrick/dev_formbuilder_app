@@ -1,7 +1,7 @@
 # Form Versioning & Schema Migration Design Doc
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
-**Status:** Draft v1.0 — written against the already-ratified table shapes in `docs/data-dictionary.md` §2–§6 and the already-established lifecycle in `docs/architecture/technical-architecture.md` §6.
+**Status:** Draft **v1.1** — written against the already-ratified table shapes in `docs/data-dictionary.md` §2–§6 and the already-established lifecycle in `docs/architecture/technical-architecture.md` §6. **v1.1 (2026-08-05, Increment H25):** §2's resolution is amended — it stands for the three CONTENT CHILD tables, and is narrowed to them, because it cannot cover the `form_versions` row itself. See §2's amendment note and **ADR-0013**.
 **Purpose:** This is the dedicated doc the architecture plan calls for "since this is legacy's single most consequential gap" (plan §4 item 8). It does **not** re-decide the versioning model — `docs/architecture/technical-architecture.md` §6 already fixed the state machine, the publish transaction's shape, and the "rollback is forward-only" policy. This document's job is to **resolve the two decisions that doc explicitly left open for here**, and to specify the operational mechanics (concurrency, schema-change classification, restore, archiving) precisely enough to implement against.
 
 ---
@@ -17,7 +17,7 @@
 | Table-level column shapes | `docs/data-dictionary.md` §2–§6 | `forms`, `form_versions`, `form_sections`, `form_fields`, `form_field_validations` — not repeated here. |
 
 **Two decisions were explicitly flagged in `docs/architecture/technical-architecture.md` §6.2 as unresolved and assigned to this document**:
-1. Point 4: whether the published-version immutability guard is enforced by a database trigger, or by extending the existing RLS policies with an additional predicate — **resolved in §2 below**.
+1. Point 4: whether the published-version immutability guard is enforced by a database trigger, or by extending the existing RLS policies with an additional predicate — **resolved in §2 below**, and **amended there in v1.1**: the answer is RLS for the three content child tables *and* a trigger for the `form_versions` row itself, because the two are not the same guard and only one of them is expressible as a policy.
 2. Point 8: a version-diff view is flagged as a "Phase 2/3 UX enhancement candidate, not load-bearing" — this document works out what Phase 1 *can* still deliver without that UI (§5) and what genuinely waits.
 
 **This document introduces zero new tables and zero new columns.** Everything below operates entirely within the already-ratified `forms`/`form_versions`/`form_sections`/`form_fields`/`form_field_validations` schema — no Data Dictionary changes accompany this doc.
@@ -26,7 +26,7 @@
 
 ## 2. Decision: Database-Level Immutability Guard
 
-**Resolved: extend the existing Row-Level Security policies, not a trigger.**
+**Resolved: extend the existing Row-Level Security policies, not a trigger** — *for the three CONTENT CHILD tables, which is what the rest of this section is about. The `form_versions` row itself is covered by a trigger; see the v1.1 amendment at the end of this section.*
 
 `docs/adr/0002-multi-tenancy-shared-db-rls.md` already established RLS as this schema's one, consistent idiom for "the application should get this right, but the database enforces it regardless." Introducing a second enforcement mechanism (a PL/pgSQL trigger) for a second invariant would mean developers reasoning about two different DB-level guard styles instead of one. Extending the RLS `WITH CHECK`/`USING` predicates that `form_sections`, `form_fields`, and `form_field_validations` already carry (for tenant isolation) with one additional `EXISTS` clause keeps this schema's DB-level-guard story singular.
 
@@ -58,6 +58,20 @@ CREATE POLICY form_fields_write_requires_draft ON form_fields
 This means: even if an application-layer bug attempts to update a `form_fields` row belonging to a `published` or `superseded` version, Postgres itself rejects the write — the exact "trust, but verify" posture ADR-0002 established for tenant isolation, now extended to version immutability.
 
 **Accepted cost**: this adds a subquery to every write against these three tables, on top of the tenant-equality check already present. Consistent with how `docs/multi-tenancy-rbac-design.md` §6 flagged its own new, heavier `users` RLS shape as "should be benchmarked during the Phase 0 spike, not treated as free" — the same applies here. In practice, writes against these tables only ever happen against the one active draft per form, so the working set `EXISTS` has to search is small (at most one non-superseded, non-published row per form), keeping the realistic cost low.
+
+### 2.1 Amendment (v1.1, 2026-08-05, Increment H25 / ADR-0013): this section covers the CHILD tables; the parent row needs a trigger
+
+Everything above is **as built and stays**. `TenantIsolation::draftChildGuardSql()` emits exactly this shape for `form_sections` / `form_fields` / `form_field_validations`, and the composition caveat the note above asked to verify was verified: it is the only write policy per command on those tables, so it is fully restrictive.
+
+What this section never covered — and, read as a general resolution, wrongly implied — is **the `form_versions` row itself**. Its own RLS shape (`formVersionGuard`) leaves `UPDATE` deliberately status-blind so the publish transaction can flip `draft → published → superseded`, which means every column of a published version was freely rewritable: `schema_snapshot`, `checksum`, `version_number`, `title`, `published_at` — and `status` back to `'draft'`, which **re-opens every child row**, because the guard above keys on precisely that value.
+
+**RLS cannot close it, and that is a property of RLS rather than a preference.** A policy's `USING` clause sees only the OLD row and `WITH CHECK` only the NEW one, and no clause can compare them. A per-column immutability rule *is* an OLD-vs-NEW comparison. A CHECK constraint cannot see OLD either. A row trigger is the only tool in PostgreSQL that can express it.
+
+So the boundary, stated once so it does not have to be re-litigated per invariant:
+
+> **Row-scoped invariants stay RLS. OLD-vs-NEW invariants get a trigger.** Today `form_versions` immutability is the only invariant in the schema that qualifies, and ADR-0013 §D1 says so explicitly. This is a narrowing of §2's "one idiom" rationale, not an abandonment of it: anything expressible as a predicate over a single row version remains RLS or a CHECK, with no exception.
+
+As built (H25): `form_versions_published_immutable_trg`, a `BEFORE UPDATE … FOR EACH ROW` guard gated `WHEN (OLD.status IS DISTINCT FROM 'draft')`, which diffs the whole row (deny-by-default — a column added by a future migration is frozen the moment it exists) against a four-name lifecycle allowlist, permits only the `published → superseded` transition, and permits `published_by` to be cleared but never re-pointed, so the `users` `ON DELETE SET NULL` referential action still fires. It raises SQLSTATE 23001, so a refusal is a thrown exception rather than the silent zero-row no-op every RLS refusal in this schema produces. Scope is **UPDATE only**: a DELETE trigger would fire on the `forms`/`tenants` FK cascade and turn hard-deletion into an error, so the cascade hole is recorded as Risk **R12** instead. Full reasoning, threat model and break-glass procedure: **`docs/adr/0013-published-version-immutability-trigger.md`**.
 
 ---
 

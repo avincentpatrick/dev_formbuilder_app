@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Models\User;
 use App\Models\UserUiPreference;
 
 /**
@@ -36,8 +37,14 @@ enum AccentToken: string
     }
 
     /**
-     * Resolve the column value to an enum case. NULL means "product default" (data-dictionary §19),
-     * which is Blueprint — the wire and the UI always carry a real, non-null value.
+     * Resolve a column value to an enum case, treating NULL as Blueprint.
+     *
+     * ⚠️ **Since H23a3 this is a LOSSY read, and callers have to know it.** NULL means "no opinion",
+     * which on a BRANDED tenant resolves to the organisation's brand rather than to Blueprint. This
+     * helper answers the narrower question *"which of the two product accents does this row imply"* —
+     * the right question for a fallback, the wrong one for deciding whether to apply a tenant ramp.
+     * {@see User::uiTheme()} deliberately does NOT use it: it carries the null through so the
+     * blade can tell the two states apart.
      */
     public static function fromColumn(?string $value): self
     {
@@ -45,12 +52,27 @@ enum AccentToken: string
     }
 
     /**
-     * The column value for this case: Blueprint is stored as NULL so "no row / no opinion" and
-     * "explicitly chose the default" are the same state in the database.
+     * The column value for this case — now always the backing value, INCLUDING Blueprint.
+     *
+     * ── AMENDED IN H23a3, and the amendment is the point rather than a tidy-up ──────────────────────
+     * This used to return NULL for Blueprint, so that "no row / no opinion" and "explicitly chose the
+     * product default" were deliberately the SAME state (data-dictionary §19). That was correct while
+     * there was only one layer of accent: absence could safely mean "the base tokens", because nothing
+     * else could occupy them.
+     *
+     * Tenant branding (ADR-0014) adds a second layer, and it makes absence AMBIGUOUS. On a branded tenant
+     * the two readings diverge: "no opinion" should inherit the organisation's brand, while "explicitly
+     * Blueprint" must not. Collapsing them left a member with **no way to ask for the product blue back**
+     * — the escape defect recorded in design-system-reference.md §395.
+     *
+     * So the column's domain widens from `{NULL, 'teal'}` to `{NULL, 'blueprint', 'teal'}`, and NULL now
+     * means exactly one thing: **no opinion** — inherit the tenant's brand if one is active, otherwise
+     * fall back to the product default. Existing NULL rows keep rendering identically, because a tenant
+     * with no brand has nothing to inherit.
      */
-    public function toColumn(): ?string
+    public function toColumn(): string
     {
-        return $this === self::Blueprint ? null : $this->value;
+        return $this->value;
     }
 
     /**

@@ -1,6 +1,6 @@
 import { computed, ref, watch, type ComputedRef } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import type { AccentToken, FontSizeScale, ThemeMode, UiTheme } from '@/types/inertia';
+import type { AccentPreference, AccentToken, FontSizeScale, ThemeMode, UiTheme } from '@/types/inertia';
 
 /**
  * Apply the §2.9 personalization attributes to <html>.
@@ -25,7 +25,17 @@ export function applyThemeMode(mode: ThemeMode): void {
     setRootAttribute('data-theme-mode', mode === 'light' || mode === 'dark' ? mode : null);
 }
 
-export function applyAccent(accent: AccentToken): void {
+/**
+ * `null` and `'blueprint'` BOTH remove the attribute, and they are not the same state.
+ *
+ * Null means "no opinion" and lets the tenant's brand ramp apply; blueprint means "the product default
+ * explicitly" and must suppress it. The attribute cannot express that difference — §2.9 keeps the
+ * default as the ABSENCE of the attribute — so the tenant ramp is emitted or withheld SERVER-side, by
+ * app.blade.php, on exactly the same condition. The client half is therefore optimistic only: switching
+ * to blueprint here removes the attribute immediately, and the brand `<style>` block disappears on the
+ * next full load. See app.blade.php's note on why precedence is not resolved in CSS.
+ */
+export function applyAccent(accent: AccentToken | null): void {
     setRootAttribute('data-accent', accent === 'teal' ? 'teal' : null);
 }
 
@@ -39,11 +49,11 @@ export function applyDyslexiaFont(enabled: boolean): void {
 
 interface AppearancePreference {
     mode: ComputedRef<ThemeMode>;
-    accent: ComputedRef<AccentToken>;
+    accent: ComputedRef<AccentPreference>;
     fontSize: ComputedRef<FontSizeScale>;
     dyslexiaFont: ComputedRef<boolean>;
     setMode: (next: ThemeMode) => void;
-    setAccent: (next: AccentToken) => void;
+    setAccent: (next: AccentPreference) => void;
     setFontSize: (next: FontSizeScale) => void;
     setDyslexiaFont: (next: boolean) => void;
 }
@@ -73,7 +83,10 @@ export function useAppearancePreference(): AppearancePreference {
         { deep: true },
     );
 
-    function persist(field: string, value: string | boolean): void {
+    // `null` is a real value here, not an omission: it is how a member says "no opinion — use my
+    // organisation's brand". UpdateAppearanceRequest's accent rule is `nullable` for exactly this, while
+    // every other axis stays `required`.
+    function persist(field: string, value: string | boolean | null): void {
         router.patch(
             '/settings/appearance',
             { [field]: value },
@@ -92,7 +105,7 @@ export function useAppearancePreference(): AppearancePreference {
             applyThemeMode(next);
             persist('theme_mode', next);
         },
-        setAccent(next: AccentToken): void {
+        setAccent(next: AccentPreference): void {
             local.value.accent = next;
             applyAccent(next);
             persist('accent_token', next);

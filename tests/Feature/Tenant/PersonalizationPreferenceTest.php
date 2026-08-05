@@ -49,14 +49,19 @@ function personalizationActor(string $slug = 'acme'): array
     return [$tenant, $user];
 }
 
-it('defaults a member with no preference row to blueprint / standard / no dyslexia font', function (): void {
+it('defaults a member with no preference row to NO ACCENT OPINION / standard / no dyslexia font', function (): void {
+    // AMENDED IN H23a3. This used to assert `'blueprint'`, and the change is behavioural rather than
+    // cosmetic: a user who has never opened Settings has expressed no opinion, and on a BRANDED tenant
+    // that must resolve to the organisation's brand. Returning `'blueprint'` here would mean "the product
+    // default, explicitly" — i.e. every un-personalized member would silently opt OUT of their own
+    // organisation's branding, which is the opposite of what a default should do.
     [, $user] = personalizationActor();
 
     $this->actingAs($user)->withoutVite()
         ->get('http://acme.meridian.test/dashboard')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('ui.theme.accent', 'blueprint')
+            ->where('ui.theme.accent', null)
             ->where('ui.theme.fontSize', 'standard')
             ->where('ui.theme.dyslexiaFont', false));
 });
@@ -80,10 +85,16 @@ it('persists the teal accent and emits data-accent on <html>', function (): void
     expect($html)->toContain('data-accent="teal"');
 });
 
-it('stores the blueprint default as NULL but reads it back as blueprint', function (): void {
-    // data-dictionary §19: NULL = the product default, so "never expressed an opinion" and
-    // "explicitly chose the default" are the same state in the database. The wire and the UI always
-    // carry a real, non-null value — the mapping happens at the request boundary.
+it('stores an EXPLICIT blueprint choice as blueprint, and an explicit null as null', function (): void {
+    // ── REWRITTEN IN H23a3, AND THE OLD ASSERTION WAS THE DEFECT ────────────────────────────────────
+    // This test used to assert that choosing Blueprint stored NULL, per the original §19 decision that
+    // "never expressed an opinion" and "explicitly chose the default" are the same database state. That
+    // was correct while accent had only one layer.
+    //
+    // Tenant branding (ADR-0014) adds a second layer and makes the two readings diverge: on a branded
+    // tenant, "no opinion" inherits the organisation's colour while "explicitly Blueprint" must not.
+    // Collapsing them left a member with no way to ask for the product blue back. So the column's domain
+    // widens to {NULL, 'blueprint', 'teal'} and this test now pins BOTH states rather than their merger.
     [$tenant, $user] = personalizationActor();
 
     $this->actingAs($user)
@@ -96,11 +107,20 @@ it('stores the blueprint default as NULL but reads it back as blueprint', functi
     enterTenant($tenant->id, $user->id);
     // Asserted through the query builder, not the model, so the enum cast cannot mask a stored string.
     expect(DB::table('user_ui_preferences')->where('user_id', $user->id)->value('accent_token'))
-        ->toBeNull();
+        ->toBe('blueprint');
 
     $this->actingAs($user)->withoutVite()
         ->get('http://acme.meridian.test/dashboard')
         ->assertInertia(fn (Assert $page) => $page->where('ui.theme.accent', 'blueprint'));
+
+    // And the other state: an explicit null is a real, storable choice — "use my organisation's brand".
+    $this->actingAs($user)
+        ->patch('http://acme.meridian.test/settings/appearance', ['accent_token' => null])
+        ->assertRedirect();
+
+    enterTenant($tenant->id, $user->id);
+    expect(DB::table('user_ui_preferences')->where('user_id', $user->id)->value('accent_token'))
+        ->toBeNull();
 });
 
 it('persists a text-size scale and emits data-font-size only when it is not standard', function (): void {

@@ -6,6 +6,7 @@ use App\Models\Form;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Branding\TenantBrandingService;
 use App\Services\Entitlements\EntitlementService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -103,6 +104,14 @@ class HandleInertiaRequests extends Middleware
             // scale / body face stay at their base values).
             'ui' => [
                 'theme' => $user?->uiTheme() ?? User::defaultUiTheme(),
+                // The tenant's brand ramp (H23a3, ADR-0014), or null. A SHARED prop rather than a
+                // per-page one because it paints every page — unlike `customDomains`, which H22b kept
+                // off the shared payload precisely because it served one card.
+                //
+                // Read through TenantBrandingService::isActive(), NEVER Tenant::hasBrandRamp(): stored
+                // and active are different questions, and a surface that checks the wrong one ships a
+                // Starter+ feature to Free tenants with nothing in the build to notice.
+                'brand' => app(TenantBrandingService::class)->sharedRamp(),
             ],
             // The tenant's read-only entitlement model (H5a / ADR-0008): current plan tier, feature flags,
             // and per-metric quota-vs-usage. One shared read-model both the H5b gated UI and any future

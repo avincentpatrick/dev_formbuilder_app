@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\IndexedDataType;
+use App\Enums\PlanTier;
 use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
@@ -14,6 +15,7 @@ use App\Models\SubmissionAnswerIndex;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
+use App\Services\Branding\TenantBrandingService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Guest\GuestShareTokenService;
@@ -109,6 +111,14 @@ it('404s an unknown slug', function (): void {
     $this->getJson('http://acme.meridian.test/f/nope')->assertNotFound();
 });
 
+/** The `<html …>` opening tag — the element the personalization invariant is actually about. */
+function guestRootTag(string $html): string
+{
+    preg_match('/<html[^>]*>/', $html, $matches);
+
+    return $matches[0] ?? '';
+}
+
 it('never emits personalization attributes on the guest runtime shell (Increment G11)', function (): void {
     // PRD Feature #9 + design-system-reference.md §2.9's governing rule: personalization is strictly a
     // per-user, authenticated-app concern. It must never affect how a tenant's public form renders to a
@@ -143,13 +153,55 @@ it('never emits personalization attributes on the guest runtime shell (Increment
         ->assertOk()
         ->getContent();
 
-    expect($html)->toContain('<html')
-        ->and($html)->not->toContain('data-theme-mode')
+    // `data-theme-mode` is asserted against the ROOT TAG rather than the whole document, and the change
+    // is H23b's. The invariant was always "the guest root element carries no personalization attribute";
+    // a whole-document substring search was a serviceable proxy for it right up until a stylesheet
+    // legitimately NAMED one of those attributes in a selector — which is what the shared brand partial
+    // does (`:root:not([data-theme-mode='light'])…`, the selector shape it must match to win the
+    // cascade). The other three axes stay whole-document assertions: nothing anywhere emits or names
+    // them, and that is worth continuing to pin at full strength.
+    expect(guestRootTag($html))->toStartWith('<html')
+        ->and(guestRootTag($html))->not->toContain('data-theme-mode')
+        ->and(guestRootTag($html))->not->toContain('data-accent')
         ->and($html)->not->toContain('data-accent')
         ->and($html)->not->toContain('data-font-size')
         ->and($html)->not->toContain('data-dyslexia-font')
         // The opt-in face must not even be referenced in the guest bundle's stylesheet graph.
         ->and($html)->not->toContain('OpenDyslexic');
+});
+
+it('keeps the root element attribute-free even when the tenant IS branded (Increment H23b)', function (): void {
+    // The layer boundary, asserted where the two layers now actually meet. A tenant brand reaching the
+    // respondent must NOT arrive as a personalization attribute — it arrives as a <style> block and
+    // nothing else. Getting this wrong by reusing the admin root's emission path would hand every
+    // respondent the preferences of whichever member happened to be signed in on that device.
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'admin');
+    assignPlanTier(PlanTier::Starter);
+    guestForm($tenant, $owner);
+    app(TenantBrandingService::class)->setBrandColor($tenant, '#C0392B');
+
+    UserUiPreference::create([
+        'user_id' => $owner->id,
+        'theme_mode' => 'dark',
+        'accent_token' => 'teal',
+        'font_size_scale' => 'extra_large',
+        'use_dyslexia_friendly_font' => true,
+    ]);
+
+    $html = $this->actingAs($owner)
+        ->withoutVite()
+        ->get('http://acme.meridian.test/f/intake')
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('id="tenant-brand"')          // the tenant layer DID arrive …
+        ->and(guestRootTag($html))->not->toContain('data-')  // … and the personalization layer did not
+        ->and($html)->not->toContain('data-accent')
+        ->and($html)->not->toContain('data-font-size')
+        ->and($html)->not->toContain('data-dyslexia-font');
 });
 
 it('404s a form that exists and is published but has guest access disabled (non-disclosure)', function (): void {

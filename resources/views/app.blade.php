@@ -50,45 +50,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title inertia>{{ config('app.name', 'Meridian') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
-    {{-- The tenant brand ramp. AFTER @vite deliberately: the light block is `:root`, the same (0,1,0) as
-         the base token declarations it must beat, so source order is what decides — and the dark blocks
-         match their base twins' specificity for the same reason. Every value is a stored, server-derived
-         hex (never tenant text), so there is nothing here to escape beyond the {{ }} Blade already does.
-
-         Only these SIX properties, never a neutral, semantic or chart token — ADR-0014 §D7, and §D11's
-         rule that a data series must look the same to two colleagues reading one screenshot. --}}
-    @if (is_array($brandTokens))
-        <style id="tenant-brand">
-            :root {
-                --mds-color-action-primary-bg: {{ $brandTokens['light']['bg'] }};
-                --mds-color-action-primary-bg-hover: {{ $brandTokens['light']['bg_hover'] }};
-                --mds-color-action-primary-bg-active: {{ $brandTokens['light']['bg_active'] }};
-                --mds-color-action-primary-fg: {{ $brandTokens['light']['fg'] }};
-                --mds-color-action-primary-tint: {{ $brandTokens['light']['tint'] }};
-                --mds-color-focus-ring: {{ $brandTokens['light']['ring'] }};
-            }
-
-            :root[data-theme-mode='dark'] {
-                --mds-color-action-primary-bg: {{ $brandTokens['dark']['bg'] }};
-                --mds-color-action-primary-bg-hover: {{ $brandTokens['dark']['bg_hover'] }};
-                --mds-color-action-primary-bg-active: {{ $brandTokens['dark']['bg_active'] }};
-                --mds-color-action-primary-fg: {{ $brandTokens['dark']['fg'] }};
-                --mds-color-action-primary-tint: {{ $brandTokens['dark']['tint'] }};
-                --mds-color-focus-ring: {{ $brandTokens['dark']['ring'] }};
-            }
-
-            @media (prefers-color-scheme: dark) {
-                :root:not([data-theme-mode='light']):not([data-theme-mode='dark']) {
-                    --mds-color-action-primary-bg: {{ $brandTokens['dark']['bg'] }};
-                    --mds-color-action-primary-bg-hover: {{ $brandTokens['dark']['bg_hover'] }};
-                    --mds-color-action-primary-bg-active: {{ $brandTokens['dark']['bg_active'] }};
-                    --mds-color-action-primary-fg: {{ $brandTokens['dark']['fg'] }};
-                    --mds-color-action-primary-tint: {{ $brandTokens['dark']['tint'] }};
-                    --mds-color-focus-ring: {{ $brandTokens['dark']['ring'] }};
-                }
-            }
-        </style>
-    @endif
+    {{-- The tenant brand ramp, AFTER @vite deliberately — see the partial for why order and selector
+         specificity are load-bearing. Shared verbatim with the guest shell since H23b: this template
+         decides WHETHER (the precedence rule above), the partial decides HOW. --}}
+    @include('partials.brand-ramp', ['tokens' => $brandTokens])
     @inertiaHead
 </head>
 <body>

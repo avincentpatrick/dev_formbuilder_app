@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Services\Branding\GuestBrandingPresenter;
 use App\Services\Entitlements\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -29,14 +30,17 @@ use Illuminate\Support\Str;
  * plain online page (the never-block online submission path is untouched). The gate defers to the resolved
  * plan, so it is inert until the catalog is seeded (the RequireFeature stance); the guest never sees a 402 —
  * a manifest fetch has no upgrade UI, so a missing feature reads as a missing manifest (404), like the others.
+ *
+ * H23b makes `theme_color` tenant-derived, through the SAME {@see GuestBrandingPresenter} the shell reads —
+ * the shell's `<meta name="theme-color">` and this value must never disagree, and the shell's manifest link
+ * carries this presenter's fingerprint as `?b=` so a brand change moves this URL. `background_color` stays
+ * fixed: it is a NEUTRAL, and ADR-0014 §D7 keeps the tenant layer off neutrals.
  */
 final class PwaManifestController extends Controller
 {
-    private const THEME_COLOR = '#1B5E5E';      // --mds-accent-teal-600
-
     private const BACKGROUND_COLOR = '#F3F4F1'; // --mds-neutral-50
 
-    public function __invoke(EntitlementService $entitlements, string $slug): JsonResponse
+    public function __invoke(EntitlementService $entitlements, GuestBrandingPresenter $branding, string $slug): JsonResponse
     {
         $form = Form::query()->where('public_slug', $slug)->first();
 
@@ -55,7 +59,7 @@ final class PwaManifestController extends Controller
             'scope' => $scope,
             'display' => 'standalone',
             'orientation' => 'portrait',
-            'theme_color' => self::THEME_COLOR,
+            'theme_color' => $branding->forGuest()['theme_color'],
             'background_color' => self::BACKGROUND_COLOR,
             'icons' => [
                 ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],

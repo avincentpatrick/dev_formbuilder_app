@@ -75,6 +75,14 @@ The fixture lives in `tests/fixtures/`, deliberately **not** `tests/golden/`: it
 
 **Not addressed here.** Per-form branding overrides (`forms.theme`, built and unread since Increment F — data-dictionary §218); custom typefaces; logo placement; full white-label. The `branding` entitlement stays at Starter+ per ADR-0008 §D7 and is not revisited.
 
+**As built — the guest runtime (H23b), the fifth and last consuming surface.** Three things are worth recording because none of them is predicted above.
+
+- **This surface CAN resolve `var()`**, so §D8's storage argument gains no new evidence here — it also loses none: the ramp is still read from storage rather than re-derived, because a ramp that was compliant when written must stay the ramp that renders. The revisit trigger below therefore does *not* fire; it asks for a **sixth** surface.
+- **There is no precedence rule on this surface, and that is the §D1 two-layers rule paying off rather than an omission.** The admin root withholds the tenant ramp when a member has expressed an accent opinion; a respondent has no preferences for the brand to lose to, so the guest shell emits it whenever branding is active and continues to emit no `data-accent` / `data-font-size` / `data-dyslexia-font` at all. The emission itself is a single shared Blade partial for both surfaces — including the `[data-theme-mode='dark']` block, which is inert on the guest shell but kept anyway: the system-dark selector has to stay at (0,3,0) to beat `theme-overrides.css`'s own, and a guest-specific variant would be a second copy of that specificity reasoning waiting to drift.
+- **Two surfaces outside CSS take the ramp's light fill**: the shell's `<meta name="theme-color">` and the per-form manifest's `theme_color`. Their unbranded default was corrected from `--mds-accent-teal-600` to `--mds-primary-600` in the same increment — the guest shell has never emitted `data-accent`, so the browser chrome and the installed app's splash screen had been tinted a colour appearing nowhere in the form. `background_color` stays `--mds-neutral-50`: §D7 keeps the tenant layer off neutrals, and these two sit adjacent in one payload, which is exactly where that rule is easiest to break.
+
+**The offline cost this creates, and how it is paid.** A brand that rides cached HTML can go stale on a device that is offline. The invalidation is a **refresh, never a purge** — deleting the shell cache would trade a fieldworker's offline access to a primed form for a colour, which is a bad trade in any brand's favour. The mechanism (a fingerprint on the mount node, a Dexie `app_state` key, a deferred retry when offline, `?b=` on the manifest link) is specified in `offline-first-sync-design.md` §4.1 rather than duplicated here.
+
 ---
 
 ## When to Revisit

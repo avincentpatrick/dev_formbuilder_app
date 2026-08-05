@@ -34,7 +34,7 @@ Three-layer architecture; the full manifest→fill→replay sequence including i
 
 ## 3. Client-Side Data Model (IndexedDB via Dexie)
 
-Four Dexie tables, each namespaced by `form_version_id` where relevant so multiple cached forms/versions coexist on one device without collision:
+Five Dexie tables, each namespaced by `form_version_id` where relevant so multiple cached forms/versions coexist on one device without collision:
 
 | Table | Key | Purpose |
 |---|---|---|
@@ -42,8 +42,9 @@ Four Dexie tables, each namespaced by `form_version_id` where relevant so multip
 | `draft_answers` | `(form_version_id, local_draft_id)` | In-progress, not-yet-finalized answers — autosaved continuously while filling, per the existing sequence diagram's "save draft answers per field (autosave)" step. |
 | `outbox` | `client_submission_uuid` | Finalized submissions queued for replay — `status: pending / synced / conflict`, matching the sequence diagram's three outcomes. |
 | `media_queue` | `attachment_local_id` | Queued respondent-submitted media awaiting the independent resumable upload (§5), referencing its parent `outbox` row by `client_submission_uuid`. |
+| `app_state` | `key` | **(H23b, schema v2)** Device-scoped scalars belonging to no form. One key today — `brand_version`, the tenant-ramp fingerprint the cached guest shells were last refreshed for (§4.1). |
 
-**Schema versioning**: Dexie's own native schema-migration mechanism (`db.version(N).stores({...})`) handles client-side schema evolution across app updates — flagged here only so it isn't assumed to need a bespoke migration system; Dexie already provides one.
+**Schema versioning**: Dexie's own native schema-migration mechanism (`db.version(N).stores({...})`) handles client-side schema evolution across app updates — flagged here only so it isn't assumed to need a bespoke migration system; Dexie already provides one. The line worth knowing in practice: **a new STORE requires a version bump, an un-indexed field on an existing row shape does not** — G8c added `outbox.conflict_code` at v1, H23b's `app_state` took the schema to v2, and both were the correct call.
 
 ---
 
@@ -53,6 +54,23 @@ The manifest is re-fetched (checksum-compared, §2) in three situations, not jus
 1. **On app open/foreground** — the always-present baseline check.
 2. **On a Reverb "sync-ready" push** (already named as existing in the C4 Container diagram's `PUBLICPWA <--> Reverb` connection, not previously detailed) — when a tenant publishes a new version of a form a device has cached, the server pushes a lightweight `form_version.published`-triggered notification over the same private/presence channel pattern ADR-0002 already establishes for tenant-scoped Reverb channels; a connected, currently-online client can proactively re-check rather than waiting for its next foreground event. **This is a convenience, not a correctness requirement** — the checksum-based cache-busting (§2) is what actually keeps a device correct even if it never receives the push (e.g., it was offline when the publish happened).
 3. **Never mid-collection** — once a respondent has started filling against a specific `form_version_id`, that device continues against that exact version until the current submission is finalized, even if a newer version becomes available in the interim (this is `docs/architecture/technical-architecture.md` §6.2's "no mid-collection schema surprise" guarantee, restated here as a client-side rule: the manifest re-check happens at natural boundaries — app open, between submissions — never interrupting an in-progress fill).
+
+### 4.1 Tenant branding — RE-PRIME, never purge (Increment H23b)
+
+The tenant's brand ramp (ADR-0014) reaches the guest runtime as an inline `<style>` block in the shell HTML, which the service worker caches `NetworkFirst` under `guest-shell-html`. That makes the page a respondent is *currently* looking at self-healing: any successful online navigation replaces the entry with a freshly-branded copy, so no invalidation logic is needed for it.
+
+What does not self-heal is every **other** `/f/…` shell the device cached earlier — a second form, an emailed resume link. Those keep rendering the superseded brand offline until their 7-day expiry, because they are only rewritten when the respondent happens to navigate to them online, which on a field device may be never.
+
+**The obvious fix — `caches.delete('guest-shell-html')` — is the wrong one, and the reasoning is the design.** A stale brand is cosmetic; a purged shell costs a fieldworker offline access to a form they deliberately primed, which is a core promise of this document. So the stale entries are **refreshed** and the cache is never emptied:
+
+1. The shell embeds `data-brand-version`, a 12-hex fingerprint of the rendered ramp (`'none'` when unbranded), derived only from the ramp hexes — no clock, no row id, so it is stable across renders and across web nodes.
+2. After mount, the SPA compares it with `app_state['brand_version']`. Equal ⇒ do nothing, which is the overwhelmingly common path.
+3. Different **and offline** ⇒ **defer**: change nothing, including the stored fingerprint. Advancing it without having refreshed anything would be a lie that permanently suppresses the retry, since every later boot would compare equal and skip.
+4. Different **and online** ⇒ re-`fetch` every cached shell URL except the current one and `cache.put` **only on a 200** (writing a 404 or a 500 would replace a working offline shell with an error page — strictly worse than the stale colour), then store the new fingerprint. One dead URL never aborts the sweep for the others.
+
+The per-form web manifest carries the same fingerprint as a `?b=` query parameter, because the service worker does not cache that URL at all and the browser caches it aggressively — moving the URL is the only lever available. It is safe for app identity: the manifest declares an explicit `id`, so the manifest URL is not what pins an installed app.
+
+`guest-schema` and `guest-shell-assets` are deliberately untouched: neither carries brand.
 
 ---
 

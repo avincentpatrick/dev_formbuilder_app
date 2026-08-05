@@ -8,6 +8,7 @@ use App\Exceptions\Guest\ExpiredShareTokenException;
 use App\Exceptions\Guest\InvalidShareTokenException;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Services\Branding\GuestBrandingPresenter;
 use App\Support\Guest\GuestShareTokenService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -25,10 +26,15 @@ use Illuminate\Http\Request;
  * Content negotiation (F6b): `Accept: application/json` (the SPA's re-mint fetch + the F5 Feature tests)
  * gets the minted token as JSON; a browser navigation gets the standalone SPA shell with the token embedded
  * in the mount node's dataset, from which the SPA drives the schema/submit endpoints same-origin.
+ *
+ * H23b — BOTH shell-rendering actions pass the tenant's branding into the view, and the JSON arm of
+ * {@see self::mint()} deliberately does NOT: it is the SPA's re-mint fetch, which renders no document.
+ * Both read it from {@see GuestBrandingPresenter} rather than composing it locally — two call sites
+ * deriving one answer independently is how a resume link ends up branded differently from a share link.
  */
 final class GuestFormController extends Controller
 {
-    public function mint(Request $request, string $slug, GuestShareTokenService $tokens): JsonResponse|View
+    public function mint(Request $request, string $slug, GuestShareTokenService $tokens, GuestBrandingPresenter $branding): JsonResponse|View
     {
         $form = Form::query()->where('public_slug', $slug)->first();
 
@@ -59,6 +65,7 @@ final class GuestFormController extends Controller
             ],
             'slug' => $slug,
             'locale' => $form->default_locale,
+            'brand' => $branding->forGuest(),
         ]);
     }
 
@@ -71,7 +78,7 @@ final class GuestFormController extends Controller
      * the resume token is embedded alongside it for the SPA to restore the saved answers (that restore step is
      * H10). Not a JSON endpoint — a resume link is always a browser navigation.
      */
-    public function resume(string $resumeToken, GuestShareTokenService $tokens): View
+    public function resume(string $resumeToken, GuestShareTokenService $tokens, GuestBrandingPresenter $branding): View
     {
         try {
             $token = $tokens->verifyResume($resumeToken);
@@ -96,6 +103,7 @@ final class GuestFormController extends Controller
             ],
             'slug' => $form->public_slug,
             'locale' => $form->default_locale,
+            'brand' => $branding->forGuest(),
         ]);
     }
 }

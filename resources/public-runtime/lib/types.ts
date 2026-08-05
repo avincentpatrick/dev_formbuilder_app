@@ -294,6 +294,10 @@ export interface Bootstrap {
     // Increment H10 — present (non-empty) only when the SPA was opened via the `/f/resume/{token}` web shell.
     // Drives the resume-and-restore flow (App.vue `load()`); empty on a normal `/f/{slug}` entry.
     resumeToken: string;
+    // Increment H23b — the fingerprint of the tenant brand ramp THIS document was rendered with (`none`
+    // when the tenant renders unbranded). Nothing in the UI reads it; it exists so the SPA can notice that
+    // OTHER guest shells cached on this device are showing a superseded brand. See lib/brand-cache.ts.
+    brandVersion: string;
 }
 
 /** How the SPA should react to a normalized API error. */

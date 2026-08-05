@@ -193,7 +193,7 @@ final class GoogleSheetsConnector implements ConnectorProvider
      */
     private function readHeaderRow(Connection $connection, string $spreadsheetId, string $sheetName): array|ConnectorDeliveryResult
     {
-        $url = self::SHEETS_BASE.'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($sheetName.'!1:1');
+        $url = self::SHEETS_BASE.'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode(self::a1Range($sheetName, '!1:1'));
 
         $response = $this->send($connection, fn (): Response => Http::withToken($connection->access_token)
             ->withOptions(['allow_redirects' => false])
@@ -238,7 +238,7 @@ final class GoogleSheetsConnector implements ConnectorProvider
      */
     private function append(Connection $connection, string $spreadsheetId, string $sheetName, array $row): ConnectorDeliveryResult
     {
-        $url = self::SHEETS_BASE.'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($sheetName).':append';
+        $url = self::SHEETS_BASE.'/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode(self::a1Range($sheetName)).':append';
 
         $response = $this->send($connection, fn (): Response => Http::withToken($connection->access_token)
             ->withOptions(['allow_redirects' => false])
@@ -342,8 +342,35 @@ final class GoogleSheetsConnector implements ConnectorProvider
             return ConnectorDeliveryResult::blocked($status, '[permission_denied] This connection isn’t allowed to write to that spreadsheet. Re-pick the file for this rule.');
         }
 
+        // 400 INVALID_ARGUMENT is Google's answer for a range it cannot parse and for a TAB THAT DOES NOT
+        // EXIST — a renamed or deleted worksheet, which is the single most likely way a working rule breaks
+        // after setup. It is human-fixable and permanent, so retrying it burns the whole seven-day ladder to
+        // reach a dead letter nobody is told about; blocked pauses the rule and says what to do.
+        if ($status === 400) {
+            return ConnectorDeliveryResult::blocked($status, '[bad_range] We couldn’t find that tab in the spreadsheet. It may have been renamed or deleted — open the rule and pick it again.');
+        }
+
         // Everything else — 401 (see above), 429, 5xx, and any 403 that is a quota — rides the ladder.
         return ConnectorDeliveryResult::failed($status, $this->excerpt('['.($reason !== '' ? $reason : 'http_'.$status).'] Google refused the write.'));
+    }
+
+    /**
+     * A sheet name in A1 notation, ALWAYS quoted.
+     *
+     * A1 notation requires single quotes around any sheet name containing a space, a punctuation character or
+     * a leading digit, and this is not an exotic edge case: **Google's own default tab name for a form-linked
+     * sheet is "Form Responses 1"**. Unquoted, `Form Responses 1!1:1` is not a parseable range, so the
+     * connector would fail for a very ordinary destination — and fail as a 400, i.e. as a retry, so it would
+     * spend seven days on the ladder and dead-letter with the tenant never told why.
+     *
+     * Quoting is unconditional rather than conditional-on-suspicious-characters: `'Sheet1'!1:1` is equally
+     * valid, and a predicate over "which characters need quoting" is a second thing to get wrong. An internal
+     * apostrophe is escaped by DOUBLING it, which is A1's own rule — a tab named `Ana's data` becomes
+     * `'Ana''s data'`.
+     */
+    private static function a1Range(string $sheetName, string $suffix = ''): string
+    {
+        return "'".str_replace("'", "''", $sheetName)."'".$suffix;
     }
 
     /**

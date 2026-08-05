@@ -403,6 +403,50 @@ it('retries a rate limit instead of blocking on it', function (): void {
         ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Active);
 });
 
+it('quotes a tab name with spaces, which is Google\'s OWN default for a form-linked sheet', function (): void {
+    // "Form Responses 1" is the tab Google creates automatically. Unquoted, `Form Responses 1!1:1` is not
+    // parseable A1 notation, so the connector would fail on an entirely ordinary destination — and fail as a
+    // 400, i.e. as a retry, spending the whole ladder to reach a dead letter with no explanation.
+    fakeSheets();
+
+    [, , $delivery] = runSheetsDelivery(config: sheetsConfig(null, ['sheet_name' => 'Form Responses 1']));
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded);
+
+    Http::assertSent(function (Request $request): bool {
+        // Both the header READ and the append WRITE must quote it, so assert on whichever this call is.
+        $url = rawurldecode($request->url());
+
+        return str_contains($url, "'Form Responses 1'");
+    });
+});
+
+it('escapes an apostrophe in a tab name by doubling it, per A1\'s own rule', function (): void {
+    fakeSheets();
+
+    [, , $delivery] = runSheetsDelivery(config: sheetsConfig(null, ['sheet_name' => "Ana's data"]));
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded);
+
+    Http::assertSent(fn (Request $r): bool => str_contains(rawurldecode($r->url()), "'Ana''s data'"));
+});
+
+it('blocks rather than retries when the tab has been renamed or deleted', function (): void {
+    // Google answers 400 INVALID_ARGUMENT for a range it cannot resolve, which includes a tab that no longer
+    // exists — the most likely way a working rule breaks after setup, and permanent until a human fixes it.
+    Http::fake([
+        'sheets.googleapis.com/*' => Http::response(['error' => ['code' => 400, 'status' => 'INVALID_ARGUMENT', 'message' => 'Unable to parse range']], 400),
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.x', 'expires_in' => 3600], 200),
+    ]);
+
+    [$connection, $subscription, $delivery] = runSheetsDelivery();
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::DeadLettered)
+        ->and($delivery->next_retry_at)->toBeNull()
+        ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Paused)
+        ->and($connection->status)->toBe(ConnectionStatus::Active);
+});
+
 it('blocks a rule whose event carries no submission to write', function (): void {
     fakeSheets();
 

@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use App\Support\Mapping\ColumnMapping;
+use App\Support\Mapping\MappingDriftDetector;
 
 // The forcing device for H16a's central claim (the `PdfFieldRoleTest` / `BrandRampParityTest` source-parsing
 // recipe). The H-map's H16a row promises a "drift-detection engine — SHARED w/ OCR linelist", and H19a depends
@@ -84,12 +86,12 @@ it('can be exercised with no Laravel application booted', function (): void {
     // The strongest statement of portability available here, and the one H19a actually cares about: the engine
     // is reachable through plain autoloading with no container, no config, no database and no tenant context.
     // If this ever needs `app()` or `config()` to run, it has stopped being shareable.
-    $mapping = App\Support\Mapping\ColumnMapping::author(
+    $mapping = ColumnMapping::author(
         ['Name', 'Age'],
         ['Name' => 'full_name', 'Age' => 'age'],
     );
 
-    $drift = (new App\Support\Mapping\MappingDriftDetector)->compare($mapping, ['Name', 'Age']);
+    $drift = (new MappingDriftDetector)->compare($mapping, ['Name', 'Age']);
 
     expect($drift->hasDrifted)->toBeFalse();
 });

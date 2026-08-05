@@ -10,10 +10,12 @@ use App\Models\ConnectionSubscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Api\ApiAbilities;
+use App\Support\Connectors\SubscriptionConfigRules;
 use App\Support\Mapping\ColumnMapping;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -68,7 +70,7 @@ function validSheetsConfig(): array
     ];
 }
 
-function createRule(Connection $connection, array $config, string $token): Illuminate\Testing\TestResponse
+function createRule(Connection $connection, array $config, string $token): TestResponse
 {
     return test()->withToken($token)->postJson(subscriptionsUrl($connection), [
         'name' => 'Sync',
@@ -85,7 +87,7 @@ function createRule(Connection $connection, array $config, string $token): Illum
  * `errors` key, finds nothing, and — because a missing key is indistinguishable from a passing request to it —
  * would report "no validation errors" for a request that was correctly rejected.
  */
-function assertRejects(Illuminate\Testing\TestResponse $response, string $field): Illuminate\Testing\TestResponse
+function assertRejects(TestResponse $response, string $field): TestResponse
 {
     return $response->assertStatus(422)
         ->assertJsonPath('error.code', 'validation_failed')
@@ -163,7 +165,7 @@ it('gives every provider in the enum at least one required destination key', fun
     // time. Asserted as "at least one required key" rather than a count, because the two providers legitimately
     // have different numbers of them and a count would pin the shape rather than the property.
     foreach (ConnectorProviderKey::cases() as $provider) {
-        $rules = App\Support\Connectors\SubscriptionConfigRules::rulesFor($provider);
+        $rules = SubscriptionConfigRules::rulesFor($provider);
 
         $required = array_filter(
             $rules,

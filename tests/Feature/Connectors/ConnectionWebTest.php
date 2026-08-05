@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
-use App\Enums\ConnectorSubscriptionStatus;
 use App\Enums\ConnectorProviderKey;
+use App\Enums\ConnectorSubscriptionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\PlanTier;
 use App\Enums\WebhookDeliveryStatus;

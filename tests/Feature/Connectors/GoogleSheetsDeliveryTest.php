@@ -18,6 +18,7 @@ use App\Support\Mapping\ColumnMapping;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -339,7 +340,7 @@ it('does NOT kill the grant when the token endpoint merely times out', function 
     // answers 401. The delivery must land on the RETRY LADDER with the grant intact — one blip costs a few
     // minutes, not the tenant's integration.
     Http::fake([
-        'oauth2.googleapis.com/token' => fn () => throw new Illuminate\Http\Client\ConnectionException('timeout'),
+        'oauth2.googleapis.com/token' => fn () => throw new ConnectionException('timeout'),
         'sheets.googleapis.com/*' => Http::response(['error' => ['code' => 401, 'status' => 'UNAUTHENTICATED']], 401),
     ]);
 

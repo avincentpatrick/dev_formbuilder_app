@@ -1,0 +1,1538 @@
+[
+    {
+        "name": "blueprint_product_primary",
+        "note": "The product's own Blueprint primary. A ramp generated from the design system's own hue must land in the design system's own register.",
+        "input": "#1C4B72",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#295880",
+                "bg_hover": "#1A4970",
+                "bg_active": "#05385E",
+                "fg": "#295880",
+                "tint": "#E9F1F8",
+                "ring": "#1A4970"
+            },
+            "dark": {
+                "bg": "#34628B",
+                "bg_hover": "#1B4B71",
+                "bg_active": "#093C62",
+                "fg": "#78A9D5",
+                "tint": "#104067",
+                "ring": "#78A9D5"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.49,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.41,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.11,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.49,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.79,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.79,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.41,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.53,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.94,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.16,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.45,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.22,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.43,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.44,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "teal_ratified_accent",
+        "note": "THE ANCHOR VECTOR. Fed the ratified Teal accent, the engine must re-derive `--mds-accent-teal-600` (#1B5E5E) and `--mds-accent-teal-50` (#E6F2F2) BYTE-IDENTICALLY, and reproduce design-system-reference.md §4.1 rows 1-3 (7.48 / 9.40 / 12.10) to two decimals. This is the evidence that the targets encode the system rather than one author's taste.",
+        "input": "#1B5E5E",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#1B5E5E",
+                "bg_hover": "#024F4F",
+                "bg_active": "#003D3D",
+                "fg": "#1B5E5E",
+                "tint": "#E6F2F2",
+                "ring": "#024F4F"
+            },
+            "dark": {
+                "bg": "#286868",
+                "bg_hover": "#055051",
+                "bg_active": "#004141",
+                "fg": "#6FAFAE",
+                "tint": "#004646",
+                "ring": "#6FAFAE"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.48,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.4,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.1,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.48,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.77,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.77,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.4,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.51,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.9,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.42,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.24,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.46,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.21,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.42,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.21,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.42,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.37,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "achromatic_black",
+        "note": "C = 0, so `atan2(0, 0)` decides the hue. Both languages define that as 0, which is the only reason the two engines agree here at all.",
+        "input": "#000000",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#555555",
+                "bg_hover": "#464646",
+                "bg_active": "#363636",
+                "fg": "#555555",
+                "tint": "#F0F0F0",
+                "ring": "#464646"
+            },
+            "dark": {
+                "bg": "#5F5F5F",
+                "bg_hover": "#484848",
+                "bg_active": "#393939",
+                "fg": "#A4A4A4",
+                "tint": "#3E3E3E",
+                "ring": "#A4A4A4"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.44,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.08,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.75,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.75,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.44,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.55,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.96,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.39,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.15,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.55,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.22,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.43,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.38,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "achromatic_white",
+        "note": "Must produce the SAME ramp as black and mid-grey: lightness is discarded and re-derived, so an achromatic input carries no information beyond \"no hue\".",
+        "input": "#FFFFFF",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#555555",
+                "bg_hover": "#464646",
+                "bg_active": "#363636",
+                "fg": "#555555",
+                "tint": "#F0F0F0",
+                "ring": "#464646"
+            },
+            "dark": {
+                "bg": "#5F5F5F",
+                "bg_hover": "#484848",
+                "bg_active": "#393939",
+                "fg": "#A4A4A4",
+                "tint": "#3E3E3E",
+                "ring": "#A4A4A4"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.44,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.08,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.75,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.75,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.44,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.55,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.96,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.39,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.15,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.55,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.22,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.43,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.38,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "achromatic_mid_grey",
+        "note": "The third of the achromatic trio. If any of these three ever diverges, the engine has started reading the input's lightness.",
+        "input": "#808080",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#555555",
+                "bg_hover": "#464646",
+                "bg_active": "#363636",
+                "fg": "#555555",
+                "tint": "#F0F0F0",
+                "ring": "#464646"
+            },
+            "dark": {
+                "bg": "#5F5F5F",
+                "bg_hover": "#484848",
+                "bg_active": "#393939",
+                "fg": "#A4A4A4",
+                "tint": "#3E3E3E",
+                "ring": "#A4A4A4"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.44,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.08,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.46,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.75,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.75,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.44,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.55,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.96,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.39,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.15,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.55,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.22,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.43,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.38,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "saturated_yellow_snap",
+        "note": "THE SNAP VECTOR. C = 0.1629 is reduced to the 0.11 cap, and no lightness at that chroma carries white text at 4.5:1 while still reading as yellow — so the light fill lands olive (#635400). This is the case a strict picker would REFUSE; B-snap accepts it and discloses it.",
+        "input": "#FFE14D",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#635400",
+                "bg_hover": "#524600",
+                "bg_active": "#403600",
+                "fg": "#635400",
+                "tint": "#F2F0E6",
+                "ring": "#524600"
+            },
+            "dark": {
+                "bg": "#6E5E00",
+                "bg_hover": "#544700",
+                "bg_active": "#433900",
+                "fg": "#B6A44C",
+                "tint": "#493D00",
+                "ring": "#B6A44C"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.4,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.03,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.8,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.8,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.4,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.51,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.93,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.51,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.2,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.41,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.2,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.41,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.44,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "extreme_chroma_purple",
+        "note": "C = 0.2660, more than double the cap and far outside sRGB at most lightnesses — exercises the gamut bisection at nearly every scan step.",
+        "input": "#7B2FF7",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#594A8F",
+                "bg_hover": "#4B3B7F",
+                "bg_active": "#3B2A6C",
+                "fg": "#594A8F",
+                "tint": "#F0EFF8",
+                "ring": "#4B3B7F"
+            },
+            "dark": {
+                "bg": "#64549B",
+                "bg_hover": "#4D3C80",
+                "bg_active": "#3F2D70",
+                "fg": "#A89AE6",
+                "tint": "#433275",
+                "ring": "#A89AE6"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.41,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.11,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.79,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.79,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.41,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.53,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.95,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.24,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.53,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.22,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.43,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.22,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.43,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.43,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "realistic_brand_red",
+        "note": "A plausible real brand colour (the \"pomegranate\" of several palettes), C = 0.1740.",
+        "input": "#C0392B",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#8B3C32",
+                "bg_hover": "#7A2D24",
+                "bg_active": "#671A13",
+                "fg": "#8B3C32",
+                "tint": "#F9EDEB",
+                "ring": "#7A2D24"
+            },
+            "dark": {
+                "bg": "#97473B",
+                "bg_hover": "#7C2F25",
+                "bg_active": "#6B1E16",
+                "fg": "#E48D7F",
+                "tint": "#70241B",
+                "ring": "#E48D7F"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.53,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.42,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.11,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.53,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.82,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.82,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.42,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.54,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.89,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.17,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.52,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.21,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.42,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.21,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.42,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.41,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "sea_green_mid_chroma",
+        "note": "A green hue, to keep the corpus from being blue/red-heavy — greens are where a luminance-blind generator most often produces something that measures fine and looks wrong.",
+        "input": "#2E8B57",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#006236",
+                "bg_hover": "#00522C",
+                "bg_active": "#003F21",
+                "fg": "#006236",
+                "tint": "#E9F2EB",
+                "ring": "#00522C"
+            },
+            "dark": {
+                "bg": "#116D3E",
+                "bg_hover": "#00532D",
+                "bg_active": "#004323",
+                "fg": "#63B482",
+                "tint": "#004826",
+                "ring": "#63B482"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.36,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.12,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.79,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.79,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.36,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.48,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.91,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.23,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.49,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.19,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.39,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.19,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.39,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.42,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "near_black_slight_hue",
+        "note": "Near-black WITH a hue, unlike #000000: exercises the sRGB→linear branch below the 0.04045 threshold, which is where the light theme's active fills live.",
+        "input": "#0A0B0C",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#535556",
+                "bg_hover": "#454648",
+                "bg_active": "#353638",
+                "fg": "#535556",
+                "tint": "#EEF0F1",
+                "ring": "#454648"
+            },
+            "dark": {
+                "bg": "#5E5F60",
+                "bg_hover": "#464849",
+                "bg_active": "#38393B",
+                "fg": "#A2A4A5",
+                "tint": "#3D3E3F",
+                "ring": "#A2A4A5"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.45,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.1,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.5,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.79,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.79,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.45,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.56,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.91,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.2,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.56,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.19,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.19,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.4,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.4,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "near_white_slight_hue",
+        "note": "Near-white with a hue. The mirror of the vector above, at the end of the transfer function where the exponent branch applies.",
+        "input": "#FDFEFF",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#545556",
+                "bg_hover": "#464647",
+                "bg_active": "#353637",
+                "fg": "#545556",
+                "tint": "#EFF0F1",
+                "ring": "#464647"
+            },
+            "dark": {
+                "bg": "#5E5F60",
+                "bg_hover": "#474848",
+                "bg_active": "#39393A",
+                "fg": "#A3A4A5",
+                "tint": "#3D3E3F",
+                "ring": "#A3A4A5"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.47,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.43,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.11,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.47,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.77,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.77,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.43,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.54,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.94,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.18,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.54,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.21,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.41,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.21,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.41,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.4,
+                "min": 4.5
+            }
+        ]
+    },
+    {
+        "name": "pure_red_max_chroma",
+        "note": "Maximum-chroma primary red — the corner of the sRGB gamut, and hue ≈ 29.2° which sits just above the atan2 branch cut.",
+        "input": "#FF0000",
+        "engine_version": 1,
+        "tokens": {
+            "light": {
+                "bg": "#8B3C32",
+                "bg_hover": "#7A2D24",
+                "bg_active": "#671A13",
+                "fg": "#8B3C32",
+                "tint": "#F9EDEB",
+                "ring": "#7A2D24"
+            },
+            "dark": {
+                "bg": "#97473C",
+                "bg_hover": "#7C2E25",
+                "bg_active": "#6B1E17",
+                "fg": "#E48C7F",
+                "tint": "#70241C",
+                "ring": "#E48C7F"
+            }
+        },
+        "measurements": [
+            {
+                "theme": "light",
+                "pairing": "white text on fill",
+                "ratio": 7.53,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on hover fill",
+                "ratio": 9.42,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "white text on active fill",
+                "ratio": 12.11,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on surface",
+                "ratio": 7.53,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg text on canvas",
+                "ratio": 6.82,
+                "min": 4.5
+            },
+            {
+                "theme": "light",
+                "pairing": "fg UI boundary vs canvas",
+                "ratio": 6.82,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs surface",
+                "ratio": 9.42,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "focus ring vs canvas",
+                "ratio": 8.54,
+                "min": 3
+            },
+            {
+                "theme": "light",
+                "pairing": "ink on tint",
+                "ratio": 15.89,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on fill",
+                "ratio": 6.4,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on hover fill",
+                "ratio": 9.23,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "white text on active fill",
+                "ratio": 11.52,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on surface",
+                "ratio": 5.17,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "fg text on canvas",
+                "ratio": 6.37,
+                "min": 4.5
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs surface",
+                "ratio": 5.17,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "focus ring vs canvas",
+                "ratio": 6.37,
+                "min": 3
+            },
+            {
+                "theme": "dark",
+                "pairing": "ink on tint",
+                "ratio": 9.4,
+                "min": 4.5
+            }
+        ]
+    }
+]

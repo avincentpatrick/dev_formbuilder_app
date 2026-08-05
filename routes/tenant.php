@@ -8,6 +8,7 @@ use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\BrandingController;
 use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
@@ -93,6 +94,24 @@ Route::middleware([
     // per-user appearance write above; gated on the Spatie permission, not just `auth`.
     Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])
         ->middleware('can:tenant.settings.manage')->name('settings.drafts.update');
+
+    // Tenant branding (H23a2, ADR-0014). Rendered inside /settings; no page of its own.
+    //
+    // ⚠️ THE GATING ASYMMETRY BELOW IS DELIBERATE AND MUST NOT BE "TIDIED UP" INTO CONSISTENCY.
+    // The two WRITES carry `feature:branding` (Starter+, ADR-0008 §D7). The two REMOVALS do not.
+    // This is ADR-0012 §D9 applied: a tenant that brands on Starter and downgrades to Free keeps its
+    // stored ramp, stops rendering branded, and must retain a path to delete what a paid tier let them
+    // create. Gate the removals and that tenant is stranded with a brand they can neither use nor
+    // remove. BrandingRoutesTest asserts both directions, precisely because making all four match looks
+    // like a cleanup.
+    Route::patch('/settings/branding', [BrandingController::class, 'update'])
+        ->middleware(['can:tenant.settings.manage', 'feature:branding'])->name('settings.branding.update');
+    Route::delete('/settings/branding', [BrandingController::class, 'destroy'])
+        ->middleware('can:tenant.settings.manage')->name('settings.branding.destroy');
+    Route::post('/settings/branding/logo', [BrandingController::class, 'storeLogo'])
+        ->middleware(['can:tenant.settings.manage', 'feature:branding'])->name('settings.branding.logo.store');
+    Route::delete('/settings/branding/logo', [BrandingController::class, 'destroyLogo'])
+        ->middleware('can:tenant.settings.manage')->name('settings.branding.logo.destroy');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).

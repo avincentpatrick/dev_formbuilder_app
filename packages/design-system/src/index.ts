@@ -34,3 +34,22 @@ export {
 export { statusVariant, type BadgeVariant, type StatusDescriptor } from './components/Badge/status-variant';
 export { type ToastType, type ToastItem } from './components/Toast/toast';
 export { icons, type IconName } from './components/Icon/icons';
+
+// The tenant brand-ramp engine's TypeScript twin (H23a1 / ADR-0014). Exported for ONE consumer: the
+// admin branding picker's live preview (H23a2). PHP remains authoritative for anything that is stored —
+// see brand-ramp.ts's header for why, and for the three implementation choices that keep the two engines
+// byte-identical.
+export {
+    generateBrandRamp,
+    brandRampSnap,
+    brandRampByHeadroom,
+    contrast as brandContrast,
+    BRAND_RAMP_ROLES,
+    BRAND_RAMP_PAIRINGS,
+    BRAND_RAMP_ENGINE_VERSION,
+    type BrandRampResult,
+    type BrandRampTokens,
+    type BrandRampRole,
+    type BrandRampTheme,
+    type BrandRampMeasurement,
+} from './theme/brand-ramp';

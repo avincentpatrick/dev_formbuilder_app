@@ -9,6 +9,7 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
+use App\Models\Attachment;
 use App\Models\Domain;
 use App\Models\Form;
 use App\Models\FormField;
@@ -327,6 +328,18 @@ function inboxTenant(string $slug = 'acme'): Tenant
     $tenant->domains()->create(['domain' => $slug]);
 
     return $tenant;
+}
+
+/**
+ * A tenant brand logo attachment (H23a2), owned by the TENANT rather than by a form field.
+ *
+ * Lives here and not in a test file on the H22a lesson: `apiMember()` once sat as a top-level function
+ * inside `ApiV1Test.php`, so a single-file run of any OTHER test in that suite died with "Call to
+ * undefined function". `tests/Pest.php` is what that header exists for.
+ */
+function brandingLogoAttachment(string $tenantId): Attachment
+{
+    return Attachment::factory()->brandingLogo($tenantId)->create();
 }
 
 /**

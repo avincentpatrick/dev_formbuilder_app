@@ -41,6 +41,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Tenant brand logo (H23a2 / ADR-0014)
+    |--------------------------------------------------------------------------
+    |
+    | Its own allowlist rather than a reuse of `default_accepted_types`, because
+    | a brand logo answers to a different threat model than a respondent's file:
+    | it is served to EVERY respondent of EVERY branded form, same-origin.
+    |
+    | SVG IS DELIBERATELY EXCLUDED. An SVG is an XML document that can carry
+    | <script> and event handlers, so a same-origin SVG logo is stored XSS
+    | (threat-model §6) — the one upload on this surface that an attacker with
+    | Owner/Admin access could turn against their own respondents. Raster only.
+    | GIF is excluded too, for a duller reason: an animated logo on every form
+    | header is a WCAG 2.2.2 problem nobody would think to check.
+    |
+    | 1 MB is generous for a logo (a 512px PNG is typically under 50 KB) and is
+    | two orders of magnitude below the 25 MB global ceiling, which exists for
+    | respondent video.
+    |
+    */
+
+    'branding_logo' => [
+        'accepted_types' => ['image/png', 'image/jpeg', 'image/webp'],
+        'max_bytes' => 1024 * 1024,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Virus scanning
     |--------------------------------------------------------------------------
     |

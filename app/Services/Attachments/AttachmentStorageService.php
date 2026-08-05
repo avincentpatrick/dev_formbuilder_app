@@ -98,6 +98,96 @@ final class AttachmentStorageService
     }
 
     /**
+     * Store a TENANT BRAND LOGO (H23a2) — the first attachment in this codebase whose owner is not
+     * form-scoped.
+     *
+     * It is a sibling of {@see self::store()} rather than a parameter on it because almost nothing
+     * transfers: there is no {@see FormField}, so no `accepted_types`, no per-field size cap, no
+     * `is_sensitive`/`is_pii` to inherit, and no {@see SubmissionPipeline} that will later re-point the
+     * owner. What DOES transfer is the discipline, and it is repeated here deliberately: the MIME is
+     * content-sniffed from the bytes rather than trusted from the client header, the storage key is
+     * server-generated and the extension derives from the sniffed type, and the object is queued for a
+     * virus scan like any other upload.
+     *
+     * **SVG IS DELIBERATELY NOT AN ACCEPTED TYPE, and this is a security decision rather than a
+     * limitation.** An SVG is an XML document that can carry `<script>` and event handlers; a brand logo
+     * is served to every respondent of every branded form, same-origin, which is precisely the shape that
+     * turns a stored file into stored XSS (threat-model §6). Raster only — the allowlist lives in
+     * `config('attachments.branding_logo.accepted_types')` and is enforced below, not merely declared.
+     *
+     * **The `tenant` morph alias is stored but NOT registered in the global morph map**, following the
+     * explicit warning in `AppServiceProvider` about `audits.auditable_type`: adding `tenant` there would
+     * change how Sanctum's `tokenable_type` and Spatie's `model_type` serialize and split existing rows
+     * between alias and FQCN. Nothing resolves `$attachment->attachable` anywhere in this codebase, and
+     * the read path for a logo is `tenants.logo_attachment_id` — a real FK — in the other direction.
+     * `BrandingMorphAliasTest` pins that this absence is deliberate.
+     *
+     * @throws AttachmentException on a rejected MIME type or an over-size file
+     */
+    public function storeBrandingLogo(UploadedFile $file, string $tenantId, ?string $uploadedBy): Attachment
+    {
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+
+        /** @var list<string> $accepted */
+        $accepted = config('attachments.branding_logo.accepted_types');
+
+        if (! $this->mimeAllowed($mime, $accepted)) {
+            throw AttachmentException::mimeRejected($mime);
+        }
+
+        $maxBytes = (int) config('attachments.branding_logo.max_bytes');
+
+        if ((int) $file->getSize() > $maxBytes) {
+            throw AttachmentException::tooLarge($maxBytes);
+        }
+
+        // A logo is uploaded by a signed-in Owner/Admin, never a guest, so the storage quota applies
+        // exactly as it does to a member's media upload (H5b / ADR-0008 §D4).
+        $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+
+        $kind = AttachmentKind::BrandingLogo;
+        $disk = (string) config('filesystems.default');
+
+        $uuid = Uuid::uuid7()->toString();
+        $extension = $file->extension() ?: 'bin';
+        $directory = "tenants/{$tenantId}/{$kind->value}/".date('Ym');
+        $storedPath = Storage::disk($disk)->putFileAs($directory, $file, "{$uuid}.{$extension}");
+
+        if ($storedPath === false) {
+            throw AttachmentException::storeFailed();
+        }
+
+        [$width, $height] = $this->imageDimensions($file, $mime);
+
+        $attachment = Attachment::create([
+            'id' => $uuid,
+            'attachable_type' => 'tenant',
+            'attachable_id' => $tenantId,
+            'kind' => $kind,
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mime,
+            'size_bytes' => (int) $file->getSize(),
+            'checksum_sha256' => hash_file('sha256', (string) $file->getRealPath()) ?: null,
+            'width' => $width,
+            'height' => $height,
+            'duration_seconds' => null,
+            // A brand logo is public-facing by definition — it is rendered to anonymous respondents on
+            // every branded form. Encrypting it at rest would be theatre, and marking it PII would be
+            // false: it is the tenant's own mark, deliberately published.
+            'is_encrypted_at_rest' => false,
+            'is_pii' => false,
+            'virus_scan_status' => ScanStatus::Pending,
+            'uploaded_by' => $uploadedBy,
+        ]);
+
+        ScanAttachmentJob::dispatch($attachment->id, $tenantId);
+
+        return $attachment;
+    }
+
+    /**
      * @throws AttachmentException
      */
     private function resolveMediaField(FormVersion $version, string $fieldKey): FormField

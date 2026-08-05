@@ -25,6 +25,7 @@ import {
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
+import BrandingCard from '@/components/settings/BrandingCard.vue';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
@@ -37,6 +38,10 @@ const props = defineProps<{
     // is ADR-0012 §D9's escape hatch: the sidebar item requires the `custom_domain` plan feature, so a
     // tenant downgraded off Business would otherwise lose every path to a hostname that is still resolving.
     customDomains: { count: number };
+    // Increment H23a2 — tenant branding. A full CONTROL rather than the signpost customDomains is:
+    // branding is three inputs and a preview, which does not earn a page of its own. The card owns
+    // its own shape; see BrandingCard.vue.
+    branding: InstanceType<typeof BrandingCard>['$props']['branding'];
 }>();
 
 const page = usePage();
@@ -232,6 +237,10 @@ function savePassword(): void {
                 </div>
             </form>
         </MdsCard>
+
+        <!-- Branding (Increment H23a2, ADR-0014). Placed after Drafts and before the custom-domain
+             signpost: both are org-wide Owner/Admin settings, and this one is a control. -->
+        <BrandingCard :branding="branding" />
 
         <!-- Custom domains (Increment H22b) — a signpost, not a control. Only rendered once the tenant
              holds a domain, so it never advertises a Business feature to a tenant that cannot buy it. -->

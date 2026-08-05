@@ -1,10 +1,14 @@
 name: CI
 
+# phase1-completion (I0, 2026-08-06) is the long-lived integration branch for the Phase-1
+# completion wave: increment PRs target IT, merge into it when green, and main receives one
+# reviewed PR at the end. It gets the same two triggers as main so every increment PR runs the
+# full pipeline and every post-merge integration state is re-verified.
 on:
   push:
-    branches: [main]
+    branches: [main, phase1-completion]
   pull_request:
-    branches: [main]
+    branches: [main, phase1-completion]
 
 concurrency:
   group: ci-${{ github.ref }}

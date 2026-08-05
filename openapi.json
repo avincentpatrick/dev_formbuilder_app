@@ -3688,6 +3688,7 @@
                     }
                 ],
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
@@ -7860,7 +7861,7 @@
             },
             "StoreConnectionSubscriptionRequest": {
                 "type": "object",
-                "description": "Create a delivery rule on a connection (ADR-0009, H15a). `event_types` must be a non-empty subset of the\n{@see DomainEventType} catalog \u2014 connectors subscribe to the same vocabulary webhooks do, deliberately, so\nthere is one event catalog rather than a per-channel dialect. `form_id` uses `exists:` on the RLS-scoped\nconnection, so another tenant's form fails validation rather than leaking that the id exists.\n\n`config.channel_id` is required because a Slack rule with no destination can never deliver: accepting one\nwould defer a permanent failure to delivery time, where it looks like an outage instead of a mistake. It is\nvalidated as a shape, not against Slack \u2014 verifying the channel exists needs an API call this request has\nno business making (H15b's picker offers real channels).",
+                "description": "Create a delivery rule on a connection (ADR-0009, H15a). `event_types` must be a non-empty subset of the\n{@see DomainEventType} catalog \u2014 connectors subscribe to the same vocabulary webhooks do, deliberately, so\nthere is one event catalog rather than a per-channel dialect. `form_id` uses `exists:` on the RLS-scoped\nconnection, so another tenant's form fails validation rather than leaking that the id exists.\n\nA rule with no destination can never deliver, so one is required: accepting it would defer a permanent\nfailure to delivery time, where it looks like an outage instead of a mistake. WHICH destination keys those\nare is the provider's business, not this class's \u2014 H16a moved that dispatch into\n{@see SubscriptionConfigRules}, because until then this file hard-coded Slack's `config.channel_id` in the\nshared layer and a Google Sheets rule was rejected by validation before any adapter was consulted.\n\nDestinations are validated as a SHAPE, never against the provider: confirming a channel or a spreadsheet\nexists needs an API call this request has no business making, and a destination that has since gone away is\na delivery-time condition the adapter reports as `blocked`.\n\n**Reading the exported contract:** `config` lists every destination key ANY provider accepts, all shown as\noptional, because WHICH are required depends on the provider of the connection being posted to \u2014 Slack\nrequires `channel_id`; Google Sheets requires `spreadsheet_id` + `mapping`. The server enforces the\nprovider's set and returns a 422 naming the missing field.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -7890,7 +7891,11 @@
                         "type": "object",
                         "properties": {
                             "channel_id": {
-                                "type": "string",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Slack. `channel_name` is nullable and that is load-bearing rather than lax: when the channel\nlist fails to load the modal falls back to a manual channel id, which by definition has no name.",
                                 "maxLength": 64
                             },
                             "channel_name": {
@@ -7899,11 +7904,64 @@
                                     "null"
                                 ],
                                 "maxLength": 150
+                            },
+                            "spreadsheet_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.",
+                                "maxLength": 255
+                            },
+                            "sheet_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 100
+                            },
+                            "mapping": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "properties": {
+                                    "fingerprint": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 64
+                                    },
+                                    "columns": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "header": {
+                                                    "type": "string",
+                                                    "maxLength": 255
+                                                },
+                                                "field_key": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "maxLength": 100
+                                                }
+                                            },
+                                            "required": [
+                                                "header"
+                                            ]
+                                        },
+                                        "minItems": 1
+                                    }
+                                }
                             }
-                        },
-                        "required": [
-                            "channel_id"
-                        ]
+                        }
                     }
                 },
                 "required": [
@@ -8335,7 +8393,7 @@
             },
             "UpdateConnectionSubscriptionRequest": {
                 "type": "object",
-                "description": "Partially update a delivery rule (ADR-0009, H15a). Every field is `sometimes`, so a caller may send only\nwhat it changes; `config` is replaced wholesale when present (it is one small destination object, and a\ndeep merge would make \"clear this key\" unexpressible).\n\n`status` accepts the full {@see ConnectorSubscriptionStatus} vocabulary \u2014 setting it back to `active` is\nhow a tenant clears a circuit-breaker pause, which also resets the failure counter in the service.",
+                "description": "Partially update a delivery rule (ADR-0009, H15a). Every field is `sometimes`, so a caller may send only\nwhat it changes; `config` is replaced wholesale when present (it is one small destination object, and a\ndeep merge would make \"clear this key\" unexpressible).\n\n`status` accepts the full {@see ConnectorSubscriptionStatus} vocabulary \u2014 setting it back to `active` is\nhow a tenant clears a circuit-breaker pause, which also resets the failure counter in the service. H16a\ngives that a second, more common caller: a rule paused by column drift is re-enabled the same way, after\nthe mapping is corrected in the same PATCH.\n\nThe `config.*` shape comes from {@see SubscriptionConfigRules} in its partial mode (H16a) rather than being\nhard-coded to Slack's `channel_id` here.\n\n**Reading the exported contract:** `config` lists every destination key ANY provider accepts, all shown as\noptional, because WHICH are required depends on the provider of the connection being posted to \u2014 Slack\nrequires `channel_id`; Google Sheets requires `spreadsheet_id` + `mapping`. The server enforces the\nprovider's set and returns a 422 naming the missing field.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -8373,7 +8431,11 @@
                         "type": "object",
                         "properties": {
                             "channel_id": {
-                                "type": "string",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Slack. `channel_name` is nullable and that is load-bearing rather than lax: when the channel\nlist fails to load the modal falls back to a manual channel id, which by definition has no name.",
                                 "maxLength": 64
                             },
                             "channel_name": {
@@ -8382,10 +8444,69 @@
                                     "null"
                                 ],
                                 "maxLength": 150
+                            },
+                            "spreadsheet_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.",
+                                "maxLength": 255
+                            },
+                            "sheet_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "maxLength": 100
+                            },
+                            "mapping": {
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "properties": {
+                                    "fingerprint": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 64
+                                    },
+                                    "columns": {
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "header": {
+                                                    "type": "string",
+                                                    "maxLength": 255
+                                                },
+                                                "field_key": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "maxLength": 100
+                                                }
+                                            },
+                                            "required": [
+                                                "header"
+                                            ]
+                                        },
+                                        "minItems": 1
+                                    }
+                                }
                             }
                         }
                     }
                 },
+                "required": [
+                    "config"
+                ],
                 "title": "UpdateConnectionSubscriptionRequest"
             },
             "UpdateScopeNodeRequest": {

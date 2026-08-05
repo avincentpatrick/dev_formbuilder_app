@@ -24,6 +24,11 @@ use Illuminate\Validation\Rule;
  * Destinations are validated as a SHAPE, never against the provider: confirming a channel or a spreadsheet
  * exists needs an API call this request has no business making, and a destination that has since gone away is
  * a delivery-time condition the adapter reports as `blocked`.
+ *
+ * **Reading the exported contract:** `config` lists every destination key ANY provider accepts, all shown as
+ * optional, because WHICH are required depends on the provider of the connection being posted to — Slack
+ * requires `channel_id`; Google Sheets requires `spreadsheet_id` + `mapping`. The server enforces the
+ * provider's set and returns a 422 naming the missing field.
  */
 final class StoreConnectionSubscriptionRequest extends FormRequest
 {
@@ -42,7 +47,8 @@ final class StoreConnectionSubscriptionRequest extends FormRequest
             'event_types' => ['required', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
-            ...SubscriptionConfigRules::rulesFor(SubscriptionConfigRules::providerFor($this)),
+            ...SubscriptionConfigRules::documentedShape(),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this)),
         ];
     }
 

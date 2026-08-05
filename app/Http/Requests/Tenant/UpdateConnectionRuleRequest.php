@@ -41,7 +41,8 @@ final class UpdateConnectionRuleRequest extends FormRequest
             'event_types' => ['sometimes', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['sometimes', 'nullable', 'uuid', 'exists:forms,id'],
-            ...SubscriptionConfigRules::rulesFor(SubscriptionConfigRules::providerFor($this), partial: true),
+            ...SubscriptionConfigRules::documentedShape(partial: true),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this), partial: true),
             'status' => ['sometimes', Rule::in(ConnectorSubscriptionStatus::values())],
         ];
     }

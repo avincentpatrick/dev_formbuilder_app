@@ -65,33 +65,77 @@ final class SubscriptionConfigRules
      */
     public static function rulesFor(?ConnectorProviderKey $provider, bool $partial = false): array
     {
-        $present = $partial ? 'required_with:config' : 'required';
+        // Later duplicate keys win in a PHP array literal, so the provider's presence rules OVERRIDE the
+        // union's `nullable` for the same field. See documentedShape() for why the union is there at all.
+        return [...self::documentedShape($partial), ...self::requiredFor($provider, $partial)];
+    }
 
-        $rules = ['config' => [$partial ? 'sometimes' : 'required', 'array']];
+    /**
+     * Every `config` key ANY provider accepts, with its type and length rules, all optional.
+     *
+     * ── WHY A UNION EXISTS AT ALL ────────────────────────────────────────────────────────────────────────
+     *
+     * Two reasons, and the second is the one that is easy to lose.
+     *
+     * **(1) It is real validation.** Type and length are provider-independent: a `sheet_name` longer than 100
+     * characters is malformed whoever sent it, and it is interpolated into an A1-notation range.
+     *
+     * **(2) IT IS WHAT KEEPS `openapi.json` HONEST.** Scramble builds the API contract by statically reading
+     * `rules()`. It cannot evaluate a method call, so when the whole `config` shape was returned dynamically
+     * the exported contract degraded `config` to `{"type": "array", "items": {"type": "string"}}` — the
+     * destination shape vanished from the published API docs entirely, and the CI contract gate did NOT catch
+     * it, because that gate only diffs a fresh export against the committed file: both were equally wrong.
+     * A static literal here is what Scramble can read.
+     *
+     * The cost is stated rather than hidden: the exported contract shows every destination key as optional,
+     * because which ones are required depends on the connection being posted to. Both request classes say so
+     * in the description Scramble publishes.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public static function documentedShape(bool $partial = false): array
+    {
+        return [
+            'config' => [$partial ? 'sometimes' : 'required', 'array'],
 
-        if ($provider === null) {
-            return $rules;
-        }
-
-        if (! $provider->isTabular()) {
             // Slack. `channel_name` is nullable and that is load-bearing rather than lax: when the channel
             // list fails to load the modal falls back to a manual channel id, which by definition has no name.
-            return $rules + [
-                'config.channel_id' => [$present, 'string', 'max:64'],
-                'config.channel_name' => ['nullable', 'string', 'max:150'],
-            ];
+            'config.channel_id' => ['nullable', 'string', 'max:64'],
+            'config.channel_name' => ['nullable', 'string', 'max:150'],
+
+            // Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.
+            'config.spreadsheet_id' => ['nullable', 'string', 'max:255'],
+            'config.sheet_name' => ['nullable', 'string', 'max:100'],
+            'config.mapping' => ['nullable', 'array'],
+            'config.mapping.fingerprint' => ['nullable', 'string', 'max:64'],
+            'config.mapping.columns' => ['nullable', 'array', 'min:1'],
+            'config.mapping.columns.*.header' => ['present', 'string', 'max:255'],
+            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:100'],
+        ];
+    }
+
+    /**
+     * Only the PRESENCE rules — which of the union's keys this provider cannot do without.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    public static function requiredFor(?ConnectorProviderKey $provider, bool $partial = false): array
+    {
+        if ($provider === null) {
+            return [];
         }
 
-        return $rules + [
+        $present = $partial ? 'required_with:config' : 'required';
+
+        if (! $provider->isTabular()) {
+            return ['config.channel_id' => [$present, 'string', 'max:64']];
+        }
+
+        return [
             'config.spreadsheet_id' => [$present, 'string', 'max:255'],
-            // Google's own default tab name, used when the rule does not name one. Bounded because it is
-            // interpolated into an A1-notation range.
-            'config.sheet_name' => ['nullable', 'string', 'max:100'],
             'config.mapping' => [$present, 'array'],
             'config.mapping.fingerprint' => [$present, 'string', 'max:64'],
             'config.mapping.columns' => [$present, 'array', 'min:1'],
-            'config.mapping.columns.*.header' => ['present', 'string', 'max:255'],
-            'config.mapping.columns.*.field_key' => ['nullable', 'string', 'max:100'],
         ];
     }
 

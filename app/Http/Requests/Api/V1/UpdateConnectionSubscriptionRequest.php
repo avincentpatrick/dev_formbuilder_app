@@ -22,6 +22,11 @@ use Illuminate\Validation\Rule;
  *
  * The `config.*` shape comes from {@see SubscriptionConfigRules} in its partial mode (H16a) rather than being
  * hard-coded to Slack's `channel_id` here.
+ *
+ * **Reading the exported contract:** `config` lists every destination key ANY provider accepts, all shown as
+ * optional, because WHICH are required depends on the provider of the connection being posted to — Slack
+ * requires `channel_id`; Google Sheets requires `spreadsheet_id` + `mapping`. The server enforces the
+ * provider's set and returns a 422 naming the missing field.
  */
 final class UpdateConnectionSubscriptionRequest extends FormRequest
 {
@@ -40,7 +45,8 @@ final class UpdateConnectionSubscriptionRequest extends FormRequest
             'event_types' => ['sometimes', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['sometimes', 'nullable', 'uuid', 'exists:forms,id'],
-            ...SubscriptionConfigRules::rulesFor(SubscriptionConfigRules::providerFor($this), partial: true),
+            ...SubscriptionConfigRules::documentedShape(partial: true),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this), partial: true),
             'status' => ['sometimes', Rule::in(ConnectorSubscriptionStatus::values())],
         ];
     }

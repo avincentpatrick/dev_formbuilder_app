@@ -42,7 +42,8 @@ final class StoreConnectionRuleRequest extends FormRequest
             'event_types' => ['required', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
-            ...SubscriptionConfigRules::rulesFor(SubscriptionConfigRules::providerFor($this)),
+            ...SubscriptionConfigRules::documentedShape(),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this)),
         ];
     }
 

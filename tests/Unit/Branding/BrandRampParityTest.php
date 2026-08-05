@@ -96,6 +96,20 @@ it('encodes exactly the seventeen pairings of design-system-reference.md §4.1',
     expect($byTheme)->toBe(['light' => 9, 'dark' => 8]);
 });
 
+it('keeps BrandRamp::ROLES in step with what the generator actually produces', function (): void {
+    // The constant is not decoration: H23a2 stores against it and H23a3 iterates it to emit the six custom
+    // properties. A role added to the generator but not to ROLES — or renamed in one place — would make the
+    // CSS emitter silently skip a token, which renders as "the hover colour didn't take" and nothing else.
+    // The TypeScript twin asserts its own mirror; this is the PHP half of that guard.
+    $tokens = (new BrandRampGenerator)->generate('#1B5E5E')->tokens;
+
+    expect(array_keys($tokens))->toBe(BrandRamp::THEMES);
+
+    foreach (BrandRamp::THEMES as $theme) {
+        expect(array_keys($tokens[$theme]))->toEqualCanonicalizing(BrandRamp::ROLES);
+    }
+});
+
 it('gives every achromatic input the same ramp', function (): void {
     // Lightness is discarded and re-derived per role, so black, white and mid-grey carry identical
     // information: no hue. If these ever diverge, the engine has started reading the input's lightness —

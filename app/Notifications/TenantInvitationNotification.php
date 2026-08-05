@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Enums\QueueName;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -35,6 +36,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class TenantInvitationNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -52,10 +54,12 @@ final class TenantInvitationNotification extends Notification implements ShouldQ
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject("You've been invited to {$this->tenantName}")
-            ->line("You've been invited to join {$this->tenantName}.")
-            ->action('Accept invitation', $this->acceptUrl)
-            ->line('This invitation will expire in 7 days.');
+        return $this->branded(
+            (new MailMessage)
+                ->subject("You've been invited to {$this->tenantName}")
+                ->line("You've been invited to join {$this->tenantName}.")
+                ->action('Accept invitation', $this->acceptUrl)
+                ->line('This invitation will expire in 7 days.')
+        );
     }
 }

@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use App\Services\Submissions\SubmissionPdfRenderer;
 use App\Services\Submissions\SubmissionPdfStorage;
+use App\Support\Branding\BrandPalette;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Facades\Log;
@@ -133,12 +134,14 @@ final class GeneratePdfJob extends TenantAwareJob
                 return;
             }
 
-            Notification::route('mail', $email)->notify(new SubmissionPdfReadyNotification(
-                $formTitle,
-                $this->submissionId,
-                $outcome,
-                $attachment === null ? null : $this->downloadUrl($attachment),
-            ));
+            Notification::route('mail', $email)->notify(
+                (new SubmissionPdfReadyNotification(
+                    $formTitle,
+                    $this->submissionId,
+                    $outcome,
+                    $attachment === null ? null : $this->downloadUrl($attachment),
+                ))->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
         } catch (Throwable $e) {
             Log::warning('Submission PDF notification failed', $this->failureContext() + ['reason' => $e->getMessage()]);
         }

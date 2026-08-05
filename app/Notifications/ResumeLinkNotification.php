@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Enums\QueueName;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -31,6 +32,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class ResumeLinkNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -48,10 +50,12 @@ final class ResumeLinkNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject("Continue your response to {$this->formName}")
-            ->line("Your progress on \"{$this->formName}\" has been saved.")
-            ->action('Continue your response', $this->resumeUrl)
-            ->line('This link will expire in 30 days.');
+        return $this->branded(
+            (new MailMessage)
+                ->subject("Continue your response to {$this->formName}")
+                ->line("Your progress on \"{$this->formName}\" has been saved.")
+                ->action('Continue your response', $this->resumeUrl)
+                ->line('This link will expire in 30 days.')
+        );
     }
 }

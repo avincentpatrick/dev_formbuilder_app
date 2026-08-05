@@ -20,6 +20,7 @@ use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
 use App\Services\Webhooks\WebhookPayloadArchive;
+use App\Support\Branding\BrandPalette;
 use App\Support\Webhooks\OutboundUrlGuard;
 use App\Support\Webhooks\RetryLadder;
 use App\Support\Webhooks\WebhookSigner;
@@ -220,8 +221,13 @@ final class DeliverWebhookJob extends TenantAwareJob
             return;
         }
 
+        // Inside handleForTenant(), where the GUC is live — the queued notification itself runs with no
+        // tenant context at all, so a brand read there would fail closed (H23a4).
         Notification::route('mail', $email)
-            ->notify(new WebhookAutoDisabledNotification($endpoint->name, $endpoint->url, $failures));
+            ->notify(
+                (new WebhookAutoDisabledNotification($endpoint->name, $endpoint->url, $failures))
+                    ->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
     }
 
     private function deadLetterForQuota(WebhookDelivery $delivery): void

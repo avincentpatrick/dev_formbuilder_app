@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Notifications\Auth;
 
 use App\Enums\QueueName;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\Attributes\Queue;
 
 /**
@@ -24,6 +26,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class QueuedResetPassword extends ResetPassword implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(public readonly string $signedUrl)
@@ -40,5 +43,20 @@ final class QueuedResetPassword extends ResetPassword implements ShouldQueue
     protected function resetUrl($notifiable): string
     {
         return $this->signedUrl;
+    }
+
+    /**
+     * Render the framework's own reset wording through the Meridian mail template.
+     *
+     * **Always the product palette** — see {@see QueuedVerifyEmail::buildMailMessage()} for the two reasons
+     * (Fortify resolves no tenant, and a user may belong to several). Overriding here rather than at
+     * `toMail()` keeps `parent::`'s `Lang::get()` strings and the expiry line it composes from
+     * `config('auth.passwords')`, which is what this subclass exists to reuse.
+     *
+     * @param  string  $url
+     */
+    protected function buildMailMessage($url): MailMessage
+    {
+        return $this->branded(parent::buildMailMessage($url));
     }
 }

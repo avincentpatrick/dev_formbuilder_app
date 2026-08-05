@@ -25,6 +25,15 @@
     runs with `isRemoteEnabled = false`, and `ext-gd` is not installed in the app container, so a
     remote or raster reference is unreachable twice over. Styles are inlined below rather than
     linked for the same reason.
+
+    ── H23a4: TENANT BRANDING, COLOUR ONLY ─────────────────────────────────────────────────────
+    `$brand` (an array of literal light-theme hexes from BrandPalette) reaches `pdf._styles` through
+    this view's scope — @include shares it — and paints three declarations there. It adds NO markup
+    here and NO logo, because the paragraph above still holds: a raster logo needs `ext-gd`, which is
+    absent from the app container and from every CI job, so it would render on a developer's machine
+    and throw in the pipeline. Nothing in `$brand` is respondent- or tenant-authored free text: the
+    generator emits `#RRGGBB` and nothing else, which is why interpolating it into a stylesheet is not
+    a new injection surface.
 --}}
 <!DOCTYPE html>
 <html lang="{{ $model['submission']['locale'] ?? 'en' }}">

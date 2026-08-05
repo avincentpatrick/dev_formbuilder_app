@@ -7,6 +7,7 @@ namespace App\Notifications\Submissions;
 use App\Enums\QueueName;
 use App\Enums\SubmissionPdfOutcome;
 use App\Mail\TenantMail;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\ResumeLinkNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -48,6 +49,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class SubmissionPdfReadyNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -76,6 +78,6 @@ final class SubmissionPdfReadyNotification extends Notification implements Shoul
             $mail->action('Download the PDF', $this->downloadUrl);
         }
 
-        return $mail->line("Submission reference: {$this->submissionId}");
+        return $this->branded($mail->line("Submission reference: {$this->submissionId}"));
     }
 }

@@ -15,6 +15,7 @@ use App\Notifications\ResumeLinkNotification;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Branding\BrandPalette;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Http\JsonResponse;
@@ -94,8 +95,13 @@ final class GuestDraftController extends Controller
         $resumeUrl = $this->resumeUrl($token->tenantId, $minted->token);
 
         if ($request->finishLater() && $submission->guest_contact_email !== null) {
+            // The only branded email a RESPONDENT receives, and the reason branding must reach mail at all
+            // (H23a4). Resolved from the ambient guest-runtime tenant, in-request.
             Notification::route('mail', $submission->guest_contact_email)
-                ->notify(new ResumeLinkNotification($form->title, $resumeUrl));
+                ->notify(
+                    (new ResumeLinkNotification($form->title, $resumeUrl))
+                        ->withBrand(BrandPalette::current())
+                );
         }
 
         return response()->json([

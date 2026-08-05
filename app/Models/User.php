@@ -83,6 +83,10 @@ class User extends Authenticatable implements MustVerifyEmail
             ['id' => $this->getKey(), 'hash' => sha1($this->getEmailForVerification())],
         );
 
+        // No ->withBrand(): the two Fortify emails are deliberately the only unbranded ones (H23a4).
+        // config/fortify.php carries no tenancy middleware, so there is no resolved tenant here — and a
+        // User may be a member of several, so "whose brand" has no correct answer either. They still
+        // render through the Meridian template; see QueuedVerifyEmail::buildMailMessage().
         Notification::route('mail', $this->getEmailForVerification())
             ->notify(new QueuedVerifyEmail($url));
     }
@@ -102,6 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email' => $this->getEmailForPasswordReset(),
         ], false));
 
+        // Unbranded for the same two reasons as the verification email above (H23a4).
         Notification::route('mail', $this->getEmailForPasswordReset())
             ->notify(new QueuedResetPassword($url));
     }

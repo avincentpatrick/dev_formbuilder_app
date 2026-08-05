@@ -6,6 +6,7 @@ namespace App\Notifications\Entitlements;
 
 use App\Enums\QueueName;
 use App\Jobs\Entitlements\ReconcileTenantUsageJob;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\TenantInvitationNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,6 +29,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class QuotaOverageNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -46,10 +48,12 @@ final class QuotaOverageNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject("You've reached your {$this->tenantName} submission limit")
-            ->line("Your workspace {$this->tenantName} has collected {$this->used} submissions this period, above your plan's limit of {$this->limit}.")
-            ->line('Your forms are still open and every response is being saved — we never turn a respondent away over a billing limit.')
-            ->line('Upgrade your plan to lift the limit and keep full reporting on the extra responses.');
+        return $this->branded(
+            (new MailMessage)
+                ->subject("You've reached your {$this->tenantName} submission limit")
+                ->line("Your workspace {$this->tenantName} has collected {$this->used} submissions this period, above your plan's limit of {$this->limit}.")
+                ->line('Your forms are still open and every response is being saved — we never turn a respondent away over a billing limit.')
+                ->line('Upgrade your plan to lift the limit and keep full reporting on the extra responses.')
+        );
     }
 }

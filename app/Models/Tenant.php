@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TenantStatus;
+use App\Services\Branding\TenantBrandingService;
+use App\Support\Branding\BrandRamp;
+use App\Support\Branding\BrandRampGenerator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
@@ -26,6 +30,9 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property ?string $status Tenant lifecycle (App\Enums\TenantStatus); not cast (stancl virtual columns).
  * @property string $default_locale Default locale for new forms (data-dictionary §1).
  * @property ?int $draft_ttl_days Tenant-configured draft-expiry window in days; null ⇒ system default (H10).
+ * @property ?string $primary_color The brand hex the tenant TYPED (#RRGGBB); null ⇒ no brand colour (H23a2).
+ * @property mixed $brand_ramp Derived ramp payload (jsonb); read through brandRamp(), never raw.
+ * @property ?string $logo_attachment_id FK to attachments; null ⇒ no brand logo (H23a2).
  */
 class Tenant extends BaseTenant
 {
@@ -45,7 +52,11 @@ class Tenant extends BaseTenant
         // remove it and stancl silently relocates the value into the `data` json column, at which
         // point `where('status', …)` matches NOTHING and every tenant vanishes from every fan-out —
         // with no error. TenantCustomColumnsTest pins this.
-        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days'];
+        //
+        // primary_color / brand_ramp / logo_attachment_id (H23a2, 2026_08_05_000003) are the same shape
+        // again. Their failure mode is quieter than 'status' but no less real: branding would appear to
+        // save, read back null, and simply never apply — with a green write path the whole way.
+        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days', 'primary_color', 'brand_ramp', 'logo_attachment_id'];
     }
 
     /**
@@ -84,5 +95,57 @@ class Tenant extends BaseTenant
     public function isActive(): bool
     {
         return TenantStatus::tryFrom((string) $this->status) === TenantStatus::Active;
+    }
+
+    /**
+     * The stored brand logo, or null.
+     *
+     * The SoftDeletes global scope on {@see Attachment} is what stops a deleted logo rendering — the FK's
+     * `ON DELETE SET NULL` fires only on a `forceDelete()`. Both halves are pinned by `BrandingStorageTest`.
+     *
+     * @return BelongsTo<Attachment, $this>
+     */
+    public function logoAttachment(): BelongsTo
+    {
+        return $this->belongsTo(Attachment::class, 'logo_attachment_id');
+    }
+
+    /**
+     * The stored brand ramp (H23a2, ADR-0014 §D8), or null when the tenant has set no brand colour.
+     *
+     * **Decoded here rather than through a `casts()` entry, and that is deliberate.** This model carries
+     * no casts at all — stancl's virtual-column machinery intercepts attribute access, which is why even
+     * `status` is documented above as an uncast `?string`. Adding the project's first cast to this one
+     * class to save a `json_decode` would trade a local convenience for an interaction nobody has tested.
+     *
+     * **Never re-derives.** A stored ramp was validated by the engine version recorded inside it; running
+     * {@see BrandRampGenerator} here would re-open that question on every read and would fail loudly on
+     * exactly the rows a future VERSION bump is meant to migrate deliberately.
+     */
+    public function brandRamp(): ?BrandRamp
+    {
+        $raw = $this->brand_ramp;
+
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = is_array($raw) ? $raw : json_decode((string) $raw, true, 512, JSON_THROW_ON_ERROR);
+
+        return BrandRamp::fromArray($payload);
+    }
+
+    /**
+     * Whether a brand ramp is STORED — which is not the same question as whether it RENDERS.
+     *
+     * Rendering additionally requires the `branding` plan feature (Starter+, ADR-0008 §D7). A tenant that
+     * downgrades keeps its stored ramp and stops being branded; the settings surface says so and offers
+     * removal, on the ADR-0012 §D9 precedent that a downgraded tenant must retain a path to undo what a
+     * paid tier let them create. See {@see TenantBrandingService::isActive()}.
+     */
+    public function hasBrandRamp(): bool
+    {
+        return $this->brand_ramp !== null && $this->brand_ramp !== '';
     }
 }

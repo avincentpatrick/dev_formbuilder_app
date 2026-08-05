@@ -64,6 +64,30 @@ class AttachmentFactory extends Factory
         ]);
     }
 
+    /**
+     * A tenant brand logo (H23a2). The owner is the TENANT itself, which is the third morph alias the
+     * `attachments` table carries and the first one that is not form-scoped.
+     *
+     * Deliberately `clean()`: a logo is served to every respondent of every branded form, and
+     * {@see ScanStatus::servable()} is the gate that decides whether it is served at all — so a fixture
+     * left `pending()` would make every branding render test assert the absence of a logo for a reason
+     * that has nothing to do with branding.
+     */
+    public function brandingLogo(string $tenantId): static
+    {
+        return $this->state(fn (): array => [
+            'attachable_type' => 'tenant',
+            'attachable_id' => $tenantId,
+            'kind' => AttachmentKind::BrandingLogo,
+            'mime_type' => 'image/png',
+            'original_filename' => 'logo.png',
+            'path' => "tenants/{$tenantId}/branding_logo/".date('Ym').'/'.Str::uuid().'.png',
+            'virus_scan_status' => ScanStatus::Clean,
+            'width' => 512,
+            'height' => 128,
+        ]);
+    }
+
     public function pending(): static
     {
         return $this->state(fn (): array => ['virus_scan_status' => ScanStatus::Pending]);

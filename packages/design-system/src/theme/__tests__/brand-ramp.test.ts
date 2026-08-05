@@ -7,6 +7,8 @@ import {
     BRAND_RAMP_ROLES,
     contrast,
     generateBrandRamp,
+    brandRampSnap,
+    brandRampByHeadroom,
     type BrandRampTheme,
 } from '../brand-ramp';
 
@@ -133,5 +135,51 @@ describe('brand-ramp engine behaviour', () => {
 
     it.each(['', '#FFF', 'FFFFFF', '#GGGGGG', '#1234567', 'rgb(1,2,3)'])('refuses %s', (input) => {
         expect(() => generateBrandRamp(input)).toThrow();
+    });
+});
+
+describe('snap disclosure helpers', () => {
+    it('reports an adjustment when the engine had to move the input', () => {
+        // A maximally saturated yellow cannot carry white button text at its own lightness, so the engine
+        // drives it dark. This is the case the disclosure exists for.
+        const snap = brandRampSnap(generateBrandRamp('#FFE14D'));
+
+        expect(snap.input).toBe('#FFE14D');
+        expect(snap.derived).not.toBe('#FFE14D');
+        expect(snap.adjusted).toBe(true);
+    });
+
+    it('reports NO adjustment when the input is already usable', () => {
+        // Teal is a shipped accent and the engine re-derives it exactly, so a tenant entering it is told
+        // their colour was used as-is. If `adjusted` compared against any token other than the light fill
+        // this would be false, and the card would claim an adjustment on every colour ever entered.
+        const snap = brandRampSnap(generateBrandRamp('#1B5E5E'));
+
+        expect(snap.derived).toBe('#1B5E5E');
+        expect(snap.adjusted).toBe(false);
+    });
+
+    it('orders measurements by headroom, worst first', () => {
+        const ordered = brandRampByHeadroom(generateBrandRamp('#C0392B').measurements);
+
+        expect(ordered).toHaveLength(17);
+
+        const headroom = ordered.map((m) => m.ratio - m.min);
+        expect(headroom).toEqual([...headroom].sort((a, b) => a - b));
+
+        // Worst-first is not the same as lowest-ratio-first, and that is the point: a 4.6:1 that needs 4.5
+        // is tighter than a 5.2:1 that needs 3.0. Assert the two orderings actually differ here, or this
+        // test would pass against a naive sort-by-ratio.
+        const byRatio = [...ordered].sort((a, b) => a.ratio - b.ratio);
+        expect(ordered.map((m) => m.pairing)).not.toEqual(byRatio.map((m) => m.pairing));
+    });
+
+    it('does not mutate the array it is given', () => {
+        const measurements = generateBrandRamp('#C0392B').measurements;
+        const before = measurements.map((m) => m.pairing);
+
+        brandRampByHeadroom(measurements);
+
+        expect(measurements.map((m) => m.pairing)).toEqual(before);
     });
 });

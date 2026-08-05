@@ -298,3 +298,35 @@ export function generateBrandRamp(input: string): BrandRampResult {
 
     return { input: normalized, engineVersion: BRAND_RAMP_ENGINE_VERSION, tokens, measurements };
 }
+
+/**
+ * What the engine changed about the tenant's input — the data behind the admin card's snap disclosure.
+ *
+ * **Lives here rather than in the component because there is a PHP twin of it too**
+ * (`BrandingPresenter::snap()`), and a third copy inlined in a Vue `computed` would be a third place for
+ * the same rule to drift. The rule has one non-obvious part worth stating: `adjusted` compares the input
+ * to the LIGHT FILL specifically, never to any of the other eleven tokens. The others are different by
+ * construction — they are hover, active, a pale tint, an entire dark ramp — so comparing against them
+ * would report an adjustment every single time and the disclosure would degrade into noise.
+ */
+export function brandRampSnap(result: BrandRampResult): {
+    input: string;
+    derived: string;
+    adjusted: boolean;
+} {
+    const derived = result.tokens.light.bg;
+
+    return { input: result.input, derived, adjusted: derived !== result.input };
+}
+
+/**
+ * Measurements ordered by HEADROOM (measured minus minimum), worst first.
+ *
+ * Worst-first because the claim the report makes is "every combination clears its minimum", and the
+ * strongest evidence for that claim is the one that clears by the least. Sorting by raw ratio would put a
+ * 15:1 tint at the top and bury the 4.6:1 that a sceptical reader actually wants. Mirrors
+ * `BrandingPresenter::contrast()`.
+ */
+export function brandRampByHeadroom(measurements: BrandRampMeasurement[]): BrandRampMeasurement[] {
+    return [...measurements].sort((a, b) => a.ratio - a.min - (b.ratio - b.min));
+}

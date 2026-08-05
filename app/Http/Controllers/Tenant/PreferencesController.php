@@ -9,6 +9,7 @@ use App\Http\Requests\Tenant\UpdateAppearanceRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
+use App\Services\Branding\BrandingPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +31,10 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  */
 final class PreferencesController extends Controller
 {
-    public function __construct(private readonly CustomDomainService $domains) {}
+    public function __construct(
+        private readonly CustomDomainService $domains,
+        private readonly BrandingPresenter $branding,
+    ) {}
 
     public function show(Request $request): Response
     {
@@ -65,6 +69,11 @@ final class PreferencesController extends Controller
                     ? $this->domains->forTenant($tenant)->count()
                     : 0,
             ],
+            // Tenant branding (H23a2, ADR-0014). Unlike customDomains above this is a full CONTROL, not a
+            // link — branding is three inputs and a preview, which does not earn a page of its own the way
+            // the per-row domain lifecycle did. `can_manage` hides the card for non-admins; `is_active`
+            // vs `has_brand_color` is what lets it explain a downgraded tenant's stored-but-dormant brand.
+            'branding' => $this->branding->forSettings($tenant, $user->can('tenant.settings.manage')),
         ]);
     }
 

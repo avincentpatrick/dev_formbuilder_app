@@ -9,6 +9,7 @@
  * The top-nav quick toggle is a deliberately narrow additional surface for theme mode only
  * (exceptions-log #3) — the other three axes live here and nowhere else.
  */
+import { computed } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from '@inertiajs/vue3';
 import {
@@ -59,10 +60,28 @@ const themeOptions: { value: ThemeMode; label: string; icon: IconName }[] = [
 // Label-only, deliberately: a colour swatch would be a colour-ONLY signifier (WCAG 1.4.1), and the
 // control already previews the accent for free — the selected chip is painted with
 // --mds-color-action-primary-bg, so choosing Teal turns the chip you just clicked teal.
-const accentOptions: { value: AccentToken; label: string }[] = [
+// On a BRANDED tenant a third option appears, and it is first because it is the effective default:
+// "Brand" stores NULL, which means "no opinion — use my organisation's colour". Blueprint then means the
+// product default EXPLICITLY, which is the only way a member can opt back out of their org's brand
+// (design-system-reference.md §395; the escape H23a3 exists to close).
+//
+// On an unbranded tenant the control is unchanged at two options: with no brand to inherit, "no opinion"
+// and "blueprint" render identically, so offering both would be a distinction without a difference.
+const isBranded = computed(() => page.props.ui.brand !== null);
+
+const accentOptions = computed<{ value: string; label: string }[]>(() => [
+    ...(isBranded.value ? [{ value: 'brand', label: 'Brand' }] : []),
     { value: 'blueprint', label: 'Blueprint' },
     { value: 'teal', label: 'Teal' },
-];
+]);
+
+// The control's value is a non-nullable string, so the null state travels as the sentinel 'brand'.
+// Mapped in both directions here and nowhere else — the wire and the column both carry a real null.
+const accentChoice = computed(() => accent.value ?? (isBranded.value ? 'brand' : 'blueprint'));
+
+function chooseAccent(value: string): void {
+    setAccent(value === 'brand' ? null : (value as AccentToken));
+}
 
 const fontSizeOptions: { value: FontSizeScale; label: string }[] = [
     { value: 'standard', label: 'Standard' },
@@ -169,10 +188,10 @@ function savePassword(): void {
                     </p>
                 </div>
                 <MdsSegmentedControl
-                    :model-value="accent"
+                    :model-value="accentChoice"
                     :options="accentOptions"
                     ariaLabel="Accent colour"
-                    @update:model-value="(v: string) => setAccent(v as AccentToken)"
+                    @update:model-value="chooseAccent"
                 />
             </div>
 

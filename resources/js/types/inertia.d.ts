@@ -5,10 +5,17 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 
 /**
  * The curated accent set (design-system-reference.md §2.9) — closed at two options by ratified
- * decision, never an arbitrary colour picker. `blueprint` is the product default and is stored as
- * NULL server-side, but always travels as a real value on the wire.
+ * decision, never an arbitrary colour picker.
+ *
+ * Since H23a3 the WIRE value is nullable, and null is a real state rather than a missing one: it means
+ * "no opinion", which on a branded tenant resolves to the organisation's brand and everywhere else to
+ * the product default. `blueprint` now means "the product default EXPLICITLY", which is the only way a
+ * member of a branded tenant can opt back out of their organisation's colour.
  */
 export type AccentToken = 'blueprint' | 'teal';
+
+/** The stored accent, where `null` means "no opinion — use my organisation's brand if it has one". */
+export type AccentPreference = AccentToken | null;
 
 /** Uniform text-size scale (§2.9). `standard` emits no attribute. */
 export type FontSizeScale = 'standard' | 'large' | 'extra_large';
@@ -19,7 +26,7 @@ export type FontSizeScale = 'standard' | 'large' | 'extra_large';
  */
 export interface UiTheme {
     mode: ThemeMode;
-    accent: AccentToken;
+    accent: AccentPreference;
     fontSize: FontSizeScale;
     dyslexiaFont: boolean;
 }
@@ -78,7 +85,11 @@ export interface EntitlementSnapshot {
 declare module '@inertiajs/core' {
     interface PageProps {
         auth: { user: AppUser | null; can: AppAbilities };
-        ui: { theme: UiTheme };
+        ui: {
+            theme: UiTheme;
+            /** The tenant's active brand ramp (H23a3), or null. Theme => role => #RRGGBB. */
+            brand: Record<'light' | 'dark', Record<string, string>> | null;
+        };
         flash: {
             toast: FlashToast | null;
             xlsformWarnings?: string[] | null;

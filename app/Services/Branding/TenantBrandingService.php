@@ -15,6 +15,7 @@ use App\Support\Branding\BrandRamp;
 use App\Support\Branding\BrandRampGenerator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 /**
  * The tenant-branding write path (H23a2, ADR-0014) — the ONLY writer of `tenants.primary_color`,
@@ -57,6 +58,33 @@ final class TenantBrandingService
     public function isActive(Tenant $tenant): bool
     {
         return $tenant->hasBrandRamp() && $this->entitlements->feature(self::FEATURE);
+    }
+
+    /**
+     * The ramp for the shared `ui.brand` Inertia prop, or null when nothing should render branded.
+     *
+     * **FAIL-CLOSED OFF-TENANT.** This runs on every Inertia render, including central-host and guest
+     * routes where there is no resolved tenant — so an unresolved tenant returns null rather than
+     * throwing, mirroring `EntitlementService::snapshot()`'s posture on the same middleware.
+     *
+     * Returns only the twelve tokens: the measurements and the input hex are the settings card's
+     * business, and shipping them on every page would put ~2KB of contrast tables into every render.
+     *
+     * @return array<string, array<string, string>>|null
+     */
+    public function sharedRamp(): ?array
+    {
+        if (! app()->bound(TenantContract::class)) {
+            return null;
+        }
+
+        $tenant = app(TenantContract::class);
+
+        if (! $tenant instanceof Tenant || ! $this->isActive($tenant)) {
+            return null;
+        }
+
+        return $tenant->brandRamp()?->tokens;
     }
 
     /**

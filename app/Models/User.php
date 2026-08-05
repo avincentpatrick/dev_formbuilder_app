@@ -144,7 +144,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * Shape is camelCase because it crosses the wire as an Inertia prop (matching `auth.can.*`); the
      * PATCH request fields stay snake_case to match the column names.
      *
-     * @return array{mode: string, accent: string, fontSize: string, dyslexiaFont: bool}
+     * @return array{mode: string, accent: ?string, fontSize: string, dyslexiaFont: bool}
      */
     public function uiTheme(): array
     {
@@ -158,8 +158,11 @@ class User extends Authenticatable implements MustVerifyEmail
 
                 return [
                     'mode' => $preference->theme_mode->value,
-                    // NULL accent_token = Blueprint, the product default (data-dictionary §19).
-                    'accent' => AccentToken::fromColumn($preference->accent_token?->value)->value,
+                    // NULL is CARRIED THROUGH, not collapsed to Blueprint (H23a3). It means "no opinion",
+                    // and on a branded tenant that resolves to the organisation's brand rather than to
+                    // the product default — a distinction `AccentToken::fromColumn()` deliberately loses,
+                    // which is why it is not used here.
+                    'accent' => $preference->accent_token?->value,
                     'fontSize' => $preference->font_size_scale->value,
                     'dyslexiaFont' => $preference->use_dyslexia_friendly_font,
                 ];
@@ -176,13 +179,19 @@ class User extends Authenticatable implements MustVerifyEmail
      * C duplicated the literal across both — so a fourth axis would have meant editing two lists that
      * nothing forced to agree.
      *
-     * @return array{mode: string, accent: string, fontSize: string, dyslexiaFont: bool}
+     * `accent` is NULL rather than `blueprint` since H23a3, and the difference is behavioural: this is
+     * the value a user who has NEVER OPENED SETTINGS gets, and such a user has expressed no opinion — so
+     * on a branded tenant they should see the organisation's brand. Returning `blueprint` here would mean
+     * "explicitly the product default", i.e. every un-personalized member would silently opt OUT of their
+     * own organisation's branding.
+     *
+     * @return array{mode: string, accent: ?string, fontSize: string, dyslexiaFont: bool}
      */
     public static function defaultUiTheme(): array
     {
         return [
             'mode' => ThemeMode::System->value,
-            'accent' => AccentToken::Blueprint->value,
+            'accent' => null,
             'fontSize' => FontSizeScale::Standard->value,
             'dyslexiaFont' => false,
         ];

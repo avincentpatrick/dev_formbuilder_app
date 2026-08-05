@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AccentToken;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Support\Tenancy\TenantContext;
@@ -29,7 +30,9 @@ it('shares auth.user (null) and a system theme for a guest', function (): void {
             ->component('Welcome', false)
             ->where('auth.user', null)
             ->where('ui.theme.mode', 'system')
-            ->where('ui.theme.accent', 'blueprint'));
+            // NULL since H23a3 — "no opinion". A guest has no tenant brand to inherit either, so this
+            // renders identically to the old 'blueprint'; what changed is what the value MEANS.
+            ->where('ui.theme.accent', null));
 });
 
 it('emits no data-theme-mode/data-accent on <html> for a guest (system = absence)', function (): void {
@@ -48,7 +51,10 @@ it('degrades uiTheme() to the product defaults when no preference row is visible
 
     expect($user->uiTheme())->toBe([
         'mode' => 'system',
-        'accent' => 'blueprint',
+        // H23a3: the fallback expresses NO OPINION rather than "explicitly Blueprint". On a branded
+        // tenant those differ — the first inherits the organisation's colour, the second refuses it —
+        // and a user whose preference read just FAILED has certainly not refused anything.
+        'accent' => null,
         'fontSize' => 'standard',
         'dyslexiaFont' => false,
     ]);
@@ -75,13 +81,21 @@ it('reads the stored appearance when the user context is set', function (): void
     ]);
 });
 
-it('resolves a NULL accent_token back to blueprint (§19: NULL = product default)', function (): void {
+it('carries a NULL accent_token through as null rather than collapsing it to blueprint', function (): void {
+    // INVERTED IN H23a3, deliberately. §19 used to rule that NULL = the product default, so uiTheme()
+    // resolved it to 'blueprint'. Tenant branding (ADR-0014) makes that collapse lossy: NULL now means
+    // "no opinion", which app.blade.php reads as "the tenant's brand may apply here". Resolving it to
+    // 'blueprint' at this boundary would suppress every tenant brand for every user, everywhere —
+    // AccentToken::fromColumn() still performs that collapse and is deliberately NOT used by uiTheme().
     $user = User::factory()->create();
 
     TenantContext::applyLocal(null, $user->id);
     UserUiPreference::create(['user_id' => $user->id, 'theme_mode' => 'light']);
 
-    expect($user->uiTheme()['accent'])->toBe('blueprint');
+    expect($user->uiTheme()['accent'])->toBeNull();
+
+    // The lossy helper still exists and still answers its own narrower question.
+    expect(AccentToken::fromColumn(null))->toBe(AccentToken::Blueprint);
 });
 
 it('emits all four personalization attributes on <html> when set', function (): void {

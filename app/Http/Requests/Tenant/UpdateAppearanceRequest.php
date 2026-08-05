@@ -47,7 +47,10 @@ final class UpdateAppearanceRequest extends FormRequest
     {
         return [
             'theme_mode' => ['sometimes', 'required', Rule::enum(ThemeMode::class)],
-            'accent_token' => ['sometimes', 'required', Rule::enum(AccentToken::class)],
+            // `nullable`, not `required`, since H23a3: an explicit NULL is a real choice — "no opinion,
+            // use my organisation's brand" — and is the only way to express it. Every other axis stays
+            // `required` because none of them has a second layer above it.
+            'accent_token' => ['sometimes', 'nullable', Rule::enum(AccentToken::class)],
             'font_size_scale' => ['sometimes', 'required', Rule::enum(FontSizeScale::class)],
             'use_dyslexia_friendly_font' => ['sometimes', 'required', 'boolean'],
         ];
@@ -71,8 +74,12 @@ final class UpdateAppearanceRequest extends FormRequest
         }
 
         if (array_key_exists('accent_token', $validated)) {
-            // Blueprint is the product default and is stored as NULL (data-dictionary §19).
-            $columns['accent_token'] = AccentToken::from($validated['accent_token'])->toColumn();
+            // A submitted NULL is stored as NULL and MEANS "no opinion — use my organisation's brand"
+            // (H23a3). Blueprint is now stored explicitly, so it can mean "the product default, even on a
+            // branded tenant" — the escape the old NULL-for-Blueprint mapping made inexpressible.
+            $columns['accent_token'] = $validated['accent_token'] === null
+                ? null
+                : AccentToken::from($validated['accent_token'])->toColumn();
         }
 
         if (array_key_exists('font_size_scale', $validated)) {

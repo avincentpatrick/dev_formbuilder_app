@@ -30,6 +30,13 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // A GET that asserts Inertia renders the ROOT VIEW, so `@vite` runs and needs a manifest — and the CI
+    // tests job never builds assets. Without this the three page-render tests below pass locally (where
+    // `public/build/` is left over from a dev build and is gitignored) and fail in CI with the misleading
+    // "Not a valid Inertia response", which is really a 500 from ViteManifestNotFoundException.
+    // Same device, same reason, as AnalyticsPageGateTest and SuperAdminConsoleTest.
+    $this->withoutVite();
+
     TenantContext::flush();
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     (new RolePermissionSeeder)->run();

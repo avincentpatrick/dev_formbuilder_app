@@ -38,7 +38,7 @@ final readonly class ColumnMapping
     /**
      * Author a mapping against the header row it was read from.
      *
-     * @param  list<string|null>  $headers    the raw header labels, in column order
+     * @param  list<string|null>  $headers  the raw header labels, in column order
      * @param  array<string, string>  $fieldKeysByHeader  raw header label ⇒ form-field key; a header absent
      *                                                    from this map becomes an unbound column
      *

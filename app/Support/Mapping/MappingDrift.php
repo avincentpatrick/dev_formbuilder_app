@@ -20,9 +20,9 @@ namespace App\Support\Mapping;
 final readonly class MappingDrift
 {
     /**
-     * @param  list<string>  $added    normalized headers present now that the mapping never saw
+     * @param  list<string>  $added  normalized headers present now that the mapping never saw
      * @param  list<string>  $removed  normalized headers the mapping binds that are gone
-     * @param  list<string>  $moved    normalized headers present in both, at a different column index
+     * @param  list<string>  $moved  normalized headers present in both, at a different column index
      */
     private function __construct(
         public bool $hasDrifted,

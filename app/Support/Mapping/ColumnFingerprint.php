@@ -91,14 +91,15 @@ final readonly class ColumnFingerprint
      */
     private static function normalizeAll(array $headers): array
     {
-        $normalized = array_map(self::normalize(...), array_values($headers));
+        $normalized = array_map(self::normalize(...), $headers);
 
-        // Drop the trailing padding only. array_pop walks backwards, so an interior blank is never reached.
+        // Drop the trailing padding only. array_pop walks backwards, so an interior blank is never reached,
+        // and popping from the end keeps the array a list — no re-indexing needed.
         while ($normalized !== [] && end($normalized) === '') {
             array_pop($normalized);
         }
 
-        return array_values($normalized);
+        return $normalized;
     }
 
     /**
@@ -106,13 +107,24 @@ final readonly class ColumnFingerprint
      */
     private static function digestOf(array $headers): string
     {
-        // The index is hashed alongside the label so a reorder changes the digest, and "\x1F" (unit separator)
-        // joins them because it cannot occur in a spreadsheet cell — a plain "|" would make ['a|b'] and
-        // ['a','b'] collide, which is the classic delimiter-injection bug in a hashing costume.
+        // Order is encoded by the CONCATENATION, not by anything added per element: `['a','b']` and `['b','a']`
+        // canonicalize to different strings because the labels are appended in column order.
+        //
+        // This once also hashed the column INDEX alongside each label, justified in a comment as what made a
+        // reorder change the digest. Mutation testing removed the index and the whole suite stayed green,
+        // because the claim was simply false — the concatenation was already doing that work. The line and its
+        // reasoning are gone rather than kept as belt-and-braces (the H24a `applyCountableJoin()` precedent:
+        // a green mutation indicted the code, not the suite).
+        //
+        // "\x1E" (record separator) TERMINATES each label and IS load-bearing: with no separator at all,
+        // `['ab']` and `['a','b']` both canonicalize to "ab" and one header row impersonates the other. It is
+        // this character rather than a printable one because it cannot occur in a spreadsheet cell — a plain
+        // "|" would let a header literally named `a|b` collide with the two columns `a` and `b`, which is the
+        // classic delimiter-injection bug wearing a hashing costume. Both collisions are pinned by test.
         $canonical = '';
 
-        foreach ($headers as $index => $header) {
-            $canonical .= $index."\x1F".$header."\x1E";
+        foreach ($headers as $header) {
+            $canonical .= $header."\x1E";
         }
 
         return hash('sha256', $canonical);

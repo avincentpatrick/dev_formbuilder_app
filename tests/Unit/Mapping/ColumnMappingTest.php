@@ -38,10 +38,18 @@ it('ignores trailing padding but not an interior blank', function (): void {
         ->not->toBe(ColumnFingerprint::forHeaders(['Name', 'Age'])->digest);
 });
 
-it('cannot be collided by a header that contains the join delimiter', function (): void {
-    // The classic delimiter-injection bug wearing a hashing costume: with a "|" join, ['a|b'] and ['a','b']
-    // canonicalize to the same string and one header row impersonates another. The separator is "\x1F", which
-    // a spreadsheet cell cannot contain, and the index is hashed alongside the label.
+it('cannot be collided by concatenation or by a header containing the delimiter', function (): void {
+    // Two distinct collisions, both pinned, because the separator is the ONLY thing preventing either.
+    //
+    // (a) With no separator at all, ['ab'] and ['a','b'] both canonicalize to "ab". This assertion is what
+    //     made removing the terminator a reddening mutation — the redundant column index that used to sit
+    //     beside it was pinned by nothing, which is how mutation testing found it was doing no work.
+    expect(ColumnFingerprint::forHeaders(['ab'])->digest)
+        ->not->toBe(ColumnFingerprint::forHeaders(['a', 'b'])->digest);
+
+    // (b) With a PRINTABLE separator such as "|", a header literally named `a|b` impersonates the two columns
+    //     `a` and `b` — the classic delimiter-injection bug wearing a hashing costume. "\x1E" cannot occur in
+    //     a spreadsheet cell, so no header can forge one.
     expect(ColumnFingerprint::forHeaders(['a|b'])->digest)
         ->not->toBe(ColumnFingerprint::forHeaders(['a', 'b'])->digest);
 

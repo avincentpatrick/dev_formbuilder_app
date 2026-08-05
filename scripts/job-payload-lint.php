@@ -95,6 +95,11 @@ const EXEMPT_JOBS = [
     'App\Notifications\ResumeLinkNotification',
     'App\Notifications\Webhooks\WebhookAutoDisabledNotification',
     'App\Notifications\Connectors\ConnectionRevokedNotification',
+    // H16a. The sibling of the line above for the case where the GRANT is healthy and one rule's DESTINATION
+    // is not (column drift, an unreachable spreadsheet). Same shape, same rules: two scalars, on-demand
+    // notifiable, QueueName::Mail. Separate from ConnectionRevokedNotification because its advice differs —
+    // "re-map the columns", not "reconnect your account".
+    'App\Notifications\Connectors\ConnectorRulePausedNotification',
     // H17. Same shape as its six siblings above, with one payload difference worth noting: it also
     // carries a BACKED ENUM (SubmissionPdfOutcome), which R3 admits explicitly. It is the first of
     // these to report a SUCCESS rather than a failure, which changes nothing about the payload rules.

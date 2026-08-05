@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Connectors\Providers\GoogleSheetsConnector;
 use App\Support\Connectors\Providers\SlackChannelLister;
 use App\Support\Connectors\Providers\SlackConnector;
 
@@ -51,6 +52,38 @@ return [
             'client_secret' => env('SLACK_CONNECTOR_CLIENT_SECRET'),
             'scopes' => ['chat:write', 'channels:read'],
         ],
+
+        /*
+        | Google Sheets (H16a — webhook-integration-design.md §4 row 4). The second provider, and the first
+        | that READS from the third party: drift detection has to see the destination's header row before it
+        | may append to it, which fires ADR-0009 §D8's own revisit trigger ("any feature that wants to read
+        | from the provider (Sheets' drift detection, H16a) — that is a genuine scope expansion").
+        |
+        | THE SCOPE SET IS `drive.file` ALONE, and that is narrower than the plan of record proposed. Google's
+        | own scope table (verified 2026-08-05 at developers.google.com/workspace/sheets/api/scopes) classifies
+        | `drive.file` as **Recommended, Non-sensitive** for the Sheets API and `spreadsheets` as **Sensitive**
+        | — so adding `spreadsheets` would grant "see, edit, create and delete ALL your spreadsheets" AND move
+        | this app into Google's sensitive-scope verification tier, in exchange for nothing `drive.file` does
+        | not already permit on a file the tenant picked or we created. `drive.readonly` (Restricted) was
+        | refused outright. The consequence is deliberate and is H16b's problem, not a gap here: with per-file
+        | access we cannot ENUMERATE a tenant's existing spreadsheets server-side, so there is no
+        | `channel_lister` entry — the destination is created by us or named by id, and the registry's
+        | null-not-throw contract for a missing lister covers exactly this case.
+        |
+        | `auth_params` are the two the offline flow cannot work without, kept in config rather than in the
+        | adapter because they are policy, not protocol: `access_type=offline` is what makes Google issue a
+        | refresh token AT ALL (without it there is no refresh path and every grant dies in an hour), and
+        | `prompt=consent` forces re-issue on a re-connect, because Google returns a refresh token only on the
+        | FIRST authorization for a given user+client and a tenant re-connecting after a revoke would otherwise
+        | receive an access token with no refresh token and silently become a one-hour connection.
+        */
+        'google_sheets' => [
+            'adapter' => GoogleSheetsConnector::class,
+            'client_id' => env('GOOGLE_CONNECTOR_CLIENT_ID'),
+            'client_secret' => env('GOOGLE_CONNECTOR_CLIENT_SECRET'),
+            'scopes' => ['https://www.googleapis.com/auth/drive.file'],
+            'auth_params' => ['access_type' => 'offline', 'prompt' => 'consent'],
+        ],
     ],
 
     /*
@@ -85,6 +118,23 @@ return [
     | A grant with no expiry (Slack's default bot token) or no refresh token is skipped entirely.
     */
     'refresh_lead_seconds' => (int) env('CONNECTOR_REFRESH_LEAD_SECONDS', 7200),
+
+    /*
+    | H16a — the DELIVERY-TIME pre-flight lead, in SECONDS, and a deliberate amendment to ADR-0009 §D6's
+    | "proactive, never lazy" rule. §D6 named its own revisit trigger: "a provider whose tokens expire faster
+    | than the sweep interval, which would force a lazy pre-flight refresh after all." Google is that provider
+    | — its access tokens live about an hour against an HOURLY sweep, so a grant minted just after one sweep
+    | and delivered against before the next can be dead on arrival, and no amount of retuning the sweep closes
+    | a window that a single missed run reopens.
+    |
+    | This is MUCH smaller than the sweep's lead on purpose. It is a last-resort guard for a token that is
+    | already expired or about to be, not a second refresh policy: at 120s a healthy Google connection is
+    | still renewed by the sweep and never touches this path, so the stampede §D6 warns about (every queued
+    | delivery refreshing at once during a provider outage) needs the sweep to have failed first.
+    |
+    | >> ALSO AN UNVALIDATED PLANNING ASSUMPTION. <<
+    */
+    'delivery_refresh_lead_seconds' => (int) env('CONNECTOR_DELIVERY_REFRESH_LEAD_SECONDS', 120),
 
     /*
     | Where the browser lands after the central-domain callback finishes (ADR-0009 §D5). The HOST is

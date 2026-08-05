@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\DomainEventType;
+use App\Support\Connectors\SubscriptionConfigRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,10 +15,15 @@ use Illuminate\Validation\Rule;
  * there is one event catalog rather than a per-channel dialect. `form_id` uses `exists:` on the RLS-scoped
  * connection, so another tenant's form fails validation rather than leaking that the id exists.
  *
- * `config.channel_id` is required because a Slack rule with no destination can never deliver: accepting one
- * would defer a permanent failure to delivery time, where it looks like an outage instead of a mistake. It is
- * validated as a shape, not against Slack — verifying the channel exists needs an API call this request has
- * no business making (H15b's picker offers real channels).
+ * A rule with no destination can never deliver, so one is required: accepting it would defer a permanent
+ * failure to delivery time, where it looks like an outage instead of a mistake. WHICH destination keys those
+ * are is the provider's business, not this class's — H16a moved that dispatch into
+ * {@see SubscriptionConfigRules}, because until then this file hard-coded Slack's `config.channel_id` in the
+ * shared layer and a Google Sheets rule was rejected by validation before any adapter was consulted.
+ *
+ * Destinations are validated as a SHAPE, never against the provider: confirming a channel or a spreadsheet
+ * exists needs an API call this request has no business making, and a destination that has since gone away is
+ * a delivery-time condition the adapter reports as `blocked`.
  */
 final class StoreConnectionSubscriptionRequest extends FormRequest
 {
@@ -36,9 +42,29 @@ final class StoreConnectionSubscriptionRequest extends FormRequest
             'event_types' => ['required', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
-            'config' => ['required', 'array'],
-            'config.channel_id' => ['required', 'string', 'max:64'],
-            'config.channel_name' => ['nullable', 'string', 'max:150'],
+            ...SubscriptionConfigRules::rulesFor(SubscriptionConfigRules::providerFor($this)),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return SubscriptionConfigRules::attributesFor(SubscriptionConfigRules::providerFor($this)) + [
+            'event_types' => 'events',
+            'form_id' => 'scope',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return SubscriptionConfigRules::messagesFor(SubscriptionConfigRules::providerFor($this)) + [
+            'event_types.required' => 'Choose at least one event.',
+            'event_types.min' => 'Choose at least one event.',
         ];
     }
 }

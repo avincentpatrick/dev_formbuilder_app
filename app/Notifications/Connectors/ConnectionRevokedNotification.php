@@ -6,6 +6,7 @@ namespace App\Notifications\Connectors;
 
 use App\Enums\QueueName;
 use App\Jobs\Connectors\DeliverConnectorMessageJob;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Services\Connectors\ConnectionTokenRefresher;
 use Illuminate\Bus\Queueable;
@@ -32,6 +33,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class ConnectionRevokedNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -49,10 +51,12 @@ final class ConnectionRevokedNotification extends Notification implements Should
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject("Your {$this->providerLabel} connection needs attention")
-            ->line("We can no longer post to {$this->accountLabel}: {$this->providerLabel} rejected our access, which usually means the app was removed or its permissions were revoked there.")
-            ->line('Everything sending to that workspace has been paused, so no messages are being lost in the background.')
-            ->line("To start them again, reconnect {$this->providerLabel} from your integration settings — your existing delivery rules are kept and will resume as soon as the connection is live.");
+        return $this->branded(
+            (new MailMessage)
+                ->subject("Your {$this->providerLabel} connection needs attention")
+                ->line("We can no longer post to {$this->accountLabel}: {$this->providerLabel} rejected our access, which usually means the app was removed or its permissions were revoked there.")
+                ->line('Everything sending to that workspace has been paused, so no messages are being lost in the background.')
+                ->line("To start them again, reconnect {$this->providerLabel} from your integration settings — your existing delivery rules are kept and will resume as soon as the connection is live.")
+        );
     }
 }

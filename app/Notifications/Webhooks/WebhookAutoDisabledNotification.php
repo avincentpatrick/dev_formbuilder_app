@@ -6,6 +6,7 @@ namespace App\Notifications\Webhooks;
 
 use App\Enums\QueueName;
 use App\Jobs\Webhooks\DeliverWebhookJob;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Entitlements\QuotaOverageNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -27,6 +28,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class WebhookAutoDisabledNotification extends Notification implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(
@@ -45,10 +47,12 @@ final class WebhookAutoDisabledNotification extends Notification implements Shou
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject("Your webhook \"{$this->endpointName}\" was automatically paused")
-            ->line("Your webhook endpoint \"{$this->endpointName}\" ({$this->endpointUrl}) failed {$this->failureCount} deliveries in a row, so we paused it to stop it from consuming delivery capacity.")
-            ->line('No deliveries are being attempted while it is paused. Recent attempts and their responses are in the endpoint\'s delivery log.')
-            ->line('Once the receiving endpoint is healthy again, re-enable the webhook to resume deliveries — that also resets the failure counter.');
+        return $this->branded(
+            (new MailMessage)
+                ->subject("Your webhook \"{$this->endpointName}\" was automatically paused")
+                ->line("Your webhook endpoint \"{$this->endpointName}\" ({$this->endpointUrl}) failed {$this->failureCount} deliveries in a row, so we paused it to stop it from consuming delivery capacity.")
+                ->line('No deliveries are being attempted while it is paused. Recent attempts and their responses are in the endpoint\'s delivery log.')
+                ->line('Once the receiving endpoint is healthy again, re-enable the webhook to resume deliveries — that also resets the failure counter.')
+        );
     }
 }

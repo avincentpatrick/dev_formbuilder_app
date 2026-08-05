@@ -22,6 +22,7 @@ use App\Services\Connectors\ConnectionService;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
 use App\Services\Webhooks\WebhookPayloadArchive;
+use App\Support\Branding\BrandPalette;
 use App\Support\Connectors\ConnectorDeliveryResult;
 use App\Support\Connectors\ConnectorRegistry;
 use App\Support\Webhooks\RetryLadder;
@@ -212,8 +213,12 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             return;
         }
 
+        // Inside handleForTenant(), where the GUC is live (H23a4) — see BrandPalette.
         Notification::route('mail', $email)
-            ->notify(new ConnectionRevokedNotification($providerLabel, $accountLabel));
+            ->notify(
+                (new ConnectionRevokedNotification($providerLabel, $accountLabel))
+                    ->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
     }
 
     private function deadLetterForQuota(WebhookDelivery $delivery): void

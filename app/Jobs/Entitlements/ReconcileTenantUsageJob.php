@@ -15,6 +15,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\Entitlements\QuotaOverageNotification;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Branding\BrandPalette;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -147,7 +148,13 @@ final class ReconcileTenantUsageJob extends TenantAwareJob
             return;
         }
 
+        // Inside handleForTenant(), so the GUC is live and BrandPalette can read the plan (H23a4). The
+        // notification itself is delivered by SendQueuedNotifications, which is NOT a TenantAwareJob and
+        // would have no context to read it from.
         Notification::route('mail', $email)
-            ->notify(new QuotaOverageNotification($tenant->name, $used, $limit));
+            ->notify(
+                (new QuotaOverageNotification($tenant->name, $used, $limit))
+                    ->withBrand(BrandPalette::forTenant($tenant))
+            );
     }
 }

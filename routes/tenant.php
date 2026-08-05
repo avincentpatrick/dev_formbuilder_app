@@ -9,6 +9,7 @@ use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
 use App\Http\Controllers\Tenant\BrandingController;
+use App\Http\Controllers\Tenant\BrandingLogoController;
 use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
@@ -465,6 +466,13 @@ Route::middleware([
 | but WITHOUT `auth`: the invitee is not a member yet, so requiring auth would be circular. Tenant
 | context is still established, which is exactly what makes the strict-RLS invite row visible (only
 | within its own tenant) and lets accept materialize the reserved role. Styled pages land in Increment C.
+|
+| H23a4 adds the brand logo to this group for the same structural reason and a different audience: the
+| caller is an EMAIL CLIENT, which carries no session and often fetches through a proxy days after the
+| message was sent. It stays on the APP host (this group identifies by subdomain) because ADR-0009 §D2 and
+| ADR-0012 scope a custom domain to the guest runtime only — so the logo URL in every branded email is
+| composed by TenantUrl's app arm, and this is the group that serves it. Deliberately NOT signed: an
+| expiry on an image inside an inbox is a broken image on a timer. See BrandingLogoController.
 */
 Route::middleware([
     'web',
@@ -475,6 +483,11 @@ Route::middleware([
     Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('/invitations/{token}', [InvitationController::class, 'decline'])->name('invitations.decline');
+
+    // No `feature:branding` middleware: the gate is inside the controller, via
+    // TenantBrandingService::isActive(), because an unentitled tenant must answer 404 (an image that is
+    // not there) and not the middleware's 403 (an image that exists and is being withheld).
+    Route::get('/branding/logo', BrandingLogoController::class)->name('branding.logo');
 });
 
 /*

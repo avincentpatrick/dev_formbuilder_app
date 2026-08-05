@@ -69,17 +69,68 @@ The fixture lives in `tests/fixtures/`, deliberately **not** `tests/golden/`: it
 - a stored ramp is immutable — nothing re-derives on read, so a ramp that was compliant when written stays the ramp that renders;
 - the engine reproduces the design system's own hand-verified accent byte-identically, which is the strongest available evidence that its judgment matches the human one it replaces.
 
-**What is now load-bearing that was not.** The H-map's *"user personalization wins over tenant branding"* rule stops being vacuous the moment tenant branding reaches the admin app (H23a3), and must be enforced by CSS specificity rather than source order — `:root` for the tenant layer at (0,1,0), losing to `:root[data-accent='…']` at (0,2,0). G11 already shipped a bug where two selectors tied at (0,2,0) and source order silently decided; that is the failure mode being designed against.
+**What is now load-bearing that was not.** The H-map's *"user personalization wins over tenant branding"* rule stops being vacuous the moment tenant branding reaches the admin app (H23a3). ~~It must be enforced by CSS specificity rather than source order — `:root` for the tenant layer at (0,1,0), losing to `:root[data-accent='…']` at (0,2,0).~~ **CORRECTED BY H23a3 (2026-08-05): it is enforced ON THE SERVER, and the CSS route was rejected on inspection.** The tenant ramp needs three blocks — `:root`, `[data-theme-mode='dark']` and a `prefers-color-scheme` twin, at (0,1,0), (0,2,0) and (0,3,0) — so the user's teal rule at (0,2,0) would have **tied** with the tenant's dark block, leaving source order to decide, which is precisely the G11 bug this paragraph names. `app.blade.php` instead emits the tenant ramp **only when the member has expressed no accent opinion**, so personalization never enters a specificity contest at all. The prediction is struck through rather than deleted because the reasoning that produced it is the reasoning a future reader is most likely to repeat.
 
-**A defect this creates downstream, recorded now so H23a3 does not rediscover it.** §2.9 makes "the product default is the ABSENCE of the attribute" an invariant across all four personalization axes. Once a tenant ramp occupies `:root`, absence stops meaning *product default* and starts meaning *inherit my organisation's brand* — so a member who wants the product blue back has no way to say so. H23a3 closes it by emitting an explicit `data-accent="blueprint"` when, and only when, the tenant has a ramp. The invariant survives everywhere a tenant has no brand.
+**A defect this creates downstream, recorded now so H23a3 does not rediscover it.** §2.9 makes "the product default is the ABSENCE of the attribute" an invariant across all four personalization axes. Once a tenant ramp occupies `:root`, absence stops meaning *product default* and starts meaning *inherit my organisation's brand* — so a member who wants the product blue back has no way to say so. ~~H23a3 closes it by emitting an explicit `data-accent="blueprint"` when, and only when, the tenant has a ramp.~~ **CORRECTED BY H23a3: an explicit `data-accent="blueprint"` would have needed a `:root[data-accent='blueprint']` restoring rule at (0,2,0), which outranks the tenant's `:root` block at (0,1,0) in EVERY case — the tenant's colour would never have applied at all.** What ships instead widens the STORED domain, not the attribute: `user_ui_preferences.accent_token` moves from `{NULL,'teal'}` to `{NULL,'blueprint','teal'}`, **NULL now means "no opinion" and nothing else**, and `<html>` still emits `data-accent` only for Teal — so §2.9's absence-as-default convention survives at the attribute level unchanged.
 
-**Not addressed here.** Per-form branding overrides (`forms.theme`, built and unread since Increment F — data-dictionary §218); custom typefaces; logo placement; full white-label. The `branding` entitlement stays at Starter+ per ADR-0008 §D7 and is not revisited.
+**Not addressed here.** Per-form branding overrides (`forms.theme`, built and unread since Increment F — data-dictionary §218); custom typefaces; ~~logo placement~~ (**decided by H23a4 — see below**); full white-label, including per-tenant `From` addresses, which would need per-domain DKIM/SPF. The `branding` entitlement stays at Starter+ per ADR-0008 §D7 and is not revisited.
+
+---
+
+## Addendum — the two surfaces §D8 was written for (H23a4, 2026-08-05)
+
+§D8 argues the ramp must be STORED because mail and dompdf cannot resolve a custom property. Until H23a4
+that was a prediction about consumers that did not exist. Both now exist, and building them settled three
+questions the ADR had left open.
+
+**1. Logo placement — mail yes, PDF no.** The logo reaches email as a **hosted absolute URL** on the
+tenant's app host (`GET /branding/logo`, in the unauthenticated subdomain group), and does **not** reach
+the PDF at all. Two facts forced the split:
+
+- The only logo-serving route H23a2 left behind is `GET /attachments/{id}`, behind `auth` +
+  `can:view,attachment`. A mail client has no session, so that is a 302 to login — a broken image in every
+  branded email. Hence a new route, and hence it is **unsigned**: an email is read days later and
+  forwarded, so any expiry guarantees the image breaks. The asset is public by nature (it is the logo
+  every respondent of every branded form sees) and the row is already `is_pii = false`. Safety comes from
+  the route resolving `tenants.logo_attachment_id` and nothing else — it is not a public read primitive
+  over `attachments` — plus the `isActive()` gate, the scan-status gate, `nosniff`, and the fact that
+  H23a2's content-sniffed allowlist means SVG cannot reach storage in the first place.
+- dompdf needs `ext-gd` for PNG and WebP (JPEG is the only GD-free path), and GD is absent from the app
+  container **and from all four CI jobs**. A logo would have rendered on a developer's machine and thrown
+  in the pipeline. The PDF's existing no-external-references contract is left intact and branding there is
+  colour only.
+
+**2. Light theme only, on both surfaces.** The stored ramp carries two themes; these surfaces take one.
+`CssToInlineStyles` deletes `@media` from the theme before inlining; a rule moved into a `<style>` tag
+would lose to the inline declarations the inliner has just written onto every element; the framework's
+mail layout hard-codes `color-scheme: light`; and the dark ramp's contrast was measured against
+Meridian's own dark grounds (`#123350` / `#0C2337`), not against whatever ground a client invents when it
+inverts a message. Shipping it would assert a guarantee the engine never made. Paper, for its part, is
+white.
+
+**3. The palette is resolved at DISPATCH, never in `toMail()`, and this is the sharpest edge in the
+increment.** A queued `Notification` is delivered by the framework's `SendQueuedNotifications`, **not** by
+`TenantAwareJob`, so on the worker `TenantContext::currentTenantId()` is null — and
+`TenantBrandingService::isActive()` reads its entitlement half from exactly that static, not from its
+`$tenant` argument. Branding read inside `toMail()` therefore fails closed and sends **every** tenant an
+unbranded email, with a green suite. `sharedRamp()` is worse: it resolves a container binding no worker
+makes and returns null unconditionally. So `App\Support\Branding\BrandPalette` resolves the palette where
+the tenant is known and it rides the notification payload as a scalar array — the same discipline every
+`TenantUrl`-built link already follows. `BrandPalette::forTenant()` additionally **refuses to answer**
+when its argument is not the ambient tenant, which turns that latent cross-tenant entitlement read into
+defined, fail-closed behaviour rather than a silent wrong answer.
+
+The two Fortify emails (verification, password reset) are deliberately the only unbranded ones: those
+routes carry no tenancy middleware, so no tenant is resolved — and a user may belong to several, so
+"whose brand" has no correct answer either. They still render through the Meridian template.
 
 ---
 
 ## When to Revisit
 
 - **A sixth consuming surface appears that can resolve `var()`.** §D8's storage argument is grounded in mail and dompdf being unable to; it does not become wrong, but it becomes worth restating.
+- **`ext-gd` is added to the app image for some other reason.** The PDF's colour-only branding is a consequence of its absence, not a preference — see the Addendum. Adding GD would also make `UploadedFile::fake()->image()` usable, which several tests currently work around with real PNG bytes.
+- **A tenant asks to send from their own domain.** That is the full white-label line above; it needs per-domain DKIM/SPF and would change what the mail footer's "Sent via" attribution is for.
 - **A target or ground token changes.** That is a `BrandRampGenerator::VERSION` bump plus a deliberate re-derivation pass over stored ramps — never a silent repaint. The version exists to make that moment visible.
 - **WCAG 3 / APCA becomes the standard the product tests against.** The whole engine is built on WCAG 2.x relative luminance, which APCA replaces rather than refines; §4.1 and this ADR would move together.
 - **The first evidence that a generated ramp reads worse than a curated one in real use.** The structural→procedural trade in Consequences is the thing to re-examine, and a real screenshot beats every argument in this document.

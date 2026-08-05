@@ -413,6 +413,70 @@ Added after the original seven-subsection token model, at the user's explicit re
 
 ---
 
+### 2.10 Transactional Email and PDF — the two surfaces that cannot resolve a token *(Increment H23a4, [ADR-0014](../adr/0014-tenant-brand-ramp-generation.md) §D8)*
+
+Standing Rule 2 says one shared design system on every surface, no exceptions. Transactional email and
+the submission PDF are the two surfaces where that rule has to be honoured **without the mechanism the
+rest of the system is built on**: a mail client strips `<style>` and ignores `var()`, and dompdf
+implements CSS 2.1, so a custom property is not merely unsupported there — it is unparseable, and the
+whole declaration is dropped. Neither surface can read `tokens.css`, ever.
+
+So both are rendered from **literal hexes resolved in PHP**, and that is the reason ADR-0014 §D8 stores
+the derived ramp rather than re-deriving it on read. The design system is present on these surfaces as
+*transcribed values*, not as a stylesheet, and the transcription is what needs guarding.
+
+**Where each surface's copy lives, and what guards it.**
+
+| Surface | File | Guard |
+|---|---|---|
+| Mail theme | `resources/views/mail/meridian.blade.php` | rendered as **Blade**, not `.css` — the view finder maps a `.css` view to the FileEngine and would emit `{{ … }}` literally |
+| Mail template | `resources/views/mail/notification.blade.php` | ours, not `notifications::email` — a Blade component does not inherit the caller's scope, so `$brand` must be injected at the tag |
+| Mail header | `resources/views/vendor/mail/html/header.blade.php` | the **only** published vendor component; the text arm is deliberately not published |
+| PDF | `resources/views/pdf/_styles.blade.php` | `SubmissionPdfRendererTest`'s structural scan of the directory |
+| The product default | `App\Support\Branding\BrandPalette::PRODUCT` | `tests/Unit/Branding/BrandPaletteTokenParityTest.php`, which parses `packages/design-system/tokens/*.json` and re-resolves each alias |
+
+That last row is the one that matters most. `PRODUCT` is six design-system values written out by hand,
+and a hand-copied value guarded only by a comment is how `https://acme/invitations/` shipped in every
+invitation email for two increments. It reads the **committed token JSON** rather than
+`packages/design-system/dist/tokens.css`, which is gitignored and therefore absent in CI.
+
+**§D7's rule holds on both surfaces: the brand paints ACTIONS, never neutrals or body text.** Mail
+references `$brand` in exactly six declarations (the primary button's fill and its four borders, links,
+the panel accent and its tint); the PDF references it in three (the header rule, the document title, the
+prose panel). Everything else is a fixed Meridian neutral. A respondent's answers must read the same
+whatever colour the tenant chose, and success/error buttons keep the semantic `success`/`danger` hues for
+the same reason ADR-0011 §D11 kept chart colours off the brand layer — a green that meant "brand" instead
+of "it worked" would be a worse button.
+
+**Contrast is inherited from the stored measurements, not re-asserted here.** Each branded declaration
+maps onto a §4.1 pairing the engine already measured: white on the fill is `bg`/on_primary verbatim; the
+brand as ink on white paper is that same measurement read backwards (contrast is symmetric); the PDF's
+prose panel is `tint`/ink, which is why it names `#0E1620` explicitly rather than inheriting the body's
+`#1a1a1a` — `#0E1620` *is* the light ink ground the ratio was taken against. Button text is `#FFFFFF`
+(the generator's `ON_PRIMARY`) and never `$brand['fg']`, because in the light ramp `fg` **is** `bg`.
+
+**Two things are deliberately not built, and both are decisions rather than gaps.**
+
+- **No dark-mode mail.** Four independent reasons, any one sufficient: `CssToInlineStyles` deletes
+  `@media` from the theme before inlining; written into a `<style>` tag instead it would lose to the
+  inline declarations the inliner has just written onto every element; the framework's layout hard-codes
+  `color-scheme: light`; and the dark ramp was measured against Meridian's own dark grounds, not against
+  whatever ground a client invents when it inverts a message.
+- **No logo in the PDF.** dompdf's PNG and WebP paths both throw without `ext-gd`, which is absent from
+  the app container *and* from all four CI jobs — so a logo would have rendered on a developer's machine
+  and thrown in the pipeline. The PDF's existing no-external-references contract
+  (`isRemoteEnabled = false`, chroot pinned to the view directory) is left intact. The logo reaches
+  **mail** instead, as a hosted absolute URL on the tenant's app host (`GET /branding/logo`,
+  unauthenticated and deliberately unsigned — an expiry on an image sitting in an inbox is a broken image
+  on a timer).
+
+**The header carries the tenant's name; the From address stays the platform's.** Per-tenant sending needs
+per-domain DKIM/SPF, which ADR-0014 files under *full white-label — not addressed here*. The footer
+therefore says "Sent via {app name}" whenever the header is not the product's own, because a branded
+header over an unexplained platform sender reads as a spoof.
+
+---
+
 ## 3. Component Inventory
 
 ### 3.0 The app shell (governing structure for everything below)

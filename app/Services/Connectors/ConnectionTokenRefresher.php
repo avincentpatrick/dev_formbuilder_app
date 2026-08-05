@@ -11,6 +11,7 @@ use App\Models\Connection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
+use App\Support\Branding\BrandPalette;
 use App\Support\Connectors\ConnectorRegistry;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -113,7 +114,13 @@ final class ConnectionTokenRefresher
             return;
         }
 
+        // The sweep visits tenants one at a time under each one's own context, so the id is passed
+        // explicitly rather than taken from the ambient GUC (H23a4). BrandPalette refuses to answer if the
+        // two ever disagree, which is what makes that explicitness load-bearing rather than decorative.
         Notification::route('mail', $email)
-            ->notify(new ConnectionRevokedNotification($providerLabel, $accountLabel));
+            ->notify(
+                (new ConnectionRevokedNotification($providerLabel, $accountLabel))
+                    ->withBrand(BrandPalette::forTenantId($tenantId))
+            );
     }
 }

@@ -48,6 +48,25 @@ class ConnectionFactory extends Factory
         ]);
     }
 
+    /**
+     * A Google Sheets grant (H16a) — and unlike the Slack default it is REFRESHABLE and EXPIRING, because
+     * that is what a real one is: Google issues an access token that lives about an hour plus a refresh token
+     * on the first authorization. A Google grant with a null expiry does not occur in production, so a factory
+     * that produced one would let a test pass over a code path the sweep and the pre-flight both skip.
+     */
+    public function googleSheets(int $expiresInSeconds = 3600): static
+    {
+        return $this->state(fn (): array => [
+            'provider' => ConnectorProviderKey::GoogleSheets,
+            'external_account_id' => 'google-drive',
+            'external_account_label' => 'Google Sheets',
+            'scopes' => ['https://www.googleapis.com/auth/drive.file'],
+            'access_token' => 'ya29.'.Str::random(40),
+            'refresh_token' => '1//'.Str::random(40),
+            'token_expires_at' => Carbon::now()->addSeconds($expiresInSeconds),
+        ]);
+    }
+
     public function revoked(): static
     {
         return $this->state(fn (): array => ['status' => ConnectionStatus::Revoked]);

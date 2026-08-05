@@ -24,12 +24,16 @@ test('Public runtime — installable PWA renders offline + guards submit', async
         .getByRole('heading', { name: 'Clinic Intake', level: 1 })
         .waitFor({ state: 'visible', timeout: 15_000 });
 
-    // Installability signals wired into the shell head (origin-independent).
+    // Installability signals wired into the shell head (origin-independent). The `?b=` fingerprint (H23b)
+    // is the manifest's cache-invalidation lever; the E2E tenant is deliberately unbranded, so it reads
+    // `none` and `theme-color` is the product default (`--mds-primary-600`, the light
+    // `--mds-color-action-primary-bg`). Seeding a brand here would move the axe contrast baselines for a
+    // property the ramp engine already measures against all seventeen §4.1 pairings before storing.
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
         'href',
-        '/f/clinic-intake/manifest.webmanifest',
+        '/f/clinic-intake/manifest.webmanifest?b=none',
     );
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#1B5E5E');
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#1C4B72');
 
     // If the service worker is available (secure context), prime its caches under control and prove the form
     // still RENDERS offline. `navigator.serviceWorker` is only defined in a secure context.

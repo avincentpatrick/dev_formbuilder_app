@@ -1,11 +1,12 @@
 /**
- * The guest runtime's IndexedDB source of truth (Increment G8b), via Dexie. Four stores back the offline
+ * The guest runtime's IndexedDB source of truth (Increment G8b), via Dexie. Five stores back the offline
  * engine (docs/offline-first-sync-design.md §3):
  *  - `cached_manifests` — a pinned form version's schema, keyed by form_version_id (forward-compatible with the
  *    authenticated sync/manifest surface; the guest schema itself is still served by the G8a SW schema cache).
  *  - `draft_answers`    — in-progress, not-yet-finalized answers (the G8a localStorage autosave migrates here).
  *  - `outbox`           — FINALIZED submissions queued for replay, keyed by the time-sortable client_submission_uuid.
  *  - `media_queue`      — respondent media blobs awaiting upload, referencing their parent outbox row by uuid.
+ *  - `app_state`        — (H23b) small device-scoped scalars that outlive a page load and belong to no form.
  *
  * The SAME db name is opened from both the Vue app and the service worker, so a `sync` event can replay the
  * exact rows a tab enqueued. Helpers (outbox.ts / media-queue.ts / replay.ts) take a db instance as a param so
@@ -81,11 +82,26 @@ export interface MediaQueueRow {
     created_at: string;
 }
 
+/**
+ * A device-scoped scalar that belongs to no form and must survive a page load (Increment H23b).
+ *
+ * One key today — `brand_version`, the fingerprint of the tenant ramp the cached guest shells were last
+ * refreshed for (see brand-cache.ts). A dedicated store rather than localStorage because the guest
+ * runtime's persistence story is Dexie: the G8a localStorage autosave was already migrated here, and a
+ * second storage mechanism for one string would be a second thing to reason about when a respondent
+ * clears site data.
+ */
+export interface AppStateRow {
+    key: string;
+    value: string;
+}
+
 export class MeridianDb extends Dexie {
     cached_manifests!: Table<CachedManifest, string>;
     draft_answers!: Table<DraftRow, [string, string]>;
     outbox!: Table<OutboxRow, string>;
     media_queue!: Table<MediaQueueRow, string>;
+    app_state!: Table<AppStateRow, string>;
 
     constructor(name: string = DB_NAME) {
         super(name);
@@ -94,6 +110,13 @@ export class MeridianDb extends Dexie {
             draft_answers: '[form_version_id+local_draft_id], form_version_id, updated_at',
             outbox: 'client_submission_uuid, status, slug, form_version_id, created_at',
             media_queue: 'attachment_local_id, client_submission_uuid, status',
+        });
+        // Increment H23b — a NEW STORE, which is the one change that genuinely requires a version bump.
+        // (Contrast `conflict_code` above: an un-indexed field added to an existing row shape needs none,
+        // and G8c deliberately did not bump for it.) Dexie carries the v1 stores forward untouched and
+        // upgrades in place, so a device mid-fill keeps its drafts, outbox and queued media.
+        this.version(2).stores({
+            app_state: 'key',
         });
     }
 }

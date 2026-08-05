@@ -5,15 +5,48 @@ let n = 0;
 const freshDb = () => openDb(`db-test-${(n += 1)}`);
 
 describe('MeridianDb', () => {
-    it('declares the four offline stores', () => {
+    it('declares the five offline stores', () => {
         const db = freshDb();
         expect(db.tables.map((t) => t.name).sort()).toEqual([
+            'app_state',
             'cached_manifests',
             'draft_answers',
             'media_queue',
             'outbox',
         ]);
         db.close();
+    });
+
+    it('adds app_state at v2 without disturbing the v1 stores (Increment H23b)', async () => {
+        // The upgrade is what matters, not the store: a device mid-fill has drafts, a queued outbox and
+        // queued media in v1, and a schema bump that dropped any of them would lose a respondent's work
+        // to a purely cosmetic feature. Dexie carries the v1 definitions forward — this asserts it did.
+        const db = freshDb();
+        await db.outbox.put({
+            client_submission_uuid: 'survives-upgrade',
+            slug: 'clinic-intake',
+            form_version_id: 'v1',
+            checksum: 'c1',
+            answers: { full_name: 'Ada' },
+            locale: 'en',
+            device_id: 'dev-1',
+            app_version: 'test',
+            submitted_at: '2026-08-05T00:00:00.000Z',
+            status: 'pending',
+            attempts: 0,
+            last_error: null,
+            conflict_code: null,
+            server_submission_id: null,
+            created_at: '2026-08-05T00:00:00.000Z',
+            updated_at: '2026-08-05T00:00:00.000Z',
+        });
+
+        await db.app_state.put({ key: 'brand_version', value: 'abc123def456' });
+
+        expect(await db.app_state.get('brand_version')).toEqual({ key: 'brand_version', value: 'abc123def456' });
+        expect(await db.outbox.get('survives-upgrade')).toMatchObject({ slug: 'clinic-intake' });
+        expect(db.verno).toBe(2);
+        await db.delete();
     });
 
     it('round-trips an outbox row keyed by client_submission_uuid', async () => {

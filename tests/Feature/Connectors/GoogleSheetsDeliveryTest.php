@@ -239,13 +239,27 @@ it('refuses to write, pauses ONLY that rule, and tells the owner once when the c
 });
 
 it('does not re-notify the owner for every queued delivery against a drifted sheet', function (): void {
-    // Edge-triggered, like the breaker and the revoked-grant path. Without the already-paused guard a busy
-    // form would mail the owner once per queued submission.
+    // A busy form has several submissions already enqueued when the tenant edits their sheet, so "notify once"
+    // has to survive the SECOND delivery, not just the first.
+    //
+    // This test drives two deliveries deliberately. Written with one, it passed under both the real code and a
+    // mutation that removed the guard entirely — the vacuous shape the H21c/H24a lessons warn about, and it is
+    // how the `! $alreadyPaused` flag was found to be dead code. What actually holds the property is the job's
+    // own Active-status precondition: the first block pauses the rule and everything queued behind it stops
+    // before it can send anything.
     Notification::fake();
     fakeSheets(['Full name', 'Colour']);
 
     [, $subscription] = runSheetsDelivery();
     expect($subscription->status)->toBe(ConnectorSubscriptionStatus::Paused);
+
+    // A second delivery for the SAME now-paused rule.
+    $second = WebhookDelivery::factory()->forSubscription($subscription)->create([
+        'payload' => ['event_type' => 'submission.created', 'occurred_at' => '2026-08-05T09:01:00Z', 'data' => ['submission_id' => '0198-x']],
+    ]);
+    DeliverConnectorMessageJob::dispatch($this->tenant->id, (string) $second->id);
+    workOneJob('webhooks');
+    enterTenant($this->tenant->id);
 
     Notification::assertSentOnDemandTimes(ConnectorRulePausedNotification::class, 1);
 });

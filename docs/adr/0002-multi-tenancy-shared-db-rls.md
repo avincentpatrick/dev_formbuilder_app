@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-07-03
+**Accepted** — 2026-07-03. **Narrowed (not superseded) by ADR-0013, 2026-08-05:** this ADR made RLS *the* database-level guard idiom, and `docs/form-versioning-schema-migration.md` §2 read that as "never a trigger." ADR-0013 draws the boundary explicitly — **row-scoped invariants stay RLS; an invariant that must compare the OLD row to the NEW one gets a trigger, because a policy sees only one of them** (`USING` = OLD, `WITH CHECK` = NEW). Exactly one invariant qualifies today (published form-version immutability, H25). Everything in §D2 below is unchanged and remains the default for every tenant-scoped table.
 
 - **Deciders**: Founding engineering (architecture owner), with product sign-off on the roadmap implications (Phase 4 dedicated-DB deferral).
 - **Supersedes**: N/A (greenfield decision; no prior ADR exists for this project).

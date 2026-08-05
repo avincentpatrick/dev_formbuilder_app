@@ -95,7 +95,14 @@ final class FormService
             $form->forceFill(['title' => $title, 'description' => $description])->save();
 
             if ($form->draft_version_id !== null) {
+                // The `status` predicate is load-bearing, not belt-and-braces (H25 / Risk R5). This method
+                // takes an in-memory $form with no lock and no re-read, so if that model was loaded before
+                // a concurrent publish, `draft_version_id` now names the version that publish just FROZE —
+                // and without this clause an ordinary form-settings save silently rewrites a published
+                // version's title/description, which is precisely the corruption R5 describes. With it the
+                // stale write degrades to a no-op instead (and, since H25, to a 23001 rather than silence).
                 FormVersion::query()->whereKey($form->draft_version_id)
+                    ->where('status', FormVersionStatus::Draft->value)
                     ->update(['title' => $title, 'description' => $description]);
             }
 

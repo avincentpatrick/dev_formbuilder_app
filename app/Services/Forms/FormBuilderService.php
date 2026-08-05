@@ -39,10 +39,19 @@ use Illuminate\Support\Facades\DB;
  */
 final class FormBuilderService
 {
-    /** Microsecond-precision optimistic-concurrency token. The client always echoes back the exact string. */
+    /** Optimistic-concurrency token format. The client always echoes back the exact string. */
     private const VERSION_FORMAT = 'Y-m-d\TH:i:s.uP';
 
-    /** The optimistic-concurrency token for a content row (its `updated_at`, microsecond precision). */
+    /**
+     * The optimistic-concurrency token for a content row — its `updated_at`, at SECOND precision.
+     *
+     * The format string carries `.u`, but the underlying column does not: Laravel's
+     * `Schema\Builder::$defaultTimePrecision` is 0 and this repo never overrides it, so `timestampsTz()`
+     * emits `timestamp(0) with time zone` and the sub-second digits are always zeroes. Corrected here in
+     * H25 (it read "microsecond precision", which was never true). The consequence is real and is NOT
+     * fixed here because it is not R5: two builder edits landing inside the same second produce the same
+     * token, so the second one is an undetectable lost update.
+     */
     public static function rowVersion(Model $row): ?string
     {
         $updatedAt = $row->getAttribute('updated_at');

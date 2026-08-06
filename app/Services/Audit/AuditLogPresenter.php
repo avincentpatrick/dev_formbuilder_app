@@ -206,32 +206,39 @@ final class AuditLogPresenter
     }
 
     /**
-     * The actor filter catalog: everyone who has acted in this tenant's ledger, named.
+     * The actor filter catalog: this tenant's visible members, named.
      *
-     * NOT a bare `SELECT DISTINCT user_id` — that is a full scan of an unbounded table (Postgres has no
-     * loose index scan over `audits_tenant_user_idx`), and worse, half the ids it returns cannot be
-     * resolved to a name for the RLS reason in {@see self::actorLabel()}, so the dropdown would contain raw
-     * uuids. Sourcing it from the ledger's distinct actors and INNER-joining names keeps every option
-     * nameable; the rows of an unnameable actor still render and are simply not filterable, which is the
-     * honest failure direction.
+     * ── It reads the ROSTER and never touches `audits`, and that is a correctness result, not a shortcut ──
+     * The obvious implementation is `SELECT DISTINCT user_id FROM audits`, and it is wrong twice over.
+     *
+     * It is wrong on COST for the reason {@see AuditableTypes} already records for `auditable_type`:
+     * Postgres has no loose index scan, so `audits_tenant_user_idx` cannot serve a DISTINCT — measured on a
+     * 400k-row tenant slice, the planner chooses a **Parallel Seq Scan (6,168 buffers, ~35 ms) to return
+     * twelve rows**, and that cost grows linearly on a table that is never pruned, on every page render.
+     *
+     * It is wrong on RESULT for a subtler reason, and this is the half that makes the roster strictly
+     * better rather than merely cheaper: `users` RLS is the join-shape policy (self + ACTIVE co-tenant
+     * members), so **every id the DISTINCT returns that the roster does not already contain is an id this
+     * process cannot resolve to a name** — see {@see self::actorLabel()}. Those ids were being dropped by
+     * the `whereIn` anyway. The scan's only actual effect was to NARROW the roster to members who happen to
+     * have acted; removing it also lists a member who has not, and "no rows for Alice" is a legitimate and
+     * useful answer to ask for.
+     *
+     * The accepted limitation, stated because it is the honest failure direction for a compliance log: a
+     * departed member is not a filter OPTION, while their rows still render (as "Unknown user") and are
+     * still exported. Losing a filter is recoverable; a dropdown of bare uuids is not.
      *
      * @return list<array{value: string, label: string}>
      */
     private function actorOptions(): array
     {
-        $actorIds = Audit::query()->whereNotNull('user_id')->distinct()->pluck('user_id')->all();
-
-        if ($actorIds === []) {
-            return [];
-        }
-
         // `pluck` rather than `->get()->map(fn (User $u) => $u->name)`: `User::$name` is one of the
         // documented PHPStan phantoms (the model declares no property for it), and reading it through the
         // model here makes the whole closure's return type unresolvable — four new level-8 errors for a
         // string this query can hand back directly.
         $options = [];
 
-        foreach (User::query()->whereIn('id', $actorIds)->orderBy('name')->pluck('name', 'id') as $id => $name) {
+        foreach (User::query()->orderBy('name')->pluck('name', 'id') as $id => $name) {
             $options[] = [
                 'value' => (string) $id,
                 'label' => is_string($name) && $name !== '' ? $name : 'Unknown user',

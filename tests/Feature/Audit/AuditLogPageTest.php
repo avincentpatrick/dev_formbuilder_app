@@ -189,6 +189,34 @@ it('labels a null actor `System` and an invisible one `Unknown user`', function 
     );
 });
 
+it('offers every visible member as an actor filter, including one who has never acted', function (): void {
+    $this->withoutVite();
+
+    // Pins the roster-based catalog against a revert to `SELECT DISTINCT user_id FROM audits`, which is
+    // wrong twice: measured on a 400k-row tenant slice the planner picks a Parallel Seq Scan (6,168
+    // buffers) to return twelve rows — Postgres has no loose index scan, so `audits_tenant_user_idx`
+    // cannot serve a DISTINCT — and every id it returns beyond the roster is one the `users` join-shape
+    // RLS policy will not let this process name anyway.
+    $quiet = User::factory()->create(['name' => 'Aaron Quiet']);
+    makeActiveMember($quiet, 'admin');
+
+    app(FormService::class)->create($this->tenant, $this->owner, 'Survey');
+
+    $this->get(auditPageUrl())->assertOk()->assertInertia(fn ($page) => $page
+        // Alphabetical, so the member who has never touched the ledger leads.
+        ->where('filters.actors.0.value', $quiet->id)
+        ->where('filters.actors.0.label', 'Aaron Quiet')
+        ->has('filters.actors', 2)
+        // …and asking for their activity is a legitimate question with an honest empty answer.
+        ->has('data', 1)
+    );
+
+    $this->get(auditPageUrl('user_id='.$quiet->id))->assertOk()->assertInertia(fn ($page) => $page
+        ->has('data', 0)
+        ->where('empty_reason', 'no_matches')
+    );
+});
+
 it('distinguishes an empty ledger from a filter that matched nothing', function (): void {
     $this->withoutVite();
 

@@ -7,6 +7,7 @@ namespace App\Support\Audit;
 use App\Services\Audit\AuditExporter;
 use App\Services\Audit\AuditLogPresenter;
 use App\Services\Submissions\SubmissionInboxPresenter;
+use App\Services\Tenancy\CustomDomainService;
 
 /**
  * Renders an audit row's `old_values`/`new_values` jsonb pair into display-ready before/after rows (I2).
@@ -39,7 +40,16 @@ final class AuditDiff
     private const string TRUNCATION_SUFFIX = '…';
 
     /**
-     * One row per changed key, in a stable, author-meaningful order.
+     * One row per key PRESENT in either payload, in a stable, author-meaningful order.
+     *
+     * ⚠️ **PRESENT, not CHANGED — there is deliberately no equality test, and adding one would lose
+     * information.** A caller records the fields that describe the act, not a computed delta: a domain
+     * audit carries the hostname on both sides precisely so the row reads without a join
+     * ({@see CustomDomainService}, where the target cannot be addressed by key at
+     * all), and a review transition snapshots the whole reviewable state so one emission site serves four
+     * verbs. Filtering out equal pairs would strip exactly those anchors and leave rows that no longer say
+     * what they are about. The ledger records what the payload said; deciding what is interesting is the
+     * reader's job, not this transform's.
      *
      * `null` on a side means **the key was not present in that payload at all** — deliberately distinct
      * from a present-but-null column, which renders as an em-dash. `public_slug: — → intake` (the column

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Tenancy\CustomDomainService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
 
@@ -41,7 +42,7 @@ function domainAuditService(): CustomDomainService
 }
 
 /** Every `domain` row in the ledger, oldest first. */
-function domainAudits(): Illuminate\Support\Collection
+function domainAudits(): Collection
 {
     return Audit::query()->where('auditable_type', 'domain')->orderBy('id')->get();
 }

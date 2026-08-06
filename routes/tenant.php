@@ -8,6 +8,7 @@ use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\AuditLogController;
 use App\Http\Controllers\Tenant\BrandingController;
 use App\Http\Controllers\Tenant\BrandingLogoController;
 use App\Http\Controllers\Tenant\ConnectionController;
@@ -41,6 +42,7 @@ use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
+use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
@@ -483,6 +485,29 @@ Route::middleware([
         ->middleware(['can:update,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.update');
     Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
         ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
+
+    /*
+    | The audit log (Increment I2, PRD Feature #12) — the Owner/Admin compliance ledger, the first surface
+    | that lets a human READ what H4 has been writing since July.
+    |
+    | `can:viewAny,Audit` IS the authorization: AuditPolicy resolves exactly the `audit_log.view`
+    | permission, seeded to Owner and Admin only and explicitly withheld from Viewer. No `ability:` — that
+    | is Sanctum token-scope middleware and a session carries no token (the H14 convention).
+    |
+    | NO `feature:` GATE, AND THE ABSENCE IS DELIBERATE. `PlanCatalog` defines no audit key on any tier,
+    | because accountability is a baseline obligation rather than an upsell — so unlike Analytics, Webhooks,
+    | Integrations and Domains, this destination turns on a permission alone. Adding a feature key here
+    | would be MAKING a pricing decision rather than enforcing one (the I1 forms.share precedent).
+    |
+    | Static segment before any binding (the H14 rule): /audit-log/export is declared here, and there is
+    | deliberately NO /audit-log/{audit} route. An audit row has no detail page — the before/after diff is
+    | rendered from props the list already carries, so the row IS the detail — and a bare {audit} pattern
+    | would be the first thing able to shadow /export.
+    */
+    Route::get('/audit-log', [AuditLogController::class, 'index'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
+    Route::get('/audit-log/export', [AuditLogController::class, 'export'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.export');
 });
 
 /*

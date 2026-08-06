@@ -10,6 +10,31 @@ on:
   pull_request:
     branches: [main, phase1-completion]
 
+  # ── Re-verification after a GitHub-side outage (added 2026-08-06, I5) ─────────────────────
+  # I5 merged with only 2 of 6 jobs confirmed: GitHub Actions was in a MAJOR OUTAGE (status page
+  # "Incident with Actions", critical) and four jobs never acquired a runner — they failed with
+  # `Service Unavailable` / `not acquired by Runner of type hosted`, never on our code. The
+  # post-merge `push` run above is the re-verification, but a run that fails for infrastructure
+  # reasons stays failed until somebody re-runs it, and "somebody remembers" is not a control.
+  #
+  # ⚠️ BOTH TRIGGERS BELOW ARE INERT UNTIL THIS FILE REACHES `main`, and that is a GitHub rule,
+  # not an oversight: scheduled and manually-dispatched workflows are read from the DEFAULT
+  # BRANCH only. `main` receives nothing until the single final integration PR at the end of the
+  # I-queue, so until then the working control is the tracker's OUTSTANDING VERIFICATION line
+  # plus `gh run rerun <id> --failed`. They arm themselves the moment the queue lands on main.
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this run was triggered by hand (e.g. re-verify after an Actions outage)"
+        required: false
+        default: "manual re-verification"
+
+  # Nightly re-verification of the default branch. Cheap insurance against exactly the failure
+  # above — an outage-skipped verification heals itself by morning instead of waiting for a human
+  # to notice. Free: the repository is public, so standard-runner minutes are not billed.
+  schedule:
+    - cron: "0 3 * * *"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

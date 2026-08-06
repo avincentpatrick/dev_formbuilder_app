@@ -295,6 +295,47 @@ final class ResourceGrantResolver
         ];
     }
 
+    /**
+     * Load the grants of MANY users in one query, warming the same memo {@see holdsAny()} reads.
+     *
+     * The caller that needs this is I3's notification recipient resolver: it asks "which of these N members
+     * reach this form" on the SYNCHRONOUS guest-submit path, and without priming that is one grant query per
+     * collaborator-scoped member inside a public POST. After a prime, every subsequent `holds*()` for those
+     * users is a pure in-memory decision.
+     *
+     * Deliberately a PRIME rather than a `granteesOfForm()` that answers the question itself: the answer
+     * still comes from {@see decide()}, the one interpreter of `resource_grants`, so a batch path cannot
+     * drift from the single-row path — which is the entire reason this class exists. Users with no grants
+     * are memoized as EMPTY sets, so they do not each fall through to a second query.
+     *
+     * @param  list<string>  $userIds
+     */
+    public function primeFor(array $userIds): void
+    {
+        $missing = array_values(array_filter(
+            array_unique($userIds),
+            fn (string $id): bool => ! isset($this->sets[$this->memoKey($id)]),
+        ));
+
+        if ($missing === []) {
+            return;
+        }
+
+        $rows = $this->grantQuery()
+            ->whereIn('resource_grants.user_id', $missing)
+            ->get([...$this->grantColumns(), 'resource_grants.user_id']);
+
+        $byUser = [];
+
+        foreach ($rows as $row) {
+            $byUser[(string) $row->getAttribute('user_id')][] = $row;
+        }
+
+        foreach ($missing as $userId) {
+            $this->sets[$this->memoKey($userId)] = $this->fold($byUser[$userId] ?? []);
+        }
+    }
+
     /** Drop memoized grants after a write. Pass null to clear every user. */
     public function forget(?string $userId = null): void
     {
@@ -387,44 +428,67 @@ final class ResourceGrantResolver
 
     private function setFor(User $user): GrantSet
     {
-        $key = $user->getKey().'|'.(TenantContext::currentTenantId() ?? '-');
+        return $this->sets[$this->memoKey((string) $user->getKey())] ??= $this->fold(
+            $this->grantQuery()->where('resource_grants.user_id', $user->getKey())->get($this->grantColumns())
+        );
+    }
 
-        return $this->sets[$key] ??= $this->load($user);
+    private function memoKey(string $userId): string
+    {
+        return $userId.'|'.(TenantContext::currentTenantId() ?? '-');
     }
 
     /**
-     * One query per (user, tenant). RLS scopes `resource_grants` AND the joined `scope_nodes`, so a grant
-     * pointing at another tenant's node yields a NULL path and is discarded here rather than trusted.
+     * The grant query minus its user predicate, so the single-user load and the batch prime cannot drift
+     * into two definitions of "a grant that counts". RLS scopes `resource_grants` AND the joined
+     * `scope_nodes`, so a grant pointing at another tenant's node yields a NULL path and is discarded in
+     * {@see fold()} rather than trusted.
+     *
+     * @return Builder<ResourceGrant>
      */
-    private function load(User $user): GrantSet
+    private function grantQuery(): Builder
     {
-        $rows = ResourceGrant::query()
-            ->where('resource_grants.user_id', $user->getKey())
+        return ResourceGrant::query()
             // Fail-closed allowlist: an alias this build does not know about is ignored, never guessed at.
             ->whereIn('resource_grants.scopeable_type', ResourceScopeable::aliases())
             // A grant only counts while its holder is an ACTIVE member. TenantMembershipService::remove()
             // sets status = removed without touching grants, so without this a removed member's grants
             // survive and silently re-arm the moment they are re-invited.
-            ->whereExists(function (QueryBuilder $exists) use ($user): void {
+            ->whereExists(function (QueryBuilder $exists): void {
                 $exists->selectRaw('1')
                     ->from('tenant_users')
                     ->whereColumn('tenant_users.tenant_id', 'resource_grants.tenant_id')
-                    ->where('tenant_users.user_id', $user->getKey())
+                    // Correlated on the grant's own holder rather than a bound id, which is what lets the
+                    // batch prime reuse this builder unchanged.
+                    ->whereColumn('tenant_users.user_id', 'resource_grants.user_id')
                     ->where('tenant_users.status', TenantUserStatus::Active->value);
             })
             ->leftJoin('scope_nodes', function (JoinClause $join): void {
                 $join->on('scope_nodes.id', '=', 'resource_grants.scopeable_id')
                     ->where('resource_grants.scopeable_type', '=', ResourceScopeable::ScopeNode->value)
                     ->where('scope_nodes.is_active', '=', true);
-            })
-            ->get([
-                'resource_grants.capacity',
-                'resource_grants.scopeable_type',
-                'resource_grants.scopeable_id',
-                'resource_grants.includes_descendants',
-                'scope_nodes.path as node_path',
-            ]);
+            });
+    }
 
+    /** @return list<string> */
+    private function grantColumns(): array
+    {
+        return [
+            'resource_grants.capacity',
+            'resource_grants.scopeable_type',
+            'resource_grants.scopeable_id',
+            'resource_grants.includes_descendants',
+            'scope_nodes.path as node_path',
+        ];
+    }
+
+    /**
+     * Fold raw grant rows into the in-memory decision structure.
+     *
+     * @param  iterable<int, ResourceGrant>  $rows
+     */
+    private function fold(iterable $rows): GrantSet
+    {
         $formIds = [];
         $exact = [];
         $prefixes = [];

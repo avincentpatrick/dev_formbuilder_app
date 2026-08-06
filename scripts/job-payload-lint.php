@@ -99,6 +99,10 @@ const EXEMPT_JOBS = [
     // carries a BACKED ENUM (SubmissionPdfOutcome), which R3 admits explicitly. It is the first of
     // these to report a SUCCESS rather than a failure, which changes nothing about the payload rules.
     'App\Notifications\Submissions\SubmissionPdfReadyNotification',
+    // I3. The notification substrate's email arm — ONE class for the whole NotificationType catalog rather
+    // than one per case, so the copy lives in a pure support class and this carries only scalars plus the
+    // backed enum R3 admits. Same on-demand-notifiable, resolved-in-request shape as every sibling above.
+    'App\Notifications\EventNotification',
 ];
 
 $root = dirname(__DIR__);

@@ -49,6 +49,10 @@ final class ConnectorEventContextResolver
      * A submission event links to the submission; every form-lifecycle event links to the form. Null when
      * the tenant has no resolvable host (a data state that should not occur, but must not break a delivery).
      *
+     * `member.invited` deliberately resolves to null: the only page it could point at is the members list,
+     * and an invitation is not yet a member — the row a recipient would arrive to look for is not there
+     * until they accept. The Slack message says what happened and stops.
+     *
      * @param  array<string, mixed>  $envelope
      */
     private function deepLink(array $envelope, ?string $formId, ?string $submissionId): ?string
@@ -60,7 +64,9 @@ final class ConnectorEventContextResolver
         }
 
         $path = match (DomainEventType::tryFrom((string) ($envelope['event_type'] ?? ''))) {
-            DomainEventType::SubmissionCreated => $submissionId === null ? null : "/submissions/{$submissionId}",
+            DomainEventType::SubmissionCreated,
+            DomainEventType::SubmissionApproved,
+            DomainEventType::SubmissionReturned => $submissionId === null ? null : "/submissions/{$submissionId}",
             DomainEventType::FormPublished,
             DomainEventType::FormOpened,
             DomainEventType::FormClosed => $formId === null ? null : "/forms/{$formId}/builder",

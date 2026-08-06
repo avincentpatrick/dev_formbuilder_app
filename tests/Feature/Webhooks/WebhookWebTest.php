@@ -78,7 +78,9 @@ it('renders the endpoints index with the entitlement summary and can flags', fun
             ->has('data', 2)
             ->has('summary.endpoints')
             ->has('summary.deliveries')
-            ->has('eventTypes', 4)
+            // Against the enum, not a literal: this catalog grows (I3 took it from four to seven), and a
+            // hard-coded count turns "the increment added an event" into a red test that says nothing.
+            ->has('eventTypes', count(DomainEventType::cases()))
             ->where('can.create', true));
 });
 

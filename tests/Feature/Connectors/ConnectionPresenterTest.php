@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
+use App\Enums\DomainEventType;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Tenant;
@@ -102,7 +103,7 @@ it('offers the provider catalog even with no connections at all', function (): v
         ->and($props['providers'][0]['key'])->toBe('slack')
         ->and($props['providers'][0]['connected'])->toBeFalse()
         ->and($props['providers'][0]['connect_url'])->toBe('/integrations/slack/connect')
-        ->and($props['eventTypes'])->toHaveCount(4);
+        ->and($props['eventTypes'])->toHaveCount(count(DomainEventType::cases()));
 });
 
 it('counts active rules against the total across every connection', function (): void {

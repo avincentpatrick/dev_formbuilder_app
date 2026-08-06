@@ -119,3 +119,61 @@ it('leaves the test.ping headline unchanged', function (): void {
     expect(slackSectionText($message))
         ->toBe('*Test message* — your form-builder workspace is connected to this channel.');
 });
+
+it('gives each I3 event its own headline instead of the generic Update arm', function (DomainEventType $type, string $expected): void {
+    $message = (new SlackMessageFormatter)->build(
+        ['event_type' => $type->value, 'occurred_at' => '2026-08-06T09:00:00Z', 'data' => ['form_id' => '0198-abc']],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/1'),
+    );
+
+    expect(slackSectionText($message))->toStartWith($expected);
+})->with([
+    [DomainEventType::SubmissionApproved, '*Submission approved*'],
+    [DomainEventType::SubmissionReturned, '*Submission returned to the respondent*'],
+]);
+
+it('labels the button by what it opens, not by whether it is submission.created', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::SubmissionApproved->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['form_id' => '0198-abc', 'submission_id' => 's-1'],
+        ],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    // Before I3 this read `=== SubmissionCreated ? 'View submission' : 'Open form'`, so the new submission
+    // events would have shipped a button saying "Open form" that opened a submission.
+    expect($message['blocks'][2]['elements'][0]['text']['text'])->toBe('View submission');
+});
+
+it('escapes the invitee email in a member.invited headline', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::MemberInvited->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['email' => '<script>@evil.test', 'role' => 'form_editor'],
+        ],
+        new ConnectorEventContext(null, null),
+    );
+
+    // The first untrusted value this class has ever put in a headline. Doc #26 §5's three characters.
+    expect(slackSectionText($message))->toContain('&lt;script&gt;@evil.test')
+        ->and(slackSectionText($message))->not->toContain('<script>')
+        ->and(slackContextText($message))->toContain('as form editor');
+});
+
+it('omits the action block entirely for an event with no deep link', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::MemberInvited->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['email' => 'newcomer@example.test', 'role' => 'reviewer'],
+        ],
+        new ConnectorEventContext(null, null),
+    );
+
+    foreach ($message['blocks'] as $block) {
+        expect($block['type'])->not->toBe('actions');
+    }
+});

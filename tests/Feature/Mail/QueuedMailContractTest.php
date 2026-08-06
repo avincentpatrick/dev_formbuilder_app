@@ -9,6 +9,7 @@ use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Notifications\Entitlements\QuotaOverageNotification;
+use App\Notifications\EventNotification;
 use App\Notifications\ResumeLinkNotification;
 use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use App\Notifications\TenantInvitationNotification;
@@ -30,6 +31,9 @@ use Illuminate\Queue\Attributes\Queue as QueueAttribute;
  * five added since (H9b, H5b, H13b, H15a, H17) were never appended — so five classes were riding a
  * contract nothing checked. Widening it is part of this increment because H23a4 adds a member to every
  * one of them and the linter cannot see it (below).
+ *
+ * **The list is append-only in practice: adding a queued mail notification means adding it HERE and to
+ * `scripts/job-payload-lint.php`'s EXEMPT_JOBS, or two separate gates fail.** I3 appended the ninth.
  */
 $queuedMailNotifications = [
     TenantInvitationNotification::class,
@@ -40,6 +44,7 @@ $queuedMailNotifications = [
     WebhookAutoDisabledNotification::class,
     ConnectionRevokedNotification::class,
     SubmissionPdfReadyNotification::class,
+    EventNotification::class,
 ];
 
 it('implements ShouldQueue on every queued mail notification', function (string $class): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Connectors;
 
 use App\Enums\ConnectionStatus;
+use App\Enums\ConnectorProviderKey;
 use App\Exceptions\Connectors\ConnectorChannelException;
 use App\Models\Connection;
 use App\Support\Connectors\ConnectorChannel;
@@ -43,13 +44,17 @@ final class ConnectorChannelDirectory
         $lister = $this->registry->channelListerFor($connection->provider);
 
         if ($lister === null) {
-            return $this->failure('This integration doesn’t offer a channel list. Enter the destination id instead.');
+            // The NORMAL state for Google Sheets (H16a), not a misconfiguration: under the `drive.file` scope
+            // we can reach only the files the tenant explicitly picks, so there is nothing to enumerate
+            // server-side and no lister is registered. The registry's null-not-throw contract was written for
+            // exactly this case, and the CONNECTION is still perfectly valid.
+            return $this->failure('This integration doesn’t offer a destination list. Enter the destination id instead.');
         }
 
         try {
             $page = $lister->channels($connection);
         } catch (ConnectorChannelException $e) {
-            return $this->failure($this->message($e->errorCode));
+            return $this->failure($this->message($connection->provider, $e->errorCode));
         }
 
         return [
@@ -62,15 +67,22 @@ final class ConnectorChannelDirectory
     /**
      * Provider error code to copy a tenant can act on. The default is deliberately generic: the code can be any
      * string the provider chooses, so echoing it would put unreviewed third-party text on our page.
+     *
+     * NAMED PER PROVIDER (H16a). Every string here used to say "Slack" from inside a provider-agnostic service
+     * — harmless while Slack was the only provider with a lister, and wrong the moment a second one has one.
+     * The error CODES stay Slack's because Slack is the only implementor today; a second lister brings its own
+     * arm rather than being forced through this vocabulary.
      */
-    private function message(string $errorCode): string
+    private function message(ConnectorProviderKey $provider, string $errorCode): string
     {
+        $label = $provider->label();
+
         return match ($errorCode) {
-            'invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'not_authed' => 'Slack rejected our credentials. Reconnect this workspace, then try again.',
-            'missing_scope' => 'The Slack app is missing the permission needed to list channels. Reconnect this workspace to grant it.',
-            'ratelimited' => 'Slack is rate-limiting us. Wait a moment and refresh the channel list.',
-            'transport_error' => 'We couldn’t reach Slack. Check your connection and refresh the channel list.',
-            default => 'We couldn’t load channels from Slack. Refresh to try again, or enter a channel id.',
+            'invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'not_authed' => "{$label} rejected our credentials. Reconnect this account, then try again.",
+            'missing_scope' => "The {$label} app is missing the permission needed to list destinations. Reconnect this account to grant it.",
+            'ratelimited' => "{$label} is rate-limiting us. Wait a moment and refresh the list.",
+            'transport_error' => "We couldn’t reach {$label}. Check your connection and refresh the list.",
+            default => "We couldn’t load destinations from {$label}. Refresh to try again, or enter a destination id.",
         };
     }
 

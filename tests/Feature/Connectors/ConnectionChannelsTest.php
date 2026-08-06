@@ -130,7 +130,7 @@ it('treats Slack ok:false at HTTP 200 as a failure and explains it', function ()
         ->getJson(channelsUrl($this->connection))
         ->assertOk()
         ->assertJsonPath('channels', [])
-        ->assertJsonPath('error', 'The Slack app is missing the permission needed to list channels. Reconnect this workspace to grant it.');
+        ->assertJsonPath('error', 'The Slack app is missing the permission needed to list destinations. Reconnect this account to grant it.');
 });
 
 it('maps a credential rejection to reconnect copy', function (): void {
@@ -139,7 +139,7 @@ it('maps a credential rejection to reconnect copy', function (): void {
     $this->actingAs($this->admin)
         ->getJson(channelsUrl($this->connection))
         ->assertOk()
-        ->assertJsonPath('error', 'Slack rejected our credentials. Reconnect this workspace, then try again.');
+        ->assertJsonPath('error', 'Slack rejected our credentials. Reconnect this account, then try again.');
 });
 
 it('never echoes an unrecognised provider error code', function (): void {
@@ -151,7 +151,7 @@ it('never echoes an unrecognised provider error code', function (): void {
     $response = $this->actingAs($this->admin)->getJson(channelsUrl($this->connection))->assertOk();
 
     expect($response->json('error'))->not->toContain('script')
-        ->and($response->json('error'))->toContain('We couldn’t load channels');
+        ->and($response->json('error'))->toContain('We couldn’t load destinations from Slack');
 });
 
 it('degrades a transport failure instead of 5xx-ing', function (): void {
@@ -161,7 +161,7 @@ it('degrades a transport failure instead of 5xx-ing', function (): void {
         ->getJson(channelsUrl($this->connection))
         ->assertOk()
         ->assertJsonPath('channels', [])
-        ->assertJsonPath('error', 'We couldn’t reach Slack. Check your connection and refresh the channel list.');
+        ->assertJsonPath('error', 'We couldn’t reach Slack. Check your connection and refresh the list.');
 });
 
 it('refuses to call the provider at all for a non-active grant', function (): void {
@@ -183,7 +183,7 @@ it('degrades when the provider has no channel lister configured', function (): v
         ->getJson(channelsUrl($this->connection))
         ->assertOk()
         ->assertJsonPath('channels', [])
-        ->assertJsonPath('error', 'This integration doesn’t offer a channel list. Enter the destination id instead.');
+        ->assertJsonPath('error', 'This integration doesn’t offer a destination list. Enter the destination id instead.');
 });
 
 it('requests only public, non-archived channels', function (): void {

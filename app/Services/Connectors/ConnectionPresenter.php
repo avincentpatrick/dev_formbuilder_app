@@ -145,8 +145,10 @@ final class ConnectionPresenter
      */
     private function providerCatalog(Collection $connections): array
     {
-        // Compared as strings rather than enum cases: with a single provider in the catalog today, an
-        // enum-to-enum identity check narrows to a constant and PHPStan (correctly) calls it always-true.
+        // Compared as strings rather than enum cases. This was originally because a single-case enum made an
+        // enum-to-enum identity check narrow to a constant that PHPStan (correctly) called always-true; H16a
+        // adds a second case, so the reason has lapsed — the comparison is left alone anyway because changing
+        // it buys nothing and `$live` is a value list either way.
         $live = $connections
             ->filter(fn (Connection $c): bool => $c->status === ConnectionStatus::Active)
             ->map(fn (Connection $c): string => $c->provider->value)
@@ -168,10 +170,16 @@ final class ConnectionPresenter
         }, ConnectorProviderKey::cases());
     }
 
+    /**
+     * `default`-less on purpose — the H8 forcing device. A new {@see ConnectorProviderKey} case with no arm
+     * here is an `UnhandledMatchError` the first time anyone opens Integrations, which is a loud failure at
+     * the moment the case is added rather than a silent blank card discovered by a tenant later.
+     */
     private function providerDescription(ConnectorProviderKey $key): string
     {
         return match ($key) {
             ConnectorProviderKey::Slack => 'Post new submissions and form status changes straight into a Slack channel.',
+            ConnectorProviderKey::GoogleSheets => 'Append every new submission as a row in one of your Google Sheets. We only get access to the spreadsheets you pick.',
         };
     }
 

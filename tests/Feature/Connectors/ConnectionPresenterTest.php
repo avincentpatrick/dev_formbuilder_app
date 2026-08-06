@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
+use App\Enums\ConnectorProviderKey;
 use App\Enums\DomainEventType;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
@@ -98,8 +99,13 @@ it('projects the destination pair out of the config blob rather than shipping it
 it('offers the provider catalog even with no connections at all', function (): void {
     $props = $this->presenter->index($this->admin);
 
+    // The catalog is EVERY ConnectorProviderKey case, not only the connected ones, so it grows with the enum
+    // (H16a added google_sheets). Asserted against the enum rather than a hardcoded count, so adding a third
+    // provider does not redden a test that has nothing to say about it — but a provider that fails to appear
+    // still does.
     expect($props['connections'])->toBe([])
-        ->and($props['providers'])->toHaveCount(1)
+        ->and(array_column($props['providers'], 'key'))
+        ->toEqualCanonicalizing(ConnectorProviderKey::values())
         ->and($props['providers'][0]['key'])->toBe('slack')
         ->and($props['providers'][0]['connected'])->toBeFalse()
         ->and($props['providers'][0]['connect_url'])->toBe('/integrations/slack/connect')

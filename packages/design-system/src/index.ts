@@ -14,6 +14,7 @@ export { default as MdsSegmentedControl } from './components/SegmentedControl/Se
 export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
 export { default as MdsBadge } from './components/Badge/Badge.vue';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
+export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';
 export { default as MdsModal } from './components/Modal/Modal.vue';
 export { default as MdsToast } from './components/Toast/Toast.vue';

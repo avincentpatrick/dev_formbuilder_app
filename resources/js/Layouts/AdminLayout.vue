@@ -28,6 +28,8 @@ watch(
 const links = [
     { label: 'Tenants', href: '/admin/tenants' },
     { label: 'Users', href: '/admin/users' },
+    // I5 — platform settings (PRD Feature #10). Last, because it is the only destructive one here.
+    { label: 'Platform', href: '/admin/settings' },
 ];
 
 function isActive(href: string): boolean {

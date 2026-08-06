@@ -48,7 +48,15 @@ function render(preferences: NotificationPreferenceRow[] = [pref()]): VueWrapper
     return mount(NotificationPreferencesCard, { props: { preferences } });
 }
 
-/** The card renders two checkboxes per type: [in app, email]. */
+/**
+ * The card renders two controls per type: [in app, email].
+ *
+ * Still `input[type="checkbox"]` after I5 swapped every control here from `MdsCheckbox` to `MdsSwitch`,
+ * because `MdsSwitch` is a real native checkbox under a track + thumb (it adds `role="switch"`, which
+ * changes what assistive tech announces, not what the DOM is). This file passing BYTE-UNCHANGED across
+ * that swap is the mechanical proof that the two components share one contract — if it ever needs editing
+ * to accommodate the switch, the component has drifted and the component is what should be fixed.
+ */
 function checkboxes(wrapper: VueWrapper, index = 0) {
     return wrapper.findAll('fieldset')[index]!.findAll('input[type="checkbox"]');
 }

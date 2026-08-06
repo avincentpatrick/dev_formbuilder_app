@@ -17,6 +17,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Build Identity (Increment I5 — PRD Feature #10's About panel)
+    |--------------------------------------------------------------------------
+    |
+    | What is deployed, for support and debugging. Set by the deployment pipeline
+    | (Track B); both fall back to a truthful placeholder rather than to a made-up
+    | version number. Deliberately NOT the Vite `__APP_VERSION__` define — that is
+    | the CLIENT BUNDLE's identity, stamped onto submissions.app_version (≤20 chars,
+    | data-dictionary §7), and conflating the two would make a server-side support
+    | answer depend on when the assets were last built.
+    |
+    */
+
+    'version' => env('APP_VERSION', 'dev'),
+
+    'commit' => env('APP_COMMIT'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

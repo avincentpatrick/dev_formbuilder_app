@@ -20,8 +20,16 @@ use App\Enums\UsageMetric;
  */
 final class PlanCatalog
 {
-    /** Every feature-gate key (pricing-feature-gating-matrix.md §3 + ADR-0008 §D7). */
-    private const array FEATURE_KEYS = [
+    /**
+     * Every feature-gate key (pricing-feature-gating-matrix.md §3 + ADR-0008 §D7).
+     *
+     * PUBLIC since I5 so `ToggleableModulesTest` can assert that every key a tenant may switch off in
+     * Settings → Modules is a key the plan catalog actually gates. Two hand-maintained lists that must
+     * agree is exactly the drift a test should own rather than a reviewer.
+     *
+     * @var list<string>
+     */
+    public const array FEATURE_KEYS = [
         'api_access',
         'webhooks',
         'xlsform_export',

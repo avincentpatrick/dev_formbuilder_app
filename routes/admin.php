@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\TenantAdminController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,5 +40,17 @@ Route::domain((string) config('tenancy.central_domain'))
 
             // Cross-tenant user list — exercises the `superadmin_bypass` RLS carve-out via SuperAdminService.
             Route::get('/users', [TenantAdminController::class, 'users'])->name('admin.users.index');
+
+            // Platform settings (I5, PRD Feature #10) — open-signup and platform maintenance, the two
+            // toggles that belong to no tenant. The WRITE is the console's first operation that needs the
+            // elevated connection to write rather than to read: `settings` keeps strict INSERT/UPDATE
+            // policies, so a NULL-tenant row is unwritable from the app connection (silently — it affects
+            // zero rows). See SuperAdminService::updatePlatformSettings().
+            //
+            // ⚠️ THIS PREFIX IS EXEMPT FROM PLATFORM MAINTENANCE ITSELF (EnforcePlatformMaintenance's
+            // `admin/*` path exemption). Without that, switching maintenance ON would lock the operator out
+            // of the only page that can switch it off.
+            Route::get('/settings', [PlatformSettingsController::class, 'index'])->name('admin.settings.index');
+            Route::patch('/settings', [PlatformSettingsController::class, 'update'])->name('admin.settings.update');
         });
     });

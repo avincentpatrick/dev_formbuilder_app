@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\GateRegistration;
 use App\Http\Middleware\RequirePlatformHost;
 use Laravel\Fortify\Features;
 
@@ -112,7 +113,12 @@ return [
     // AppSecurityHeaders (I1) is appended for the surface it matters on most: a framed login form is the
     // textbook clickjacking target, and these routes are the only ones in the app that render a credential
     // prompt. See that class for why the guest runtime deliberately makes the opposite choice.
-    'middleware' => ['web', RequirePlatformHost::class, AppSecurityHeaders::class],
+    // GateRegistration (I5 / PRD Feature #10) closes /register when the platform's open-signup toggle is
+    // off, or when the tenant whose subdomain the request arrived on is invitation-only. It is appended
+    // here because Fortify has no per-route middleware hook — Features::registration() registers both verbs
+    // with THIS list — which is exactly why that class checks `$request->is('register')` before it does
+    // anything: applied indiscriminately it would 404 /login for everyone.
+    'middleware' => ['web', RequirePlatformHost::class, AppSecurityHeaders::class, GateRegistration::class],
 
     /*
     |--------------------------------------------------------------------------

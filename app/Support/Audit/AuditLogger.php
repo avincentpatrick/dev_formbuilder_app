@@ -6,6 +6,7 @@ namespace App\Support\Audit;
 
 use App\Enums\AuditEvent;
 use App\Models\Audit;
+use App\Services\Admin\SuperAdminService;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\Auth;
 
@@ -23,6 +24,12 @@ use Illuminate\Support\Facades\Auth;
  * A super-admin action against a tenant is recorded the same way, under the AFFECTED tenant's context (see
  * SuperAdminService), so it needs no elevated connection or INSERT bypass.
  *
+ * I5 adds the ONE case that does: a PLATFORM settings change belongs to no tenant, so its row carries
+ * `tenant_id = NULL` and is written on the elevated connection through an INSERT-only bypass — the
+ * `$connection` parameter below. Such a row is invisible to every tenant's /audit-log by construction (the
+ * base SELECT policy stays strict), which is the intent, not a gap: a tenant must not read the platform
+ * operator's actions. Audit spec §1 records it.
+ *
  * Redaction (§2) is applied here, at write time, so stored `old_values`/`new_values` are already safe and
  * the read API returns them verbatim.
  */
@@ -34,6 +41,15 @@ final class AuditLogger
      * Record a tenant-scoped audit row (the tenant is the active context's). `$actorId` defaults to the
      * authenticated user; pass it explicitly (or null for a guest/system-less action) when auth() is not
      * the actor.
+     *
+     * `$connection` exists for exactly one caller and is not a general escape hatch: I5's PLATFORM settings
+     * writes ({@see SuperAdminService::updatePlatformSettings()}) describe a row that
+     * belongs to no tenant, so their audit carries `tenant_id = NULL` — which the strict append-only INSERT
+     * policy (`tenant_id = ctx`) cannot pass on the app connection. They run on the elevated
+     * `pgsql_superadmin` connection through the `audits_superadmin_insert` bypass that
+     * `2026_08_06_000003_apply_superadmin_bypass_to_audits.php` adds. Routing them through THIS method
+     * rather than a hand-rolled insert is what keeps redaction and the row shape single-sourced; a
+     * tenant-scoped caller must never pass it.
      *
      * @param  ?array<string, mixed>  $old
      * @param  ?array<string, mixed>  $new
@@ -49,10 +65,16 @@ final class AuditLogger
         ?string $actorId = null,
         array $erasedKeys = [],
         array $piiAnswerKeys = [],
+        ?string $connection = null,
     ): Audit {
         $redacted = $this->redactor->redact($auditableType, $old, $new, $erasedKeys, $piiAnswerKeys);
 
         $audit = new Audit;
+
+        if ($connection !== null) {
+            $audit->setConnection($connection);
+        }
+
         $audit->forceFill([
             // tenant_id intentionally omitted — BelongsToTenant fills it from the active context on create.
             'auditable_type' => $auditableType,

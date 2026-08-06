@@ -40,6 +40,7 @@ use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
@@ -166,6 +167,17 @@ Route::middleware([
     // per-user appearance write above; gated on the Spatie permission, not just `auth`.
     Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])
         ->middleware('can:tenant.settings.manage')->name('settings.drafts.update');
+
+    // App Settings (I5, PRD Feature #10) — the same org-wide posture and the same gate as /settings/drafts
+    // above. Deliberately NOT `feature:`-gated: these are not paid capabilities, they are how a tenant
+    // configures the product it already has, and the Modules write in particular must stay reachable on
+    // every plan (it is how a tenant switches a capability back ON after switching it off).
+    Route::patch('/settings/access', [TenantSettingsController::class, 'updateAccess'])
+        ->middleware('can:tenant.settings.manage')->name('settings.access.update');
+    Route::patch('/settings/maintenance', [TenantSettingsController::class, 'updateMaintenance'])
+        ->middleware('can:tenant.settings.manage')->name('settings.maintenance.update');
+    Route::patch('/settings/modules', [TenantSettingsController::class, 'updateModules'])
+        ->middleware('can:tenant.settings.manage')->name('settings.modules.update');
 
     // Tenant branding (H23a2, ADR-0014). Rendered inside /settings; no page of its own.
     //
@@ -638,6 +650,12 @@ Route::middleware([
     EstablishTenantDatabaseContext::class,
     // The guest SPA shell hosts the G5b2 geo control's Leaflet map → allow the OSM tile origin (ADR-0006 D3).
     PublicRuntimeSecurityHeaders::class,
+    // Tenant maintenance mode (I5 / PRD Feature #10). LISTED AFTER the identification middleware above, and
+    // that position is load-bearing: it reads the flag off the tenant they have already resolved and bound,
+    // which is the whole reason `maintenance_mode` is a `tenants` column and not a `settings` row. Sorted
+    // ahead of them it would find no tenant, pass everything through, and leave the feature dead with a
+    // green build — TenancyMiddlewarePriorityTest asserts the resolved order.
+    EnforceTenantMaintenance::class,
 ])->group(function (): void {
     Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
         ->middleware('throttle:guest-mint')->name('guest.form.mint');

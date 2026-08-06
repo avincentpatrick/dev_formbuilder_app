@@ -30,6 +30,7 @@ use App\Http\Controllers\Public\GuestSubmissionController;
 use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforceApiRequestQuota;
+use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EstablishGuestDraftContext;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
@@ -415,6 +416,12 @@ Route::prefix('api/v1/public')
     ->middleware([
         'throttle:guest',
         EstablishGuestTenantContext::class,
+        // Tenant maintenance (I5 / PRD #10) — AFTER the context middleware, which is what makes the tenant
+        // knowable at all here. Unlike the shell path in routes/tenant.php there is no bound Tenant MODEL
+        // on this surface (the token sets only the RLS GUC), so this costs ONE pk lookup on the RLS-exempt
+        // `tenants` table. It guards the whole group, not just the submit route: an already-mounted offline
+        // SPA would otherwise keep fetching schema and queueing responses against a paused form.
+        EnforceTenantMaintenance::class,
         SubstituteBindings::class,
     ])
     ->group(function (): void {
@@ -441,6 +448,8 @@ Route::prefix('api/v1/public')
     ->middleware([
         'throttle:guest',
         EstablishGuestDraftContext::class,
+        // Same guard, same reason, same slot as the share-token group above (I5 / PRD #10).
+        EnforceTenantMaintenance::class,
         SubstituteBindings::class,
         'feature:save_and_resume',
     ])

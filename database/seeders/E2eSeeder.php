@@ -12,8 +12,10 @@ use App\Enums\DomainEventType;
 use App\Enums\DomainVerificationFailure;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
+use App\Enums\NotificationType;
 use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
+use App\Enums\SubmissionPdfOutcome;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
@@ -26,6 +28,7 @@ use App\Models\Domain;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Models\Notification;
 use App\Models\Plan;
 use App\Models\Role;
 use App\Models\SavedReportView;
@@ -43,6 +46,7 @@ use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Notifications\NotificationPreferenceResolver;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Submissions\AnswerIndexProjector;
 use App\Services\Webhooks\WebhookEndpointService;
@@ -51,6 +55,7 @@ use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -630,6 +635,8 @@ class E2eSeeder extends Seeder
 
             $this->seedScopingHierarchy($owner, $reviewer);
 
+            $this->seedNotifications($owner, $reviewer);
+
             // Last, so the ledger it inspects already contains everything the seeders above wrote.
             $this->seedAuditLog($owner, $reviewer);
         });
@@ -892,6 +899,173 @@ class E2eSeeder extends Seeder
         // A descendant-inclusive Reviewer grant for the second active member: the state the whole G10 line
         // exists to make reachable, and what makes the grant list on /scopes non-empty on first load.
         app(ResourceGrantService::class)->grant($owner, $reviewer, $ncr, ResourceCapacity::Reviewer, true);
+    }
+
+    /** The `fixtureUuid()` namespace for the notification rows below. */
+    private const NOTIFICATION_FIXTURE_PREFIX = 'i4:notification:';
+
+    /**
+     * Notification fixtures (Increment I4) — so the bell carries a badge, the popover has rows to scan, and
+     * the Settings preferences card renders a NON-default state.
+     *
+     * ⚠️ **THE TABLE IS EMPTY WHEN THIS RUNS, AND THAT IS EXACTLY WHY THE GUARD IS NOT `exists()`.** This
+     * seeder writes submissions with `Submission::create()`, memberships with `TenantUser::create()` and
+     * performs no review transitions at all — never `SubmissionPipeline`, `TenantMembershipService` or
+     * `SubmissionReviewService`, which are the only announce sites for I3's four notification listeners
+     * (see {@see self::seedAnalyticsFixture()}'s reason (2) for the same deliberate bypass). So an
+     * emptiness guard would WORK today and start silently skipping the moment a later seed routes anything
+     * through the real writers. Every row is keyed on a DETERMINISTIC primary key from
+     * {@see self::fixtureUuid()} and upserted — the {@see self::seedCustomDomains()} posture — so a re-seed
+     * CONVERGES rather than doubling or skipping.
+     *
+     * ⚠️ **AND DO NOT "FIX" THAT BY ROUTING A SEEDED SUBMISSION THROUGH `SubmissionPipeline`.**
+     * `E2eSeederIdempotencyTest` pins the exact submission counts, and the pipeline's synchronous listeners
+     * would attempt real outbound HTTPS during `db:seed` while polluting the delivery ledgers the H14/H15b
+     * axe scans assert on.
+     *
+     * ⚠️ **ONE ROW BELONGS TO THE REVIEWER, ON PURPOSE.** Playwright only ever logs in as the Owner, so a
+     * regression that dropped `Notification::scopeForUser()` would be INVISIBLE in a fixture where every
+     * row is the Owner's — the badge would read the same either way. With the reviewer's row present the
+     * Owner's badge is 4 while the table holds 7.
+     *
+     * ⚠️ **THE ONE DIVERGING PREFERENCE IS ON THE ONE TYPE WITH NO NOTIFICATION.** `review_requested` is
+     * silenced on both channels for the Owner and is the only type the Owner holds no row for, so the
+     * fixture cannot contradict itself — a seeded bell row for a type the seeded preference says is
+     * silenced is exactly what a later reader would "fix". Written through the real
+     * {@see NotificationPreferenceResolver::set()}, never the factory, for the reason
+     * {@see self::seedAuditLog()} records for `AuditLogger`: the both-booleans rule has to be PRODUCED by
+     * the code path the product uses.
+     *
+     * `created_at` is back-dated with `forceFill(...)->saveQuietly()`, which is legitimate here and NOT the
+     * `audits` case: `notifications` is not append-only and carries the ordinary strict UPDATE policy —
+     * precisely why {@see self::seedAuditLog()} cannot spread ITS rows in time and says so.
+     *
+     * Public, not private, on the {@see self::seedCustomDomains()} seam, so the idempotency test can re-run
+     * this block alone.
+     */
+    public function seedNotifications(User $owner, User $reviewer): void
+    {
+        $intakeSubmissionId = Submission::query()
+            ->whereHas('form', fn (Builder $query) => $query->where('title', 'Clinic Intake'))
+            ->orderBy('id')
+            ->value('id');
+
+        $endpoint = WebhookEndpoint::query()->where('name', 'CRM sync')->first();
+
+        // Real ids, so every link in the demo actually loads. Degrade rather than fatal if an upstream
+        // block was skipped — the analyticsFixtureRows() posture.
+        $submissionId = is_string($intakeSubmissionId) ? $intakeSubmissionId : null;
+        $endpointId = $endpoint === null ? null : (string) $endpoint->getKey();
+
+        /** @var list<array{key: string, user: string, type: NotificationType, ago: int, read: bool, emailed: bool, data: array<string, mixed>}> $rows */
+        $rows = [
+            [
+                'key' => 'received',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionReceived,
+                'ago' => 6,
+                'read' => false,
+                'emailed' => false,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+            [
+                'key' => 'returned',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionReturned,
+                'ago' => 180,
+                'read' => false,
+                'emailed' => true,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+            [
+                // form_title null on purpose — the two review outcomes write `$form?->title`, so a trashed
+                // form yields null and NotificationCopy's "one of your forms" fallback has to render.
+                'key' => 'approved',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionApproved,
+                'ago' => 1_440,
+                'read' => true,
+                'emailed' => true,
+                'data' => ['submission_id' => $submissionId, 'form_title' => null],
+            ],
+            [
+                'key' => 'invited',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::MemberInvited,
+                'ago' => 2_880,
+                'read' => true,
+                'emailed' => true,
+                'data' => ['email' => self::PENDING_EMAIL, 'role' => 'viewer', 'invited_by' => (string) $owner->getKey()],
+            ],
+            [
+                'key' => 'webhook',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::WebhookFailed,
+                'ago' => 4_320,
+                'read' => false,
+                'emailed' => true,
+                'data' => ['webhook_endpoint_id' => $endpointId, 'endpoint_name' => 'CRM sync', 'failure_count' => 20],
+            ],
+            [
+                // A submission id that names nothing, so NotificationPresenter's reachability pass resolves
+                // `url` to NULL and the popover renders its non-interactive row — the only fixture that
+                // would catch an <a href=""> regression. A FAILED export at the same time, so the bell's
+                // "Export failed" title (which corrects a live I3 defect) is on screen for the axe scan.
+                'key' => 'export',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::ExportReady,
+                'ago' => 5_760,
+                'read' => false,
+                'emailed' => true,
+                'data' => [
+                    'submission_id' => self::fixtureUuid(self::NOTIFICATION_FIXTURE_PREFIX.'missing-target'),
+                    'form_title' => 'Clinic Intake',
+                    'outcome' => SubmissionPdfOutcome::Failed->value,
+                ],
+            ],
+            [
+                'key' => 'reviewer-received',
+                'user' => (string) $reviewer->getKey(),
+                'type' => NotificationType::SubmissionReceived,
+                'ago' => 120,
+                'read' => false,
+                'emailed' => false,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+        ];
+
+        foreach ($rows as $row) {
+            $id = self::fixtureUuid(self::NOTIFICATION_FIXTURE_PREFIX.$row['key']);
+            $at = now()->subMinutes($row['ago']);
+
+            $attributes = [
+                'user_id' => $row['user'],
+                'type' => $row['type']->value,
+                'data' => array_filter($row['data'], static fn (mixed $value): bool => $value !== null),
+                'read_at' => $row['read'] ? $at->copy()->addMinutes(5) : null,
+                'emailed_at' => $row['emailed'] ? $at : null,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ];
+
+            $existing = Notification::query()->whereKey($id)->first();
+
+            if ($existing instanceof Notification) {
+                $existing->forceFill($attributes)->saveQuietly();
+
+                continue;
+            }
+
+            // forceCreate, NOT `(new Notification)->forceFill(...)->saveQuietly()`: saveQuietly suppresses
+            // model EVENTS, which on this model are BelongsToTenant::creating (which fills tenant_id, and
+            // without which the strict-RLS WITH CHECK rejects the row) and HasUuidv7::creating. forceCreate
+            // fires both, and HasUuidv7 only fills an EMPTY key, so the deterministic id survives.
+            Notification::query()->forceCreate([...$attributes, 'id' => $id]);
+        }
+
+        // The one divergence, so the preferences card renders something other than the platform defaults.
+        app(NotificationPreferenceResolver::class)
+            ->set($owner, NotificationType::ReviewRequested, false, false);
     }
 
     /**

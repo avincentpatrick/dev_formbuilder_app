@@ -30,6 +30,7 @@ use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
@@ -93,6 +94,58 @@ Route::middleware([
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
+    /*
+    | The notification centre (Increment I4, PRD Feature #13b) — a BELL, not a page. There is deliberately
+    | no /notifications Inertia page: the popover shows the latest rows and every deep link goes to the
+    | thing itself, so a full-page list would be a second surface with no second job.
+    |
+    | ⚠️ ALL THREE ROUTES ARE JSON, AND BOTH HALVES OF THAT ARE DELIBERATE.
+    |
+    | The READ is a sidecar (the /scopes/{n}/impact + /integrations/.../channels precedent), polled on ~60s
+    | and refetched on Inertia navigation. It is NOT an Inertia::optional() shared prop, which is what the
+    | I-map originally called for: a partial reload RE-DISPATCHES THE CURRENT PAGE'S CONTROLLER — Inertia
+    | filters what it SERIALIZES, not what it COMPUTES — so a tick with /audit-log open would pay for a full
+    | ledger paginate plus a count(*) and throw the result away (AuditLogPresenter's docblock accepts that
+    | cost once per navigation, not once per minute). Nothing about notifications enters
+    | HandleInertiaRequests::share(), which renders on every page in the application.
+    |
+    | The two WRITES are also JSON, which is a NAMED EXCEPTION to the rule scopesClient/integrationsClient
+    | state ("every mutation on this surface is an Inertia visit"). That rule exists because bootstrap/app.php
+    | keys its domain-exception branch on the `api/v1/*` PATH, so a DomainException raised on a web route
+    | 302s even to a fetch expecting JSON. Neither route here raises one — they stamp a timestamp on a row
+    | the caller owns — and framework exceptions already negotiate (bootstrap/app.php's
+    | shouldRenderJsonWhen covers 401/403/404/419). The reason it MUST be a fetch is Inertia's own request
+    | stream: it is `maxConcurrent: 1, interruptible: true`, so a router.post() fired in the same tick as
+    | the row's <Link> navigation is silently ABORTED — click-to-read is unimplementable as an Inertia visit
+    | without a wasted second round trip. A 204 also avoids re-rendering the page under the user on every
+    | click, which back() would do.
+    |
+    | ⚠️ NO `can:` GATE ON THE COLLECTION AND NO `feature:` GATE ANYWHERE, AND BOTH ABSENCES ARE DELIBERATE.
+    |  · No permission: the RBAC catalog is closed, and a notification is addressed to ONE person by
+    |    notifications.user_id — so "may I read this?" is answered by Notification::scopeForUser(), never by
+    |    a role. Coining `notifications.view` would invent a permission whose audience is "every
+    |    authenticated user" (the closed-catalog argument AuditLogPresenter makes for `audit_log.export`).
+    |    This is PATCH /settings/appearance's posture: a user reads and edits only their own account.
+    |  · No plan feature: PlanCatalog defines no notifications key on any tier, and PRD Feature #13's own
+    |    acceptance criterion is that notifications are "available on EVERY tier — a Free tenant with no
+    |    webhook access still gets submission notifications". Adding one would be MAKING a pricing decision
+    |    rather than enforcing one (the /audit-log "baseline obligation, not an upsell" argument).
+    |    NotificationRouteGuardsTest asserts both, so neither can be "tidied" into symmetry with the
+    |    neighbours below.
+    |
+    | The per-row write DOES carry a gate, on the BOUND INSTANCE: `notifications` is strict RLS, so binding
+    | resolves any co-tenant's row and NotificationPolicy::markRead is the only thing standing between a
+    | member and a colleague's read state. Same shape, same reason, as analytics.views.update below.
+    |
+    | Static segment before any binding (the H14 rule): /notifications/read-all is declared BEFORE
+    | /notifications/{notification}/read, or the bare binding would capture "read-all" as a uuid.
+    */
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
+        ->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])
+        ->middleware('can:markRead,notification')->name('notifications.read');
+
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to
     // user_ui_preferences; it lives here (not central) so app.current_user_id is set and the
@@ -100,6 +153,15 @@ Route::middleware([
     Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
     Route::patch('/settings/appearance', [PreferencesController::class, 'updateAppearance'])
         ->name('settings.appearance.update');
+    // Per-user notification preferences (I4, data-dictionary §23) — the same posture as the appearance
+    // write directly above, and for the same reason: a user edits only their own account, and
+    // notification_preferences is strict-RLS keyed on user_id. ONE type per request, BOTH booleans always
+    // (see UpdateNotificationPreferenceRequest — the deliberate opposite of UpdateAppearanceRequest's
+    // all-`sometimes` axes, because §23's unit is a row rather than a field). An Inertia visit rather than
+    // a sidecar write, unlike /notifications above: this one has a rendered page to redirect back to, and
+    // a validation failure has somewhere to put its errors.
+    Route::patch('/settings/notifications', [PreferencesController::class, 'updateNotifications'])
+        ->name('settings.notifications.update');
     // Tenant-level (org-wide) settings — Owner/Admin only (H10 draft-expiry window). Distinct from the
     // per-user appearance write above; gated on the Spatie permission, not just `auth`.
     Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])

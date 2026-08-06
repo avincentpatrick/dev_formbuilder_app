@@ -225,12 +225,20 @@ final class AuditLogPresenter
             return [];
         }
 
-        return array_values(User::query()
-            ->whereIn('id', $actorIds)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (User $u): array => ['value' => (string) $u->getKey(), 'label' => $u->name])
-            ->all());
+        // `pluck` rather than `->get()->map(fn (User $u) => $u->name)`: `User::$name` is one of the
+        // documented PHPStan phantoms (the model declares no property for it), and reading it through the
+        // model here makes the whole closure's return type unresolvable — four new level-8 errors for a
+        // string this query can hand back directly.
+        $options = [];
+
+        foreach (User::query()->whereIn('id', $actorIds)->orderBy('name')->pluck('name', 'id') as $id => $name) {
+            $options[] = [
+                'value' => (string) $id,
+                'label' => is_string($name) && $name !== '' ? $name : 'Unknown user',
+            ];
+        }
+
+        return $options;
     }
 
     /** @param  array<string, mixed>  $filters */

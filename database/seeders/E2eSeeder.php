@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\AnalyticsAxis;
+use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
@@ -18,6 +19,7 @@ use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
+use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Domain;
@@ -45,6 +47,8 @@ use App\Services\Scoping\ScopeNodeService;
 use App\Services\Submissions\AnswerIndexProjector;
 use App\Services\Webhooks\WebhookEndpointService;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Audit\AuditLogger;
+use App\Support\Audit\AuditRedactor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -625,6 +629,9 @@ class E2eSeeder extends Seeder
             $this->seedCustomDomains($tenant);
 
             $this->seedScopingHierarchy($owner, $reviewer);
+
+            // Last, so the ledger it inspects already contains everything the seeders above wrote.
+            $this->seedAuditLog($owner, $reviewer);
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
@@ -885,6 +892,114 @@ class E2eSeeder extends Seeder
         // A descendant-inclusive Reviewer grant for the second active member: the state the whole G10 line
         // exists to make reachable, and what makes the grant list on /scopes non-empty on first load.
         app(ResourceGrantService::class)->grant($owner, $reviewer, $ncr, ResourceCapacity::Reviewer, true);
+    }
+
+    /**
+     * A uuid that names nothing, doubling as the "target no longer exists" fixture (label and url both
+     * resolve to null) AND as this seeder's idempotency sentinel.
+     */
+    private const AUDIT_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000a11d';
+
+    /**
+     * Audit-ledger fixtures (Increment I2) — so /audit-log renders with every badge variant and both kinds
+     * of redacted diff for the responsive-axe scan.
+     *
+     * ⚠️ **THE TENANT ALREADY HAS AUDIT ROWS, so this is about SPREAD, not non-emptiness.** `PublishService`,
+     * `WebhookEndpointService::create` and `ResourceGrantService::grant` all audit inside this seeder's own
+     * transaction, and since I2 so does every `FormService` write — the page is populated with `created`
+     * and `published` rows before this method runs. What is MISSING without it is the tail: no `deleted`,
+     * `restored`, `archived` or `exported` row exists anywhere in the seeded data, and no diff carries a
+     * redacted field. The scan would be green over three badge variants and a redaction notice that never
+     * rendered.
+     *
+     * Two consequences of that, both easy to get wrong:
+     *  - The idempotency guard CANNOT be "does any audit row exist" — it always will. It keys on
+     *    {@see self::AUDIT_FIXTURE_ID}, a uuid nothing else writes.
+     *  - Rows are written through the real {@see AuditLogger}, never `Audit::factory()`. The factory
+     *    bypasses {@see AuditRedactor}, so a hand-written `redacted_fields` would be a fiction that the axe
+     *    scan then validates. The redaction has to be PRODUCED by the code path the product uses.
+     *
+     * **Every row lands at `now()`, and that is an accepted limitation rather than an oversight.**
+     * `Audit::UPDATED_AT` is null, `record()` takes no `occurredAt`, and back-dating would need an UPDATE
+     * the append-only RLS shape denies. So the E2E exercises the date filters' PRESENCE AND LAYOUT, not
+     * their selectivity. Do not add an `occurredAt` parameter to AuditLogger for a seeder's benefit.
+     */
+    private function seedAuditLog(User $owner, User $reviewer): void
+    {
+        if (Audit::query()->where('auditable_id', self::AUDIT_FIXTURE_ID)->exists()) {
+            return;
+        }
+
+        $audit = app(AuditLogger::class);
+        $ownerId = (string) $owner->getKey();
+        $submissionId = (string) Str::uuid7();
+
+        // `deleted` (danger) against a target that is GONE — the label/url-null path in the target cell.
+        $audit->record(
+            AuditEvent::Deleted,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            old: ['title' => 'Pilot Survey (2025)', 'status' => 'archived'],
+            new: null,
+            actorId: $ownerId,
+        );
+
+        // `restored` (info) — emitted nowhere else in the seeded data.
+        $audit->record(
+            AuditEvent::Restored,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            new: ['draft_version_id' => (string) Str::uuid7(), 'draft_version_number' => 3, 'source_version_number' => 2],
+            actorId: $ownerId,
+        );
+
+        // `archived` — on screen this must read NEUTRAL, not the amber a form STATUS badge would use.
+        $audit->record(
+            AuditEvent::Archived,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            old: ['status' => 'draft'],
+            new: ['status' => 'archived', 'archived_at' => now()->toIso8601String()],
+            actorId: $ownerId,
+        );
+
+        // `exported` (warning) with NO payload — the zero-changes row, which renders the disabled
+        // "No field changes recorded" action state.
+        $audit->record(AuditEvent::Exported, 'submission', $submissionId, actorId: $ownerId);
+
+        // THE §2.1 FIXTURE. `guest_contact_email` and `guest_ip` are in AuditRedactor::PII['submission'],
+        // so the real redactor placeholders BOTH sides and fills redacted_fields — giving one diff that
+        // carries a redacted change AND an unredacted one, which is what makes the flag legible.
+        $audit->record(
+            AuditEvent::Updated,
+            'submission',
+            $submissionId,
+            old: ['status' => 'submitted', 'guest_contact_email' => 'jane@example.test', 'guest_ip' => '203.0.113.9'],
+            new: ['status' => 'approved', 'guest_contact_email' => 'jane@example.test', 'guest_ip' => '203.0.113.9'],
+            actorId: $ownerId,
+        );
+
+        // A many-field diff whose secret is redacted from a DIFFERENT map (SECRETS, not PII), and whose
+        // long URL is the widest unbreakable string on the page — the 375px overflow trap arriving on a
+        // second surface after Domains.
+        $audit->record(
+            AuditEvent::Updated,
+            'webhook_endpoint',
+            (string) Str::uuid7(),
+            old: ['name' => 'CRM sync', 'url' => 'https://api.crm.example.com/webhooks/forms', 'secret' => 'whsec_'.str_repeat('a', 48), 'status' => 'active'],
+            new: ['name' => 'CRM sync (v2)', 'url' => 'https://api.crm.example.com/webhooks/forms/v2/inbound-with-a-deliberately-long-path', 'secret' => 'whsec_'.str_repeat('b', 48), 'status' => 'paused'],
+            actorId: $ownerId,
+        );
+
+        // A RESOLVABLE target for the modal E2E to locate by its row text.
+        $audit->record(
+            AuditEvent::PermissionChanged,
+            'users',
+            (string) $reviewer->getKey(),
+            old: ['role' => 'viewer'],
+            new: ['role' => 'reviewer'],
+            actorId: $ownerId,
+        );
     }
 
     /** Resolve an existing identity on the pre-auth connection (users RLS hides non-members), or create it. */

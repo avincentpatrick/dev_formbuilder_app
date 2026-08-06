@@ -40,6 +40,20 @@ const pages = [
     // `minmax(0, 1fr)` column and `overflow-wrap: anywhere` are what keep the body from scrolling
     // sideways, and this scan is the only thing that checks they still do.
     { name: 'Domains', path: '/domains' },
+    // The audit ledger (I2, PRD Feature #12) — Owner/Admin only and, unlike its four neighbours above, NOT
+    // plan-gated: PlanCatalog carries no audit key on any tier because accountability is baseline. Reachable
+    // because the seeded demo user is the tenant Owner.
+    //
+    // ⚠️ THIS PAGE IS ALREADY NON-EMPTY WITHOUT A FIXTURE. PublishService, WebhookEndpointService and
+    // ResourceGrantService all audit inside E2eSeeder's own transaction, and since I2 so does every
+    // FormService write. What `E2eSeeder::seedAuditLog()` buys is the SPREAD: without it there is no
+    // `deleted`, `restored`, `archived` or `exported` row anywhere in the seeded data and no diff carries a
+    // redacted field, so this scan would be green over three badge variants and a redaction notice that
+    // never rendered.
+    //
+    // It also plants the widest unbreakable strings on the page — a full uuid and a long webhook URL inside
+    // a diff cell — which is the Domains overflow trap arriving on a second surface.
+    { name: 'Audit log', path: '/audit-log' },
     { name: 'Settings', path: '/settings' },
 ];
 
@@ -235,5 +249,29 @@ for (const theme of themes) {
         await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Integration rule detail');
+    });
+}
+
+// The audit change-detail dialog (I2) — this increment's ONLY new structural markup: a before/after
+// <table> with a visually-hidden <caption> and column headers, inside a dialog that becomes a FULL-BLEED
+// SHEET at 375px (Modal's ≤480px rule). That is where it earns a scan of its own: the diff carries a full
+// uuid and a long URL value, and the table's own ≤480px stacked layout is hand-written in the component
+// rather than inherited from MdsDataTable, so nothing else in this suite covers it.
+//
+// A CSS `tr` locator scoped by row text rather than getByRole('row', …), for the same reason the webhook
+// detail above uses one: the DataTable's mobile card layout drops the table ARIA role. `forceTheme` runs
+// AFTER the click, matching that test.
+for (const theme of themes) {
+    test(`Audit change detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/audit-log', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Permission changed' })
+            .getByRole('button', { name: 'View changes' })
+            .first()
+            .click();
+        await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Audit change detail');
     });
 }

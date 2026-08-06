@@ -591,8 +591,8 @@ Carried forward essentially as-is from legacy's confirmed-good `Auditable` trait
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
 | `tenant_id` | `uuid` | Yes | `NULL` | No | FK to `tenants.id`. Nullable only for the rare platform-level action with no single-tenant context (e.g. a super-admin action spanning multiple tenants); every ordinary tenant-owned-model audit row sets this. |
-| `auditable_type` | `varchar(100)` | No | — | No | Polymorphic morph type (e.g. `form`, `form_version`, `submission`, `webhook_endpoint`, `subscription`). |
-| `auditable_id` | `uuid` | No | — | No | Polymorphic morph id. |
+| `auditable_type` | `varchar(100)` | No | — | No | Polymorphic morph type (e.g. `form`, `form_version`, `submission`, `webhook_endpoint`, `subscription`, `settings`, `domain`, `audit_log`). The definitive list is `audit-compliance-logging-spec.md` §1. |
+| `auditable_id` | `uuid` | No | — | No | Polymorphic morph id. **When the target's primary key is not a uuid, or the target has no addressable surrogate key at all, the row is keyed on the OWNING tenant's or user's uuid instead** — `domains.id` is an `increments()` integer, `model_has_roles` has a composite PK with no `id`, and `settings` is a per-tenant singleton. Writing the target's own key in those cases either raises `SQLSTATE 22P02` at runtime or splits one resource's history across two ids; see `audit-compliance-logging-spec.md` §1 for the per-alias rule. |
 | `event` | `varchar(30)` — PHP enum: `AuditEvent` | No | — | No | See the 8-value catalog above. |
 | `old_values` | `jsonb` | Yes | `NULL` | **Yes (conditional)** | Prior field values, redacted per sensitive-field rules before write (plan §5). |
 | `new_values` | `jsonb` | Yes | `NULL` | **Yes (conditional)** | — |

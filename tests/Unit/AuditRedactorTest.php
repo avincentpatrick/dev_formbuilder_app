@@ -42,6 +42,34 @@ it('redacts PII columns declared for the auditable type', function (): void {
     expect($result['redacted_fields'])->toEqualCanonicalizing(['guest_contact_email', 'guest_ip']);
 });
 
+it('redacts a reviewer\'s free-text remarks but keeps the returned reason (I2)', function (): void {
+    // The asymmetry is the decision, not an oversight. `remarks` is an internal note with no audience
+    // discipline — a reviewer can paste respondent PII into it — and `audits` is never deleted.
+    // `returned_reason` was authored FOR the respondent and already emailed to them, so it is exactly the
+    // accountability the ledger exists to preserve.
+    $result = $this->redactor->redact(
+        'submission',
+        old: ['status' => 'under_review', 'remarks' => 'called the mother, number is 555-0101', 'returned_reason' => null],
+        new: ['status' => 'returned', 'remarks' => 'still incomplete', 'returned_reason' => 'Missing page 2'],
+    );
+
+    expect($result['old']['remarks'])->toBe(AuditRedactor::PLACEHOLDER);
+    expect($result['new']['remarks'])->toBe(AuditRedactor::PLACEHOLDER);
+    expect($result['new']['returned_reason'])->toBe('Missing page 2');
+    expect($result['new']['status'])->toBe('returned');
+    expect($result['redacted_fields'])->toBe(['remarks']);
+});
+
+it('leaves a submission payload that carries no remarks key untouched', function (): void {
+    // SubmissionFinalizer's `created` payload has no `remarks` key, and apply() guards on
+    // array_key_exists — so adding `remarks` to the PII map is a no-op there. Pinned because that is the
+    // one place the new registration could have silently changed an existing audited site.
+    $result = $this->redactor->redact('submission', old: null, new: ['form_id' => 'f1', 'status' => 'submitted']);
+
+    expect($result['new'])->toBe(['form_id' => 'f1', 'status' => 'submitted']);
+    expect($result['redacted_fields'])->toBeNull();
+});
+
 it('records exactly the stripped field names, and null when nothing was stripped', function (): void {
     $clean = $this->redactor->redact('tenant', old: ['status' => 'active'], new: ['status' => 'suspended']);
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Audit;
 use App\Models\Form;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -96,6 +97,16 @@ class HandleInertiaRequests extends Middleware
                     // (Sidebar.vue) — but the PAGE deliberately does not, because ADR-0012 §D9 keeps reads
                     // and deletes open so a tenant downgraded off Business can still remove a live host.
                     'manageDomains' => (bool) $user?->can('tenant.settings.manage'),
+                    // Gates the Audit log nav item + the /audit-log page and its export (I2). The POLICY,
+                    // not the bare `audit_log.view` string, for the reason `viewAnalytics` gives above:
+                    // AuditPolicy already defines "may read the ledger", and re-spelling the permission
+                    // here would put a second definition of it in a second file.
+                    //
+                    // THE ONLY GATED NAV ITEM WITH NO COMPANION PLAN FEATURE, and that is deliberate rather
+                    // than an omission — PlanCatalog carries no audit key on any tier, because an audit
+                    // trail is a baseline obligation for every tenant and not an enterprise upsell. So
+                    // unlike its four neighbours above, this one turns on a permission alone.
+                    'viewAuditLog' => (bool) $user?->can('viewAny', Audit::class),
                 ],
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the

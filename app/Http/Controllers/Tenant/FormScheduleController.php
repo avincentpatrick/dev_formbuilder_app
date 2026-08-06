@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\UpdateFormScheduleRequest;
 use App\Models\Form;
+use App\Models\User;
 use App\Services\Forms\FormService;
 use App\Support\Forms\FormSchedule;
 use Illuminate\Http\RedirectResponse;
@@ -25,12 +26,16 @@ final class FormScheduleController extends Controller
 
     public function update(UpdateFormScheduleRequest $request, Form $form): RedirectResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+
         $this->forms->setSchedule(
             $form,
             $request->opensAt(),
             $request->closesAt(),
             $request->timezone(),
             $request->maxResponses(),
+            $user,
         );
 
         return back()->with('toast', [

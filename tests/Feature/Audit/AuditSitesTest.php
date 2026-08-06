@@ -31,6 +31,20 @@ uses(RefreshDatabase::class);
 | change it records. This is the increment's payoff: grant/revoke, ownership transfer, publish, and the
 | submission pipeline now leave an audit trail. The super-admin suspend/reactivate sites are proven
 | separately in AuditSuperAdminSitesTest.
+|
+| ⚠️ THIS FILE'S IDENTITY IS "H4's SIX SITES". DO NOT GROW IT.
+| H4 counted six `TODO(audit)` markers and retired them; a SEVENTH survived uncounted at
+| SubmissionReviewService::apply(), because the four review verbs funnel through one private method its
+| inventory never walked. Increment I2 retired that one and closed the rest of the coverage — form
+| create/metadata/scope/save-resume/confirmation/schedule/archive, version restore, tenant draft settings,
+| branding, and the custom-domain lifecycle — and those live in their own files:
+|
+|   tests/Feature/Audit/AuditCoverageTest.php     — the I2 sites, including the 7th
+|   tests/Feature/Audit/AuditDomainSitesTest.php  — the domain sites and their two RLS hazards
+|
+| Note there is no numeric assertion here that "six" holds; the only count in the file is the pair of
+| permission_changed rows an ownership transfer emits, which I2 does not touch. The six is prose, and a
+| future increment that adds coverage should add a file rather than edit this sentence.
 */
 
 beforeEach(function (): void {

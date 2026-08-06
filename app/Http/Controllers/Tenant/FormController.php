@@ -59,14 +59,18 @@ final class FormController extends Controller
 
     public function update(FormMetadataRequest $request, Form $form): RedirectResponse
     {
-        $this->forms->updateMetadata($form, (string) $request->string('title'), $request->input('description'));
+        /** @var User $user */
+        $user = $request->user();
+        $this->forms->updateMetadata($form, (string) $request->string('title'), $request->input('description'), $user);
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Form updated.']);
     }
 
-    public function archive(Form $form): RedirectResponse
+    public function archive(Request $request, Form $form): RedirectResponse
     {
-        $this->forms->archive($form);
+        /** @var User $user */
+        $user = $request->user();
+        $this->forms->archive($form, $user);
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Form archived.']);
     }

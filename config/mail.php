@@ -115,4 +115,34 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Components
+    |--------------------------------------------------------------------------
+    |
+    | Where Laravel looks for the `mail::` components before falling back to its
+    | own (H23a4). This application publishes exactly ONE of them —
+    | `html/header.blade.php`, so a branded tenant's logo can render in the HTML
+    | arm without corrupting the plaintext arm — and every other component
+    | resolves from the framework.
+    |
+    | Stated explicitly even though the framework's base config already supplies
+    | this path: an override directory that exists only by virtue of config
+    | merging is an override nobody reading `config/mail.php` would know about.
+    |
+    | `theme` is DELIBERATELY ABSENT. The Meridian theme is selected per message
+    | by `CarriesTenantBrand::branded()` (`->theme('meridian')`), because a theme
+    | resolved from config or env would silently fall back to the framework's
+    | `default` in any environment that had not set it — and every brand
+    | assertion in the suite would then be asserting against the wrong
+    | stylesheet, passing or failing for the wrong reason.
+    |
+    */
+
+    'markdown' => [
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
 ];

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services\Branding;
 
+use App\Enums\AuditEvent;
 use App\Enums\PlanTier;
 use App\Exceptions\Branding\BrandRampException;
 use App\Models\Attachment;
 use App\Models\Plan;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Tenancy\TenantSettingsService;
+use App\Support\Audit\AuditLogger;
 use App\Support\Branding\BrandRamp;
 use App\Support\Branding\BrandRampGenerator;
 use Illuminate\Http\UploadedFile;
@@ -46,6 +50,7 @@ final class TenantBrandingService
         private readonly BrandRampGenerator $generator,
         private readonly AttachmentStorageService $attachments,
         private readonly EntitlementService $entitlements,
+        private readonly AuditLogger $audit,
     ) {}
 
     /**
@@ -95,17 +100,23 @@ final class TenantBrandingService
      *
      * @throws BrandRampException on a malformed hex (defence-in-depth behind the FormRequest's regex)
      */
-    public function setBrandColor(Tenant $tenant, string $hex): BrandRamp
+    public function setBrandColor(Tenant $tenant, string $hex, ?User $actor = null): BrandRamp
     {
+        // Outside the transaction on purpose: generate() throws on a malformed hex, and a refusal is not
+        // an act — there is nothing to record and nothing to roll back.
         $ramp = $this->generator->generate($hex);
 
-        DB::transaction(function () use ($tenant, $ramp): void {
+        DB::transaction(function () use ($tenant, $ramp, $actor): void {
+            $old = ['primary_color' => $tenant->primary_color];
+
             // forceFill mirrors FormService's guarded-column writes, and the two columns move together —
             // see the class docblock on why a row with one and not the other has no honest reading.
             $tenant->forceFill([
                 'primary_color' => $ramp->input,
                 'brand_ramp' => json_encode($ramp->toArray(), JSON_THROW_ON_ERROR),
             ])->save();
+
+            $this->recordSettingsChange($tenant, $old, ['primary_color' => $ramp->input], $actor);
         });
 
         return $ramp;
@@ -118,10 +129,17 @@ final class TenantBrandingService
      * "reset my colour" action that silently deleted an uploaded file would be the kind of destructive
      * surprise this codebase avoids elsewhere. {@see self::removeLogo()} is its own verb.
      */
-    public function clearBrandColor(Tenant $tenant): void
+    public function clearBrandColor(Tenant $tenant, ?User $actor = null): void
     {
-        DB::transaction(function () use ($tenant): void {
+        DB::transaction(function () use ($tenant, $actor): void {
+            $old = ['primary_color' => $tenant->primary_color];
+
             $tenant->forceFill(['primary_color' => null, 'brand_ramp' => null])->save();
+
+            // `updated`, not `deleted`: nothing is removed from the system, a tenant column is nulled — and
+            // spec §1 gives the `settings` alias only `created`/`updated`, so this is also the one
+            // spec-legal choice.
+            $this->recordSettingsChange($tenant, $old, ['primary_color' => null], $actor);
         });
     }
 
@@ -133,12 +151,19 @@ final class TenantBrandingService
      * the tenant's storage-accounting ledger — an orphan is visible and reclaimable, a deleted file is
      * not. Reclamation of superseded logos belongs to a sweep, not to this write.
      */
-    public function replaceLogo(Tenant $tenant, UploadedFile $file, ?string $uploadedBy): Attachment
+    public function replaceLogo(Tenant $tenant, UploadedFile $file, ?string $uploadedBy, ?User $actor = null): Attachment
     {
         $attachment = $this->attachments->storeBrandingLogo($file, (string) $tenant->id, $uploadedBy);
 
-        DB::transaction(function () use ($tenant, $attachment): void {
+        DB::transaction(function () use ($tenant, $attachment, $actor): void {
+            $old = ['logo_attachment_id' => $tenant->logo_attachment_id];
+
             $tenant->forceFill(['logo_attachment_id' => $attachment->id])->save();
+
+            // The SUPERSEDED attachment id is the useful half of this row: replacement deliberately leaves
+            // the old object in place (see the docblock), so the ledger is what tells an operator which
+            // orphan belonged to which tenant era when the reclamation sweep eventually lands.
+            $this->recordSettingsChange($tenant, $old, ['logo_attachment_id' => (string) $attachment->id], $actor);
         });
 
         return $attachment;
@@ -151,11 +176,45 @@ final class TenantBrandingService
      * storage ledger where it can be accounted for and reclaimed deliberately. The tenant's experience is
      * identical either way — the logo stops rendering immediately.
      */
-    public function removeLogo(Tenant $tenant): void
+    public function removeLogo(Tenant $tenant, ?User $actor = null): void
     {
-        DB::transaction(function () use ($tenant): void {
+        DB::transaction(function () use ($tenant, $actor): void {
+            $old = ['logo_attachment_id' => $tenant->logo_attachment_id];
+
             $tenant->forceFill(['logo_attachment_id' => null])->save();
+
+            $this->recordSettingsChange($tenant, $old, ['logo_attachment_id' => null], $actor);
         });
+    }
+
+    /**
+     * The one emission site the four branding writes share (Increment I2).
+     *
+     * **`auditable_type = 'settings'`, not a new `branding` alias.** Branding IS tenant settings: it renders
+     * inside `/settings`, it gates on `tenant.settings.manage`, and spec §1's `settings` row exists for
+     * exactly PRD Feature #12's "every settings change". A separate alias would fragment one user-visible
+     * surface across two filter options in the audit viewer. `auditable_id` is the tenant id, the same key
+     * {@see TenantSettingsService} uses and for the reason pinned there.
+     *
+     * ⚠️ **`brand_ramp` NEVER enters the payload.** It is ~2 KB of derived contrast tables, and it is a
+     * PURE FUNCTION of `primary_color` — so it carries no information the diff does not already have, and
+     * the two columns move together by construction (see the class docblock: a row with one and not the
+     * other has no honest reading). Recording the colour records both. `audits` is append-only and never
+     * pruned; one such blob per brand tweak is how a compliance ledger becomes unqueryable.
+     *
+     * @param  array<string, mixed>  $old
+     * @param  array<string, mixed>  $new
+     */
+    private function recordSettingsChange(Tenant $tenant, array $old, array $new, ?User $actor): void
+    {
+        $this->audit->record(
+            AuditEvent::Updated,
+            'settings',
+            (string) $tenant->getKey(),
+            old: $old,
+            new: $new,
+            actorId: $actor?->getKey() === null ? null : (string) $actor->getKey(),
+        );
     }
 
     /**

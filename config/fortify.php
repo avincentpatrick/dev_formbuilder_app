@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\RequirePlatformHost;
 use Laravel\Fortify\Features;
 
@@ -108,7 +109,10 @@ return [
     // WHATEVER host it arrived at — including a tenant's custom domain, where the platform's credential
     // form would then render. It allows the central host and its subdomains (tenant users legitimately
     // log in at acme.meridian.test/login) and 404s exactly one class of host: a custom domain.
-    'middleware' => ['web', RequirePlatformHost::class],
+    // AppSecurityHeaders (I1) is appended for the surface it matters on most: a framed login form is the
+    // textbook clickjacking target, and these routes are the only ones in the app that render a credential
+    // prompt. See that class for why the guest runtime deliberately makes the opposite choice.
+    'middleware' => ['web', RequirePlatformHost::class, AppSecurityHeaders::class],
 
     /*
     |--------------------------------------------------------------------------

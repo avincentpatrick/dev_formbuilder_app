@@ -54,6 +54,12 @@ export interface AppAbilities {
     // `custom_domain` entitlement; the PAGE deliberately does not, so a tenant downgraded off Business can
     // still see and remove a hostname that is still resolving (ADR-0012 §D9).
     manageDomains: boolean;
+    // I2 — AuditPolicy::viewAny (the `audit_log.view` permission, Owner/Admin only; Viewer is excluded on
+    // purpose). THE ONLY GATE HERE WITH NO COMPANION ENTITLEMENT, and the absence is deliberate rather than
+    // an oversight: PlanCatalog carries no audit key on any tier, because an audit trail is a baseline
+    // obligation for every tenant and not an upsell. Do not add a `feature:` to its nav item by symmetry
+    // with its four neighbours.
+    viewAuditLog: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

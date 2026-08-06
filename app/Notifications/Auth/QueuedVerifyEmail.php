@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Notifications\Auth;
 
 use App\Enums\QueueName;
+use App\Notifications\Concerns\CarriesTenantBrand;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\Attributes\Queue;
 
 /**
@@ -26,6 +28,7 @@ use Illuminate\Queue\Attributes\Queue;
 #[Queue(QueueName::Mail)]
 final class QueuedVerifyEmail extends VerifyEmail implements ShouldQueue
 {
+    use CarriesTenantBrand;
     use Queueable;
 
     public function __construct(public readonly string $signedUrl) {}
@@ -38,5 +41,28 @@ final class QueuedVerifyEmail extends VerifyEmail implements ShouldQueue
     protected function verificationUrl($notifiable): string
     {
         return $this->signedUrl;
+    }
+
+    /**
+     * Render the framework's own verification wording through the Meridian mail template.
+     *
+     * ── ALWAYS THE PRODUCT PALETTE, AND THAT IS THE HONEST ANSWER (H23a4) ───────────────────────
+     * Every other outbound email carries its tenant's brand. This one cannot, for two independent reasons,
+     * and neither is a gap to be closed later:
+     *   1. Fortify's routes (`config/fortify.php`) carry NO tenancy middleware — they run on the central
+     *      host — so there is no resolved tenant at send time to take a brand from.
+     *   2. A `User` may be a member of several tenants, so "which brand does this person's verification
+     *      email wear" has no correct answer even if a tenant were resolvable.
+     * It still renders through the Meridian template rather than stock Laravel, which is the whole reason
+     * for the override: an account-level email should look like the product, not like the framework.
+     *
+     * `buildMailMessage()` rather than `toMail()` is the seam because it keeps `parent::`'s `Lang::get()`
+     * strings — reusing the framework's localized wording is what this subclass exists for.
+     *
+     * @param  string  $url
+     */
+    protected function buildMailMessage($url): MailMessage
+    {
+        return $this->branded(parent::buildMailMessage($url));
     }
 }

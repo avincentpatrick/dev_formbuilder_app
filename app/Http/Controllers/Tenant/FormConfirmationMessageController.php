@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\UpdateConfirmationMessageRequest;
 use App\Models\Form;
+use App\Models\User;
 use App\Rules\ValidTemplate;
 use App\Services\Forms\FormService;
 use App\Services\Forms\TemplateValidationGate;
@@ -63,7 +64,10 @@ final class FormConfirmationMessageController extends Controller
         $message = $message !== null && trim($message) === '' ? null : $message;
         $translations = $data['confirmation_message_translations'] ?? null;
 
-        $this->forms->setConfirmationMessage($form, $message, $translations);
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->forms->setConfirmationMessage($form, $message, $translations, $user);
 
         if ($message === null) {
             return back()->with('toast', ['type' => 'success', 'message' => 'Confirmation message reset to the default.']);

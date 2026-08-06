@@ -6,10 +6,13 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateAppearanceRequest;
+use App\Http\Requests\Tenant\UpdateNotificationPreferenceRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Branding\BrandingPresenter;
+use App\Services\Notifications\NotificationPreferenceResolver;
+use App\Services\Notifications\NotificationPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
 use Illuminate\Http\RedirectResponse;
@@ -34,6 +37,8 @@ final class PreferencesController extends Controller
     public function __construct(
         private readonly CustomDomainService $domains,
         private readonly BrandingPresenter $branding,
+        private readonly NotificationPresenter $notifications,
+        private readonly NotificationPreferenceResolver $notificationPreferences,
     ) {}
 
     public function show(Request $request): Response
@@ -74,6 +79,12 @@ final class PreferencesController extends Controller
             // the per-row domain lifecycle did. `can_manage` hides the card for non-admins; `is_active`
             // vs `has_brand_color` is what lets it explain a downgraded tenant's stored-but-dormant brand.
             'branding' => $this->branding->forSettings($tenant, $user->can('tenant.settings.manage')),
+            // Per-type notification preferences (I4, §23). RESOLVED, never read raw: the table is sparse —
+            // a row exists only where someone diverged — so the card renders
+            // NotificationPreferenceResolver's answer, which fills every gap from NotificationType's
+            // defaults. `email_locked` is what lets the two site-owned types render their email control as
+            // unavailable instead of as a switch wired to nothing.
+            'notificationPreferences' => $this->notifications->preferences($user),
         ]);
     }
 
@@ -92,5 +103,26 @@ final class PreferencesController extends Controller
         UserUiPreference::updateOrCreate(['user_id' => $user->id], $request->toColumns());
 
         return back()->with('status', 'appearance-updated');
+    }
+
+    /**
+     * One notification type's channels for the acting user — ALWAYS BOTH BOOLEANS.
+     *
+     * Note the deliberate divergence from {@see self::updateAppearance()} directly above, whose every field
+     * is `sometimes`: there the four axes are independent, here the pair is a single §23 row and a partial
+     * write would lean on the columns' `default true`, silently opting the user into the one type the PRD
+     * says to keep quiet. That guarantee lives in {@see UpdateNotificationPreferenceRequest} and in
+     * {@see NotificationPreferenceResolver::set()}, not here.
+     */
+    public function updateNotifications(UpdateNotificationPreferenceRequest $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $channels = $request->toChannels();
+
+        $this->notificationPreferences->set($user, $request->type(), $channels['in_app'], $channels['email']);
+
+        return back()->with('status', 'notifications-updated');
     }
 }

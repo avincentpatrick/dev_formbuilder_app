@@ -8,7 +8,9 @@
 
 ## 0. Already adopted from this review (not backlog — done)
 
-These seven were judged table-stakes and folded into the spec during the Phase-0-readiness reconciliation:
+These were judged table-stakes and folded into the spec during the Phase-0-readiness reconciliation
+(seven originally; the last row was added by Increment I1, which built the rest of PRD Feature #3 and
+found one of its acceptance criteria unbuilt with no row anywhere):
 
 | Feature | Where it landed |
 |---|---|
@@ -18,7 +20,8 @@ These seven were judged table-stakes and folded into the spec during the Phase-0
 | Builder undo/redo | PRD Feature #8 (Phase 1 acceptance criteria) |
 | CI security scanning (SCA/SAST/secret) | Testing Strategy §3/§6; Deployment §4 |
 | **Post-submission answer editing** (permissioned, audited) — *fast-follow* | RBAC §5 (`submissions.edit.any/.own`); Audit Spec §1 |
-| **Share panel** (copy-link + QR + embed + social) — *fast-follow* | PRD §6 fast-follow note |
+| ~~**Share panel** (copy-link + QR + embed + social)~~ — **SHIPPED in I1**, narrowed to the remainder below | PRD §6 fast-follow note |
+| **Per-form rate limiting / bot-challenge (CAPTCHA)** on the guest runtime — **an unbuilt PRD Feature #3 acceptance criterion**, not a backlog nicety. Only the global `throttle:guest-mint` exists; the criterion asks for it to be per-form and configurable. Surfaced by I1 (which built the rest of Feature #3) and **assigned to I8** (security hardening) rather than left here | PRD Feature #3 acceptance criteria; threat-model §4 bot-flooding row |
 
 ---
 
@@ -62,6 +65,9 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Password / access-code protected public forms | should | 2 | Common light-security lever given the sensitive-data positioning |
 | Client-side marketing/analytics tracking (GA4, Meta Pixel, GTM, conversion-on-submit) | should | 3 | Server webhooks can't measure views/starts/drop-off; needs CSP allow-listing + consent-gating. Note there is no **first-party** measurement of those three either, and for related reasons: ADR-0011 §D1 defers the form-engagement event stream to Phase 4 rather than opening a fourth unauthenticated ingress class in Phase 3 |
 | Kiosk mode (lock to one form, auto-reset, clear PII on timeout) | nice | 3 | Shared field/event-desk devices; niche hardening on the offline story |
+| Share panel — the remainder after I1: **branded social links** (X/LinkedIn/Facebook intent URLs) | nice | 3 | I1 shipped `navigator.share` + `mailto:` instead — native share is the real mobile path (it reaches WhatsApp/SMS, which no fixed set of buttons can) and it keeps third-party brand marks out of the builder and three vendor glyphs out of the hand-authored `icons.ts` |
+| Share panel — **script-snippet embed** with `postMessage` auto-resize | should | 3 | I1 ships the `<iframe>` only, which is exactly what the parity matrix committed ("iframe at MVP; richer embed a Phase 3 candidate"). Auto-resize needs a message protocol on both sides — a listener in the guest runtime and a loader script the platform serves and versions forever |
+| **Per-form embed-origin allowlist** — narrow the guest runtime's `frame-ancestors *` to named hosts | should | 3 | The honest narrowing of the clickjacking risk I1 explicitly ACCEPTED (threat-model §4). Not achievable by editing `PublicRuntimeSecurityHeaders`: the allowed set is per-form data, so it needs a column, a UI and a per-request policy build |
 
 ## 4. Submission management, review & collaboration
 
@@ -72,6 +78,8 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Saved / named views on the inbox (persistent per-user filter + column presets) | should | 3 | Planned saved-views are scoped to the Phase-3 *dashboard*, not the inbox. ADR-0011 §D8 pins that table as strict-RLS with a `user_id` (never the `belongs_to_user` isolation variant, which carries no tenant predicate) and dashboard-scoped; reusing it for the inbox is a future decision, not an implied one |
 | Duplicate / near-duplicate detection (beyond exact offline-replay idempotency) | should | 3 | Catches two records describing the same real-world entity |
 | Assignment of individual submissions to specific reviewers (caseload split) | nice | 3–4 | High-volume review only; reference products are weak here (more differentiator than gap) |
+| Notification retention / pruning sweep | should | 3–4 | Filed 2026-08-06 from I4. `notifications` has **no retention policy and no sweeper**: `app/Jobs/Maintenance/` holds seven (`PruneFailedJobs`, `ReapExpiredDrafts`, `RefreshConnectorTokens`, `RollUpUsageCounters`, `SweepScheduledForms`, `SweepWebhookRetries`, `VerifyCustomDomains`) and none touches this table, while `submission_received` fans out to owner + admin + every granted form editor on **every** submission of **every** public form. Two consequences to size the job against: the bell's unread `count(*)` runs twice a minute per open tab (index-only on `notifications_tenant_user_read_idx`, so cheap but unbounded), and "Mark all as read" is a single unbounded `UPDATE` — at a few hundred thousand rows that is a synchronous web request holding row locks. Neither is a Phase-1 problem at seeded scale; both are recorded here rather than discovered. A prune of read rows older than N days, plus a badge cap, is the likely shape |
+| Respondents may always read their own submission | should | 3 | Filed 2026-08-06 from I4. `SubmissionPolicy::view()` is `submissions.view && (org-wide \|\| collaborates on the form)` with **no respondent clause**, yet `submission_approved`/`submission_returned` are addressed to `respondent_user_id` and `NotificationCopy` tells them to "open it to see what they asked for". A form editor whose grant is later revoked, or whose form moves to another scope node, therefore keeps a notification pointing at a 403. I4 made that honest rather than broken — `NotificationPresenter` runs the real gate and ships `url: null`, so the row renders as plain text — but the underlying question is an authorization widening and belongs with I9's review/edit vertical, where post-submission answer editing raises the same "whose submission is this" question |
 
 ## 5. Analytics, reporting & exports
 

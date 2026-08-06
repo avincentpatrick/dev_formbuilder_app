@@ -9,8 +9,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreBrandingLogoRequest;
 use App\Http\Requests\Tenant\UpdateBrandingRequest;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\Branding\TenantBrandingService;
+use App\Support\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 /**
@@ -48,7 +51,7 @@ final class BrandingController extends Controller
             return back();
         }
 
-        $ramp = $this->branding->setBrandColor($this->tenant(), $hex);
+        $ramp = $this->branding->setBrandColor($this->tenant(), $hex, $this->actor($request));
 
         // The message names the DERIVED fill, not the submitted hex, because they are frequently
         // different and the difference is the whole point of B-snap (ADR-0014 §D3). The card's snap
@@ -65,9 +68,9 @@ final class BrandingController extends Controller
     }
 
     /** Remove the brand colour. NOT plan-gated — see the class docblock. */
-    public function destroy(): RedirectResponse
+    public function destroy(Request $request): RedirectResponse
     {
-        $this->branding->clearBrandColor($this->tenant());
+        $this->branding->clearBrandColor($this->tenant(), $this->actor($request));
 
         return back()->with('toast', [
             'type' => 'success',
@@ -86,6 +89,7 @@ final class BrandingController extends Controller
                 $this->tenant(),
                 $request->logo(),
                 (string) $request->user()?->getAuthIdentifier(),
+                $this->actor($request),
             );
         } catch (AttachmentException $e) {
             // The service layer's refusals are already written for a human (a rejected MIME type, an
@@ -98,9 +102,9 @@ final class BrandingController extends Controller
     }
 
     /** Remove the brand logo. NOT plan-gated — see the class docblock. */
-    public function destroyLogo(): RedirectResponse
+    public function destroyLogo(Request $request): RedirectResponse
     {
-        $this->branding->removeLogo($this->tenant());
+        $this->branding->removeLogo($this->tenant(), $this->actor($request));
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Logo removed.']);
     }
@@ -112,5 +116,19 @@ final class BrandingController extends Controller
         $tenant = app(TenantContract::class);
 
         return $tenant;
+    }
+
+    /**
+     * The audit actor for a branding write (Increment I2). Threaded explicitly rather than left to
+     * {@see AuditLogger}'s `Auth::id()` fallback, matching the FormService convention:
+     * the two `destroy*` verbs gained a `Request` parameter solely for this, which is cheaper than a
+     * service that silently records a different actor when called from anywhere but a session.
+     */
+    private function actor(Request $request): ?User
+    {
+        /** @var ?User $user */
+        $user = $request->user();
+
+        return $user;
     }
 }

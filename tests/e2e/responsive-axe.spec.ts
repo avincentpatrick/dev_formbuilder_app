@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
 
 // Composed-page responsive + accessibility gate. Each authenticated tenant page is scanned at the
@@ -40,6 +40,20 @@ const pages = [
     // `minmax(0, 1fr)` column and `overflow-wrap: anywhere` are what keep the body from scrolling
     // sideways, and this scan is the only thing that checks they still do.
     { name: 'Domains', path: '/domains' },
+    // The audit ledger (I2, PRD Feature #12) — Owner/Admin only and, unlike its four neighbours above, NOT
+    // plan-gated: PlanCatalog carries no audit key on any tier because accountability is baseline. Reachable
+    // because the seeded demo user is the tenant Owner.
+    //
+    // ⚠️ THIS PAGE IS ALREADY NON-EMPTY WITHOUT A FIXTURE. PublishService, WebhookEndpointService and
+    // ResourceGrantService all audit inside E2eSeeder's own transaction, and since I2 so does every
+    // FormService write. What `E2eSeeder::seedAuditLog()` buys is the SPREAD: without it there is no
+    // `deleted`, `restored`, `archived` or `exported` row anywhere in the seeded data and no diff carries a
+    // redacted field, so this scan would be green over three badge variants and a redaction notice that
+    // never rendered.
+    //
+    // It also plants the widest unbreakable strings on the page — a full uuid and a long webhook URL inside
+    // a diff cell — which is the Domains overflow trap arriving on a second surface.
+    { name: 'Audit log', path: '/audit-log' },
     { name: 'Settings', path: '/settings' },
 ];
 
@@ -235,5 +249,119 @@ for (const theme of themes) {
         await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Integration rule detail');
+    });
+}
+
+// The audit change-detail dialog (I2) — this increment's ONLY new structural markup: a before/after
+// <table> with a visually-hidden <caption> and column headers, inside a dialog that becomes a FULL-BLEED
+// SHEET at 375px (Modal's ≤480px rule). That is where it earns a scan of its own: the diff carries a full
+// uuid and a long URL value, and the table's own ≤480px stacked layout is hand-written in the component
+// rather than inherited from MdsDataTable, so nothing else in this suite covers it.
+//
+// A CSS `tr` locator scoped by row text rather than getByRole('row', …), for the same reason the webhook
+// detail above uses one: the DataTable's mobile card layout drops the table ARIA role. `forceTheme` runs
+// AFTER the click, matching that test.
+for (const theme of themes) {
+    test(`Audit change detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/audit-log', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Permission changed' })
+            .getByRole('button', { name: 'View changes' })
+            .first()
+            .click();
+        await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Audit change detail');
+    });
+}
+
+// The notification centre (I4) — the only interactive overlay in the suite anchored to a 40px trigger in
+// the top nav rather than centred by MdsModal, and the only one that appears on EVERY page (the bell is
+// shell chrome, so its trigger is already inside all thirteen scans above; this one opens it).
+//
+// ⚠️ THE FEED IS STUBBED, AND THAT IS NOT A SHORTCUT. The bell polls on a ~60s interval, `artisan serve`
+// is single-process (workers: 1) and CI retries once — so a tick landing between forceTheme and
+// assertClean would re-render the list mid-scan and produce an intermittent red that "passes on re-run",
+// the worst kind. Fulfilling the route BEFORE goto also makes the rows deterministic, which is what lets
+// this assert on specific states rather than on whatever the seeder happened to write.
+//
+// ⚠️ THE BOUNDING-BOX CHECK IS LOAD-BEARING AND assertClean CANNOT REPLACE IT. `.app-shell` is
+// `overflow-x: clip`, so a popover that runs off the left edge at 375px is CLIPPED rather than scrolled —
+// the scrollWidth assertion stays green over an unreadable panel. This is the only thing that proves the
+// ≤480px fixed-sheet rule in NotificationBell.vue is still doing its job.
+//
+// The trigger is matched by a PREFIX regex because its accessible name carries the unread count
+// ("Notifications, 3 unread") — a WCAG 1.4.1 requirement, and the reason an exact-name locator would rot.
+const notificationFeed = {
+    unread_count: 3,
+    items: [
+        {
+            id: '0192e2e0-0000-7000-8000-0000000000f1',
+            type: 'submission_received',
+            title: 'New submission',
+            description: 'A new response arrived on Clinic Intake.',
+            url: '/submissions/0192e2e0-0000-7000-8000-0000000000a1',
+            action_label: 'View submission',
+            read_at: null,
+            created_at: new Date(Date.now() - 6 * 60_000).toISOString(),
+        },
+        {
+            // The danger chip, and a long unbroken title — the overflow-wrap case at 375px.
+            id: '0192e2e0-0000-7000-8000-0000000000f2',
+            type: 'webhook_failed',
+            title: 'Webhook paused',
+            description: 'CRM-sync-production-endpoint-with-a-deliberately-long-name stopped accepting deliveries.',
+            url: '/webhooks/0192e2e0-0000-7000-8000-0000000000b1',
+            action_label: 'View webhook',
+            read_at: null,
+            created_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+        },
+        {
+            // url: null — the NON-INTERACTIVE row. Renders as text with no action label, and is the only
+            // fixture that would catch an `<a href="">` regression.
+            id: '0192e2e0-0000-7000-8000-0000000000f3',
+            type: 'export_ready',
+            title: 'Export failed',
+            description: 'Your export for Clinic Intake could not be generated.',
+            url: null,
+            action_label: 'View submission',
+            read_at: null,
+            created_at: new Date(Date.now() - 4 * 86_400_000).toISOString(),
+        },
+        {
+            // A READ row: dimmer title weight, no unread dot, no mark-read button, and the spacer that
+            // keeps the grid columns aligned against the three above it.
+            id: '0192e2e0-0000-7000-8000-0000000000f4',
+            type: 'member_invited',
+            title: 'Member invited',
+            description: 'pending@meridian.test was invited as viewer.',
+            url: '/members',
+            action_label: 'View members',
+            read_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+            created_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        },
+    ],
+};
+
+for (const theme of themes) {
+    test(`Notification centre (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.route('**/notifications', (route) =>
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(notificationFeed) }),
+        );
+
+        await page.goto('/dashboard', { waitUntil: 'networkidle' });
+        await page.getByRole('button', { name: /^Notifications/ }).click();
+
+        const panel = page.getByRole('dialog', { name: 'Notifications' });
+        await panel.waitFor({ state: 'visible', timeout: 10_000 });
+        await page.getByRole('listitem').first().waitFor({ state: 'visible', timeout: 10_000 });
+
+        const box = await panel.boundingBox();
+        expect(box, 'the notification panel has no box').not.toBeNull();
+        expect(box!.x, 'the notification panel starts off the left edge').toBeGreaterThanOrEqual(0);
+
+        await forceTheme(page, theme);
+        await assertClean(page, 'Notification centre');
     });
 }

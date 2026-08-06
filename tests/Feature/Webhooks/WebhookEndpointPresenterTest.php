@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DomainEventType;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\Tenant;
 use App\Models\User;
@@ -51,7 +52,7 @@ it('shapes the index list, the entitlement summary, and the catalogs', function 
         ->and($props['summary']['endpoints']['used'])->toBe(2)
         ->and($props['summary']['endpoints']['limit'])->toBeNull()
         ->and($props['summary']['deliveries'])->toHaveKeys(['used', 'limit'])
-        ->and($props['eventTypes'])->toHaveCount(4)
+        ->and($props['eventTypes'])->toHaveCount(count(DomainEventType::cases()))
         ->and($props['eventTypes'][0])->toHaveKeys(['value', 'label'])
         ->and($props['can']['create'])->toBeTrue();
 });

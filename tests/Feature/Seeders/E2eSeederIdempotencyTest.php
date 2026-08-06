@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Domain;
 use App\Models\Form;
+use App\Models\Notification;
+use App\Models\NotificationPreference;
 use App\Models\SavedReportView;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -158,4 +160,80 @@ it('converges the custom-domain fixture too, and never activates one', function 
 
     // One pending, one verified-awaiting-operator: the two states the page has to render honestly.
     expect(collect($first)->where('verified', true)->count())->toBe(1);
+});
+
+it('converges the notification fixture, and keeps one row on the reviewer on purpose', function (): void {
+    // I4. Upsert-keyed on `fixtureUuid()` rather than guarded by `exists()`, and the guard choice is the
+    // interesting part: the table IS empty when the block runs (this seeder never routes a write through
+    // SubmissionPipeline / TenantMembershipService / SubmissionReviewService, the only announce sites for
+    // I3's listeners), so an emptiness guard would work today and start silently skipping the moment a
+    // later seed uses the real writers.
+    $seeder = new E2eSeeder;
+    $seeder->run();
+
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+    /** @var User $owner */
+    $owner = User::query()->withoutGlobalScopes()->findOrFail($tenant->owner_user_id);
+
+    /** @return array<string, mixed> */
+    $shape = fn (): array => DB::transaction(function () use ($tenant, $owner): array {
+        TenantContext::applyLocal($tenant->id, (string) $owner->getKey());
+
+        return [
+            // Timestamp-free by design: `created_at` is relative ("6 minutes ago") and is re-stamped on
+            // every re-seed on purpose, so the popover keeps reading sensibly on a box seeded weeks ago.
+            // What must converge is which rows exist, whose they are, and which are unread.
+            'rows' => Notification::query()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (Notification $n): array => [
+                    'user' => (string) $n->user_id,
+                    'type' => $n->type->value,
+                    'read' => $n->read_at !== null,
+                    'emailed' => $n->emailed_at !== null,
+                ])
+                ->all(),
+            'owner_unread' => Notification::query()->forUser($owner)->unread()->count(),
+            'preferences' => NotificationPreference::query()
+                ->orderBy('notification_type')
+                ->get()
+                ->map(fn (NotificationPreference $p): array => [
+                    'type' => $p->notification_type->value,
+                    'in_app' => $p->in_app_enabled,
+                    'email' => $p->email_enabled,
+                ])
+                ->all(),
+        ];
+    });
+
+    $first = $shape();
+
+    DB::transaction(function () use ($seeder, $tenant, $owner): void {
+        TenantContext::applyLocal($tenant->id, (string) $owner->getKey());
+        app(PermissionRegistrar::class)->setPermissionsTeamId($tenant->id);
+        // Resolved on the DEFAULT connection, inside the tenant context: `pgsql_auth` is a separate
+        // connection and cannot see RefreshDatabase's uncommitted transaction — the same trap this file's
+        // header records for re-running `run()`. Under the users join-shape policy the reviewer is visible
+        // here because they are an ACTIVE co-tenant member of the acting owner.
+        /** @var User $reviewer */
+        $reviewer = User::query()->where('email', 'reviewer@meridian.test')->firstOrFail();
+        $seeder->seedNotifications($owner, $reviewer);
+    });
+
+    expect($shape())->toBe($first)
+        ->and($first['rows'])->toHaveCount(7);
+
+    // ⚠️ THE LOAD-BEARING ASSERTION, and the reason the fixture is not seven Owner rows. Playwright only
+    // ever logs in as the Owner, so a regression that dropped `Notification::scopeForUser()` from the feed
+    // would be INVISIBLE in an all-Owner fixture — the badge would read the same either way. With the
+    // reviewer's row present, the bell must say 4 while the table holds 7.
+    expect($first['owner_unread'])->toBe(4)
+        ->and(collect($first['rows'])->where('user', (string) $owner->getKey())->count())->toBe(6);
+
+    // The one diverging preference, so the /settings card renders a non-default state for the axe scan.
+    // On `review_requested` deliberately — the one type the Owner holds no notification for, so the
+    // fixture cannot contradict itself.
+    expect($first['preferences'])->toBe([
+        ['type' => 'review_requested', 'in_app' => false, 'email' => false],
+    ]);
 });

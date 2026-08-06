@@ -89,6 +89,18 @@ export const icons = {
     // borrowed `external-link` or `building`, because below 1024px the sidebar is icons only and there the
     // mark is the only thing telling this destination apart from Integrations and Scopes.
     globe: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M3 12h18 M12 3c2.5 2.4 3.8 5.4 3.8 9s-1.3 6.6-3.8 9 M12 3c-2.5 2.4-3.8 5.4-3.8 9s1.3 6.6 3.8 9',
+
+    // ── Share surface (I1) ────────────────────────────────────────────────────
+    // Three nodes joined by two edges — the conventional share mark, drawn as a graph so it reads at 16px
+    // where a filled arrow would blot. Its own glyph rather than `external-link`: that one means "this
+    // navigates away", and the Share toolbar button opens a modal that goes nowhere.
+    share: 'M18 8a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M6 15a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M18 21a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M8.2 11.3l7.6-3.8 M8.2 13.2l7.6 3.8',
+    // Two chain links at 45°, the standard "copy link" mark. Distinct from `copy` (two stacked sheets),
+    // because the share panel puts both on screen at once and they must not read as the same control.
+    link: 'M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.4 1.4 M13.5 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.4-1.4',
+    // A QR code reduced to its three finder patterns plus one data module — the part of a QR a person
+    // actually recognises. Not a literal code: at 24×24 real modules would alias into grey mush.
+    qr: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M14 20h2 M20 14h.01',
 } as const;
 
 export type IconName = keyof typeof icons;

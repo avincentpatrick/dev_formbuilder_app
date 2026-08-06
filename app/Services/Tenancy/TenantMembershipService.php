@@ -7,6 +7,7 @@ namespace App\Services\Tenancy;
 use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
 use App\Enums\UsageMetric;
+use App\Events\MemberInvited;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
+use App\Support\Branding\BrandPalette;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -103,8 +105,27 @@ final class TenantMembershipService
         // context — so the queued notification carries only scalars (§D5) and needs no context on the
         // worker. after_commit=true (ADR-0007 §D8, global) backstops ordering: the mail job is not visible
         // on the queue until the transaction above commits, and is never enqueued on a rollback.
+        // The brand palette is resolved HERE for the same reason the URL is: the worker has no tenant
+        // context, so anything read from it there fails closed and the invitation would arrive unbranded
+        // (H23a4). BrandPalette returns literal light-theme hexes — a scalar array, R3-legal payload.
         Notification::route('mail', $email)
-            ->notify(new TenantInvitationNotification($tenant->name, $this->buildInviteAcceptUrl($tenant, $plainToken)));
+            ->notify(
+                (new TenantInvitationNotification($tenant->name, $this->buildInviteAcceptUrl($tenant, $plainToken)))
+                    ->withBrand(BrandPalette::forTenant($tenant))
+            );
+
+        // Post-commit announcement (I3), raised ALONGSIDE the mail above rather than replacing it: the
+        // accept URL cannot be rebuilt by a listener (the plaintext token dies with $plainToken) and must
+        // never enter a webhook-visible payload anyway. See {@see MemberInvited} for the full argument.
+        // This event tells the tenant's own admins that a seat was offered; the invitee's email is the
+        // line above, unchanged since H22a.
+        event(MemberInvited::for(
+            $tenant,
+            $email,
+            $roleName,
+            $invitedBy,
+            $invite->invite_expires_at?->toIso8601String(),
+        ));
 
         return $invite;
     }

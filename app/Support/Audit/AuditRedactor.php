@@ -49,7 +49,18 @@ final class AuditRedactor
      * @var array<string, list<string>>
      */
     private const array PII = [
-        'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email'],
+        // `remarks` joined this list in I2, when SubmissionReviewService started auditing the four review
+        // transitions. It is registered for the SAME reason `feedback_reports.remarks` already is: free
+        // text with no audience discipline, where a reviewer can paste respondent PII copied straight out
+        // of the answers ("called the mother, number is …"). `audits` is append-only and never deleted,
+        // and data-privacy-gdpr-compliance §9's whole reconciliation rests on this table never having
+        // stored raw PII — so the ledger records THAT the remarks changed (via `redacted_fields`) without
+        // recording what they said, which is §2's principle exactly.
+        //
+        // `returned_reason` is deliberately NOT here, and the asymmetry is the point: it is the reviewer's
+        // explanation AUTHORED FOR the respondent and already emailed to them, so "why was this returned"
+        // is precisely the accountability the ledger exists to preserve.
+        'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email', 'remarks'],
         'attachment' => ['original_filename'],
         'feedback_reports' => ['remarks', 'browser_info'],
     ];

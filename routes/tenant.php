@@ -8,7 +8,9 @@ use App\Http\Controllers\Public\ServiceWorkerController;
 use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\AuditLogController;
 use App\Http\Controllers\Tenant\BrandingController;
+use App\Http\Controllers\Tenant\BrandingLogoController;
 use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
@@ -22,10 +24,13 @@ use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
 use App\Http\Controllers\Tenant\FormScheduleController;
 use App\Http\Controllers\Tenant\FormScopeController;
+use App\Http\Controllers\Tenant\FormShareController;
+use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
@@ -34,9 +39,11 @@ use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\WebhookController;
+use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
+use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
@@ -78,10 +85,66 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
     'auth',
+    // AppSecurityHeaders (I1) — frame-ancestors 'none' + nosniff + Referrer-Policy on every authenticated
+    // page. Named here rather than globally on `web` on purpose: the guest runtime below also uses `web`,
+    // and a global mount would set frame-ancestors 'none' on it and break every embed in the product.
+    AppSecurityHeaders::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    /*
+    | The notification centre (Increment I4, PRD Feature #13b) — a BELL, not a page. There is deliberately
+    | no /notifications Inertia page: the popover shows the latest rows and every deep link goes to the
+    | thing itself, so a full-page list would be a second surface with no second job.
+    |
+    | ⚠️ ALL THREE ROUTES ARE JSON, AND BOTH HALVES OF THAT ARE DELIBERATE.
+    |
+    | The READ is a sidecar (the /scopes/{n}/impact + /integrations/.../channels precedent), polled on ~60s
+    | and refetched on Inertia navigation. It is NOT an Inertia::optional() shared prop, which is what the
+    | I-map originally called for: a partial reload RE-DISPATCHES THE CURRENT PAGE'S CONTROLLER — Inertia
+    | filters what it SERIALIZES, not what it COMPUTES — so a tick with /audit-log open would pay for a full
+    | ledger paginate plus a count(*) and throw the result away (AuditLogPresenter's docblock accepts that
+    | cost once per navigation, not once per minute). Nothing about notifications enters
+    | HandleInertiaRequests::share(), which renders on every page in the application.
+    |
+    | The two WRITES are also JSON, which is a NAMED EXCEPTION to the rule scopesClient/integrationsClient
+    | state ("every mutation on this surface is an Inertia visit"). That rule exists because bootstrap/app.php
+    | keys its domain-exception branch on the `api/v1/*` PATH, so a DomainException raised on a web route
+    | 302s even to a fetch expecting JSON. Neither route here raises one — they stamp a timestamp on a row
+    | the caller owns — and framework exceptions already negotiate (bootstrap/app.php's
+    | shouldRenderJsonWhen covers 401/403/404/419). The reason it MUST be a fetch is Inertia's own request
+    | stream: it is `maxConcurrent: 1, interruptible: true`, so a router.post() fired in the same tick as
+    | the row's <Link> navigation is silently ABORTED — click-to-read is unimplementable as an Inertia visit
+    | without a wasted second round trip. A 204 also avoids re-rendering the page under the user on every
+    | click, which back() would do.
+    |
+    | ⚠️ NO `can:` GATE ON THE COLLECTION AND NO `feature:` GATE ANYWHERE, AND BOTH ABSENCES ARE DELIBERATE.
+    |  · No permission: the RBAC catalog is closed, and a notification is addressed to ONE person by
+    |    notifications.user_id — so "may I read this?" is answered by Notification::scopeForUser(), never by
+    |    a role. Coining `notifications.view` would invent a permission whose audience is "every
+    |    authenticated user" (the closed-catalog argument AuditLogPresenter makes for `audit_log.export`).
+    |    This is PATCH /settings/appearance's posture: a user reads and edits only their own account.
+    |  · No plan feature: PlanCatalog defines no notifications key on any tier, and PRD Feature #13's own
+    |    acceptance criterion is that notifications are "available on EVERY tier — a Free tenant with no
+    |    webhook access still gets submission notifications". Adding one would be MAKING a pricing decision
+    |    rather than enforcing one (the /audit-log "baseline obligation, not an upsell" argument).
+    |    NotificationRouteGuardsTest asserts both, so neither can be "tidied" into symmetry with the
+    |    neighbours below.
+    |
+    | The per-row write DOES carry a gate, on the BOUND INSTANCE: `notifications` is strict RLS, so binding
+    | resolves any co-tenant's row and NotificationPolicy::markRead is the only thing standing between a
+    | member and a colleague's read state. Same shape, same reason, as analytics.views.update below.
+    |
+    | Static segment before any binding (the H14 rule): /notifications/read-all is declared BEFORE
+    | /notifications/{notification}/read, or the bare binding would capture "read-all" as a uuid.
+    */
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
+        ->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])
+        ->middleware('can:markRead,notification')->name('notifications.read');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to
@@ -90,6 +153,15 @@ Route::middleware([
     Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
     Route::patch('/settings/appearance', [PreferencesController::class, 'updateAppearance'])
         ->name('settings.appearance.update');
+    // Per-user notification preferences (I4, data-dictionary §23) — the same posture as the appearance
+    // write directly above, and for the same reason: a user edits only their own account, and
+    // notification_preferences is strict-RLS keyed on user_id. ONE type per request, BOTH booleans always
+    // (see UpdateNotificationPreferenceRequest — the deliberate opposite of UpdateAppearanceRequest's
+    // all-`sometimes` axes, because §23's unit is a row rather than a field). An Inertia visit rather than
+    // a sidecar write, unlike /notifications above: this one has a rendered page to redirect back to, and
+    // a validation failure has somewhere to put its errors.
+    Route::patch('/settings/notifications', [PreferencesController::class, 'updateNotifications'])
+        ->name('settings.notifications.update');
     // Tenant-level (org-wide) settings — Owner/Admin only (H10 draft-expiry window). Distinct from the
     // per-user appearance write above; gated on the Spatie permission, not just `auth`.
     Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])
@@ -285,6 +357,23 @@ Route::middleware([
     Route::patch('/forms/{form}/confirmation', [FormConfirmationMessageController::class, 'update'])
         ->middleware('can:update,form')->name('forms.confirmation');
 
+    // The share surface (Increment I1, PRD Feature #3) — the public link name + the guest-access toggle, the
+    // two columns the guest runtime resolves on and that until now had no writer outside the XLSForm importer
+    // and the e2e seeder. Same shape as the four routes above: its own endpoint, a guarded
+    // FormService::setShareSettings write, never mass-assignment (both columns ARE fillable, and together they
+    // are the difference between a private draft and an open collection endpoint).
+    //
+    // Ungated by plan, deliberately: no entitlement in the catalog covers guest forms, and inventing one here
+    // would be a pricing decision rather than the enforcement of one. What IS tiered — reaching the form on a
+    // custom domain — is gated on the domains surface, where that was decided.
+    //
+    // The QR is a GET on the same gate rather than a data URI in the page props, so "download the QR" is a
+    // plain browser navigation (the XLSForm-export precedent) instead of a canvas round-trip.
+    Route::patch('/forms/{form}/share', [FormShareController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.share');
+    Route::get('/forms/{form}/share/qr.svg', FormShareQrController::class)
+        ->middleware('can:update,form')->name('forms.share.qr');
+
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),
     // resolved by `can:create,<Submission>,form`: the Authorize middleware passes the Submission class-string
@@ -458,6 +547,29 @@ Route::middleware([
         ->middleware(['can:update,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.update');
     Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
         ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
+
+    /*
+    | The audit log (Increment I2, PRD Feature #12) — the Owner/Admin compliance ledger, the first surface
+    | that lets a human READ what H4 has been writing since July.
+    |
+    | `can:viewAny,Audit` IS the authorization: AuditPolicy resolves exactly the `audit_log.view`
+    | permission, seeded to Owner and Admin only and explicitly withheld from Viewer. No `ability:` — that
+    | is Sanctum token-scope middleware and a session carries no token (the H14 convention).
+    |
+    | NO `feature:` GATE, AND THE ABSENCE IS DELIBERATE. `PlanCatalog` defines no audit key on any tier,
+    | because accountability is a baseline obligation rather than an upsell — so unlike Analytics, Webhooks,
+    | Integrations and Domains, this destination turns on a permission alone. Adding a feature key here
+    | would be MAKING a pricing decision rather than enforcing one (the I1 forms.share precedent).
+    |
+    | Static segment before any binding (the H14 rule): /audit-log/export is declared here, and there is
+    | deliberately NO /audit-log/{audit} route. An audit row has no detail page — the before/after diff is
+    | rendered from props the list already carries, so the row IS the detail — and a bare {audit} pattern
+    | would be the first thing able to shadow /export.
+    */
+    Route::get('/audit-log', [AuditLogController::class, 'index'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
+    Route::get('/audit-log/export', [AuditLogController::class, 'export'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.export');
 });
 
 /*
@@ -465,16 +577,32 @@ Route::middleware([
 | but WITHOUT `auth`: the invitee is not a member yet, so requiring auth would be circular. Tenant
 | context is still established, which is exactly what makes the strict-RLS invite row visible (only
 | within its own tenant) and lets accept materialize the reserved role. Styled pages land in Increment C.
+|
+| H23a4 adds the brand logo to this group for the same structural reason and a different audience: the
+| caller is an EMAIL CLIENT, which carries no session and often fetches through a proxy days after the
+| message was sent. It stays on the APP host (this group identifies by subdomain) because ADR-0009 §D2 and
+| ADR-0012 scope a custom domain to the guest runtime only — so the logo URL in every branded email is
+| composed by TenantUrl's app arm, and this is the group that serves it. Deliberately NOT signed: an
+| expiry on an image inside an inbox is a broken image on a timer. See BrandingLogoController.
 */
 Route::middleware([
     'web',
     InitializeTenancyBySubdomain::class,
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
+    // AppSecurityHeaders (I1): the invitation pages accept a role-granting POST from a link in an email —
+    // exactly the shape of act that must not be framed. The branding logo shares this group and is served to
+    // email clients, which the header does not affect (frame-ancestors governs framing, not <img> fetching).
+    AppSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('/invitations/{token}', [InvitationController::class, 'decline'])->name('invitations.decline');
+
+    // No `feature:branding` middleware: the gate is inside the controller, via
+    // TenantBrandingService::isActive(), because an unentitled tenant must answer 404 (an image that is
+    // not there) and not the middleware's 403 (an image that exists and is being withheld).
+    Route::get('/branding/logo', BrandingLogoController::class)->name('branding.logo');
 });
 
 /*

@@ -9,6 +9,7 @@ use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\Notification;
 use App\Models\PersonalAccessToken;
 use App\Models\ResourceGrant;
 use App\Models\SavedReportView;
@@ -21,6 +22,7 @@ use App\Policies\AuditPolicy;
 use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
 use App\Policies\FormPolicy;
+use App\Policies\NotificationPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\SavedReportViewPolicy;
 use App\Policies\ScopeNodePolicy;
@@ -44,6 +46,7 @@ use Dedoc\Scramble\Support\Generator\ServerVariable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -137,6 +140,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── Markdown-mail output encoding (H23a4) — closes a LIVE defect, not a hardening nicety ───────
+        // security-threat-model.md §5 carried this as "Open — a live defect, assigned" to H3/H23: Laravel's
+        // markdown mailer runs `{{ }}` values through htmlspecialchars before CommonMark sees them, so
+        // SCRIPT is already blocked — but `[` is not, which makes markdown LINK and IMAGE syntax live in
+        // every interpolated tenant name, form name and webhook label. A tenant named
+        // `[Reset your password](https://evil.example)` would have rendered a working phishing link inside
+        // a platform-branded email, and `![x](https://evil.example/px.gif)` a remote tracking pixel.
+        //
+        // H23a4 is the increment that owns this surface (it builds the mail template layer the row was
+        // waiting on), so it closes it here rather than inheriting it. Enabling secured encoding escapes
+        // `[`, `<` and `>` in every markdown-mail interpolation.
+        //
+        // RESIDUAL, stated rather than implied: `*`, `_` and backticks stay live, so an adversarial name
+        // can still render italic or as a code span. That is typography, not a security control — both
+        // vectors the threat model names need `[`, and both are closed.
+        Markdown::withSecuredEncoding();
+
         // Per-form `.any`/`.own` authorization (Increment D2). Registered explicitly rather than relying
         // on auto-discovery so the mapping is greppable alongside the other RBAC wiring.
         Gate::policy(Form::class, FormPolicy::class);
@@ -185,6 +205,13 @@ class AppServiceProvider extends ServiceProvider
         // gate on — and a nested one would 404 after a disconnect, which soft-deletes the grant but keeps its
         // rules. See ConnectionSubscriptionPolicy's docblock.
         Gate::policy(ConnectionSubscription::class, ConnectionSubscriptionPolicy::class);
+
+        // In-app notifications (I4). No permission is consulted — the single `markRead` ability is an
+        // OWNERSHIP check, because `notifications` is strict-RLS and therefore tenant-scoped rather than
+        // user-scoped, exactly as SavedReportView is. Registered explicitly for the same fail-OPEN reason as
+        // the policies above; without the mapping `can:markRead,notification` would fall through to Gate
+        // closures and allow a co-tenant to mark a colleague's notification read.
+        Gate::policy(Notification::class, NotificationPolicy::class);
 
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the

@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Tenancy;
 
+use App\Enums\AuditEvent;
 use App\Enums\DomainVerificationFailure;
+use App\Jobs\Tenancy\VerifyCustomDomainsJob;
 use App\Models\Domain;
 use App\Models\Tenant;
 use App\Rules\ClaimableDomain;
+use App\Services\Forms\FormService;
+use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\DnsTxtResolver;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -41,10 +46,34 @@ use Illuminate\Support\Facades\DB;
  * Until it exists a certificate is installed by hand, so a tenant that could activate its own domain
  * could put its respondents on an origin with no certificate — and the resume link they receive would
  * carry that origin. The gate is the ratified "failing closed" posture made mechanical.
+ *
+ * ── Auditing (Increment I2): THREE of the six verbs, and the other three are a recorded decision ───────
+ * `claim`, `makePrimary` and `release` emit `domain` rows through {@see self::auditDomain()}. The rest do
+ * not, and the reasons are not "we ran out of time":
+ *
+ *  - **`verify()`** is reached from HTTP *and* from the sweep. One method, two contexts — a conditional
+ *    audit would make the ledger's contents depend on which caller won a race, which is worse than a
+ *    consistent gap. It also records a CHECK RESULT the sweep rewrites every fifteen minutes forever, and
+ *    flooding a compliance ledger with machine noise is exactly what spec §1's noise-reduction clause
+ *    forbids.
+ *  - **`activate()` / `deactivate()`** are artisan-only, with no tenant context and — decisively — no
+ *    actor. {@see self::activate()}'s own docblock already argues this for `activated_by`. An audit row
+ *    from there would carry `user_id = null` beside `is_system_action = false`, which is malformed by
+ *    {@see AuditLogger}'s own contract.
+ *  - **`sweep()` / `releaseExpiredClaims()`** are bulk deletes with no per-row read and no context. An
+ *    accepted, documented gap: an expired claim was never verified, routed nowhere and appeared in no
+ *    link, so there is nothing an auditor could act on.
+ *
+ * The actor comes from {@see AuditLogger}'s `Auth::id()` fallback rather than a threaded `?User`, which is
+ * a deliberate asymmetry with {@see FormService}: an explicit actor parameter earns
+ * its keep only where a non-HTTP caller exists, and the verbs that have one are precisely the verbs above.
  */
 final class CustomDomainService
 {
-    public function __construct(private readonly DnsTxtResolver $dns) {}
+    public function __construct(
+        private readonly DnsTxtResolver $dns,
+        private readonly AuditLogger $audit,
+    ) {}
 
     /**
      * Reserve a hostname for a tenant and mint its challenge token. The row is pending: it routes
@@ -56,24 +85,37 @@ final class CustomDomainService
      */
     public function claim(Tenant $tenant, string $host): Domain
     {
-        /** @var Domain $domain */
-        $domain = $tenant->domains()->create([
-            'domain' => mb_strtolower(trim($host)),
-            // 256-bit CSPRNG, random and never derived. An HMAC of (tenant, domain) would be
-            // unrotatable per claim and would make an APP_KEY compromise a domain-claim primitive, for
-            // no benefit — the token is published in public DNS either way.
-            'verification_token' => bin2hex(random_bytes(32)),
-            'token_issued_at' => Carbon::now(),
-            'verified_at' => null,
-            'activated_at' => null,
-            'verification_checked_at' => null,
-            'verification_failure_reason' => null,
-            // Explicit for the same reason every field above is: the model is `$guarded = []`, so a claim
-            // body carrying `is_primary` would otherwise be mass-assignable straight past the CHECK's intent.
-            'is_primary' => false,
-        ]);
+        return DB::transaction(function () use ($tenant, $host): Domain {
+            /** @var Domain $domain */
+            $domain = $tenant->domains()->create([
+                'domain' => mb_strtolower(trim($host)),
+                // 256-bit CSPRNG, random and never derived. An HMAC of (tenant, domain) would be
+                // unrotatable per claim and would make an APP_KEY compromise a domain-claim primitive, for
+                // no benefit — the token is published in public DNS either way.
+                'verification_token' => bin2hex(random_bytes(32)),
+                'token_issued_at' => Carbon::now(),
+                'verified_at' => null,
+                'activated_at' => null,
+                'verification_checked_at' => null,
+                'verification_failure_reason' => null,
+                // Explicit for the same reason every field above is: the model is `$guarded = []`, so a claim
+                // body carrying `is_primary` would otherwise be mass-assignable straight past the CHECK's intent.
+                'is_primary' => false,
+            ]);
 
-        return $domain;
+            // ⚠️ `verification_token` IS DELIBERATELY ABSENT FROM THIS PAYLOAD, and it must not be added
+            // "for completeness". The token is not in AuditRedactor::SECRETS by an explicit decision
+            // recorded at 2026_08_04_000001_add_custom_domain_verification_to_domains.php:49-51 — it is
+            // published in public DNS at a name only the zone's controller can write, so it is not a
+            // credential and registering it would contradict that decision. The right move for a
+            // non-secret that is also not accountability-relevant is simply not to record it.
+            $this->auditDomain(AuditEvent::Created, $domain, null, [
+                'domain' => $domain->domain,
+                'is_primary' => false,
+            ]);
+
+            return $domain;
+        });
     }
 
     /**
@@ -201,6 +243,16 @@ final class CustomDomainService
                 ->update(['is_primary' => false]);
 
             $domain->forceFill(['is_primary' => true])->save();
+
+            // The hostname rides on BOTH sides of every domain row. That is the price of keying on the
+            // tenant id (see auditDomain()): without it a reader cannot tell which of a tenant's hosts the
+            // row is about, and `domains` rows are deletable, so a join would not always answer it either.
+            $this->auditDomain(
+                AuditEvent::Updated,
+                $domain,
+                ['domain' => $domain->domain, 'is_primary' => false],
+                ['domain' => $domain->domain, 'is_primary' => true],
+            );
         });
 
         return true;
@@ -226,7 +278,65 @@ final class CustomDomainService
             return false;
         }
 
-        return (bool) $domain->delete();
+        // Snapshot BEFORE the delete, audit and delete in ONE transaction — the ResourceGrantService::revoke()
+        // shape, and for the same reason with more force: this row is HARD-deleted, so the audit entry is the
+        // only surviving record that the tenant ever controlled this hostname.
+        return DB::transaction(function () use ($domain): bool {
+            $old = [
+                'domain' => $domain->domain,
+                'verified_at' => $domain->verified_at?->toIso8601String(),
+                'activated_at' => $domain->activated_at?->toIso8601String(),
+                'is_primary' => $domain->is_primary,
+            ];
+
+            $deleted = (bool) $domain->delete();
+
+            if ($deleted) {
+                $this->auditDomain(AuditEvent::Deleted, $domain, $old, null);
+            }
+
+            return $deleted;
+        });
+    }
+
+    /**
+     * Emit one `domain` audit row, or nothing at all — the guard is the point of this method (Increment I2).
+     *
+     * **`auditable_id` IS THE TENANT'S UUID, NEVER THE DOMAIN ROW'S ID, AND THAT IS NOT A STYLE CHOICE.**
+     * `domains.id` is an `increments()` INTEGER (2026_07_05_000100_create_domains_table.php:23) while
+     * `audits.auditable_id` is `uuid NOT NULL` — so `(string) $domain->getKey()` would try to insert `'3'`
+     * into a uuid column and raise SQLSTATE 22P02 on the first live claim. Nothing catches that statically:
+     * not PHPStan, not the `audits_event_check`, not the migration linter. This is the same addressing
+     * problem spec §1 already solves the same way for role grants (`model_has_roles` has a composite PK and
+     * no surrogate id), and it is written into §1 so nobody "fixes" it back. The hostname travels in the
+     * payload instead.
+     *
+     * ⚠️ **`domains` IS RLS-EXEMPT; `audits` IS NOT.** Two distinct failures this guard closes:
+     *
+     *  1. **NO TENANT CONTEXT.** This service is also reachable from the console (`domains:activate`, the
+     *     verification sweep). An `audits` INSERT there violates the strict append-only `WITH CHECK` — and
+     *     inside a `$tries = 1` MaintenanceJob that lands in `failed_jobs` ON EVERY TICK, FOREVER, which is
+     *     the exact failure {@see VerifyCustomDomainsJob}'s docblock spends a paragraph
+     *     avoiding. It fails SILENT on purpose: an audit gap is recoverable, a permanently-failing sweep is
+     *     not.
+     *  2. **WRONG TENANT.** Because `domains` is exempt, an operator path can hand this service tenant B's
+     *     row while the ambient context is tenant A's. The `audits` `WITH CHECK` compares `tenant_id` to the
+     *     AMBIENT GUC, not to the row's owner — so that INSERT would SUCCEED and file B's domain event in
+     *     A's ledger. RLS cannot catch this, precisely because the source table is exempt. This equality IS
+     *     the isolation, exactly as the class docblock says of the `where('tenant_id', …)` filters.
+     *
+     * @param  ?array<string, mixed>  $old
+     * @param  ?array<string, mixed>  $new
+     */
+    private function auditDomain(AuditEvent $event, Domain $domain, ?array $old, ?array $new): void
+    {
+        $tenantId = TenantContext::currentTenantId();
+
+        if ($tenantId === null || $tenantId !== (string) $domain->tenant_id) {
+            return;
+        }
+
+        $this->audit->record($event, 'domain', $tenantId, old: $old, new: $new);
     }
 
     /**

@@ -28,6 +28,22 @@ use Illuminate\Support\Facades\DB;
  * Form creation (form-versioning-schema-migration.md §3.1). Creates the durable form, its initial draft
  * version (v1, empty snapshot), and the creator's editor grant — in one transaction. Assumes the caller
  * has established the tenant DB context (BelongsToTenant auto-fills tenant_id; RLS is the backstop).
+ *
+ * ── Every write on this service is audited (Increment I2) ─────────────────────────────────────────────
+ * I1 audited {@see self::setShareSettings()} alone and left the rest silent; I2 closed them AS A SET,
+ * which is the only honest way to ship a viewer: a partial `form` trail looks complete and is not.
+ * The shape is I1's throughout — a `DB::transaction` (required by {@see AuditLogger}, so the row is
+ * atomic with the change it records), explicit `$old`/`$new` literal arrays, `auditable_type = 'form'`,
+ * and a trailing `?User $actor = null` threaded from the controller. `create()` is the one exception to
+ * the trailing parameter: it already takes `$creator`, who IS the actor.
+ *
+ * Two payload rules that are not obvious and are load-bearing:
+ *  - **Carbon values are stringified.** A raw Carbon serializes into jsonb as
+ *    `{"date":…,"timezone_type":3,…}` — unreadable, and it drives the diff renderer down its array
+ *    branch. {@see self::setSchedule()} passes `?->toIso8601String()`.
+ *  - **Derived and bulk values stay out.** {@see self::setConfirmationMessage()} records the translation
+ *    LOCALE KEYS, not the map: N locales of the same copy in an append-only, never-pruned table is how a
+ *    ledger becomes unqueryable (the same reason `brand_ramp` is excluded in TenantBrandingService).
  */
 final class FormService
 {
@@ -84,6 +100,16 @@ final class FormService
             // policy check later in the SAME request (e.g. the redirect's Inertia render).
             $this->grants->forget($creatorId);
 
+            // No `?User $actor` parameter here, unlike every sibling: $creator IS the actor, and the
+            // template-instantiate caller (TemplateService) passes the acting user through as well.
+            $this->audit->record(
+                AuditEvent::Created,
+                'form',
+                (string) $form->getKey(),
+                new: ['title' => $title, 'status' => FormStatus::Draft->value],
+                actorId: $creatorId,
+            );
+
             return $form->refresh();
         });
     }
@@ -92,10 +118,13 @@ final class FormService
      * Update a form's metadata, keeping the denormalized title/description in sync on the current draft
      * version (data-dictionary §2 — the form's copy tracks the draft's on every save).
      */
-    public function updateMetadata(Form $form, string $title, ?string $description): Form
+    public function updateMetadata(Form $form, string $title, ?string $description, ?User $actor = null): Form
     {
-        return DB::transaction(function () use ($form, $title, $description): Form {
-            $form->forceFill(['title' => $title, 'description' => $description])->save();
+        return DB::transaction(function () use ($form, $title, $description, $actor): Form {
+            $old = ['title' => $form->title, 'description' => $form->description];
+            $new = ['title' => $title, 'description' => $description];
+
+            $form->forceFill($new)->save();
 
             if ($form->draft_version_id !== null) {
                 // The `status` predicate is load-bearing, not belt-and-braces (H25 / Risk R5). This method
@@ -109,8 +138,30 @@ final class FormService
                     ->update(['title' => $title, 'description' => $description]);
             }
 
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
             return $form->refresh();
         });
+    }
+
+    /**
+     * The one emission site the six `form`/`updated` setters share (I2). Keeping it private rather than
+     * repeating six `record()` calls is what makes "every form-config write is audited the same way" a
+     * property of the code instead of a review convention.
+     *
+     * @param  array<string, mixed>  $old
+     * @param  array<string, mixed>  $new
+     */
+    private function recordFormUpdate(Form $form, array $old, array $new, ?User $actor): void
+    {
+        $this->audit->record(
+            AuditEvent::Updated,
+            'form',
+            (string) $form->getKey(),
+            old: $old,
+            new: $new,
+            actorId: $actor?->getKey() === null ? null : (string) $actor->getKey(),
+        );
     }
 
     /**
@@ -134,15 +185,26 @@ final class FormService
      * No resolver invalidation: nothing memoized is keyed by form id — `$formPaths` is keyed by NODE id, and
      * `holds()` reads `scope_node_id` live off the model. See ResourceGrantResolver::$formPaths.
      */
-    public function assignScope(Form $form, ?string $scopeNodeId): Form
+    public function assignScope(Form $form, ?string $scopeNodeId, ?User $actor = null): Form
     {
         $node = $scopeNodeId === null
             ? null
             : ScopeNode::query()->whereKey($scopeNodeId)->where('is_active', true)->firstOrFail();
 
-        $form->forceFill(['scope_node_id' => $node?->getKey()])->save();
+        // The transaction is new in I2 and is not decoration: AuditLogger requires the row to be atomic
+        // with the change. Of the six setters I2 audited this is the one that most needs it — the
+        // docblock above calls this column an AUTHORIZATION INPUT, so a write that landed without its
+        // audit row would be a silent capacity change across a whole subtree.
+        return DB::transaction(function () use ($form, $node, $actor): Form {
+            $old = ['scope_node_id' => $form->scope_node_id];
+            $new = ['scope_node_id' => $node?->getKey()];
 
-        return $form->refresh();
+            $form->forceFill($new)->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
     }
 
     /**
@@ -155,11 +217,18 @@ final class FormService
      * writes the per-form half. No pipeline/version effect — it only governs whether the guest runtime offers
      * the control and whether the guest draft channel accepts a save.
      */
-    public function setSaveAndResume(Form $form, bool $enabled): Form
+    public function setSaveAndResume(Form $form, bool $enabled, ?User $actor = null): Form
     {
-        $form->forceFill(['save_and_resume' => $enabled])->save();
+        return DB::transaction(function () use ($form, $enabled, $actor): Form {
+            $old = ['save_and_resume' => $form->save_and_resume];
+            $new = ['save_and_resume' => $enabled];
 
-        return $form->refresh();
+            $form->forceFill($new)->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
     }
 
     /**
@@ -236,14 +305,33 @@ final class FormService
      *
      * @param  array<string, string>|null  $translations
      */
-    public function setConfirmationMessage(Form $form, ?string $message, ?array $translations): Form
+    public function setConfirmationMessage(Form $form, ?string $message, ?array $translations, ?User $actor = null): Form
     {
-        $form->forceFill([
-            'confirmation_message' => $message,
-            'confirmation_message_translations' => $translations === null || $translations === [] ? null : $translations,
-        ])->save();
+        return DB::transaction(function () use ($form, $message, $translations, $actor): Form {
+            $normalized = $translations === null || $translations === [] ? null : $translations;
 
-        return $form->refresh();
+            // The audit records which LOCALES carry a translation, never the translations themselves:
+            // N locales of the same copy, in an append-only never-pruned table, on every confirmation-copy
+            // tweak. The message body is recorded because it is the thing that changed and it is short;
+            // the locale set is the part that answers "who added Spanish, and when".
+            $old = [
+                'confirmation_message' => $form->confirmation_message,
+                'confirmation_message_locales' => array_keys($form->confirmation_message_translations ?? []),
+            ];
+            $new = [
+                'confirmation_message' => $message,
+                'confirmation_message_locales' => array_keys($normalized ?? []),
+            ];
+
+            $form->forceFill([
+                'confirmation_message' => $message,
+                'confirmation_message_translations' => $normalized,
+            ])->save();
+
+            $this->recordFormUpdate($form, $old, $new, $actor);
+
+            return $form->refresh();
+        });
     }
 
     /**
@@ -266,21 +354,43 @@ final class FormService
         ?CarbonInterface $closesAt,
         string $timezone,
         ?int $maxResponses,
+        ?User $actor = null,
     ): Form {
+        // Outside the transaction: a refusal is not an act and leaves nothing to record.
         if ($opensAt !== null && $closesAt !== null && $opensAt->greaterThanOrEqualTo($closesAt)) {
             throw FormException::invalidSchedule();
         }
 
-        $form->forceFill([
-            'opens_at' => $opensAt,
-            'closes_at' => $closesAt,
-            'timezone' => $timezone,
-            'max_responses' => $maxResponses,
-        ]);
-        $form->schedule_state = FormSchedule::initialState($form, CarbonImmutable::now());
-        $form->save();
+        return DB::transaction(function () use ($form, $opensAt, $closesAt, $timezone, $maxResponses, $actor): Form {
+            // ISO strings, not Carbon instances — a Carbon serializes into jsonb as
+            // {"date":…,"timezone_type":3,…}, which no reader can parse and no diff can render.
+            $old = [
+                'opens_at' => $form->opens_at?->toIso8601String(),
+                'closes_at' => $form->closes_at?->toIso8601String(),
+                'timezone' => $form->timezone,
+                'max_responses' => $form->max_responses,
+                'schedule_state' => $form->schedule_state?->value,
+            ];
 
-        return $form->refresh();
+            $form->forceFill([
+                'opens_at' => $opensAt,
+                'closes_at' => $closesAt,
+                'timezone' => $timezone,
+                'max_responses' => $maxResponses,
+            ]);
+            $form->schedule_state = FormSchedule::initialState($form, CarbonImmutable::now());
+            $form->save();
+
+            $this->recordFormUpdate($form, $old, [
+                'opens_at' => $opensAt?->toIso8601String(),
+                'closes_at' => $closesAt?->toIso8601String(),
+                'timezone' => $timezone,
+                'max_responses' => $maxResponses,
+                'schedule_state' => $form->schedule_state?->value,
+            ], $actor);
+
+            return $form->refresh();
+        });
     }
 
     /**
@@ -288,10 +398,22 @@ final class FormService
      * draft version cascades its sections/fields/validations away), clear draft_version_id, and mark the
      * form archived. Published/superseded versions and current_published_version_id are untouched.
      */
-    public function archive(Form $form): Form
+    public function archive(Form $form, ?User $actor = null): Form
     {
-        return DB::transaction(function () use ($form): Form {
+        return DB::transaction(function () use ($form, $actor): Form {
             $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            // Snapshotted off $locked, AFTER the lock — never off the passed-in $form, which may be stale.
+            // Re-reading under lockForUpdate is the whole reason that line exists, and an audit built from
+            // the stale copy would record a `status` this method never actually saw.
+            //
+            // `draft_version_id` is in the payload because archiving DESTROYS that version and cascades its
+            // whole section/field/validation subtree away: the audit row is the only surviving record of
+            // which version died.
+            $old = [
+                'status' => $locked->status->value,
+                'draft_version_id' => $locked->draft_version_id,
+            ];
 
             if ($locked->draft_version_id !== null) {
                 // Only a draft is deletable (form_version RLS guard) — the current draft is one by
@@ -304,6 +426,19 @@ final class FormService
                 'archived_at' => now(),
                 'draft_version_id' => null,
             ])->save();
+
+            $this->audit->record(
+                AuditEvent::Archived,
+                'form',
+                (string) $locked->getKey(),
+                old: $old,
+                new: [
+                    'status' => FormStatus::Archived->value,
+                    'archived_at' => $locked->archived_at?->toIso8601String(),
+                    'draft_version_id' => null,
+                ],
+                actorId: $actor?->getKey() === null ? null : (string) $actor->getKey(),
+            );
 
             return $locked->refresh();
         });

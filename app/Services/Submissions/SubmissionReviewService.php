@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AuditEvent;
 use App\Enums\SubmissionStatus;
 use App\Exceptions\Submissions\SubmissionReviewException;
 use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
+use App\Support\Audit\AuditLogger;
+use App\Support\Audit\AuditRedactor;
 use Closure;
 use Illuminate\Support\Facades\DB;
 
@@ -19,15 +22,26 @@ use Illuminate\Support\Facades\DB;
  * data-dictionary §7, and saves — all in one transaction. Authorization is the `can:review,submission` route
  * middleware ({@see SubmissionPolicy::review()}); this service assumes it has already passed.
  *
- * Audit-log rows + reviewer notifications are stubbed (no `audits` table lands until its own increment —
- * consistent with F2–F6). `submitted → approved/returned` may skip the intermediate `under_review` claim.
+ * `submitted → approved/returned` may skip the intermediate `under_review` claim.
+ *
+ * ── The 7th TODO(audit) site, retired in I2 ───────────────────────────────────────────────────────────
+ * H4 retired six `TODO(audit)` markers and its test file pins those six; this one survived, uncounted,
+ * because the four review verbs funnel through a single private {@see self::apply()} that H4's inventory
+ * never walked. All four now emit one `submission`/`updated` row from that one site.
+ *
+ * `remarks` IS in the payload and IS redacted at write ({@see AuditRedactor::PII}); `returned_reason` is
+ * in the payload raw. The asymmetry is deliberate and argued where the registration lives.
+ *
+ * Reviewer NOTIFICATIONS remain stubbed — that half is I3/I4's row, not this one's.
  */
 final class SubmissionReviewService
 {
+    public function __construct(private readonly AuditLogger $audit) {}
+
     /** Claim a submitted response for review (no reviewer/timestamp is finalized until approve/return). */
     public function markUnderReview(Submission $submission, User $reviewer, ?string $remarks = null): Submission
     {
-        return $this->apply($submission, [SubmissionStatus::Submitted], 'start reviewing', function (Submission $s) use ($remarks): void {
+        return $this->apply($submission, [SubmissionStatus::Submitted], 'start reviewing', $reviewer, function (Submission $s) use ($remarks): void {
             $s->status = SubmissionStatus::UnderReview;
             $this->applyRemarks($s, $remarks);
         });
@@ -35,7 +49,7 @@ final class SubmissionReviewService
 
     public function approve(Submission $submission, User $reviewer, ?string $remarks = null): Submission
     {
-        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'approve', function (Submission $s) use ($reviewer, $remarks): void {
+        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'approve', $reviewer, function (Submission $s) use ($reviewer, $remarks): void {
             $s->status = SubmissionStatus::Approved;
             $s->validated_by = (string) $reviewer->id;
             $s->validated_at = now();
@@ -46,7 +60,7 @@ final class SubmissionReviewService
 
     public function returnToRespondent(Submission $submission, User $reviewer, string $reason, ?string $remarks = null): Submission
     {
-        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'return', function (Submission $s) use ($reviewer, $reason, $remarks): void {
+        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'return', $reviewer, function (Submission $s) use ($reviewer, $reason, $remarks): void {
             $s->status = SubmissionStatus::Returned;
             $s->validated_by = (string) $reviewer->id;
             $s->validated_at = now();
@@ -61,7 +75,7 @@ final class SubmissionReviewService
         return $this->apply($submission, [
             SubmissionStatus::Submitted, SubmissionStatus::UnderReview,
             SubmissionStatus::Approved, SubmissionStatus::Returned,
-        ], 'archive', function (Submission $s) use ($remarks): void {
+        ], 'archive', $reviewer, function (Submission $s) use ($remarks): void {
             $s->status = SubmissionStatus::Archived;
             $s->finalized_at = now();
             $this->applyRemarks($s, $remarks);
@@ -72,22 +86,59 @@ final class SubmissionReviewService
      * @param  list<SubmissionStatus>  $from  legal source states
      * @param  Closure(Submission): void  $mutate
      */
-    private function apply(Submission $submission, array $from, string $action, Closure $mutate): Submission
+    private function apply(Submission $submission, array $from, string $action, User $reviewer, Closure $mutate): Submission
     {
-        return DB::transaction(function () use ($submission, $from, $action, $mutate): Submission {
+        return DB::transaction(function () use ($submission, $from, $action, $reviewer, $mutate): Submission {
             $fresh = Submission::query()->whereKey($submission->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($fresh->status, $from, true)) {
                 throw SubmissionReviewException::illegalTransition($fresh->status, $action);
             }
 
+            $old = $this->snapshot($fresh);
+
             $mutate($fresh);
             $fresh->save();
 
-            // TODO(audit): emit an `updated` audit event + reviewer notification once the audits table lands.
+            // The actor is the passed-in $reviewer, NOT AuditLogger's Auth::id() fallback, and the
+            // difference is not theoretical: approve()/returnToRespondent() stamp `validated_by =
+            // $reviewer->id`, so any caller that ever passes a reviewer who is not the authenticated user
+            // (I9's review/edit surface, a bulk-review job, an artisan command) would leave the ledger
+            // contradicting the very row it describes — and the ledger would be the one that is wrong.
+            $this->audit->record(
+                AuditEvent::Updated,
+                'submission',
+                (string) $fresh->getKey(),
+                old: $old,
+                new: $this->snapshot($fresh),
+                actorId: (string) $reviewer->getKey(),
+            );
 
             return $fresh;
         });
+    }
+
+    /**
+     * The reviewable state of a submission, snapshotted identically before and after the mutation so one
+     * emission site serves all four verbs.
+     *
+     * Timestamps are ISO strings, never Carbon instances: a Carbon serializes into jsonb as
+     * `{"date":…,"timezone_type":3,…}`, which no reader can parse.
+     *
+     * @return array<string, mixed>
+     */
+    private function snapshot(Submission $submission): array
+    {
+        return [
+            'status' => $submission->status->value,
+            'validated_by' => $submission->validated_by,
+            'validated_at' => $submission->validated_at?->toIso8601String(),
+            'finalized_at' => $submission->finalized_at?->toIso8601String(),
+            'returned_reason' => $submission->returned_reason,
+            // Placeholdered on both sides by AuditRedactor before this ever reaches the table — the row
+            // records THAT the remarks changed, never what they said. See AuditRedactor::PII['submission'].
+            'remarks' => $submission->remarks,
+        ];
     }
 
     private function applyRemarks(Submission $submission, ?string $remarks): void

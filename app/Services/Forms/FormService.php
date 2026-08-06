@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\AuditEvent;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
@@ -17,6 +18,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\QuotaGuard;
+use App\Support\Audit\AuditLogger;
 use App\Support\Forms\FormSchedule;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -32,6 +34,7 @@ final class FormService
     public function __construct(
         private readonly ResourceGrantResolver $grants,
         private readonly QuotaGuard $quota,
+        private readonly AuditLogger $audit,
     ) {}
 
     public function create(Tenant $tenant, User $creator, string $title, ?string $description = null): Form
@@ -157,6 +160,54 @@ final class FormService
         $form->forceFill(['save_and_resume' => $enabled])->save();
 
         return $form->refresh();
+    }
+
+    /**
+     * Set a form's public link + guest-access toggle (Increment I1, PRD Feature #3) — the only writer of
+     * `forms.public_slug` and `forms.allow_guest_submissions` outside the XLSForm importer.
+     *
+     * `forceFill` with explicit keys for the reason given at {@see self::assignScope()}, which applies here
+     * with more force than anywhere else it is stated: both columns ARE in `Form::$fillable`, and together
+     * they are the switch that makes a form collectable by anyone on the internet. A `$form->update($validated)`
+     * behind `can:update,form` would make "publish this to the world" reachable as a side effect of an
+     * unrelated edit. Centralizing it here is what keeps that structural rather than a review convention.
+     *
+     * THIS IS THE FIRST AUDITED FORM-CONFIG WRITE, and it is deliberately first. Nothing else on this service
+     * emits an audit row — `updateMetadata`, `assignScope`, `setSaveAndResume`, `setConfirmationMessage`,
+     * `setSchedule` and `archive` are all silent, and Increment I2 closes that as a set. This one does not
+     * wait for I2 because it is the highest-blast-radius toggle a form has: it is the difference between a
+     * private draft and an open collection endpoint, and "who turned guest access on, and when" is the first
+     * question anyone asks about an unexpected submission. It establishes `auditable_type = 'form'`, which I2
+     * then follows for the rest.
+     *
+     * The transaction is not decoration: {@see AuditLogger} requires the row to be atomic with the change it
+     * records, and the sibling single-column setters open none.
+     */
+    public function setShareSettings(Form $form, ?string $slug, bool $allowGuests, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $slug, $allowGuests, $actor): Form {
+            $old = [
+                'public_slug' => $form->public_slug,
+                'allow_guest_submissions' => $form->allow_guest_submissions,
+            ];
+            $new = [
+                'public_slug' => $slug,
+                'allow_guest_submissions' => $allowGuests,
+            ];
+
+            $form->forceFill($new)->save();
+
+            $this->audit->record(
+                AuditEvent::Updated,
+                'form',
+                (string) $form->getKey(),
+                old: $old,
+                new: $new,
+                actorId: $actor?->getKey() === null ? null : (string) $actor->getKey(),
+            );
+
+            return $form->refresh();
+        });
     }
 
     /**

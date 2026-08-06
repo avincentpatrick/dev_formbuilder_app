@@ -926,6 +926,16 @@ The rationale is also captured in `exceptions-log.md` #2.
 - **Registry growth:** add glyphs to `icons.ts` as features need them (the C2 set: dashboard, forms,
   submissions, settings, bell, menu, close, chevron-down, sun, moon, monitor, user, logout, feedback,
   check). Keep geometry simple/technical. Adding a glyph is a MINOR change (§7.1).
+- **Glyphs added in I1** (the Share surface, PRD Feature #3): **`share`** — three nodes joined by two
+  edges, the conventional share mark drawn as a graph so it survives 16px where a filled arrow blots;
+  **`link`** — two chain links at 45°; **`qr`** — a QR reduced to its three finder patterns plus two
+  data modules. Two notes on why each is its own glyph rather than a reuse. `share` is not
+  `external-link`: that mark means "this navigates away", and the Share toolbar button opens a modal
+  that goes nowhere. `link` is not `copy`: the Share panel puts a copy-the-link control and a
+  copy-the-embed-code control on screen **at the same time**, and two identical glyphs on two
+  adjacent controls that do different things is the defect. `qr` is deliberately **not** a literal
+  code — at 24×24 real modules alias into grey mush, so it draws the part of a QR a person actually
+  recognises.
 
 **Components added in C2** (implementing existing sections, with stories + this doc updated per §7.3):
 `MdsCard` (§3.5), `MdsEmptyState` (§3.10), `MdsSpinner` (§3.9 indeterminate; determinate bar still

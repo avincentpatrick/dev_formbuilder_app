@@ -80,6 +80,33 @@ for (const theme of themes) {
         await scan(page, 'after keyboard reorder');
     });
 
+    // The Share panel (Increment I1) — scanned in BOTH of its states, because they are structurally
+    // different surfaces rather than one surface with a hidden block. `Community Health Survey` is seeded
+    // with no `public_slug`, so it renders the "not shareable yet" notice; `Clinic Intake` is seeded with a
+    // slug AND guest access on, so it renders the live link, the QR image and the embed snippet. Scanning
+    // only the first would leave every control that matters unscanned.
+    //
+    // Read-only on purpose: this suite shares one database with the rest of the e2e run, so toggling the
+    // form's real share settings here would mutate state E2eSeederIdempotencyTest and the guest-runtime
+    // specs both depend on. The two seeded rows already give both states without a write.
+    test(`Builder — share panel, not yet shared (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Community Health Survey');
+        await page.getByRole('button', { name: 'Share' }).click();
+        await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+        await scan(page, 'share panel — no link yet');
+    });
+
+    test(`Builder — share panel, live link (${theme})`, async ({ page }) => {
+        await openBuilder(page, 'Clinic Intake');
+        await page.getByRole('button', { name: 'Share' }).click();
+        await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
+        // The QR is a server round-trip; scanning before it lands would miss its alt text entirely.
+        await expect(page.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
+        await forceTheme(page, theme);
+        await scan(page, 'share panel — live link');
+    });
+
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Blank Intake Form');
         await expect(page.getByText('An empty form')).toBeVisible({ timeout: 10_000 });

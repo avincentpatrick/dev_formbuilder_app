@@ -121,6 +121,23 @@ export interface LibraryItem {
     is_platform: boolean;
 }
 
+// The share surface's read model (Increment I1, PRD Feature #3). Every absolute URL here is composed by
+// TenantUrl's PUBLIC arm on the server — a custom domain serves the guest runtime and only the guest runtime
+// (ADR-0012 §D1), so this is deliberately NOT derivable from `window.location` in the browser.
+export interface ShareProps {
+    public_slug: string | null;
+    allow_guest_submissions: boolean;
+    // A slug that is already free within the tenant, from the same FormSlug helper the XLSForm importer uses,
+    // so the editor opens on a value that will save rather than one the author discovers is taken via a 422.
+    suggested_slug: string;
+    // `current_published_version_id !== null`. False means the public link 404s even with guest access on.
+    is_published: boolean;
+    public_host: string;
+    // Null whenever `public_slug` is — the modal shows the "no link yet" state rather than a plausible URL
+    // that leads nowhere.
+    public_url: string | null;
+}
+
 export interface BuilderPageProps {
     form: {
         id: string;
@@ -142,6 +159,7 @@ export interface BuilderPageProps {
         default_locale: string;
         supported_locales: string[];
     };
+    share: ShareProps;
     draft: { id: string; version_number: number } | null;
     sections: ServerSection[];
     fields: ServerField[];

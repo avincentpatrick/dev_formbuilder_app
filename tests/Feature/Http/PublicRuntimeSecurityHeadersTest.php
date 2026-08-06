@@ -34,6 +34,12 @@ it('sets an img-src CSP allowlisting self, data/blob, and the configured tile or
         ->and($csp)->toContain('media-src')
         ->and($csp)->toContain("worker-src 'self'")
         ->and($csp)->toContain("manifest-src 'self'")
+        // I1: framing is EXPLICITLY unrestricted here, because PRD Feature #3 requires the guest runtime to
+        // be embeddable on third-party domains. Before I1 the same behaviour held by accident, which is a
+        // different thing from a decision. The authenticated app makes the opposite choice — see
+        // AppSecurityHeadersTest — and this assertion is what stops a well-meaning hardening PR from
+        // "fixing" the asymmetry and silently breaking every embed in the product.
+        ->and($csp)->toContain('frame-ancestors *')
         // script/connect/default are deliberately left unrestricted (dev HMR + Inertia + same-origin API).
         ->and($csp)->not->toContain('script-src')
         ->and($csp)->not->toContain('connect-src')

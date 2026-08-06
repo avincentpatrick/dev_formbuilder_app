@@ -23,6 +23,8 @@ use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
 use App\Http\Controllers\Tenant\FormScheduleController;
 use App\Http\Controllers\Tenant\FormScopeController;
+use App\Http\Controllers\Tenant\FormShareController;
+use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
 use App\Http\Controllers\Tenant\InvitationController;
@@ -35,6 +37,7 @@ use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\WebhookController;
+use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
@@ -79,6 +82,10 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
     'auth',
+    // AppSecurityHeaders (I1) — frame-ancestors 'none' + nosniff + Referrer-Policy on every authenticated
+    // page. Named here rather than globally on `web` on purpose: the guest runtime below also uses `web`,
+    // and a global mount would set frame-ancestors 'none' on it and break every embed in the product.
+    AppSecurityHeaders::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
@@ -286,6 +293,23 @@ Route::middleware([
     Route::patch('/forms/{form}/confirmation', [FormConfirmationMessageController::class, 'update'])
         ->middleware('can:update,form')->name('forms.confirmation');
 
+    // The share surface (Increment I1, PRD Feature #3) — the public link name + the guest-access toggle, the
+    // two columns the guest runtime resolves on and that until now had no writer outside the XLSForm importer
+    // and the e2e seeder. Same shape as the four routes above: its own endpoint, a guarded
+    // FormService::setShareSettings write, never mass-assignment (both columns ARE fillable, and together they
+    // are the difference between a private draft and an open collection endpoint).
+    //
+    // Ungated by plan, deliberately: no entitlement in the catalog covers guest forms, and inventing one here
+    // would be a pricing decision rather than the enforcement of one. What IS tiered — reaching the form on a
+    // custom domain — is gated on the domains surface, where that was decided.
+    //
+    // The QR is a GET on the same gate rather than a data URI in the page props, so "download the QR" is a
+    // plain browser navigation (the XLSForm-export precedent) instead of a canvas round-trip.
+    Route::patch('/forms/{form}/share', [FormShareController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.share');
+    Route::get('/forms/{form}/share/qr.svg', FormShareQrController::class)
+        ->middleware('can:update,form')->name('forms.share.qr');
+
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),
     // resolved by `can:create,<Submission>,form`: the Authorize middleware passes the Submission class-string
@@ -479,6 +503,10 @@ Route::middleware([
     InitializeTenancyBySubdomain::class,
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
+    // AppSecurityHeaders (I1): the invitation pages accept a role-granting POST from a link in an email —
+    // exactly the shape of act that must not be framed. The branding logo shares this group and is served to
+    // email clients, which the header does not affect (frame-ancestors governs framing, not <img> fetching).
+    AppSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');

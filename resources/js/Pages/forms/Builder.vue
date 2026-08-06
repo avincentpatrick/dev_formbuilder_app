@@ -20,6 +20,7 @@ import ConflictDialog from '@/components/builder/ConflictDialog.vue';
 import ConfirmationModal from '@/components/builder/ConfirmationModal.vue';
 import ScheduleModal from '@/components/builder/ScheduleModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
+import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
@@ -110,6 +111,11 @@ const scheduleOpen = ref(false);
 // author-editable text that may carry `${key}` piping holes. Same shape as Schedule: a modal over its own
 // guarded PATCH route, ungated by plan. ──
 const confirmationOpen = ref(false);
+
+// ── Share (Increment I1, PRD Feature #3) — the public link, its QR and its embed snippet. Same shape again:
+// a modal over its own guarded PATCH route, ungated by plan. It lives on the toolbar rather than beside
+// Publish because sharing is not a step in publishing — an author revisits the link long after. ──
+const shareOpen = ref(false);
 
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
 // author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
@@ -244,6 +250,12 @@ function submitImport(): void {
                 <!-- Confirmation message (H6a) — ungated, all tiers; references are checked at publish. -->
                 <MdsButton variant="secondary" icon-left="message-check" @click="confirmationOpen = true">
                     Confirmation
+                </MdsButton>
+                <!-- Share (I1) — ungated, all tiers. Not disabled on `readOnly`: a form with no editable
+                     draft still has a live link worth copying, and the panel is where an author goes to
+                     turn responses OFF, which matters most exactly when they cannot edit. -->
+                <MdsButton variant="secondary" icon-left="share" @click="shareOpen = true">
+                    Share
                 </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
@@ -383,6 +395,13 @@ function submitImport(): void {
         <!-- Confirmation message (H6a) — the post-submit thank-you copy, over PATCH /forms/{form}/confirmation. -->
         <ConfirmationModal v-model:open="confirmationOpen" :form-id="form.id" :form="form" />
 
+        <!-- Share (I1) — the public link, QR and embed snippet, over PATCH /forms/{form}/share. -->
+        <ShareModal
+            v-model:open="shareOpen"
+            :form-id="form.id"
+            :form-title="form.title"
+            :share="share"
+        />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">
             <p class="builder__prose">

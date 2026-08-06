@@ -19,9 +19,9 @@ use App\Services\Forms\SchemaTreeCloner;
 use App\Services\Xlsform\Dto\ImportPlan;
 use App\Services\Xlsform\Dto\SettingsSpec;
 use App\Services\Xlsform\Dto\XlsformImportResult;
+use App\Support\Forms\FormSlug;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Imports an XLSForm `.xlsx` into an EXISTING form's current draft (Increment G7b /
@@ -174,33 +174,27 @@ final class XlsformImporter
     /**
      * The `public_slug` to write, or null to leave it untouched: an explicit `form_id` (slugged + de-duped
      * against the per-tenant unique index), or a title-derived fallback only when the form has none yet.
+     *
+     * Normalization and the de-collision loop moved to {@see FormSlug} in Increment I1, so the importer and
+     * the share surface cannot disagree about which suffix is free — and so both inherit that helper's
+     * `withTrashed()` predicate, which matches the unique index a soft-deleted form still occupies.
      */
     private function resolveSlug(Form $form, SettingsSpec $settings): ?string
     {
         if ($settings->formId !== null && $settings->formId !== '') {
-            $base = Str::slug($settings->formId) ?: Str::slug($settings->formTitle ?? $form->title ?: 'form');
+            $source = $settings->formId;
         } elseif ($form->public_slug === null || $form->public_slug === '') {
-            $base = Str::slug($settings->formTitle ?? $form->title ?: 'form');
+            $source = $settings->formTitle ?? $form->title;
         } else {
             return null; // keep the form's existing slug when the file names none
         }
 
-        $base = $base !== '' ? $base : 'form';
-        $candidate = $base;
-        $n = 2;
-        while ($this->slugTaken($form, $candidate)) {
-            $candidate = $base.'-'.$n;
-            $n++;
+        // A `form_id` that normalizes to nothing (all punctuation, say) still deserves the title fallback the
+        // pre-I1 code gave it — FormSlug::suggest's own 'form' default is the last resort behind that.
+        if (FormSlug::normalize($source) === null) {
+            $source = $settings->formTitle ?? $form->title;
         }
 
-        return $candidate;
-    }
-
-    private function slugTaken(Form $form, string $slug): bool
-    {
-        return Form::query()
-            ->where('public_slug', $slug)
-            ->whereKeyNot($form->id)
-            ->exists();
+        return FormSlug::suggest($form, $source);
     }
 }

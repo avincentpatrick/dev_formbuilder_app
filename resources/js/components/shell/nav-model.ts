@@ -32,6 +32,19 @@ export const navItems: NavItem[] = [
     // Scoping hierarchy (G10b2) — sits beside Members because both are Owner/Admin administration of WHO
     // can reach what, rather than authoring surfaces.
     { key: 'scopes', label: 'Scopes', icon: 'building', href: '/scopes', enabled: true, gate: 'manageScopes' },
+    // The audit ledger (I2, PRD Feature #12) — placed with Members and Scopes because it is the RECORD of
+    // that same Owner/Admin administration of who can reach what.
+    //
+    // NO `feature:`, and it is the first gated item without one. PlanCatalog defines no audit key on any
+    // tier: an audit trail is a baseline obligation for every tenant, not an enterprise upsell, so
+    // visibility turns on the permission alone.
+    //
+    // `shield` rather than `clock`: below 1024px the sidebar is icons-only and the glyph is the SOLE
+    // signifier (the rule that minted `chart-bar` and `globe`). `clock` already means version history on
+    // /forms, so a user who learned that mark would misread this destination; `shield` reads
+    // accountability, is used by no other nav item, and its two in-page uses (Transfer ownership, Grant
+    // access) are the same semantic family.
+    { key: 'audit', label: 'Audit log', icon: 'shield', href: '/audit-log', enabled: true, gate: 'viewAuditLog' },
     // Webhook management + delivery log (H14) — Owner/Admin (gate) AND a Starter+ plan feature (feature),
     // so a tier without `webhooks` never sees the item (a direct visit still bounces off `feature:webhooks`).
     { key: 'webhooks', label: 'Webhooks', icon: 'activity', href: '/webhooks', enabled: true, gate: 'manageWebhooks', feature: 'webhooks' },

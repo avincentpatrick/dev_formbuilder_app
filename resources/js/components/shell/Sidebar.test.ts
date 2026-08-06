@@ -39,6 +39,7 @@ function allAbilities(overrides: Record<string, boolean> = {}): Record<string, b
         manageIntegrations: true,
         viewAnalytics: true,
         manageDomains: true,
+        viewAuditLog: true,
         ...overrides,
     };
 }
@@ -145,6 +146,52 @@ describe('Sidebar — the Domains destination', () => {
         const wrapper = mount(Sidebar);
 
         expect(labels(wrapper).join(' ')).not.toContain('Domains');
+        wrapper.unmount();
+    });
+});
+
+/**
+ * The Audit log destination (Increment I2).
+ *
+ * SHAPED DIFFERENTLY FROM ITS NEIGHBOURS ON PURPOSE. Analytics, Webhooks, Integrations and Domains each
+ * AND a permission with a plan feature, so their suites include an `entitlements: null` fail-closed case.
+ * This item has NO `feature:` — PlanCatalog carries no audit key on any tier, because an audit trail is a
+ * baseline obligation rather than an upsell — so an entitlements case here would pass for a reason that has
+ * nothing to do with the claim (it would be exercising `can.*`, not the entitlement path). Its absence is
+ * deliberate; do not add one back by symmetry.
+ *
+ * The negative that DOES matter is the ROLE one. RolePermissionSeeder grants `audit_log.view` to Owner and
+ * Admin only and excludes Viewer with a comment saying so, and Playwright only ever loads the Owner
+ * fixture — so this is the only thing in the suite proving a Viewer, Reviewer or Form Editor never sees a
+ * destination that would show them every act in the organization.
+ */
+describe('Sidebar — the Audit log destination', () => {
+    it('shows the Audit log to a user who may read the ledger', () => {
+        const wrapper = render(allAbilities(), {});
+
+        expect(labels(wrapper).join(' ')).toContain('Audit log');
+        wrapper.unmount();
+    });
+
+    it('HIDES it from a user without viewAuditLog, even with every entitlement on', () => {
+        const wrapper = render(allAbilities({ viewAuditLog: false }), {
+            advanced_analytics: true,
+            webhooks: true,
+            native_connectors: true,
+            custom_domain: true,
+        });
+
+        expect(labels(wrapper).join(' ')).not.toContain('Audit log');
+        wrapper.unmount();
+    });
+
+    it('shows it on a plan with NO features at all — it is not an upsell', () => {
+        // The property that makes it unlike its four neighbours: a Free tenant that can see nothing else
+        // in this group still gets its own accountability record.
+        const wrapper = render(allAbilities(), {});
+
+        expect(labels(wrapper).join(' ')).toContain('Audit log');
+        expect(labels(wrapper).join(' ')).not.toContain('Analytics');
         wrapper.unmount();
     });
 });

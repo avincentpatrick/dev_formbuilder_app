@@ -13,6 +13,7 @@ use App\Models\UserUiPreference;
 use App\Services\Branding\BrandingPresenter;
 use App\Services\Notifications\NotificationPreferenceResolver;
 use App\Services\Notifications\NotificationPresenter;
+use App\Services\Settings\AppSettingsPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,13 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  * The current appearance is NOT passed as a page prop — it reaches the panel through the shared
  * `ui.theme` prop (HandleInertiaRequests), which the top-nav quick toggle reads too, so both surfaces
  * cannot disagree.
+ *
+ * ⚠️ THIS CONTROLLER RENDERS THE PAGE; IT DOES NOT OWN EVERY WRITE ON IT. The per-USER writes (appearance,
+ * notifications) are here because a user edits only their own account. The org-wide ones (drafts, branding,
+ * and I5's access/maintenance/modules) live on {@see TenantSettingsController} and {@see BrandingController}
+ * behind `can:tenant.settings.manage`. Reads are assembled here from one presenter per surface so this
+ * method stays a list of props rather than a page-assembly routine — `scripts/controller-gate.php` caps it
+ * at 250 lines and complexity 10, and a fifth surface built inline is what would breach that.
  */
 final class PreferencesController extends Controller
 {
@@ -39,6 +47,7 @@ final class PreferencesController extends Controller
         private readonly BrandingPresenter $branding,
         private readonly NotificationPresenter $notifications,
         private readonly NotificationPreferenceResolver $notificationPreferences,
+        private readonly AppSettingsPresenter $appSettings,
     ) {}
 
     public function show(Request $request): Response
@@ -85,6 +94,10 @@ final class PreferencesController extends Controller
             // defaults. `email_locked` is what lets the two site-owned types render their email control as
             // unavailable instead of as a switch wired to nothing.
             'notificationPreferences' => $this->notifications->preferences($user),
+            // App Settings (I5, PRD Feature #10) — Access / Maintenance / Modules / About in ONE prop from
+            // ONE presenter, rather than four more assembled here. Every value is RESOLVED (the `settings`
+            // table is sparse), and `can_manage` gates the first three cards; About renders for everyone.
+            'appSettings' => $this->appSettings->forSettings($tenant, $user),
         ]);
     }
 

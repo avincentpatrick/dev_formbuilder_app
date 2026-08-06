@@ -4,8 +4,14 @@
  * data-dictionary §23).
  *
  * Autosave-on-change, like the Appearance panel and unlike Profile/Drafts: seven types × two channels
- * behind one Save button is a form nobody finishes, and a checkbox that stays unsaved until you find a
+ * behind one Save button is a form nobody finishes, and a control that stays unsaved until you find a
  * button reads as broken.
+ *
+ * I5 swapped all fourteen controls from `MdsCheckbox` to `MdsSwitch` — these are per-channel ON/OFF states,
+ * not a selection out of a set, and I5's App Settings panels below turned "we have no switch" from a
+ * defensible gap into an inconsistency. The swap was mechanical BY DESIGN: `MdsSwitch` keeps `MdsCheckbox`'s
+ * exact prop and event contract over a real `<input type="checkbox">`, so the locked treatment below and
+ * every `input[type="checkbox"]` locator in this card's spec survived it untouched.
  *
  * ⚠️ BOTH BOOLEANS GO IN EVERY WRITE, and that is not belt-and-braces. The columns default `true`/`true`,
  * which DISAGREES with `NotificationType::SubmissionReceived`'s email default of `false` — so a partial
@@ -13,20 +19,20 @@
  * quiet. `UpdateNotificationPreferenceRequest` makes both `required` and
  * `NotificationPreferenceResolver::set()` spells the same rule again on the write side.
  *
- * ⚠️ A LOCKED EMAIL CONTROL IS CHECKED AND DISABLED, NEVER A LIVE SWITCH.
+ * ⚠️ A LOCKED EMAIL CONTROL IS ON AND DISABLED, NEVER A LIVE CONTROL.
  * `NotificationType::honorsEmailPreference()` is false for `export_ready` and `webhook_failed`: their
  * purpose-built branded emails predate this table and are sent by the emitting job regardless of anything
  * stored. A toggle wired to nothing that appears to turn something off is worse than no toggle.
  *
  * ⚠️ THE `.settings-*` RULES ARE RE-DECLARED AT THE BOTTOM OF THIS FILE RATHER THAN INHERITED.
  * Vue applies a parent's scope id to a child component's ROOT node only, so `Settings/Index.vue`'s
- * `<style scoped>` reaches `.settings-card` and nothing inside it. `BrandingCard.vue` has the same
- * construction and its `.settings-card__head` is consequently unstyled — pre-existing, out of scope here,
- * and not to be copied.
+ * `<style scoped>` reaches `.settings-card` and nothing inside it. Every card component on this page now
+ * carries the same block; `BrandingCard.vue` was the one that did not, which is why its head was unstyled
+ * until I5 fixed it.
  */
 import { ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsCard, MdsCheckbox, MdsIcon } from '@meridian/design-system';
+import { MdsCard, MdsIcon, MdsSwitch } from '@meridian/design-system';
 import type { NotificationPreferenceRow } from '@/components/notifications/types';
 
 const props = defineProps<{ preferences: NotificationPreferenceRow[] }>();
@@ -95,8 +101,8 @@ const hintId = (type: string): string => `notification-pref-${type}-locked`;
             workspace.
         </p>
 
-        <!-- A real <fieldset>/<legend> per type, so each checkbox has a GROUP name: without it a screen
-             reader announces "Email checkbox" seven times with nothing to tell them apart. Stacked rather
+        <!-- A real <fieldset>/<legend> per type, so each control has a GROUP name: without it a screen
+             reader announces "Email switch" seven times with nothing to tell them apart. Stacked rather
              than label-left/controls-right so nothing can overflow at 375px under the §2.9 extra-large
              text scale. -->
         <fieldset v-for="row in local" :key="row.type" class="prefs__row">
@@ -108,19 +114,19 @@ const hintId = (type: string): string => `notification-pref-${type}-locked`;
             </p>
 
             <div class="prefs__channels">
-                <MdsCheckbox
+                <MdsSwitch
                     :model-value="row.in_app"
                     label="In app"
                     @update:model-value="(value: boolean) => setInApp(row, value)"
                 />
-                <MdsCheckbox
+                <MdsSwitch
                     v-if="row.email_locked"
                     :model-value="true"
                     label="Email"
                     disabled
                     :describedby="hintId(row.type)"
                 />
-                <MdsCheckbox
+                <MdsSwitch
                     v-else
                     :model-value="row.email"
                     label="Email"
@@ -153,7 +159,7 @@ const hintId = (type: string): string => `notification-pref-${type}-locked`;
 }
 
 /* The Appearance card's row separator, so each type reads as its own decision rather than as one dense
-   block of fourteen checkboxes. */
+   block of fourteen switches. */
 .prefs__row + .prefs__row {
     margin-block-start: var(--mds-space-4);
     padding-block-start: var(--mds-space-4);

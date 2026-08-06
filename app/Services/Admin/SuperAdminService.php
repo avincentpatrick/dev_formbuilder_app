@@ -6,13 +6,17 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
+use App\Enums\SettingKey;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Models\Concerns\BelongsToTenant;
 use App\Models\Plan;
+use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\SuperAdminContext;
 use App\Support\Tenancy\TenantContext;
@@ -37,8 +41,11 @@ use Illuminate\Support\Facades\DB;
  * Super-admin actions ARE audited (H4), into the AFFECTED tenant's own log (RBAC §9 transparency), by
  * writing the audit UNDER that tenant's context on the default connection — atomically with the status
  * change — so the strict INSERT policy passes with no elevated connection or INSERT bypass. It records the
- * acting super-admin's id (a human acted; `is_system_action` stays false). Still deferred to later
- * increments (tables don't exist yet): platform `settings` / billing / feedback-report consoles, and
+ * acting super-admin's id (a human acted; `is_system_action` stays false).
+ *
+ * I5 adds the console's PLATFORM settings write, which is the first operation here that genuinely needs
+ * the elevated connection to WRITE rather than to read — see {@see updatePlatformSettings()}. Still
+ * deferred to later increments (tables don't exist yet): billing / feedback-report consoles, and
  * cross-tenant `audits` SEARCH.
  */
 final class SuperAdminService
@@ -180,6 +187,89 @@ final class SuperAdminService
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
         });
+    }
+
+    /**
+     * Write one or more PLATFORM (NULL-tenant) settings — the signup toggle and the platform maintenance
+     * pair (I5, PRD Feature #10). The console's only write besides tenant status and plan assignment.
+     *
+     * ── WHY THIS CANNOT BE AN ORDINARY UPDATE ──────────────────────────────────────────────────────────
+     * `settings` is nullable_global: the SELECT policy reveals platform rows to everyone, but INSERT and
+     * UPDATE stay STRICT (`tenant_id = ctx`) so no tenant connection can author one. The failure mode is
+     * the quiet one — a strict UPDATE that matches no row affects ZERO rows and raises nothing, so a naive
+     * implementation would look like it worked and change nothing forever. `SettingsRlsTest` pins that
+     * no-op; this method is the reason it never happens in production code.
+     *
+     * So both the settings write AND its audit run inside {@see elevated()}, on the `pgsql_superadmin`
+     * connection with the transaction-local `app.is_superadmin_context` GUC open — through the two bypass
+     * policies added in 2026_08_06_000002 (settings INSERT/UPDATE) and 2026_08_06_000003 (audits INSERT).
+     * The audit row carries `tenant_id = NULL` because there is no tenant context on the central console
+     * and {@see BelongsToTenant} only fills what it can see. That makes the row
+     * invisible to every tenant's /audit-log, which is the point: the ledger is tenant-scoped and a tenant
+     * must not read the operator's platform actions.
+     *
+     * `updateOrCreate` needs the SELECT grant as well as INSERT/UPDATE — it reads before it writes, and
+     * without it every save would insert a duplicate and hit `settings_platform_key_unique`.
+     *
+     * @param  array<string, bool|string>  $values  key ⇒ new value, already validated by the caller
+     */
+    public function updatePlatformSettings(array $values, User $actor): void
+    {
+        if ($values === []) {
+            return;
+        }
+
+        $this->elevated(function () use ($values, $actor): void {
+            $before = $this->platformValues();
+            $old = [];
+
+            foreach ($values as $key => $value) {
+                $known = SettingKey::tryFrom($key);
+                $old[$key] = array_key_exists($key, $before) ? $before[$key] : $known?->default();
+
+                Setting::on(SuperAdminContext::CONNECTION)->updateOrCreate(
+                    ['tenant_id' => null, 'key' => $key],
+                    ['value' => json_encode($value, JSON_THROW_ON_ERROR), 'updated_by' => $actor->getKey()],
+                );
+            }
+
+            $this->audit->record(
+                AuditEvent::Updated,
+                'settings',
+                (string) $actor->getKey(),
+                old: $old,
+                new: $values,
+                actorId: (string) $actor->getKey(),
+                connection: SuperAdminContext::CONNECTION,
+            );
+        });
+
+        // The read side is memoized per request; without this the console's own redirect would re-render
+        // the page it just changed from a stale map.
+        app(PlatformSettings::class)->forget();
+    }
+
+    /**
+     * The platform rows as they stand, decoded — read on the ELEVATED connection inside {@see elevated()}
+     * so the "before" snapshot and the write see the same transaction.
+     *
+     * `auditable_id` on the emitted row is the acting super-admin's user id, not a settings-row uuid. That
+     * is audit spec §1's standing device (used for role grants and for domain events since I2): when the
+     * target has no single addressable uuid — here it is a set of platform-wide keys, not one record — the
+     * row is keyed on the owning tenant or user, and the payload carries what changed.
+     *
+     * @return array<string, mixed>
+     */
+    private function platformValues(): array
+    {
+        /** @var array<string, mixed> $rows */
+        $rows = Setting::on(SuperAdminContext::CONNECTION)
+            ->whereNull('tenant_id')
+            ->pluck('value', 'key')
+            ->map(static fn (mixed $raw): mixed => is_string($raw) ? json_decode($raw, true) : $raw)
+            ->all();
+
+        return $rows;
     }
 
     /**

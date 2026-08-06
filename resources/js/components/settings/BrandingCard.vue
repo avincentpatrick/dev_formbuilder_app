@@ -303,6 +303,31 @@ function removeLogo(): void {
 </template>
 
 <style scoped>
+/* Re-declared, not inherited (fixed in I5). Vue applies a parent's scope id to a child component's ROOT
+   node only, so `Settings/Index.vue`'s `<style scoped>` reaches `.settings-card` here and nothing inside
+   it — which is why this card's header rendered unstyled beside five identically-marked-up siblings from
+   H23a2 until now. `NotificationPreferencesCard.vue` carried the same block from the start and named this
+   file as the counter-example; every card on the page now declares it. */
+.settings-card {
+    max-width: 640px;
+}
+
+.settings-card__head {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    color: var(--mds-color-text-secondary);
+}
+
+.settings-card__title {
+    margin: 0;
+    font-family: var(--mds-font-family-display);
+    font-size: var(--mds-type-heading-3-font-size);
+    line-height: var(--mds-type-heading-3-line-height);
+    font-weight: var(--mds-type-heading-3-font-weight);
+    color: var(--mds-color-text-heading);
+}
+
 .branding__lede {
     margin: 0 0 var(--mds-space-4);
     color: var(--mds-color-text-secondary);

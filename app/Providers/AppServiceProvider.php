@@ -34,6 +34,8 @@ use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
+use App\Services\Settings\PlatformSettings;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
@@ -107,6 +109,15 @@ class AppServiceProvider extends ServiceProvider
         // current tenant's plan + usage per request, so `scoped` (reset per request under Octane), never
         // `singleton` (which would leak one tenant's plan into another's request).
         $this->app->scoped(EntitlementService::class);
+
+        // The two halves of the `settings` store (I5 / PRD Feature #10). `scoped` for the same reason as
+        // everything above AND for one more that is specific to settings: a `singleton` memo would mean an
+        // operator switching platform maintenance ON does not take effect on a long-lived worker until it
+        // restarts — a toggle that appears to do nothing. EntitlementService takes the tenant registry as a
+        // constructor dependency, so scoping both is what keeps them the SAME instance (and therefore one
+        // query) within a request.
+        $this->app->scoped(TenantSettingRegistry::class);
+        $this->app->scoped(PlatformSettings::class);
 
         // The hard-block quota guard (H5b). `scoped` so it shares the request's one EntitlementService
         // instance (its live-gauge memo), the same reason the resolvers above are scoped.

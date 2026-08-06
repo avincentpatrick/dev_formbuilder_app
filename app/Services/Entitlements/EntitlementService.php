@@ -18,7 +18,9 @@ use App\Models\TenantUser;
 use App\Models\UsageCounter;
 use App\Models\WebhookEndpoint;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Entitlements\ToggleableModules;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
 
@@ -51,6 +53,12 @@ final class EntitlementService
 
     /** @var array<string, array<string, bool>> tenant id => memoized legacy (grandfather) override map */
     private array $overrides = [];
+
+    /**
+     * I5's third {@see feature()} layer. Injected rather than resolved inline so the module read shares the
+     * ONE per-request `settings` query `/settings` already makes, instead of adding a second.
+     */
+    public function __construct(private readonly TenantSettingRegistry $settings) {}
 
     /**
      * The plan governing the current tenant: the plan of its active subscription, else the seeded `free`
@@ -86,18 +94,38 @@ final class EntitlementService
     }
 
     /**
-     * Whether a feature-gate key is enabled for the current tenant. A per-tenant legacy override (the
-     * grandfather seam, ADR-0008 §D5) wins over the plan flags; it is empty until H5c ships the storage.
+     * Whether a feature-gate key is enabled for the current tenant.
+     *
+     * THREE layers, and the third composes differently from the first two — deliberately:
+     *   1. a per-tenant legacy override (the grandfather seam, ADR-0008 §D5) wins over the plan flags;
+     *   2. otherwise the plan's own `feature_flags` map decides;
+     *   3. and then the tenant's own module toggle (I5, PRD Feature #10) can SUBTRACT from the answer.
+     *
+     * ── Why the third layer ANDs rather than overrides ─────────────────────────────────────────────────
+     * PRD #10 requires the module panel to reuse "the same capability-flag mechanism… not a second flagging
+     * system", which is why the toggle lands here rather than beside the surfaces it governs — every
+     * existing `feature:<key>` route gate, every policy and the shared `entitlements` Inertia prop
+     * ({@see snapshot()} calls this once per flag) honour it with no further change. But the toggle is
+     * TENANT-WRITABLE, and layers 1–2 are not: if it could win outright, an Owner could grant their own
+     * workspace a capability their plan denies simply by writing their own `settings` row. One-directional
+     * by construction — a tenant may silence what it pays for, never conjure what it does not.
+     *
+     * Only {@see ToggleableModules::KEYS} are consultable, so a key nobody offers cannot be switched off by
+     * a hand-crafted row, and the read is shared with `/settings` rather than issuing its own query.
      */
     public function feature(string $key): bool
     {
         $overrides = $this->legacyOverrides();
 
-        if (array_key_exists($key, $overrides)) {
-            return $overrides[$key];
+        $granted = array_key_exists($key, $overrides)
+            ? $overrides[$key]
+            : ($this->currentPlan()?->featureEnabled($key) ?? false);
+
+        if (! $granted || ! ToggleableModules::isToggleable($key)) {
+            return $granted;
         }
 
-        return $this->currentPlan()?->featureEnabled($key) ?? false;
+        return $this->settings->moduleEnabled($key);
     }
 
     /** The current tenant's quota for a metric, or null for unlimited (also null off-tenant). */

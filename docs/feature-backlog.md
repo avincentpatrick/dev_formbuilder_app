@@ -114,6 +114,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Recurring third-party penetration test | should | 2+ | Companion to the now-adopted CI SCA/SAST |
 | Legally-defensible e-signature (signer auth, consent-to-sign, tamper-evident certificate) | nice | 3–4 | Today's signature field stores only an image; a real ESIGN/eIDAS capability is a separate product line — only on demonstrated demand |
 | Enterprise identity/network — SCIM auto-provisioning + tenant IP allowlisting | nice | 4 (with the planned SSO/SAML) | SCIM auto-deprovisioning is the standard companion to SAML for large tenants |
+| **Playwright a11y coverage for the central-domain admin console** (owner: **I8**) | should | 1 | Filed by I5, which added `/admin/settings` — the console's first page with real form controls. `playwright.config.ts`'s header records why the console is excluded today: `superadmin.mfa` requires a TOTP, so the E2E run cannot sign in. Closing it needs a second `globalSetup` + `storageState`, a seeded super-admin with a known `two_factor_secret`, and a TOTP generator (`otplib`) as a new dependency under the `npm audit --omit=dev` gate — E2E-infrastructure work, not settings work. I8 already owns "auth pages into responsive-axe (needs a no-storageState project)", which is the same config restructure. Until then the console's primitives are axe-covered per-story by the Storybook job |
 
 ## 8. AI & modern 2026 differentiators
 

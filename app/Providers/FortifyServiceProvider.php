@@ -9,6 +9,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
+use App\Services\Settings\RegistrationGate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -48,7 +49,13 @@ class FortifyServiceProvider extends ServiceProvider
 
         // Inertia views (unstyled in B1; the design-system-styled versions land with the app shell in
         // Increment C). config/fortify.php sets `views => true` so these routes are registered.
-        Fortify::loginView(fn () => Inertia::render('auth/Login'));
+        // canRegister (I5) comes from the SAME RegistrationGate the GateRegistration middleware consults,
+        // so the link on this page and the reachability of the route it points at are one answer rather
+        // than two that agree until they don't. Resolved per request (it depends on the host and on two
+        // settings rows), never memoized here.
+        Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
+            'canRegister' => app(RegistrationGate::class)->allows($request),
+        ]));
         Fortify::registerView(fn () => Inertia::render('auth/Register'));
         Fortify::requestPasswordResetLinkView(fn () => Inertia::render('auth/ForgotPassword'));
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [

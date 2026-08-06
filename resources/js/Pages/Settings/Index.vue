@@ -15,12 +15,12 @@ import { useForm } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsCard,
-    MdsCheckbox,
     MdsFormField,
     MdsIcon,
     MdsNumberInput,
     MdsPasswordInput,
     MdsSegmentedControl,
+    MdsSwitch,
     MdsTextInput,
     type IconName,
 } from '@meridian/design-system';
@@ -28,6 +28,10 @@ import PageHeader from '@/components/shell/PageHeader.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 import BrandingCard from '@/components/settings/BrandingCard.vue';
 import NotificationPreferencesCard from '@/components/settings/NotificationPreferencesCard.vue';
+import AccessCard from '@/components/settings/AccessCard.vue';
+import MaintenanceCard from '@/components/settings/MaintenanceCard.vue';
+import ModulesCard from '@/components/settings/ModulesCard.vue';
+import AboutCard from '@/components/settings/AboutCard.vue';
 import type { NotificationPreferenceRow } from '@/components/notifications/types';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
@@ -50,6 +54,17 @@ const props = defineProps<{
     // than through InstanceType like `branding` above: `components/notifications/types.ts` exists so the
     // card's own test fixtures type-check against the same shape the server sends.
     notificationPreferences: NotificationPreferenceRow[];
+    // Increment I5 — App Settings (PRD Feature #10). ONE prop from ONE presenter rather than four, because
+    // the four panels answer one question ("how is this workspace configured") and share one gate.
+    // `can_manage` hides Access/Maintenance/Modules from a non-admin; About is for everyone (a support aid,
+    // and the person filing a bug report is rarely an Owner).
+    appSettings: {
+        can_manage: boolean;
+        access: InstanceType<typeof AccessCard>['$props']['access'];
+        maintenance: InstanceType<typeof MaintenanceCard>['$props']['maintenance'];
+        modules: InstanceType<typeof ModulesCard>['$props']['modules'];
+        about: InstanceType<typeof AboutCard>['$props']['about'];
+    };
 }>();
 
 const page = usePage();
@@ -225,7 +240,10 @@ function savePassword(): void {
                         Switches body text to OpenDyslexic. Headings and code stay as they are.
                     </p>
                 </div>
-                <MdsCheckbox
+                <!-- A switch since I5. DSR §3.2 argued for a checkbox here while no switch existed; now
+                     that one does, this is the only on/off preference on the page that would have looked
+                     different from the eighteen around it. -->
+                <MdsSwitch
                     :model-value="dyslexiaFont"
                     label="Use a dyslexia-friendly font"
                     @update:model-value="setDyslexiaFont"
@@ -237,6 +255,17 @@ function savePassword(): void {
              Drafts, because Appearance and Notifications are the two PERSONAL preference cards, while
              Drafts, Branding and Custom domains below are org-wide Owner/Admin settings. -->
         <NotificationPreferencesCard :preferences="notificationPreferences" />
+
+        <!-- App Settings (Increment I5, PRD Feature #10). PRD #10 asks for the area to be "organized by
+             section (Access, Maintenance, Modules) rather than as one long unstructured list of switches",
+             so the three stay CONTIGUOUS and in that order, and they open the org-wide block: everything
+             above is a personal preference, everything from here down is a decision for the whole
+             workspace. About is deliberately not among them — see the bottom of the page. -->
+        <template v-if="appSettings.can_manage">
+            <AccessCard :access="appSettings.access" />
+            <MaintenanceCard :maintenance="appSettings.maintenance" />
+            <ModulesCard :modules="appSettings.modules" />
+        </template>
 
         <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
         <MdsCard v-if="draftSettings.can_manage" class="settings-card">
@@ -367,6 +396,10 @@ function savePassword(): void {
                 <TwoFactorSetup :enabled="twoFactor.enabled" :confirmed="twoFactor.confirmed" />
             </section>
         </MdsCard>
+
+        <!-- About (Increment I5, PRD Feature #10). Last, and OUTSIDE the can_manage block above: it is a
+             support aid rather than a control, and the person who files a bug report is rarely the Owner. -->
+        <AboutCard :about="appSettings.about" />
     </div>
 </template>
 

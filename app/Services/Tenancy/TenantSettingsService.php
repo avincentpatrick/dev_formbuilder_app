@@ -8,6 +8,7 @@ use App\Enums\AuditEvent;
 use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Audit\AuditLogger;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -26,11 +27,20 @@ use Illuminate\Support\Facades\DB;
  *
  * ── `auditable_type = 'settings'`, `auditable_id = tenants.id` — and that is PERMANENT ─────────────────
  * Spec §1 assigns tenant configuration changes to the `settings` alias (`tenant` is explicitly limited to
- * status and ownership changes, "not every cosmetic tenant-settings edit"). There is no `settings` table
- * yet — I5 builds one — and the rule is pinned in §1 now precisely so I5 does not key its new rows on a
- * settings-row uuid: a per-tenant singleton whose history was split across two `auditable_id`s would be
- * unqueryable by `audits_tenant_auditable_idx`, which is the index the viewer's "this resource's history"
- * filter rides on.
+ * status and ownership changes, "not every cosmetic tenant-settings edit"). The rule was pinned in §1 while
+ * there was still no `settings` table, precisely so I5 would not key its new rows on a settings-row uuid: a
+ * per-tenant singleton whose history was split across two `auditable_id`s would be unqueryable by
+ * `audits_tenant_auditable_idx`, which is the index the viewer's "this resource's history" filter rides on.
+ * **I5 built that table and honoured the rule** — {@see TenantSettingRegistry::put()}
+ * emits the same alias and the same key.
+ *
+ * ── Why TWO tenant-settings writers now exist, and why that is not a split brain ───────────────────────
+ * This class writes tenant COLUMNS (`draft_ttl_days`, and I5's `maintenance_mode`/`maintenance_message`);
+ * `TenantSettingRegistry` writes `settings` ROWS (`registration.invite_only`, `modules.*`). Two stores,
+ * two mechanics — a column exists exactly where a request pipeline must read the value without paying for
+ * a query (the guest runtime consults maintenance mode on every public form render, and the tenant model
+ * is already resolved there). Both emit the SAME audit alias keyed on the SAME tenant id, so the ledger
+ * and the viewer see one resource with one history, which is the only place the split would have shown.
  */
 final class TenantSettingsService
 {
@@ -42,6 +52,30 @@ final class TenantSettingsService
      * @param  array<string, mixed>  $columns  ONLY the keys the request actually sent
      */
     public function updateDraftSettings(Tenant $tenant, array $columns, ?User $actor = null): Tenant
+    {
+        return $this->updateColumns($tenant, $columns, $actor);
+    }
+
+    /**
+     * Tenant maintenance mode (I5, PRD Feature #10) — the respondent-facing pause and its notice.
+     *
+     * Both fields are written together and the request makes both `required`, deliberately: the flag and
+     * the message are ONE decision, and a partial write would switch maintenance on carrying whatever
+     * sentence the tenant last used, months ago. (`updateDraftSettings` above is `sometimes` for the
+     * opposite and equally deliberate reason — independent axes on one row. Pick per surface, never by
+     * symmetry.)
+     *
+     * @param  array<string, mixed>  $columns  `maintenance_mode` and `maintenance_message`
+     */
+    public function updateMaintenance(Tenant $tenant, array $columns, ?User $actor = null): Tenant
+    {
+        return $this->updateColumns($tenant, $columns, $actor);
+    }
+
+    /**
+     * @param  array<string, mixed>  $columns  ONLY the keys the request actually sent
+     */
+    private function updateColumns(Tenant $tenant, array $columns, ?User $actor = null): Tenant
     {
         // The one place a write is not recorded, and it is not a "no-change" exemption: a request that sent
         // no field AT ALL is an empty PATCH, not an act. AuditLogger's standing rule — a no-change save

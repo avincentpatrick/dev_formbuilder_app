@@ -8,20 +8,24 @@ use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
 use App\Enums\UsageMetric;
 use App\Events\MemberInvited;
+use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
+use App\Services\Admin\SuperAdminService;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use App\Support\Branding\BrandPalette;
+use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * The tenant-membership lifecycle (multi-tenancy-rbac-design.md §7): invite → accept / decline, plus
@@ -155,6 +159,106 @@ final class TenantMembershipService
             }
 
             return $invite;
+        });
+    }
+
+    /**
+     * Join an OPEN workspace by having just registered on its subdomain (Increment I5, PRD Feature #10's
+     * "whether new members can self-register or must be invited").
+     *
+     * This is the only membership write in the file that runs with **no ambient tenant context**: it is
+     * called from a `Registered` listener on Fortify's `/register`, whose middleware list carries no
+     * tenancy middleware at all. So it borrows the tenant's context itself — inside `DB::transaction`,
+     * because {@see TenantContext::applyLocal()} is `SET LOCAL` and a silent no-op outside one, and
+     * `tenant_users` is strict-RLS: without the GUC the INSERT is REFUSED, not mis-scoped. Both the DB GUC
+     * and Spatie's permissions team id are restored in `finally`, the {@see SuperAdminService}
+     * adopt-and-restore precedent.
+     *
+     * Role `viewer` deliberately: the least-privileged role in the catalog. Someone who joined by knowing a
+     * URL has proved nothing about what they should be able to do, and an Owner can promote them on the
+     * Members page in two clicks. `syncRoles` (not `assignRole`) keeps §7's one-role-per-tenant invariant.
+     *
+     * ── RETURNS NULL WHEN THE SEAT QUOTA IS FULL, AND DOES NOT THROW ───────────────────────────────────
+     * {@see invite()} above asserts the same quota and lets {@see QuotaExceededException} become a 402 —
+     * correct there, because the Admin who triggered it can act on it. Here the caller is a person who has
+     * just had an account created for them by a DIFFERENT service in a DIFFERENT transaction that has
+     * already committed: a 402 would leave them with a live account, no workspace, and an upgrade prompt
+     * addressed to somebody else. Returning null lands them in exactly the state a central-host
+     * registration produces (an account with no membership), which is a state the product already has.
+     * The workspace's Owner sees no new member, which is the correct outcome for a full workspace.
+     */
+    public function joinOpenTenant(Tenant $tenant, User $user, string $roleName = 'viewer'): ?TenantUser
+    {
+        $role = Role::query()->where('name', $roleName)->whereNull('tenant_id')->first();
+
+        if ($role === null) {
+            throw MembershipException::unknownRole($roleName);
+        }
+
+        $tenantId = (string) $tenant->getKey();
+        $userId = (string) $user->getKey();
+
+        $savedTenant = TenantContext::currentTenantId();
+        $savedUser = TenantContext::currentUserId();
+        $savedTeam = app(PermissionRegistrar::class)->getPermissionsTeamId();
+
+        return DB::transaction(function () use ($user, $role, $tenantId, $userId, $savedTenant, $savedUser, $savedTeam): ?TenantUser {
+            TenantContext::applyLocal($tenantId, $userId);
+            app(PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
+
+            try {
+                // Reuse a prior row rather than duplicating it — (tenant_id, user_id) is unique, and a
+                // person who declined an invitation last month may legitimately walk in the front door now.
+                $existing = TenantUser::query()->where('user_id', $userId)->first();
+
+                if ($existing !== null && $existing->status === TenantUserStatus::Active) {
+                    return $existing;
+                }
+
+                try {
+                    $this->quota->assertCanCreate(UsageMetric::ActiveSeats);
+                } catch (QuotaExceededException) {
+                    return null;
+                }
+
+                $membership = $existing ?? new TenantUser;
+                $membership->fill([
+                    'user_id' => $userId,
+                    'status' => TenantUserStatus::Active,
+                    'invited_role_id' => $role->id,
+                    'invited_by' => null,
+                    'invited_at' => null,
+                    'invite_expires_at' => null,
+                    'invite_token' => null,
+                    'joined_at' => now(),
+                    'removed_at' => null,
+                    'removed_by' => null,
+                ])->save(); // BelongsToTenant fills tenant_id from the context borrowed above
+
+                $user->syncRoles([$role]);
+
+                // `via` is what distinguishes this row from an accepted invitation in the ledger — the two
+                // produce the same membership and the same role, and only the audit says which door it
+                // came through. Keyed on the membership's own uuid (tenant_users.id IS a uuid, so I2's
+                // 22P02 hazard does not apply here).
+                $this->audit->record(
+                    AuditEvent::Created,
+                    'tenant_users',
+                    (string) $membership->getKey(),
+                    new: [
+                        'user_id' => $userId,
+                        'status' => TenantUserStatus::Active->value,
+                        'role' => $role->name,
+                        'via' => 'self_registration',
+                    ],
+                    actorId: $userId,
+                );
+
+                return $membership;
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+                app(PermissionRegistrar::class)->setPermissionsTeamId($savedTeam);
+            }
         });
     }
 

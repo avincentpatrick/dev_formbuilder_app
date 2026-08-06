@@ -4,6 +4,11 @@ import { useForm } from '@inertiajs/vue3';
 import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 
+// I5 — whether /register is reachable from HERE, on THIS host. The server answers it from the same
+// RegistrationGate the route middleware uses, precisely so the link and the route cannot disagree: a
+// visible "Create an account" that leads to a 404 is the exact failure that sharing one gate prevents.
+defineProps<{ canRegister: boolean }>();
+
 const form = useForm({ email: '', password: '', remember: false });
 
 function submit(): void {
@@ -53,7 +58,7 @@ function submit(): void {
 
     <nav class="auth-links">
       <a href="/forgot-password">Forgot your password?</a>
-      <a href="/register">Create an account</a>
+      <a v-if="canRegister" href="/register">Create an account</a>
     </nav>
   </AuthLayout>
 </template>

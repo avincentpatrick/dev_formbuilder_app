@@ -23,6 +23,7 @@ use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Exceptions\Xlsform\XlsformImportException;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
@@ -86,6 +87,14 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // Platform maintenance (I5 / PRD Feature #10) — GLOBAL, not `web`. "Blocks the entire product"
+        // includes /api/v1 (routes/api.php declares its own stacks) and the connector callbacks
+        // (routes/connectors.php sits outside `web` entirely), so a group mount would leave two holes that
+        // each look fine until someone tries them. Exemptions are BY PATH — global middleware runs before
+        // routing, so `$request->route()` is null and a name-based list would silently exempt nothing,
+        // starting with the admin console. See EnforcePlatformMaintenance.
+        $middleware->append(EnforcePlatformMaintenance::class);
 
         // Bridges resolved tenant/user → PostgreSQL RLS session variables (ADR-0002 §D3). Registered
         // as an alias; Increment B attaches it to the authenticated subdomain tenant route group,

@@ -54,6 +54,15 @@ const pages = [
     // It also plants the widest unbreakable strings on the page — a full uuid and a long webhook URL inside
     // a diff cell — which is the Domains overflow trap arriving on a second surface.
     { name: 'Audit log', path: '/audit-log' },
+    // I5 added four cards here (Access · Maintenance · Modules · About) and swapped fifteen controls from
+    // MdsCheckbox to MdsSwitch, so this entry now scans the whole App Settings surface for free at three
+    // viewports × two themes. The E2E demo user is the Owner and E2eSeeder puts acme on Business, so
+    // `can_manage` is true and the Modules list renders populated rather than empty.
+    //
+    // The PLATFORM half (/admin/settings) is deliberately NOT here: playwright.config.ts's header records
+    // that central-domain admin pages are excluded because `superadmin.mfa` needs a TOTP in CI. Its
+    // primitives are axe-covered by the Storybook job; see docs/feature-backlog.md for the row that owns
+    // closing that gap.
     { name: 'Settings', path: '/settings' },
 ];
 

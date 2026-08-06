@@ -8,6 +8,7 @@ use App\Enums\AttachmentKind;
 use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Jobs\Submissions\GeneratePdfJob;
 use App\Models\Attachment;
 use App\Models\Form;
 use App\Models\FormField;
@@ -155,11 +156,20 @@ final class SubmissionInboxPresenter
     /**
      * The submission's current PDF, if one has been generated (Increment H17).
      *
-     * This is the ONLY in-app surface for the artifact. There is no notification bell, no polling
-     * and no broadcast anywhere in this application, so the flow is deliberately plain: a toast
-     * confirms the job was queued, an email carries the link, and this prop means a user who
-     * simply reloads the page also finds it. H17 does not invent an async-completion surface —
-     * `NotificationType::export_ready` is specified in the data dictionary and remains unbuilt.
+     * ── AMENDED I3/I4 ───────────────────────────────────────────────────────────────────────────────
+     * ~~This is the ONLY in-app surface for the artifact. There is no notification bell, no polling and no
+     * broadcast anywhere in this application … `NotificationType::export_ready` is specified in the data
+     * dictionary and remains unbuilt.~~ Two of those three claims are now false, and the first was already
+     * false when I3 merged: {@see GeneratePdfJob} calls
+     * `NotificationDispatcher::record()` with `NotificationType::ExportReady`, so an in-app row is written;
+     * I4 built the bell and its ~60s poll. **There is still NO BROADCAST — Reverb is Track B.**
+     *
+     * This prop is NOT made redundant by the bell, and the split is worth stating: the bell announces that
+     * the file EXISTS and links here (both go through `NotificationType::pathFor()`, so they cannot point
+     * at different places), while this prop is what RENDERS it. A recipient who marked the notification
+     * read, or silenced `export_ready` in Settings, must still find the artifact by reloading. H17's plain
+     * flow — a toast on queue, an email with the link, this prop on reload — is therefore load-bearing
+     * rather than a stopgap.
      *
      * @return array{id: string, generated_at: ?string, size_bytes: int}|null
      */

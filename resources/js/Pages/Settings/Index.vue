@@ -27,6 +27,8 @@ import {
 import PageHeader from '@/components/shell/PageHeader.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 import BrandingCard from '@/components/settings/BrandingCard.vue';
+import NotificationPreferencesCard from '@/components/settings/NotificationPreferencesCard.vue';
+import type { NotificationPreferenceRow } from '@/components/notifications/types';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
@@ -43,6 +45,11 @@ const props = defineProps<{
     // branding is three inputs and a preview, which does not earn a page of its own. The card owns
     // its own shape; see BrandingCard.vue.
     branding: InstanceType<typeof BrandingCard>['$props']['branding'];
+    // Increment I4 — the seven NotificationType cases with this user's RESOLVED channels (§23 is sparse,
+    // so absence means default and the server fills the gaps). Typed from the shared contract file rather
+    // than through InstanceType like `branding` above: `components/notifications/types.ts` exists so the
+    // card's own test fixtures type-check against the same shape the server sends.
+    notificationPreferences: NotificationPreferenceRow[];
 }>();
 
 const page = usePage();
@@ -225,6 +232,11 @@ function savePassword(): void {
                 />
             </div>
         </MdsCard>
+
+        <!-- Notifications (Increment I4, PRD Feature #13b) — placed here, after Appearance and before
+             Drafts, because Appearance and Notifications are the two PERSONAL preference cards, while
+             Drafts, Branding and Custom domains below are org-wide Owner/Admin settings. -->
+        <NotificationPreferencesCard :preferences="notificationPreferences" />
 
         <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
         <MdsCard v-if="draftSettings.can_manage" class="settings-card">

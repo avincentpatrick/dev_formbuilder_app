@@ -2,14 +2,27 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * ── `WithoutModelEvents` WAS REMOVED IN I6, AND IT WAS A LIVE BUG RATHER THAN A TIDY-UP ────────────────
+ * That trait wraps the whole `run()` — and every seeder it `->call()`s — in `Model::withoutEvents()`. Two
+ * of this schema's `creating` hooks are load-bearing, not cosmetic:
+ *
+ *   · `HasUuidv7` fills the uuid primary key. `users.id` is `uuid primary` with NO database default and
+ *     `UserFactory` never sets it, so both `User::factory()->create()` calls below were inserting a NULL
+ *     primary key.
+ *   · `BelongsToTenant::creating` fills `tenant_id`, and without it every tenant-scoped INSERT is refused
+ *     by the strict RLS `WITH CHECK`.
+ *
+ * The trait exists to suppress *observer* side effects during seeding, and this repository has no Observer
+ * classes at all — so it bought nothing and cost the key. `E2eSeeder`, the only seeder that any gate has
+ * ever actually run, deliberately does not use it; this file now matches. Nothing in CI runs
+ * `DatabaseSeeder`, which is why the breakage survived this long — `DemoSeederIdempotencyTest` is the
+ * first thing that exercises it.
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
@@ -28,18 +41,20 @@ class DatabaseSeeder extends Seeder
         // connection (it has no RLS), idempotent on `code`.
         $this->call(PlanSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
-        // A platform super-admin (RBAC §9) for exercising the B2c console in dev. Left WITHOUT confirmed
-        // two-factor auth so the mandatory-MFA enrollment redirect (security §8) is exercised on first
-        // console access. Seeded on the default connection — the permissive `users` INSERT policy allows
-        // it, same path as the Test User above.
-        User::factory()->superAdmin()->create([
-            'name' => 'Platform Admin',
-            'email' => 'admin@meridian.test',
-        ]);
+        // ── THE TWO ad-hoc `User::factory()->create()` CALLS THAT LIVED HERE WERE REMOVED IN I6 ───────────
+        // Both were `create()` on a column with a UNIQUE index and no upsert, so the SECOND `db:seed` on any
+        // already-seeded database raised a 23505 on the email — the same class of latent breakage as the
+        // `WithoutModelEvents` bug above, and invisible for the same reason. `test@example.com` was also a
+        // Laravel-skeleton leftover with no `tenant_users` row at all: it could log in and land nowhere.
+        //
+        // `DemoSeeder` now owns every identity in the dev database. It resolves users on the `pgsql_auth`
+        // connection (the join-shape `users` RLS hides a non-member from the app connection, so a plain
+        // `firstOrCreate` would try to insert a duplicate), gives each one a membership and a role, and
+        // seeds the platform super-admin — deliberately UNENROLLED in two-factor, for the reason its own
+        // docblock gives. The credentials are listed in `docs/TESTING-GUIDE.md` §0.
+        //
+        // Runs LAST: it resolves the plan catalog and the RBAC roles the four calls above create.
+        // Idempotent, and guarded against production internally.
+        $this->call(DemoSeeder::class);
     }
 }

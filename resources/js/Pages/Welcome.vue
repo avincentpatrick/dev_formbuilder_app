@@ -13,7 +13,7 @@ import { Head } from '@inertiajs/vue3';
  * `resources/js/app.ts` excludes `Welcome` from `AppLayout`, and the design system defines exactly two
  * top-level shells — neither of which fits a guest-facing hero (`AuthLayout` is a ~400px centred card).
  * DSR §1.3 blesses "a marketing page with different layout needs" as a legitimate exception; it is logged
- * as `docs/ux/exceptions-log.md` #5. Every value below is a design token, so the page follows the theme in
+ * as `docs/ux/exceptions-log.md` #8. Every value below is a design token, so the page follows the theme in
  * both light and dark and cannot drift from the app it fronts.
  */
 defineProps<{

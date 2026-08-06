@@ -7,6 +7,7 @@ namespace App\Services\Tenancy;
 use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
 use App\Enums\UsageMetric;
+use App\Events\MemberInvited;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -112,6 +113,19 @@ final class TenantMembershipService
                 (new TenantInvitationNotification($tenant->name, $this->buildInviteAcceptUrl($tenant, $plainToken)))
                     ->withBrand(BrandPalette::forTenant($tenant))
             );
+
+        // Post-commit announcement (I3), raised ALONGSIDE the mail above rather than replacing it: the
+        // accept URL cannot be rebuilt by a listener (the plaintext token dies with $plainToken) and must
+        // never enter a webhook-visible payload anyway. See {@see MemberInvited} for the full argument.
+        // This event tells the tenant's own admins that a seat was offered; the invitee's email is the
+        // line above, unchanged since H22a.
+        event(MemberInvited::for(
+            $tenant,
+            $email,
+            $roleName,
+            $invitedBy,
+            $invite->invite_expires_at?->toIso8601String(),
+        ));
 
         return $invite;
     }

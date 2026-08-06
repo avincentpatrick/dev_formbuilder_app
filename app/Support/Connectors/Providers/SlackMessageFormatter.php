@@ -59,9 +59,15 @@ final class SlackMessageFormatter
             ? '*Test message* — your form-builder workspace is connected to this channel.'
             : match ($eventType) {
                 DomainEventType::SubmissionCreated => "*New submission* — {$formLabel}",
+                DomainEventType::SubmissionApproved => "*Submission approved* — {$formLabel}",
+                DomainEventType::SubmissionReturned => "*Submission returned to the respondent* — {$formLabel}",
                 DomainEventType::FormPublished => "*Form published* — {$formLabel}",
                 DomainEventType::FormOpened => "*Form opened for responses* — {$formLabel}",
                 DomainEventType::FormClosed => "*Form closed* — {$formLabel}",
+                // `member.invited` carries no form at all, so the shared $formLabel would read "a form".
+                DomainEventType::MemberInvited => '*Member invited* — '.self::mrkdwn(
+                    is_string($data['email'] ?? null) ? $data['email'] : 'a new member'
+                ).' was invited to your workspace.',
                 default => "*Update* — {$formLabel}",
             };
 
@@ -121,12 +127,26 @@ final class SlackMessageFormatter
             $facts[] = 'version '.$data['version_number'];
         }
 
+        if ($eventType === DomainEventType::MemberInvited && is_string($data['role'] ?? null)) {
+            $facts[] = 'as '.self::mrkdwn(str_replace('_', ' ', $data['role']));
+        }
+
         return $facts;
     }
 
+    /**
+     * The action button's words. Submission events open the submission; form-lifecycle events open the
+     * form. `member.invited` has no deep link at all ({@see ConnectorEventContextResolver}), so this is
+     * never reached for it — the button block is omitted entirely rather than pointed somewhere wrong.
+     */
     private function linkLabel(?DomainEventType $eventType): string
     {
-        return $eventType === DomainEventType::SubmissionCreated ? 'View submission' : 'Open form';
+        return match ($eventType) {
+            DomainEventType::SubmissionCreated,
+            DomainEventType::SubmissionApproved,
+            DomainEventType::SubmissionReturned => 'View submission',
+            default => 'Open form',
+        };
     }
 
     /**

@@ -104,7 +104,7 @@ it('renders the integrations index with the provider catalog, connections and th
             ->has('connections.0.rules', 2)
             ->has('summary.rules')
             ->has('summary.deliveries')
-            ->has('eventTypes', 4)
+            ->has('eventTypes', count(DomainEventType::cases()))
             ->where('can.create', true));
 });
 

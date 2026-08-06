@@ -6195,9 +6195,12 @@
                             "type": "string",
                             "enum": [
                                 "submission.created",
+                                "submission.approved",
+                                "submission.returned",
                                 "form.published",
                                 "form.opened",
-                                "form.closed"
+                                "form.closed",
+                                "member.invited"
                             ]
                         },
                         "minItems": 1
@@ -6451,9 +6454,12 @@
                             "type": "string",
                             "enum": [
                                 "submission.created",
+                                "submission.approved",
+                                "submission.returned",
                                 "form.published",
                                 "form.opened",
-                                "form.closed"
+                                "form.closed",
+                                "member.invited"
                             ]
                         },
                         "minItems": 1
@@ -6678,9 +6684,12 @@
                             "type": "string",
                             "enum": [
                                 "submission.created",
+                                "submission.approved",
+                                "submission.returned",
                                 "form.published",
                                 "form.opened",
-                                "form.closed"
+                                "form.closed",
+                                "member.invited"
                             ]
                         },
                         "minItems": 1
@@ -6764,9 +6773,12 @@
                             "type": "string",
                             "enum": [
                                 "submission.created",
+                                "submission.approved",
+                                "submission.returned",
                                 "form.published",
                                 "form.opened",
-                                "form.closed"
+                                "form.closed",
+                                "member.invited"
                             ]
                         },
                         "minItems": 1

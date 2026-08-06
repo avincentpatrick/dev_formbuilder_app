@@ -6,6 +6,9 @@ namespace App\Services\Submissions;
 
 use App\Enums\AuditEvent;
 use App\Enums\SubmissionStatus;
+use App\Events\DomainEvent;
+use App\Events\SubmissionApproved;
+use App\Events\SubmissionReturned;
 use App\Exceptions\Submissions\SubmissionReviewException;
 use App\Models\Submission;
 use App\Models\User;
@@ -32,7 +35,15 @@ use Illuminate\Support\Facades\DB;
  * `remarks` IS in the payload and IS redacted at write ({@see AuditRedactor::PII}); `returned_reason` is
  * in the payload raw. The asymmetry is deliberate and argued where the registration lives.
  *
- * Reviewer NOTIFICATIONS remain stubbed — that half is I3/I4's row, not this one's.
+ * ── Two of the four verbs also ANNOUNCE (I3) ───────────────────────────────────────────────────────────
+ * `approve` and `return` raise {@see SubmissionApproved} / {@see SubmissionReturned} post-commit; the
+ * notification listeners tell the respondent, and any webhook or Slack rule subscribed to those event types
+ * fires from the same one event. `start reviewing` and `archive` announce nothing: claiming a submission is
+ * internal queue mechanics nobody outside this screen is waiting on, and archival is a retention act — both
+ * are still fully audited, which is the record that matters for them.
+ *
+ * That is why {@see self::apply()} no longer returns the transaction directly: an announcement made INSIDE
+ * the closure would fire for a transition that then rolled back.
  */
 final class SubmissionReviewService
 {
@@ -49,24 +60,38 @@ final class SubmissionReviewService
 
     public function approve(Submission $submission, User $reviewer, ?string $remarks = null): Submission
     {
-        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'approve', $reviewer, function (Submission $s) use ($reviewer, $remarks): void {
-            $s->status = SubmissionStatus::Approved;
-            $s->validated_by = (string) $reviewer->id;
-            $s->validated_at = now();
-            $s->finalized_at = now();
-            $this->applyRemarks($s, $remarks);
-        });
+        return $this->apply(
+            $submission,
+            [SubmissionStatus::Submitted, SubmissionStatus::UnderReview],
+            'approve',
+            $reviewer,
+            function (Submission $s) use ($reviewer, $remarks): void {
+                $s->status = SubmissionStatus::Approved;
+                $s->validated_by = (string) $reviewer->id;
+                $s->validated_at = now();
+                $s->finalized_at = now();
+                $this->applyRemarks($s, $remarks);
+            },
+            static fn (Submission $s): DomainEvent => SubmissionApproved::for($s, $reviewer),
+        );
     }
 
     public function returnToRespondent(Submission $submission, User $reviewer, string $reason, ?string $remarks = null): Submission
     {
-        return $this->apply($submission, [SubmissionStatus::Submitted, SubmissionStatus::UnderReview], 'return', $reviewer, function (Submission $s) use ($reviewer, $reason, $remarks): void {
-            $s->status = SubmissionStatus::Returned;
-            $s->validated_by = (string) $reviewer->id;
-            $s->validated_at = now();
-            $s->returned_reason = $reason;
-            $this->applyRemarks($s, $remarks);
-        });
+        return $this->apply(
+            $submission,
+            [SubmissionStatus::Submitted, SubmissionStatus::UnderReview],
+            'return',
+            $reviewer,
+            function (Submission $s) use ($reviewer, $reason, $remarks): void {
+                $s->status = SubmissionStatus::Returned;
+                $s->validated_by = (string) $reviewer->id;
+                $s->validated_at = now();
+                $s->returned_reason = $reason;
+                $this->applyRemarks($s, $remarks);
+            },
+            static fn (Submission $s, SubmissionStatus $from): DomainEvent => SubmissionReturned::for($s, $reviewer, $from->value),
+        );
     }
 
     /** Move a non-draft submission to the terminal `archived` retention state. */
@@ -85,16 +110,28 @@ final class SubmissionReviewService
     /**
      * @param  list<SubmissionStatus>  $from  legal source states
      * @param  Closure(Submission): void  $mutate
+     * @param  Closure(Submission, SubmissionStatus): DomainEvent|null  $announce  builds the post-commit
+     *                                                                             domain event, or null for a
+     *                                                                             verb that announces nothing
      */
-    private function apply(Submission $submission, array $from, string $action, User $reviewer, Closure $mutate): Submission
-    {
-        return DB::transaction(function () use ($submission, $from, $action, $reviewer, $mutate): Submission {
+    private function apply(
+        Submission $submission,
+        array $from,
+        string $action,
+        User $reviewer,
+        Closure $mutate,
+        ?Closure $announce = null,
+    ): Submission {
+        $previousStatus = null;
+
+        $fresh = DB::transaction(function () use ($submission, $from, $action, $reviewer, $mutate, &$previousStatus): Submission {
             $fresh = Submission::query()->whereKey($submission->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($fresh->status, $from, true)) {
                 throw SubmissionReviewException::illegalTransition($fresh->status, $action);
             }
 
+            $previousStatus = $fresh->status;
             $old = $this->snapshot($fresh);
 
             $mutate($fresh);
@@ -116,6 +153,17 @@ final class SubmissionReviewService
 
             return $fresh;
         });
+
+        // POST-COMMIT, by call-site ordering — the convention the whole event pipeline uses
+        // (technical-architecture.md §7.4; `DB::afterCommit` is verified never to fire under the suite's
+        // uncommitted outer transaction, so it is not an option here). The audit row above is the ledger
+        // and is atomic with the change; this is the announcement, and it must not fire for a transition
+        // that rolled back — which is exactly what moving it out of the closure buys.
+        if ($announce !== null && $previousStatus instanceof SubmissionStatus) {
+            event($announce($fresh, $previousStatus));
+        }
+
+        return $fresh;
     }
 
     /**

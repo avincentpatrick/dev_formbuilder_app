@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Webhooks;
 
+use App\Enums\NotificationType;
 use App\Enums\QueueName;
 use App\Enums\UsageMetric;
 use App\Enums\WebhookDeliveryStatus;
@@ -19,6 +20,7 @@ use App\Models\WebhookEndpoint;
 use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Webhooks\WebhookPayloadArchive;
 use App\Support\Branding\BrandPalette;
 use App\Support\Webhooks\OutboundUrlGuard;
@@ -216,6 +218,21 @@ final class DeliverWebhookJob extends TenantAwareJob
         }
 
         $email = User::query()->whereKey($ownerId)->value('email');
+
+        // I3: the bell gets this too. `record()`, not `dispatch()` — the branded email below is this
+        // type's email channel and always has been, so the dispatcher would only add a second, blander
+        // copy. Written BEFORE the address check, because an owner with no resolvable email is exactly
+        // the case where the in-app record is the only trace the endpoint was paused.
+        app(NotificationDispatcher::class)->record(
+            NotificationType::WebhookFailed,
+            $ownerId,
+            [
+                'webhook_endpoint_id' => (string) $endpoint->getKey(),
+                'endpoint_name' => $endpoint->name,
+                'failure_count' => $failures,
+            ],
+            emailed: is_string($email) && $email !== '',
+        );
 
         if (! is_string($email) || $email === '') {
             return;

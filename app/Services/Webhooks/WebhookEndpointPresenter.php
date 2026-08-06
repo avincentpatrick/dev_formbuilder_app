@@ -191,19 +191,9 @@ final class WebhookEndpointPresenter
     private function eventTypeOptions(): array
     {
         return array_map(
-            fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $this->eventTypeLabel($t)],
+            static fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $t->label()],
             DomainEventType::cases(),
         );
-    }
-
-    private function eventTypeLabel(DomainEventType $type): string
-    {
-        return match ($type) {
-            DomainEventType::SubmissionCreated => 'Submission created',
-            DomainEventType::FormPublished => 'Form published',
-            DomainEventType::FormOpened => 'Form opened',
-            DomainEventType::FormClosed => 'Form closed',
-        };
     }
 
     private function formTitle(WebhookEndpoint $endpoint): ?string

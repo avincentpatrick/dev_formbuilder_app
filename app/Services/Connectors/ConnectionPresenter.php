@@ -288,26 +288,17 @@ final class ConnectionPresenter
 
     /**
      * The subscribable event catalog with the SAME human labels the webhook UI uses — one catalog, one set of
-     * words, whichever channel a tenant is configuring.
+     * words, whichever channel a tenant is configuring. Since I3 that is structural rather than promised:
+     * both surfaces read {@see DomainEventType::label()}.
      *
      * @return list<array{value: string, label: string}>
      */
     private function eventTypeOptions(): array
     {
         return array_map(
-            fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $this->eventTypeLabel($t)],
+            static fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $t->label()],
             DomainEventType::cases(),
         );
-    }
-
-    private function eventTypeLabel(DomainEventType $type): string
-    {
-        return match ($type) {
-            DomainEventType::SubmissionCreated => 'Submission created',
-            DomainEventType::FormPublished => 'Form published',
-            DomainEventType::FormOpened => 'Form opened',
-            DomainEventType::FormClosed => 'Form closed',
-        };
     }
 
     private function formTitle(ConnectionSubscription $rule): ?string

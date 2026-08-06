@@ -1318,8 +1318,15 @@ class DemoSeeder extends Seeder
      */
     private function seedGrants(User $actor, array $people): void
     {
+        // ⚠️ DELIBERATELY EXCLUDES THE WORKHORSE FORM, AND THAT IS THE WHOLE POINT OF THE GRANT SET.
+        // `Patient Intake` carries ~420 of the ~520 seeded submissions. Granting it would leave a reviewer
+        // seeing 446 rows where an Owner sees 497 — correct, but a difference nobody would notice, so the
+        // permission model would look like it was not doing anything. Granting the other three instead makes
+        // the contrast plain (roughly a hundred rows against five hundred) while still giving the reviewer a
+        // real queue across three forms. `docs/TESTING-GUIDE.md` §6 has the tester compare exactly this.
         $granted = Form::query()
             ->whereNotNull('current_published_version_id')
+            ->where('title', '!=', self::HISTORY_FORM)
             ->orderBy('title')
             ->limit(3)
             ->get();

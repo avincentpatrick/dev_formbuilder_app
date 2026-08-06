@@ -191,11 +191,13 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
    <http://localhost:8025>.
 10. From `/forms`, **export** Patient Intake as CSV and again as XLSX. **Expect:** both download and stream
     rather than time out; the multi-select column is readable and the single-select shows labels.
-11. Sign out and sign in as **`reviewer@demo.test`**. Open `/submissions`. **Expect:** a *smaller* list — a
-    reviewer sees only the forms they hold a grant on (three of them), not the whole workspace. This is the
-    permission model working.
-12. Sign in as **`viewer@demo.test`**. **Expect:** the full list is visible but there are no approve/return
-    controls.
+11. Note the total row count as the Owner (it is around 500). Now sign out and sign in as
+    **`reviewer@demo.test`** and open `/submissions` again. **Expect:** roughly **a hundred** rows, not five
+    hundred — a reviewer sees only the three forms they hold a grant on, and the biggest form is deliberately
+    not one of them. This is the permission model working, and it is meant to be obvious.
+12. Sign in as **`viewer@demo.test`**. **Expect:** the *full* list again — a Viewer is read-only but
+    org-wide — and no approve/return controls anywhere.
+13. As the reviewer or the viewer, try `/audit-log`. **Expect:** a 403 refusal; it is Owner and Admin only.
 
 ---
 
@@ -376,9 +378,13 @@ This is the chapter that checks the thing a multi-tenant product must never get 
 3. `/submissions`. **Expect:** roughly a dozen rows, none of them from the demo workspace.
 4. `/audit-log`, `/dashboard`, the notification bell. **Expect:** all scoped to Northwind only.
 5. Check the sidebar. **Expect:** **no Analytics item** — Northwind is on Starter, which does not include
-   advanced analytics. It is hidden, not shown-and-locked.
-6. **Expect no Webhooks item either** — that module is seeded *off* for this workspace, which is a different
-   mechanism from the plan gate above and worth seeing side by side.
+   advanced analytics. It is hidden, not shown-and-locked. Now type
+   <http://northwind.localhost:8080/analytics> directly. **Expect:** you are turned away rather than shown
+   the page — hiding the link is not the whole of the gate.
+6. **Expect no Webhooks item either**, and the same result if you navigate to `/webhooks` directly. This one
+   is a *different mechanism* from step 5 and worth seeing beside it: Starter **does** include webhooks, but
+   the module is switched **off** in this workspace's settings. Sign in as `owner@northwind.test`, turn it
+   back on under `/settings` → Modules, and confirm the item and the route both return.
 7. Now switch back to <http://demo.localhost:8080> in the same browser. **Expect:** you must sign in again —
    sessions are per-host by design — and once in, you see the demo workspace's data and none of Northwind's.
 8. Try to reach a demo workspace record by ID from the Northwind host (paste a submission URL). **Expect:**
@@ -418,9 +424,12 @@ Anything else that does not work as this guide describes **is** worth reporting.
 | Read outgoing email | <http://localhost:8025> |
 | Watch the logs | `docker compose logs -f app worker` |
 
-Two things worth knowing if you go beyond this guide:
+Three things worth knowing if you go beyond this guide:
 
-- **The end-to-end test fixture is a different dataset.** `E2eSeeder` builds a workspace called `acme` for the
-  automated browser tests. `migrate:fresh --seed` does *not* create it, and `DemoSeeder` never touches it.
-- **Never run the automated test suites while you are testing by hand** — they share this database and will
-  wipe it underneath you.
+- **The end-to-end browser fixture is a different dataset.** `E2eSeeder` builds a workspace called `acme` for
+  the automated browser tests. `migrate:fresh --seed` does *not* create it, and `DemoSeeder` never touches it.
+- **The PHP test suite is safe to run while you are testing by hand.** `phpunit.xml` pins it to a separate
+  `meridian_testing` database, so `php artisan test` cannot disturb the demo data in `meridian`.
+- **The Playwright browser suite is not.** It serves the app from `.env`, so it runs against *this* database
+  and its setup step seeds the `acme` fixture into it. Don't run it mid-walkthrough; if you already have,
+  `php artisan migrate:fresh --seed` puts the demo back.

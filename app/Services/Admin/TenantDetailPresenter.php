@@ -122,7 +122,9 @@ final class TenantDetailPresenter
             'status' => $status,
             'status_label' => TenantStatus::tryFrom($status) === TenantStatus::Suspended ? 'Suspended' : 'Active',
             'is_active' => $tenant->isActive(),
-            'created_at' => $tenant->created_at?->toIso8601String(),
+            // `->`, not `?->`: stancl's base model types `created_at` as non-nullable Carbon, and PHPStan
+            // rejects a nullsafe call on it. Matches how every other presenter reads a model timestamp.
+            'created_at' => $tenant->created_at->toIso8601String(),
             'default_locale' => (string) $tenant->default_locale,
             'maintenance_mode' => (bool) $tenant->maintenance_mode,
             'maintenance_message' => $tenant->maintenance_message,
@@ -190,7 +192,10 @@ final class TenantDetailPresenter
         $offered = [];
 
         foreach ($plan->billing_interval_options as $option) {
-            $interval = is_string($option) ? BillingInterval::tryFrom($option) : null;
+            // `(string)` rather than an `is_string()` guard: the model types this array as strings, so the
+            // guard is dead code to PHPStan — but the underlying column is untyped jsonb, so a cast still
+            // earns its place. `tryFrom` then filters anything the enum does not recognise.
+            $interval = BillingInterval::tryFrom((string) $option);
 
             if ($interval !== null) {
                 $offered[] = ['value' => $interval->value, 'label' => $this->intervalLabel($interval->value)];

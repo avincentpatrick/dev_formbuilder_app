@@ -65,11 +65,12 @@ final class PlatformAuditPresenter
     {
         $result = $this->superAdmin->listPlatformAudits($filters, self::PER_PAGE, $page);
 
-        $rows = array_map(static function (array $row): array {
+        $rows = array_map(function (array $row): array {
             // from(), not tryFrom(): `audits_event_check` is generated from the enum and the model casts
             // the column, so an unknown value could not have been hydrated to reach this point.
             $event = AuditEvent::from((string) $row['event']);
             $type = (string) $row['auditable_type'];
+            $redacted = $this->stringList($row['redacted_fields']);
 
             return [
                 'id' => $row['id'],
@@ -92,9 +93,9 @@ final class PlatformAuditPresenter
                 'changes' => AuditDiff::rows(
                     is_array($row['old_values']) ? $row['old_values'] : null,
                     is_array($row['new_values']) ? $row['new_values'] : null,
-                    is_array($row['redacted_fields']) ? $row['redacted_fields'] : null,
+                    $redacted,
                 ),
-                'redacted_fields' => $row['redacted_fields'],
+                'redacted_fields' => $redacted,
             ];
         }, $result['rows']);
 
@@ -121,6 +122,23 @@ final class PlatformAuditPresenter
                 default => 'no_rows',
             },
         ];
+    }
+
+    /**
+     * `audits.redacted_fields` as the `list<string>` {@see AuditDiff::rows()} requires. The column is
+     * jsonb, so the service hands it over as an untyped array — and a jsonb array that has had a key
+     * removed deserialises with non-sequential integer keys, i.e. not a `list` at all. `array_values`
+     * is what makes it one; the cast covers a value that is not already a string.
+     *
+     * @return list<string>|null
+     */
+    private function stringList(mixed $value): ?array
+    {
+        if (! is_array($value)) {
+            return null;
+        }
+
+        return array_values(array_map(static fn (mixed $item): string => (string) $item, $value));
     }
 
     /** @param  array<string, mixed>  $filters */

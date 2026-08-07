@@ -104,7 +104,14 @@ function rlsReport(Tenant $tenant, User $user, string $remarks): string
     return $id;
 }
 
-beforeEach(fn () => TenantContext::flush());
+beforeEach(function (): void {
+    TenantContext::flush();
+
+    // Committed fixtures are purged after the test transaction rolls back — see the long note in
+    // FeedbackConsoleTest for why leaving committed TENANTS behind is not the same trade
+    // SuperAdminBypassTest made with committed users.
+    $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
+});
 
 it('lets the elevated role read reports from every tenant while the context is open', function (): void {
     $a = rlsReport(rlsTenant('rls-a-'.Str::random(6)), rlsUser(), 'A '.Str::random(8));

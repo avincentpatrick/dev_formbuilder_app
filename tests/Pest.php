@@ -591,3 +591,68 @@ function seedCountableAt(
 
     return $submission->refresh();
 }
+
+/*
+|--------------------------------------------------------------------------
+| Committed cross-connection fixtures (Increment I7a)
+|--------------------------------------------------------------------------
+| The elevated `pgsql_superadmin` connection cannot see rows written inside
+| RefreshDatabase's uncommitted transaction, so any test of a cross-tenant
+| console read must seed COMMITTED rows on `pgsql_privileged`.
+|
+| `SuperAdminBypassTest` (B2c) established that idiom and deliberately did NOT
+| clean up, on the reasoning that a privileged DELETE would deadlock against a
+| test's own open transaction. **That reasoning held only because it committed
+| `users` and nothing else.** I7a committed TENANTS, and tenants are global
+| state that other suites legitimately assert over: `DemoSeederIdempotencyTest`
+| pins the exact slug list, and the three sweep-command tests iterate every
+| tenant. Nine unrelated tests went red in CI on a locally-green tree — the
+| textbook shape of a convenience fixture coupling itself to a merge-blocking
+| gate, which the I6 notes warn about in as many words.
+|
+| So the rows ARE cleaned up, and the deadlock objection is answered by WHEN
+| rather than by giving up: {@see purgeCommittedFeedbackFixtures()} is meant to
+| be registered through `$this->beforeApplicationDestroyed(...)` from a test's
+| `beforeEach`. RefreshDatabase registers its rollback the same way during
+| `setUp` — i.e. EARLIER — and Laravel runs those callbacks in registration
+| order, so this one executes after the test transaction is already gone and
+| there are no locks left to block on.
+*/
+
+/** Delete every committed I7a fixture row, in FK-safe order, on the privileged connection. */
+function purgeCommittedFeedbackFixtures(): void
+{
+    $connection = DB::connection('pgsql_privileged');
+
+    // Markers, not ids: a test that dies mid-way still gets cleaned by the next one.
+    $tenantIds = $connection->table('tenants')
+        ->where('slug', 'like', 'console-%')
+        ->orWhere('slug', 'like', 'rls-%')
+        ->pluck('id')
+        ->all();
+
+    $userIds = $connection->table('users')
+        ->where('email', 'like', '%@feedbackconsoletest.local')
+        ->orWhere('email', 'like', '%@feedbackrlstest.local')
+        ->pluck('id')
+        ->all();
+
+    if ($tenantIds !== []) {
+        $connection->table('feedback_reports')->whereIn('tenant_id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        // Any report authored by a fixture user in a tenant that is NOT ours (there should be none —
+        // belt and braces, since `users.id` is an FK target and the delete below would otherwise fail).
+        $connection->table('feedback_reports')->whereIn('user_id', $userIds)->delete();
+        $connection->table('feedback_reports')->whereIn('resolved_by', $userIds)->update(['resolved_by' => null]);
+    }
+
+    if ($tenantIds !== []) {
+        $connection->table('tenants')->whereIn('id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('users')->whereIn('id', $userIds)->delete();
+    }
+}

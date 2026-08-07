@@ -30,9 +30,17 @@ uses(RefreshDatabase::class);
 | so it cannot see rows written inside RefreshDatabase's uncommitted transaction. Ordinary factory rows
 | are therefore invisible to the very code under test, and a naive version of this file would assert an
 | empty list and pass. The fixtures are seeded COMMITTED on the privileged connection with recognisable
-| `@feedbackconsoletest.local` markers and deliberately NOT cleaned up, exactly as SuperAdminBypassTest
-| does and for the same reason (a privileged DELETE would deadlock a test's own open transaction);
-| `migrate:fresh` wipes them next run.
+| `@feedbackconsoletest.local` markers, following SuperAdminBypassTest.
+|
+| ⚠️ **BUT THEY ARE CLEANED UP, AND THAT IS WHERE THIS FILE DEPARTS FROM ITS OWN PRECEDENT.**
+| SuperAdminBypassTest leaves its rows behind, reasoning that a privileged DELETE would deadlock against
+| a test's own open transaction. That held only because it commits `users` and nothing else. This file
+| commits **TENANTS**, which are global state other suites legitimately assert over — and leaving them
+| behind turned NINE unrelated tests red in CI on a locally-green tree (`DemoSeederIdempotencyTest` pins
+| the exact slug list; three sweep-command tests iterate every tenant). The deadlock objection is
+| answered by WHEN rather than by giving up: the purge is registered through
+| `beforeApplicationDestroyed()`, which Laravel runs in registration order AFTER RefreshDatabase's own
+| rollback (registered during `setUp`) — so by then the test transaction is gone and no locks remain.
 |
 | ⚠️ **ONE TRANSITION PER TEST — DO NOT CHAIN THEM.** The consequence of the above runs in both
 | directions: a transition's UPDATE lands on the DEFAULT connection inside the uncommitted transaction, so
@@ -114,6 +122,10 @@ function adminUrl(string $path): string
 
 beforeEach(function (): void {
     TenantContext::flush();
+
+    // Registered here, not in afterEach: RefreshDatabase registers its rollback the same way during
+    // setUp — earlier — and Laravel runs these in order, so this fires once the transaction is gone.
+    $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
 });
 
 it('renders the console for an enrolled super-admin', function (): void {

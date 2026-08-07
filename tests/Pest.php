@@ -3,6 +3,7 @@
 declare(strict_types=1);
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
+use App\Enums\IndexedDataType;
 use App\Enums\PlanTier;
 use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
@@ -37,6 +38,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -853,4 +855,60 @@ function purgeCommittedPlatformAuditFixtures(): void
 function confirmPasswordNow(int $secondsAgo = 0): void
 {
     session()->put('auth.password_confirmed_at', now()->unix() - $secondsAgo);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Guest-runtime fixtures (Increment F5, moved here in I8b).
+|--------------------------------------------------------------------------
+| These four lived as top-level functions in tests/Feature/Guest/GuestRuntimeTest.php, which meant they
+| resolved only when THAT file happened to be loaded into the process — so a single-file run of any other
+| guest suite died with "Call to undefined function guestTenant()". That is precisely the failure H22a
+| already paid for with apiMember(), and this file's header exists to prevent. Moved on the second
+| occurrence rather than the third.
+|
+| GuestRuntimeTest's call sites are unchanged, which keeps it the regression gate for these fixtures.
+*/
+
+/** A tenant reachable at {slug}.meridian.test. */
+function guestTenant(string $slug = 'acme'): Tenant
+{
+    $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
+    $tenant->domains()->create(['domain' => $slug]);
+
+    return $tenant;
+}
+
+/** A published form (required full_name + optional age). Requires enterTenant already called. */
+function publishedGuestForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Intake');
+    addFormField($form->draftVersion, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    addFormField($form->draftVersion, $owner, 'age', FieldType::Integer, 1, [
+        'is_queryable' => true,
+        'indexed_data_type' => IndexedDataType::Number, // so the pipeline projects a typed index row for `age`
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+/** The same, with guest access enabled at a public slug. */
+function guestForm(Tenant $tenant, User $owner, string $slug = 'intake'): Form
+{
+    $form = publishedGuestForm($tenant, $owner);
+    $form->update(['public_slug' => $slug, 'allow_guest_submissions' => true]);
+
+    return $form->refresh();
+}
+
+/** Mint a share token for a form's current published version (optionally at a forged clock, for expiry tests). */
+function shareTokenFor(Form $form, ?int $now = null): string
+{
+    return app(GuestShareTokenService::class)->mint(
+        $form->tenant_id,
+        $form->id,
+        (string) $form->current_published_version_id,
+        $now,
+    )->token;
 }

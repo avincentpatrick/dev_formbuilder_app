@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\FieldType;
+use App\Enums\FormBotChallenge;
 use App\Enums\RequiredMode;
 use App\Http\Middleware\AppSecurityHeaders;
 use App\Models\Tenant;
@@ -145,7 +146,7 @@ it('does NOT refuse framing on the guest runtime', function (): void {
         'is_required' => RequiredMode::Required,
     ]);
     app(PublishService::class)->publish($form->refresh(), $owner);
-    app(FormService::class)->setShareSettings($form->refresh(), 'intake', true, $owner);
+    app(FormService::class)->setShareSettings($form->refresh(), 'intake', true, FormBotChallenge::Off, null, $owner);
 
     $response = $this->withoutVite()->get('http://acme.meridian.test/f/intake')->assertOk();
 

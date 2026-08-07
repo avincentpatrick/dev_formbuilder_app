@@ -132,6 +132,13 @@ export interface SchemaResponse {
         // so no cache-version bump is owed.
         confirmation_message?: string | null;
         confirmation_message_translations?: Record<string, string> | null;
+        // Increment I8b — whether this form requires a proof-of-work spam check before it accepts a
+        // submission. A HINT ONLY: `ApiClient.submit()` retries once on a 403 `challenge_required`, so
+        // correctness never depends on this reaching the client. That matters because `replay.ts` caches
+        // one SchemaResponse per slug per pass, so rows 2..n of a drain construct a client that never
+        // called fetchSchema(). Optional for the usual reason — the service worker can serve a manifest
+        // cached before I8b shipped, and absent must mean "off", which is what every form defaults to.
+        bot_challenge?: 'off' | 'proof_of_work';
     };
     version: {
         id: string;
@@ -307,6 +314,10 @@ export type ErrorKind =
     | 'refresh' // version superseded — re-mint + re-fetch schema
     | 'rate_limited' // 429 — back off
     | 'schedule' // 403 form_not_open/form_closed/max_responses_reached — show the schedule state (H12b)
+    // I8b — 403 challenge_required/challenge_failed. ⚠️ ITS OWN KIND ON PURPOSE: without it these fall to
+    // `terminal`, and replay.ts maps terminal to markNeedsAttention — PARKING THE ROW FOR A HUMAN, which
+    // is exactly wrong for a spam check that just needs re-solving. api-client re-solves and retries once.
+    | 'challenge'
     | 'terminal' // 401 invalid / 403 disabled / 404 — unrecoverable
     | 'unknown';
 

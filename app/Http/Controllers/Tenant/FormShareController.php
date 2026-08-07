@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\FormBotChallenge;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\UpdateFormShareRequest;
 use App\Models\Form;
@@ -39,7 +40,18 @@ final class FormShareController extends Controller
         /** @var ?User $actor */
         $actor = Auth::user();
 
-        $this->forms->setShareSettings($form, $slug, $allowGuests, $actor);
+        // I8b — spam protection travels with the rest of the share settings, saved by the same button and
+        // recorded in the SAME audit row. See FormService::setShareSettings() for why that matters.
+        $rateLimit = $request->input('guest_rate_limit_per_minute');
+
+        $this->forms->setShareSettings(
+            $form,
+            $slug,
+            $allowGuests,
+            FormBotChallenge::from((string) $request->input('bot_challenge')),
+            $rateLimit === null ? null : (int) $rateLimit,
+            $actor,
+        );
 
         return back()->with('toast', [
             'type' => 'success',

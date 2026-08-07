@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Forms;
 
 use App\Enums\AuditEvent;
+use App\Enums\FormBotChallenge;
 use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
@@ -251,17 +252,42 @@ final class FormService
      *
      * The transaction is not decoration: {@see AuditLogger} requires the row to be atomic with the change it
      * records, and the sibling single-column setters open none.
+     *
+     * ── ⚠️ I8b GREW THIS METHOD RATHER THAN ADDING A SIBLING, AND THE AUDIT ROW IS THE WHOLE ARGUMENT ──
+     * The numerically dominant pattern on this service is a single-column setter per concern
+     * (`setSaveAndResume`, `setSchedule`, `setConfirmationMessage`), and a `setSpamProtection()` would have
+     * cost zero call-site churn. But spam protection is saved by the SAME BUTTON in the SAME modal as the
+     * two columns above, and "who turned the spam check off on the public form that then got flooded" is
+     * the same question, about the same act, as the one this method's audit row was created to answer.
+     * Split across two service calls it becomes two `AuditEvent::Updated` rows an investigator has to
+     * correlate by timestamp. One user action, one ledger row.
+     *
+     * The new parameters are REQUIRED rather than defaulted, so a caller cannot silently reset a form's
+     * protection to `off` by forgetting them — the compiler asks instead. Call sites pass named arguments.
+     *
+     * **If a fifth share column ever arrives, stop and introduce a readonly `ShareSettings` value object
+     * rather than a sixth positional parameter.** Four is the last comfortable number here.
      */
-    public function setShareSettings(Form $form, ?string $slug, bool $allowGuests, ?User $actor = null): Form
-    {
-        return DB::transaction(function () use ($form, $slug, $allowGuests, $actor): Form {
+    public function setShareSettings(
+        Form $form,
+        ?string $slug,
+        bool $allowGuests,
+        FormBotChallenge $botChallenge,
+        ?int $guestRateLimitPerMinute,
+        ?User $actor = null,
+    ): Form {
+        return DB::transaction(function () use ($form, $slug, $allowGuests, $botChallenge, $guestRateLimitPerMinute, $actor): Form {
             $old = [
                 'public_slug' => $form->public_slug,
                 'allow_guest_submissions' => $form->allow_guest_submissions,
+                'bot_challenge' => $form->bot_challenge->value,
+                'guest_rate_limit_per_minute' => $form->guest_rate_limit_per_minute,
             ];
             $new = [
                 'public_slug' => $slug,
                 'allow_guest_submissions' => $allowGuests,
+                'bot_challenge' => $botChallenge->value,
+                'guest_rate_limit_per_minute' => $guestRateLimitPerMinute,
             ];
 
             $form->forceFill($new)->save();

@@ -26,7 +26,16 @@
  */
 import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsCheckbox, MdsFormField, MdsIcon, MdsIconButton, MdsModal, MdsTextInput } from '@meridian/design-system';
+import {
+    MdsButton,
+    MdsCheckbox,
+    MdsFormField,
+    MdsIcon,
+    MdsIconButton,
+    MdsModal,
+    MdsNumberInput,
+    MdsTextInput,
+} from '@meridian/design-system';
 import type { ShareProps } from '@/components/builder/types';
 
 const props = defineProps<{
@@ -38,9 +47,23 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 
-const form = useForm<{ public_slug: string; allow_guest_submissions: boolean }>({
+const form = useForm<{
+    public_slug: string;
+    allow_guest_submissions: boolean;
+    // I8b — held as a BOOLEAN and mapped to the enum in transform(), because the control is one checkbox
+    // and binding a checkbox straight to a two-member string union is how a third member later arrives as
+    // a silent `true`. ⚠️ The KEY still has to be `bot_challenge`: Inertia types `form.errors` off the form
+    // data, and the server keys its validation errors by the wire name — so a local alias would leave the
+    // field's error unreachable and the control would silently never show one.
+    bot_challenge: boolean;
+    // null is "no per-form ceiling". MdsNumberInput already emits `number | null` and does the ''→null
+    // conversion, so nothing here has to parse a string.
+    guest_rate_limit_per_minute: number | null;
+}>({
     public_slug: props.share.public_slug ?? '',
     allow_guest_submissions: props.share.allow_guest_submissions,
+    bot_challenge: props.share.bot_challenge === 'proof_of_work',
+    guest_rate_limit_per_minute: props.share.guest_rate_limit_per_minute,
 });
 
 /** Which block was copied last, so exactly one confirmation shows. */
@@ -56,6 +79,8 @@ watch(
         if (!open) return;
         form.public_slug = props.share.public_slug ?? '';
         form.allow_guest_submissions = props.share.allow_guest_submissions;
+        form.bot_challenge = props.share.bot_challenge === 'proof_of_work';
+        form.guest_rate_limit_per_minute = props.share.guest_rate_limit_per_minute;
         form.clearErrors();
         copied.value = null;
     },
@@ -170,6 +195,10 @@ function submit(): void {
         .transform((data) => ({
             public_slug: data.public_slug === '' ? null : data.public_slug,
             allow_guest_submissions: data.allow_guest_submissions,
+            // Boolean → enum. The wire value is the enum the column stores; `present` + `nullable` on the
+            // limit is what lets a cleared field through, the same "meaningful absence" the slug expresses.
+            bot_challenge: data.bot_challenge ? 'proof_of_work' : 'off',
+            guest_rate_limit_per_minute: data.guest_rate_limit_per_minute,
         }))
         .patch(`/forms/${props.formId}/share`, {
             preserveScroll: true,
@@ -187,9 +216,12 @@ function submit(): void {
         </p>
 
         <!-- ── Guest access ──────────────────────────────────────────────────────────────────────── -->
-        <!-- MdsCheckbox, not a switch: MdsSwitch is specified in DSR §3.2 but deliberately unbuilt, and the
-             same table's rule ("on/off is additionally labelled with visible text") would make it a checkbox
-             with extra steps. This follows the save-and-resume toggle already in the builder toolbar. -->
+        <!-- MdsCheckbox, not a switch. ⚠️ THE ORIGINAL REASON IS NOW STALE and is corrected here rather
+             than left to mislead: MdsSwitch was "specified in DSR §3.2 but deliberately unbuilt" when this
+             was written, and I5 built it. The choice still stands on the second half of that argument —
+             DSR §3.2's rule that on/off carry visible text makes a switch a checkbox with extra steps here
+             — and on consistency: this modal saves behind a button, unlike the autosave switches in
+             Settings, and a switch that does not take effect until you press Save is a lie about itself. -->
         <div class="share__block">
             <MdsCheckbox
                 v-model="form.allow_guest_submissions"
@@ -245,6 +277,42 @@ function submit(): void {
                 <span class="share__preview-label">Address:</span>
                 <code class="share__code">{{ previewUrl }}</code>
             </p>
+        </div>
+
+        <!-- ── Spam protection (I8b, PRD Feature #3) ─────────────────────────────────────────────── -->
+        <!-- Both controls are OFF by default and stay that way unless an author opts in. That is a
+             commitment from docs/security-threat-model.md §4, not a convenience: many M&E and
+             field-collection deployments run on trusted enumerator devices, where a spam check is
+             actively harmful UX. The help text says so plainly rather than selling the feature. -->
+        <div class="share__block">
+            <h3 class="share__legend">Spam protection</h3>
+
+            <MdsCheckbox
+                v-model="form.bot_challenge"
+                label="Require an automatic spam check before a response is sent"
+                :invalid="Boolean(form.errors.bot_challenge)"
+            />
+            <p class="share__help">
+                Adds a short check the visitor's browser completes on its own — no typing, no puzzle, no
+                images. It costs a moment on older phones, so leave it off for forms your own staff fill in.
+            </p>
+
+            <MdsFormField
+                v-slot="{ id, describedby, invalid }"
+                label="Limit responses per visitor"
+                help="Responses per minute from one visitor. Leave blank for no limit."
+                :error="form.errors.guest_rate_limit_per_minute"
+            >
+                <MdsNumberInput
+                    :id="id"
+                    v-model="form.guest_rate_limit_per_minute"
+                    :min="1"
+                    :max="600"
+                    placeholder="No limit"
+                    :describedby="describedby"
+                    :invalid="invalid"
+                />
+            </MdsFormField>
         </div>
 
         <!-- ── Live state: either the working link and everything built on it, or why not ─────────── -->

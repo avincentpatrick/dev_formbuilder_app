@@ -130,6 +130,10 @@ final class BuilderPresenter
         return [
             'public_slug' => $slug,
             'allow_guest_submissions' => $form->allow_guest_submissions,
+            // Spam protection (I8b) — saved by the same button as the two above, which is why it lives in
+            // this block rather than in one of its own.
+            'bot_challenge' => $form->bot_challenge->value,
+            'guest_rate_limit_per_minute' => $form->guest_rate_limit_per_minute,
             'suggested_slug' => $slug ?? FormSlug::suggest($form),
             'is_published' => $form->current_published_version_id !== null,
             'public_host' => TenantUrl::publicHost($tenant),

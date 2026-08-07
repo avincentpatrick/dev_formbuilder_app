@@ -3084,6 +3084,71 @@
                 "security": []
             }
         },
+        "/public/f/{shareToken}/challenge": {
+            "post": {
+                "operationId": "v1.public.challenges.store",
+                "summary": "Mint a spam-check challenge for this share link",
+                "tags": [
+                    "GuestChallenge"
+                ],
+                "parameters": [
+                    {
+                        "name": "shareToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "algorithm": {
+                                                    "type": "string",
+                                                    "const": "SHA-256"
+                                                },
+                                                "challenge": {
+                                                    "type": "string"
+                                                },
+                                                "salt": {
+                                                    "type": "string"
+                                                },
+                                                "maxnumber": {
+                                                    "type": "integer"
+                                                },
+                                                "signature": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "algorithm",
+                                                "challenge",
+                                                "salt",
+                                                "maxnumber",
+                                                "signature"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/draft": {
             "post": {
                 "operationId": "v1.public.drafts.store",
@@ -3541,6 +3606,10 @@
                                                             "type": "string",
                                                             "description": "Whether the SPA should offer \"Save and finish later\" (H10, UX \u00a75.2). Both gates must pass:\nthe per-form opt-in AND the tenant plan. The plan half mirrors RequireFeature exactly \u2014\nfail-open when no catalog resolves \u2014 so this flag and the draft route never disagree. The\nroute is still authoritative; this only decides whether the control is shown."
                                                         },
+                                                        "bot_challenge": {
+                                                            "type": "string",
+                                                            "description": "Whether this form requires a proof-of-work spam check before it will accept a submission\n(I8b). \u26a0\ufe0f A HINT, NOT A GATE \u2014 and the distinction is load-bearing. The authority is\nVerifyGuestBotChallenge on the submit route; this only saves the client a rejected round\ntrip. It has to be that way because `replay.ts` caches one SchemaResponse per slug per\ndrain pass, so rows 2..n construct a client that never fetched a schema at all; they\nrecover through api-client's retry-once on a 403 instead. Emitting it as a gate would\nmake the offline path depend on a hint it does not have."
+                                                        },
                                                         "confirmation_message": {
                                                             "type": [
                                                                 "string",
@@ -3608,6 +3677,7 @@
                                                         "supported_locales",
                                                         "single_page_mode",
                                                         "save_and_resume",
+                                                        "bot_challenge",
                                                         "confirmation_message",
                                                         "confirmation_message_translations",
                                                         "schedule"

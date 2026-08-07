@@ -31,6 +31,8 @@ const links = [
     // I7a — the feedback support queue (PRD Feature #11). Read-and-triage, so it sits with the other
     // read surfaces rather than beside the destructive one.
     { label: 'Feedback', href: '/admin/feedback' },
+    // I7b — the platform ledger (PRD Feature #12). A read surface, so it sits with the others.
+    { label: 'Audit log', href: '/admin/audit-log' },
     // I5 — platform settings (PRD Feature #10). Last, because it is the only destructive one here.
     { label: 'Platform', href: '/admin/settings' },
 ];
@@ -224,7 +226,18 @@ function logout(): void {
     color: var(--mds-color-text-heading);
 }
 
-@media (max-width: 480px) {
+/*
+ * ⚠️ 900px, not 480px, and I7b is what forced the measurement. `.admin__bar` is a fixed-height 56px flex
+ * ROW with no wrap, so once brand + nav + email + logout exceed the viewport the bar overflows
+ * horizontally rather than reflowing. At 768px the content box is ~720px while five nav links, the brand
+ * and a real email address measure ~860px — and with the four pre-I7b links it was ~767px, i.e. already
+ * marginally over. Nothing in CI would ever have caught it: /admin/* is excluded from the Playwright
+ * responsive sweep because `superadmin.mfa` needs a TOTP, so this surface has never been measured at a
+ * tablet width. Raising the existing breakpoint (which already wraps the bar, frees its height and drops
+ * the email) is the whole fix; a competing `flex-wrap` on `.admin__nav` alone would wrap INSIDE the fixed
+ * 56px and clip the second row.
+ */
+@media (max-width: 900px) {
     .admin__bar {
         flex-wrap: wrap;
         height: auto;

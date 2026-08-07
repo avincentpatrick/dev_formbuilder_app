@@ -86,3 +86,36 @@ export type AuditPageProps = {
     empty_reason: EmptyReason;
     can: { export: boolean };
 };
+
+/**
+ * The PLATFORM viewer's contracts (Increment I7b), from `App\Services\Audit\PlatformAuditPresenter`.
+ * Both surfaces' shapes live in one file on the `components/feedback/types.ts` precedent, which exports
+ * `FeedbackRow` and `ConsoleFeedbackRow` side by side for the same reason: every divergence between the
+ * tenant page and its console twin is then visible in a single diff.
+ *
+ * Only these two types are new — `Option`, `AuditChange`, `AuditTarget`, `AuditRow`, `AuditMeta` and
+ * `EmptyReason` are reused VERBATIM, and reusing `AuditRow` in particular is a hard requirement rather than
+ * a convenience: `AuditChangeModal.vue` is typed `defineProps<{ row: AuditRow | null }>()`, so a narrower
+ * platform row would be structurally incompatible and force either a modal fork or a widened prop. Emitting
+ * two always-null keys (`target.label`, `target.url`) is the cheaper honest trade.
+ */
+export type ConsoleAuditFilters = {
+    /** Super-admins only — the platform ledger's rows can have no other author. */
+    actors: Option[];
+    applied: {
+        user_id: string | null;
+        from: string | null;
+        to: string | null;
+    };
+};
+
+/**
+ * No `can` key, and no `events`/`auditable_types` catalogs — all three absences are decisions the presenter
+ * argues. Adding `can.export` here would imply an export route that deliberately does not exist.
+ */
+export type ConsoleAuditPageProps = {
+    data: AuditRow[];
+    meta: AuditMeta;
+    filters: ConsoleAuditFilters;
+    empty_reason: EmptyReason;
+};

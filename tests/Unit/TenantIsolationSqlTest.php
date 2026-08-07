@@ -236,6 +236,64 @@ it('emits WITH CHECK on the write commands of the bypass shape', function (): vo
         ->toContain('CREATE POLICY audits_superadmin_delete ON audits FOR DELETE TO meridian_superadmin USING');
 });
 
+// Increment I7b — the NARROWED carve-out. Same construction, one extra conjunct, and that conjunct is
+// the entire difference between a platform ledger viewer and a cross-tenant surveillance tool. These
+// assertions are the mechanical guard a hand-written CREATE POLICY would not have had.
+
+it('emits a platform-slice SELECT bypass narrowed to rows with no tenant', function (): void {
+    $statements = TenantIsolation::platformRowsBypassSql('audits', 'meridian_superadmin', ['SELECT']);
+    $sql = joined($statements);
+
+    expect($sql)->toContain(
+        'CREATE POLICY audits_platform_select ON audits FOR SELECT TO meridian_superadmin '
+        ."USING (current_setting('app.is_superadmin_context', true) = 'true' AND tenant_id IS NULL);"
+    );
+
+    // Layered onto an already-secured table, exactly like its unrestricted sibling.
+    expect($sql)
+        ->not->toContain('FORCE ROW LEVEL SECURITY')
+        ->not->toContain('app.current_tenant_id')
+        ->not->toContain('::uuid');
+});
+
+it('names the platform shape outside the superadmin_ prefix its siblings sweep', function (): void {
+    $sql = joined(TenantIsolation::platformRowsBypassSql('audits', 'meridian_superadmin', ['SELECT']));
+
+    // The bypass migrations drop policies with `DELETE ... WHERE policyname LIKE '{table}_superadmin_%'`.
+    // Sharing that prefix would let an unrelated rollback drop this policy while its GRANT survived,
+    // and the reading page would then render zero rows with no error.
+    expect($sql)->not->toContain('audits_superadmin_');
+});
+
+it('keeps the tenant conjunct on every command of the platform shape', function (): void {
+    $sql = joined(TenantIsolation::platformRowsBypassSql('audits', 'meridian_superadmin', ['SELECT', 'INSERT', 'UPDATE', 'DELETE']));
+
+    expect($sql)
+        ->toContain('CREATE POLICY audits_platform_insert ON audits FOR INSERT TO meridian_superadmin WITH CHECK')
+        ->toContain('CREATE POLICY audits_platform_update ON audits FOR UPDATE TO meridian_superadmin USING')
+        ->toContain('CREATE POLICY audits_platform_delete ON audits FOR DELETE TO meridian_superadmin USING');
+
+    // Four policies, four conjuncts — a command that lost it would be a silent widening.
+    expect(substr_count($sql, 'tenant_id IS NULL'))->toBe(5); // UPDATE carries it in USING *and* WITH CHECK
+});
+
+it('honours a non-default tenant column in the platform shape', function (): void {
+    $sql = joined(TenantIsolation::platformRowsBypassSql('widgets', 'meridian_superadmin', ['SELECT'], 'workspace_id'));
+
+    expect($sql)->toContain('workspace_id IS NULL')->not->toContain('tenant_id');
+});
+
+it('rejects an unsafe role name, table or tenant column in the platform shape', function (): void {
+    expect(fn () => TenantIsolation::platformRowsBypassSql('audits; DROP TABLE users', 'meridian_superadmin'))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => TenantIsolation::platformRowsBypassSql('audits', 'role; DROP TABLE users'))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => TenantIsolation::platformRowsBypassSql('audits', 'meridian_superadmin', ['SELECT'], 'tenant_id) OR (true'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('rejects an unsafe role name or table in the bypass shape', function (): void {
     expect(fn () => TenantIsolation::superAdminBypassSql('users', 'evil; DROP ROLE x'))
         ->toThrow(InvalidArgumentException::class);

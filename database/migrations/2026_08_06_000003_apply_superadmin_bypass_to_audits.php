@@ -25,9 +25,22 @@ use Illuminate\Support\Facades\DB;
  * ── THE CONSEQUENCE, STATED SO IT IS NOT LATER MISTAKEN FOR A BUG ───────────────────────────────────────
  * A NULL-tenant audit row is INVISIBLE to every tenant's /audit-log, because the base SELECT policy stays
  * strict (`tenant_id = ctx`) — that is the point: a tenant must not read the platform operator's actions,
- * and unlike `settings` this table is deliberately NOT nullable_global, which would leak them. There is no
- * platform-side audit viewer yet, so these rows are write-only-and-retained until one exists (I7/I11). The
- * audit spec §1 records that; do not "fix" the invisibility by widening the SELECT policy.
+ * and unlike `settings` this table is deliberately NOT nullable_global, which would leak them.
+ *
+ * ── I7b BUILT THE VIEWER, AND THE PARAGRAPH ABOVE STILL STANDS AS WRITTEN ───────────────────────────────
+ * This file used to end "there is no platform-side audit viewer yet, so these rows are write-only-and-
+ * retained until one exists (I7/I11) … do not 'fix' the invisibility by widening the SELECT policy."
+ * `GET /admin/audit-log` (I7b) is that viewer, and it did NOT take the widening this file forbids. It reads
+ * through a SEPARATE, deliberately narrower policy — `audits_platform_select`, added by
+ * `2026_08_08_000001_apply_platform_audit_read_to_audits.php` via {@see TenantIsolation::platformRowsBypass()} —
+ * whose USING clause is `current_setting('app.is_superadmin_context', true) = 'true' AND tenant_id IS NULL`.
+ * The base `audits_tenant_select` is untouched, so **a tenant still cannot read a platform row**; and
+ * because of that second conjunct, **the operator cannot read a tenant row either**. Both directions of the
+ * wall stand, and `PlatformAuditRlsTest` asserts both rather than promising them.
+ *
+ * **Do not replace that policy with `TenantIsolation::applySuperAdminBypass('audits', ['SELECT'])`.** The
+ * generic helper's gate is unrestricted; on this table it would hand the platform operator every tenant's
+ * complete history. That is the widening this file has always forbidden, and it is still forbidden.
  *
  * Runs on the default `meridian_app` connection (it owns `audits`). Creates no table, so the migration
  * linter does not require withTenantIsolation() here.
@@ -41,8 +54,10 @@ return new class extends Migration
             throw new RuntimeException("Unsafe pgsql_superadmin role name: {$role}");
         }
 
-        // Table privileges are checked before RLS. INSERT only — no SELECT: the elevated role writes the
-        // platform ledger, it does not read tenant history.
+        // Table privileges are checked before RLS. INSERT here; I7b's own migration adds the paired
+        // GRANT SELECT. The second half of this comment's original claim still holds, and is now enforced
+        // by a policy rather than by the absence of a grant: the elevated role reads the PLATFORM ledger,
+        // never tenant history — `audits_platform_select` carries `AND tenant_id IS NULL`.
         DB::statement("GRANT INSERT ON audits TO {$role}");
 
         TenantIsolation::applySuperAdminBypass('audits', ['INSERT']);

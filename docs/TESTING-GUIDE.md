@@ -371,33 +371,58 @@ The console lives on the **central host**, not on a workspace, and it requires t
    > secret that no authenticator can reproduce, which would lock you out permanently rather than save you a
    > step. If you ever need to reset it, re-run `php artisan migrate:fresh --seed`.
 
-4. `/admin/tenants`. **Expect:** both workspaces listed. Suspend one and confirm its members are locked out;
-   reactivate it.
-5. Assign a different **plan** to `northwind`. **Expect:** its available features change accordingly.
-6. `/admin/users`. **Expect:** users across all workspaces — this is one of the places that reads across
+4. `/admin/tenants`. **Expect:** both workspaces listed, and **each name is now a link**. Suspend one from
+   the list and confirm its members are locked out; reactivate it.
+5. Click **Northwind's name** to open `/admin/tenants/{id}`. **Expect** four things on one page: its status
+   and owner; its current plan; its usage against that plan's limits; and its custom domains, read-only.
+   - **Expect the usage numbers to be Northwind's**, not zeros and not the demo workspace's. Cross-check
+     one of them — the Forms count here should equal what `/forms` shows inside Northwind itself.
+   - **Expect an unlimited quota to read as a bare number with "Unlimited on this plan"**, never `3 / ∞`,
+     and **expect a zero limit to read as `0 / 0`** — on Free those are real ceilings, not "no limit".
+   - **Expect the Capabilities table to show two columns**, what the plan grants beside what is actually in
+     effect. Northwind's **Webhooks** row should say granted-but-not-in-effect, with the note *"Switched
+     off by the workspace"* — the same fact §16 step 6 has you verify from the inside.
+   - **Expect NO verify / make-primary / remove buttons** on the domains card. That is deliberate: a domain
+     write from the console would succeed and record no audit entry, so the console does not offer one.
+6. Assign a different **plan** to Northwind from that page. **Expect:** a success toast, the card updates in
+   place, and its available features change accordingly (re-check the sidebar inside Northwind).
+   **Then expect the change to appear in Northwind's OWN `/audit-log`, not the platform one** — step 14.
+7. `/admin/users`. **Expect:** users across all workspaces — this is one of the places that reads across
    tenants.
-7. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the four seeded demo reports
+8. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the four seeded demo reports
    (one in each state: New, Reviewed, Resolved, Won't fix) plus anything you sent in §11, from **both**
    `demo` and `northwind`. Filter by workspace and by status.
-8. Open a **New** report. **Expect:** the full remarks, the page it came from, the reporter's email, the
+9. Open a **New** report. **Expect:** the full remarks, the page it came from, the reporter's email, the
    browser details, and the screenshot if it has one. **Expect the only buttons to be `Mark Reviewed` and
    `Mark Won't fix`** — not `Mark Resolved`. A report goes to Resolved *through* Reviewed; the console only
    ever offers the steps the server will accept.
-9. Mark it **Reviewed**, then open it again and mark it **Resolved**. Now re-open it (`Mark Reviewed`).
+10. Mark it **Reviewed**, then open it again and mark it **Resolved**. Now re-open it (`Mark Reviewed`).
    **Expect:** it returns to Reviewed and the "Closed" line disappears — re-opening clears the resolution
    rather than keeping a stale one. Note there is no way back to **New**: once someone has looked at a
    report, the queue must not be able to claim nobody has.
-10. **This is the transparency check, and it is the interesting one.** Sign in to the workspace that report
+11. **This is the transparency check, and it is the interesting one.** Sign in to the workspace that report
    came from (e.g. <http://demo.localhost:8080> as `owner@demo.test`) and open `/audit-log`. **Expect:** your
    status changes are listed there, under **Feedback report**, showing the before and after status —
    the workspace can see how the platform handled what they sent. **Expect the remarks NOT to appear** in
    the ledger entry: the audit trail records *that* a report was handled, never a copy of its contents.
-11. `/admin/settings`. **Expect:** a platform signup toggle and platform maintenance mode.
-12. Turn **platform signup** off. Open <http://localhost:8080> in a private window. **Expect:** the
+12. `/admin/settings`. **Expect:** a platform signup toggle and platform maintenance mode.
+13. Turn **platform signup** off. Open <http://localhost:8080> in a private window. **Expect:** the
    "Create a workspace" button is gone from the landing page. Turn it back on and confirm it returns.
-13. Turn **platform maintenance** on. In a private window, open <http://localhost:8080> and a workspace.
+14. Turn **platform maintenance** on. In a private window, open <http://localhost:8080> and a workspace.
    **Expect:** both show the maintenance page — while `/admin` stays reachable for you, so you can turn it
    back off. **Turn it back off.**
+15. `/admin/audit-log`. This step comes last on purpose: until steps 13 and 14 the platform ledger is
+    genuinely empty.
+    - **Expect** the two platform-settings changes you just made, newest first, with your name against them
+      and the before/after values. Open one — **expect** the same change dialog the workspace audit log uses.
+    - **Expect NOT to see** the suspension from step 4 or the plan assignment from step 6. Those live in the
+      affected workspace's own `/audit-log`, which step 11 already had you confirm. **That is the design, not
+      a gap** — the page says so above the table — and the operator genuinely cannot read a workspace's
+      history from here.
+    - **On a freshly seeded database this page is empty before step 13, and it says so in as many words**
+      ("…not because anything is wrong"). An empty compliance viewer with no explanation would be
+      indistinguishable from a broken one, so check that the sentence is there.
+    - **Expect no export buttons.** The workspace audit log has them; this one does not, deliberately.
 
 ---
 
@@ -438,6 +463,8 @@ expected and is not a defect.
 | **Real-time notification push** | The bell polls on an interval rather than pushing over a socket. Deliberate; the socket layer is deployment-track work. |
 | **Google Sheets connector UI** | The backend and the shared column-mapping engine are built; the connect-and-map screens are increment H16b. |
 | **Airtable connector** | Increment H16c. |
+| **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
+| **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
 | **Step-up re-authentication, org-wide enforced 2FA** | Increment I8. |
 | **Post-submission answer editing, screened-out status** | Increment I9. |
 | **Production deployment** | Track B, after the application is otherwise complete. |

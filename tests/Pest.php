@@ -44,6 +44,9 @@ use Database\Seeders\PlanSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
 use Tests\Support\FakeDnsTxtResolver;
@@ -647,6 +650,169 @@ function purgeCommittedFeedbackFixtures(): void
         $connection->table('feedback_reports')->whereIn('user_id', $userIds)->delete();
         $connection->table('feedback_reports')->whereIn('resolved_by', $userIds)->update(['resolved_by' => null]);
     }
+
+    if ($tenantIds !== []) {
+        $connection->table('tenants')->whereIn('id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('users')->whereIn('id', $userIds)->delete();
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Committed platform fixtures (Increment I7b)
+|--------------------------------------------------------------------------
+| Same harness constraint as the I7a block above — the elevated
+| `pgsql_superadmin` connection cannot see RefreshDatabase's uncommitted
+| transaction — applied to the PLATFORM slice: `audits` rows with
+| `tenant_id IS NULL`, and the super-admins who authored them.
+|
+| `clearPlatformRows()` and `committedSuperAdmin()` were file-scope functions in
+| `PlatformSettingsWriteTest.php` until I7b. They live here now because Pest
+| loads every test file into ONE process, so a second declaration in a second
+| file is a fatal redeclare — and relying on load order to reuse them across
+| files is fragile in a way that fails at collection time, not at assert time.
+*/
+
+/** Every NULL-tenant row, gone. Safe on the privileged connection: the default connection's open test
+ *  transaction never touches platform rows. */
+function clearPlatformRows(): void
+{
+    DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->delete();
+    DB::connection('pgsql_privileged')->table('audits')->whereNull('tenant_id')->delete();
+}
+
+/**
+ * A COMMITTED super-admin, visible from the separate `pgsql_superadmin` connection.
+ *
+ * `User::factory()->create()` writes inside RefreshDatabase's uncommitted transaction on the DEFAULT
+ * connection, so an elevated read cannot see it — and `settings.updated_by` is a real FK to `users`, which
+ * turns that invisibility into a 23503 rather than into a null.
+ */
+function committedSuperAdmin(string $email, string $name = 'Platform Operator'): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => $email,
+        'password' => Hash::make(Str::random(40)),
+        'email_verified_at' => now(),
+        'is_super_admin' => true,
+    ]);
+
+    return $user;
+}
+
+/** A COMMITTED ordinary (non-super-admin) user, for proving the actor catalog excludes them. */
+function committedPlainUser(string $email, string $name = 'Ordinary User'): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => $email,
+        'password' => Hash::make(Str::random(40)),
+        'email_verified_at' => now(),
+        'is_super_admin' => false,
+    ]);
+
+    return $user;
+}
+
+/**
+ * A COMMITTED tenant row, returned hydrated.
+ *
+ * ⚠️ `Tenant::on('pgsql_privileged')` DOES NOT WORK and fails silently — stancl's `CentralConnection`
+ * trait makes `getConnectionName()` return the central connection unconditionally, discarding the
+ * override, so the row lands inside the test transaction and the failure surfaces later and elsewhere as
+ * an FK violation. The raw query builder is the only way to commit one.
+ */
+function committedPlatformTenant(string $slug, string $name = 'Platform Fixture'): Tenant
+{
+    $id = Uuid::uuid7()->toString();
+
+    DB::connection('pgsql_privileged')->table('tenants')->insert([
+        'id' => $id,
+        'name' => $name,
+        'slug' => $slug,
+        'status' => 'active',
+        'default_locale' => 'en',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    /** @var Tenant $tenant */
+    $tenant = Tenant::query()->findOrFail($id);
+
+    return $tenant;
+}
+
+/**
+ * A COMMITTED audit row. Pass `$tenantId = null` for a PLATFORM row (the slice `/admin/audit-log` reads),
+ * or a tenant id for the row that must NEVER appear there.
+ *
+ * @param  array<string, mixed>|null  $new
+ */
+function committedAudit(
+    ?string $tenantId,
+    ?string $actorId,
+    string $auditableType = 'settings',
+    string $event = 'updated',
+    ?array $new = null,
+    ?string $auditableId = null,
+): string {
+    $id = Uuid::uuid7()->toString();
+
+    DB::connection('pgsql_privileged')->table('audits')->insert([
+        'id' => $id,
+        'tenant_id' => $tenantId,
+        'user_id' => $actorId,
+        'event' => $event,
+        'auditable_type' => $auditableType,
+        'auditable_id' => $auditableId ?? $actorId ?? Uuid::uuid7()->toString(),
+        'old_values' => null,
+        'new_values' => $new === null ? null : json_encode($new),
+        'redacted_fields' => null,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'pest',
+        'is_system_action' => false,
+        'created_at' => now(),
+    ]);
+
+    return $id;
+}
+
+/**
+ * Delete every committed I7b fixture, IN THIS ORDER. **The order is load-bearing.**
+ *
+ * ⚠️ `audits.tenant_id` is `nullOnDelete` (create_audits_table.php). Deleting a fixture TENANT before its
+ * audit rows does not delete those rows — it sets their `tenant_id` to NULL, **PROMOTING a tenant-scoped
+ * fixture into a permanent PLATFORM row** that the very viewer under test would then display, in this run
+ * and every run afterwards. Audits first, then tenants, then users.
+ *
+ * Registered via `$this->beforeApplicationDestroyed(...)` from a `beforeEach`, the I7a device: Laravel runs
+ * those callbacks in registration order, and RefreshDatabase registers its rollback earlier during setUp,
+ * so this executes once the test transaction is gone and there is nothing left to deadlock against.
+ */
+function purgeCommittedPlatformAuditFixtures(): void
+{
+    $connection = DB::connection('pgsql_privileged');
+
+    // Markers, not ids: a test that dies mid-way is still cleaned up by the next one.
+    $tenantIds = $connection->table('tenants')->where('slug', 'like', 'platform-audit-%')->pluck('id')->all();
+    $userIds = $connection->table('users')->where('email', 'like', '%@platformaudittest.local')->pluck('id')->all();
+
+    if ($tenantIds !== []) {
+        $connection->table('audits')->whereIn('tenant_id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('audits')->whereIn('user_id', $userIds)->delete();
+    }
+
+    // Whatever this suite left in the platform slice, including rows authored by a system actor.
+    $connection->table('audits')->whereNull('tenant_id')->where('user_agent', 'pest')->delete();
 
     if ($tenantIds !== []) {
         $connection->table('tenants')->whereIn('id', $tenantIds)->delete();

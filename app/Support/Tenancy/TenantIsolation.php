@@ -119,6 +119,43 @@ final class TenantIsolation
     }
 
     /**
+     * The NARROWED super-admin carve-out (Increment I7b): identical to {@see applySuperAdminBypass()}
+     * except that the gate carries a second conjunct, `<tenantColumn> IS NULL`, so the elevated role
+     * reaches the PLATFORM slice of a table and nothing else.
+     *
+     * ── WHY THIS EXISTS AS A SEPARATE SHAPE ─────────────────────────────────────────────────────────
+     * The gate {@see superAdminBypassSql()} emits is a DEFAULT, NOT A CONTRACT. It is correct on a table
+     * whose base shape is {@see nullableGlobalSql()} — the platform slice is already readable by every
+     * tenant there, so widening the elevated role to "all rows" adds nothing the operator could not
+     * already reach. It is WRONG on a table whose base shape is strict or append-only, where "all rows"
+     * means every tenant's complete history. `audits` is the first such table: the unrestricted form
+     * would have handed the platform operator every form title, every reviewer's returned_reason and
+     * every membership change in the deployment, bought to display a handful of platform-settings rows.
+     *
+     * The conjunct is the entire difference between a platform ledger viewer and a cross-tenant
+     * surveillance tool, so it is generated rather than hand-written per table (ADR-0002 §D2: policies
+     * come from a reusable helper, "not hand-written per table — reducing the chance any single
+     * migration author forgets a policy"). `tests/Unit/TenantIsolationSqlTest.php` pins the emitted
+     * string, which is the mechanical guard a hand-written CREATE POLICY would not have had.
+     *
+     * The policy name is `{table}_platform_{command}`, deliberately NOT `{table}_superadmin_*`:
+     *   - the existing bypass migrations sweep `LIKE '{table}_superadmin_%'` in their `down()`, so a
+     *     shared prefix would let an unrelated rollback drop this policy while its GRANT survived —
+     *     leaving the reading page rendering ZERO ROWS WITH NO ERROR, the worst failure available on a
+     *     compliance surface;
+     *   - every `*_superadmin_*` policy in the schema carries the unrestricted gate, so keeping the
+     *     names distinct means `SELECT policyname FROM pg_policies WHERE policyname LIKE '%_superadmin_%'`
+     *     stays an honest answer to "where does the operator hold an unrestricted read".
+     *
+     * @param  list<string>  $commands
+     */
+    public static function platformRowsBypass(string $table, array $commands = ['SELECT'], string $tenantColumn = 'tenant_id'): void
+    {
+        $role = config('database.connections.pgsql_superadmin.username');
+        self::execute(self::platformRowsBypassSql($table, is_string($role) ? $role : 'meridian_superadmin', $commands, $tenantColumn));
+    }
+
+    /**
      * The `form_versions` shape (Increment D, form-versioning-schema-migration.md §2): strict tenant
      * isolation for SELECT/INSERT/UPDATE — UPDATE stays strict so the publish transaction can perform
      * every legitimate status transition (draft→published, published→superseded) — PLUS a DELETE
@@ -366,6 +403,51 @@ final class TenantIsolation
                 'INSERT' => self::policy($table, 'superadmin_insert', 'INSERT', check: $gate, role: $superAdminRole),
                 'UPDATE' => self::policy($table, 'superadmin_update', 'UPDATE', using: $gate, check: $gate, role: $superAdminRole),
                 'DELETE' => self::policy($table, 'superadmin_delete', 'DELETE', using: $gate, role: $superAdminRole),
+                default => throw new InvalidArgumentException("Unsupported RLS command: {$command}"),
+            };
+        }
+
+        return $statements;
+    }
+
+    /**
+     * SQL for the {@see platformRowsBypass()} shape — the super-admin carve-out narrowed to the rows
+     * that belong to no tenant. Same additive, role-scoped, GUC-gated, no-ENABLE/FORCE construction as
+     * {@see superAdminBypassSql()}; the only difference is the `AND <tenantColumn> IS NULL` conjunct,
+     * and it is the whole point (see {@see platformRowsBypass()} for why it is a separate shape).
+     *
+     * `IS NULL` on a plain column is leakproof, so the planner may push it below the security barrier
+     * and use it as an index condition — which matters, because the base tenant SELECT policy has no
+     * `TO` clause and therefore also applies to the elevated role, and Postgres OR-composes same-command
+     * permissive policies. A caller that adds the same predicate at the ORM level gets an ordered index
+     * scan instead of an OR-over-two-branches plan.
+     *
+     * @param  list<string>  $commands
+     * @return list<string>
+     */
+    public static function platformRowsBypassSql(
+        string $table,
+        string $superAdminRole,
+        array $commands = ['SELECT'],
+        string $tenantColumn = 'tenant_id',
+    ): array {
+        self::assertIdentifier($table);
+        self::assertIdentifier($superAdminRole);
+        self::assertIdentifier($tenantColumn);
+
+        $gate = sprintf(
+            "current_setting(%s, true) = 'true' AND %s IS NULL",
+            self::quote(self::SUPERADMIN_SETTING),
+            $tenantColumn,
+        );
+
+        $statements = [];
+        foreach ($commands as $command) {
+            $statements[] = match (strtoupper($command)) {
+                'SELECT' => self::policy($table, 'platform_select', 'SELECT', using: $gate, role: $superAdminRole),
+                'INSERT' => self::policy($table, 'platform_insert', 'INSERT', check: $gate, role: $superAdminRole),
+                'UPDATE' => self::policy($table, 'platform_update', 'UPDATE', using: $gate, check: $gate, role: $superAdminRole),
+                'DELETE' => self::policy($table, 'platform_delete', 'DELETE', using: $gate, role: $superAdminRole),
                 default => throw new InvalidArgumentException("Unsupported RLS command: {$command}"),
             };
         }

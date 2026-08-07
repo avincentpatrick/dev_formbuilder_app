@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\SettingKey;
 use App\Models\Setting;
-use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Tenancy\SuperAdminContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 
 uses(RefreshDatabase::class);
@@ -36,34 +33,9 @@ uses(RefreshDatabase::class);
 | NULL-tenant rows.
 */
 
-function clearPlatformRows(): void
-{
-    DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->delete();
-    DB::connection('pgsql_privileged')->table('audits')->whereNull('tenant_id')->delete();
-}
-
-/**
- * A COMMITTED super-admin, visible from the separate `pgsql_superadmin` connection.
- *
- * `User::factory()->create()` writes inside RefreshDatabase's uncommitted transaction on the DEFAULT
- * connection, so the elevated write cannot see it — and `settings.updated_by` is a real FK to `users`,
- * which turns that invisibility into a 23503 rather than into a null. Exactly the SuperAdminBypassTest
- * idiom, including its trade-off: these rows are NOT cleaned up (a privileged DELETE would deadlock the
- * test's own open transaction), they carry a distinctive email, and `migrate:fresh` wipes them next run.
- */
-function committedSuperAdmin(string $email): User
-{
-    /** @var User $user */
-    $user = User::on('pgsql_privileged')->forceCreate([
-        'name' => 'Platform Operator',
-        'email' => $email,
-        'password' => Hash::make(Str::random(40)),
-        'email_verified_at' => now(),
-        'is_super_admin' => true,
-    ]);
-
-    return $user;
-}
+// ⚠️ `clearPlatformRows()` and `committedSuperAdmin()` MOVED TO tests/Pest.php in I7b. Pest loads every
+// test file into one process, so re-declaring a file-scope function in a second file is a fatal redeclare
+// — and I7b's platform-audit suites need both. They are globals from Pest.php now; nothing to import.
 
 beforeEach(function (): void {
     clearPlatformRows();

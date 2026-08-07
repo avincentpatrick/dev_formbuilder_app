@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\FeedbackConsoleController;
+use App\Http\Controllers\Admin\PlatformAuditController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\TenantAdminController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,12 @@ Route::domain((string) config('tenancy.central_domain'))
 
         Route::middleware('superadmin.mfa')->group(function (): void {
             Route::get('/tenants', [TenantAdminController::class, 'index'])->name('admin.tenants.index');
+            // One workspace in depth (I7b): plan + usage + domains. ⚠️ `whereUuid` is not decoration —
+            // `tenants.id` is a uuid column, so an unbound `/admin/tenants/not-a-uuid` reaches Postgres as
+            // `where id = 'not-a-uuid'` and raises SQLSTATE 22P02, i.e. a 500 rather than a 404. The three
+            // POST routes below share that latent defect and have simply never been reachable from a UI.
+            Route::get('/tenants/{tenant}', [TenantAdminController::class, 'show'])
+                ->whereUuid('tenant')->name('admin.tenants.show');
             Route::post('/tenants/{tenant}/suspend', [TenantAdminController::class, 'suspend'])->name('admin.tenants.suspend');
             Route::post('/tenants/{tenant}/reactivate', [TenantAdminController::class, 'reactivate'])->name('admin.tenants.reactivate');
             // Assign (or change) a tenant's plan — admin-assigned, no Cashier (H5a / ADR-0008). The service
@@ -50,6 +57,14 @@ Route::domain((string) config('tenancy.central_domain'))
                 ->whereUuid('feedback')->name('admin.feedback.update');
             Route::get('/feedback/{feedback}/screenshot', [FeedbackConsoleController::class, 'screenshot'])
                 ->whereUuid('feedback')->name('admin.feedback.screenshot');
+
+            // The PLATFORM audit ledger (I7b, PRD Feature #12 / RBAC §9). Reads `audits` rows with
+            // `tenant_id IS NULL` ONLY — the rows /admin/settings writes — through a narrowed SELECT policy
+            // (`audits_platform_select`). A super-admin action against a SPECIFIC tenant is deliberately
+            // not here: it lands in that tenant's own /audit-log, which is RBAC §9's transparency posture,
+            // and the page says so in as many words. No {audit} detail route (the diff is a modal, matching
+            // routes/tenant.php's call) and no export — see the controller docblock.
+            Route::get('/audit-log', [PlatformAuditController::class, 'index'])->name('admin.audit-log.index');
 
             // Platform settings (I5, PRD Feature #10) — open-signup and platform maintenance, the two
             // toggles that belong to no tenant. The WRITE is the console's first operation that needs the

@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
+use App\Services\Admin\TenantDetailPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -26,13 +27,31 @@ use Inertia\Response;
  */
 final class TenantAdminController extends Controller
 {
-    public function __construct(private readonly SuperAdminService $superAdmin) {}
+    public function __construct(
+        private readonly SuperAdminService $superAdmin,
+        private readonly TenantDetailPresenter $detail,
+    ) {}
 
     public function index(): Response
     {
         return Inertia::render('admin/Tenants', [
             'tenants' => $this->superAdmin->listTenants(),
         ]);
+    }
+
+    /**
+     * One workspace in depth (I7b): identity + plan + usage + domains. `show` belongs on this controller
+     * rather than a fourth one because it is the detail view of the resource {@see index()} lists —
+     * splitting `index` and `show` of one resource across two classes would be worse than any line count.
+     *
+     * Route-model binding is safe here ONLY because `tenants` is central and RLS-exempt. A console route
+     * over an RLS-protected table cannot use it — binding resolves on the app connection, which carries no
+     * tenant context on the central host, so every valid id would 404. {@see FeedbackConsoleController}
+     * states the rule in full; this is the one place in the console that is legitimately exempt from it.
+     */
+    public function show(Tenant $tenant): Response
+    {
+        return Inertia::render('admin/TenantDetail', $this->detail->show($tenant));
     }
 
     public function suspend(Request $request, Tenant $tenant): RedirectResponse
@@ -64,8 +83,14 @@ final class TenantAdminController extends Controller
      */
     public function assignPlan(Request $request, Tenant $tenant): RedirectResponse
     {
+        // ⚠️ `bail` + `uuid` BEFORE `exists`, and both are load-bearing. `plans.id` is a uuid column, so
+        // `exists:plans,id` on a non-uuid string emits `where id = 'garbage'` and Postgres raises
+        // SQLSTATE 22P02 — a 500, not a validation error. And `uuid` alone does not save it: Laravel only
+        // short-circuits an attribute after an IMPLICIT rule fails, so without `bail` the `exists` rule
+        // still runs after `uuid` has already failed. Latent since H5a purely because no UI ever posted
+        // here; I7b gives the route a form.
         $validated = $request->validate([
-            'plan_id' => ['required', 'string', 'exists:plans,id'],
+            'plan_id' => ['required', 'bail', 'uuid', 'exists:plans,id'],
             'billing_interval' => ['nullable', Rule::enum(BillingInterval::class)],
         ]);
 

@@ -60,6 +60,9 @@ export interface AppAbilities {
     // obligation for every tenant and not an upsell. Do not add a `feature:` to its nav item by symmetry
     // with its four neighbours.
     viewAuditLog: boolean;
+    // `feedback.view` (I7a) — Owner/Admin. Like viewAuditLog it carries no companion plan feature: seeing
+    // what your own people reported about the product is a baseline, not a tier.
+    viewFeedback: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };

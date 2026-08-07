@@ -28,6 +28,9 @@ watch(
 const links = [
     { label: 'Tenants', href: '/admin/tenants' },
     { label: 'Users', href: '/admin/users' },
+    // I7a — the feedback support queue (PRD Feature #11). Read-and-triage, so it sits with the other
+    // read surfaces rather than beside the destructive one.
+    { label: 'Feedback', href: '/admin/feedback' },
     // I5 — platform settings (PRD Feature #10). Last, because it is the only destructive one here.
     { label: 'Platform', href: '/admin/settings' },
 ];

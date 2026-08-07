@@ -281,10 +281,26 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
 
 ## 11. Feedback — Feature #11
 
-1. Any page · owner. Find the feedback affordance in the app shell.
-2. Submit feedback with a comment. **Expect:** a confirmation, and the route you were on is captured with it.
-3. There is **no** admin console for reading feedback yet — that is increment I7. The four seeded reports (one
-   in each state) exist so that console has data on day one.
+1. Any page · owner. Find the **Feedback** button in the top bar and open it.
+2. Submit feedback with a comment only. **Expect:** a confirmation toast, and the page you were on is
+   captured with it — you never left the screen you were reporting about.
+3. Open it again and press **Capture screen**. **Expect:** your browser asks which window or tab to share;
+   pick this one and a thumbnail appears in the panel. Press **Remove**, then capture again — it replaces.
+4. Now open it once more, press **Capture screen**, and **cancel** the browser's picker. **Expect:** nothing
+   happens. No error, no red text, and the form is still ready to send. *Declining is a normal choice, not a
+   failure — if you see an error here, that is a defect.*
+5. Note the **Attach an image** file input beside the capture button. It is there in every browser, including
+   ones that cannot capture at all (iOS Safari). Attach any PNG/JPEG and send.
+
+   > Try attaching an **SVG**. **Expect:** it is refused with a message about PNG/JPEG/WebP. This is
+   > deliberate — that image is displayed back to the platform operator, and an SVG can carry a script.
+
+6. `/feedback` · owner. **Expect:** a read-only list of everything your workspace has sent, including what
+   you just submitted, with a **Screenshot** tag on the ones that have one. Open a row to read it in full and
+   see the image.
+7. **Expect no way to change a status here.** That belongs to the platform support team — §15 is where you
+   act on these. Sign in as `viewer@demo.test` and try `/feedback`. **Expect:** turned away; every role can
+   *send* feedback, only Owner and Admin can *read* the workspace's list.
 
 ---
 
@@ -358,11 +374,28 @@ The console lives on the **central host**, not on a workspace, and it requires t
 4. `/admin/tenants`. **Expect:** both workspaces listed. Suspend one and confirm its members are locked out;
    reactivate it.
 5. Assign a different **plan** to `northwind`. **Expect:** its available features change accordingly.
-6. `/admin/users`. **Expect:** users across all workspaces — this is the one place that reads across tenants.
-7. `/admin/settings`. **Expect:** a platform signup toggle and platform maintenance mode.
-8. Turn **platform signup** off. Open <http://localhost:8080> in a private window. **Expect:** the
+6. `/admin/users`. **Expect:** users across all workspaces — this is one of the places that reads across
+   tenants.
+7. `/admin/feedback`. **Expect:** every workspace's feedback in one queue — the four seeded demo reports
+   (one in each state: New, Reviewed, Resolved, Won't fix) plus anything you sent in §11, from **both**
+   `demo` and `northwind`. Filter by workspace and by status.
+8. Open a **New** report. **Expect:** the full remarks, the page it came from, the reporter's email, the
+   browser details, and the screenshot if it has one. **Expect the only buttons to be `Mark Reviewed` and
+   `Mark Won't fix`** — not `Mark Resolved`. A report goes to Resolved *through* Reviewed; the console only
+   ever offers the steps the server will accept.
+9. Mark it **Reviewed**, then open it again and mark it **Resolved**. Now re-open it (`Mark Reviewed`).
+   **Expect:** it returns to Reviewed and the "Closed" line disappears — re-opening clears the resolution
+   rather than keeping a stale one. Note there is no way back to **New**: once someone has looked at a
+   report, the queue must not be able to claim nobody has.
+10. **This is the transparency check, and it is the interesting one.** Sign in to the workspace that report
+   came from (e.g. <http://demo.localhost:8080> as `owner@demo.test`) and open `/audit-log`. **Expect:** your
+   status changes are listed there, under **Feedback report**, showing the before and after status —
+   the workspace can see how the platform handled what they sent. **Expect the remarks NOT to appear** in
+   the ledger entry: the audit trail records *that* a report was handled, never a copy of its contents.
+11. `/admin/settings`. **Expect:** a platform signup toggle and platform maintenance mode.
+12. Turn **platform signup** off. Open <http://localhost:8080> in a private window. **Expect:** the
    "Create a workspace" button is gone from the landing page. Turn it back on and confirm it returns.
-9. Turn **platform maintenance** on. In a private window, open <http://localhost:8080> and a workspace.
+13. Turn **platform maintenance** on. In a private window, open <http://localhost:8080> and a workspace.
    **Expect:** both show the maintenance page — while `/admin` stays reachable for you, so you can turn it
    back off. **Turn it back off.**
 
@@ -405,7 +438,6 @@ expected and is not a defect.
 | **Real-time notification push** | The bell polls on an interval rather than pushing over a socket. Deliberate; the socket layer is deployment-track work. |
 | **Google Sheets connector UI** | The backend and the shared column-mapping engine are built; the connect-and-map screens are increment H16b. |
 | **Airtable connector** | Increment H16c. |
-| **Feedback admin console** | Increment I7. The seeded feedback reports exist so it has data when it lands. |
 | **Step-up re-authentication, org-wide enforced 2FA** | Increment I8. |
 | **Post-submission answer editing, screened-out status** | Increment I9. |
 | **Production deployment** | Track B, after the application is otherwise complete. |

@@ -188,6 +188,100 @@ final class AttachmentStorageService
     }
 
     /**
+     * Store a FEEDBACK SCREENSHOT (I7a, PRD Feature #11) — the third sibling, after {@see self::store()}
+     * and {@see self::storeBrandingLogo()}, and it is a sibling for the same reason the logo is: there is
+     * no {@see FormField}, so no `accepted_types`, no per-field size cap, and no `is_sensitive`/`is_pii`
+     * to inherit. What transfers is the discipline — content-sniffed MIME, server-generated key, sniffed
+     * extension, queued scan.
+     *
+     * ── `$feedbackReportId` IS PASSED IN, AND THAT IS THE WHOLE POINT ────────────────────────────────────
+     * `attachable_type`/`attachable_id` are NOT NULL (`uuidMorphs`), but the report row does not exist yet
+     * when its screenshot is stored — the FK runs the other way (`feedback_reports.screenshot_attachment_id`,
+     * data-dictionary:1060). {@see App\Services\Feedback\FeedbackService::submit()} therefore mints the
+     * report's uuid7 FIRST and hands it here, so both directions agree from the first INSERT. The
+     * alternative — store against the tenant, then re-point — is what `store()` does for respondent media
+     * only because a submission genuinely does not exist at upload time; here it does, one line later.
+     *
+     * **The `feedback_report` morph alias is stored but NOT registered in the global morph map**, exactly
+     * as `tenant` is not (see storeBrandingLogo()'s note and `BrandingMorphAliasTest`): registering it
+     * would change how Sanctum's `tokenable_type` and Spatie's `model_type` serialize. Nothing resolves
+     * `$attachment->attachable`, and the read path is the real FK in the other direction.
+     *
+     * **`is_pii` is TRUE, unlike the brand logo's false, and the asymmetry is deliberate.** A logo is the
+     * tenant's own published mark. A screenshot is a photograph of whatever was on the reporter's screen —
+     * data-dictionary §21 flags exactly this: the pointer column is not PII but "the captured screenshot
+     * **image itself** may contain PII (whatever was on-screen)". It is not encrypted at rest for the same
+     * reason no other attachment is (that is `is_sensitive`'s job, and no field owns this file), but it is
+     * flagged so a GDPR erasure sweep finds it.
+     *
+     * @throws AttachmentException on a rejected MIME type or an over-size file
+     */
+    public function storeFeedbackScreenshot(
+        UploadedFile $file,
+        string $tenantId,
+        string $feedbackReportId,
+        string $uploadedBy,
+    ): Attachment {
+        $mime = $file->getMimeType() ?? 'application/octet-stream';
+
+        /** @var list<string> $accepted */
+        $accepted = config('attachments.feedback_screenshot.accepted_types');
+
+        if (! $this->mimeAllowed($mime, $accepted)) {
+            throw AttachmentException::mimeRejected($mime);
+        }
+
+        $maxBytes = (int) config('attachments.feedback_screenshot.max_bytes');
+
+        if ((int) $file->getSize() > $maxBytes) {
+            throw AttachmentException::tooLarge($maxBytes);
+        }
+
+        // A screenshot is always uploaded by a signed-in member (feedback has no guest path — §21's
+        // Design Notes rule guest feedback out of the initial release), so the storage quota applies
+        // exactly as it does to a member's media upload.
+        $this->quota->assertCanCreate(UsageMetric::StorageBytes, (int) $file->getSize());
+
+        $kind = AttachmentKind::FeedbackScreenshot;
+        $disk = (string) config('filesystems.default');
+
+        $uuid = Uuid::uuid7()->toString();
+        $extension = $file->extension() ?: 'bin';
+        $directory = "tenants/{$tenantId}/{$kind->value}/".date('Ym');
+        $storedPath = Storage::disk($disk)->putFileAs($directory, $file, "{$uuid}.{$extension}");
+
+        if ($storedPath === false) {
+            throw AttachmentException::storeFailed();
+        }
+
+        [$width, $height] = $this->imageDimensions($file, $mime);
+
+        $attachment = Attachment::create([
+            'id' => $uuid,
+            'attachable_type' => 'feedback_report',
+            'attachable_id' => $feedbackReportId,
+            'kind' => $kind,
+            'disk' => $disk,
+            'path' => $storedPath,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $mime,
+            'size_bytes' => (int) $file->getSize(),
+            'checksum_sha256' => hash_file('sha256', (string) $file->getRealPath()) ?: null,
+            'width' => $width,
+            'height' => $height,
+            'duration_seconds' => null,
+            'is_encrypted_at_rest' => false,
+            'is_pii' => true,
+            'virus_scan_status' => ScanStatus::Pending,
+            'uploaded_by' => $uploadedBy,
+        ]);
+
+        ScanAttachmentJob::dispatch($attachment->id, $tenantId);
+
+        return $attachment;
+    }
+
+    /**
      * @throws AttachmentException
      */
     private function resolveMediaField(FormVersion $version, string $fieldKey): FormField

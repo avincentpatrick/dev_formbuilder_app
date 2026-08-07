@@ -6,10 +6,13 @@ namespace App\Services\Admin;
 
 use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
+use App\Enums\FeedbackStatus;
 use App\Enums\SettingKey;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
+use App\Models\Attachment;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\FeedbackReport;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\Subscription;
@@ -44,9 +47,12 @@ use Illuminate\Support\Facades\DB;
  * acting super-admin's id (a human acted; `is_system_action` stays false).
  *
  * I5 adds the console's PLATFORM settings write, which is the first operation here that genuinely needs
- * the elevated connection to WRITE rather than to read — see {@see updatePlatformSettings()}. Still
- * deferred to later increments (tables don't exist yet): billing / feedback-report consoles, and
- * cross-tenant `audits` SEARCH.
+ * the elevated connection to WRITE rather than to read — see {@see updatePlatformSettings()}.
+ *
+ * I7a adds the feedback-report console: {@see listFeedback()} reads across tenants through a SELECT-only
+ * bypass, while {@see transitionFeedback()} writes through the adopt-context pattern instead — the
+ * clearest illustration in this file of the rule its header states, that §9 requires routing through the
+ * one service and NOT elevating every operation. Still deferred: the billing console.
  */
 final class SuperAdminService
 {
@@ -290,6 +296,243 @@ final class SuperAdminService
                 'name' => $u->name,
                 'email' => $u->email,
             ])->all());
+        });
+    }
+
+    /**
+     * One page of feedback reports across EVERY tenant (I7a, PRD Feature #11 / RBAC §9 console scope:
+     * "the internal `feedback_reports` (§21) review queue"). The second elevated read after
+     * {@see self::listAllUsers()}, and the first that joins two bypassed tables.
+     *
+     * ── THREE DELIBERATE CHOICES ────────────────────────────────────────────────────────────────────────
+     * 1. **Reporter names are fetched with a second explicit query, not `with('user')`.** Eager loading
+     *    does propagate the parent's connection (`newRelatedInstance()` sets it), so the elegant version
+     *    very probably works — but its failure mode if that ever changes is silent and wrong rather than
+     *    loud: the related query would run on the app connection, which on the central host has no tenant
+     *    context, so every reporter would simply render as null. An explicit `User::on(CONNECTION)` cannot
+     *    fail that way.
+     * 2. **Tenant names are resolved OUTSIDE the elevated connection**, on the default one. `tenants` is
+     *    central and RLS-exempt, so the ordinary role reads it in full; joining it here would mean granting
+     *    the elevated role a privilege it has no other reason to hold.
+     * 3. **`orderByDesc('submitted_at')`**, served by the index added in 2026_08_07_000001. `id` would give
+     *    recency for free (uuidv7) as the audit viewer exploits — but rows are created per tenant and read
+     *    across all of them, and `submitted_at` is the column the operator is actually sorting by.
+     *
+     * ⚠️ **`withoutGlobalScope($tenantScope)` IS MANDATORY HERE, AND ITS ABSENCE FAILS SILENTLY.** The RLS
+     * carve-out is only the DATABASE half. {@see BelongsToTenant} also injects a PHP-side
+     * `where tenant_id = <context>` into every query, and with no context — which is exactly the console's
+     * situation, since it runs on the central host — that predicate becomes the NO_TENANT_SENTINEL, so the
+     * query asks for rows belonging to a tenant that cannot exist. The result is an empty list with no
+     * error, on a page whose empty state reads "No feedback yet". {@see listAllUsers()} needs no such call
+     * only because `users` has no tenant column and does not use the trait; every future cross-tenant read
+     * of a tenant-scoped table does.
+     *
+     * @param  array{status?: ?string, tenant_id?: ?string}  $filters
+     * @return array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
+     */
+    public function listFeedback(array $filters, int $perPage, int $page): array
+    {
+        /** @var array{rows: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, total: int, per_page: int}} $result */
+        $result = $this->elevated(function () use ($filters, $perPage, $page): array {
+            $query = FeedbackReport::on(SuperAdminContext::CONNECTION)
+                ->withoutGlobalScope(FeedbackReport::$tenantScope)
+                ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
+                ->when($filters['tenant_id'] ?? null, fn ($q, $v) => $q->where('tenant_id', $v))
+                ->orderByDesc('submitted_at');
+
+            $total = (clone $query)->count();
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $current = min(max(1, $page), $lastPage);
+
+            /** @var Collection<int, FeedbackReport> $reports */
+            $reports = $query->forPage($current, $perPage)->get();
+
+            $names = $this->reporterNames($reports);
+
+            return [
+                'rows' => array_values($reports->map(fn (FeedbackReport $r): array => [
+                    'id' => (string) $r->getKey(),
+                    'tenant_id' => $r->tenant_id,
+                    'route' => $r->route,
+                    'remarks' => $r->remarks,
+                    'browser_info' => $r->browser_info,
+                    'status' => $r->status->value,
+                    'submitted_at' => $r->submitted_at->toIso8601String(),
+                    'resolved_at' => $r->resolved_at?->toIso8601String(),
+                    'reporter' => $names[$r->user_id] ?? null,
+                    'resolver' => $r->resolved_by === null ? null : ($names[$r->resolved_by] ?? null),
+                    'has_screenshot' => $r->screenshot_attachment_id !== null,
+                ])->all()),
+                'meta' => [
+                    'current_page' => $current,
+                    'last_page' => $lastPage,
+                    'total' => $total,
+                    'per_page' => $perPage,
+                ],
+            ];
+        });
+
+        return $result;
+    }
+
+    /**
+     * Reporter + resolver display names for one page, keyed by user id — one query through the `users`
+     * SELECT bypass (2026_07_05_040100), inside the caller's already-open elevated transaction.
+     *
+     * @param  Collection<int, FeedbackReport>  $reports
+     * @return array<string, array{name: string, email: string}>
+     */
+    private function reporterNames(Collection $reports): array
+    {
+        $ids = $reports
+            ->flatMap(fn (FeedbackReport $r): array => array_filter([$r->user_id, $r->resolved_by]))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var Collection<int, User> $users */
+        $users = User::on(SuperAdminContext::CONNECTION)->whereIn('id', $ids)->get(['id', 'name', 'email']);
+
+        /** @var array<string, array{name: string, email: string}> $map */
+        $map = $users->mapWithKeys(fn (User $u): array => [
+            (string) $u->getKey() => ['name' => $u->name, 'email' => $u->email],
+        ])->all();
+
+        return $map;
+    }
+
+    /**
+     * One feedback report by id, read across tenants (I7a). Used by the console's screenshot route, which
+     * must learn the report's `tenant_id` before it can adopt that tenant's context to reach the
+     * attachment row. Returns null when the id is unknown — the caller 404s.
+     *
+     * The returned model is bound to the ELEVATED connection and its elevation is already gone (the GUC is
+     * transaction-local). Treat it as a read-only value object: never `save()` it.
+     *
+     * Drops the ORM tenant scope for the reason {@see listFeedback()} spells out — without it this returns
+     * null for every id and the console 404s reports that plainly exist.
+     */
+    public function findFeedback(string $reportId): ?FeedbackReport
+    {
+        /** @var ?FeedbackReport $report */
+        $report = $this->elevated(fn (): ?FeedbackReport => FeedbackReport::on(SuperAdminContext::CONNECTION)
+            ->withoutGlobalScope(FeedbackReport::$tenantScope)
+            ->find($reportId));
+
+        return $report;
+    }
+
+    /**
+     * The {@see Attachment} row behind a report's screenshot, read for the console (I7a).
+     *
+     * **This is why `attachments` needs no super-admin bypass of its own, and must not get one.** The
+     * report already names its tenant, so the attachment is reachable through the H4 adopt-context pattern:
+     * one transaction with that tenant's context adopted, the ordinary strict SELECT policy passing
+     * unaided, context restored in `finally`. A bypass on `attachments` would have handed the operator
+     * every respondent's uploaded file and every OCR source scan in the deployment — an enormous
+     * widening, bought to read one image the platform is already entitled to see.
+     *
+     * Returns null when the report has no screenshot, or when the row is soft-deleted (the SoftDeletes
+     * global scope, which is what actually stops a deleted screenshot rendering — not the FK).
+     */
+    public function feedbackScreenshot(FeedbackReport $report): ?Attachment
+    {
+        if ($report->screenshot_attachment_id === null) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($report): ?Attachment {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal($report->tenant_id);
+
+            try {
+                /** @var ?Attachment $attachment */
+                $attachment = Attachment::query()->find($report->screenshot_attachment_id);
+
+                return $attachment;
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
+        });
+    }
+
+    /**
+     * Move a feedback report through its lifecycle (I7a) — the console's one write, and the event
+     * `docs/audit-compliance-logging-spec.md` §1 registers for this table: *"`updated` (status transitions
+     * by platform support) — support-team accountability for how a tenant's feedback report was handled."*
+     *
+     * ── NO ELEVATED WRITE, BY DESIGN ────────────────────────────────────────────────────────────────────
+     * The bypass on `feedback_reports` is SELECT-only. A transition names exactly one report whose tenant
+     * is already known, so this uses the H4 adopt-tenant-context pattern ({@see self::changeStatus()}):
+     * one transaction on the ORDINARY connection with the affected tenant's context adopted, so both the
+     * UPDATE and its audit INSERT pass the strict policies unaided, and the prior context is restored in
+     * `finally`. The audit therefore lands in the AFFECTED TENANT'S OWN LEDGER — RBAC §9 transparency: the
+     * workspace that reported a problem can see, on its own /audit-log, that the operator handled it. An
+     * elevated write would have produced a `tenant_id = NULL` row invisible to exactly the people entitled
+     * to see it.
+     *
+     * ⚠️ **The auditable type is `'feedback_reports'` — PLURAL.** `AuditRedactor::PII` and
+     * `AuditableTypes::LABELS` are both keyed that way for this table, unlike the singular `'submission'`
+     * and `'attachment'`. Emitting `'feedback_report'` would still write a perfectly valid-looking row,
+     * and would silently switch OFF redaction of `remarks`/`browser_info` for it.
+     *
+     * @throws SuperAdminException on a transition the lifecycle does not offer
+     */
+    public function transitionFeedback(FeedbackReport $report, FeedbackStatus $to, User $actor): void
+    {
+        $from = $report->status;
+
+        if (! $from->canTransitionTo($to)) {
+            throw SuperAdminException::invalidFeedbackTransition($from, $to);
+        }
+
+        DB::transaction(function () use ($report, $from, $to, $actor): void {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal($report->tenant_id);
+
+            try {
+                /** @var FeedbackReport $row */
+                $row = FeedbackReport::query()->findOrFail($report->getKey());
+
+                $old = [
+                    'status' => $from->value,
+                    'resolved_at' => $row->resolved_at?->toIso8601String(),
+                    'resolved_by' => $row->resolved_by,
+                ];
+
+                // Re-opening CLEARS the resolution stamp rather than preserving it: those two columns mean
+                // "when, and by whom, was this closed", and a re-opened report is not closed. The history
+                // is not lost — it is in the audit row this method writes.
+                $resolvedAt = $to->isTerminal() ? now() : null;
+                $resolvedBy = $to->isTerminal() ? (string) $actor->getKey() : null;
+
+                $row->forceFill([
+                    'status' => $to,
+                    'resolved_at' => $resolvedAt,
+                    'resolved_by' => $resolvedBy,
+                ])->save();
+
+                $this->audit->record(
+                    AuditEvent::Updated,
+                    'feedback_reports',
+                    (string) $row->getKey(),
+                    old: $old,
+                    new: [
+                        'status' => $to->value,
+                        'resolved_at' => $resolvedAt?->toIso8601String(),
+                        'resolved_by' => $resolvedBy,
+                    ],
+                    actorId: (string) $actor->getKey(),
+                );
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+            }
         });
     }
 

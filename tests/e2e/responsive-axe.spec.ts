@@ -64,6 +64,17 @@ const pages = [
     // primitives are axe-covered by the Storybook job; see docs/feature-backlog.md for the row that owns
     // closing that gap.
     { name: 'Settings', path: '/settings' },
+    // The workspace's own feedback (I7a, PRD Feature #11). `E2eSeeder::seedFeedback()` puts one row in
+    // each of the four FeedbackStatus states, which is what makes this scan worth running: the four map
+    // to four DIFFERENT badge variants, and a table where every pill is the same colour proves nothing
+    // about the other three. The last fixture row also carries a long unbroken URL inside the remarks
+    // cell — the 375px overflow trap that has now caught Domains and the Audit log.
+    //
+    // The PLATFORM console (/admin/feedback) is deliberately NOT here, on the same footing as
+    // /admin/settings: playwright.config.ts records that central-domain admin pages are excluded because
+    // `superadmin.mfa` needs a TOTP in CI. Its primitives are axe-covered by the Storybook job, and its
+    // behaviour by resources/js/Pages/admin/feedback.test.ts.
+    { name: 'Feedback', path: '/feedback' },
 ];
 
 const themes = ['light', 'dark'] as const;

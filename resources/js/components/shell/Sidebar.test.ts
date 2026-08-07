@@ -40,6 +40,7 @@ function allAbilities(overrides: Record<string, boolean> = {}): Record<string, b
         viewAnalytics: true,
         manageDomains: true,
         viewAuditLog: true,
+        viewFeedback: true,
         ...overrides,
     };
 }
@@ -165,6 +166,46 @@ describe('Sidebar — the Domains destination', () => {
  * fixture — so this is the only thing in the suite proving a Viewer, Reviewer or Form Editor never sees a
  * destination that would show them every act in the organization.
  */
+/**
+ * The Feedback destination (Increment I7a, PRD Feature #11).
+ *
+ * Shaped like the Audit log's suite and for the same two reasons: no `feature:` (seeing what your own
+ * people reported about the product is a baseline, not a tier), and a ROLE negative that nothing else
+ * covers. `RolePermissionSeeder` grants `feedback.submit` to every role but `feedback.view` to Owner and
+ * Admin only — so a Viewer who can SEND feedback must not see the destination that READS the workspace's
+ * whole pile of it, and Playwright only ever loads the Owner fixture.
+ */
+describe('Sidebar — the Feedback destination', () => {
+    it('shows Feedback to a user who may read the workspace list', () => {
+        const wrapper = render(allAbilities(), {});
+
+        expect(labels(wrapper).join(' ')).toContain('Feedback');
+        wrapper.unmount();
+    });
+
+    it('HIDES it from a user without viewFeedback, even with every entitlement on', () => {
+        // The Viewer case: they still hold feedback.submit and the shell's Send Feedback button, which is
+        // exactly why the destination disappearing is the thing worth asserting.
+        const wrapper = render(allAbilities({ viewFeedback: false }), {
+            advanced_analytics: true,
+            webhooks: true,
+            native_connectors: true,
+            custom_domain: true,
+        });
+
+        expect(labels(wrapper).join(' ')).not.toContain('Feedback');
+        wrapper.unmount();
+    });
+
+    it('shows it on a plan with NO features at all — it is not an upsell', () => {
+        const wrapper = render(allAbilities(), {});
+
+        expect(labels(wrapper).join(' ')).toContain('Feedback');
+        expect(labels(wrapper).join(' ')).not.toContain('Analytics');
+        wrapper.unmount();
+    });
+});
+
 describe('Sidebar — the Audit log destination', () => {
     it('shows the Audit log to a user who may read the ledger', () => {
         const wrapper = render(allAbilities(), {});

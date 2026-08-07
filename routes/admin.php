@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\FeedbackConsoleController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\TenantAdminController;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +41,15 @@ Route::domain((string) config('tenancy.central_domain'))
 
             // Cross-tenant user list — exercises the `superadmin_bypass` RLS carve-out via SuperAdminService.
             Route::get('/users', [TenantAdminController::class, 'users'])->name('admin.users.index');
+
+            // Feedback support console (I7a, PRD Feature #11 / RBAC §9 review queue). The `{feedback}`
+            // parameter is a RAW UUID, never a bound model: binding resolves on the app connection, which
+            // has no tenant context here, so RLS would 404 every valid id. See the controller's docblock.
+            Route::get('/feedback', [FeedbackConsoleController::class, 'index'])->name('admin.feedback.index');
+            Route::patch('/feedback/{feedback}', [FeedbackConsoleController::class, 'update'])
+                ->whereUuid('feedback')->name('admin.feedback.update');
+            Route::get('/feedback/{feedback}/screenshot', [FeedbackConsoleController::class, 'screenshot'])
+                ->whereUuid('feedback')->name('admin.feedback.screenshot');
 
             // Platform settings (I5, PRD Feature #10) — open-signup and platform maintenance, the two
             // toggles that belong to no tenant. The WRITE is the console's first operation that needs the

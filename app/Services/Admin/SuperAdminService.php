@@ -11,6 +11,7 @@ use App\Enums\SettingKey;
 use App\Enums\TenantStatus;
 use App\Exceptions\Admin\SuperAdminException;
 use App\Models\Attachment;
+use App\Models\Audit;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\FeedbackReport;
 use App\Models\Plan;
@@ -18,11 +19,14 @@ use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Audit\AuditLogPresenter;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Settings\PlatformSettings;
 use App\Support\Audit\AuditLogger;
 use App\Support\Tenancy\SuperAdminContext;
 use App\Support\Tenancy\TenantContext;
+use App\Support\Tenancy\TenantIsolation;
+use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +57,14 @@ use Illuminate\Support\Facades\DB;
  * bypass, while {@see transitionFeedback()} writes through the adopt-context pattern instead — the
  * clearest illustration in this file of the rule its header states, that §9 requires routing through the
  * one service and NOT elevating every operation. Still deferred: the billing console.
+ *
+ * I7b adds both halves once more, and one genuinely new thing. {@see tenantSnapshot()} is adopt-context —
+ * eight RLS-scoped tables reached by one `SET LOCAL` rather than by eight new GRANTs. {@see listPlatformAudits()}
+ * is the third elevated read, and the FIRST whose carve-out is NARROWED rather than unrestricted: it uses
+ * {@see TenantIsolation::platformRowsBypass()}, whose gate carries `AND tenant_id IS NULL`,
+ * because the generic bypass on `audits` would have handed the operator every tenant's complete history.
+ * The generalising rule, for the next console surface: a cross-tenant read of a table whose base policy is
+ * not `nullable_global` needs a carve-out narrowed to the slice it actually serves.
  */
 final class SuperAdminService
 {
@@ -193,6 +205,94 @@ final class SuperAdminService
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
         });
+    }
+
+    /**
+     * Everything about ONE tenant that only that tenant's own context can answer (I7b) — its entitlement
+     * snapshot, its governing subscription, and its owner. The read behind `GET /admin/tenants/{tenant}`.
+     *
+     * ── WHY THIS IS ADOPT-CONTEXT AND NOT elevated() ────────────────────────────────────────────────────
+     * Every table involved (`subscriptions`, `forms`, `attachments`, `tenant_users`, `webhook_endpoints`,
+     * `usage_counters`, `legacy_overrides`, `users`) is reachable under the ordinary app role once the
+     * affected tenant's context is adopted — the {@see feedbackScreenshot()} argument applied to eight
+     * tables instead of one. Elevating instead would have needed eight new GRANTs and eight new bypass
+     * policies to read what one `SET LOCAL` already reaches, and §9 requires routing through the one
+     * service, not elevating every operation.
+     *
+     * ⚠️ **THE TRANSACTION IS MANDATORY AND EVERY FAILURE MODE HERE IS SILENT.**
+     * {@see TenantContext::applyLocal()} is `SET LOCAL` — outside a transaction it is a no-op, and
+     * {@see EntitlementService::snapshot()} then returns **null** (it early-returns off-tenant) while every
+     * gauge reads 0 and the owner reads null. Nothing throws. Move any line below out of the closure and
+     * the page renders a plausible, wrong tenant.
+     *
+     * ⚠️ **THE OWNER IS ONLY READABLE FROM INSIDE.** `users` has the join-shape visibility policy
+     * ({@see TenantIsolation::usersVisibilitySql()}), whose second disjunct matches
+     * every ACTIVE member of the current tenant — so the owner resolves under the adopted context and
+     * returns null everywhere else. Null is also the honest answer when the owner is no longer an active
+     * member; the presenter says so rather than rendering an em dash.
+     *
+     * **`forget()` is called on BOTH sides, and the reason for the leading one is not the obvious one.**
+     * It is not about leaking into the shared Inertia props: inertia-laravel's middleware calls
+     * `Inertia::share()` BEFORE the controller runs, and `EntitlementService::currentPlan()` early-returns
+     * on a null tenant id before it ever consults the memo, so that leak is structurally impossible. The
+     * real reason is the test process: the service is bound `scoped()`, and only the queue worker calls
+     * `forgetScopedInstances()` — so one instance survives every `$this->get()`/`$this->post()` in a Pest
+     * test, and a test that renders, mutates, then re-renders would read a memoized plan and assert a stale
+     * answer IN THE PASSING DIRECTION. The trailing one is hygiene: the request-scoped service ends holding
+     * no foreign tenant's plan, gauges or overrides.
+     *
+     * @return array{
+     *     entitlements: array{plan: array{code: string, name: string}, features: array<string, bool>, quotas: array<string, array{limit: int|null, used: int}>}|null,
+     *     subscription: array{plan_id: string, plan_code: ?string, plan_name: ?string, name: string, stripe_status: string, billing_interval: string, assigned_at: ?string}|null,
+     *     owner: array{name: string, email: string}|null,
+     * }
+     */
+    public function tenantSnapshot(Tenant $tenant): array
+    {
+        $tenantId = (string) $tenant->getKey();
+        $entitlements = app(EntitlementService::class);
+
+        /** @var array{entitlements: array{plan: array{code: string, name: string}, features: array<string, bool>, quotas: array<string, array{limit: int|null, used: int}>}|null, subscription: array{plan_id: string, plan_code: ?string, plan_name: ?string, name: string, stripe_status: string, billing_interval: string, assigned_at: ?string}|null, owner: array{name: string, email: string}|null} $result */
+        $result = DB::transaction(function () use ($tenant, $tenantId, $entitlements): array {
+            $savedTenant = TenantContext::currentTenantId();
+            $savedUser = TenantContext::currentUserId();
+            TenantContext::applyLocal($tenantId);
+
+            try {
+                $entitlements->forget($tenantId);
+
+                // The GOVERNING subscription — deliberately the same row EntitlementService::resolvePlan()
+                // picks (active, latest), NOT `where('name', 'default')` which is the row assignPlan()
+                // upserts. The two selectors can disagree, and this codebase has already been bitten by
+                // that; the presenter ships `name` so a divergence is visible instead of silently wrong.
+                $subscription = Subscription::query()->active()->with('plan')->latest('created_at')->first();
+
+                $owner = $tenant->owner_user_id === null
+                    ? null
+                    : User::query()->find($tenant->owner_user_id);
+
+                $snapshot = $entitlements->snapshot();
+
+                return [
+                    'entitlements' => $snapshot,
+                    'subscription' => $subscription === null ? null : [
+                        'plan_id' => (string) $subscription->plan_id,
+                        'plan_code' => $subscription->plan?->code->value,
+                        'plan_name' => $subscription->plan?->name,
+                        'name' => $subscription->name,
+                        'stripe_status' => $subscription->stripe_status,
+                        'billing_interval' => $subscription->billing_interval->value,
+                        'assigned_at' => $subscription->updated_at?->toIso8601String(),
+                    ],
+                    'owner' => $owner === null ? null : ['name' => $owner->name, 'email' => $owner->email],
+                ];
+            } finally {
+                TenantContext::applyLocal($savedTenant, $savedUser);
+                $entitlements->forget($tenantId);
+            }
+        });
+
+        return $result;
     }
 
     /**
@@ -403,6 +503,154 @@ final class SuperAdminService
         ])->all();
 
         return $map;
+    }
+
+    /**
+     * One page of the PLATFORM ledger — `audits` rows with `tenant_id IS NULL` (I7b, PRD Feature #12).
+     * The third elevated read, and the only one whose policy is narrowed rather than unrestricted
+     * ({@see TenantIsolation::platformRowsBypass()}). A super-admin action against a
+     * SPECIFIC tenant is deliberately not here: it lands in that tenant's own ledger (RBAC §9).
+     *
+     * ⚠️ **`withoutGlobalScope(Audit::$tenantScope)` IS MANDATORY AND ITS ABSENCE FAILS SILENTLY** — the
+     * same trap {@see listFeedback()} documents, now on a second surface. {@see BelongsToTenant} injects a
+     * PHP-side `where tenant_id = <context ?? NO_TENANT_SENTINEL>` into every query independently of RLS,
+     * and `Model::on()` does not remove it. On the console there is no context, so the sentinel matches
+     * nothing and the page renders "No platform activity yet" over a populated ledger.
+     *
+     * ⚠️ **`whereNull('tenant_id')` IS SEPARATELY MANDATORY — it is THREE things and only one of them is
+     * belt-and-braces.** Dropping a scope does not add a predicate, so:
+     *   1. it is the ORM half of the isolation, keeping the two-layer agreement {@see BelongsToTenant}'s
+     *      docblock says this project keeps rather than making the application depend on the database for
+     *      a correctness property;
+     *   2. it is the query plan. `audits_tenant_select` carries no `TO` clause, so it defaults to PUBLIC
+     *      and applies to the elevated role too, and Postgres OR-composes same-command permissive policies.
+     *      The planner cannot know at plan time that the tenant branch is unsatisfiable here, so an OR over
+     *      two branches costs the ordered index path. A user-level `IS NULL` on a plain column is leakproof,
+     *      may be pushed below the security barrier, and restores the backward scan on
+     *      `audits_tenant_recent_idx (tenant_id, id)` with `id DESC` satisfied and no sort;
+     *   3. it is what makes the surface's contract legible at the call site.
+     * "The policy already does that" is exactly the reasoning that would delete it.
+     *
+     * **Plain arrays, never a paginator and never live models.** `paginate()` would work on this connection
+     * inside this transaction, but (a) it does not clamp `page`, and `?page=999` on a three-row ledger
+     * returns nothing while `empty_reason` computes `no_rows` — printing "nobody has saved a change on the
+     * Platform page" over a non-empty compliance ledger; and (b) the GUC is transaction-local, so ANY model
+     * returned out of {@see elevated()} carries dead elevation: a later `load()`/`refresh()` would hit the
+     * strict base policies and return nothing, silently. Arrays cannot fail that way.
+     *
+     * **`orderByDesc('id')`, never `created_at`** — uuidv7 gives recency for free and no index leads with
+     * the timestamp. **Actor names via an explicit second query, not `with('user:id,name')`** — reason 1 of
+     * {@see listFeedback()}, and here the silent failure would render every row's actor as "Unknown user"
+     * on the one screen built to attribute actions to people.
+     *
+     * @param  array{user_id?: ?string, from?: ?CarbonInterface, to?: ?CarbonInterface}  $filters
+     * @return array{rows: list<array<string, mixed>>, actors: list<array{value: string, label: string}>, meta: array{current_page: int, last_page: int, total: int, per_page: int}}
+     */
+    public function listPlatformAudits(array $filters, int $perPage, int $page): array
+    {
+        /** @var array{rows: list<array<string, mixed>>, actors: list<array{value: string, label: string}>, meta: array{current_page: int, last_page: int, total: int, per_page: int}} $result */
+        $result = $this->elevated(function () use ($filters, $perPage, $page): array {
+            $query = Audit::on(SuperAdminContext::CONNECTION)
+                ->withoutGlobalScope(Audit::$tenantScope)
+                ->whereNull('tenant_id')
+                ->when($filters['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))
+                ->when($filters['from'] ?? null, fn ($q, $v) => $q->where('created_at', '>=', $v))
+                ->when($filters['to'] ?? null, fn ($q, $v) => $q->where('created_at', '<=', $v))
+                ->orderByDesc('id');
+
+            $total = (clone $query)->count();
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $current = min(max(1, $page), $lastPage);
+
+            /** @var Collection<int, Audit> $rows */
+            $rows = $query->forPage($current, $perPage)->get();
+
+            $names = $this->platformActorNames($rows);
+
+            return [
+                'rows' => array_values($rows->map(fn (Audit $a): array => [
+                    'id' => (string) $a->getKey(),
+                    'created_at' => $a->created_at?->toIso8601String(),
+                    'event' => $a->event->value,
+                    'auditable_type' => $a->auditable_type,
+                    'auditable_id' => (string) $a->auditable_id,
+                    // Three states, matching AuditLogPresenter::actorLabel(). `is_system` is derived from
+                    // a null user_id, NOT from the is_system_action column, which AuditLogger hard-codes
+                    // false on every row.
+                    'actor' => $a->user_id === null ? 'System' : ($names[$a->user_id] ?? 'Unknown user'),
+                    'is_system' => $a->user_id === null,
+                    'ip_address' => $a->ip_address,
+                    'old_values' => $a->old_values,
+                    'new_values' => $a->new_values,
+                    'redacted_fields' => $a->redacted_fields ?? [],
+                ])->all()),
+                'actors' => $this->platformOperators(),
+                'meta' => [
+                    'current_page' => $current,
+                    'last_page' => $lastPage,
+                    'total' => $total,
+                    'per_page' => $perPage,
+                ],
+            ];
+        });
+
+        return $result;
+    }
+
+    /**
+     * Actor display names for one page of the platform ledger, keyed by user id — one query through the
+     * `users` SELECT bypass, inside the caller's already-open elevated transaction.
+     *
+     * @param  Collection<int, Audit>  $rows
+     * @return array<string, string>
+     */
+    private function platformActorNames(Collection $rows): array
+    {
+        /** @var list<string> $ids */
+        $ids = $rows->pluck('user_id')->filter()->unique()->values()->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        /** @var Collection<int, User> $users */
+        $users = User::on(SuperAdminContext::CONNECTION)->whereIn('id', $ids)->get(['id', 'name']);
+
+        /** @var array<string, string> $map */
+        $map = $users->mapWithKeys(fn (User $u): array => [(string) $u->getKey() => $u->name])->all();
+
+        return $map;
+    }
+
+    /**
+     * The actor-filter catalog for the platform ledger: the PLATFORM OPERATOR roster, not every user.
+     *
+     * This is {@see AuditLogPresenter::actorOptions()}'s argument — read the roster,
+     * never `SELECT DISTINCT` on `audits` — transplanted to the correct roster for this surface. That
+     * method itself does NOT port: it runs `User::query()` under tenant RLS, which on the console has
+     * neither a tenant context nor the elevated connection, and would return an empty catalog with no
+     * error. {@see listAllUsers()} is equally wrong here for the opposite reason — it returns every user
+     * in the deployment, hundreds of options of which none but a super-admin can ever match a row.
+     *
+     * Accepted limitation, stated so it is not later read as a bug: a person whose `is_super_admin` flag
+     * was revoked stops being a filter OPTION while their existing rows still render under their real name
+     * ({@see platformActorNames()} looks up by id, unconditionally). Losing a filter entry is recoverable;
+     * a dropdown of bare uuids is not.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    private function platformOperators(): array
+    {
+        /** @var Collection<int, User> $users */
+        $users = User::on(SuperAdminContext::CONNECTION)
+            ->where('is_super_admin', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return array_values($users->map(fn (User $u): array => [
+            'value' => (string) $u->getKey(),
+            'label' => $u->name !== '' ? $u->name : 'Unknown user',
+        ])->all());
     }
 
     /**

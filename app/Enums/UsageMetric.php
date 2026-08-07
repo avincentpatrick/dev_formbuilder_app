@@ -68,4 +68,30 @@ enum UsageMetric: string
             self::SubmissionsCount, self::ApiRequests, self::WebhookDeliveries, self::ExportsCount => false,
         };
     }
+
+    /**
+     * The human label for a usage row (I7b). It lives on the enum rather than in the one presenter that
+     * needs it today because `HandleInertiaRequests`'s shared entitlements prop already anticipates "any
+     * future Plan & Usage panel" reading the same snapshot: a second consumer that invented its own
+     * wording is how two screens end up disagreeing about what `active_seats` is called. The
+     * {@see FeedbackStatus::label()} precedent.
+     *
+     * Deliberately unqualified by period — "Submissions", not "Submissions this month". Whether a number
+     * is a current level or a per-period flow is {@see isGauge()}'s answer, and the surface groups on it,
+     * so baking the qualifier into the label would repeat it on every row of the flows block and be wrong
+     * on any surface that groups differently.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::SubmissionsCount => 'Submissions',
+            self::StorageBytes => 'Storage',
+            self::ApiRequests => 'API requests',
+            self::WebhookDeliveries => 'Webhook deliveries',
+            self::ActiveSeats => 'Members',
+            self::FormsCount => 'Forms',
+            self::ExportsCount => 'Exports',
+            self::WebhookEndpointsCount => 'Webhook endpoints',
+        };
+    }
 }

@@ -16,6 +16,7 @@ use App\Services\Notifications\NotificationPresenter;
 use App\Services\Settings\AppSettingsPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
+use App\Support\Auth\PasswordConfirmation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -59,9 +60,14 @@ final class PreferencesController extends Controller
         $tenant = app(TenantContract::class);
 
         return Inertia::render('Settings/Index', [
+            // ⚠️ `needs_password_confirmation` IS NOT DECORATION — WITHOUT IT THE ENROLMENT PANEL RENDERS A
+            // BLANK QR CODE. Fortify's 2FA-management routes carry `password.confirm`, and TwoFactorSetup.vue
+            // reads the QR and the recovery codes as JSON sidecars — which RequirePassword answers with a
+            // bare 423 rather than the redirect a navigation would get. See {@see PasswordConfirmation}.
             'twoFactor' => [
                 'enabled' => $user->two_factor_secret !== null,
                 'confirmed' => $user->two_factor_confirmed_at !== null,
+                'needs_password_confirmation' => PasswordConfirmation::isStale($request),
             ],
             // Tenant-level draft settings (H10). Only Owner/Admin (tenant.settings.manage) may edit; the page
             // hides the card otherwise. The effective value falls back to the 30-day default when unset.

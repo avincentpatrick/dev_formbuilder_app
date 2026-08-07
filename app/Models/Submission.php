@@ -195,6 +195,23 @@ class Submission extends Model implements TenantScoped
      * {@see SubmissionPolicy} consults for single-row checks — so the list and the per-row check cannot
      * drift into "a row appears in the inbox but 403s when opened".
      *
+     * I8a adds the RESPONDENT arm, mirroring {@see SubmissionPolicy::view()}'s new clause. It is the other
+     * direction of the same invariant: without it a respondent could OPEN a submission the inbox never
+     * lists, which is the drift the paragraph above exists to prevent, merely running the other way.
+     *
+     * ⚠️ THE `orWhere` IS WRAPPED, AND THE REASON IS NARROWER THAN IT LOOKS. Flat, the OR would associate
+     * against every predicate already on the builder — the inbox composes status filters, date ranges and
+     * form filters onto this scope — and `(A and B) or C` is not `A and (B or C)`; a "returned this week"
+     * filter would additionally return every submission the user ever made, of any status.
+     *
+     * That does NOT happen when this is invoked as a scope: {@see Builder::callScope()} counts the wheres
+     * before and after and calls `addNewWheresWithinGroup()`, so the framework already nests whatever a
+     * local scope adds. Verified by mutation — flattening this leaves the whole suite green. The wrapper
+     * stays anyway, because the protection is a property of the CALL MECHANISM rather than of this method:
+     * it evaporates the moment anyone invokes `scopeVisibleTo($query, $user)` directly, or hoists the body
+     * into a `where(fn ($q) => ...)` elsewhere. Correctness that depends on how you were called is worth
+     * one closure to make unconditional.
+     *
      * @param  Builder<Submission>  $query
      * @return Builder<Submission>
      */
@@ -204,6 +221,10 @@ class Submission extends Model implements TenantScoped
             return $query;
         }
 
-        return $query->whereIn('form_id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
+        return $query->where(function (Builder $scoped) use ($user): void {
+            $scoped
+                ->whereIn('form_id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user))
+                ->orWhere('respondent_user_id', $user->getKey());
+        });
     }
 }

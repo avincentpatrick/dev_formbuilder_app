@@ -18,6 +18,12 @@ use Illuminate\Support\Facades\Route;
 |   - auth        — a logged-in user (session established centrally; SESSION_DOMAIN spans subdomains).
 |   - superadmin  — 404 unless the user's global is_super_admin flag is set (non-disclosure).
 |   - superadmin.mfa — redirect to enrollment unless the super-admin has confirmed 2FA (security §8).
+|   - step-up (I8a)  — PRD Feature #14 names "the super-admin console" as a high-blast-radius surface, so
+|                      a live session is not enough: the operator must have confirmed their password in
+|                      the last 15 minutes (auth.step_up_timeout). ⚠️ ITS POSITION IS LOAD-BEARING — it is
+|                      INSIDE the superadmin.mfa group, never ahead of it, or an un-enrolled operator
+|                      confirms a password and is then bounced to enrollment having gained nothing.
+|                      GET /admin/two-factor stays outside BOTH, for the same anti-loop reason.
 |
 | The console runs with NO tenant context (it is cross-tenant by nature): tenant/suspend/reactivate
 | touch the RLS-exempt central `tenants` table on the ordinary connection, and the cross-tenant user
@@ -32,7 +38,7 @@ Route::domain((string) config('tenancy.central_domain'))
         // reach it without a redirect loop. It drives Fortify's own global 2FA endpoints.
         Route::get('/two-factor', [TenantAdminController::class, 'mfaSetup'])->name('admin.mfa.setup');
 
-        Route::middleware('superadmin.mfa')->group(function (): void {
+        Route::middleware(['superadmin.mfa', 'step-up'])->group(function (): void {
             Route::get('/tenants', [TenantAdminController::class, 'index'])->name('admin.tenants.index');
             // One workspace in depth (I7b): plan + usage + domains. ⚠️ `whereUuid` is not decoration —
             // `tenants.id` is a uuid column, so an unbound `/admin/tenants/not-a-uuid` reaches Postgres as

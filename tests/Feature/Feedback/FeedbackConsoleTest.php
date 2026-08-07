@@ -126,6 +126,10 @@ beforeEach(function (): void {
     // Registered here, not in afterEach: RefreshDatabase registers its rollback the same way during
     // setUp — earlier — and Laravel runs these in order, so this fires once the transaction is gone.
     $this->beforeApplicationDestroyed(purgeCommittedFeedbackFixtures(...));
+
+    // I8a — the console carries `step-up`; without a fresh confirmation every request here 302s to
+    // /user/confirm-password instead of rendering. See tests/Pest.php.
+    confirmPasswordNow();
 });
 
 it('renders the console for an enrolled super-admin', function (): void {

@@ -34,7 +34,7 @@ final class AppSettingsPresenter
     /**
      * @return array{
      *     can_manage: bool,
-     *     access: array{invite_only: bool, signup_host: string},
+     *     access: array{invite_only: bool, require_two_factor: bool, signup_host: string, actor_enrolled: bool},
      *     maintenance: array{enabled: bool, message: ?string},
      *     modules: list<array{key: string, label: string, hint: string, plan_granted: bool, enabled: bool}>,
      *     about: array{version: string, commit: ?string, built_at: ?string, environment: string}
@@ -48,9 +48,16 @@ final class AppSettingsPresenter
             'can_manage' => $canManage,
             'access' => [
                 'invite_only' => (bool) $this->settings->get(SettingKey::RegistrationInviteOnly),
+                // I8a, PRD Feature #14's org-level enforcement policy. Enforced by
+                // {@see \App\Http\Middleware\EnforceTenantTwoFactor} on the authenticated tenant group.
+                'require_two_factor' => (bool) $this->settings->get(SettingKey::SecurityRequireTwoFactor),
                 // Shown in the card's hint so "people can join by signing up" names WHERE, rather than
                 // leaving an admin to guess which URL the setting is about.
                 'signup_host' => $tenant->slug.'.'.(string) config('tenancy.central_domain'),
+                // Whether the ADMIN LOOKING AT THE SWITCH is themselves enrolled. The card uses it to warn
+                // that turning enforcement on will send them to the enrollment interstitial on their very
+                // next request — true, recoverable, and alarming if it arrives unannounced.
+                'actor_enrolled' => $user->two_factor_confirmed_at !== null,
             ],
             'maintenance' => [
                 'enabled' => $tenant->isUnderMaintenance(),

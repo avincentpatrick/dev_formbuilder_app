@@ -107,12 +107,47 @@ function submitTransfer(): void {
     );
 }
 
+// ── Change role (I8a, PRD Feature #14) ──────────────────────────────────
+// A MODAL rather than an inline select, unlike the autosave switches in Settings. Two reasons: the
+// route carries `step-up`, so a change may bounce the whole page to the confirm-password screen — that
+// is a jarring answer to an idle click on a dropdown; and re-grading what a colleague may do deserves
+// the same deliberateness as removing them, which is already a modal beside it.
+const roleTarget = ref<Member | null>(null);
+const roleForm = useForm({ role: 'viewer' });
+
+function openRoleChange(row: Member): void {
+    roleForm.clearErrors();
+    roleForm.role = row.role;
+    roleTarget.value = row;
+}
+
+function submitRoleChange(): void {
+    if (!roleTarget.value) return;
+    roleForm.patch(`/members/${roleTarget.value.user_id}/role`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            roleTarget.value = null;
+        },
+    });
+}
+
 // A row can be removed if it's an active, non-owner member (pending invites + the owner can't be).
 function canRemove(row: Member): boolean {
     return row.status === 'active' && !row.is_owner;
 }
 function canTransfer(row: Member): boolean {
     return can.transferOwnership && row.status === 'active' && !row.is_owner;
+}
+// Mirrors TenantMembershipService::changeRole()'s refusals so the control is absent rather than
+// present-and-rejected: the Owner's role moves only by transfer, a pending invite has no role to change
+// yet (it holds a RESERVED one until acceptance), and nobody may re-grade themselves.
+function canChangeRole(row: Member): boolean {
+    return (
+        can.assignRoles &&
+        row.status === 'active' &&
+        !row.is_owner &&
+        row.user_id !== page.props.auth.user?.id
+    );
 }
 </script>
 
@@ -132,6 +167,15 @@ function canTransfer(row: Member): boolean {
             </template>
             <template #row-actions="{ row }">
                 <div class="members__actions">
+                    <MdsButton
+                        v-if="canChangeRole(row)"
+                        variant="tertiary"
+                        size="sm"
+                        icon-left="user-cog"
+                        @click="openRoleChange(row)"
+                    >
+                        Change role
+                    </MdsButton>
                     <MdsButton
                         v-if="canTransfer(row)"
                         variant="tertiary"
@@ -211,6 +255,38 @@ function canTransfer(row: Member): boolean {
                 <MdsButton variant="tertiary" @click="removeTarget = null">Cancel</MdsButton>
                 <MdsButton variant="destructive" icon-left="trash" :loading="removing.busy" @click="submitRemove">
                     Remove member
+                </MdsButton>
+            </template>
+        </MdsModal>
+
+        <!-- Change role -->
+        <MdsModal
+            :open="roleTarget !== null"
+            title="Change role"
+            @close="roleTarget = null"
+        >
+            <form class="members__form" @submit.prevent="submitRoleChange">
+                <p class="members__prose">
+                    Choose a new role for <strong>{{ roleTarget?.name }}</strong> ({{ roleTarget?.email }}).
+                    It takes effect on their next request.
+                </p>
+                <MdsFormField label="Role" :error="roleForm.errors.role">
+                    <MdsSegmentedControl
+                        v-model="roleForm.role"
+                        :options="assignableRoles"
+                        ariaLabel="Role"
+                    />
+                </MdsFormField>
+            </form>
+            <template #actions>
+                <MdsButton variant="tertiary" @click="roleTarget = null">Cancel</MdsButton>
+                <MdsButton
+                    variant="primary"
+                    icon-left="user-cog"
+                    :loading="roleForm.processing"
+                    @click="submitRoleChange"
+                >
+                    Change role
                 </MdsButton>
             </template>
         </MdsModal>

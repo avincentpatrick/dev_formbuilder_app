@@ -64,7 +64,26 @@ class FortifyServiceProvider extends ServiceProvider
         ]));
         Fortify::verifyEmailView(fn () => Inertia::render('auth/VerifyEmail'));
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
-        Fortify::confirmPasswordView(fn () => Inertia::render('auth/ConfirmPassword'));
+        // ⚠️ THE `url.intended` WRITE IS THE OTHER HALF OF I8a'S STEP-UP, AND WITHOUT IT THE FLOW STRANDS
+        // PEOPLE. Fortify answers a successful confirmation with `redirect()->intended(...)`, but Laravel
+        // only RECORDS an intended URL when RequirePassword itself issues the redirect. Anyone who arrives
+        // here from a LINK — which the 2FA enrolment panel deliberately offers, because its two JSON
+        // sidecars get a 423 rather than a redirect (see TwoFactorSetup.vue) — would otherwise be dropped
+        // on `/dashboard` having just confirmed a password in order to reach a different page entirely.
+        //
+        // Same host only. `url()->previous()` returns the `Referer` verbatim when one is present, so an
+        // attacker-chosen value would make this an open redirect; Laravel's own Redirector::guest() takes
+        // that risk, and this path does not need to. The check covers tenant subdomains and the central
+        // console alike, because this route is served on whichever host the user is already on.
+        Fortify::confirmPasswordView(function (Request $request) {
+            $previous = url()->previous();
+
+            if (parse_url($previous, PHP_URL_HOST) === $request->getHost()) {
+                $request->session()->put('url.intended', $previous);
+            }
+
+            return Inertia::render('auth/ConfirmPassword');
+        });
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower((string) $request->input(Fortify::username())).'|'.$request->ip());

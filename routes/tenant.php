@@ -38,9 +38,11 @@ use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
+use App\Http\Controllers\Tenant\TwoFactorRequiredController;
 use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\AppSecurityHeaders;
 use App\Http\Middleware\EnforceTenantMaintenance;
+use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
@@ -90,6 +92,12 @@ Route::middleware([
     // page. Named here rather than globally on `web` on purpose: the guest runtime below also uses `web`,
     // and a global mount would set frame-ancestors 'none' on it and break every embed in the product.
     AppSecurityHeaders::class,
+    // EnforceTenantTwoFactor (I8a) — PRD Feature #14's org-level enforcement policy. LAST in the array
+    // deliberately: it reads a tenant-scoped setting, so EstablishTenantDatabaseContext must already have
+    // set the RLS GUC, and `auth` must already have resolved the user. The enrollment interstitial it
+    // redirects to is registered in its OWN group below, outside this one — see that group's header for
+    // why the exemption is structural rather than a path allow-list.
+    EnforceTenantTwoFactor::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
@@ -201,14 +209,27 @@ Route::middleware([
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
     // The roster page is gated on the same manage ability (the permission catalog is closed — there is no
     // separate members.view — so viewing the roster is an Owner/Admin management surface).
+    //
+    // ⚠️ THE THREE MUTATIONS CARRY `step-up`, THE READ DOES NOT (I8a, PRD Feature #14). Removing someone,
+    // changing what they may do, and handing over the workspace are the tenant-side high-blast-radius
+    // actions the PRD names; each requires a password confirmation from the last 15 minutes rather than
+    // merely a live session. `members.index` is a read and is deliberately left alone — gating it would
+    // put a password prompt in front of simply looking at the roster, which trains people to type their
+    // password on reflex and devalues the prompt on the three routes where it means something.
     Route::get('/members', [MemberController::class, 'index'])
         ->middleware('can:tenant.members.invite')->name('members.index');
     Route::post('/members/invitations', [MemberController::class, 'invite'])
         ->middleware('can:tenant.members.invite')->name('members.invite');
+    // `tenant.roles.assign` has been seeded to Owner/Admin and documented in RBAC §5 since Phase 0 with
+    // ZERO code behind it — the same dormant-key situation I7a found on `feedback.view`. I8a consumes it
+    // rather than minting a `tenant.members.role`: the catalog is closed by design, and a second key for
+    // the same capability is how a matrix comes to disagree with itself.
+    Route::patch('/members/{user}/role', [MemberController::class, 'changeRole'])
+        ->middleware(['can:tenant.roles.assign', 'step-up'])->name('members.role');
     Route::delete('/members/{user}', [MemberController::class, 'remove'])
-        ->middleware('can:tenant.members.remove')->name('members.remove');
+        ->middleware(['can:tenant.members.remove', 'step-up'])->name('members.remove');
     Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
-        ->middleware('can:tenant.ownership.transfer')->name('members.ownership');
+        ->middleware(['can:tenant.ownership.transfer', 'step-up'])->name('members.ownership');
 
     // In-app feedback (Feature #11). Every role may SUBMIT (can:feedback.submit); Owner/Admin may VIEW
     // the workspace's own reports (can:feedback.view — seeded since Phase 0, first consumed in I7a). The
@@ -587,6 +608,32 @@ Route::middleware([
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
     Route::get('/audit-log/export', [AuditLogController::class, 'export'])
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.export');
+});
+
+/*
+| The 2FA enrollment interstitial (Increment I8a, PRD Feature #14) — one route, and the ONLY reason it is
+| a group of its own is that it must sit OUTSIDE EnforceTenantTwoFactor.
+|
+| ⚠️ A GATE THAT REDIRECTS EVERYWHERE REDIRECTS TO ITSELF. This is the same carve-out routes/admin.php has
+| given `admin.mfa.setup` since B2c, drawn the same way — STRUCTURALLY, by living outside the guarded
+| group, rather than as a path allow-list inside EnforceTenantTwoFactor. The difference matters: an
+| allow-list would also have to name `/settings` (the personal 2FA panel lives there), and every future
+| `/settings/*` route would then inherit an exemption nobody decided to grant. One route out, visible here.
+|
+| Everything else in the pipeline is identical to the authenticated group above — this page needs the same
+| tenant context, the same session, and the same security headers. Only the enforcement gate is absent.
+| Sign-out is reachable from it because POST /logout is a Fortify route in its own group; that is the
+| second door "enroll or leave" requires, and it must not be tidied inside this gate.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    'auth',
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/two-factor/required', TwoFactorRequiredController::class)->name('two-factor.required');
 });
 
 /*

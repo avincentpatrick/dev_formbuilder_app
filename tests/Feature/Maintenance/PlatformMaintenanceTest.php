@@ -36,6 +36,10 @@ beforeEach(function (): void {
 
     DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->delete();
     app(PlatformSettings::class)->forget();
+
+    // I8a — the console carries `step-up`; without a fresh confirmation the admin-exemption cases below
+    // 302 to /user/confirm-password and read as "maintenance locked the operator out" when it did not.
+    confirmPasswordNow();
 });
 
 afterEach(function (): void {

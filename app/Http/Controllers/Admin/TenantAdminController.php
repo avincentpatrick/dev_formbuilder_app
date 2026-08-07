@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Admin\TenantDetailPresenter;
+use App\Support\Auth\PasswordConfirmation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -120,6 +121,11 @@ final class TenantAdminController extends Controller
      * The 2FA enrollment landing (reachable WITHOUT confirmed 2FA — it sits outside `superadmin.mfa`).
      * It drives Fortify's own global two-factor endpoints; this passes the current enrolment state so the
      * styled TwoFactorSetup component renders the right step (off / awaiting-confirmation / on).
+     *
+     * ⚠️ `needsPasswordConfirmation` MATTERS MORE HERE THAN ANYWHERE ELSE IN THE PRODUCT. Fortify's
+     * QR/recovery-code endpoints carry `password.confirm` and answer a JSON sidecar with a 423, so without
+     * this prop an operator whose confirmation window has lapsed sees a blank QR — on the one page
+     * `superadmin.mfa` allows them to reach. That is a lockout, not a cosmetic defect.
      */
     public function mfaSetup(Request $request): Response
     {
@@ -129,6 +135,7 @@ final class TenantAdminController extends Controller
         return Inertia::render('admin/TwoFactorSetup', [
             'enabled' => $user->two_factor_secret !== null,
             'confirmed' => $user->two_factor_confirmed_at !== null,
+            'needsPasswordConfirmation' => PasswordConfirmation::isStale($request),
         ]);
     }
 }

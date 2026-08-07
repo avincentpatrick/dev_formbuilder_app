@@ -175,8 +175,10 @@ final class TenantMembershipService
      * adopt-and-restore precedent.
      *
      * Role `viewer` deliberately: the least-privileged role in the catalog. Someone who joined by knowing a
-     * URL has proved nothing about what they should be able to do, and an Owner can promote them on the
-     * Members page in two clicks. `syncRoles` (not `assignRole`) keeps §7's one-role-per-tenant invariant.
+     * URL has proved nothing about what they should be able to do, and an Owner can promote them from the
+     * Members page — {@see self::changeRole()}, which I8a built precisely because this sentence had been
+     * promising a surface that did not exist. `syncRoles` (not `assignRole`) keeps §7's one-role-per-tenant
+     * invariant.
      *
      * ── RETURNS NULL WHEN THE SEAT QUOTA IS FULL, AND DOES NOT THROW ───────────────────────────────────
      * {@see invite()} above asserts the same quota and lets {@see QuotaExceededException} become a 402 —
@@ -304,6 +306,84 @@ final class TenantMembershipService
                 ->where('tokenable_id', $member->id)
                 ->where('tenant_id', $tenant->id)
                 ->delete(); // strict RLS scopes this to the current tenant
+        });
+    }
+
+    /**
+     * Change an active member's tenant-scoped role — Increment I8a (PRD Feature #14).
+     *
+     * ⚠️ THIS SURFACE WAS PROMISED BEFORE IT EXISTED. {@see self::joinOpenTenant()}'s docblock has told
+     * readers since H-phase that "an Owner can promote them on the Members page in two clicks", and PRD
+     * Feature #14 names "role changes" among the actions step-up must gate — but there was no route, no
+     * controller method and no service method, so the criterion was vacuously satisfiable and the invite
+     * copy was untrue. Built here so the gate has something real to guard.
+     *
+     * ── THE FOUR REFUSALS, AND WHY THEY ARE HERE RATHER THAN IN THE REQUEST ────────────────────────────
+     * A FormRequest can validate that `role` is one of four strings; it cannot know that this particular
+     * user is the Owner, or is the actor. Those are role-model invariants (§5, §7) and they belong beside
+     * {@see self::transferOwnership()}, which enforces the same Owner-uniqueness rule from the other side:
+     *   · the Owner's own role is immutable here — ownership moves only by transfer, so a "demote the
+     *     Owner" path would leave the tenant ownerless while `tenants.owner_user_id` still pointed at them;
+     *   · `owner` is not assignable — the mirror of {@see self::invite()}'s cannotInviteAsOwner();
+     *   · an actor cannot change their OWN role — otherwise the last Admin can demote themselves out of
+     *     the ability to promote anyone back, locking the workspace's administration with no way in short
+     *     of an operator; and an Admin self-promoting is a privilege escalation with a straight face;
+     *   · a no-op is refused rather than silently audited, so the ledger never carries `admin → admin`.
+     *
+     * One `permission_changed` audit row against the affected user's `users` row — the SAME alias, event
+     * and auditable_type transferOwnership() already writes for exactly this kind of change, so both
+     * appear together under the audit viewer's "this resource's history" filter. Not the `model_has_roles`
+     * pivot: its composite PK has no surrogate id `audits.auditable_id` could address (audit spec §1).
+     *
+     * NO NOTIFICATION, deliberately. A `member.role_changed` event would need a new `DomainEventType` and
+     * `NotificationType` case, and I3 recorded the trap that comes with one: the exhaustive `match` arms
+     * in WebhookEndpointPresenter and ConnectionPresenter throw `UnhandledMatchError` on an unhandled case.
+     * That is a real feature with a real cost and it is not what PRD #14 asked for; `docs/feature-backlog.md`
+     * carries the row.
+     *
+     * `syncRoles` (not `assignRole`) preserves §7's one-role-per-tenant invariant, matching every other
+     * writer in this class.
+     */
+    public function changeRole(Tenant $tenant, User $member, string $roleName, User $actor): void
+    {
+        if ($roleName === 'owner') {
+            throw MembershipException::cannotAssignOwner();
+        }
+
+        if ($tenant->owner_user_id === $member->id) {
+            throw MembershipException::cannotChangeOwnerRole();
+        }
+
+        if ($actor->id === $member->id) {
+            throw MembershipException::cannotChangeOwnRole();
+        }
+
+        $role = Role::query()->where('name', $roleName)->whereNull('tenant_id')->first();
+        if ($role === null) {
+            throw MembershipException::unknownRole($roleName);
+        }
+
+        $membership = TenantUser::query()->where('user_id', $member->id)->first();
+        if ($membership === null || $membership->status !== TenantUserStatus::Active) {
+            throw MembershipException::notAMember();
+        }
+
+        $priorRole = $member->getRoleNames()->first();
+        if ($priorRole === $roleName) {
+            throw MembershipException::roleUnchanged($roleName);
+        }
+
+        DB::transaction(function () use ($member, $roleName, $priorRole, $actor): void {
+            $member->syncRoles([$roleName]);
+
+            $this->audit->record(
+                AuditEvent::PermissionChanged,
+                'users',
+                (string) $member->id,
+                old: ['role' => $priorRole],
+                new: ['role' => $roleName],
+                actorId: (string) $actor->getKey(),
+            );
         });
     }
 

@@ -8,7 +8,7 @@ import { MdsCard } from '@meridian/design-system';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 
-defineProps<{ enabled: boolean; confirmed: boolean }>();
+defineProps<{ enabled: boolean; confirmed: boolean; needsPasswordConfirmation: boolean }>();
 </script>
 
 <template>
@@ -18,7 +18,11 @@ defineProps<{ enabled: boolean; confirmed: boolean }>();
                 Platform administrators must enable two-factor authentication before using the admin
                 console.
             </p>
-            <TwoFactorSetup :enabled="enabled" :confirmed="confirmed" />
+            <TwoFactorSetup
+                :enabled="enabled"
+                :confirmed="confirmed"
+                :needs-password-confirmation="needsPasswordConfirmation"
+            />
         </MdsCard>
     </AdminLayout>
 </template>

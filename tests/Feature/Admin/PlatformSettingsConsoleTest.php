@@ -26,6 +26,10 @@ $adminUrl = fn (string $path): string => "http://meridian.test/admin{$path}";
 beforeEach(function (): void {
     DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->delete();
     app(PlatformSettings::class)->forget();
+
+    // I8a — the console carries `step-up`; without a fresh confirmation every request here 302s to
+    // /user/confirm-password instead of rendering. See tests/Pest.php.
+    confirmPasswordNow();
 });
 
 afterEach(function (): void {

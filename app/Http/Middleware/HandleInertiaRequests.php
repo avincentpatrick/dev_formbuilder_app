@@ -60,6 +60,12 @@ class HandleInertiaRequests extends Middleware
                 'can' => [
                     'manageMembers' => (bool) $user?->can('tenant.members.invite'),
                     'transferOwnership' => (bool) $user?->can('tenant.ownership.transfer'),
+                    // Gates the Members page's per-row role control (I8a). A SEPARATE key from
+                    // manageMembers because the catalog separates them: `tenant.roles.assign` is the
+                    // authority to change what someone may DO, `tenant.members.invite` only who is here.
+                    // Both land on Owner/Admin today, but collapsing them here would quietly decide that
+                    // they must always agree.
+                    'assignRoles' => (bool) $user?->can('tenant.roles.assign'),
                     // Gates the Forms nav item + the list page (viewAny composes forms.create/.edit.* — FormPolicy).
                     'manageForms' => (bool) $user?->can('viewAny', Form::class),
                     // Gates the Submissions inbox nav item + list page (F7). All five roles that hold

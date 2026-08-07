@@ -110,6 +110,29 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `feedback.view` | ✓ | ✓ | | | |
 | `scopes.manage` *(G10a — author the tenant's `scope_nodes` hierarchy)* | ✓ | ✓ | | | |
 
+> **Design Note (I8a, 2026-08-07) — `tenant.roles.assign` finally has code behind it, and the respondent
+> clause is the matrix's one row-level exception.** Two corrections to how this table should be read.
+>
+> **First**, `tenant.roles.assign` has been seeded to Owner/Admin and listed here since Phase 0 with *no
+> consumer anywhere in the codebase* — there was no role-change route, no controller method and no service
+> method, so PRD Feature #14's "step-up gates role changes" criterion was vacuously satisfiable while
+> `TenantMembershipService::joinOpenTenant()`'s docblock told invitees an Owner "can promote them on the
+> Members page in two clicks". I8a built `PATCH /members/{user}/role` against **this** key rather than
+> minting a `tenant.members.role`: the catalog is closed by design, and a second key for one capability is
+> how a matrix comes to disagree with itself. The route also carries `step-up`. Four refusals live in the
+> service, not the request, because no FormRequest can know them: the Owner's role is immutable here
+> (ownership moves only by transfer, §7), `owner` is not assignable, nobody may re-grade themselves, and a
+> no-op is refused rather than written to the ledger.
+>
+> **Second**, `submissions.view` now carries a **row-level** clause this table cannot express. Since I8a,
+> {@see SubmissionPolicy::view()} additionally allows a user to read a submission whose
+> `respondent_user_id` is their own — regardless of org-wide visibility or per-form grant. The permission
+> is still required, so this grants nothing to a role holding no read at all, and guest rows carry a NULL
+> respondent so it is inert on the public runtime. It is `view()` **only**: reading back what you yourself
+> submitted is not a privilege, whereas deciding your own submission's outcome (`review()`) or editing it
+> after review (`submissions.edit.*`, I9) are different questions with different answers. Mirrored in
+> `Submission::scopeVisibleTo()` so the single-row check and the inbox query still express one rule.
+
 > **Design Note (ADR-0011 / H1e, 2026-08-03) — advanced analytics coins no permission.** The Phase-3
 > analytics surface (H24a/H24b) authorizes on `dashboard.org.view` and `dashboard.form.view` exactly as
 > shipped: the org-wide-versus-own-forms split those two already encode *is* the visibility split an

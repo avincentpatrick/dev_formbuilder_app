@@ -30,6 +30,10 @@ beforeEach(function (): void {
     TenantContext::flush();
     clearPlatformRows();
     $this->beforeApplicationDestroyed(purgeCommittedPlatformAuditFixtures(...));
+
+    // I8a — the console carries `step-up`; without a fresh confirmation every request here 302s to
+    // /user/confirm-password instead of rendering. See tests/Pest.php.
+    confirmPasswordNow();
 });
 
 afterEach(function (): void {

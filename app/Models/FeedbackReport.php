@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -22,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $route
  * @property string $remarks
  * @property array<string, mixed> $browser_info
+ * @property string|null $screenshot_attachment_id
  * @property FeedbackStatus $status
  * @property Carbon $submitted_at
  * @property Carbon|null $resolved_at
@@ -34,12 +36,19 @@ class FeedbackReport extends Model implements TenantScoped
 
     public $timestamps = false;
 
+    /**
+     * `resolved_at`/`resolved_by` are deliberately ABSENT: they are written only by
+     * {@see App\Services\Feedback\FeedbackService::transition()} — the platform support console's
+     * transition, never a tenant-side submit — so they are set with `forceFill()` and can never arrive
+     * through mass assignment from a request payload.
+     */
     protected $fillable = [
         'tenant_id',
         'user_id',
         'route',
         'remarks',
         'browser_info',
+        'screenshot_attachment_id',
         'status',
     ];
 
@@ -54,5 +63,38 @@ class FeedbackReport extends Model implements TenantScoped
             'submitted_at' => 'datetime',
             'resolved_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The reporter.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * The platform support member who closed (or re-opened) it.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function resolver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    /**
+     * The captured screenshot, if any. Resolved through {@see Attachment}'s SoftDeletes global scope —
+     * which, not the `ON DELETE SET NULL` FK, is what makes a deleted screenshot stop rendering (an
+     * ordinary `delete()` never fires the referential action). Same two-halves-disagree hazard the
+     * branding migration documents.
+     *
+     * @return BelongsTo<Attachment, $this>
+     */
+    public function screenshot(): BelongsTo
+    {
+        return $this->belongsTo(Attachment::class, 'screenshot_attachment_id');
     }
 }

@@ -68,6 +68,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Feedback screenshot (I7a / PRD Feature #11)
+    |--------------------------------------------------------------------------
+    |
+    | Its own allowlist for the same reason the brand logo has one: a feedback
+    | screenshot answers to a different threat model than a respondent's file.
+    |
+    | SVG IS DELIBERATELY EXCLUDED, for the branding argument exactly — an SVG
+    | is an XML document that can carry <script>, and this image is rendered
+    | back into the PLATFORM OPERATOR's own console, same-origin, on the
+    | central host. That makes it the highest-value stored-XSS target in the
+    | product: the one viewer who is a super-admin on every tenant. GIF is
+    | excluded too (an animated screenshot is noise, and WCAG 2.2.2).
+    |
+    | 4 MB against the logo's 1 MB: this is a full-viewport raster, not a mark.
+    | A 1600px-wide PNG of a dense screen lands around 1–2 MB, so 4 MB is
+    | headroom rather than a target — and still six times under the 25 MB
+    | global ceiling, which exists for respondent video. The client downscales
+    | to 1600px before encoding; this cap is the server's independent check,
+    | since the client's is advice and not enforcement.
+    |
+    */
+
+    'feedback_screenshot' => [
+        'accepted_types' => ['image/png', 'image/jpeg', 'image/webp'],
+        'max_bytes' => 4 * 1024 * 1024,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Virus scanning
     |--------------------------------------------------------------------------
     |

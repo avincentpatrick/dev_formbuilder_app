@@ -210,8 +210,13 @@ Route::middleware([
     Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
         ->middleware('can:tenant.ownership.transfer')->name('members.ownership');
 
-    // In-app feedback (Feature #11) — every role may submit (can:feedback.submit). Screenshot capture
-    // and the cross-tenant support console are Phase 1 (need the attachments table + elevated read).
+    // In-app feedback (Feature #11). Every role may SUBMIT (can:feedback.submit); Owner/Admin may VIEW
+    // the workspace's own reports (can:feedback.view — seeded since Phase 0, first consumed in I7a). The
+    // status lifecycle is deliberately absent here: it belongs to the platform support console.
+    Route::get('/feedback', [FeedbackController::class, 'index'])
+        ->middleware('can:feedback.view')->name('feedback.index');
+    Route::get('/feedback/{feedbackReport}/screenshot', [FeedbackController::class, 'screenshot'])
+        ->middleware('can:feedback.view')->name('feedback.screenshot');
     Route::post('/feedback', [FeedbackController::class, 'store'])
         ->middleware('can:feedback.submit')->name('feedback.store');
 

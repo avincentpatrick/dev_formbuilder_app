@@ -10,6 +10,7 @@ use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\DomainVerificationFailure;
+use App\Enums\FeedbackStatus;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
 use App\Enums\NotificationType;
@@ -25,6 +26,7 @@ use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Domain;
+use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
@@ -640,6 +642,8 @@ class E2eSeeder extends Seeder
 
             $this->seedNotifications($owner, $reviewer);
 
+            $this->seedFeedback($owner, $reviewer);
+
             // Last, so the ledger it inspects already contains everything the seeders above wrote.
             $this->seedAuditLog($owner, $reviewer);
         });
@@ -1069,6 +1073,77 @@ class E2eSeeder extends Seeder
         // The one divergence, so the preferences card renders something other than the platform defaults.
         app(NotificationPreferenceResolver::class)
             ->set($owner, NotificationType::ReviewRequested, false, false);
+    }
+
+    /** Deterministic ids for the feedback fixture (I7a), so re-seeding updates rather than duplicates. */
+    private const FEEDBACK_FIXTURE_IDS = [
+        '0192e2e0-0000-7000-8000-00000000fb01',
+        '0192e2e0-0000-7000-8000-00000000fb02',
+        '0192e2e0-0000-7000-8000-00000000fb03',
+        '0192e2e0-0000-7000-8000-00000000fb04',
+    ];
+
+    /**
+     * Feedback fixtures (I7a, PRD Feature #11) — so `/feedback` renders a POPULATED table for the
+     * responsive-axe scan rather than its empty state.
+     *
+     * ⚠️ **ONE ROW PER STATUS, AND THAT IS THE POINT.** All four `FeedbackStatus` cases map to four
+     * DIFFERENT badge variants (info / warning / success / neutral), and a scan over a table where every
+     * pill is the same colour proves nothing about the other three — the same argument
+     * {@see self::seedAuditLog()} makes for its event spread. `resolved` and `wont_fix` also exercise the
+     * resolver column, which nothing else in this fixture fills.
+     *
+     * ⚠️ **THE LAST ROW CARRIES A DELIBERATELY LONG, UNBROKEN REMARK.** The remarks cell is the widest
+     * free-text column on the page, and 375px overflow is the trap that has now caught three surfaces
+     * (Domains, Audit log, and this one before it shipped).
+     *
+     * One row belongs to the REVIEWER for the reason `seedNotifications()` gives: Playwright only ever
+     * signs in as the Owner, so a fixture where every row is the Owner's would hide a regression that
+     * accidentally scoped this list to the viewer.
+     *
+     * Written with `forceCreate`, not through {@see App\Services\Feedback\FeedbackService}: the service
+     * requires an `UploadedFile` and an open tenant context to attach a screenshot, and this fixture wants
+     * neither. `status` is written from the enum, never a literal — the column has no CHECK constraint.
+     */
+    private function seedFeedback(User $owner, User $reviewer): void
+    {
+        $rows = [
+            ['user' => $owner, 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'remarks' => 'The date range picker resets when I switch tabs.'],
+            ['user' => $reviewer, 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['user' => $owner, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
+            [
+                'user' => $reviewer,
+                'route' => '/analytics',
+                'status' => FeedbackStatus::WontFix,
+                'remarks' => 'Please add a pie chart to the analytics page https://example.test/reference/dashboards/comparison-of-chart-types-for-categorical-data',
+            ],
+        ];
+
+        foreach ($rows as $index => $row) {
+            $id = self::FEEDBACK_FIXTURE_IDS[$index];
+            $closed = $row['status']->isTerminal();
+
+            $attributes = [
+                'user_id' => $row['user']->getKey(),
+                'route' => $row['route'],
+                'remarks' => $row['remarks'],
+                'browser_info' => ['viewport' => '1440x900', 'platform' => 'e2e-seed'],
+                'status' => $row['status']->value,
+                'submitted_at' => now()->subDays(($index + 1) * 3),
+                'resolved_at' => $closed ? now()->subDay() : null,
+                'resolved_by' => $closed ? $owner->getKey() : null,
+            ];
+
+            $existing = FeedbackReport::query()->whereKey($id)->first();
+
+            if ($existing instanceof FeedbackReport) {
+                $existing->forceFill($attributes)->save();
+
+                continue;
+            }
+
+            FeedbackReport::query()->forceCreate([...$attributes, 'id' => $id]);
+        }
     }
 
     /**

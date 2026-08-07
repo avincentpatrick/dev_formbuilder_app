@@ -24,6 +24,25 @@ describe('statusVariant — webhook tokens (H14)', () => {
     });
 });
 
+describe('statusVariant — feedback triage tokens (I7a)', () => {
+    it('mirrors the submission review lifecycle, because it is the same shape', () => {
+        expect(statusVariant('new')).toEqual({ variant: 'info', label: 'New' });
+        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Reviewed' });
+        expect(statusVariant('resolved')).toEqual({ variant: 'success', label: 'Resolved' });
+    });
+
+    it("colours wont_fix neutral, not danger — a settled decision is not a failure", () => {
+        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: "Won't fix" });
+    });
+
+    it('does not disturb any status the four feedback words could have collided with', () => {
+        // `new`/`resolved`/`reviewed`/`wont_fix` are all first uses. If a later increment adds a status
+        // that shares one of these words, this is where the shared-descriptor decision gets made.
+        expect(statusVariant('submitted')).toEqual({ variant: 'info', label: 'Submitted' });
+        expect(statusVariant('approved')).toEqual({ variant: 'success', label: 'Approved' });
+    });
+});
+
 describe('statusVariant — native-connector tokens (H15b)', () => {
     it('labels a connection by what the tenant must do, not by the enum word', () => {
         expect(statusVariant('refresh_failed')).toEqual({ variant: 'danger', label: 'Reconnect needed' });

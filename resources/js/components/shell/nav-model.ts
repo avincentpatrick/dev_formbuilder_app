@@ -45,6 +45,12 @@ export const navItems: NavItem[] = [
     // accountability, is used by no other nav item, and its two in-page uses (Transfer ownership, Grant
     // access) are the same semantic family.
     { key: 'audit', label: 'Audit log', icon: 'shield', href: '/audit-log', enabled: true, gate: 'viewAuditLog' },
+    // The workspace's own feedback (I7a, PRD Feature #11) — Owner/Admin, and no `feature:` for the same
+    // baseline reason the audit ledger has none. It sits next to the ledger because it is the other
+    // read-only record of things that happened, not an authoring surface. The `feedback` glyph is already
+    // in the icon set (the shell's Send Feedback trigger uses it), so the icons-only sidebar below 1024px
+    // shows the same mark for reading feedback and for sending it — which is the association we want.
+    { key: 'feedback', label: 'Feedback', icon: 'feedback', href: '/feedback', enabled: true, gate: 'viewFeedback' },
     // Webhook management + delivery log (H14) — Owner/Admin (gate) AND a Starter+ plan feature (feature),
     // so a tier without `webhooks` never sees the item (a direct visit still bounces off `feature:webhooks`).
     { key: 'webhooks', label: 'Webhooks', icon: 'activity', href: '/webhooks', enabled: true, gate: 'manageWebhooks', feature: 'webhooks' },

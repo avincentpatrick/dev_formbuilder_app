@@ -20,15 +20,42 @@ const themes = ['light', 'dark'] as const;
 // measures 6.96:1). H21d1's `Structure ⇄ Logic` control is the first always-mounted transitioning element
 // in the builder's chrome, so it made a latent race in this file reproducible; the race was never its own.
 
-async function scan(page: Page, label: string): Promise<void> {
+/**
+ * Scan the composed page, or — with `within` — only a subtree of it.
+ *
+ * ⚠️ `within` EXISTS FOR MODALS, AND THE REASON IS THE SCRIM. `MdsModal` renders a semi-transparent
+ * backdrop and does NOT mark the rest of the page `inert`, so axe still evaluates the builder's config
+ * panel underneath and BLENDS the scrim into its computed background. An unselected segmented-control
+ * label that measures fine on its own surface reads 1.82:1 once axe composites the overlay on top of it —
+ * a finding about content nobody can see, reach or tab to while the dialog is open.
+ *
+ * Caught by I8c, when the Share modal grew a "Spam protection" block: on the 375px viewport the taller
+ * dialog shifted the layout enough to expose a different slice of the config panel to that blend, and the
+ * whole-page scan started failing on a control the increment never touched. Same class as the G9b
+ * field-library case that scoped its scan to `.builder__pane--left`.
+ *
+ * ⚠️ SCOPING IS NOT A SUPPRESSION HERE, AND THE DISTINCTION MATTERS. The builder's config panel IS scanned
+ * — unscrimmed, at all three viewports in both themes, by the `config panel` and `builder empty` cases in
+ * this same file. What is dropped is only the second, blended look at it through an overlay. **The real
+ * observation the failure surfaced — that a modal should make its background inert, for focus order and
+ * screen readers, not just for axe — is filed in `docs/feature-backlog.md` rather than fixed here**, since
+ * it changes every modal in the product and belongs in a design-system increment.
+ */
+async function scan(page: Page, label: string, within?: string): Promise<void> {
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
     expect(overflows, `${label}: horizontal overflow`).toBe(false);
 
-    const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-        .analyze();
+    const builder = new AxeBuilder({ page }).withTags([
+        'wcag2a',
+        'wcag2aa',
+        'wcag21a',
+        'wcag21aa',
+        'wcag22aa',
+    ]);
+
+    const results = await (within === undefined ? builder : builder.include(within)).analyze();
 
     expect(
         results.violations,
@@ -94,7 +121,7 @@ for (const theme of themes) {
         await page.getByRole('button', { name: 'Share' }).click();
         await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — no link yet');
+        await scan(page, 'share panel — no link yet', '.mds-modal');
     });
 
     test(`Builder — share panel, live link (${theme})`, async ({ page }) => {
@@ -104,7 +131,7 @@ for (const theme of themes) {
         // The QR is a server round-trip; scanning before it lands would miss its alt text entirely.
         await expect(page.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — live link');
+        await scan(page, 'share panel — live link', '.mds-modal');
     });
 
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {

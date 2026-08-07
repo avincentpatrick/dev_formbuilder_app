@@ -59,6 +59,15 @@ function maintenanceFixture(string $slug, bool $paused, ?string $message = null)
 it('serves the guest form normally when the tenant is not paused', function (): void {
     [$tenant, $owner, $form] = maintenanceFixture('acme', paused: false);
 
+    // ⚠️ `withoutVite()` is REQUIRED on the two not-paused cases specifically, and its absence is why they
+    // were the only two red jobs in this file. They are the only tests here that render the real guest
+    // runtime shell — `public-runtime.blade.php`, which carries `@vite`. The paused cases render the
+    // maintenance blade instead, which is why they were green without it. The Pest CI job never runs
+    // `npm run build`, so `@vite` throws `Vite manifest not found` and the 200 arrives as a 500; locally it
+    // passes whenever `public/build` happens to exist, which is exactly the silent local/CI divergence
+    // PROGRESS.md records under "Any Pest test that renders a blade view needs withoutVite()".
+    $this->withoutVite();
+
     $this->get('http://acme.meridian.test/f/acme-feedback')->assertOk();
 });
 
@@ -119,6 +128,9 @@ it('does not pause another tenant\'s forms', function (): void {
     $paused->domains()->create(['domain' => 'paused']);
 
     [$tenant, $owner, $form] = maintenanceFixture('acme', paused: false);
+
+    // Renders the real guest shell, so it needs withoutVite() for the reason the first test spells out.
+    $this->withoutVite();
 
     $this->get('http://acme.meridian.test/f/acme-feedback')->assertOk();
 });

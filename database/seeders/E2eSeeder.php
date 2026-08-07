@@ -55,6 +55,7 @@ use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\DeterministicIds;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,8 @@ use Spatie\Permission\PermissionRegistrar;
  */
 class E2eSeeder extends Seeder
 {
+    use DeterministicIds;
+
     private const OWNER_EMAIL = 'demo@meridian.test';
 
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
@@ -1494,26 +1497,6 @@ class E2eSeeder extends Seeder
             ['form' => $hr, 'back' => 7, 'hour' => 10, 'status' => $d, 'source' => $g, 'locale' => 'es', 'saved' => true, 'fill_seconds' => null],
             ['form' => $pu, 'back' => 2, 'hour' => 8, 'status' => $d, 'source' => $m, 'locale' => 'en', 'saved' => true, 'fill_seconds' => null],
         ];
-    }
-
-    /**
-     * A stable UUID from a human-readable fixture key, so a row is greppable and a re-seed converges.
-     *
-     * Hand-rolled rather than `Ramsey\Uuid::uuid5()`: that package is only a transitive dependency here,
-     * and `Str::uuid()`/`orderedUuid()` are both random, which is exactly what an upsert key must not be.
-     */
-    private static function fixtureUuid(string $key): string
-    {
-        $hash = hash('sha256', $key);
-
-        return sprintf(
-            '%s-%s-5%s-%s-%s',
-            substr($hash, 0, 8),
-            substr($hash, 8, 4),
-            substr($hash, 13, 3),
-            dechex((hexdec(substr($hash, 16, 2)) & 0x3F) | 0x80).substr($hash, 18, 2),
-            substr($hash, 20, 12),
-        );
     }
 
     /**

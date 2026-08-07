@@ -25,10 +25,18 @@ cp .env.example .env
 docker compose up -d --build            # app, web (nginx), postgres, redis, mailpit, node (vite)
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate
+docker compose exec app php artisan migrate:fresh --seed
 ```
 
 - App: <http://localhost:8080>  ·  Mailpit UI: <http://localhost:8025>  ·  Vite/HMR: <http://localhost:5173>
+
+`migrate:fresh --seed` builds the **demo fixture** — two workspaces at <http://demo.localhost:8080> and
+<http://northwind.localhost:8080>, every role, six forms and ~90 days of submissions. Sign in as
+`owner@demo.test` / `meridian-demo-2026`.
+
+**To exercise the whole application by hand, follow [`docs/TESTING-GUIDE.md`](docs/TESTING-GUIDE.md)** — a
+chapter per feature, with the URL, the account and the expected result for every step, plus a list of what is
+deliberately not built yet.
 
 ## Everyday commands
 

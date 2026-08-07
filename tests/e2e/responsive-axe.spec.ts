@@ -374,3 +374,40 @@ for (const theme of themes) {
         await assertClean(page, 'Notification centre');
     });
 }
+
+// ── The platform landing page (I6), and the FIRST central-domain page in this matrix ────────────────────
+// The standing exclusion recorded in playwright.config.ts is specifically about `superadmin.mfa` needing a
+// TOTP in CI, which is why /admin/* is covered by a Storybook story instead. `/` has no MFA requirement and
+// no auth requirement at all, so it joins the real-browser scan on its own merits — and it needs to, being
+// the one page in the product built on the marketing-scale type and space tokens that appear nowhere else.
+//
+// ⚠️ ABSOLUTE URL, DELIBERATELY. playwright.config.ts's `baseURL` is the TENANT host, so a relative
+// page.goto('/') lands on the workspace root — which since I6 redirects to /dashboard. That redirect is
+// worth asserting too, and the second block below does exactly that.
+const centralOrigin = (process.env.E2E_BASE_URL ?? 'http://acme.meridian.test:8000').replace('acme.', '');
+
+for (const theme of themes) {
+    test(`Platform landing (${theme}) — accessible & no horizontal overflow`, async ({ browser }) => {
+        // A FRESH context with no storageState: the landing page's whole job is to greet someone who is not
+        // signed in. The saved session's cookies are host-only and would not be sent to the central host
+        // anyway, but relying on that silently is how a test comes to assert the wrong page.
+        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const page = await context.newPage();
+
+        try {
+            await page.goto(centralOrigin + '/', { waitUntil: 'networkidle' });
+            await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+            await forceTheme(page, theme);
+            await assertClean(page, 'Platform landing');
+        } finally {
+            await context.close();
+        }
+    });
+}
+
+test('the workspace root sends a signed-in member to the dashboard', async ({ page }) => {
+    // The other half of I6's single-route branch, asserted against a real browser on the tenant host that
+    // playwright's baseURL already points at.
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page).toHaveURL(/\/dashboard$/);
+});

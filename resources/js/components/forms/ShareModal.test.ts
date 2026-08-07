@@ -24,6 +24,11 @@ import type { ShareProps } from '@/components/builder/types';
 // one here would leave every computed in the component frozen at its first value — the preview and the
 // rename warning would silently never update and three tests would fail for a reason that has nothing to do
 // with the component.
+// `patch` and the transform are captured (I8b) so a test can assert the WIRE payload, not just that a
+// request happened: the spam-protection controls are a boolean and a text field on screen but an enum and a
+// nullable int on the wire, and that mapping is the part with something to get wrong.
+const sent = vi.hoisted(() => ({ payload: null as Record<string, unknown> | null }));
+
 vi.mock('@inertiajs/vue3', () => ({
     useForm: (initial: Record<string, unknown>) =>
         reactive({
@@ -31,10 +36,15 @@ vi.mock('@inertiajs/vue3', () => ({
             errors: {} as Record<string, string>,
             processing: false,
             clearErrors: () => {},
-            transform() {
+            transform(fn: (data: Record<string, unknown>) => Record<string, unknown>) {
+                this.__transform = fn;
+
                 return this;
             },
-            patch: vi.fn(),
+            patch(this: Record<string, unknown>) {
+                const fn = this.__transform as ((d: Record<string, unknown>) => Record<string, unknown>) | undefined;
+                sent.payload = fn ? fn(this) : { ...this };
+            },
         }),
 }));
 
@@ -43,6 +53,9 @@ function live(overrides: Partial<ShareProps> = {}): ShareProps {
     return {
         public_slug: 'clinic-intake',
         allow_guest_submissions: true,
+        // I8b — off is the default state for every form, and the threat model commits to it staying so.
+        bot_challenge: 'off',
+        guest_rate_limit_per_minute: null,
         suggested_slug: 'clinic-intake',
         is_published: true,
         public_host: 'acme.meridian.test',
@@ -180,5 +193,65 @@ group('the slug editor', () => {
         await wrapper.find('input.mds-input').setValue('first-link');
 
         expect(wrapper.find('.share__warn').exists()).toBe(false);
+    });
+});
+
+/*
+ * Spam protection (Increment I8b, PRD Feature #3).
+ *
+ * ⚠️ THE MAPPING IS THE PART WITH SOMETHING TO GET WRONG. On screen these are a checkbox and a text field;
+ * on the wire they are a two-member enum and a nullable integer. Binding the checkbox straight to the
+ * string union is how a third enum member later arrives as a silent `true`, and a number input cannot hold
+ * null — so "" has to become null, the same "meaningful absence" the slug field already expresses.
+ */
+group('spam protection (I8b)', () => {
+    function spamCheckbox(modal: ReturnType<typeof mountModal>) {
+        return modal
+            .findAll('input[type="checkbox"]')
+            .find((input) => input.attributes('id') && modal.html().includes('automatic spam check'))!;
+    }
+
+    it('renders both controls off for a form that has not opted in', () => {
+        const modal = mountModal(live());
+
+        expect(modal.text()).toContain('Spam protection');
+        // The help text says out loud that this is not for everyone — docs/security-threat-model.md §4's
+        // point that a spam check is actively harmful UX on trusted enumerator devices.
+        expect(modal.text()).toContain('leave it off for forms your own staff fill in');
+
+        const numberInput = modal.find('input[type="number"]');
+        expect(numberInput.exists()).toBe(true);
+        expect((numberInput.element as HTMLInputElement).value).toBe('');
+    });
+
+    it('seeds both controls from the server state', () => {
+        const modal = mountModal(live({ bot_challenge: 'proof_of_work', guest_rate_limit_per_minute: 12 }));
+
+        expect((modal.find('input[type="number"]').element as HTMLInputElement).value).toBe('12');
+    });
+
+    it('maps the checkbox to the ENUM and a blank limit to NULL', async () => {
+        sent.payload = null;
+        const modal = mountModal(live());
+
+        await modal.findAll('button').find((b) => b.text().includes('Save sharing settings'))?.trigger('click');
+
+        expect(sent.payload).toMatchObject({
+            bot_challenge: 'off',
+            guest_rate_limit_per_minute: null,
+        });
+    });
+
+    it('maps an enabled check and a typed limit to the wire types', async () => {
+        sent.payload = null;
+        const modal = mountModal(live({ bot_challenge: 'proof_of_work', guest_rate_limit_per_minute: 30 }));
+
+        await modal.findAll('button').find((b) => b.text().includes('Save sharing settings'))?.trigger('click');
+
+        expect(sent.payload).toMatchObject({
+            bot_challenge: 'proof_of_work',
+            // A NUMBER, not the input's string. `integer` on the request would reject '30' from JSON.
+            guest_rate_limit_per_minute: 30,
+        });
     });
 });

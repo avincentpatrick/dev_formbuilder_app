@@ -84,9 +84,19 @@ function classify(status: number, code: string): ErrorKind {
     if (status === 403) {
         // A form that was open at load can close / fill up before submit — the write path 403s with a
         // schedule reason code. Surface the schedule state rather than a generic terminal error (H12b).
-        return code === 'form_not_open' || code === 'form_closed' || code === 'max_responses_reached'
-            ? 'schedule'
-            : 'terminal';
+        if (code === 'form_not_open' || code === 'form_closed' || code === 'max_responses_reached') {
+            return 'schedule';
+        }
+
+        // I8b — the spam check. ⚠️ NOT `terminal`: replay.ts maps terminal to markNeedsAttention, which
+        // parks the row for a human. A challenge that was never sent (the client had no hint) or has
+        // gone stale is RECOVERABLE by solving a fresh one, which api-client does exactly once.
+        // `guest_disabled` deliberately stays terminal — that one really is unrecoverable.
+        if (code === 'challenge_required' || code === 'challenge_failed') {
+            return 'challenge';
+        }
+
+        return 'terminal';
     }
     if (status === 409) {
         return 'refresh';

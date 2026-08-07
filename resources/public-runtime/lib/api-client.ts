@@ -10,6 +10,7 @@
  * Any other non-2xx becomes an `ApiError` carrying the normalized shape the caller branches on.
  */
 
+import { encodeSolution, solveChallenge, type Challenge } from './challenge';
 import { ApiError, normalizeError } from './error-normalizer';
 import type {
     AnswerMap,
@@ -57,6 +58,34 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
     const doFetch = options.fetch ?? fetch;
     let currentToken = options.token;
 
+    /*
+     * Increment I8b — the proof-of-work spam check. Everything about it lives in this file, so no
+     * component, composable, outbox row or service-worker file learns the feature exists.
+     *
+     * ⚠️ THE CHALLENGE IS FETCHED AND SOLVED AT SEND TIME, NEVER AT FILL TIME, AND THAT IS WHAT MAKES
+     * OFFLINE WORK. A challenge captured while someone fills the form would be days stale by the time a
+     * queued row drains in a village with signal. But `replay.ts` already re-mints the share token and
+     * re-resolves the schema immediately before every outbox POST — a row is only ever replayed at a
+     * moment the device is demonstrably online and already talking to us — so a challenge minted 200ms
+     * before the POST cannot expire. The consequence is the design's whole value: `OutboxRow` gains no
+     * columns, `lib/db.ts` needs no Dexie version bump, and outbox.ts / replay.ts / sw.ts / RuntimeSession
+     * are untouched. If a diff ever touches those, something here went wrong.
+     */
+    let challengeRequired = false;
+
+    async function solveChallengeHeader(token: string): Promise<string> {
+        const response = await doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/challenge`, {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+        });
+        const body = await parseBody(response);
+        if (!response.ok) {
+            throw toError(response, body);
+        }
+
+        return encodeSolution(await solveChallenge((body as { data: Challenge }).data));
+    }
+
     async function remint(): Promise<MintResponse> {
         const response = await doFetch(`/f/${encodeURIComponent(options.slug)}`, {
             headers: { Accept: 'application/json' },
@@ -96,15 +125,28 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             const body = await withFreshToken<{ data: SchemaResponse }>((token) =>
                 doFetch(`/api/v1/public/f/${encodeURIComponent(token)}`, { headers: { Accept: 'application/json' } }),
             );
+            // Self-configure from the schema the caller was fetching anyway (I8b). App.vue calls this on
+            // load and replay.ts calls it once per drain pass, so both paths pick it up for free — and
+            // nobody has to remember to wire it. A ROUND-TRIP OPTIMISATION ONLY: submit() recovers from a
+            // 403 regardless, which is what covers rows 2..n of a drain reusing a cached schema.
+            challengeRequired = body.data.form.bot_challenge === 'proof_of_work';
+
             return body.data;
         },
 
         async submit(payload: SubmitPayload): Promise<SubmitResult> {
             // We need the HTTP status (201 vs 200) so we don't fold this into withFreshToken's body-only return.
-            const run = (token: string): Promise<Response> =>
+            const run = (token: string, challengeHeader: string | null): Promise<Response> =>
                 doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/submissions`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        // A HEADER, not a body field — see VerifyGuestBotChallenge. It keeps the solution
+                        // out of the validated payload, out of the stored answers, out of openapi.json's
+                        // request schema and, decisively, out of the persisted OutboxRow.
+                        ...(challengeHeader ? { 'X-Meridian-Challenge': challengeHeader } : {}),
+                    },
                     body: JSON.stringify({
                         answers: payload.answers,
                         client_submission_uuid: payload.clientSubmissionUuid,
@@ -115,14 +157,31 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                     }),
                 });
 
-            let response = await run(currentToken);
+            let challengeHeader = challengeRequired ? await solveChallengeHeader(currentToken) : null;
+            let response = await run(currentToken, challengeHeader);
+
             if (response.status === 401) {
                 const peek = normalizeError(response.status, await parseBody(response.clone()), null);
                 if (peek.kind === 'remint') {
                     await remint();
-                    response = await run(currentToken);
+                    // The new token needs its own challenge: a spent one cannot be reused, and the old
+                    // one may well have been spent by the attempt we are retrying.
+                    challengeHeader = challengeRequired ? await solveChallengeHeader(currentToken) : null;
+                    response = await run(currentToken, challengeHeader);
                 }
             }
+
+            // The same retry-once shape as the 401 above, applied to the second credential this request
+            // carries. Reached when the hint was absent or stale — the common case being rows 2..n of an
+            // outbox drain, which reuse a cached schema and so never called fetchSchema().
+            if (response.status === 403) {
+                const peek = normalizeError(response.status, await parseBody(response.clone()), null);
+                if (peek.kind === 'challenge') {
+                    challengeRequired = true;
+                    response = await run(currentToken, await solveChallengeHeader(currentToken));
+                }
+            }
+
             const body = await parseBody(response);
             if (!response.ok) {
                 throw toError(response, body);

@@ -183,7 +183,7 @@ Acceptance criteria:
 - The public link resolves to whichever `form_version_id` is currently marked as the live public version (defaulting to `current_published_version_id`), and a signed token embeds that version reference — so a guest who starts filling out version 3 keeps a consistent experience even if the form owner republishes to version 4 mid-session.
 - Guest submissions capture `guest_ip` and `guest_user_agent`; no account creation is required at any point.
 - Tenant context for a guest request is resolved from the share token/slug, never from a session — satisfying the tenant-isolation rule that public endpoints must not depend on authenticated session state.
-- Per-form, configurable rate limiting / bot-challenge (e.g., CAPTCHA) is available to curb spam submissions.
+- Per-form, configurable rate limiting / bot-challenge (e.g., CAPTCHA) is available to curb spam submissions. *(Built in I8b as `forms.bot_challenge` — a self-hosted proof-of-work check rather than a hosted CAPTCHA, since every hosted option needs tenant-held credentials, a CSP widening, and cannot work offline-first — plus `forms.guest_rate_limit_per_minute`. Both default off, per the threat model's field-collection requirement.)*
 - The form is embeddable via iframe or script snippet on third-party domains — which is precisely why this channel is served by the dedicated public Vue SPA/PWA on a real REST API, not by the Inertia-based admin app (architecture plan §1).
 - The guest-facing runtime meets WCAG AA from its first release (this is a build-time CI constraint, not a later audit item).
 

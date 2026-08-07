@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\AuditEvent;
 use App\Enums\FieldType;
+use App\Enums\FormBotChallenge;
 use App\Enums\RequiredMode;
 use App\Models\Audit;
 use App\Models\Form;
@@ -87,7 +88,7 @@ it('sets a public slug and opens guest access', function (): void {
     $form = shareableForm($this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertRedirect();
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -102,10 +103,10 @@ it('sets a public slug and opens guest access', function (): void {
 
 it('closes guest access without discarding the slug', function (): void {
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, FormBotChallenge::Off, null, $this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertRedirect();
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -121,10 +122,10 @@ it('closes guest access without discarding the slug', function (): void {
 
 it('clears the link entirely when the slug is nulled', function (): void {
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', false, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', false, FormBotChallenge::Off, null, $this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => null, 'allow_guest_submissions' => false])
+        ->patch(shareUrl($form), ['public_slug' => null, 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertRedirect();
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -137,7 +138,7 @@ it('rejects slugs that are not lowercase hyphenated', function (string $slug): v
     $form = shareableForm($this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => $slug, 'allow_guest_submissions' => false])
+        ->patch(shareUrl($form), ['public_slug' => $slug, 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasErrors('public_slug');
 })->with([
     'uppercase' => 'Clinic-Intake',
@@ -157,7 +158,7 @@ it('rejects the reserved `resume` slug', function (): void {
     $form = shareableForm($this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'resume', 'allow_guest_submissions' => false])
+        ->patch(shareUrl($form), ['public_slug' => 'resume', 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasErrors('public_slug');
 });
 
@@ -165,7 +166,7 @@ it('refuses to open guest access without a slug', function (): void {
     $form = shareableForm($this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => null, 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => null, 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasErrors('public_slug');
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -184,11 +185,11 @@ it('requires the guest flag to be present', function (): void {
 
 it('refuses a slug another form in the tenant already holds', function (): void {
     $taken = shareableForm($this->admin, 'First');
-    app(FormService::class)->setShareSettings($taken, 'clinic-intake', false, $this->admin);
+    app(FormService::class)->setShareSettings($taken, 'clinic-intake', false, FormBotChallenge::Off, null, $this->admin);
     $other = shareableForm($this->admin, 'Second');
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($other), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false])
+        ->patch(shareUrl($other), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasErrors('public_slug');
 });
 
@@ -196,10 +197,10 @@ it('lets a form keep its own slug on an unrelated save', function (): void {
     // The `->ignore($form->id)` half: without it, toggling guest access on a form that already has a link
     // would 422 against itself.
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', false, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', false, FormBotChallenge::Off, null, $this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasNoErrors();
 });
 
@@ -207,13 +208,13 @@ it('refuses a slug held by a SOFT-DELETED form', function (): void {
     // The DB index has no deleted_at predicate, so a trashed row keeps its slug reserved. A validator that
     // respected the SoftDeletes scope would pass this and then eat a 23505 in the service.
     $trashed = shareableForm($this->admin, 'Archived');
-    app(FormService::class)->setShareSettings($trashed, 'clinic-intake', false, $this->admin);
+    app(FormService::class)->setShareSettings($trashed, 'clinic-intake', false, FormBotChallenge::Off, null, $this->admin);
     $trashed->delete();
 
     $other = shareableForm($this->admin, 'Live');
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($other), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false])
+        ->patch(shareUrl($other), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => false, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertSessionHasErrors('public_slug');
 });
 
@@ -223,7 +224,7 @@ it('suggests past a SOFT-DELETED form that still holds the slug', function (): v
     // Without `withTrashed()` this returns `clinic-intake`, which the validator then refuses — leaving the
     // modal pre-filled with a value that cannot be saved and no way for the author to know why.
     $trashed = shareableForm($this->admin, 'Clinic Intake');
-    app(FormService::class)->setShareSettings($trashed, 'clinic-intake', false, $this->admin);
+    app(FormService::class)->setShareSettings($trashed, 'clinic-intake', false, FormBotChallenge::Off, null, $this->admin);
     $trashed->delete();
 
     $fresh = shareableForm($this->admin, 'Clinic Intake');
@@ -235,7 +236,7 @@ it('lets a DIFFERENT tenant use the same slug', function (): void {
     // public_slug is unique per tenant, which is exactly why the guest runtime resolves tenant context from
     // the HOST before it ever looks at the slug.
     $mine = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($mine, 'clinic-intake', true, $this->admin);
+    app(FormService::class)->setShareSettings($mine, 'clinic-intake', true, FormBotChallenge::Off, null, $this->admin);
 
     $beta = Tenant::create(['name' => 'Beta', 'slug' => 'beta']);
     $beta->domains()->create(['domain' => 'beta']);
@@ -251,6 +252,8 @@ it('lets a DIFFERENT tenant use the same slug', function (): void {
         ->patch("http://beta.meridian.test/forms/{$theirs->id}/share", [
             'public_slug' => 'clinic-intake',
             'allow_guest_submissions' => true,
+            'bot_challenge' => 'off',
+            'guest_rate_limit_per_minute' => null,
         ])
         ->assertSessionHasNoErrors();
 
@@ -268,7 +271,7 @@ it('refuses a member with no edit rights on the form', function (): void {
     makeActiveMember($viewer, 'viewer');
 
     $this->actingAs($viewer)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertForbidden();
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -281,7 +284,7 @@ it('audits the share write as an `updated` event on the form', function (): void
     $form = shareableForm($this->admin);
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake', 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertRedirect();
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -305,7 +308,7 @@ it('leaves an in-flight share token valid across a slug rename', function (): vo
     // The pinned semantics behind the modal's rename warning. A share token is an HMAC over
     // (tenant, form, version) — the slug is not in it, so a guest who is mid-form keeps going.
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, FormBotChallenge::Off, null, $this->admin);
 
     $token = app(GuestShareTokenService::class)->mint(
         $form->tenant_id,
@@ -314,7 +317,7 @@ it('leaves an in-flight share token valid across a slug rename', function (): vo
     )->token;
 
     $this->actingAs($this->admin)->withoutVite()
-        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake-2026', 'allow_guest_submissions' => true])
+        ->patch(shareUrl($form), ['public_slug' => 'clinic-intake-2026', 'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null])
         ->assertRedirect();
 
     // Still resolves — the token pins a version id, not an address.
@@ -329,7 +332,7 @@ it('leaves an in-flight share token valid across a slug rename', function (): vo
 
 it('renders the public link as an SVG QR code', function (): void {
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, FormBotChallenge::Off, null, $this->admin);
 
     $response = $this->actingAs($this->admin)->withoutVite()
         ->get("http://acme.meridian.test/forms/{$form->id}/share/qr.svg")
@@ -350,7 +353,7 @@ it('404s the QR when the form has no link yet', function (): void {
 
 it('refuses the QR to a member with no edit rights', function (): void {
     $form = shareableForm($this->admin);
-    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, $this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, FormBotChallenge::Off, null, $this->admin);
 
     $viewer = User::factory()->create();
     enterTenant($this->tenant->id, $viewer->id);
@@ -359,4 +362,115 @@ it('refuses the QR to a member with no edit rights', function (): void {
     $this->actingAs($viewer)->withoutVite()
         ->get("http://acme.meridian.test/forms/{$form->id}/share/qr.svg")
         ->assertForbidden();
+});
+
+// ── Spam protection (Increment I8b, PRD Feature #3) ───────────────────────────────────────────
+
+it('saves spam protection in the SAME audit row as the rest of the share settings', function (): void {
+    // ⚠️ THE REASON setShareSettings() GREW RATHER THAN GAINING A SIBLING. Spam protection is saved by the
+    // same button in the same modal as the slug and the guest toggle, and "who turned the spam check off
+    // on the form that then got flooded" is the same question, about the same act, as the one this audit
+    // row exists to answer. Two service calls would make it two rows to correlate by timestamp.
+    $form = shareableForm($this->admin);
+
+    $this->actingAs($this->admin)->withoutVite()
+        ->patch(shareUrl($form), [
+            'public_slug' => 'clinic-intake',
+            'allow_guest_submissions' => true,
+            'bot_challenge' => 'proof_of_work',
+            'guest_rate_limit_per_minute' => 20,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    $fresh = Form::query()->whereKey($form->id)->firstOrFail();
+    expect($fresh->bot_challenge)->toBe(FormBotChallenge::ProofOfWork)
+        ->and($fresh->guest_rate_limit_per_minute)->toBe(20);
+
+    $audits = Audit::query()
+        ->where('auditable_type', 'form')
+        ->where('auditable_id', $form->id)
+        ->where('event', AuditEvent::Updated->value)
+        ->get();
+
+    // ONE row for the whole save, carrying all four keys on both sides.
+    expect($audits)->toHaveCount(1);
+    expect($audits->first()->new_values)->toMatchArray([
+        'public_slug' => 'clinic-intake',
+        'allow_guest_submissions' => true,
+        'bot_challenge' => 'proof_of_work',
+        'guest_rate_limit_per_minute' => 20,
+    ]);
+    expect($audits->first()->old_values)->toMatchArray([
+        'bot_challenge' => 'off',
+        'guest_rate_limit_per_minute' => null,
+    ]);
+});
+
+it('accepts a null rate limit as "no per-form ceiling"', function (): void {
+    // `present` + `nullable`, not `required` — null is a meaningful value and `required` would make the
+    // field unclearable once set, the same trap public_slug's rule avoids.
+    $form = shareableForm($this->admin);
+    app(FormService::class)->setShareSettings($form, 'clinic-intake', true, FormBotChallenge::ProofOfWork, 5, $this->admin);
+
+    $this->actingAs($this->admin)->withoutVite()
+        ->patch(shareUrl($form), [
+            'public_slug' => 'clinic-intake',
+            'allow_guest_submissions' => true,
+            'bot_challenge' => 'off',
+            'guest_rate_limit_per_minute' => null,
+        ])
+        ->assertSessionHasNoErrors();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $fresh = Form::query()->whereKey($form->id)->firstOrFail();
+
+    expect($fresh->guest_rate_limit_per_minute)->toBeNull()
+        ->and($fresh->bot_challenge)->toBe(FormBotChallenge::Off);
+});
+
+it('rejects an unknown challenge mechanism', function (): void {
+    $form = shareableForm($this->admin);
+
+    $this->actingAs($this->admin)->withoutVite()
+        ->patch(shareUrl($form), [
+            'public_slug' => 'clinic-intake',
+            'allow_guest_submissions' => false,
+            'bot_challenge' => 'recaptcha',
+            'guest_rate_limit_per_minute' => null,
+        ])
+        ->assertSessionHasErrors('bot_challenge');
+});
+
+it('rejects a rate limit outside 1..600', function (mixed $value): void {
+    // 0 would refuse every response — a footgun disguised as a limit — and the upper bound keeps the
+    // smallInteger column honest.
+    $form = shareableForm($this->admin);
+
+    $this->actingAs($this->admin)->withoutVite()
+        ->patch(shareUrl($form), [
+            'public_slug' => 'clinic-intake',
+            'allow_guest_submissions' => false,
+            'bot_challenge' => 'off',
+            'guest_rate_limit_per_minute' => $value,
+        ])
+        ->assertSessionHasErrors('guest_rate_limit_per_minute');
+})->with(['zero' => 0, 'negative' => -1, 'too large' => 601, 'not a number' => 'many']);
+
+it('never lets the two new columns be mass-assigned', function (): void {
+    // Neither is in Form::$fillable, deliberately. The two OLDER share columns are — for historical
+    // reasons UpdateFormShareRequest's docblock apologises for — and adding two more would hand every
+    // form editor the ability to switch a public form's spam protection off as a side effect of an
+    // unrelated update().
+    $form = shareableForm($this->admin);
+
+    $form->update(['bot_challenge' => 'proof_of_work', 'guest_rate_limit_per_minute' => 1]);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $fresh = Form::query()->whereKey($form->id)->firstOrFail();
+
+    expect($fresh->bot_challenge)->toBe(FormBotChallenge::Off)
+        ->and($fresh->guest_rate_limit_per_minute)->toBeNull();
 });

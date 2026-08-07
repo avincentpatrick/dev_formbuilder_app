@@ -21,7 +21,7 @@ found one of its acceptance criteria unbuilt with no row anywhere):
 | CI security scanning (SCA/SAST/secret) | Testing Strategy §3/§6; Deployment §4 |
 | **Post-submission answer editing** (permissioned, audited) — *fast-follow* | RBAC §5 (`submissions.edit.any/.own`); Audit Spec §1 |
 | ~~**Share panel** (copy-link + QR + embed + social)~~ — **SHIPPED in I1**, narrowed to the remainder below | PRD §6 fast-follow note |
-| **Per-form rate limiting / bot-challenge (CAPTCHA)** on the guest runtime — **an unbuilt PRD Feature #3 acceptance criterion**, not a backlog nicety. Only the global `throttle:guest-mint` exists; the criterion asks for it to be per-form and configurable. Surfaced by I1 (which built the rest of Feature #3) and **assigned to I8** (security hardening) rather than left here | PRD Feature #3 acceptance criteria; threat-model §4 bot-flooding row |
+| ~~**Per-form rate limiting / bot-challenge (CAPTCHA)** on the guest runtime~~ ✅ **DONE — I8b (2026-08-08)**. Was an unbuilt PRD Feature #3 acceptance criterion, not a backlog nicety: only the deployment-wide `throttle:guest*` limiters existed, while the criterion asked for per-form and configurable. Built as `forms.bot_challenge` (a self-hosted proof-of-work check, no npm dependency, no third-party credentials, no CSP change) plus `forms.guest_rate_limit_per_minute` (per-IP **within one form** — a form-wide bucket would be a self-DoS lever, since one attacker at one IP could lock the form for every legitimate respondent). Both default off, per the threat model's own "not enabled by default" requirement. **PRD Feature #3 is now closed end-to-end.** | PRD Feature #3 acceptance criteria; threat-model §4 bot-flooding row |
 
 ---
 

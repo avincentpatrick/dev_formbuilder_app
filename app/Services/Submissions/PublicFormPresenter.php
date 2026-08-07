@@ -43,6 +43,14 @@ final class PublicFormPresenter
                 // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
                 // route is still authoritative; this only decides whether the control is shown.
                 'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
+                // Whether this form requires a proof-of-work spam check before it will accept a submission
+                // (I8b). ⚠️ A HINT, NOT A GATE — and the distinction is load-bearing. The authority is
+                // VerifyGuestBotChallenge on the submit route; this only saves the client a rejected round
+                // trip. It has to be that way because `replay.ts` caches one SchemaResponse per slug per
+                // drain pass, so rows 2..n construct a client that never fetched a schema at all; they
+                // recover through api-client's retry-once on a 403 instead. Emitting it as a gate would
+                // make the offline path depend on a hint it does not have.
+                'bot_challenge' => $form->bot_challenge->value,
                 // The author-editable confirmation copy (Increment H6a, Doc #26 §6.2), emitted RAW — as a
                 // template, with its `${key}` holes unfilled — plus its locale variants. Two reasons it is
                 // not rendered here: `version.schema` below travels VERBATIM with a checksum the runtime

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
 use App\Models\Concerns\BelongsToTenant;
@@ -34,6 +35,8 @@ use Illuminate\Support\Carbon;
  * @property bool $allow_guest_submissions
  * @property bool $single_page_mode
  * @property bool $save_and_resume
+ * @property FormBotChallenge $bot_challenge
+ * @property ?int $guest_rate_limit_per_minute
  * @property ?string $confirmation_message
  * @property ?array<string, mixed> $confirmation_message_translations
  * @property array<string, mixed> $capability_flags
@@ -108,6 +111,13 @@ class Form extends Model implements TenantScoped
             'allow_offline_sync' => 'boolean',
             'single_page_mode' => 'boolean',
             'save_and_resume' => 'boolean',
+            // I8b — deliberately NOT in $fillable. The two older share columns (public_slug,
+            // allow_guest_submissions) are fillable for historical reasons that UpdateFormShareRequest's
+            // docblock spends a paragraph apologising for; adding two more would hand every form editor
+            // the ability to switch a public form's spam protection off as a side effect of an unrelated
+            // update(). They are written by FormService::setShareSettings() through forceFill(), audited.
+            'bot_challenge' => FormBotChallenge::class,
+            'guest_rate_limit_per_minute' => 'integer',
             // Increment H6a — the confirmation template (Doc #26 §6.2). Deliberately NOT in $fillable:
             // the only writer is FormService::setConfirmationMessage()'s forceFill, so mass-assignment
             // can never reach a template-bearing column, and Form has no $hidden/$guarded — a fillable

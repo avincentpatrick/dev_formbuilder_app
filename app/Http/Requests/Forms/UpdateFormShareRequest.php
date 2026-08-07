@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Forms;
 
+use App\Enums\FormBotChallenge;
 use App\Models\Form;
 use App\Services\Forms\FormService;
 use App\Support\Forms\FormSlug;
@@ -48,6 +49,13 @@ final class UpdateFormShareRequest extends FormRequest
 
         return [
             'allow_guest_submissions' => ['required', 'boolean'],
+            // Spam protection (I8b). `bot_challenge` is `required` — it is a closed enum with a safe
+            // member, so there is no meaningful "unset". `guest_rate_limit_per_minute` is `present` +
+            // `nullable` for the same reason `public_slug` below is: **null is a MEANINGFUL value** ("no
+            // per-form ceiling") and `required` would reject it, silently making the field unclearable.
+            // The 600 ceiling is arbitrary from an author's chair, so it gets a message() entry.
+            'bot_challenge' => ['required', Rule::enum(FormBotChallenge::class)],
+            'guest_rate_limit_per_minute' => ['present', 'nullable', 'integer', 'min:1', 'max:600'],
             'public_slug' => [
                 'present',
                 'nullable',
@@ -72,6 +80,8 @@ final class UpdateFormShareRequest extends FormRequest
             'public_slug.regex' => 'Use lowercase letters, numbers and single hyphens — for example "clinic-intake".',
             'public_slug.not_in' => 'That link name is reserved. Choose another.',
             'public_slug.unique' => 'Another form in this workspace already uses that link.',
+            'guest_rate_limit_per_minute.max' => 'Choose a limit of 600 or fewer responses per minute, or leave it blank for no limit.',
+            'guest_rate_limit_per_minute.min' => 'A limit of zero would refuse every response. Leave it blank for no limit.',
         ];
     }
 

@@ -24,17 +24,20 @@ use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Api\V1\WebhookDeliveryController;
 use App\Http\Controllers\Api\V1\WebhookEndpointController;
 use App\Http\Controllers\Public\GuestAttachmentController;
+use App\Http\Controllers\Public\GuestChallengeController;
 use App\Http\Controllers\Public\GuestDraftController;
 use App\Http\Controllers\Public\GuestDraftResumeController;
 use App\Http\Controllers\Public\GuestSubmissionController;
 use App\Http\Controllers\Public\PublicFormSchemaController;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforceApiRequestQuota;
+use App\Http\Middleware\EnforceGuestFormRateLimit;
 use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EstablishGuestDraftContext;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\MeterApiUsage;
+use App\Http\Middleware\VerifyGuestBotChallenge;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
@@ -426,18 +429,53 @@ Route::prefix('api/v1/public')
     ])
     ->group(function (): void {
         Route::get('f/{shareToken}', [PublicFormSchemaController::class, 'show'])->name('forms.schema');
-        Route::post('f/{shareToken}/submissions', [GuestSubmissionController::class, 'store'])->name('submissions.store');
+
+        /*
+        | Submit (F5) + the two I8b anti-abuse layers, in route order and therefore in cost order:
+        | rate limit (one cache read) → challenge (one HMAC) → FormRequest validation → pipeline.
+        |
+        | ⚠️ PER-ROUTE, NOT ON THE GROUP, AND THAT IS WHAT MAKES THE ORDERING STRUCTURAL. Route middleware is
+        | appended after group middleware, and neither class is in bootstrap/app.php's priority list — so
+        | both land AFTER EstablishGuestTenantContext, which they must: `forms` is FORCE ROW LEVEL SECURITY
+        | and a read before the tenant GUC is set returns zero rows rather than failing loudly. See
+        | EnforceGuestFormRateLimit's docblock for why this cannot instead live in the `guest` limiter.
+        */
+        Route::post('f/{shareToken}/submissions', [GuestSubmissionController::class, 'store'])
+            ->middleware([EnforceGuestFormRateLimit::class, VerifyGuestBotChallenge::class])
+            ->name('submissions.store');
+
+        /*
+        | Mint a spam-check challenge (I8b). ⚠️ POST, NOT GET: sw.ts registers a NetworkFirst strategy for
+        | GET on this path prefix, so a GET here would be SERVICE-WORKER CACHED and re-served, and the
+        | replay guard would then reject every reuse — a bug that appears only after the SW activates.
+        |
+        | ⚠️ ITS OWN LIMITER. `throttle:guest` is replaced rather than added to: sharing that bucket would
+        | make every submission cost two requests against `submit_per_token` and silently halve the
+        | documented 30/min submit ceiling. Regenerate openapi.json after touching this route.
+        */
+        Route::post('f/{shareToken}/challenge', GuestChallengeController::class)
+            ->withoutMiddleware('throttle:guest')
+            ->middleware('throttle:guest-challenge')
+            ->name('challenges.store');
+
         // Media upload (Increment G6) — a respondent stages a file mid-form (before submit) against the
         // pinned version's media field; the returned AttachmentRef rides the answer document at submit.
-        Route::post('f/{shareToken}/attachments', [GuestAttachmentController::class, 'store'])->name('attachments.store');
+        // Carries the per-form ceiling but NOT the challenge: one puzzle per uploaded file is a hostile
+        // experience for a field worker photographing three documents, and an attachment finalizes nothing.
+        Route::post('f/{shareToken}/attachments', [GuestAttachmentController::class, 'store'])
+            ->middleware(EnforceGuestFormRateLimit::class)
+            ->name('attachments.store');
 
         // Save-and-resume draft upsert (Increment H9b) — create/overwrite a durable server draft and return a
         // resume token scoped to its submissions.id. Gated on save_and_resume (Starter+): a paid convenience,
         // not the respondent's final answer, so this does not breach never-block (submit above stays ungated).
         // The feature middleware runs after EstablishGuestTenantContext, so tenant context is set. Regenerate
         // openapi.json after adding this.
+        // Per-form ceiling but no challenge: draft autosave fires repeatedly while someone types, so a
+        // challenge here would be one puzzle every few seconds. Never-block still holds — submit is what
+        // must not be obstructed, and a rate-limited draft save degrades to a local-only draft.
         Route::post('f/{shareToken}/draft', [GuestDraftController::class, 'store'])
-            ->middleware('feature:save_and_resume')->name('drafts.store');
+            ->middleware(['feature:save_and_resume', EnforceGuestFormRateLimit::class])->name('drafts.store');
     });
 
 // ── Group C (resume): guest draft RESUME — UNAUTHENTICATED; tenant + the target draft submissions.id resolved ─

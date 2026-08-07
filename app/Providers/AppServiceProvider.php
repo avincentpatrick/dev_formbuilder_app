@@ -37,6 +37,7 @@ use App\Services\Entitlements\QuotaGuard;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Connectors\ConnectorOAuthStateService;
+use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\SystemDnsTxtResolver;
@@ -46,6 +47,7 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Dedoc\Scramble\Support\Generator\Server;
 use Dedoc\Scramble\Support\Generator\ServerVariable;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Markdown;
@@ -82,6 +84,23 @@ class AppServiceProvider extends ServiceProvider
                 (int) config('guest.share_token.ttl'),
                 $resumeKey,
                 (int) config('guest.resume_token.ttl'),
+            );
+        });
+
+        // The guest proof-of-work challenge signer (I8b) — the FOURTH member of this key family, minted
+        // here beside the other three and domain-separated the same way, so a share, resume, state or
+        // challenge value can never validate as another. Set GUEST_CHALLENGE_KEY to rotate it independently.
+        $this->app->singleton(GuestChallengeService::class, function (): GuestChallengeService {
+            $configuredKey = config('guest.challenge.key');
+            $key = is_string($configuredKey) && $configuredKey !== ''
+                ? $configuredKey
+                : hash_hmac('sha256', 'guest-challenge.v1', (string) config('app.key'));
+
+            return new GuestChallengeService(
+                $this->app->make(CacheRepository::class),
+                $key,
+                (int) config('guest.challenge.ttl'),
+                (int) config('guest.challenge.max_number'),
             );
         });
 
@@ -275,6 +294,18 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('guest-mint', fn (Request $request): Limit => Limit::perMinute(
             (int) config('guest.rate_limit.mint_per_ip'),
         )->by('gmint:'.$request->ip()));
+
+        // The proof-of-work challenge endpoint (I8b). ⚠️ ITS OWN LIMITER, NOT `guest`: sharing that bucket
+        // would make every submission cost TWO requests against `submit_per_token`, silently halving the
+        // documented 30/min submit ceiling to 15/min — a limit the operator set for one thing quietly
+        // enforcing something else. Ceilings sit above the submit ones because a client may legitimately
+        // re-solve after a 403 (the api-client's retry-once), and because issuing costs one HMAC.
+        RateLimiter::for('guest-challenge', fn (Request $request): array => [
+            Limit::perMinute((int) config('guest.rate_limit.challenge_per_token'))
+                ->by('gch:'.hash('sha256', (string) $request->route('shareToken'))),
+            Limit::perMinute((int) config('guest.rate_limit.challenge_per_ip'))
+                ->by('gchip:'.$request->ip()),
+        ]);
 
         // Native-connector OAuth callback (H15a / ADR-0009). An unauthenticated public endpoint on the
         // central domain: a real tenant reaches it once per connection, so a per-IP ceiling this low costs

@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\FieldType;
-use App\Enums\IndexedDataType;
 use App\Enums\PlanTier;
-use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
@@ -16,7 +13,6 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Branding\TenantBrandingService;
-use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\TenantContext;
@@ -48,48 +44,9 @@ afterEach(function (): void {
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 });
 
-/** A tenant reachable at {slug}.meridian.test. */
-function guestTenant(string $slug = 'acme'): Tenant
-{
-    $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
-    $tenant->domains()->create(['domain' => $slug]);
-
-    return $tenant;
-}
-
-/** A published form (required full_name + optional age). Requires enterTenant already called. */
-function publishedGuestForm(Tenant $tenant, User $owner): Form
-{
-    $form = app(FormService::class)->create($tenant, $owner, 'Intake');
-    addFormField($form->draftVersion, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
-    addFormField($form->draftVersion, $owner, 'age', FieldType::Integer, 1, [
-        'is_queryable' => true,
-        'indexed_data_type' => IndexedDataType::Number, // so the pipeline projects a typed index row for `age`
-    ]);
-    app(PublishService::class)->publish($form->refresh(), $owner);
-
-    return $form->refresh();
-}
-
-/** The same, with guest access enabled at a public slug. */
-function guestForm(Tenant $tenant, User $owner, string $slug = 'intake'): Form
-{
-    $form = publishedGuestForm($tenant, $owner);
-    $form->update(['public_slug' => $slug, 'allow_guest_submissions' => true]);
-
-    return $form->refresh();
-}
-
-/** Mint a share token for a form's current published version (optionally at a forged clock, for expiry tests). */
-function shareTokenFor(Form $form, ?int $now = null): string
-{
-    return app(GuestShareTokenService::class)->mint(
-        $form->tenant_id,
-        $form->id,
-        (string) $form->current_published_version_id,
-        $now,
-    )->token;
-}
+// guestTenant() / publishedGuestForm() / guestForm() / shareTokenFor() moved to tests/Pest.php in I8b —
+// as top-level functions here they resolved only when THIS file was loaded, so a single-file run of any
+// other guest suite died with "Call to undefined function". The H22a apiMember() lesson, second occurrence.
 
 // ── Mint (GET /f/{slug} on the subdomain) ────────────────────────────────────────────────────
 

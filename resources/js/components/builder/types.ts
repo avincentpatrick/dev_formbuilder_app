@@ -127,6 +127,11 @@ export interface LibraryItem {
 export interface ShareProps {
     public_slug: string | null;
     allow_guest_submissions: boolean;
+    // Spam protection (I8b, PRD Feature #3). `bot_challenge` is a proof-of-work check the respondent's
+    // browser solves before submitting; `guest_rate_limit_per_minute` is a per-IP ceiling for this form,
+    // null meaning "no per-form ceiling" (the deployment-wide limits still apply).
+    bot_challenge: 'off' | 'proof_of_work';
+    guest_rate_limit_per_minute: number | null;
     // A slug that is already free within the tenant, from the same FormSlug helper the XLSForm importer uses,
     // so the editor opens on a value that will save rather than one the author discovers is taken via a 422.
     suggested_slug: string;

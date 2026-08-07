@@ -34,6 +34,19 @@ const themes = ['light', 'dark'] as const;
  * whole-page scan started failing on a control the increment never touched. Same class as the G9b
  * field-library case that scoped its scan to `.builder__pane--left`.
  *
+ * ⚠️ THE SELECTOR IS `[role="dialog"]`, NOT A CLASS, AND I LEARNED THAT THE EXPENSIVE WAY. My first
+ * attempt used `.mds-modal`, which does not exist — the element carries `.mds-modal__panel` inside a
+ * `.mds-modal__backdrop`. axe does not treat an unmatched `include` as "scan nothing"; it THROWS
+ * `No elements found for include in page Context`, so a wrong selector turned two failing cases into
+ * twelve. The role attribute is also the better anchor: it is the accessibility contract the test
+ * already asserts on two lines above (`getByRole('dialog')`), so the scan and the wait cannot drift.
+ *
+ * **The process fix, which is worth more than the selector: a Playwright selector cannot be checked by
+ * any local gate in this repo, so verify it against the BUILT BUNDLE before pushing** —
+ * `grep -o '.\{0,90\}mds-modal__panel.\{0,90\}' public/build/assets/*.js` shows the compiled element
+ * verbatim (`class:\`mds-modal__panel\`, role:\`dialog\``) and would have taken ten seconds. Guessing at
+ * a class name costs a full 12-minute E2E round trip per attempt.
+ *
  * ⚠️ SCOPING IS NOT A SUPPRESSION HERE, AND THE DISTINCTION MATTERS. The builder's config panel IS scanned
  * — unscrimmed, at all three viewports in both themes, by the `config panel` and `builder empty` cases in
  * this same file. What is dropped is only the second, blended look at it through an overlay. **The real
@@ -121,7 +134,7 @@ for (const theme of themes) {
         await page.getByRole('button', { name: 'Share' }).click();
         await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — no link yet', '.mds-modal');
+        await scan(page, 'share panel — no link yet', '[role="dialog"]');
     });
 
     test(`Builder — share panel, live link (${theme})`, async ({ page }) => {
@@ -131,7 +144,7 @@ for (const theme of themes) {
         // The QR is a server round-trip; scanning before it lands would miss its alt text entirely.
         await expect(page.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — live link', '.mds-modal');
+        await scan(page, 'share panel — live link', '[role="dialog"]');
     });
 
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {

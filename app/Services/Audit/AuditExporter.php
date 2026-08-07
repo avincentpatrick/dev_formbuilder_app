@@ -14,6 +14,7 @@ use App\Services\Submissions\SubmissionExporter;
 use App\Support\Audit\AuditableTypes;
 use App\Support\Audit\AuditDiff;
 use App\Support\Audit\AuditLogger;
+use App\Support\Export\SpreadsheetCell;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -96,7 +97,7 @@ final class AuditExporter
         return response()->streamDownload(function () use ($filters, $format, $tenantId, $userId): void {
             $writer = $this->writer($format);
             $writer->openToFile('php://output');
-            $writer->addRow(Row::fromValues(self::HEADERS));
+            $writer->addRow(Row::fromValues(SpreadsheetCell::row(self::HEADERS)));
 
             DB::transaction(function () use ($filters, $writer, $tenantId, $userId): void {
                 // BOTH arguments — see the class docblock on the blank-Actor-column trap.
@@ -108,7 +109,7 @@ final class AuditExporter
                     ->orderBy('id')
                     ->lazy()
                     ->each(function (Audit $audit) use ($writer): void {
-                        $writer->addRow(Row::fromValues($this->row($audit)));
+                        $writer->addRow(Row::fromValues(SpreadsheetCell::row($this->row($audit))));
                     });
             });
 

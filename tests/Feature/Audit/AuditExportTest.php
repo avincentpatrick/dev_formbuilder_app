@@ -213,3 +213,38 @@ it('refuses a Viewer', function (): void {
 
     $this->actingAs($viewer)->get(auditExportUrl())->assertForbidden();
 });
+
+/*
+| Spreadsheet formula injection (Increment I8c) â€” the audit export is a third path to a reviewer's Excel,
+| and I2 flagged it explicitly so all the exporters would be fixed as one set rather than half of them.
+|
+| âš ï¸ THE VECTOR HERE IS THE **ACTOR** COLUMN, NOT `Changes`, AND THAT SURPRISED ME. `Changes` renders as
+| `key: old â†’ new`, so a tenant-authored VALUE can never sit at the start of that cell â€” a cell beginning
+| `title: ` is inert whatever follows. The genuinely exposed column is `Actor`, which is a user's own
+| display name, written by that user, landing unprefixed at position 0 of a cell. Recorded because the
+| obvious reading of I2's note ("the Changes column carries tenant-authored strings") points at the wrong
+| column, and a fix aimed only there would have left the real one open.
+*/
+
+it('neutralises a formula-injection payload in the Actor column', function (): void {
+    $attacker = User::factory()->create(['name' => '=cmd|\' /C calc\'!A0']);
+    enterTenant($this->tenant->id, $attacker->id);
+    makeActiveMember($attacker, 'admin');
+
+    app(FormService::class)->create($this->tenant, $attacker, 'Clinic Intake');
+
+    enterTenant($this->tenant->id, $this->owner->id);
+    $rows = auditExportRows($this->actingAs($this->owner)->get(auditExportUrl())->assertOk()->streamedContent());
+
+    $actors = array_map(static fn (array $r): string => $r[4] ?? '', $rows);
+    expect($actors)->toContain('\'=cmd|\' /C calc\'!A0');
+
+    // And nothing anywhere in the file opens a formula. Asserted across EVERY cell rather than one
+    // column, because the point of putting the wrapper at the writer is that no column is exempt.
+    foreach ($rows as $row) {
+        foreach ($row as $cell) {
+            expect(str_starts_with($cell, '='))->toBeFalse();
+            expect(str_starts_with($cell, '@'))->toBeFalse();
+        }
+    }
+});

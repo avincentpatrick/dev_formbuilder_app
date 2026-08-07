@@ -206,3 +206,60 @@ it('forbids a Viewer from exporting and confines an Editor to their own forms', 
         ->get("http://acme.meridian.test/forms/{$other->id}/submissions/export?format=csv")
         ->assertForbidden();
 });
+
+/*
+| Spreadsheet formula injection (Increment I8c) â€” the threat model's last **Open** row.
+|
+| A respondent's answer travels through this product as an inert string and becomes EXECUTABLE the moment
+| a reviewer opens the exported file, on the reviewer's machine, with the reviewer's privileges. The fix
+| lives at the writer boundary (SpreadsheetCell), so this test asserts the boundary rather than the helper
+| â€” the unit test already covers the vectors; this one proves the wrapper is actually wired to the sink.
+*/
+
+it('neutralises a formula-injection payload in a respondent answer', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, [
+        'full_name' => '=cmd|\' /C calc\'!A0',
+        'color' => 'r',
+    ]);
+
+    $csv = $this->actingAs($owner)
+        ->get("http://acme.meridian.test/forms/{$form->id}/submissions/export?format=csv")
+        ->assertOk()
+        ->streamedContent();
+
+    $rows = csvRows($csv);
+    $col = array_search('Full name', $rows[0], true);
+
+    // The apostrophe is what tells every major spreadsheet "this is text, do not evaluate it".
+    expect($rows[1][$col])->toBe('\'=cmd|\' /C calc\'!A0');
+});
+
+it('leaves a negative number a number in the export', function (): void {
+    // âš ï¸ THE OTHER HALF, AND THE ONE THAT WOULD SHIP AS A DATA-INTEGRITY BUG. `-5` starts with a
+    // dangerous character and is an ordinary answer; prefixing it would turn every negative figure in
+    // every export into literal text and break the sums a reviewer builds on top of it.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, [
+        'full_name' => '-5',
+        'color' => 'r',
+    ]);
+
+    $csv = $this->actingAs($owner)
+        ->get("http://acme.meridian.test/forms/{$form->id}/submissions/export?format=csv")
+        ->assertOk()
+        ->streamedContent();
+
+    $rows = csvRows($csv);
+    $col = array_search('Full name', $rows[0], true);
+
+    expect($rows[1][$col])->toBe('-5');
+});

@@ -616,8 +616,10 @@ final class SuperAdminService
         /** @var Collection<int, User> $users */
         $users = User::on(SuperAdminContext::CONNECTION)->whereIn('id', $ids)->get(['id', 'name']);
 
-        /** @var array<string, string> $map */
-        $map = $users->mapWithKeys(fn (User $u): array => [(string) $u->getKey() => $u->name])->all();
+        $map = [];
+        foreach ($users as $user) {
+            $map[(string) $user->getKey()] = $user->name;
+        }
 
         return $map;
     }

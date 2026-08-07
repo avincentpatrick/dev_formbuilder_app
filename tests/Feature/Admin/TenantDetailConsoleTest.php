@@ -58,6 +58,10 @@ function consoleAdmin(): User
 
 beforeEach(function (): void {
     TenantContext::flush();
+
+    // I8a — the console carries `step-up`; without a fresh confirmation every request here 302s to
+    // /user/confirm-password instead of rendering. See tests/Pest.php.
+    confirmPasswordNow();
 });
 
 /* ── Gates ───────────────────────────────────────────────────────────────────────────────────────────── */

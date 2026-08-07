@@ -37,7 +37,9 @@ import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
 const props = defineProps<{
-    twoFactor: { enabled: boolean; confirmed: boolean };
+    // `needs_password_confirmation` is what stops the enrolment panel rendering a blank QR when the
+    // session's password confirmation has lapsed — see TwoFactorSetup.vue's docblock (I8a).
+    twoFactor: { enabled: boolean; confirmed: boolean; needs_password_confirmation: boolean };
     // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
     // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
     draftSettings: { draft_ttl_days: number; is_default: boolean; can_manage: boolean };
@@ -393,7 +395,11 @@ function savePassword(): void {
 
             <section class="settings-sub">
                 <h3 class="settings-sub__title">Two-factor authentication</h3>
-                <TwoFactorSetup :enabled="twoFactor.enabled" :confirmed="twoFactor.confirmed" />
+                <TwoFactorSetup
+                    :enabled="twoFactor.enabled"
+                    :confirmed="twoFactor.confirmed"
+                    :needs-password-confirmation="twoFactor.needs_password_confirmation"
+                />
             </section>
         </MdsCard>
 

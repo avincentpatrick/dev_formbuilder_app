@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Notifications\NotificationPresenter;
 
 /**
  * Authorization for the submissions inbox, review, and export (Increments F4b + F7). Mirrors
@@ -48,11 +49,40 @@ final class SubmissionPolicy
         return $user->can('submissions.view');
     }
 
-    /** View one submission's detail: the permission + tenant-wide OR per-form collaborator scope (F7). */
+    /**
+     * View one submission's detail: the permission + tenant-wide OR per-form collaborator scope (F7) OR
+     * — since I8a — being the person who submitted it.
+     *
+     * ── THE RESPONDENT CLAUSE (I8a, filed by I4, `docs/feature-backlog.md` §4) ─────────────────────────
+     * `submission_approved` / `submission_returned` are addressed to `respondent_user_id` and the copy
+     * tells that person to "open it to see what they asked for" — but before this clause the rule was
+     * `submissions.view && (org-wide || collaborates)`, with nothing about having AUTHORED the thing. A
+     * Form Editor whose grant was later revoked, or whose form moved to another scope node, kept a
+     * notification pointing at a **bare 403 rendered outside the Inertia shell, with no navigation back**.
+     * I4 made that honest rather than broken — {@see NotificationPresenter}
+     * runs this very Gate and ships `url: null` so the row renders as plain text — and I8a makes it
+     * WORKED, so those links resolve. That presenter needs no change; it starts allowing by itself.
+     *
+     * ⚠️ THIS IS `view()` ONLY, NOT `review()` AND NOT A FUTURE `update()`. Reading back what you yourself
+     * submitted is not a privilege — the answers are already yours, and you typed them. Deciding your own
+     * submission's outcome, or editing it after review, are different questions with different answers;
+     * post-submission editing is I9's vertical and lights up `submissions.edit.any/.own` (seeded since
+     * Phase 0 with no code behind them). Do not widen the neighbours "for symmetry".
+     *
+     * `submissions.view` is still required, so this grants nothing to a role that holds no read at all —
+     * and guest respondents have no `users` row, so `respondent_user_id` is null for them and the clause
+     * is inert on the public runtime.
+     *
+     * MIRRORED IN {@see Submission::scopeVisibleTo()} — this class's docblock pins that the single-row
+     * check and the list query must express exactly one rule, and a respondent who could open a row the
+     * inbox never lists is precisely the divergence that pin exists to prevent.
+     */
     public function view(User $user, Submission $submission): bool
     {
         return $user->can('submissions.view')
-            && ($this->hasOrgWideVisibility($user) || $this->collaboratesWith($user, $submission->form_id));
+            && ($this->hasOrgWideVisibility($user)
+                || $this->collaboratesWith($user, $submission->form_id)
+                || $this->isRespondent($user, $submission));
     }
 
     /** Stream a form's export (F7): submissions.export (Viewer lacks it) + the same visibility scope. */
@@ -102,5 +132,20 @@ final class SubmissionPolicy
     private function collaboratesWith(User $user, string $formId): bool
     {
         return $this->grants->holdsAny($user, $formId);
+    }
+
+    /**
+     * Did this user submit this submission? (I8a — see {@see self::view()} for the reasoning.)
+     *
+     * ⚠️ THE NULL CHECK IS LOAD-BEARING, NOT DEFENSIVE. `respondent_user_id` is NULL on every guest
+     * submission — the public runtime has no user to record — and `$user->getKey()` is never null on a
+     * resolved User, so a bare `===` would already be false. But the explicit guard states the rule the
+     * comparison only implies: an ANONYMOUS submission belongs to nobody, and must never become readable
+     * by falling out of a comparison between two nulls if either side's typing ever loosens.
+     */
+    private function isRespondent(User $user, Submission $submission): bool
+    {
+        return $submission->respondent_user_id !== null
+            && $submission->respondent_user_id === $user->getKey();
     }
 }

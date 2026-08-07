@@ -7,21 +7,40 @@
  *   - enabled, unconfirmed → show the QR + recovery codes (fetched from Fortify's JSON endpoints), then
  *                            confirm with a TOTP code (POST /user/confirmed-two-factor-authentication)
  *   - confirmed        → on; regenerate recovery codes / turn off
- * Fortify's `confirmPassword` feature may interpose a password-confirmation step; that is Fortify's own
- * redirect flow (the ConfirmPassword page), not re-implemented here.
+ * Fortify's `confirmPassword` feature interposes a password-confirmation step on every one of those
+ * endpoints, and how it does so is load-bearing here — see `needsPasswordConfirmation` below.
+ *
+ * ⚠️ THE TWO SETUP READS ARE JSON SIDECARS, AND A STALE PASSWORD CONFIRMATION DOES NOT REDIRECT THEM.
+ * Laravel's RequirePassword forks on `expectsJson()`: a navigation gets a 302 to the ConfirmPassword page,
+ * but a `fetch` sent with `Accept: application/json` gets a bare **423 with a JSON body**. The first
+ * draft of this file read `res.json()` unconditionally, so that 423 landed as `qrSvg = undefined` and a
+ * non-array `recoveryCodes` — **a blank QR under working-looking copy, with no error and no way forward.**
+ * On `Pages/admin/TwoFactorSetup.vue` that is a lockout: `superadmin.mfa` allows no other console route.
+ * So there are two guards, and both are wanted:
+ *   - `needsPasswordConfirmation` (server-computed, {@see \App\Support\Auth\PasswordConfirmation}) is the
+ *     fast path — the panel renders instead of the fetch ever being made.
+ *   - the `res.status` check is the correctness guarantee — the window can lapse between render and click.
  */
-import { ref, watch } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
 
-const props = defineProps<{ enabled: boolean; confirmed: boolean }>();
+const props = defineProps<{
+    enabled: boolean;
+    confirmed: boolean;
+    needsPasswordConfirmation: boolean;
+}>();
 
 const qrSvg = ref<string>('');
 const recoveryCodes = ref<string[]>([]);
 const loading = ref(false);
+const staleConfirmation = ref(false);
 
 const confirmForm = useForm({ code: '' });
 const busy = ref(false);
+
+/** Render the confirm-password panel rather than the setup panel, from either guard. */
+const mustConfirmPassword = computed(() => props.needsPasswordConfirmation || staleConfirmation.value);
 
 async function loadSetup(): Promise<void> {
     loading.value = true;
@@ -30,6 +49,15 @@ async function loadSetup(): Promise<void> {
             fetch('/user/two-factor-qr-code', { headers: { Accept: 'application/json' } }),
             fetch('/user/two-factor-recovery-codes', { headers: { Accept: 'application/json' } }),
         ]);
+
+        // 423 is RequirePassword refusing a JSON request. Anything else non-OK is a real failure, but the
+        // remedy a respondent can act on is the same panel, so both raise it rather than rendering blanks.
+        if (!qrRes.ok || !rcRes.ok) {
+            staleConfirmation.value = true;
+
+            return;
+        }
+
         qrSvg.value = ((await qrRes.json()) as { svg: string }).svg;
         recoveryCodes.value = (await rcRes.json()) as string[];
     } finally {
@@ -37,9 +65,10 @@ async function loadSetup(): Promise<void> {
     }
 }
 
-// Whenever we're enabled-but-unconfirmed (on mount or right after enabling), pull the QR + codes.
+// Whenever we're enabled-but-unconfirmed (on mount or right after enabling), pull the QR + codes — unless
+// the server already told us the fetch would be refused, in which case we never make it.
 watch(
-    () => props.enabled && !props.confirmed,
+    () => props.enabled && !props.confirmed && !mustConfirmPassword.value,
     (needSetup) => {
         if (needSetup) void loadSetup();
     },
@@ -96,6 +125,17 @@ function regenerate(): void {
             <MdsButton variant="primary" :loading="busy" @click="enable">
                 Enable two-factor authentication
             </MdsButton>
+        </template>
+
+        <!-- Enabled, awaiting confirmation, but the password confirmation has lapsed -->
+        <template v-else-if="!confirmed && mustConfirmPassword">
+            <p class="tfa__prose">
+                For your security, confirm your password before we show your QR code and recovery codes.
+                You'll come straight back here.
+            </p>
+            <Link href="/user/confirm-password" class="tfa__confirm-link">
+                <MdsButton variant="primary" type="button">Confirm your password</MdsButton>
+            </Link>
         </template>
 
         <!-- Enabled, awaiting confirmation -->
@@ -235,5 +275,11 @@ function regenerate(): void {
     display: flex;
     flex-wrap: wrap;
     gap: var(--mds-space-2);
+}
+
+/* The Link wraps a button, so it must not add its own underline or inherit the anchor colour. */
+.tfa__confirm-link {
+    align-self: flex-start;
+    text-decoration: none;
 }
 </style>

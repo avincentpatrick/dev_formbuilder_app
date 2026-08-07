@@ -30,6 +30,7 @@ use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
+use App\Http\Middleware\RequireRecentPassword;
 use App\Support\Api\ApiErrorResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authorize;
@@ -105,10 +106,16 @@ return Application::configure(basePath: dirname(__DIR__))
         //
         // ability / abilities (Increment E) are Sanctum's token-ability gates for the /api/v1 surface
         // (CheckForAnyAbility = any-of; CheckAbilities = all-of); not auto-registered by the package.
+        //
+        // step-up (I8a) — PRD Feature #14's re-authentication for high-blast-radius actions. A NARROWER
+        // window (auth.step_up_timeout, 15 min) than the framework's `password.confirm` default of three
+        // hours. ⚠️ Never mount it on a route a JSON sidecar calls: RequirePassword answers an
+        // `Accept: application/json` request with a bare 423 instead of redirecting. See the class.
         $middleware->alias([
             'tenant.context' => EstablishTenantDatabaseContext::class,
             'superadmin' => EnsureSuperAdmin::class,
             'superadmin.mfa' => EnsureSuperAdminMfa::class,
+            'step-up' => RequireRecentPassword::class,
             'ability' => CheckForAnyAbility::class,
             'abilities' => CheckAbilities::class,
             // feature:<key> (H5c) — plan feature-gate on top of ability/can. Requires tenant context (all

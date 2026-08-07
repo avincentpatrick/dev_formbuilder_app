@@ -58,6 +58,30 @@ final class MemberController extends Controller
             ->with('toast', ['type' => 'success', 'message' => "Invitation sent to {$validated['email']}"]);
     }
 
+    /**
+     * Change an active member's role (I8a, PRD Feature #14). Gated by `can:tenant.roles.assign` — a key
+     * seeded to Owner/Admin since Phase 0 with no code behind it until now — plus `step-up`, so a live
+     * session alone is not enough.
+     *
+     * The allowed values are ASSIGNABLE_ROLES, the same list the invite form offers, which is what keeps
+     * `owner` off both surfaces. The four domain refusals (Owner's role, self, no-op, non-member) live in
+     * {@see TenantMembershipService::changeRole()} — a request cannot know any of them.
+     */
+    public function changeRole(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'role' => ['required', 'string', Rule::in(array_column(self::ASSIGNABLE_ROLES, 'value'))],
+        ]);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $this->memberships->changeRole($this->currentTenant(), $user, $validated['role'], $actor);
+
+        return back()
+            ->with('status', 'member-role-changed')
+            ->with('toast', ['type' => 'success', 'message' => 'Role updated']);
+    }
+
     public function remove(Request $request, User $user): RedirectResponse
     {
         /** @var User $actor */

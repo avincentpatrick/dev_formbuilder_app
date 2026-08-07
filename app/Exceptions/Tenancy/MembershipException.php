@@ -64,4 +64,34 @@ final class MembershipException extends RuntimeException
     {
         return new self('That user is already the Owner of this tenant.');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role change (Increment I8a) — the four refusals TenantMembershipService::changeRole() can make.
+    |--------------------------------------------------------------------------
+    | All four are ROLE-MODEL invariants rather than permission checks: an Admin holding
+    | `tenant.members.role` legitimately reaches the route, and is then told no by the domain. The Owner
+    | pair in particular is what keeps §5's "exactly one Owner, changed only by transfer" true no matter
+    | what the roster UI sends.
+    */
+
+    public static function cannotAssignOwner(): self
+    {
+        return new self('Ownership is established by transfer, not by a role change.');
+    }
+
+    public static function cannotChangeOwnerRole(): self
+    {
+        return new self("The Owner's role changes only by transferring ownership.");
+    }
+
+    public static function cannotChangeOwnRole(): self
+    {
+        return new self('You cannot change your own role.');
+    }
+
+    public static function roleUnchanged(string $role): self
+    {
+        return new self("That member already holds the {$role} role.");
+    }
 }

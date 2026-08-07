@@ -122,4 +122,25 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Step-Up Re-Authentication Window (Increment I8a — PRD Feature #14)
+    |--------------------------------------------------------------------------
+    |
+    | The NARROWER window enforced on high-blast-radius actions: ownership transfer, member role changes
+    | and removals, plan assignment, and every page of the super-admin console. PRD Feature #14 asks for
+    | "a recent credential confirmation, not just a live session", and three hours is not recent for an
+    | action that cannot be undone from the UI — a laptop left unlocked over lunch is still inside the
+    | framework default.
+    |
+    | Deliberately a SECOND key rather than a change to `password_timeout` above: that one governs
+    | Fortify's own 2FA-management endpoints, where a 15-minute window would make enrolment (scan a QR,
+    | save the codes, type a rotating code) re-confirm mid-flow. Two windows, two purposes.
+    |
+    | Read by App\Http\Middleware\RequireRecentPassword, which is aliased `step-up`.
+    |
+    */
+
+    'step_up_timeout' => env('AUTH_STEP_UP_TIMEOUT', 900),
+
 ];

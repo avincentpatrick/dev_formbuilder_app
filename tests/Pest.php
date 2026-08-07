@@ -822,3 +822,35 @@ function purgeCommittedPlatformAuditFixtures(): void
         $connection->table('users')->whereIn('id', $userIds)->delete();
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Step-up re-authentication (Increment I8a) — PRD Feature #14.
+|--------------------------------------------------------------------------
+| `App\Http\Middleware\RequireRecentPassword` (aliased `step-up`) guards the tenant-side
+| high-blast-radius mutations and EVERY page of the super-admin console. A live session is no
+| longer enough there: the session must also carry a password confirmation from the last
+| `auth.step_up_timeout` seconds.
+|
+| ⚠️ EVERY CONSOLE TEST WRITTEN BEFORE I8a NEEDS THIS, AND THE FAILURE IS NOT SUBTLE — the request
+| 302s to `/user/confirm-password` instead of rendering, so an `assertOk()` reports "expected 200,
+| got 302" and an `assertRedirect(...)` reports the wrong target. 43 pre-existing tests across four
+| console suites hit it the first time step-up landed. That is the cost of the gate rather than a
+| defect in it, and it is paid here once instead of forty-three times.
+|
+| Lives in this file for the reason stated at the top of it: Pest loads every test file into ONE
+| process, so the same helper declared in two suites is a fatal, not a duplicate.
+*/
+
+/**
+ * Mark the current test session's password as confirmed `$secondsAgo` seconds ago.
+ *
+ * Writes exactly the key Fortify's own `ConfirmablePasswordController` writes on success, so a test
+ * that calls this is indistinguishable — to the middleware — from one that walked the real
+ * confirm-password flow. Pass a value larger than `auth.step_up_timeout` (900) to assert the
+ * REFUSAL side; the default of 0 asserts the allowed side.
+ */
+function confirmPasswordNow(int $secondsAgo = 0): void
+{
+    session()->put('auth.password_confirmed_at', now()->unix() - $secondsAgo);
+}

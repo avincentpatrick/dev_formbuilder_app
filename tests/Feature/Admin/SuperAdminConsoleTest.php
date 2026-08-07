@@ -21,6 +21,11 @@ uses(RefreshDatabase::class);
 | so no committed rows are needed here (unlike the DB-level SuperAdminBypassTest).
 */
 
+// I8a — every console page now carries `step-up` as well, so a live session is not enough: the request
+// 302s to /user/confirm-password unless this session confirmed its password in the last 15 minutes. The
+// `superadmin.mfa` cases below still assert their own redirect, because superadmin.mfa runs FIRST.
+beforeEach(fn () => confirmPasswordNow());
+
 $adminUrl = fn (string $path): string => "http://meridian.test/admin{$path}";
 
 it('lets a super-admin with confirmed 2FA into the console', function () use ($adminUrl): void {

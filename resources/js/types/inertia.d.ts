@@ -41,6 +41,9 @@ export interface AppUser {
 export interface AppAbilities {
     manageMembers: boolean;
     transferOwnership: boolean;
+    // I8a — `tenant.roles.assign`, the Members page's per-row role control. Distinct from manageMembers
+    // on purpose: who is here vs what they may do are two grants in the RBAC §5 catalog.
+    assignRoles: boolean;
     manageForms: boolean;
     viewSubmissions: boolean;
     manageScopes: boolean;

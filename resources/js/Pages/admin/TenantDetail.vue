@@ -386,7 +386,9 @@ function formatDay(iso: string | null): string {
                         : `Members of ${tenant.name} will regain access immediately.`
                 }}
             </p>
-            <template #footer>
+            <!-- `#actions`, not `#footer` — MdsModal's slot is `actions` (MdsCard's is `footer`). Getting
+                 this wrong renders the confirm buttons nowhere at all, silently. -->
+            <template #actions>
                 <MdsButton variant="secondary" @click="pendingAction = null">Cancel</MdsButton>
                 <MdsButton
                     :variant="pendingAction === 'suspend' ? 'destructive' : 'primary'"

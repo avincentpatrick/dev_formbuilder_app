@@ -75,6 +75,16 @@ const pages = [
     // `superadmin.mfa` needs a TOTP in CI. Its primitives are axe-covered by the Storybook job, and its
     // behaviour by resources/js/Pages/admin/feedback.test.ts.
     { name: 'Feedback', path: '/feedback' },
+    // The step-up re-authentication page (I8c, scanning what I8a made load-bearing). It sits behind
+    // `auth`, which is why it is HERE and not in auth-axe.spec.ts with the genuinely unauthenticated
+    // pages — a no-storageState visit would be redirected to /login and would scan that instead, passing
+    // while covering nothing.
+    //
+    // It earns a scan because I8a changed what it is. Before, it guarded nothing and almost nobody saw
+    // it; now it is the interposed step for ownership transfer, member role changes, member removal and
+    // every page of the super-admin console — a page an administrator meets in the middle of a task they
+    // have already started, which is precisely when an accessibility failure is most costly.
+    { name: 'Confirm password', path: '/user/confirm-password' },
 ];
 
 const themes = ['light', 'dark'] as const;

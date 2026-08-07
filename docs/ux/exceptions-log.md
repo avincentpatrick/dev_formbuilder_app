@@ -153,11 +153,24 @@ available for the active state that keeps its label readable, so "lighter on pre
 unreachable for this hue. Darkening instead yields 9.40:1 and reads as a pressed-in surface, which is
 the conventional pressed metaphor anyway.
 
-**Related observation, deliberately not fixed here:** Blueprint's own dark `bg-active` (`primary-300`)
+**Related observation, deliberately not fixed here:** ~~Blueprint's own dark `bg-active` (`primary-300`)
 measures **2.52:1** with white text — a pre-existing latent failure, invisible to CI because
 `assertClean` parks the pointer and axe never evaluates `:active`. It predates G11 and is unrelated to
 personalization; fixing it means re-deriving Blueprint's dark press step and re-verifying every
-component that uses it, which is its own change. Recorded here so it is not rediscovered as new.
+component that uses it, which is its own change. Recorded here so it is not rediscovered as new.~~
+
+✅ **FIXED IN H21d1 (`774b9ae`), AND THIS PARAGRAPH WAS LEFT STALE FOR THREE INCREMENTS —
+CORRECTED IN I8c (2026-08-08).** `theme-overrides.css` now reads `--mds-color-action-primary-bg-active:
+var(--mds-primary-700)` (**13.00:1**) in both the explicit dark block and its `prefers-color-scheme`
+twin, and `theme-overrides.test.ts` asserts every `--mds-color-action-primary-bg*` declaration clears
+4.5:1 against white — so the failure this paragraph described cannot return silently.
+
+**The correction is worth more than the fix.** I8's original scope carried "Blueprint dark `bg-active`
+2.52:1 fix" as a work item *because this document still said it was open*, and the increment planned
+against the prose rather than the code. Reading `theme-overrides.css` took a minute and removed a task
+from the increment. **A "recorded so it is not rediscovered as new" note becomes an active liability the
+moment it outlives its own subject** — it is trusted precisely because it looks like diligence. If you
+close something a log entry describes, close the entry in the same commit.
 
 **Disposition:** accepted. Both directions are contrast-verified in DSR §4.1's 17-row table, and the
 `TealDark` / `MaxPersonalization` Storybook stories plus the Playwright `personalization-axe` spec keep

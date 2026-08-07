@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Xlsform;
 
+use App\Support\Export\SpreadsheetCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 
@@ -28,9 +29,9 @@ final class XlsformWorkbookWriter
             $current->setName($name);
             $first = false;
 
-            $writer->addRow(Row::fromValues($sheet['headers']));
+            $writer->addRow(Row::fromValues(SpreadsheetCell::row($sheet['headers'])));
             foreach ($sheet['rows'] as $row) {
-                $writer->addRow(Row::fromValues($this->align($sheet['headers'], $row)));
+                $writer->addRow(Row::fromValues(SpreadsheetCell::row($this->align($sheet['headers'], $row))));
             }
         }
     }

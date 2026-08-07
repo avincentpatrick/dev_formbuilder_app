@@ -10,6 +10,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\UsageMeter;
+use App\Support\Export\SpreadsheetCell;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +78,7 @@ final class SubmissionExporter
         return response()->streamDownload(function () use ($form, $filters, $format, $headerRow, $keys, $fieldMeta, $tenantId, $userId, $locale): void {
             $writer = $this->writer($format);
             $writer->openToFile('php://output');
-            $writer->addRow(Row::fromValues($headerRow));
+            $writer->addRow(Row::fromValues(SpreadsheetCell::row($headerRow)));
 
             DB::transaction(function () use ($form, $filters, $keys, $fieldMeta, $writer, $tenantId, $userId, $locale): void {
                 TenantContext::applyLocal($tenantId, $userId);
@@ -87,7 +88,7 @@ final class SubmissionExporter
                     ->orderBy('id')
                     ->lazy()
                     ->each(function (Submission $submission) use ($keys, $fieldMeta, $writer, $locale): void {
-                        $writer->addRow(Row::fromValues($this->row($submission, $keys, $fieldMeta, $locale)));
+                        $writer->addRow(Row::fromValues(SpreadsheetCell::row($this->row($submission, $keys, $fieldMeta, $locale))));
                     });
             });
 

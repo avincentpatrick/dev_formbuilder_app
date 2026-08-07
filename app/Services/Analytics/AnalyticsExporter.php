@@ -8,6 +8,7 @@ use App\Enums\UsageMetric;
 use App\Models\User;
 use App\Services\Entitlements\UsageMeter;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Export\SpreadsheetCell;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Row;
@@ -93,7 +94,7 @@ final class AnalyticsExporter
                 app(PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
 
                 foreach ($this->rows($query, $user) as $row) {
-                    $writer->addRow(Row::fromValues($row));
+                    $writer->addRow(Row::fromValues(SpreadsheetCell::row($row)));
                 }
             });
 

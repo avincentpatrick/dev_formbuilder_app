@@ -1,0 +1,297 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, ref, reactive } from 'vue';
+
+import { createServerAutosave, type ServerAutosaveOptions } from '../useServerAutosave';
+
+/**
+ * Increment I9b — the manual-encode autosave.
+ *
+ * Every case here is a failure mode rather than a happy path, because the happy path ("it eventually POSTs")
+ * is satisfied by almost any implementation. What is worth pinning is the behaviour under a burst of typing,
+ * under an in-flight request, on a dead session, and on a page view where nobody has typed anything at all.
+ */
+
+function jsonResponse(status: number, data: Record<string, unknown> = {}): Response {
+    return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => ({ data }),
+    } as unknown as Response;
+}
+
+function harness(overrides: Partial<ServerAutosaveOptions> = {}) {
+    const post = vi.fn(async () => jsonResponse(200, { last_saved_at: '2026-08-08T00:00:00+00:00', completeness_percent: 50 }));
+    const answers = reactive<Record<string, unknown>>({});
+    const enabled = ref(true);
+    const currentStepKey = ref('step-1');
+
+    const autosave = createServerAutosave({
+        url: '/forms/f1/submissions/draft',
+        clientSubmissionUuid: 'uuid-1',
+        answers,
+        currentStepKey,
+        enabled,
+        debounceMs: 100,
+        backstopMs: 1_000,
+        post,
+        ...overrides,
+    });
+
+    return { autosave, post, answers, enabled, currentStepKey };
+}
+
+beforeEach(() => {
+    vi.useFakeTimers();
+});
+
+describe('useServerAutosave — batching', () => {
+    it('collapses a burst of typing into ONE request', async () => {
+        const { post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+        answers.a = '12';
+        await nextTick();
+        answers.a = '123';
+        await nextTick();
+
+        expect(post).not.toHaveBeenCalled(); // still inside the debounce window
+
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(1);
+        // And it sends the LAST value, not the first.
+        expect((post.mock.calls[0][0] as { answers: Record<string, unknown> }).answers).toEqual({ a: '123' });
+    });
+
+    it('sends the uuid and the step cursor with every save', async () => {
+        const { post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        const body = post.mock.calls[0][0] as Record<string, unknown>;
+        expect(body.client_submission_uuid).toBe('uuid-1');
+        expect(body.draft_current_step).toBe('step-1');
+    });
+});
+
+describe('useServerAutosave — the empty-draft guard', () => {
+    it('POSTs nothing while disabled, however much the answer map changes', async () => {
+        // ⚠️ THE ROW-PER-PAGE-VIEW GUARD. `Encode.vue` seeds each repeatable section's min_instances during
+        // mount, which MUTATES the answer map before any human has typed. Armed at setup, the composable
+        // would create a `status = draft` row with a 30-day TTL on every single page view of any form with a
+        // repeat group.
+        const { post, answers, enabled } = harness();
+        enabled.value = false;
+
+        answers.a = 'seeded-by-mount';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(1_000);
+
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('starts saving once armed by a real edit', async () => {
+        // The control: without it, the case above passes against a composable that never saves at all.
+        const { post, answers, enabled } = harness();
+        enabled.value = false;
+
+        answers.a = 'seeded';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(post).not.toHaveBeenCalled();
+
+        enabled.value = true;
+        answers.a = 'typed';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('useServerAutosave — concurrency', () => {
+    it('never runs two requests at once, and schedules exactly one follow-up', async () => {
+        // Two concurrent POSTs would serialize on the server's row lock, so the risk is not corruption but an
+        // OLDER payload landing last.
+        let resolveFirst: ((r: Response) => void) | null = null;
+        const post = vi.fn(
+            () =>
+                new Promise<Response>((resolve) => {
+                    if (resolveFirst === null) {
+                        resolveFirst = resolve;
+
+                        return;
+                    }
+                    resolve(jsonResponse(200));
+                }),
+        );
+
+        const { answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1); // in flight, unresolved
+
+        // Three more edits land while it is in flight.
+        answers.a = '2';
+        await nextTick();
+        answers.a = '3';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(1); // still only one — the rest coalesced
+
+        resolveFirst!(jsonResponse(200));
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post).toHaveBeenCalledTimes(2); // exactly ONE follow-up, not three
+    });
+});
+
+describe('useServerAutosave — the backstop', () => {
+    it('is dirty-gated: a quiet tab issues no periodic requests', async () => {
+        const { post } = harness();
+
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('does fire when there is unsaved work', async () => {
+        // The control for the case above. A save that failed leaves the work dirty, and the backstop is what
+        // eventually retries it without the keyer having to type again.
+        const post = vi.fn(async () => jsonResponse(500));
+        const { answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+        expect(post).toHaveBeenCalledTimes(1); // the failed attempt
+
+        await vi.advanceTimersByTimeAsync(1_100); // one backstop interval
+
+        expect(post.mock.calls.length).toBeGreaterThan(1);
+    });
+});
+
+describe('useServerAutosave — terminal failures', () => {
+    it('stops permanently on a 409 and names what happened', async () => {
+        // The draft was submitted from another tab. Retrying can never succeed.
+        const post = vi.fn(async () => jsonResponse(409));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        expect(autosave.message.value).toContain('already been submitted');
+
+        const callsAtStop = post.mock.calls.length;
+        answers.a = '2';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(post).toHaveBeenCalledTimes(callsAtStop); // never tries again
+    });
+
+    it('stops permanently on a 419, because a dead session loses work silently otherwise', async () => {
+        const post = vi.fn(async () => jsonResponse(419));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        expect(autosave.message.value).toContain('expired');
+    });
+
+    it('keeps retrying after a 5xx rather than giving up', async () => {
+        const post = vi.fn(async () => jsonResponse(503));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('error');
+
+        answers.a = '2';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(post.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('keeps retrying after a network throw', async () => {
+        const post = vi.fn(async () => {
+            throw new Error('offline');
+        });
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('error');
+        expect(autosave.message.value).toContain('keep trying');
+    });
+});
+
+describe('useServerAutosave — lifecycle', () => {
+    it('flushes pending work on demand', async () => {
+        const { autosave, post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+
+        expect(post).not.toHaveBeenCalled(); // debounce not yet elapsed
+        await autosave.flush();
+
+        expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it('SAVES pending work on dispose(), because Inertia navigation fires no unload event', async () => {
+        // ⚠️ THE MOST COMMON WAY TO LEAVE THIS PAGE IS AN INERTIA <Link> (Cancel, the breadcrumb, any sidebar
+        // item), which unmounts the component client-side and fires no `beforeunload` at all. An earlier
+        // draft of dispose() cleared the timers WITHOUT saving, so up to a full debounce window of typing
+        // vanished on every click-away — no error, no prompt, nothing to notice.
+        const { autosave, post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+        expect(post).not.toHaveBeenCalled(); // still inside the debounce window
+
+        autosave.dispose();
+
+        expect(post).toHaveBeenCalledTimes(1);
+        expect((post.mock.calls[0][0] as { answers: Record<string, unknown> }).answers).toEqual({ a: '1' });
+    });
+
+    it('stops the backstop on dispose(), so a torn-down page issues nothing further', async () => {
+        const { autosave, post, answers } = harness();
+
+        answers.a = '1';
+        await nextTick();
+        autosave.dispose();
+        const afterDispose = post.mock.calls.length;
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(post).toHaveBeenCalledTimes(afterDispose);
+    });
+
+    it('saves nothing on dispose() when there is nothing pending', async () => {
+        // The control: dispose() must not manufacture a write on a page nobody touched.
+        const { autosave, post } = harness();
+
+        autosave.dispose();
+
+        expect(post).not.toHaveBeenCalled();
+    });
+});

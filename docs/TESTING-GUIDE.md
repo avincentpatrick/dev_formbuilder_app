@@ -472,7 +472,7 @@ expected and is not a defect.
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
-| **Post-submission answer editing, manual-encode save-as-draft** | Increments I9b and I9c. A staff member filling a form in-app must finish in one sitting, and a submitted response's answers cannot be corrected by anyone. |
+| **Post-submission answer editing** | Increment I9c. A submitted response's answers cannot be corrected by anyone, on any channel. |
 | **Production deployment** | Track B, after the application is otherwise complete. |
 
 Anything else that does not work as this guide describes **is** worth reporting.

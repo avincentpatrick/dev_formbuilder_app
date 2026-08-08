@@ -51,6 +51,14 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     await consolePage.getByRole('button', { name: 'Sign in' }).click();
     await consolePage.waitForLoadState('networkidle');
 
+    // Snapshot HERE, immediately after the POST settles. The earlier version grabbed the page only after
+    // navigating on to /admin/settings, by which point any flashed validation error had been consumed and
+    // the snapshot showed a pristine form — which read as "never submitted" when it may well have been
+    // "submitted and rejected". Same class of mistake as asserting on <body>'s text in I10d.
+    const afterLogin = `${consolePage.url()} :: ${(await consolePage.locator('body').innerText())
+        .replace(/\s+/g, ' ')
+        .slice(0, 300)}`;
+
     // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify does
     // not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which reads only
     // the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains the trade.
@@ -64,6 +72,7 @@ async function globalSetup(_config: FullConfig): Promise<void> {
 ` +
                 `Requests: ${seen.join(' | ')}
 Cookies: ${cookies}
+After login: ${afterLogin}
 Page said: ${shown}`,
         );
     }

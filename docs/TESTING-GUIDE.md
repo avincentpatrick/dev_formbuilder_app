@@ -175,29 +175,36 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
 
 1. `/submissions` · owner. **Expect:** several hundred rows spread over the last 90 days, with a status badge
    on each.
-2. Filter by status. **Expect:** every one of *submitted*, *under review*, *approved*, *returned* and
-   *archived* returns rows. Note that in-progress **drafts are hidden from the unfiltered list on purpose** —
-   the inbox is a work queue, not a log — but selecting the **Draft** status explicitly does surface them,
-   with their progress. Check both halves of that.
-3. Filter by form, and by date range. **Expect:** both narrow the list; the counts change accordingly.
-4. Page through the list. **Expect:** pagination works and the sort order is stable.
-5. Open any submission. **Expect:** the full answer document, who submitted it, when, from which channel, and
+2. Filter by status. **Expect:** every one of *submitted*, *screened out*, *under review*, *approved*,
+   *returned* and *archived* returns rows. Note that in-progress **drafts are hidden from the unfiltered list
+   on purpose** — the inbox is a work queue, not a log — but selecting the **Draft** status explicitly does
+   surface them, with their progress. Check both halves of that.
+3. Open a **Screened out** row. **Expect:** an empty answer document, and **no review buttons at all** — no
+   Approve, no Return, not even Archive. That state means the respondent finalized a form that had no
+   questions left to show them (a branching form whose conditions ruled every remaining section out), so
+   there is nothing to review and nothing to decide. Two things follow from it that are worth checking
+   deliberately, because they are the reason it exists: such a response **does not consume a form's response
+   cap** (§3's `max_responses`), and it still **appears in the unfiltered inbox** rather than being hidden —
+   a form that screens everyone out should be loud, not silent.
+4. Filter by form, and by date range. **Expect:** both narrow the list; the counts change accordingly.
+5. Page through the list. **Expect:** pagination works and the sort order is stable.
+6. Open any submission. **Expect:** the full answer document, who submitted it, when, from which channel, and
    which form version it was captured against.
-6. On a *submitted* row, **Approve** it. **Expect:** the status changes and the reviewer and timestamp are
+7. On a *submitted* row, **Approve** it. **Expect:** the status changes and the reviewer and timestamp are
    recorded.
-7. On another, **Return to respondent** with a reason. **Expect:** the reason is stored and shown.
-8. **Archive** a third.
-9. From a submission, request a **PDF**. **Expect:** a job is queued and the PDF arrives by email — check
+8. On another, **Return to respondent** with a reason. **Expect:** the reason is stored and shown.
+9. **Archive** a third.
+10. From a submission, request a **PDF**. **Expect:** a job is queued and the PDF arrives by email — check
    <http://localhost:8025>.
-10. From `/forms`, **export** Patient Intake as CSV and again as XLSX. **Expect:** both download and stream
+11. From `/forms`, **export** Patient Intake as CSV and again as XLSX. **Expect:** both download and stream
     rather than time out; the multi-select column is readable and the single-select shows labels.
-11. Note the total row count as the Owner (it is around 500). Now sign out and sign in as
+12. Note the total row count as the Owner (it is around 500). Now sign out and sign in as
     **`reviewer@demo.test`** and open `/submissions` again. **Expect:** roughly **a hundred** rows, not five
     hundred — a reviewer sees only the three forms they hold a grant on, and the biggest form is deliberately
     not one of them. This is the permission model working, and it is meant to be obvious.
-12. Sign in as **`viewer@demo.test`**. **Expect:** the *full* list again — a Viewer is read-only but
+13. Sign in as **`viewer@demo.test`**. **Expect:** the *full* list again — a Viewer is read-only but
     org-wide — and no approve/return controls anywhere.
-13. As the reviewer or the viewer, try `/audit-log`. **Expect:** a 403 refusal; it is Owner and Admin only.
+14. As the reviewer or the viewer, try `/audit-log`. **Expect:** a 403 refusal; it is Owner and Admin only.
 
 ---
 
@@ -465,8 +472,7 @@ expected and is not a defect.
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
-| **Step-up re-authentication, org-wide enforced 2FA** | Increment I8. |
-| **Post-submission answer editing, screened-out status** | Increment I9. |
+| **Post-submission answer editing, manual-encode save-as-draft** | Increments I9b and I9c. A staff member filling a form in-app must finish in one sitting, and a submitted response's answers cannot be corrected by anyone. |
 | **Production deployment** | Track B, after the application is otherwise complete. |
 
 Anything else that does not work as this guide describes **is** worth reporting.

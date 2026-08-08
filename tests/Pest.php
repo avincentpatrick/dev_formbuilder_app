@@ -336,6 +336,23 @@ function inboxTenant(string $slug = 'acme'): Tenant
 }
 
 /**
+ * The per-form statistics URL (Increment I10c).
+ *
+ * HERE rather than in a test file, and for the reason the docblock immediately below records about
+ * `apiMember()`: FormAnalyticsPageTest and FormAnalyticsGateTest both need it, and a top-level function in
+ * one of them dies with "Call to undefined function" on a single-file run of the OTHER. It cost one run to
+ * rediscover that.
+ *
+ * ⚠️ Pest helpers are GLOBAL: `gateUrl`, `analyticsPageUrl`, `analyticsRange`, `analyticsUrl`,
+ * `trendFixture` and `analyticsIndexDef` are already taken in this tree, and a duplicate name passes every
+ * per-file run and fatals only on the full suite.
+ */
+function formAnalyticsUrl(string $formId, string $slug = 'acme'): string
+{
+    return 'http://'.$slug.'.meridian.test/forms/'.$formId.'/analytics';
+}
+
+/**
  * A tenant brand logo attachment (H23a2), owned by the TENANT rather than by a form field.
  *
  * Lives here and not in a test file on the H22a lesson: `apiMember()` once sat as a top-level function

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\PlanTier;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -110,8 +111,36 @@ it('serves the ungated trend props alongside the KPI tiles', function (): void {
             ->has('trends.series', 30)
             ->has('trends.top_forms.rows')
             ->has('trends.top_forms.unassigned')
+            // I10c — docs/PRD.md:198's channel breakdown, shaped identically to top_forms so the page reads
+            // both through one client-side builder.
+            ->has('trends.channels.rows')
+            ->has('trends.channels.other')
+            ->has('trends.channels.unassigned')
             ->has('trends.forms_accepting')
             ->has('trends.drafts'));
+});
+
+it('serves the channel breakdown on a FREE plan, because PRD:198 is a Phase-1 criterion', function (): void {
+    // assignPlanTier is not decoration: RequireFeature FAILS OPEN on a tenant with no plan, so a test that
+    // skipped it would pass even if the route grew a `feature:advanced_analytics` middleware.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Free);
+
+    $form = publishedInboxForm($tenant, $owner, 'Channel Form');
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Dashboard', false)
+            // A real label on the lowest tier — not a 402, and not a null-shaped "upgrade to see this".
+            ->has('trends.channels.rows.0.label')
+            ->has('trends.channels.rows.0.count'));
 });
 
 // H24b1 — the aggregate row carries a form UUID and nothing else, so the page had no name to put on a

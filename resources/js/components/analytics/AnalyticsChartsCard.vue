@@ -24,9 +24,12 @@ import {
 } from '@meridian/design-system';
 import { breakdownBars, breakdownTableRows } from './breakdown-bars';
 import { bucketFormatter, categoryLabel } from './bucket-label';
-import type { Report } from './types';
+import type { ChartsReport } from './types';
 
-const props = defineProps<{ report: Report }>();
+// `ChartsReport` (I10c), not `Report`: this card reads only range/series/breakdown, and narrowing the prop
+// lets a surface with no workspace-wide accepting count reuse it. Type-only — /analytics still passes a
+// full Report, which is structurally assignable, so nothing changes at runtime.
+const props = defineProps<{ report: ChartsReport }>();
 
 const label = computed(() => bucketFormatter(props.report.range.granularity));
 

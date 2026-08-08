@@ -62,6 +62,7 @@ function trends(overrides: Record<string, unknown> = {}) {
             count: 0,
         })),
         top_forms: { rows: [{ key: 'f1', label: 'Clinic Intake', count: 9 }], other: null, unassigned: 0 },
+        channels: { rows: [{ key: 'guest', label: 'Guest link', count: 9 }], other: null, unassigned: 0 },
         forms_accepting: 5,
         drafts: {
             suppressed: false,
@@ -195,12 +196,34 @@ describe('Dashboard — the three draft states (ADR-0011 §D5)', () => {
     });
 });
 
+/**
+ * The card whose `<h3>` matches.
+ *
+ * ⚠️ EVERY SELECTOR BELOW USED TO BE DOCUMENT-WIDE, AND I10c BROKE THAT by putting a SECOND bar chart on
+ * this page. `.mds-bar__label` then matched both charts' labels, and four assertions here silently started
+ * measuring something other than what they name. The fix is to scope, never to broaden the expectation to
+ * accommodate the other chart — an assertion that accepts both cards' contents is an assertion about
+ * neither.
+ */
+function card(wrapper: VueWrapper, heading: string) {
+    const found = wrapper
+        .findAll('.mds-card')
+        .find((c) => c.find('.dash__card-title').exists() && c.find('.dash__card-title').text() === heading);
+
+    if (found === undefined) {
+        throw new Error(`no card headed "${heading}"`);
+    }
+
+    return found;
+}
+
 describe('Dashboard — the breakdown', () => {
     it('plots the labelled rows and omits an Other bar when nothing overflowed', () => {
         const wrapper = render();
+        const forms = card(wrapper, 'Top forms');
 
-        expect(wrapper.findAll('.mds-bar__label').map((s) => s.text())).toEqual(['Clinic Intake']);
-        expect(wrapper.find('.mds-bar__fill--other').exists()).toBe(false);
+        expect(forms.findAll('.mds-bar__label').map((s) => s.text())).toEqual(['Clinic Intake']);
+        expect(forms.find('.mds-bar__fill--other').exists()).toBe(false);
         wrapper.unmount();
     });
 
@@ -216,7 +239,8 @@ describe('Dashboard — the breakdown', () => {
             },
         });
 
-        expect(wrapper.findAll('.mds-bar__label').map((s) => s.text())).toEqual([
+        const forms = card(wrapper, 'Top forms');
+        expect(forms.findAll('.mds-bar__label').map((s) => s.text())).toEqual([
             'Clinic Intake',
             'Household Roster',
             'Unassigned',
@@ -224,22 +248,131 @@ describe('Dashboard — the breakdown', () => {
         ]);
         // Exactly one neutral bar, and it is the aggregate — Unassigned is a real set of forms, not a
         // remainder, so it keeps the ordinary fill.
-        expect(wrapper.findAll('.mds-bar__fill--other')).toHaveLength(1);
+        expect(forms.findAll('.mds-bar__fill--other')).toHaveLength(1);
         wrapper.unmount();
     });
 
     it('drops the zero Unassigned bucket, which is always present in the prop', () => {
         const wrapper = render();
 
-        expect(wrapper.text()).not.toContain('Unassigned');
+        expect(card(wrapper, 'Top forms').text()).not.toContain('Unassigned');
         wrapper.unmount();
     });
 
     it('shows an empty state rather than an empty plot when nothing was submitted', () => {
         const wrapper = render({ top_forms: { rows: [], other: null, unassigned: 0 } });
+        const forms = card(wrapper, 'Top forms');
 
-        expect(wrapper.find('.mds-bar__plot').exists()).toBe(false);
-        expect(wrapper.text()).toContain('No responses in this period');
+        expect(forms.find('.mds-bar__plot').exists()).toBe(false);
+        expect(forms.text()).toContain('No responses in this period');
+        wrapper.unmount();
+    });
+});
+
+/*
+ * Increment I10c — the submission-channel breakdown (docs/PRD.md:198's last unbuilt Phase-1 clause).
+ *
+ * ADR-0011 §D12 is why the paired-table assertions are here and not left to the axe gate: axe CANNOT detect
+ * a missing text alternative for an SVG that carries a plausible `aria-label`, so the merge-blocking job
+ * would happily pass a chart that is a beautiful, unreadable picture. The contract is pinned by Vitest or it
+ * is not pinned at all.
+ */
+describe('Dashboard — the channel breakdown (I10c)', () => {
+    it('pairs the channel chart with a table naming every channel', () => {
+        const wrapper = render({
+            channels: {
+                rows: [
+                    { key: 'guest', label: 'Guest link', count: 6 },
+                    { key: 'manual', label: 'Manual entry', count: 3 },
+                ],
+                other: null,
+                unassigned: 0,
+            },
+        });
+        const channels = card(wrapper, 'Responses by channel');
+
+        // The §D12 non-visual equivalent. Swapping MdsBarChart for a bare <svg aria-label> is the exact
+        // substitution axe cannot see, and this is what reddens on it.
+        const cells = channels.findAll('.mds-table tbody tr').map((row) => row.text());
+        expect(cells).toHaveLength(2);
+        expect(cells.join(' ')).toContain('Guest link');
+        expect(cells.join(' ')).toContain('Manual entry');
+        wrapper.unmount();
+    });
+
+    it('labels the axis "Channel", never "Source"', () => {
+        const wrapper = render();
+        const channels = card(wrapper, 'Responses by channel');
+
+        // The same word AnalyticsChartsCard uses for this axis — two surfaces, one name.
+        expect(channels.text()).toContain('Channel');
+        expect(channels.text()).not.toContain('Source');
+        wrapper.unmount();
+    });
+
+    it('names the single channel in prose when only one has responses', () => {
+        // The ordinary state of a real tenant: three of six sources are ever written, so one full-width bar
+        // saying "100% of something" is the common case. The sentence is what makes it mean anything.
+        const wrapper = render();
+
+        expect(card(wrapper, 'Responses by channel').text()).toContain(
+            'Every response in this period arrived by guest link.',
+        );
+        wrapper.unmount();
+    });
+
+    it('says nothing extra once two channels have responses', () => {
+        const wrapper = render({
+            channels: {
+                rows: [
+                    { key: 'guest', label: 'Guest link', count: 6 },
+                    { key: 'manual', label: 'Manual entry', count: 3 },
+                ],
+                other: null,
+                unassigned: 0,
+            },
+        });
+
+        expect(card(wrapper, 'Responses by channel').text()).not.toContain('Every response in this period');
+        wrapper.unmount();
+    });
+
+    it('renders no bar for a channel with no responses', () => {
+        // A GROUP BY returns only what occurred; zero-filling the six cases client-side would invent
+        // categories and advertise unbuilt OCR / API import as available and unused.
+        const wrapper = render();
+
+        expect(card(wrapper, 'Responses by channel').findAll('.mds-bar__label')).toHaveLength(1);
+        wrapper.unmount();
+    });
+
+    it('shows a channel-specific empty state, not a copy of the top-forms one', () => {
+        const wrapper = render({
+            top_forms: { rows: [], other: null, unassigned: 0 },
+            channels: { rows: [], other: null, unassigned: 0 },
+        });
+
+        const channels = card(wrapper, 'Responses by channel');
+        expect(channels.text()).toContain('manual entry, guest link');
+        // Two adjacent cards rendering the identical sentence teaches nothing.
+        expect(channels.text()).not.toBe(card(wrapper, 'Top forms').text());
+        wrapper.unmount();
+    });
+
+    it('tabulates the Other bucket the plot folds away on the channel axis', () => {
+        const wrapper = render({
+            channels: {
+                rows: [
+                    { key: 'guest', label: 'Guest link', count: 6 },
+                    { key: 'manual', label: 'Manual entry', count: 3 },
+                ],
+                other: { count: 2, categories: 1 },
+                unassigned: 0,
+            },
+        });
+
+        // §D11: "nothing is hidden, only un-plotted" — singular "channel", from breakdown-bars' pluraliser.
+        expect(card(wrapper, 'Responses by channel').text()).toContain('Other (1 channel)');
         wrapper.unmount();
     });
 });

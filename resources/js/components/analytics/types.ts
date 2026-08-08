@@ -110,6 +110,24 @@ export interface Report {
     week_starts_on: 'monday';
 }
 
+/**
+ * `AnalyticsReportBuilder::build()` verbatim — the Report MINUS the workspace-wide accepting count
+ * (Increment I10c). Derived from `Report` rather than declared separately so the two cannot drift.
+ *
+ * `forms_accepting` is absent because it answers "how many forms across your WHOLE visible set are accepting
+ * responses right now" — no range, no form selection. On `/forms/{form}/analytics` that would be a
+ * confidently wrong number sitting beside three correct ones.
+ */
+export type FormReport = Omit<Report, 'forms_accepting'>;
+
+/**
+ * Exactly what `AnalyticsChartsCard` reads (Increment I10c), so a surface with no accepting-count can reuse
+ * it. Narrowing the card's prop to this is type-only and changes nothing at runtime — `/analytics` passes a
+ * full `Report`, which is structurally assignable — and it makes the card's contract honest: it already read
+ * only these three keys.
+ */
+export type ChartsReport = Pick<Report, 'range' | 'series' | 'breakdown'>;
+
 /** AnswerValueAggregator::questions() verbatim. The picker ENCODES these refusals rather than deriving them. */
 export interface QuestionRow {
     key: string;

@@ -30,16 +30,18 @@ import {
     MdsBarChart,
     MdsButton,
     MdsCard,
+    MdsDataTable,
     MdsEmptyState,
     MdsStatTile,
     MdsTimeSeriesChart,
     type ChartSeries,
+    type DataTableColumn,
     type IconName,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import AnalyticsViewSwitcher from '@/components/analytics/AnalyticsViewSwitcher.vue';
 import { bucketFormatter, rangeLabel as formatRange } from '@/components/analytics/bucket-label';
-import { breakdownBars } from '@/components/analytics/breakdown-bars';
+import { breakdownBars, breakdownTableRows } from '@/components/analytics/breakdown-bars';
 import { conversionTile, medianTile } from '@/components/analytics/draft-metrics';
 import type { Breakdown, DraftMetrics } from '@/components/analytics/types';
 
@@ -48,6 +50,12 @@ interface Trends {
     total: { current: number; prior: number; change: number | null };
     series: { bucket: string; count: number }[];
     top_forms: {
+        rows: { key: string | null; label: string; count: number }[];
+        other: { count: number; categories: number } | null;
+        unassigned: number;
+    };
+    // I10c — the same shape as `top_forms`, deliberately, so one client-side builder reads both.
+    channels: {
         rows: { key: string | null; label: string; count: number }[];
         other: { count: number; categories: number } | null;
         unassigned: number;
@@ -121,6 +129,41 @@ const topFormsBreakdown = computed<Breakdown>(() => ({
 }));
 
 const topForms = computed(() => breakdownBars(topFormsBreakdown.value));
+
+// I10c — `docs/PRD.md:198`'s channel breakdown, named here for the same reason `top_forms` is above.
+// `has_unassigned_bucket: false` is AnalyticsAxis::hasUnassignedBucket()'s answer for `source`, restated
+// client-side exactly as the form axis already is: `submissions.source` is NOT NULL, so there is no
+// Unassigned bucket and the builder drops the always-zero value on its own.
+const channelsBreakdown = computed<Breakdown>(() => ({
+    axis: 'source',
+    rows: props.trends.channels.rows,
+    other: props.trends.channels.other,
+    unassigned: props.trends.channels.unassigned,
+    unassigned_label: 'Unassigned',
+    has_unassigned_bucket: false,
+}));
+
+const channels = computed(() => breakdownBars(channelsBreakdown.value));
+
+// ADR-0011 §D11: the plot folds everything past the top four into a neutral "Other", so the paired table is
+// what keeps the full breakdown visible — "nothing is hidden, only un-plotted".
+const channelRows = computed(() => breakdownTableRows(channelsBreakdown.value));
+const channelColumns = computed<DataTableColumn[]>(() => [
+    { key: 'label', header: 'Channel' },
+    { key: 'count', header: 'Responses', align: 'end' },
+]);
+
+/**
+ * Only THREE of the six channels are ever written today (`manual`, `guest`, `offline_sync` — OCR and API
+ * import are unbuilt), so the ordinary state of a real tenant is ONE bar at full width: a chart that says
+ * "100% of something" and names no quantity. This states the fact in prose instead. Null at two or more
+ * channels, where the bars carry the comparison themselves, and the empty state owns the zero case.
+ */
+const channelNote = computed<string | null>(() => {
+    const used = props.trends.channels.rows.filter((row) => row.count > 0);
+
+    return used.length === 1 ? `Every response in this period arrived by ${used[0].label.toLowerCase()}.` : null;
+});
 
 // ADR-0011 §D5's three states, and the reason the two tiles never share a sentence, live in
 // `draft-metrics.ts` — /analytics renders the identical pair from the identical prop shape.
@@ -227,6 +270,35 @@ const goToForms = () => router.visit('/forms');
                         description="Once a form is submitted, the busiest forms appear here."
                     />
                 </MdsCard>
+
+                <MdsCard>
+                    <!-- "Channel", never "Source" — the same word AnalyticsChartsCard uses for this axis, so
+                         the dashboard and /analytics cannot name the same thing two ways. -->
+                    <template #header><h3 class="dash__card-title">Responses by channel</h3></template>
+                    <template v-if="channels.length > 0">
+                        <MdsBarChart
+                            :data="channels"
+                            title="Responses by channel"
+                            category-label="Channel"
+                            value-label="Responses"
+                        />
+                        <p v-if="channelNote" class="dash__card-note">{{ channelNote }}</p>
+                        <MdsDataTable
+                            :columns="channelColumns"
+                            :rows="channelRows"
+                            caption="Every channel in this period"
+                            row-key="key"
+                        />
+                    </template>
+                    <!-- Deliberately NOT the top-forms sentence: two adjacent cards rendering the identical
+                         copy teaches nothing, and naming the channels means a zero card still says what it
+                         will show. -->
+                    <MdsEmptyState
+                        v-else
+                        headline="No responses in this period"
+                        description="Responses are grouped by how they arrived — manual entry, guest link or offline sync."
+                    />
+                </MdsCard>
             </div>
         </section>
     </div>
@@ -248,6 +320,13 @@ const goToForms = () => router.visit('/forms');
 
 .dash__empty-card {
     padding: 0;
+}
+
+.dash__card-note {
+    margin: var(--mds-space-3) 0 0;
+    font-size: var(--mds-type-body-sm-font-size, var(--mds-type-caption-font-size));
+    line-height: var(--mds-type-body-sm-line-height, var(--mds-type-caption-line-height));
+    color: var(--mds-color-text-secondary);
 }
 
 .dash__section-head {

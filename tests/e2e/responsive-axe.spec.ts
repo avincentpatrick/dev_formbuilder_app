@@ -113,6 +113,34 @@ for (const theme of themes) {
     });
 }
 
+// Per-form response statistics (I10c) — the UNGATED Form-Owner view of docs/PRD.md:198, and the second
+// analytics surface in the product. Reached from the /forms row action, so no uuid appears in this file
+// (the Builder / Encode / Submission-detail precedent above).
+//
+// "Community Health Survey" is the fixture that makes this scan worth running rather than a formality:
+// E2eSeeder::analyticsFixtureRows() gives it NINE countable responses across THREE channels (guest,
+// ocr_single, api_import) plus one unconverted draft, all inside the rolling 29-day window — so the trend
+// line, the channel bars, the paired data table AND both draft tiles render populated rather than as empty
+// states. A single-channel form would leave the bar chart one full-width bar and the horizontal-overflow
+// assertion with nothing to bite on. "OCR (single)" and "API import" are also the longest category labels
+// the chart can produce, which is exactly the 375px label-wrap case that assertion exists for.
+for (const theme of themes) {
+    test(`Form analytics (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        // A CSS `tr` locator scoped by row text rather than getByRole('row', …), for the reason the webhook
+        // and encode blocks below record: MdsDataTable drops the table ARIA role for its card layout at 375px.
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Community Health Survey' })
+            .getByRole('button', { name: 'Response statistics' })
+            .click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/analytics$/, { timeout: 30_000 });
+        await page.getByRole('link', { name: '← Forms' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Form analytics');
+    });
+}
+
 // The builder's LOGIC view (H21d1) — the read-derived branching rail, scanned at all three viewports in
 // light + dark. The 375px pass is the one that matters and is Doc #27 §9's explicit obligation for this
 // row: an author's own expression is the widest thing on the page and it must WRAP, never scroll, so the

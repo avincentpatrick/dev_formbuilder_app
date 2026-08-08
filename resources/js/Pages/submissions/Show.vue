@@ -77,6 +77,14 @@ function formatBytes(bytes: number): string {
 }
 
 // Which transitions are offered, from the current status (the service also guards server-side).
+//
+// `archive` is a POSITIVE list, mirroring `SubmissionReviewService::archive()`'s `$from` exactly. It used to
+// be the negative `s !== 'archived' && s !== 'draft'`, which agreed with the server only by accident: the
+// server refuses what it does not name, the client offered whatever it did not exclude, so every new
+// SubmissionStatus silently became archivable in the UI and 500-adjacent on click. I9a's `screened_out` was
+// the case that would have shipped that — and archiving it would have been worse than a dead button, because
+// `archived` CONSUMES a capacity slot and `screened_out` deliberately does not, so the transition would have
+// retroactively overfilled a paid cap. Keep this list positive; a future status must be added on purpose.
 const actions = computed(() => {
     if (!props.can.review) return { review: false, approve: false, return: false, archive: false };
     const s = props.submission.status;
@@ -84,7 +92,7 @@ const actions = computed(() => {
         review: s === 'submitted',
         approve: s === 'submitted' || s === 'under_review',
         return: s === 'submitted' || s === 'under_review',
-        archive: s !== 'archived' && s !== 'draft',
+        archive: s === 'submitted' || s === 'under_review' || s === 'approved' || s === 'returned',
     };
 });
 

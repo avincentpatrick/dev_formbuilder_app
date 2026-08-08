@@ -161,16 +161,21 @@ class Submission extends Model implements TenantScoped
      * non-adopters below are public/guest paths that must not consult it.
      *
      * ── Deliberate non-adopters, so nobody "finishes the refactor" ───────────────────────────────────────
-     * Three sites spell this predicate identically today and answer a DIFFERENT question — "how many
-     * responses have consumed the paid `max_responses` cap?": `FormAcceptanceGuard::assertCapacity()`
-     * (enforcement, under `lockForUpdate()` on the ingest path) and its two display twins,
-     * `PublicFormPresenter::finalizedCount()` and `EncodeFormPresenter::finalizedCount()`. Binding a
-     * purchased capacity cap to the analytics definition of a response would mean a later analytics change
-     * — excluding `returned`, say — silently changing what a customer bought, in two places that must agree
-     * with the guard or the public banner lies.
+     * Three sites used to spell this predicate identically while answering a DIFFERENT question — "how many
+     * responses have consumed the paid `max_responses` cap?" Since I9a they no longer spell it at all: they
+     * adopt {@see scopeConsumesCapacity()}, which is the NAME this paragraph always said the other question
+     * deserved. Binding a purchased capacity cap to the analytics definition of a response would mean a later
+     * analytics change — excluding `returned`, say — silently changing what a customer bought. Keeping the
+     * two scopes separate is what let `screened_out` diverge from `draft` in one of them and not the other.
      *
-     * A fourth, `ReconcileTenantUsageJob`, is a metering COUNT with no status predicate at all (drafts fall
-     * out only incidentally, because their `submitted_at` is NULL). Same decoupling argument: it is billing.
+     * A further site, `ReconcileTenantUsageJob`, is a metering COUNT with no status predicate at all (drafts
+     * fall out only incidentally, because their `submitted_at` is NULL) — a non-adopter of BOTH scopes. Same
+     * decoupling argument: it is billing.
+     *
+     * ⚠️ `screened_out` IS countable and is deliberately NOT excluded here. It is a real row the tenant
+     * received and the inbox lists it by default, so dropping it from analytics would make the tile disagree
+     * with the list a reviewer is looking at — the exact §D2 failure this scope exists to prevent. It is also
+     * the predicate `submissions_analytics_series_idx` is partial on, so changing it is a migration.
      *
      * The column is QUALIFIED. `status` is unqualified-ambiguous the moment a caller joins `forms`, which
      * also has one — and H24a's scope-node breakdown does exactly that. An unqualified scope would work
@@ -183,6 +188,42 @@ class Submission extends Model implements TenantScoped
     public function scopeCountable(Builder $query): Builder
     {
         return $query->where('submissions.status', '!=', SubmissionStatus::Draft->value);
+    }
+
+    /**
+     * THE capacity predicate (Increment I9a): a submission consumed one of the form's paid `max_responses`
+     * slots. The sibling of {@see scopeCountable()} and deliberately NOT the same predicate — see that
+     * method's non-adopters paragraph for why the two questions are kept apart, and this scope for what
+     * happens once they answer differently.
+     *
+     * A `draft` has not been finalized. A `screened_out` submission was finalized but the respondent was
+     * shown no questions at all ({@see SubmissionStatus}) — charging a paid slot for a response that was
+     * never solicited is the live bug `docs/workflow-branching-design.md:140` recorded and deferred.
+     * Everything else — including `archived`, which is why `screened_out` must never be archivable —
+     * consumed one.
+     *
+     * ⚠️ TWO SEPARATE NOT-EQUAL CONJUNCTS, NEVER `whereNotIn`, AND THAT IS NOT A STYLE PREFERENCE. (`!=` is
+     * spelled here to match `scopeCountable()`; Postgres's grammar folds it to `<>` before planning, so the
+     * two spellings reach the planner as the same node.) The hot
+     * consumer is `FormAcceptanceGuard::assertCapacity()`, running under `lockForUpdate()` inside the
+     * finalize transaction, and it is served by the partial index `submissions_form_finalized_idx`, whose
+     * predicate is `WHERE status <> 'draft'`. Postgres will use a partial index only when it can PROVE the
+     * index predicate from the query's clauses; a bare `status <> 'draft'` conjunct matches it verbatim.
+     * `whereNotIn` compiles to a `ScalarArrayOpExpr` (`<> ALL (...)`), from which that implication is not
+     * guaranteed to be established — which would silently turn the count into a scan on the ingest path,
+     * under a lock, with no test failing. `ScreenedOutTest`'s "spells the capacity predicate as two
+     * not-equal conjuncts, never as NOT IN" case pins the emitted SQL and its bindings for this reason.
+     *
+     * The column is QUALIFIED for the same reason `scopeCountable()`'s is: `forms` also has a `status`.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeConsumesCapacity(Builder $query): Builder
+    {
+        return $query
+            ->where('submissions.status', '!=', SubmissionStatus::Draft->value)
+            ->where('submissions.status', '!=', SubmissionStatus::ScreenedOut->value);
     }
 
     /**

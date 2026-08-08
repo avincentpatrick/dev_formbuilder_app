@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Listeners\Notifications;
 
 use App\Enums\NotificationType;
+use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
 use App\Listeners\Webhooks\DispatchWebhooksForSubmissionCreated;
 use App\Models\Form;
@@ -31,6 +32,18 @@ use App\Services\Notifications\NotificationRecipientResolver;
  *
  * The respondent is excluded from both. On the manual-encode channel the person who typed the response is
  * a Form Editor, and telling them their own keystrokes arrived is how a bell becomes background noise.
+ *
+ * ── A SCREENED-OUT SUBMISSION GETS `submission_received` BUT NOT `review_requested` (I9a) ───────────────
+ * `SubmissionStatus::ScreenedOut` is TERMINAL: it is absent from all four `$from` lists in
+ * `SubmissionReviewService`, so a reviewer opening one finds a detail page with every action refused. Telling
+ * them "review requested" is asking for work that cannot be done, and a queue notification nobody can action
+ * is exactly how people learn to ignore the bell — the same argument the paragraph above makes about
+ * double-notifying an Owner, reached from the other direction.
+ *
+ * `submission_received` still fires, and that asymmetry is the point rather than an inconsistency: the tenant
+ * DID receive something, it is listed in the inbox by default, and the whole reason the state is visible
+ * rather than hidden is so that a form which screens everyone out is loud. The person who owns the data
+ * should know; the person who works the queue has nothing to work.
  */
 final class NotifyOnSubmissionCreated
 {
@@ -43,7 +56,7 @@ final class NotifyOnSubmissionCreated
     {
         $submission = Submission::query()
             ->whereKey($event->submissionId)
-            ->first(['id', 'form_id', 'respondent_user_id']);
+            ->first(['id', 'form_id', 'respondent_user_id', 'status']);
 
         if (! $submission instanceof Submission) {
             return;
@@ -65,6 +78,12 @@ final class NotifyOnSubmissionCreated
 
         $received = $this->recipients->forType(NotificationType::SubmissionReceived, $form, $actorId);
         $this->dispatcher->dispatch(NotificationType::SubmissionReceived, $received, $data);
+
+        // Nothing to review on a terminal row — see the header. Returning here rather than filtering the
+        // recipient list keeps the resolver query off the hot path entirely for these.
+        if ($submission->status === SubmissionStatus::ScreenedOut) {
+            return;
+        }
 
         $reviewers = array_values(array_diff(
             $this->recipients->forType(NotificationType::ReviewRequested, $form, $actorId),

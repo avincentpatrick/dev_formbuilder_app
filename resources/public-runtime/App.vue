@@ -69,7 +69,11 @@ const resolvingUuid = ref<string | null>(null);
 
 // I10d — the app-level OfflineIndicator needs its own reading. RuntimeSession keeps its own useOnline()
 // for the H12b schedule guard; this one only decides whether the pill shows.
-const online = useOnline();
+// DESTRUCTURED — `useOnline()` returns `{ online, dispose }`, not a bare ref. Writing `const online =
+// useOnline()` binds the OBJECT, which is always truthy, so `v-if="!online"` never fires and the offline
+// pill silently never renders. vue-tsc cannot catch it (`!someObject` is valid TS) and the component
+// tests mount OfflineIndicator directly, so only the e2e saw it.
+const { online } = useOnline();
 const resolveMode = ref(false);
 
 const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.bootstrap.slug });

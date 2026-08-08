@@ -206,7 +206,9 @@ test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', 
     // getByRole('button', { name: 'Review' }) now matches two elements and dies on Playwright's strict mode.
     const reviewButton = page.getByTestId('review-conflicts');
     await expect(reviewButton).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/need review/i)).toBeVisible();
+    // `needs?` — I10d pluralises the badge, so a single conflict now reads "1 needs review" and the old
+    // contiguous /need review/ no longer matches. The row copy below it says "Needs review" too.
+    await expect(page.getByText(/needs? review/i).first()).toBeVisible();
 
     // I10d — a conflict row NEVER offers a blind retry. A parked 409 either 409s again or is re-parked by
     // the version guard before the POST, so the button would be a lie.

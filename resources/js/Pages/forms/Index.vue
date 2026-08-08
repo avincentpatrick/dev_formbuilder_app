@@ -47,7 +47,14 @@ type FormRow = {
     draft_version: number | null;
     updated_at: string | null;
     versions: FormVersionRow[];
-    can: { edit: boolean; publish: boolean; delete: boolean; encode: boolean; template: boolean };
+    can: {
+        edit: boolean;
+        publish: boolean;
+        delete: boolean;
+        encode: boolean;
+        template: boolean;
+        analytics: boolean;
+    };
 };
 
 type ScopeOption = { id: string; name: string; parent_id: string | null; is_active: boolean };
@@ -223,6 +230,16 @@ function submitRestore(): void {
             </template>
             <template #row-actions="{ row }">
                 <div class="forms__actions">
+                    <!-- I10c — the per-form statistics page (PRD #4's Form Owner/Editor view). `chart-bar`
+                         matches the Analytics nav glyph deliberately: the association is the point, and the
+                         glyph-uniqueness rule applies to the sidebar, not to row actions. -->
+                    <MdsIconButton
+                        v-if="row.can.analytics"
+                        icon="chart-bar"
+                        label="Response statistics"
+                        size="sm"
+                        @click="router.visit(`/forms/${row.id}/analytics`)"
+                    />
                     <MdsIconButton
                         v-if="row.can.encode"
                         icon="submissions"

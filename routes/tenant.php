@@ -17,6 +17,7 @@ use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DomainController;
 use App\Http\Controllers\Tenant\FeedbackController;
+use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
@@ -368,6 +369,28 @@ Route::middleware([
     // like every other builder route, not `can:view` — this surface exists only inside the editor.
     Route::get('/forms/{form}/graph', [FormBuilderController::class, 'graph'])
         ->middleware('can:update,form')->name('forms.graph');
+
+    // Per-form response statistics (Increment I10c) — docs/PRD.md:198's "Form Owner/Editor view shows:
+    // submissions over time for that form … and a breakdown by submission channel".
+    //
+    // ⚠️ THE ABSENCE OF `feature:advanced_analytics` IS THE DECISION, NOT AN OVERSIGHT. PRD.md:198 is a
+    // PHASE-1 acceptance criterion, and ADR-0011 §D9 gates the genuinely Phase-3 surface — arbitrary axis
+    // selection, scope-subtree selection, saved views, answer-value aggregation and the streamed export, all
+    // of which stay behind the gate on /analytics below. ToggleableModules' own hint for that key already
+    // names per-form statistics alongside the dashboard; this page is dashboard family, scoped to one form. The page is
+    // built so it CANNOT drift into a second /analytics — five structural mechanisms, listed in
+    // FormAnalyticsPresenter's docblock, starting with a one-dependency constructor and no FormRequest.
+    // There is deliberately NO /forms/{form}/analytics/export.
+    //
+    // `can:view,form` is FormPolicy::view — the same read gate save-as-template and the XLSForm export use
+    // for a per-form derive, and no new permission key. It resolves to Owner/Admin (forms.edit.any) and to a
+    // Form Editor holding an editor grant on THIS form, which is exactly PRD.md:198's stated audience. A
+    // Reviewer and a tenant Viewer are refused, and that too is a decision rather than an accident: a
+    // Viewer's org-wide surface is /dashboard and a Reviewer's is the inbox, and both already answer "how
+    // many responses" for everything they can reach. FormAnalyticsGateTest pins those refusals so a later
+    // "tidy-up" to can:viewAny,Submission is visible rather than silent.
+    Route::get('/forms/{form}/analytics', FormAnalyticsController::class)
+        ->middleware('can:view,form')->name('forms.analytics');
 
     // Assign a form to the scoping hierarchy (Increment G10b2). Deliberately NOT part of PATCH /forms/{form}:
     // writing scope_node_id confers capacity on the form — and via SubmissionPolicy on its whole submission

@@ -6,12 +6,14 @@ namespace App\Services\Dashboard;
 
 use App\Enums\AnalyticsAxis;
 use App\Enums\FormStatus;
+use App\Enums\SubmissionSource;
 use App\Enums\TenantUserStatus;
 use App\Models\Form;
 use App\Models\Submission;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Analytics\AnalyticsMetricsService;
+use App\Services\Analytics\AnalyticsReportBuilder;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\EntitlementService;
 use App\Support\Analytics\AnalyticsQuery;
@@ -73,7 +75,19 @@ final class DashboardMetricsService
      * No new permission and no new gate — the existing `dashboard.org.view` split flows through
      * `AnalyticsFormSet`, so a Form Editor's trend covers exactly the forms their KPI tiles already count.
      *
-     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
+     * ── `channels` (Increment I10c) ──────────────────────────────────────────────────────────────────────
+     * `docs/PRD.md:198`'s last unbuilt Phase-1 clause: "a breakdown by submission channel (manual / guest /
+     * OCR / API / offline-sync)". It ships here, ungated, for the same reason everything else in this method
+     * does — it is a Phase-1 acceptance criterion, and `advanced_analytics` gates the Phase-3 surface
+     * (arbitrary grouping, saved views, export), not this. `ToggleableModules`' own hint for that key says
+     * the dashboard and per-form statistics are unaffected.
+     *
+     * Deliberately NOT zero-filled to the six `SubmissionSource` cases. A GROUP BY returns only the channels
+     * that actually occurred; five permanent `0` bars would invent categories that do not exist — the exact
+     * failure `breakdown-bars.ts` already names for the "Other" bucket — and would advertise OCR and API
+     * import, which are unbuilt, as available and unused.
+     *
+     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, channels: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
      */
     public function trendsForUser(User $user): array
     {
@@ -82,13 +96,32 @@ final class DashboardMetricsService
         // H24b2 — the window constant moved to AnalyticsQuery so `/analytics` opens on the SAME range this
         // page shows. It was private here, which is exactly how two surfaces come to mean two different
         // things by "the last 30 days"; the constant's docblock records why the number is 29 and not 30.
-        $query = new AnalyticsQuery(
-            from: $today->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS),
-            to: $today,
-            axis: AnalyticsAxis::Form,
-        );
+        $from = $today->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS);
+
+        $query = new AnalyticsQuery(from: $from, to: $today, axis: AnalyticsAxis::Form);
 
         $topForms = $this->analytics->breakdown($query, $user);
+
+        // One more aggregate over the SAME bounded row set (ADR-0011 §D7: time-bounded, form-bounded,
+        // fixed-cardinality). Built from the same `$from`/`$today` rather than derived, so the two
+        // breakdowns cannot drift into meaning different periods.
+        //
+        // ⚠️ `topN` IS RAISED TO THE FULL CASE COUNT HERE, AND THAT IS NOT A TUNING CHOICE. `source` is a
+        // CLOSED axis — six values, no more — and `breakdown()` discards the IDENTITIES of everything it
+        // folds into `other`, keeping only a count and a category tally. So at the default top-5 a tenant
+        // using all six channels would lose one channel's name permanently: the plot cannot show it and the
+        // paired data table cannot either, because `breakdownTableRows()` renders what the server sent. On
+        // an OPEN axis (forms) that trade is the point of a top-N; on a closed one it buys nothing and costs
+        // a name. Asking for six guarantees `other` is always null on this axis, which is what makes
+        // "nothing is hidden" true on the page rather than merely likely.
+        $channelQuery = new AnalyticsQuery(
+            from: $from,
+            to: $today,
+            axis: AnalyticsAxis::Source,
+            topN: count(SubmissionSource::cases()),
+        );
+
+        $channels = $this->analytics->breakdown($channelQuery, $user);
 
         return [
             // Echoed so the page can label the tiles honestly — "last 30 days", not an unqualified total —
@@ -103,6 +136,13 @@ final class DashboardMetricsService
             'top_forms' => [
                 ...$topForms,
                 'rows' => $this->labelFormRows($topForms['rows']),
+            ],
+            // Shaped identically to `top_forms` on purpose. `Dashboard.vue` already documents why the three
+            // client-side breakdown keys are named on the page rather than widened into the prop; a second,
+            // richer shape on the same bag would make one page speak two dialects of the same thing.
+            'channels' => [
+                ...$channels,
+                'rows' => $this->labelSourceRows($channels['rows']),
             ],
             'forms_accepting' => $this->analytics->acceptingFormsCount($user),
             'drafts' => $this->analytics->draftMetrics($query, $user),
@@ -142,6 +182,46 @@ final class DashboardMetricsService
             static fn (array $row): array => [
                 'key' => $row['key'],
                 'label' => $row['key'] === null ? 'Unassigned' : ($titles[$row['key']] ?? 'Deleted form'),
+                'count' => $row['count'],
+            ],
+            $rows,
+        );
+    }
+
+    /**
+     * Attach a human label to each `axis=source` breakdown row (Increment I10c).
+     *
+     * Here rather than inside {@see AnalyticsMetricsService::breakdown()} for the reason
+     * {@see self::labelFormRows()} records at length: that method's shape is the `/api/v1/analytics/report`
+     * response, byte-diffed against the committed `openapi.json`.
+     *
+     * ⚠️ `tryFrom`, NEVER `from`, AND THE FALLBACK IS THE RAW VALUE RATHER THAN A PLACEHOLDER. Three facts
+     * make an unknown string genuinely reachable here rather than defensive: `submissions.source` is
+     * `varchar(20) NOT NULL` with **no DB CHECK constraint**, so nothing at the database level rejects a bad
+     * value; the aggregate reads it off a `selectRaw` alias, so the Eloquent `SubmissionSource` cast never
+     * runs to catch one; and this is the page every role lands on after login, where `from()`'s uncaught
+     * `ValueError` would be a 500 on the workspace's front door. A placeholder like "Unknown channel" would
+     * be worse than the raw value in the other direction — it hides the string an operator needs in order to
+     * find whatever wrote it.
+     *
+     * This is the same expression {@see AnalyticsReportBuilder::enumLabel()} uses
+     * (moved there from `AnalyticsPresenter` by this same increment): a second CALL SITE of
+     * `SubmissionSource::label()`, not a second definition of what a channel is called.
+     *
+     * The null arm is unreachable today (`breakdown()` diverts nulls into `unassigned`) and is kept for one
+     * line rather than asserted away, matching `labelFormRows()`.
+     *
+     * @param  list<array{key: string|null, count: int}>  $rows
+     * @return list<array{key: string|null, label: string, count: int}>
+     */
+    private function labelSourceRows(array $rows): array
+    {
+        return array_map(
+            static fn (array $row): array => [
+                'key' => $row['key'],
+                'label' => $row['key'] === null
+                    ? 'Unassigned'
+                    : (SubmissionSource::tryFrom($row['key'])?->label() ?? $row['key']),
                 'count' => $row['count'],
             ],
             $rows,

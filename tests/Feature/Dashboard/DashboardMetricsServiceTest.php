@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\FormStatus;
 use App\Enums\PlanTier;
+use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
+use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
@@ -13,6 +15,7 @@ use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -179,4 +182,98 @@ it('scopes the trends to the same forms the KPI tiles count', function (): void 
 
     expect($metrics->trendsForUser($editor)['total']['current'])->toBe(0)
         ->and($metrics->trendsForUser($owner)['total']['current'])->toBe(1);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment I10c -- the submission-channel breakdown
+|--------------------------------------------------------------------------
+|
+| docs/PRD.md:198's last unbuilt Phase-1 clause. Ungated, for the same reason every other trend prop above
+| is: `advanced_analytics` gates the Phase-3 surface, not a Phase-1 acceptance criterion.
+*/
+
+it('breaks the period down by submission channel, labelled from the enum', function (): void {
+    ['owner' => $owner, 'tenant' => $tenant] = trendFixture();
+    $form = Form::query()->where('title', 'Intake')->firstOrFail();
+
+    // trendFixture() already seeded ONE guest row; add a second guest, a manual and an offline-sync.
+    seedCountableAt($form, CarbonImmutable::now()->subDay(), source: SubmissionSource::Guest);
+    seedCountableAt($form, CarbonImmutable::now()->subDay(), source: SubmissionSource::Manual);
+    seedCountableAt($form, CarbonImmutable::now()->subDay(), source: SubmissionSource::OfflineSync);
+
+    $channels = app(DashboardMetricsService::class)->trendsForUser($owner)['channels'];
+
+    expect($channels)->toHaveKeys(['rows', 'other', 'unassigned']);
+
+    $byLabel = array_column($channels['rows'], 'count', 'label');
+
+    // Labels from SubmissionSource::label(), not raw enum values -- the same call site AnalyticsPresenter
+    // uses, so the dashboard and /analytics cannot disagree about what a channel is called.
+    expect($byLabel)->toBe(['Guest link' => 2, 'Manual entry' => 1, 'Offline sync' => 1]);
+});
+
+it('falls back to the raw value for a channel this build does not know', function (): void {
+    // `submissions.source` is varchar(20) NOT NULL with NO DB CHECK constraint, and the aggregate reads it
+    // off a selectRaw alias so the Eloquent cast never runs -- an unknown string genuinely reaches the
+    // labeller. `from()` here would be an uncaught ValueError on the page every role lands on after login.
+    ['owner' => $owner, 'tenant' => $tenant] = trendFixture();
+    $form = Form::query()->where('title', 'Intake')->firstOrFail();
+    $stray = seedCountableAt($form, CarbonImmutable::now()->subDay());
+
+    DB::table('submissions')->where('id', $stray->id)->update(['source' => 'sms_gateway']);
+
+    $rows = app(DashboardMetricsService::class)->trendsForUser($owner)['channels']['rows'];
+    $byLabel = array_column($rows, 'count', 'label');
+
+    // Counted, and shown VERBATIM -- a placeholder would hide the string an operator needs to find whatever
+    // wrote it.
+    expect($byLabel)->toHaveKey('sms_gateway')
+        ->and($byLabel['sms_gateway'])->toBe(1);
+});
+
+it('never invents a zero bar for a channel nobody has used', function (): void {
+    // A GROUP BY returns only what occurred. Zero-filling the six cases would invent categories AND
+    // advertise OCR / API import -- which are unbuilt -- as available and unused.
+    ['owner' => $owner] = trendFixture();
+
+    $rows = app(DashboardMetricsService::class)->trendsForUser($owner)['channels']['rows'];
+    $keys = array_column($rows, 'key');
+
+    expect($rows)->toHaveCount(1)
+        ->and($keys)->toBe(['guest'])
+        ->and($keys)->not->toContain('ocr_single')
+        ->and($keys)->not->toContain('api_import');
+});
+
+it('scopes the channel breakdown to the same forms as the tiles', function (): void {
+    ['owner' => $owner] = trendFixture();
+
+    $editor = User::factory()->create();
+    makeActiveMember($editor, 'form_editor');
+    app(ResourceGrantResolver::class)->forget();
+
+    $metrics = app(DashboardMetricsService::class);
+
+    expect($metrics->trendsForUser($editor)['channels']['rows'])->toBe([])
+        ->and($metrics->trendsForUser($owner)['channels']['rows'])->not->toBe([]);
+});
+
+it('keeps rows + other + unassigned equal to the period total on the channel axis', function (): void {
+    // ADR-0011 section D6/D11's conservation property: nothing may be silently dropped from a grouped result.
+    ['owner' => $owner] = trendFixture();
+    $form = Form::query()->where('title', 'Intake')->firstOrFail();
+
+    foreach ([SubmissionSource::Manual, SubmissionSource::OfflineSync] as $source) {
+        seedCountableAt($form, CarbonImmutable::now()->subDay(), source: $source);
+    }
+
+    $trends = app(DashboardMetricsService::class)->trendsForUser($owner);
+    $channels = $trends['channels'];
+
+    $summed = array_sum(array_column($channels['rows'], 'count'))
+        + ($channels['other']['count'] ?? 0)
+        + $channels['unassigned'];
+
+    expect($summed)->toBe($trends['total']['current']);
 });

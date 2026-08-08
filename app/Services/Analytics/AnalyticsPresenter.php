@@ -46,6 +46,7 @@ final class AnalyticsPresenter
 {
     public function __construct(
         private readonly AnalyticsMetricsService $metrics,
+        private readonly AnalyticsReportBuilder $reports,
         private readonly AnswerValueAggregator $aggregator,
         private readonly AnalyticsFormSet $formSet,
         private readonly SavedReportViewService $views,
@@ -131,107 +132,14 @@ final class AnalyticsPresenter
      */
     private function report(User $user, AnalyticsQuery $query): array
     {
-        $breakdown = $this->metrics->breakdown($query, $user);
-        $prior = $query->priorPeriod();
-
         return [
-            'range' => [
-                'from' => $query->from->toDateString(),
-                'to' => $query->to->toDateString(),
-                'timezone' => $query->timezone,
-                'granularity' => $query->granularity->value,
-            ],
-            // The comparison window, named rather than assumed. The dashboard can hard-code "vs. previous 30
-            // days" because its range is fixed; here the user chooses it, so the tile must say which window
-            // it is comparing against or the delta is a number with no referent.
-            'prior_range' => [
-                'from' => $prior->from->toDateString(),
-                'to' => $prior->to->toDateString(),
-            ],
-            'total' => $this->metrics->total($query, $user),
-            'series' => $this->metrics->series($query, $user),
-            'breakdown' => [
-                ...$breakdown,
-                'axis' => $query->axis->value,
-                'rows' => $this->labelRows($query->axis, $breakdown['rows']),
-                'unassigned_label' => $this->unassignedLabel($query->axis),
-                'has_unassigned_bucket' => $query->axis->hasUnassignedBucket(),
-            ],
-            'drafts' => $this->metrics->draftMetrics($query, $user),
+            ...$this->reports->build($query, $user),
+            // Workspace-wide, and deliberately NOT in the builder (Increment I10c). It answers "how many
+            // forms across your whole visible set are accepting responses right now" — a question that takes
+            // no range and no form selection, so on a surface scoped to one form it would be a confidently
+            // wrong number beside three correct ones. Keeping it here means such a surface cannot inherit it.
             'forms_accepting' => $this->metrics->acceptingFormsCount($user),
-            // Stated on every response, matching the API's `meta`: ISO weeks are Monday-start and not
-            // configurable, and a chart labelled "Week of …" is otherwise making a claim nobody declared.
-            'week_starts_on' => 'monday',
         ];
-    }
-
-    /**
-     * Attach a human name to each breakdown row.
-     *
-     * `Form::withTrashed()` is load-bearing for the same reason it is in `DashboardMetricsService`: an
-     * org-wide reader's visible set is rooted on it, so a soft-deleted form legitimately appears in a
-     * breakdown whose submissions are still countable, and a plain lookup would leave a bar with a number
-     * and no name. `ScopeNode` takes no `withTrashed()` — it has no `SoftDeletes` at all.
-     *
-     * The `key === null` arm is unreachable today ({@see AnalyticsMetricsService::breakdown()} diverts nulls
-     * into `unassigned`) and is kept anyway rather than asserted away: it costs one line and its absence
-     * would be a fatal on a shape change rather than a wrong label.
-     *
-     * @param  list<array{key: string|null, count: int}>  $rows
-     * @return list<array{key: string|null, label: string, count: int}>
-     */
-    private function labelRows(AnalyticsAxis $axis, array $rows): array
-    {
-        /** @var list<string> $ids */
-        $ids = array_values(array_filter(array_column($rows, 'key'), 'is_string'));
-
-        /** @var array<string, string> $names */
-        $names = match ($axis) {
-            AnalyticsAxis::Form => $ids === [] ? [] : Form::withTrashed()
-                ->whereIn('id', $ids)->pluck('title', 'id')->all(),
-            AnalyticsAxis::ScopeNode => $ids === [] ? [] : ScopeNode::query()
-                ->whereIn('id', $ids)->pluck('name', 'id')->all(),
-            AnalyticsAxis::Source, AnalyticsAxis::Status, AnalyticsAxis::Locale => [],
-        };
-
-        $missing = match ($axis) {
-            AnalyticsAxis::Form => 'Deleted form',
-            AnalyticsAxis::ScopeNode => 'Deleted area',
-            AnalyticsAxis::Source, AnalyticsAxis::Status, AnalyticsAxis::Locale => '',
-        };
-
-        return array_map(fn (array $row): array => [
-            ...$row,
-            'label' => $row['key'] === null
-                ? $this->unassignedLabel($axis)
-                : ($names[$row['key']] ?? $this->enumLabel($axis, $row['key']) ?? $missing),
-        ], $rows);
-    }
-
-    /**
-     * The display name for a raw enum-valued axis key.
-     *
-     * `locale` deliberately returns the raw BCP-47 tag rather than a localised display name: the same label
-     * appears in the CSV export, and a viewer-localised name would make the chart and the file disagree
-     * about what the same bucket is called.
-     */
-    private function enumLabel(AnalyticsAxis $axis, string $key): ?string
-    {
-        return match ($axis) {
-            AnalyticsAxis::Source => SubmissionSource::tryFrom($key)?->label() ?? $key,
-            AnalyticsAxis::Status => SubmissionStatus::tryFrom($key)?->label() ?? $key,
-            AnalyticsAxis::Locale => $key,
-            AnalyticsAxis::Form, AnalyticsAxis::ScopeNode => null,
-        };
-    }
-
-    /** Axis-specific copy for the bucket §D6 requires to be explicit rather than silently missing. */
-    private function unassignedLabel(AnalyticsAxis $axis): string
-    {
-        return match ($axis) {
-            AnalyticsAxis::Locale => 'Not recorded',
-            AnalyticsAxis::Form, AnalyticsAxis::Source, AnalyticsAxis::Status, AnalyticsAxis::ScopeNode => 'Unassigned',
-        };
     }
 
     /**

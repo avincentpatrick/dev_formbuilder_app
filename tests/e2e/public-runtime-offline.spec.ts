@@ -148,7 +148,16 @@ test('Public runtime — installable PWA renders offline + guards submit', async
 
     // ...and the SAME reference is still on screen, now as a sent receipt. The code did not change across
     // the transition, which is the property the whole client-uuid derivation exists to give.
-    await expect(page.getByText(`Sent — reference ${reference}`)).toBeVisible({ timeout: 20_000 });
+    //
+    // Scoped to the row's own paragraph, and the live region asserted separately, because a bare
+    // getByText() matches BOTH: the receipt reads "Sent — reference MER-…" and the polite announcement reads
+    // "Response sent — reference MER-…", which contains it. Two elements is a strict-mode violation, and the
+    // fix is to say which one — asserting both is stronger than picking one with .first() anyway, since it
+    // pins that the visible receipt and the screen-reader announcement quote the same code.
+    await expect(page.locator('.outbox__detail', { hasText: `Sent — reference ${reference}` })).toBeVisible({
+        timeout: 20_000,
+    });
+    await expect(page.locator('.sync-status__sr')).toHaveText(`Response sent — reference ${reference}`);
 });
 
 // Increment G8c — the 409 conflict-resolution UX. The replay→409→park-as-conflict path itself is covered by

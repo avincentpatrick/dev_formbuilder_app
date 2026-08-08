@@ -5,6 +5,7 @@
  *   - a top-right close affordance (icon button with aria-label), also closable via Escape;
  *   - a focus trap (Tab cycles within the panel) with initial focus into the panel and
  *     return-focus to the opener on close;
+ *   - the rest of the page marked `inert` while open (Increment I10a) -- see ./inert-stack.ts;
  *   - role="dialog" + aria-modal + aria-labelledby (the title);
  *   - renders in a top-level portal above the scrim (shadow-4), and becomes a full-screen
  *     sheet below the tablet breakpoint (section 6).
@@ -14,6 +15,7 @@
  */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import Icon from '../Icon/Icon.vue';
+import { popModalRoot, pushModalRoot } from './inert-stack';
 
 const props = withDefaults(
     defineProps<{
@@ -31,7 +33,15 @@ const emit = defineEmits<{ close: []; 'update:open': [value: boolean] }>();
 
 const titleId = useId();
 const panel = ref<HTMLElement | null>(null);
+const backdrop = ref<HTMLElement | null>(null);
 let opener: HTMLElement | null = null;
+
+/**
+ * The backdrop element THIS instance handed to the inert stack, held separately from the template ref.
+ * On close the leave-Transition and the ref's own teardown both race the watcher, and popping an element
+ * the stack never received would leave the page permanently inert.
+ */
+let ownedRoot: HTMLElement | null = null;
 
 const FOCUSABLE =
     'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -79,33 +89,75 @@ function onBackdrop(event: MouseEvent) {
     if (event.target === event.currentTarget) requestClose();
 }
 
+function takePage() {
+    // nextTick, because the backdrop does not exist until the v-if renders -- and on the `immediate` run
+    // below we are still inside setup(). `props.open` is re-read inside the callback because an open
+    // immediately followed by a close in the SAME tick would otherwise push a page the modal no longer
+    // wants: the close runs synchronously (releasePage is a no-op, nothing was pushed yet) and this
+    // callback would then take the page for a dialog that is already gone, leaving it inert forever.
+    nextTick(() => {
+        if (!props.open || backdrop.value === null) return;
+        ownedRoot = backdrop.value;
+        pushModalRoot(ownedRoot);
+        const items = focusable();
+        (items[0] ?? panel.value)?.focus();
+    });
+}
+
+function releasePage() {
+    if (ownedRoot === null) return;
+    popModalRoot(ownedRoot);
+    ownedRoot = null;
+}
+
+/** Release the page, then return focus. Order matters -- see popModalRoot's contract. */
+function closePage() {
+    const wasOpen = ownedRoot !== null;
+    releasePage();
+    if (!wasOpen) return;
+    opener?.focus?.();
+    opener = null;
+}
+
 watch(
     () => props.open,
     (isOpen, was) => {
         if (isOpen && !was) {
             opener = document.activeElement as HTMLElement | null;
-            document.body.style.overflow = 'hidden';
-            nextTick(() => {
-                const items = focusable();
-                (items[0] ?? panel.value)?.focus();
-            });
+            takePage();
         } else if (!isOpen && was) {
-            document.body.style.overflow = '';
-            opener?.focus?.();
-            opener = null;
+            closePage();
         }
     },
+    // `immediate` is load-bearing, not tidiness. A modal MOUNTED already open never ran this watcher, so it
+    // got no scroll lock, no captured opener and no initial focus -- and two live sites do exactly that
+    // (`forms/Index.vue`'s AssignScopeModal, `scopes/Index.vue`'s move confirm), as does every Storybook
+    // story (`args: { open: true }`), which would have made the axe story green over a no-op. The first run
+    // arrives as (true, undefined), so `isOpen && !was` holds and `!isOpen && was` cannot.
+    { immediate: true },
 );
 
-onBeforeUnmount(() => {
-    document.body.style.overflow = '';
-});
+/**
+ * Unmounting while open is a close the watcher never sees, and it is not an edge case: the `v-if="x"
+ * :open="true"` shape unmounts INSTEAD of setting `open` to false, and two live consumers use it
+ * (`forms/Index.vue`'s AssignScopeModal, `scopes/Index.vue`'s move confirm).
+ *
+ * It therefore has to run the full close, not just the release. Before I10a that did not matter, because a
+ * mount-open modal never captured an opener in the first place; `immediate: true` now captures one, and
+ * releasing `inert` without returning focus would strand the user on `<body>` -- the exact outcome DSR §4.5
+ * says must never happen ("focus returns to the element that triggered the modal, never left stranded").
+ * Focusing an already-detached opener (a full page teardown) is a harmless no-op.
+ *
+ * It is also the guard against cross-file pollution in Vitest, where specs share one happy-dom document and
+ * a leaked `inert` would silently blank the next file's assertions.
+ */
+onBeforeUnmount(closePage);
 </script>
 
 <template>
     <Teleport to="body" :disabled="!teleport">
         <Transition name="mds-modal">
-            <div v-if="open" class="mds-modal__backdrop" @mousedown="onBackdrop">
+            <div v-if="open" ref="backdrop" class="mds-modal__backdrop" @mousedown="onBackdrop">
                 <div
                     ref="panel"
                     class="mds-modal__panel"

@@ -21,54 +21,53 @@ const themes = ['light', 'dark'] as const;
 // in the builder's chrome, so it made a latent race in this file reproducible; the race was never its own.
 
 /**
- * Scan the composed page, or — with `within` — only a subtree of it.
+ * Scan the composed page.
  *
- * ⚠️ `within` EXISTS FOR MODALS, AND THE REASON IS THE SCRIM. `MdsModal` renders a semi-transparent
- * backdrop and does NOT mark the rest of the page `inert`, so axe still evaluates the builder's config
- * panel underneath and BLENDS the scrim into its computed background. An unselected segmented-control
- * label that measures fine on its own surface reads 1.82:1 once axe composites the overlay on top of it —
- * a finding about content nobody can see, reach or tab to while the dialog is open.
+ * ── THIS HELPER USED TO TAKE A `within` SUBTREE, AND I10a DELETED IT ───────────────────────────────────
+ * The parameter existed for ONE reason: the scrim. I8c found that `MdsModal` rendered a semi-transparent
+ * backdrop and did NOT mark the rest of the page `inert`, so axe still evaluated the builder's config panel
+ * underneath and BLENDED the scrim into its computed background. An unselected segmented-control label that
+ * measures fine on its own surface read 1.82:1 once axe composited the overlay on top of it — a finding
+ * about content nobody could see, reach or tab to while the dialog was open. The two share-panel cases were
+ * scoped to `[role="dialog"]` and the underlying observation was filed to `docs/feature-backlog.md:109`.
  *
- * Caught by I8c, when the Share modal grew a "Spam protection" block: on the 375px viewport the taller
- * dialog shifted the layout enough to expose a different slice of the config panel to that blend, and the
- * whole-page scan started failing on a control the increment never touched. Same class as the G9b
- * field-library case that scoped its scan to `.builder__pane--left`.
+ * I10a fixed the component instead: `MdsModal` now marks every non-ancestor sibling `inert`
+ * (`packages/design-system/src/components/Modal/inert-stack.ts`). axe 4.12.1 excludes an inert subtree from
+ * `color-contrast` (`colorContrastMatches` early-returns on `_isInert`) and from
+ * `isVisibleToScreenReadersVirtual`, which is precisely the blend that produced the finding. **Both
+ * share-panel cases below are whole-page again, and they are the merge-blocking proof that the fix works on
+ * real product markup**: if the inert walk regresses, the builder's config panel comes back through the
+ * scrim and these two go red.
  *
- * ⚠️ THE SELECTOR IS `[role="dialog"]`, NOT A CLASS, AND I LEARNED THAT THE EXPENSIVE WAY. My first
- * attempt used `.mds-modal`, which does not exist — the element carries `.mds-modal__panel` inside a
- * `.mds-modal__backdrop`. axe does not treat an unmatched `include` as "scan nothing"; it THROWS
- * `No elements found for include in page Context`, so a wrong selector turned two failing cases into
- * twelve. The role attribute is also the better anchor: it is the accessibility contract the test
- * already asserts on two lines above (`getByRole('dialog')`), so the scan and the wait cannot drift.
+ * Two honest caveats rather than a claim that the whole class is gone:
+ *  - `_isInert` has a small number of call sites in axe. Rules that composite background colour WITHOUT
+ *    going through `color-contrast`'s matcher — `link-in-text-block` is the one in our tag list — can still
+ *    evaluate inert content. If one of those ever fires on background markup here, that is new information
+ *    about axe, not a reason to re-scope: fix it or narrow the RULE, not the context.
+ *  - Whole-page also re-enables axe's only `pageLevel` rule, `bypass`, which `.include()` suppressed. It
+ *    cannot break the gate: `bypass` is declared `reviewOnFail: true`, so a failure is reported as
+ *    *incomplete* and `assertClean`/this helper assert on `violations` only. It passes anyway — its
+ *    `header-present` check matches `:is(h1..h6):not([role])`, and the dialog's own `.mds-modal__title` is
+ *    an `<h2>` outside the inert subtree.
  *
- * **The process fix, which is worth more than the selector: a Playwright selector cannot be checked by
- * any local gate in this repo, so verify it against the BUILT BUNDLE before pushing** —
- * `grep -o '.\{0,90\}mds-modal__panel.\{0,90\}' public/build/assets/*.js` shows the compiled element
- * verbatim (`class:\`mds-modal__panel\`, role:\`dialog\``) and would have taken ten seconds. Guessing at
- * a class name costs a full 12-minute E2E round trip per attempt.
+ * Do not reintroduce a `within` here for a modal. If a dialog scan ever fails on background content again,
+ * the bug is in the modal, not in the scan.
  *
- * ⚠️ SCOPING IS NOT A SUPPRESSION HERE, AND THE DISTINCTION MATTERS. The builder's config panel IS scanned
- * — unscrimmed, at all three viewports in both themes, by the `config panel` and `builder empty` cases in
- * this same file. What is dropped is only the second, blended look at it through an overlay. **The real
- * observation the failure surfaced — that a modal should make its background inert, for focus order and
- * screen readers, not just for axe — is filed in `docs/feature-backlog.md` rather than fixed here**, since
- * it changes every modal in the product and belongs in a design-system increment.
+ * NOTE on the two sibling specs: `analytics-axe.spec.ts:150` and `scopes-axe.spec.ts:83` DO still scope a
+ * modal scan to `[role="dialog"]`, so this file is not the last of the pattern. They were left alone
+ * deliberately — those files scope EVERY scan, modal or not, for the separate G9b reason recorded in their
+ * headers (whole-page scans there re-flag pre-existing violations elsewhere on those pages), so widening
+ * only their dialog call would be a different change with a different risk. Filed to the backlog instead.
  */
-async function scan(page: Page, label: string, within?: string): Promise<void> {
+async function scan(page: Page, label: string): Promise<void> {
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );
     expect(overflows, `${label}: horizontal overflow`).toBe(false);
 
-    const builder = new AxeBuilder({ page }).withTags([
-        'wcag2a',
-        'wcag2aa',
-        'wcag21a',
-        'wcag21aa',
-        'wcag22aa',
-    ]);
-
-    const results = await (within === undefined ? builder : builder.include(within)).analyze();
+    const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        .analyze();
 
     expect(
         results.violations,
@@ -77,6 +76,22 @@ async function scan(page: Page, label: string, within?: string): Promise<void> {
                 .map((v) => `${v.id}: ${v.help} → ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)
                 .join('\n'),
     ).toEqual([]);
+}
+
+/**
+ * The I10a contract, asserted as BOTH halves. "Something on the page is inert" is not the claim and would
+ * pass just as well if the walk inerted everything including the dialog — which is the failure mode that
+ * would make the whole-page scan below go green over an empty accessibility tree.
+ */
+async function assertBackgroundInert(page: Page): Promise<void> {
+    expect(
+        await page.locator('.builder__pane--left').evaluate((el) => el.closest('[inert]') !== null),
+        'the builder behind the dialog should be inert',
+    ).toBe(true);
+    expect(
+        await page.getByRole('dialog').first().evaluate((el) => el.closest('[inert]') === null),
+        'the dialog itself must NOT be inert — otherwise the scan below measures nothing',
+    ).toBe(true);
 }
 
 async function openBuilder(page: Page, formTitle: string): Promise<void> {
@@ -134,7 +149,11 @@ for (const theme of themes) {
         await page.getByRole('button', { name: 'Share' }).click();
         await expect(page.getByRole('dialog', { name: 'Share form' })).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — no link yet', '[role="dialog"]');
+        // I10a: whole-page again, and the DOM-level claim stated directly rather than inferred from an axe
+        // side-effect. `closest('[inert]')` rather than a getByRole count, because that would depend on
+        // Playwright's own ARIA engine honouring inert; this depends only on the DOM.
+        await assertBackgroundInert(page);
+        await scan(page, 'share panel — no link yet');
     });
 
     test(`Builder — share panel, live link (${theme})`, async ({ page }) => {
@@ -144,7 +163,8 @@ for (const theme of themes) {
         // The QR is a server round-trip; scanning before it lands would miss its alt text entirely.
         await expect(page.locator('img.share__qr')).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
-        await scan(page, 'share panel — live link', '[role="dialog"]');
+        await assertBackgroundInert(page);
+        await scan(page, 'share panel — live link');
     });
 
     test(`Builder — empty canvas (${theme})`, async ({ page }) => {

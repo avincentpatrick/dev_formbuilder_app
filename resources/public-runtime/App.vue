@@ -7,8 +7,11 @@
 import { onMounted, provide, ref, shallowRef } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
+import OfflineIndicator from './components/OfflineIndicator.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
+import SyncStatus from './components/SyncStatus.vue';
 import { ConflictReviewKey, DbKey, OfflineMediaKey, SyncOutboxKey, UploadUrlKey } from './composables/context';
+import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
 import { openDb } from './lib/db';
@@ -63,6 +66,14 @@ const RESUME_UNAVAILABLE_MESSAGE =
     'This saved form is no longer available — it may have already been submitted, or the link may have expired.';
 // Increment G8c — while resolving a parked conflict, the uuid of the row being reviewed (discarded on success).
 const resolvingUuid = ref<string | null>(null);
+
+// I10d — the app-level OfflineIndicator needs its own reading. RuntimeSession keeps its own useOnline()
+// for the H12b schedule guard; this one only decides whether the pill shows.
+// DESTRUCTURED — `useOnline()` returns `{ online, dispose }`, not a bare ref. Writing `const online =
+// useOnline()` binds the OBJECT, which is always truthy, so `v-if="!online"` never fires and the offline
+// pill silently never renders. vue-tsc cannot catch it (`!someObject` is valid TS) and the component
+// tests mount OfflineIndicator directly, so only the e2e saw it.
+const { online } = useOnline();
 const resolveMode = ref(false);
 
 const client = createApiClient({ token: props.bootstrap.shareToken, slug: props.bootstrap.slug });
@@ -228,7 +239,7 @@ function onSubmitted(id: string, authored: string | null = null): void {
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
     const resolved = resolvingUuid.value !== null;
     if (resolved) {
-        void syncOutbox.discardConflict(resolvingUuid.value as string);
+        void syncOutbox.discardSubmission(resolvingUuid.value as string);
         clearResolveState();
     }
     reference.value = deriveReference(id);
@@ -245,7 +256,7 @@ function onQueued(clientUuid: string): void {
     // Increment G8c — a resolve that went offline: the reviewed answers are safely re-queued under the new
     // uuid, so the old parked conflict row can be dropped.
     if (resolvingUuid.value !== null) {
-        void syncOutbox.discardConflict(resolvingUuid.value);
+        void syncOutbox.discardSubmission(resolvingUuid.value);
         clearResolveState();
     }
     reference.value = deriveReference(clientUuid);
@@ -275,8 +286,9 @@ function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): vo
 // Increment G8c — open the review UX for the oldest parked conflict on this form: re-mint the token, re-fetch
 // the current published schema, and re-mount the fill session seeded with the saved answers (re-mapped onto the
 // new schema; a fresh client_submission_uuid is minted by the store). The user reviews and resubmits (or discards).
-async function beginConflictReview(): Promise<void> {
-    const row = await syncOutbox.nextConflict();
+async function beginConflictReview(uuid?: string): Promise<void> {
+    // Named row first (the per-row Review button), else the oldest (the banner's Review).
+    const row = uuid === undefined ? await syncOutbox.nextConflict() : await syncOutbox.conflictRow(uuid);
     if (row === null) {
         await syncOutbox.refresh();
         return;
@@ -287,6 +299,10 @@ async function beginConflictReview(): Promise<void> {
         retainedAnswers.value = row.answers;
         resumeSeed.value = null; // a conflict review is its own entry, never a resume (H10)
         resolvingUuid.value = row.client_submission_uuid;
+        // I10d — the list hides the row whose review flow is on screen. This replaces RuntimeSession's old
+        // blanket `v-if="!resolving"`, which hid the WHOLE surface during a review; the respondent now keeps
+        // sight of their other queued submissions while resolving one.
+        syncOutbox.reviewingUuid.value = row.client_submission_uuid;
         resolveMode.value = true;
         driftNotice.value = resolveNotice(row.conflict_code);
         sessionKey.value += 1;
@@ -307,10 +323,17 @@ async function onDiscard(): Promise<void> {
     if (uuid === null) {
         return;
     }
+    // ⚠️ NARROWING, RECORDED RATHER THAN LEFT AS AN INCONSISTENCY. I10d gave the new per-submission list an
+    // INLINE two-step confirm and rejected `window.confirm` for it on specific grounds — it blocks the main
+    // thread, renders as unstyled OS chrome inside the branded offline shell, cannot be asserted by the
+    // Playwright gate without a dialog handler, and cannot name WHICH response it is about to destroy. Every
+    // one of those applies here too. It is left alone in this increment only because this is the G8c
+    // resolve-mode path, whose button lives in RuntimeSession's notice slot and whose visibility the e2e
+    // already pins; converting it is a change to that flow rather than to this one. Filed to the backlog.
     if (typeof window !== 'undefined' && !window.confirm('Discard this saved response? This cannot be undone.')) {
         return;
     }
-    await syncOutbox.discardConflict(uuid);
+    await syncOutbox.discardSubmission(uuid);
     clearResolveState();
     if ((await syncOutbox.nextConflict()) !== null) {
         void beginConflictReview();
@@ -321,6 +344,7 @@ async function onDiscard(): Promise<void> {
 
 function clearResolveState(): void {
     resolvingUuid.value = null;
+    syncOutbox.reviewingUuid.value = null;
     resolveMode.value = false;
     driftNotice.value = null;
     retainedAnswers.value = undefined;
@@ -332,48 +356,91 @@ function onRestart(): void {
 </script>
 
 <template>
-    <div v-if="phase === 'loading'" class="app-state">
-        <MdsSpinner size="lg" label="Loading form" />
-    </div>
-    <div v-else-if="phase === 'error'" class="app-state">
-        <MdsEmptyState illustration="lock" headline="This form isn’t available" :description="errorMessage" />
-    </div>
-    <div v-else-if="phase === 'unavailable' && unavailableCopy" class="app-state">
-        <MdsEmptyState
-            :illustration="unavailableCopy.illustration"
-            :headline="unavailableCopy.headline"
-            :description="unavailableCopy.description"
+    <!--
+        I10d — the sync surface is mounted HERE, above the phase machine, not inside RuntimeSession.
+        `docs/ux/form-filling-ux-flow.md` §7.1 puts the list "inside the installed PWA — visible from the
+        form's own completion/home view", and §7.3 asks for a persistent, non-modal banner. Mounted inside the
+        fill session this vanished on exactly the screen §7.1 names — the confirmation — as well as when a
+        form is unavailable and while one is loading. (The cited section is §7.1/§7.3; an earlier version of
+        this comment cited a §7.3.1 that does not exist.)
+
+        The wrapper is a flex COLUMN and the phase panels below became `flex: 1`, replacing the three
+        `min-height: 100vh` rules that each assumed they owned the viewport. Without that, putting anything
+        above them makes the document taller than the screen and every page gains a scrollbar — which
+        `assertClean` would NOT have caught, since it asserts horizontal overflow only.
+    -->
+    <div class="app-shell">
+        <div class="app-shell__banner">
+            <OfflineIndicator v-if="!online" />
+            <SyncStatus />
+        </div>
+
+        <div v-if="phase === 'loading'" class="app-state">
+            <MdsSpinner size="lg" label="Loading form" />
+        </div>
+        <div v-else-if="phase === 'error'" class="app-state">
+            <MdsEmptyState illustration="lock" headline="This form isn’t available" :description="errorMessage" />
+        </div>
+        <div v-else-if="phase === 'unavailable' && unavailableCopy" class="app-state">
+            <MdsEmptyState
+                :illustration="unavailableCopy.illustration"
+                :headline="unavailableCopy.headline"
+                :description="unavailableCopy.description"
+            />
+        </div>
+        <ConfirmationScreen
+            v-else-if="phase === 'confirmation'"
+            :reference="reference"
+            :message="confirmationMessage"
+            @restart="onRestart"
+        />
+        <RuntimeSession
+            v-else-if="schema"
+            :key="sessionKey"
+            :schema="schema"
+            :bootstrap="bootstrap"
+            :client="client"
+            :initial-answers="retainedAnswers"
+            :notice="driftNotice"
+            :resolving="resolveMode"
+            :resume="resumeSeed"
+            :search="initialSearch"
+            :now="sessionNow"
+            @submitted="onSubmitted"
+            @queued="onQueued"
+            @reschema="onReschema"
+            @discard="onDiscard"
+            @unavailable="onUnavailable"
         />
     </div>
-    <ConfirmationScreen
-        v-else-if="phase === 'confirmation'"
-        :reference="reference"
-        :message="confirmationMessage"
-        @restart="onRestart"
-    />
-    <RuntimeSession
-        v-else-if="schema"
-        :key="sessionKey"
-        :schema="schema"
-        :bootstrap="bootstrap"
-        :client="client"
-        :initial-answers="retainedAnswers"
-        :notice="driftNotice"
-        :resolving="resolveMode"
-        :resume="resumeSeed"
-        :search="initialSearch"
-        :now="sessionNow"
-        @submitted="onSubmitted"
-        @queued="onQueued"
-        @reschema="onReschema"
-        @discard="onDiscard"
-        @unavailable="onUnavailable"
-    />
 </template>
 
 <style scoped>
-.app-state {
+/* I10d — the column that lets a persistent surface sit above a full-height phase panel without making the
+   document taller than the viewport. The phase panels below use `flex: 1` for the same reason. */
+.app-shell {
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
+}
+
+/*
+ * The promoted surface has to line up with the runtime's own column, not span the viewport. Both used to
+ * render inside RuntimeShell's notice slot, i.e. inside its centred 44rem column with its padding; hoisted
+ * to a bare flex child they became full-bleed and the offline pill sat against the screen edge.
+ */
+.app-shell__banner {
+    width: 100%;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: var(--mds-space-3) var(--mds-space-4) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
+}
+
+.app-state {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;

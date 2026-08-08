@@ -92,10 +92,26 @@ test('Public runtime — installable PWA renders offline + guards submit', async
     await page.getByRole('button', { name: 'Submit' }).click();
     await expect(page.getByRole('heading', { name: /saved on this device/i })).toBeVisible({ timeout: 15_000 });
 
+    // Increment I10d — the per-submission list, on the confirmation screen. This is the screen UX §7.1 names
+    // ("visible from the form's own completion/home view") and, before I10d, the sync surface was mounted
+    // inside the fill session and so was absent from exactly here.
+    await expect(page.getByText('My submissions on this device')).toBeVisible();
+    await expect(page.getByText(/Saved on this device — will send/i)).toBeVisible();
+
+    // The reference the list shows must be the one the confirmation screen shows. Deriving the list's from
+    // the server id once it arrives would make a code the respondent may have written down CHANGE.
+    const reference = (await page.locator('.outbox__ref').first().innerText()).trim();
+    expect(reference).toMatch(/^MER-[0-9A-Z]{6}$/);
+    await expect(page.getByText(reference).first()).toBeVisible();
+
     await assertClean(page, 'Public runtime queued confirmation');
 
-    // Reconnect → the app-driven replay driver mints a token, POSTs the queued submission, and drains the
-    // Dexie outbox. Assert the outbox empties (the row synced), reading IndexedDB directly.
+    // Reconnect → the app-driven replay driver mints a token and POSTs the queued submission.
+    //
+    // ⚠️ THIS USED TO ASSERT THE OUTBOX WAS EMPTY, and I10d reverses it deliberately: a delivered row is
+    // RETAINED as the respondent's receipt (PRD:223 names `synced` as a state they must SEE). The replacement
+    // is strictly stronger — it proves delivery, retention AND the PII scrub in one wait, where the old
+    // count-is-zero could not distinguish "sent" from "dropped on the floor".
     await context.setOffline(false);
     await page.waitForFunction(
         () =>
@@ -104,18 +120,44 @@ test('Public runtime — installable PWA renders offline + guards submit', async
                 request.onsuccess = () => {
                     const db = request.result;
                     if (!db.objectStoreNames.contains('outbox')) {
-                        resolve(true);
+                        resolve(false);
                         return;
                     }
-                    const count = db.transaction('outbox', 'readonly').objectStore('outbox').count();
-                    count.onsuccess = () => resolve(count.result === 0);
-                    count.onerror = () => resolve(false);
+                    const all = db.transaction('outbox', 'readonly').objectStore('outbox').getAll();
+                    all.onsuccess = () => {
+                        const rows = all.result as Array<{
+                            status: string;
+                            server_submission_id: string | null;
+                            answers: Record<string, unknown>;
+                        }>;
+                        resolve(
+                            rows.length === 1 &&
+                                rows[0].status === 'synced' &&
+                                typeof rows[0].server_submission_id === 'string' &&
+                                rows[0].server_submission_id.length > 0 &&
+                                Object.keys(rows[0].answers ?? {}).length === 0,
+                        );
+                    };
+                    all.onerror = () => resolve(false);
                 };
                 request.onerror = () => resolve(false);
             }),
         null,
         { timeout: 20_000 },
     );
+
+    // ...and the SAME reference is still on screen, now as a sent receipt. The code did not change across
+    // the transition, which is the property the whole client-uuid derivation exists to give.
+    //
+    // Scoped to the row's own paragraph, and the live region asserted separately, because a bare
+    // getByText() matches BOTH: the receipt reads "Sent — reference MER-…" and the polite announcement reads
+    // "Response sent — reference MER-…", which contains it. Two elements is a strict-mode violation, and the
+    // fix is to say which one — asserting both is stronger than picking one with .first() anyway, since it
+    // pins that the visible receipt and the screen-reader announcement quote the same code.
+    await expect(page.locator('.outbox__detail', { hasText: `Sent — reference ${reference}` })).toBeVisible({
+        timeout: 20_000,
+    });
+    await expect(page.locator('.sync-status__sr')).toHaveText(`Response sent — reference ${reference}`);
 });
 
 // Increment G8c — the 409 conflict-resolution UX. The replay→409→park-as-conflict path itself is covered by
@@ -169,9 +211,17 @@ test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', 
         .waitFor({ state: 'visible', timeout: 15_000 });
 
     // The conflict banner surfaces a Review CTA.
-    const reviewButton = page.getByRole('button', { name: 'Review' });
+    // The BANNER's Review, by testid. I10d gave each conflict ROW its own Review button too, so a bare
+    // getByRole('button', { name: 'Review' }) now matches two elements and dies on Playwright's strict mode.
+    const reviewButton = page.getByTestId('review-conflicts');
     await expect(reviewButton).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/need review/i)).toBeVisible();
+    // `needs?` — I10d pluralises the badge, so a single conflict now reads "1 needs review" and the old
+    // contiguous /need review/ no longer matches. The row copy below it says "Needs review" too.
+    await expect(page.getByText(/needs? review/i).first()).toBeVisible();
+
+    // I10d — a conflict row NEVER offers a blind retry. A parked 409 either 409s again or is re-parked by
+    // the version guard before the POST, so the button would be a lie.
+    await expect(page.getByRole('button', { name: 'Retry now' })).toHaveCount(0);
     await assertClean(page, 'Public runtime conflict banner');
 
     // Review → the app re-mints + re-fetches the current schema and re-opens the fill with a resolve notice
@@ -187,7 +237,9 @@ test('Public runtime — reviews & resolves a parked conflict (Increment G8c)', 
         timeout: 15_000,
     });
 
-    // The outbox is empty: the parked conflict was discarded and the resubmission synced.
+    // The outbox is STILL empty here, and that is not an oversight after I10d's retention change: the
+    // resolve-resubmit goes out through RuntimeSession's ONLINE path, which discards the intent record
+    // rather than retaining a receipt (see the comment on that call). Only a REPLAYED submission leaves one.
     await page.waitForFunction(
         () =>
             new Promise<boolean>((resolve) => {

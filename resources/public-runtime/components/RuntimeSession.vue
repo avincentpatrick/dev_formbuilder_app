@@ -10,8 +10,6 @@
  */
 import { computed, inject, onBeforeUnmount, onMounted, provide, ref } from 'vue';
 import RuntimeShell from './RuntimeShell.vue';
-import OfflineIndicator from './OfflineIndicator.vue';
-import SyncStatus from './SyncStatus.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
 import WelcomeBackBanner from './WelcomeBackBanner.vue';
@@ -33,7 +31,7 @@ import {
 import { ApiError } from '../lib/error-normalizer';
 import { acceptanceForReasonCode, hasScheduleConstraint } from '../lib/schedule';
 import { openDb } from '../lib/db';
-import { discardRow, enqueue, markSynced } from '../lib/outbox';
+import { discardRow, enqueue } from '../lib/outbox';
 import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
 import { APP_VERSION } from '../lib/app-version';
@@ -257,7 +255,16 @@ async function submit(): Promise<SubmitOutcome> {
             deviceId,
             appVersion: APP_VERSION,
         });
-        await markSynced(db, uuid);
+        // I10d — discardRow, NOT markSynced. This is the path where the submission went straight out while
+        // ONLINE, so the outbox row is only the crash-safe intent record and its job is done: outbox.ts's own
+        // docblock for discardRow says exactly that ("an online submit resolved the intent without queuing").
+        //
+        // Retaining here would be actively wrong, not merely redundant. markSynced() now KEEPS the row so it
+        // can appear in the list, and the list derives its reference from the CLIENT uuid — while the
+        // confirmation screen this path routes to derives its reference from the SERVER id (App.vue). The
+        // respondent would be looking at two different codes for the same submission, on the same screen.
+        // Discarding also makes the list mean what UX §7.1 says it means: submissions finalized while OFFLINE.
+        await discardRow(db, uuid);
         void sync?.refresh();
         await autosave.clear();
         emit('submitted', result.id, authoredConfirmation());
@@ -354,8 +361,6 @@ const description = computed(() => runtime.renderModel.form.description);
                 :step-title="resumeStepTitle"
                 :note="resume.note"
             />
-            <OfflineIndicator v-if="!online" />
-            <SyncStatus v-if="!resolving" />
             <div
                 v-if="notice"
                 class="session-notice"

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDb, type MeridianDb } from '../lib/db';
-import { enqueue, type EnqueueInput } from '../lib/outbox';
+import { enqueue, markSynced, type EnqueueInput } from '../lib/outbox';
 import { attachToSubmission, localMediaRefId, stash } from '../lib/media-queue';
-import { replayOutbox } from '../lib/replay';
+import { replayOne, replayOutbox, type RowOutcome } from '../lib/replay';
 import { field, schemaResponse } from './fixtures';
 
 let n = 0;
@@ -94,18 +94,24 @@ class FakeFormData {
 }
 
 describe('replayOutbox', () => {
-    it('marks a 201 as synced and removes the row', async () => {
+    it('marks a 201 as synced, KEEPS the row, records the server id and scrubs the answers', async () => {
+        // I10d reversed the old assertion here (the row used to be deleted). Reverting markSynced() to a
+        // delete is what this reddens on.
         await enqueue(db, input('u1'));
         const { fetchFn } = makeFetch();
         expect(await replayOutbox(db, fetchFn)).toMatchObject({ synced: 1 });
-        expect(await db.outbox.get('u1')).toBeUndefined();
+
+        const row = await db.outbox.get('u1');
+        expect(row?.status).toBe('synced');
+        expect(row?.server_submission_id).toBeTruthy();
+        expect(row?.answers).toEqual({});
     });
 
     it('treats a 200 idempotent replay as synced too', async () => {
         await enqueue(db, input('u1'));
         const { fetchFn } = makeFetch({ submit: () => res(200, { data: { id: 'srv-1', status: 'submitted' } }) });
         expect(await replayOutbox(db, fetchFn)).toMatchObject({ synced: 1 });
-        expect(await db.outbox.get('u1')).toBeUndefined();
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'synced', server_submission_id: 'srv-1' });
     });
 
     it('flags a 422 as needs_attention (never dropped)', async () => {
@@ -222,7 +228,9 @@ describe('replayOutbox', () => {
 
         const posted = submitBodies[0].answers as { photo: Array<{ id: string }> };
         expect(posted.photo[0].id).toBe('att-99'); // the local: placeholder was swapped for the real id
-        expect(await db.outbox.get('u1')).toBeUndefined();
+        // Retention and the scrub coexist: the receipt survives, the blobs do not.
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'synced' });
+        expect(await db.media_queue.where('client_submission_uuid').equals('u1').count()).toBe(0);
     });
 
     it('drains multiple rows in one pass', async () => {
@@ -230,5 +238,79 @@ describe('replayOutbox', () => {
         await enqueue(db, input('u2'));
         const { fetchFn } = makeFetch();
         expect(await replayOutbox(db, fetchFn)).toMatchObject({ synced: 2 });
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment I10d — one-row replay, the progress hooks, and pruning on the no-tab path.
+|--------------------------------------------------------------------------
+*/
+
+describe('replayOne (I10d)', () => {
+    it('replays exactly the named row and leaves the others alone', async () => {
+        await enqueue(db, input('u1'));
+        await enqueue(db, input('u2'));
+        const { fetchFn, submitBodies } = makeFetch();
+
+        expect(await replayOne(db, 'u1', fetchFn)).toBe('synced');
+
+        // Delegating to run() is the obvious wrong implementation and it would drain the sibling too.
+        expect(submitBodies).toHaveLength(1);
+        expect((await db.outbox.get('u1'))?.status).toBe('synced');
+        expect((await db.outbox.get('u2'))?.status).toBe('pending');
+    });
+
+    it('returns null for a row that is not pending', async () => {
+        await enqueue(db, input('u1'));
+        await markSynced(db, 'u1', 'srv-1');
+        const { fetchFn, submitBodies } = makeFetch();
+
+        expect(await replayOne(db, 'u1', fetchFn)).toBeNull();
+        expect(submitBodies).toHaveLength(0);
+    });
+
+    it('calls onRowStart BEFORE the POST and onRowSettled after it', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies } = makeFetch();
+        const seen: string[] = [];
+
+        await replayOne(db, 'u1', fetchFn, {
+            onRowStart: () => seen.push(`start:${submitBodies.length}`),
+            onRowSettled: (_uuid, outcome: RowOutcome) => seen.push(`settled:${outcome}:${submitBodies.length}`),
+        });
+
+        // The ordering IS the feature: a "Sending…" indicator that appears after the request has finished is
+        // not an indicator. The counts pin it without needing a deferred fetch.
+        expect(seen).toEqual(['start:0', 'settled:synced:1']);
+    });
+
+    it('clears the in-flight mark even when the row fails', async () => {
+        await enqueue(db, input('u1'));
+        const { fetchFn } = makeFetch({ submit: () => res(422, errorBody('submission_invalid')) });
+        const settled: string[] = [];
+
+        await replayOne(db, 'u1', fetchFn, { onRowSettled: (uuid) => settled.push(uuid) });
+
+        // Without the `finally`, a failed row would be stuck showing "Sending…" forever.
+        expect(settled).toEqual(['u1']);
+    });
+
+    it('prunes receipts on a plain drain, which is the ONLY path a tabless device takes', async () => {
+        // sw.ts calls replayOutbox() directly on a Background-Sync event with no tab open, so pruning only
+        // in the composable would let a device that never opens the app accumulate receipts forever.
+        for (let i = 0; i < 25; i += 1) {
+            await enqueue(db, input(`old${i}`));
+            await markSynced(db, `old${i}`, `srv-${i}`);
+        }
+        await enqueue(db, input('fresh'));
+
+        const { fetchFn } = makeFetch();
+        await replayOutbox(db, fetchFn);
+
+        // 20, not 21: the row just delivered is ITSELF a receipt now, and it is the newest, so it is one of
+        // the twenty kept. The cap is on retained receipts in total, not on pre-existing ones.
+        expect(await db.outbox.count()).toBe(20);
+        expect((await db.outbox.get('fresh'))?.status).toBe('synced');
     });
 });

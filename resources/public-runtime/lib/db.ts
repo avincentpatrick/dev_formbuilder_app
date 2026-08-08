@@ -5,6 +5,8 @@
  *    authenticated sync/manifest surface; the guest schema itself is still served by the G8a SW schema cache).
  *  - `draft_answers`    — in-progress, not-yet-finalized answers (the G8a localStorage autosave migrates here).
  *  - `outbox`           — FINALIZED submissions queued for replay, keyed by the time-sortable client_submission_uuid.
+ *                         From I10d a DELIVERED row is RETAINED (status `synced`, answers scrubbed) rather
+ *                         than deleted, so the respondent can see what was sent; see outbox.ts.
  *  - `media_queue`      — respondent media blobs awaiting upload, referencing their parent outbox row by uuid.
  *  - `app_state`        — (H23b) small device-scoped scalars that outlive a page load and belong to no form.
  *
@@ -61,6 +63,9 @@ export interface OutboxRow {
      *  Not indexed → no `db.version()` bump. */
     conflict_code: string | null;
     server_submission_id: string | null;
+    /** Increment I10d — when the server accepted this row. Un-indexed → no `db.version()` bump, the same
+     *  reasoning as `conflict_code` above. Null for every status except `synced`. */
+    synced_at: string | null;
     created_at: string;
     updated_at: string;
 }

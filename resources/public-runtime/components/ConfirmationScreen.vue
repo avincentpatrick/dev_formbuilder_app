@@ -37,7 +37,11 @@ onMounted(() => heading.value?.focus());
 
 <style scoped>
 .confirmation {
-    min-height: 100vh;
+    /* I10d — `flex: 1`, not `min-height: 100vh`. The sync surface now sits ABOVE this in App.vue's
+       flex column, so claiming the whole viewport here would make the document taller than the screen and
+       put a scrollbar on every page. `assertClean` checks HORIZONTAL overflow only, so this would have
+       shipped as a visible regression with a green gate. */
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;

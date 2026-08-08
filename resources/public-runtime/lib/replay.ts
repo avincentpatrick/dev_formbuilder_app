@@ -16,7 +16,7 @@ import { createApiClient } from './api-client';
 import { ApiError, normalizeError } from './error-normalizer';
 import type { MeridianDb, MediaQueueRow, OutboxRow } from './db';
 import type { SchemaResponse } from './types';
-import { listPending, markConflict, markNeedsAttention, markSynced, recordAttempt, setAnswers } from './outbox';
+import { listPending, markConflict, markNeedsAttention, markSynced, pruneSynced, recordAttempt, setAnswers } from './outbox';
 import {
     collectLocalMediaIds,
     listForSubmission,
@@ -34,35 +34,126 @@ export interface ReplayResult {
     retry: number;
 }
 
-type RowOutcome = keyof ReplayResult;
+export type RowOutcome = keyof ReplayResult;
 
 const EMPTY: ReplayResult = { synced: 0, conflict: 0, needsAttention: 0, retry: 0 };
+
+/**
+ * Per-row progress callbacks (Increment I10d), so the UI can show "Sending…" on the ONE row being sent.
+ *
+ * Hooks rather than shared state, because this module is deliberately framework-free and injectable — that
+ * is the property the whole file is built around, and it is what lets `sw.ts` call the same function with no
+ * Vue anywhere. `useSyncOutbox` passes hooks; `sw.ts` passes none and is untouched.
+ */
+export interface ReplayHooks {
+    onRowStart?(uuid: string): void;
+    onRowSettled?(uuid: string, outcome: RowOutcome): void;
+}
 
 /** A per-context guard so overlapping triggers (online + visibility) don't run concurrent passes in one context. */
 let inFlight: Promise<ReplayResult> | null = null;
 
+/**
+ * Rows currently being sent, ACROSS passes (I10d).
+ *
+ * `inFlight` above guards a whole pass; this guards a row. They are not the same thing now that
+ * `replayOne()` exists: a per-item "Retry now" can fire while a full drain is already walking the queue, and
+ * two concurrent `replayRow()` calls on one uuid race the media leg — it reads `status === 'uploaded'` and
+ * then writes it, so the same blob can be uploaded twice and the second id wins. Server-side idempotency
+ * makes the double POST harmless; it does not make the double upload harmless.
+ */
+const rowsInFlight = new Set<string>();
+
 /** Drain every `pending` outbox row once, oldest-first. Concurrent calls in the same context share one pass. */
-export function replayOutbox(db: MeridianDb, fetchFn: typeof fetch = fetch): Promise<ReplayResult> {
+export function replayOutbox(db: MeridianDb, fetchFn: typeof fetch = fetch, hooks: ReplayHooks = {}): Promise<ReplayResult> {
     if (inFlight !== null) {
+        // NOTE: the shared promise means a second caller's hooks are dropped. Only useSyncOutbox passes
+        // hooks and it has its own `running` flag, so this cannot bite today — but it is a property, not an
+        // accident, and a second hook-passing caller would need this revisited.
         return inFlight;
     }
-    inFlight = run(db, fetchFn).finally(() => {
+    inFlight = run(db, fetchFn, hooks).finally(() => {
         inFlight = null;
     });
     return inFlight;
 }
 
-async function run(db: MeridianDb, fetchFn: typeof fetch): Promise<ReplayResult> {
+/**
+ * Replay exactly ONE row (Increment I10d) — the per-item "Retry now" of UX spec §7.3.
+ *
+ * Returns null when the row is gone, is not pending, or is already being sent by another pass.
+ */
+export async function replayOne(
+    db: MeridianDb,
+    uuid: string,
+    fetchFn: typeof fetch = fetch,
+    hooks: ReplayHooks = {},
+): Promise<RowOutcome | null> {
+    const row = await db.outbox.get(uuid);
+
+    if (row === undefined || row.status !== 'pending' || rowsInFlight.has(uuid)) {
+        return null;
+    }
+
+    const outcome = await sendRow(db, fetchFn, row, new Map(), hooks);
+    await pruneSynced(db);
+
+    return outcome;
+}
+
+async function run(db: MeridianDb, fetchFn: typeof fetch, hooks: ReplayHooks): Promise<ReplayResult> {
     const rows = await listPending(db);
     const result: ReplayResult = { ...EMPTY };
     // Per-PASS, not module-level, so a republish between two drains is always seen. Several queued rows for
     // one form therefore cost one schema read, not one each.
     const schemas = new Map<string, SchemaResponse>();
     for (const row of rows) {
-        const outcome = await replayRow(db, fetchFn, row, schemas);
-        result[outcome] += 1;
+        const outcome = await sendRow(db, fetchFn, row, schemas, hooks);
+        if (outcome !== null) {
+            result[outcome] += 1;
+        }
     }
+
+    // Prune HERE and not only in the composable: sw.ts calls replayOutbox() directly with no tab open, so a
+    // device that only ever syncs through Background Sync would otherwise accumulate receipts forever.
+    await pruneSynced(db);
+
     return result;
+}
+
+/** `replayRow` plus the in-flight guard and the progress hooks. Returns null if the row is already in flight. */
+async function sendRow(
+    db: MeridianDb,
+    fetchFn: typeof fetch,
+    row: OutboxRow,
+    schemas: Map<string, SchemaResponse>,
+    hooks: ReplayHooks,
+): Promise<RowOutcome | null> {
+    const uuid = row.client_submission_uuid;
+
+    if (rowsInFlight.has(uuid)) {
+        return null;
+    }
+
+    rowsInFlight.add(uuid);
+    hooks.onRowStart?.(uuid);
+
+    let outcome: RowOutcome | null = null;
+
+    try {
+        outcome = await replayRow(db, fetchFn, row, schemas);
+
+        return outcome;
+    } finally {
+        // BOTH in the `finally`, and the second one is the whole point. `rowsInFlight` is this module's own
+        // bookkeeping; the thing the RESPONDENT sees is `syncingUuids` in useSyncOutbox, which is driven by
+        // `onRowSettled`. Leaving that inside the `try` meant a throw out of replayRow — a Dexie failure, a
+        // fetch that rejects rather than resolving, anything not caught as an ApiError — left the row
+        // rendering "Sending…" forever with every action hidden behind `isSyncing`. `retry` is the honest
+        // outcome for an unfinished attempt: the row is still pending and the next pass will take it.
+        rowsInFlight.delete(uuid);
+        hooks.onRowSettled?.(uuid, outcome ?? 'retry');
+    }
 }
 
 async function replayRow(
@@ -161,14 +252,16 @@ async function replayRow(
 
     // 4. POST the submission (idempotent by client_submission_uuid).
     try {
-        await client.submit({
+        const result = await client.submit({
             answers,
             clientSubmissionUuid: uuid,
             locale: row.locale,
             deviceId: row.device_id,
             appVersion: row.app_version,
         });
-        await markSynced(db, uuid);
+        // I10d — the server id is recorded on the retained row. Note the LIST still derives its reference
+        // from the client uuid, deliberately: this id is for support to resolve, not for display.
+        await markSynced(db, uuid, result.id);
         return 'synced';
     } catch (error) {
         if (error instanceof ApiError) {

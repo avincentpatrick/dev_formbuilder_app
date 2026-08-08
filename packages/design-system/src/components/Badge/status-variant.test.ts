@@ -75,3 +75,23 @@ describe('statusVariant — custom-domain tokens (H22b)', () => {
         expect(statusVariant('pending')).toEqual({ variant: 'neutral', label: 'Pending' });
     });
 });
+
+describe('statusVariant — submission screen-out (I9a)', () => {
+    it('colours screened_out neutral, not danger — nothing went wrong', () => {
+        // Same rule as `wont_fix`/`disabled`/`revoked`: a settled non-failure is neutral. The respondent
+        // finalized a form that had no questions left to show them; red would read as "this response errored".
+        expect(statusVariant('screened_out')).toEqual({ variant: 'neutral', label: 'Screened out' });
+    });
+
+    it('would otherwise have rendered a pill labelled with the raw enum value', () => {
+        // Why the entry is not optional. `statusVariant` never throws — it falls back to the raw string — so a
+        // missing map entry is a SILENT defect: a neutral badge reading literally "screened_out" in front of a
+        // customer. This asserts the fallback is what the map is standing in front of.
+        expect(statusVariant('screened_out_typo')).toEqual({ variant: 'neutral', label: 'screened_out_typo' });
+    });
+
+    it('leaves the statuses screened_out sits between untouched', () => {
+        expect(statusVariant('submitted')).toEqual({ variant: 'info', label: 'Submitted' });
+        expect(statusVariant('under_review')).toEqual({ variant: 'warning', label: 'Under review' });
+    });
+});

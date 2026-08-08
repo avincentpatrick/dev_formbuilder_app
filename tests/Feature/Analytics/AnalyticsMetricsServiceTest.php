@@ -408,6 +408,11 @@ it('suppresses rather than estimates beyond the draft-retention window, and says
 it('agrees with FormSchedule::acceptance() on every form', function (): void {
     // The one place H24a builds a SECOND implementation of an existing rule, so it is pinned against the
     // first. An unpinned copy is how a dashboard tile comes to contradict the public form's own banner.
+    //
+    // ⚠️ THE ORACLE IS `consumesCapacity()`, NOT `countable()`, AND THE `$screenedOut` FORM IS WHAT MAKES THIS
+    // TEST BITE (I9a). Until then the oracle was `countable()` and no fixture carried a `screened_out` row, so
+    // the two implementations could diverge on exactly the status this increment introduced while the
+    // assertion stayed green -- the vacuous shape a parity test exists to prevent.
     $now = CarbonImmutable::now();
 
     $open = $this->form;                                                   // published, no schedule
@@ -419,19 +424,27 @@ it('agrees with FormSchedule::acceptance() on every form', function (): void {
     $capped->forceFill(['max_responses' => 1])->save();
     seedCountableAt($capped, $now->subHour());
 
-    $expected = collect([$open, $soon, $closed, $capped])
+    // A capped form whose one and only response was SCREENED OUT. It is countable and it is not capacity-
+    // consuming, so it must still be ACCEPTING -- and the raw SQL in acceptingFormsCount() has to say so on
+    // its own, without the scope to lean on.
+    $screenedOut = publishedInboxForm($this->tenant, $this->owner, 'Capped but screened out');
+    $screenedOut->forceFill(['max_responses' => 1])->save();
+    seedInboxSubmission($screenedOut, $this->owner, SubmissionStatus::ScreenedOut, []);
+
+    $expected = collect([$open, $soon, $closed, $capped, $screenedOut])
         ->filter(function (Form $form) use ($now): bool {
             $form = $form->refresh();
             $count = $form->max_responses === null
                 ? null
-                : Submission::query()->countable()->where('form_id', $form->id)->count();
+                : Submission::query()->consumesCapacity()->where('form_id', $form->id)->count();
 
             return FormSchedule::acceptance($form, $count, $now) === 'open';
         })
         ->count();
 
     expect($this->metrics->acceptingFormsCount($this->owner))->toBe($expected)
-        ->and($expected)->toBe(1); // only $open; soon/closed/capped are each excluded for a different reason
+        // $open and $screenedOut; soon/closed/capped are each excluded for a different reason.
+        ->and($expected)->toBe(2);
 });
 
 /*

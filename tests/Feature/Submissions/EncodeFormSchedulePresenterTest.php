@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SubmissionSource;
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\User;
 use App\Services\Submissions\EncodeFormPresenter;
@@ -73,6 +74,19 @@ it('reports capacity_reached with zero remaining once the cap is full', function
 
     expect($schedule['acceptance'])->toBe('capacity_reached')
         ->and($schedule['remaining'])->toBe(0);
+});
+
+it('does not let a screened-out response eat a slot in the encode banner', function (): void {
+    // I9a, and the twin of the same case in `PublicFormSchedulePresenterTest`. The two presenters' capacity
+    // counts are textually identical on purpose; this pair is what proves they stayed that way.
+    $version = scheduledForm($this->tenant, $this->user, ['max_responses' => 1]);
+    $form = Form::findOrFail($version->form_id);
+    seedInboxSubmission($form, $this->user, SubmissionStatus::ScreenedOut, [], SubmissionSource::Guest);
+
+    $schedule = $this->presenter->present($form, $version)['form']['schedule'];
+
+    expect($schedule['acceptance'])->toBe('open')
+        ->and($schedule['remaining'])->toBe(1);
 });
 
 it('leaves remaining null for an uncapped form', function (): void {

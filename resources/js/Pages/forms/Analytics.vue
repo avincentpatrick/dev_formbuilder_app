@@ -91,7 +91,12 @@ const deltaLabel = computed(
             />
         </div>
 
-        <AnalyticsChartsCard :report="report" />
+        <!-- The empty-state copy is overridden because the card's default tells the reader to widen the date
+             range or clear a filter — two controls /analytics has and this page structurally never will. -->
+        <AnalyticsChartsCard
+            :report="report"
+            breakdown-empty-description="Responses are grouped by how they arrived — manual entry, guest link or offline sync. None have arrived in the last 30 days."
+        />
     </div>
 </template>
 

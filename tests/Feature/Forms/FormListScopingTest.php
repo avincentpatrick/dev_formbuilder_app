@@ -127,6 +127,13 @@ it('exposes can.analytics on each row, matching the route gate exactly', functio
     // The row action and `GET /forms/{form}/analytics` must agree, or the button either 403s on click or is
     // hidden from someone who may use it. Both resolve to FormPolicy::view.
     //
+    // ⚠️ THERE IS NO FALSE CASE TO ASSERT, AND THAT IS THE FINDING RATHER THAN A GAP. FormPresenter::list()
+    // already restricts rows to `forms.edit.any` holders or to grantedFormIdsQuery(..., Editor), and
+    // can('view', $form) is FormPolicy::view -> canEdit -> that same predicate — so on every row that
+    // REACHES this list the flag is structurally true. What this pins is that the key exists and tracks the
+    // policy; the REFUSALS are pinned where they are observable, against the route itself, in
+    // FormAnalyticsGateTest.
+    //
     // Named separately from `can.template` rather than reusing it: FormPolicy::view and ::update resolve to
     // the same predicate TODAY, and a row action riding on that coincidence would follow the wrong one the
     // day they diverge.

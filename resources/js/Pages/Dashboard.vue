@@ -145,8 +145,10 @@ const channelsBreakdown = computed<Breakdown>(() => ({
 
 const channels = computed(() => breakdownBars(channelsBreakdown.value));
 
-// ADR-0011 §D11: the plot folds everything past the top four into a neutral "Other", so the paired table is
-// what keeps the full breakdown visible — "nothing is hidden, only un-plotted".
+// ADR-0011 §D11's "nothing is hidden, only un-plotted", as a table beside the plot. On THIS axis nothing is
+// ever folded — the service asks for the full six-case top-N precisely so a CLOSED axis cannot lose a name —
+// so the table is a text equivalent of the same rows rather than a disclosure of missing ones. It still earns
+// its place: §D12 requires a non-visual equivalent, and axe cannot detect a missing one.
 const channelRows = computed(() => breakdownTableRows(channelsBreakdown.value));
 const channelColumns = computed<DataTableColumn[]>(() => [
     { key: 'label', header: 'Channel' },

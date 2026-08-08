@@ -8,6 +8,7 @@ use App\Enums\AnalyticsAxis;
 use App\Enums\AnalyticsFormSelection;
 use App\Models\Form;
 use App\Models\User;
+use App\Services\Dashboard\DashboardMetricsService;
 use App\Support\Analytics\AnalyticsQuery;
 use Carbon\CarbonImmutable;
 
@@ -18,7 +19,8 @@ use Carbon\CarbonImmutable;
  * ── UNGATED, AND BUILT SO IT CANNOT DRIFT INTO A SECOND /analytics ──────────────────────────────────────
  * These are PHASE-1 acceptance criteria, so the page carries no `feature:advanced_analytics` — the same
  * unbundling {@see DashboardMetricsService::trendsForUser()} records, and the same one `ToggleableModules`
- * states in its own hint for that key ("the dashboard is unaffected"). What the gate protects is the
+ * states in its own hint for that key (which this increment widened to name per-form
+ * statistics alongside the dashboard). What the gate protects is the
  * genuinely Phase-3 surface: arbitrary axis selection, scope-subtree selection, saved views, answer-value
  * aggregation and the streamed export.
  *

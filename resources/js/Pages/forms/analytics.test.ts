@@ -23,8 +23,11 @@ vi.mock('@/components/shell/PageHeader.vue', () => ({
 // Imported AFTER the mocks so the component resolves them.
 const Analytics = (await import('./Analytics.vue')).default;
 
-// A NON-UTC zone throughout: under a UTC runner a component that dropped the `timeZone` option would still
-// render the right day, so a UTC fixture cannot see the bug the timezone plumbing exists to prevent.
+// A NON-UTC zone in the fixture, but note where it does and does not go: `range.timezone` reaches only the
+// banner text via `rangeLabel()`. `bucketFormatter()` takes ONLY a granularity and formats at UTC by design
+// — bucket-label.ts records that formatting at the QUERY's zone was H24b1's bug, since the bucket string is
+// already a UTC-truncated date. A non-UTC fixture here is what makes that separation visible rather than
+// accidental.
 const TZ = 'Asia/Manila';
 
 function report(overrides: Partial<FormReport> = {}): FormReport {
@@ -100,6 +103,31 @@ describe('forms/Analytics — the §D12 non-visual equivalents', () => {
         expect(wrapper.findAll('.mds-table tbody tr').length).toBeGreaterThanOrEqual(2);
         wrapper.unmount();
     });
+
+    it('tabulates rows the PLOT drops — a zero Unassigned and the Other total', () => {
+        // This file is the only mount of AnalyticsChartsCard in the tree, and §D11's "nothing is hidden, only
+        // un-plotted" is a claim about the TABLE being a superset of the bars. Wiring the table to the same
+        // builder as the plot would satisfy every other assertion here and quietly break that.
+        const wrapper = render({
+            breakdown: {
+                axis: 'source',
+                rows: [
+                    { key: 'guest', label: 'Guest link', count: 6 },
+                    { key: 'manual', label: 'Manual entry', count: 3 },
+                ],
+                other: { count: 2, categories: 1 },
+                unassigned: 0,
+                unassigned_label: 'Unassigned',
+                has_unassigned_bucket: true,
+            },
+        } as Partial<FormReport>);
+
+        const table = wrapper.find('.analytics__breakdown-table');
+        expect(table.exists()).toBe(true);
+        // The Other total is disclosed in text even though the plot folded it.
+        expect(table.text()).toContain('Other');
+        wrapper.unmount();
+    });
 });
 
 describe('forms/Analytics — the page contract', () => {
@@ -142,6 +170,26 @@ describe('forms/Analytics — the page contract', () => {
         wrapper.unmount();
     });
 
+    it('does not tell the reader to widen a range or clear a filter it cannot offer', () => {
+        // AnalyticsChartsCard's DEFAULT empty-state copy names two remediations only /analytics can offer.
+        // This page overrides it, and that override is the assertion.
+        const wrapper = render({
+            breakdown: {
+                axis: 'source',
+                rows: [],
+                other: null,
+                unassigned: 0,
+                unassigned_label: 'Unassigned',
+                has_unassigned_bucket: false,
+            },
+        } as Partial<FormReport>);
+
+        expect(wrapper.text()).toContain('No responses in this period');
+        expect(wrapper.text()).not.toContain('Widen the date range');
+        expect(wrapper.text()).not.toContain('clear a filter');
+        wrapper.unmount();
+    });
+
     it('offers no export control and no axis control', () => {
         // The gate boundary, rendered. FormAnalyticsPresenter cannot reach the export or an axis picker by
         // construction; this is the client-side half of that claim.
@@ -161,13 +209,20 @@ describe('forms/Analytics — the page contract', () => {
         wrapper.unmount();
     });
 
-    it('formats bucket labels in the query timezone, not the viewer’s', () => {
-        // bucket-label.ts passes the query zone into Intl. Dropping it renders the previous day for any
-        // viewer west of the range's zone — invisible under a UTC-only fixture, which is why TZ is Manila.
+    it('formats bucket labels at UTC regardless of the range’s declared zone', () => {
+        // ⚠️ THE CONTRACT IS THE OPPOSITE OF WHAT IT LOOKS LIKE, AND I WROTE IT BACKWARDS FIRST.
+        // `bucketFormatter()` takes ONLY a granularity and hard-codes `timeZone: 'UTC'`; the query zone is
+        // deliberately NOT plumbed into it. bucket-label.ts's own docblock records that formatting at the
+        // query's zone was the H24b1 BUG — the bucket string is already a UTC-truncated date, so re-applying
+        // an offset shifts it a day for any negative-offset zone. The fixture's Manila zone therefore reaches
+        // only `rangeLabel()`'s banner text, never the axis.
+        //
+        // So this asserts the bucket renders as its OWN day whatever the range claims, which is what the
+        // hard-coded UTC buys.
         const wrapper = render();
 
-        // Whatever the runner's zone, the first bucket must render as its own day (5 July), never the 4th.
         expect(wrapper.find('.mds-tsc__table tbody tr').text()).toMatch(/5 Jul|Jul 5/);
+        expect(wrapper.text()).not.toContain('4 Jul');
         wrapper.unmount();
     });
 });

@@ -92,7 +92,8 @@ final class FormPresenter
                 // Per-form response statistics (I10c) — also a read/derive, so also `view`. Named separately
                 // rather than reusing `can.template`: FormPolicy::view and ::update resolve to the same
                 // predicate TODAY, and a row action riding on that coincidence would follow the wrong one the
-                // day they diverge. It must match the route's own gate exactly, and a test pins that.
+                // day they diverge. It must match the route's own gate exactly: FormListScopingTest pins the
+                // key here, and FormAnalyticsGateTest pins the route's refusals — neither alone would.
                 'analytics' => $user->can('view', $form),
             ],
         ];

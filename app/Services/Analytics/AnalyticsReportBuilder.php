@@ -10,6 +10,7 @@ use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\ScopeNode;
 use App\Models\User;
+use App\Services\Dashboard\DashboardMetricsService;
 use App\Support\Analytics\AnalyticsQuery;
 
 /**
@@ -17,9 +18,11 @@ use App\Support\Analytics\AnalyticsQuery;
  *
  * Extracted verbatim from {@see AnalyticsPresenter::report()}, which now delegates here, so that a second
  * surface can render the same numbers without inheriting the first one's dependencies. The Vue side takes
- * this shape as authoritative: `resources/js/components/analytics/types.ts` records that its `Report` type is
- * derived from these `@return` annotations, and a second PHP author of the same shape is exactly what that
- * sentence exists to prevent.
+ * this shape as authoritative: `resources/js/components/analytics/types.ts` records that its shapes are
+ * derived literally from PHP `@return` annotations, and a second PHP author of the same shape is exactly what
+ * that sentence exists to prevent — which is why this was extracted rather than copied. Note the TS twin of
+ * THIS method is `FormReport`, not `Report`: `Report` additionally carries `forms_accepting`, which `build()`
+ * deliberately never emits (below).
  *
  * ── WHY `forms_accepting` IS NOT HERE ────────────────────────────────────────────────────────────────────
  * It stays on {@see AnalyticsPresenter}, and the omission is the point rather than an oversight. It answers

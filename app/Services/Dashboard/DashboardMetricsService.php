@@ -13,6 +13,7 @@ use App\Models\Submission;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Analytics\AnalyticsMetricsService;
+use App\Services\Analytics\AnalyticsReportBuilder;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\EntitlementService;
 use App\Support\Analytics\AnalyticsQuery;
@@ -79,7 +80,7 @@ final class DashboardMetricsService
      * OCR / API / offline-sync)". It ships here, ungated, for the same reason everything else in this method
      * does — it is a Phase-1 acceptance criterion, and `advanced_analytics` gates the Phase-3 surface
      * (arbitrary grouping, saved views, export), not this. `ToggleableModules`' own hint for that key says
-     * "the dashboard is unaffected".
+     * the dashboard and per-form statistics are unaffected.
      *
      * Deliberately NOT zero-filled to the six `SubmissionSource` cases. A GROUP BY returns only the channels
      * that actually occurred; five permanent `0` bars would invent categories that do not exist — the exact
@@ -95,22 +96,32 @@ final class DashboardMetricsService
         // H24b2 — the window constant moved to AnalyticsQuery so `/analytics` opens on the SAME range this
         // page shows. It was private here, which is exactly how two surfaces come to mean two different
         // things by "the last 30 days"; the constant's docblock records why the number is 29 and not 30.
-        $query = new AnalyticsQuery(
-            from: $today->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS),
-            to: $today,
-            axis: AnalyticsAxis::Form,
-        );
+        $from = $today->subDays(AnalyticsQuery::DEFAULT_RANGE_DAYS);
+
+        $query = new AnalyticsQuery(from: $from, to: $today, axis: AnalyticsAxis::Form);
 
         $topForms = $this->analytics->breakdown($query, $user);
 
         // One more aggregate over the SAME bounded row set (ADR-0011 §D7: time-bounded, form-bounded,
-        // fixed-cardinality — the axis is closed at six values). `withAxis()` preserves the range, timezone
-        // and selection, so the two breakdowns cannot drift into meaning different periods.
+        // fixed-cardinality). Built from the same `$from`/`$today` rather than derived, so the two
+        // breakdowns cannot drift into meaning different periods.
         //
-        // `topN` stays at the default 5 rather than being raised to 6: only three of the six cases are ever
-        // written today, so `other` is null in every reachable state, and the paired data table on the page
-        // discloses the sixth if a tenant ever gets there.
-        $channels = $this->analytics->breakdown($query->withAxis(AnalyticsAxis::Source), $user);
+        // ⚠️ `topN` IS RAISED TO THE FULL CASE COUNT HERE, AND THAT IS NOT A TUNING CHOICE. `source` is a
+        // CLOSED axis — six values, no more — and `breakdown()` discards the IDENTITIES of everything it
+        // folds into `other`, keeping only a count and a category tally. So at the default top-5 a tenant
+        // using all six channels would lose one channel's name permanently: the plot cannot show it and the
+        // paired data table cannot either, because `breakdownTableRows()` renders what the server sent. On
+        // an OPEN axis (forms) that trade is the point of a top-N; on a closed one it buys nothing and costs
+        // a name. Asking for six guarantees `other` is always null on this axis, which is what makes
+        // "nothing is hidden" true on the page rather than merely likely.
+        $channelQuery = new AnalyticsQuery(
+            from: $from,
+            to: $today,
+            axis: AnalyticsAxis::Source,
+            topN: count(SubmissionSource::cases()),
+        );
+
+        $channels = $this->analytics->breakdown($channelQuery, $user);
 
         return [
             // Echoed so the page can label the tiles honestly — "last 30 days", not an unqualified total —
@@ -193,7 +204,8 @@ final class DashboardMetricsService
      * be worse than the raw value in the other direction — it hides the string an operator needs in order to
      * find whatever wrote it.
      *
-     * This is the same expression {@see AnalyticsPresenter::enumLabel()} uses: a second CALL SITE of
+     * This is the same expression {@see AnalyticsReportBuilder::enumLabel()} uses
+     * (moved there from `AnalyticsPresenter` by this same increment): a second CALL SITE of
      * `SubmissionSource::label()`, not a second definition of what a channel is called.
      *
      * The null arm is unreachable today (`breakdown()` diverts nulls into `unassigned`) and is kept for one

@@ -377,7 +377,7 @@ Route::middleware([
     // PHASE-1 acceptance criterion, and ADR-0011 §D9 gates the genuinely Phase-3 surface — arbitrary axis
     // selection, scope-subtree selection, saved views, answer-value aggregation and the streamed export, all
     // of which stay behind the gate on /analytics below. ToggleableModules' own hint for that key already
-    // says "the dashboard is unaffected"; this page is dashboard family, scoped to one form. The page is
+    // names per-form statistics alongside the dashboard; this page is dashboard family, scoped to one form. The page is
     // built so it CANNOT drift into a second /analytics — five structural mechanisms, listed in
     // FormAnalyticsPresenter's docblock, starting with a one-dependency constructor and no FormRequest.
     // There is deliberately NO /forms/{form}/analytics/export.

@@ -291,8 +291,13 @@ describe('Dashboard — the channel breakdown (I10c)', () => {
         });
         const channels = card(wrapper, 'Responses by channel');
 
-        // The §D12 non-visual equivalent. Swapping MdsBarChart for a bare <svg aria-label> is the exact
-        // substitution axe cannot see, and this is what reddens on it.
+        // §D12's non-visual equivalent, asserted on BOTH tables, because they are different components and
+        // only one of them survives each mutation: `.mds-bar__table` is MdsBarChart's OWN sr-only table (so
+        // it is what disappears if the chart is swapped for a bare <svg aria-label> — the substitution axe
+        // cannot see), and `.mds-table` is the paired MdsDataTable this page adds beside it. An assertion on
+        // only the latter would have stayed green through exactly the mutation the comment claimed it caught.
+        expect(channels.findAll('.mds-bar__table tbody tr').length).toBeGreaterThanOrEqual(2);
+
         const cells = channels.findAll('.mds-table tbody tr').map((row) => row.text());
         expect(cells).toHaveLength(2);
         expect(cells.join(' ')).toContain('Guest link');
@@ -354,8 +359,12 @@ describe('Dashboard — the channel breakdown (I10c)', () => {
 
         const channels = card(wrapper, 'Responses by channel');
         expect(channels.text()).toContain('manual entry, guest link');
-        // Two adjacent cards rendering the identical sentence teaches nothing.
-        expect(channels.text()).not.toBe(card(wrapper, 'Top forms').text());
+        // Two adjacent cards rendering the identical sentence teaches nothing. Compare the DESCRIPTIONS, not
+        // the whole cards — the card text includes the header, so a whole-card comparison is unequal by
+        // construction and would pass however identical the copy underneath became.
+        expect(channels.find('.mds-empty__desc').text()).not.toBe(
+            card(wrapper, 'Top forms').find('.mds-empty__desc').text(),
+        );
         wrapper.unmount();
     });
 

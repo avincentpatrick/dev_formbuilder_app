@@ -36,6 +36,9 @@ type SubmissionRow = {
     completeness_percent: number | null;
     last_saved_at: string | null;
     draft_expires_at: string | null;
+    // Increment I9b — whether THIS viewer may pick the draft up. False on every non-draft row by
+    // construction, so the button is not merely hidden by CSS on rows it would 404 on.
+    can: { resume: boolean };
 };
 
 type Meta = { current_page: number; last_page: number; total: number; per_page: number };
@@ -165,6 +168,16 @@ function formatDate(iso: string | null): string {
                 </template>
             </template>
             <template #row-actions="{ row }">
+                <!-- Increment I9b. Leftmost and primary on a draft row, because on the Draft-filtered view
+                     "continue this" is the only thing a keyer came here to do — the detail page for a draft
+                     shows an answer document nobody has finished writing. -->
+                <MdsIconButton
+                    v-if="(row as SubmissionRow).can?.resume"
+                    icon="edit"
+                    label="Continue this draft"
+                    size="sm"
+                    @click="router.visit(`/submissions/${(row as SubmissionRow).id}/resume`)"
+                />
                 <MdsIconButton
                     icon="external-link"
                     label="View submission"

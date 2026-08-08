@@ -34,6 +34,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsCard } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import {
     createFormRuntime,
@@ -90,6 +91,21 @@ const props = defineProps<{
     };
     blocks: Block[];
     steps: ServerStep[];
+    /**
+     * The saved draft being resumed, or null on the blank keying form (Increment I9b). Its presence is the
+     * single test for "am I in resume mode" — one nullable object rather than five scalars, so this block
+     * grows by exactly one entry.
+     */
+    draft: {
+        id: string;
+        client_submission_uuid: string;
+        answers: Record<string, unknown>;
+        current_step: string | null;
+        completeness_percent: number | null;
+        last_saved_at: string | null;
+        expires_at: string | null;
+    } | null;
+    draft_url: string;
 }>();
 
 const page = usePage();
@@ -101,10 +117,16 @@ const page = usePage();
 //
 // `now` comes from the SERVER (`version.now`), not from `isoClock(new Date())` as the guest does — see
 // `EncodeFormPresenter::clock()`. Same clock in, same step list out.
+// On a RESUME (Increment I9b) the store is seeded from the draft rather than started empty, and the uuid is
+// adopted rather than re-minted. Re-minting is the subtle half: the uuid is the idempotency key, so a fresh
+// one would make Submit look like a brand-new response and leave the draft row behind, unpromoted, until the
+// reaper deleted it.
 const runtime = createFormRuntime(props as unknown as SchemaResponse, {
     now: props.version.now,
     initialLocale: props.form.default_locale,
     search: '',
+    initialAnswers: props.draft?.answers as Record<string, never> | undefined,
+    initialClientSubmissionUuid: props.draft?.client_submission_uuid,
 });
 
 // Seed each repeatable section's `min_instances` starter rows. The GUEST deliberately opens a repeat group
@@ -255,12 +277,21 @@ const scheduleNotice = computed<{ title: string; body: string } | null>(() => {
                     : 'Submissions are blocked until it opens.',
             };
         case 'closed':
-            return {
-                title: 'This form is closed',
-                body: schedule.closes_at
-                    ? `It closed on ${formatInstant(schedule.closes_at)}. New submissions are no longer accepted.`
-                    : 'New submissions are no longer accepted.',
-            };
+            // On a RESUMED draft the copy must not contradict the enabled Submit button beside it (I9b).
+            // H12a's grace window lets a draft STARTED before the close still be finalized, so "new
+            // submissions are no longer accepted" is true and "you cannot submit this" is not — an alert
+            // saying the latter over a working button is how a keyer learns to distrust the banners.
+            return props.draft !== null
+                ? {
+                      title: 'This form has closed',
+                      body: 'You can still submit this draft, because it was started before the form closed. New responses cannot be started.',
+                  }
+                : {
+                      title: 'This form is closed',
+                      body: schedule.closes_at
+                          ? `It closed on ${formatInstant(schedule.closes_at)}. New submissions are no longer accepted.`
+                          : 'New submissions are no longer accepted.',
+                  };
         case 'capacity_reached':
             return {
                 title: 'This form is full',
@@ -285,6 +316,7 @@ function flatValue(fieldKey: string): AnswerValue {
 function setFlatValue(fieldKey: string, value: AnswerValue): void {
     runtime.setAnswer(fieldKey, value as never);
     runtime.markTouched(fieldKey);
+    armAutosave();
 }
 
 function fieldError(fieldKey: string): string | undefined {
@@ -312,9 +344,27 @@ function instanceValue(sectionKey: string, index: number, fieldKey: string): Ans
     return runtime.instanceValue(sectionKey, index, fieldKey) as AnswerValue;
 }
 
+/**
+ * Adding or removing a repeat instance IS an edit, and routing both through here is what makes autosave see
+ * it. Wired straight from the template, `runtime.addInstance`/`removeInstance` mutate the answer map without
+ * ever arming autosave — so a session whose only change was structural (a keyer deleting the two seeded roster
+ * rows a household does not need) was silently never persisted, and the page showed no save indicator at all
+ * because none had ever run.
+ */
+function addInstance(sectionKey: string): void {
+    runtime.addInstance(sectionKey);
+    armAutosave();
+}
+
+function removeInstance(sectionKey: string, index: number): void {
+    runtime.removeInstance(sectionKey, index);
+    armAutosave();
+}
+
 function setInstanceValue(sectionKey: string, index: number, fieldKey: string, value: AnswerValue): void {
     runtime.setInstanceAnswer(sectionKey, index, fieldKey, value as never);
     runtime.markInstanceTouched(sectionKey, index, fieldKey);
+    armAutosave();
 }
 
 function boundsHint(block: Block): string | null {
@@ -386,14 +436,102 @@ async function jumpTo(item: { address: string; stepKey: string }): Promise<void>
     target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]')?.focus();
 }
 
+// ── Autosave (Increment I9b) ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ ARMED ON THE FIRST REAL EDIT, NOT AT SETUP, and this is not defensive politeness. The min-instance
+// seeding loop above calls `addInstance()`, which MUTATES `runtime.answers` during mount — so a deep watcher
+// armed here would fire on every page view of any form with a repeatable section and create an empty
+// `status = draft` row, with a 30-day TTL, for a keyer who never typed a character.
+const autosaveArmed = ref(false);
+
+const autosave = createServerAutosave({
+    url: props.draft_url,
+    clientSubmissionUuid: runtime.clientSubmissionUuid,
+    answers: runtime.answers,
+    currentStepKey: runtime.currentStepKey,
+    // Also gated on the schedule: `saveDraft()` runs `assertCanStart()` on the CREATE branch, so on a closed
+    // form the first tick would 403 while later ones (once a draft exists) succeed — one red flash, then
+    // silence. Erring one case strict (`capacity_reached` would actually allow a draft create) is the right
+    // side to err on.
+    enabled: computed(() => autosaveArmed.value && (isOpen.value || props.draft !== null)),
+});
+
+function armAutosave(): void {
+    autosaveArmed.value = true;
+}
+
+/** The header indicator. Null before the first save, so a fresh page carries no stale "Saved" claim. */
+const autosaveLabel = computed<string | null>(() => {
+    switch (autosave.state.value) {
+        case 'saving':
+            return 'Saving…';
+        case 'saved':
+            return autosave.completeness.value === null
+                ? 'Draft saved'
+                : `Draft saved · ${autosave.completeness.value}% complete`;
+        case 'error':
+            return 'Not saved — retrying';
+        case 'stopped':
+            return 'Not saved';
+        default:
+            return null;
+    }
+});
+
+function formatDay(iso: string | null): string | null {
+    if (iso === null) {
+        return null;
+    }
+    const date = new Date(iso);
+
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+}
+
+const draftSavedLabel = computed(() => {
+    const day = formatDay(props.draft?.last_saved_at ?? null);
+
+    return day === null ? '' : ` from ${day}`;
+});
+
+const draftExpiryLabel = computed(() => {
+    const day = formatDay(props.draft?.expires_at ?? null);
+
+    return day === null ? '' : ` If you do not come back to it, it is removed on ${day}.`;
+});
+
+// Restore the resume cursor. After mount, so the store's own step reconciliation has settled first; a key
+// that no longer resolves (the schema moved, or the step is no longer relevant under the restored answers)
+// is a guarded no-op in the store rather than an error here.
+if (props.draft?.current_step != null && props.draft.current_step !== '') {
+    void nextTick(() => runtime.goToStep(props.draft!.current_step as string));
+}
+
 // ── Submit ───────────────────────────────────────────────────────────────────────────────────────────────
 const submitting = ref(false);
 
+/**
+ * Increment I9b — a RESUMED draft may be submitted after the form has closed.
+ *
+ * The old gate was `isOpen` alone, which blocked exactly the grace window `FormAcceptanceGuard::assertCanPromote()`
+ * exists to allow: a draft STARTED before the close may still be promoted after it, so a keyer mid-transcription
+ * when the window shuts is not stranded. This read as correct defensive UI and was the opposite — the client
+ * refusing what the server would have accepted. `capacity_reached` deliberately still blocks: the cap is
+ * enforced transactionally at finalize and would 403 anyway.
+ */
+const canSubmit = computed(() => isOpen.value || (props.draft !== null && props.form.schedule.acceptance === 'closed'));
+
 function submit(): void {
     // Increment H12b — never POST a submission the schedule guard will 403 (the button is disabled too).
-    if (!isOpen.value) {
+    if (!canSubmit.value) {
         return;
     }
+
+    // ⚠️ STOP AUTOSAVING BEFORE THE SUBMIT GOES OUT. A debounce timer armed within the last 1500 ms would
+    // otherwise fire while the promote is in flight: the draft POST blocks on the promoted row's
+    // `lockForUpdate`, comes back 409 `draft_already_finalized`, and the composable — correctly, by its own
+    // rules — renders the red "Your changes are no longer being saved" alert over a submission that in fact
+    // succeeded. Disposing here is not merely cosmetic: `dispose()` flushes any pending edit first, so the
+    // last keystroke before Submit is still captured, and Submit itself posts the full answer map anyway.
+    autosave.dispose();
     runtime.markSubmitAttempted();
     // The FULL answer map, not `effectiveAnswers`. The guest posts the pruned set; this channel deliberately
     // posts everything so the server's own prune stays observable — that is what keeps `prunedAnswers` above
@@ -405,7 +543,9 @@ function submit(): void {
 
     router.post(
         `/forms/${props.form.id}/submissions`,
-        { answers },
+        // The uuid routes a resumed draft to `promote()` (flipping the SAME row) instead of `submit()`
+        // (creating a second one), and makes a double-clicked Submit resolve to one submission via Stage 2b.
+        { answers, client_submission_uuid: runtime.clientSubmissionUuid },
         {
             preserveScroll: true,
             onStart: () => {
@@ -430,11 +570,20 @@ function submit(): void {
     <div class="encode">
         <Head :title="`Encode — ${form.title}`" />
 
-        <PageHeader title="New submission" icon="submissions">
+        <PageHeader :title="draft === null ? 'New submission' : 'Continue submission'" icon="submissions">
             <template #breadcrumbs>
                 <Link href="/forms" class="encode__crumb">← Forms</Link>
             </template>
             <template #actions>
+                <!-- The autosave indicator lives in the header, beside Cancel, because that is where a keyer
+                     looks before leaving the page. `aria-live="polite"` and not `assertive`: it changes on
+                     every debounce tick, and an assertive region would interrupt a screen reader mid-question
+                     on a page whose whole job is uninterrupted typing. -->
+                <!-- Always PRESENT, empty until there is something to say. A live region inserted into the
+                     DOM with its content already in it is not reliably announced — the assistive technology
+                     has to be observing the node before the text changes — so `v-if` here would silently
+                     swallow the first "Draft saved". -->
+                <span class="encode__autosave" role="status" aria-live="polite">{{ autosaveLabel ?? '' }}</span>
                 <Link href="/forms" class="encode__cancel">Cancel</Link>
             </template>
         </PageHeader>
@@ -442,6 +591,25 @@ function submit(): void {
         <p class="encode__intro">
             Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
         </p>
+
+        <!-- Resume banner (I9b). Two jobs: confirm that what is on screen is the keyer's own saved work
+             rather than a blank form, and name the expiry, because the reaper HARD-deletes an expired draft
+             and a silent disappearance is the worst version of this feature. -->
+        <div v-if="draft !== null" class="encode__resume" role="status">
+            <strong class="encode__resume-title">Continuing a saved draft</strong>
+            <span class="encode__resume-body">
+                Your answers were restored{{ draftSavedLabel }}. This draft is saved as you type and is not
+                submitted until you press Submit.{{ draftExpiryLabel }}
+            </span>
+        </div>
+
+        <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
+             an expired session). `role="alert"` because unlike the indicator above, continuing to type after
+             this is wasted work. -->
+        <div v-if="autosave.state.value === 'stopped'" class="encode__degraded" role="alert">
+            <strong class="encode__degraded-title">Your changes are no longer being saved</strong>
+            <span class="encode__degraded-body">{{ autosave.message.value }}</span>
+        </div>
 
         <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
              naming what relevance removed from it. -->
@@ -593,7 +761,7 @@ function submit(): void {
                                                 size="sm"
                                                 icon-left="trash"
                                                 :aria-label="`Remove ${instanceLegend(blockFor(step)!, index)}`"
-                                                @click="runtime.removeInstance(step.sectionKey, index)"
+                                                @click="removeInstance(step.sectionKey, index)"
                                             >
                                                 Remove
                                             </MdsButton>
@@ -612,7 +780,7 @@ function submit(): void {
                                     variant="secondary"
                                     icon-left="plus"
                                     :disabled="!runtime.canAddInstance(step.sectionKey)"
-                                    @click="runtime.addInstance(step.sectionKey)"
+                                    @click="addInstance(step.sectionKey)"
                                 >
                                     Add {{ blockFor(step)?.label ?? 'entry' }}
                                 </MdsButton>
@@ -663,7 +831,7 @@ function submit(): void {
                     variant="primary"
                     icon-left="check"
                     :loading="submitting"
-                    :disabled="!isOpen"
+                    :disabled="!canSubmit"
                 >
                     Submit response
                 </MdsButton>
@@ -768,6 +936,32 @@ function submit(): void {
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
+}
+
+/* Autosave state + resume banner (I9b). */
+.encode__autosave {
+    font-size: var(--mds-type-caption-font-size);
+    color: var(--mds-color-text-secondary);
+    align-self: center;
+}
+
+.encode__resume {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    margin-bottom: var(--mds-space-4);
+    border-radius: var(--mds-radius-md);
+    background: var(--mds-color-status-info-bg);
+    color: var(--mds-color-status-info-fg);
+}
+
+.encode__resume-title {
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.encode__resume-body {
+    font-size: var(--mds-type-caption-font-size);
 }
 
 /* Scheduled-form pre-warning (H12b) — an alert banner, border-accent (never color alone, WCAG 1.4.1). */

@@ -24,6 +24,13 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     // `.env` and `.env.example`: the session cookie is HOST-ONLY, so a login on `acme.meridian.test` is
     // simply not sent to `meridian.test`. `routes/tenant.php`'s own header records that correction.
     //
+    // ⚠️ DO NOT WAIT ON THE POST-LOGIN REDIRECT HERE. `fortify.home` is `/dashboard`, which is a TENANT
+    // route — on the central host `InitializeTenancyBySubdomain` cannot resolve a tenant from `meridian.test`
+    // and the landing page is meaningless. The first version of this setup waited for the URL to leave
+    // `/login` and timed out for that reason, not because the credentials were wrong (the diagnostic showed
+    // a CLEAN login form, no validation error). All this step actually needs is the SESSION COOKIE, so it
+    // asserts the session by fetching a console route instead of by watching where Fortify redirects.
+    //
     // The step-up challenge is deliberately NOT confirmed here — it expires in 900s and this job runs far
     // longer than that. `tests/e2e/support/console.ts` clears it per navigation instead.
     const centralOrigin = baseURL.replace('acme.', '');
@@ -32,17 +39,19 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     await consolePage.goto(`${centralOrigin}/login`, { waitUntil: 'networkidle' });
     await consolePage.getByLabel('Email', { exact: true }).fill('console@meridian.test');
     await consolePage.getByLabel('Password', { exact: true }).fill('meridian-console-2026');
-    await consolePage.getByRole('button', { name: 'Sign in' }).click();
-    // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify
-    // does not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which
-    // reads only the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains the trade.
-    await consolePage.waitForLoadState('networkidle');
+    await Promise.all([
+        consolePage.waitForLoadState('networkidle'),
+        consolePage.getByRole('button', { name: 'Sign in' }).click(),
+    ]);
 
-    // Diagnose rather than time out opaquely: a failed sign-in re-renders /login with the reason, and a
-    // 30s waitForURL would report only "timeout" for what is really a fixture problem.
+    // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify does
+    // not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which reads only
+    // the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains the trade.
+    await consolePage.goto(`${centralOrigin}/admin/settings`, { waitUntil: 'networkidle' });
+
     if (new URL(consolePage.url()).pathname.startsWith('/login')) {
         const shown = (await consolePage.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
-        throw new Error(`console sign-in stayed on /login (${consolePage.url()}). Page said: ${shown}`);
+        throw new Error(`console sign-in did not establish a session (${consolePage.url()}). Page said: ${shown}`);
     }
 
     await consolePage.context().storageState({ path: 'tests/e2e/.auth/admin.json' });

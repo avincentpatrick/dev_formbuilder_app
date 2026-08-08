@@ -81,6 +81,11 @@ class E2eSeeder extends Seeder
 
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
 
+    /** The central-domain console operator (Increment I10e) — see seedSuperAdmin(). */
+    private const SUPER_ADMIN_EMAIL = 'console@meridian.test';
+
+    private const SUPER_ADMIN_PASSWORD = 'meridian-console-2026';
+
     private const PENDING_EMAIL = 'pending@meridian.test';
 
     /** A second ACTIVE member (G10b2) — the grant modal needs a recipient other than the acting Owner. */
@@ -112,6 +117,10 @@ class E2eSeeder extends Seeder
         if (! $tenant->domains()->where('domain', 'acme')->exists()) {
             $tenant->domains()->create(['domain' => 'acme']);
         }
+
+        // I10e — the central-domain console operator. Before the tenant work below and deliberately outside
+        // it: this writes one central `users` row and touches nothing tenant-scoped.
+        $this->seedSuperAdmin();
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
         $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
@@ -1255,6 +1264,52 @@ class E2eSeeder extends Seeder
     }
 
     /** Resolve an existing identity on the pre-auth connection (users RLS hides non-members), or create it. */
+    /**
+     * The central-domain console operator, for Increment I10e's admin-console accessibility scan.
+     *
+     * ⚠️ THIS FIXTURE ASSERTS SOMETHING UNTRUE ABOUT THE ACCOUNT, AND THAT IS A DELIBERATE, BOUNDED TRADE.
+     * It sets `two_factor_confirmed_at` while leaving `two_factor_secret` NULL — a state no real enrolment
+     * produces. It works because the two gates read different things: {@see EnsureSuperAdminMfa} checks ONLY
+     * `two_factor_confirmed_at`, so the console opens; Fortify's `hasEnabledTwoFactorAuthentication()`
+     * additionally requires a SECRET when `fortify.features.two-factor.confirm` is true (it is), so login
+     * issues no TOTP challenge. The account therefore reaches `/admin/*` in one POST, with no authenticator
+     * app and no TOTP implementation in the test suite.
+     *
+     * Acceptable ONLY because this is an accessibility gate, not a security one: the middleware's real
+     * behaviour — that an unenrolled super-admin is redirected to `admin.mfa.setup` — is covered in Pest by
+     * `SuperAdminConsoleTest`, and nothing here weakens that. If a future increment wants to e2e the
+     * ENROLMENT flow, it needs a genuine TOTP, not this.
+     *
+     * ⚠️ DO NOT reuse `UserFactory::confirmedTwoFactor()`. It writes `encrypt('PLACEHOLDERSECRET')`, which
+     * flips `hasEnabledTwoFactorAuthentication()` to TRUE and makes the account TOTP-challenged at login with
+     * a secret nobody can compute against — a permanent lockout. `DemoSeeder::ensureSuperAdmin()` carries the
+     * same warning for the same reason, and deliberately leaves its own admin UNENROLLED so a human can
+     * complete the real flow. These two seeders want opposite things and both are right.
+     *
+     * Idempotent, and outside the tenant transaction: it writes one central `users` row and no tenant-scoped
+     * rows at all — idempotency comes from {@see self::resolveOrCreateUser()}, the same primitive every other
+     * seeded account uses, plus a `forceFill` that is a no-op on a second run.
+     *
+     * Deliberately NOT covered by a case in `E2eSeederIdempotencyTest`, and the reason is worth recording so
+     * nobody adds a broken one: that file asserts through the DEFAULT connection inside a tenant context,
+     * because `pgsql_auth` cannot see `RefreshDatabase`'s uncommitted transaction (its header records the
+     * trap). This operator has NO tenant membership, so the users join-shape RLS policy makes it invisible
+     * from any tenant's context — a test there could only assert “did not throw”, which is the kind of
+     * near-vacuous case this codebase keeps catching in review. What actually proves the fixture is the e2e
+     * itself: `admin-console-axe.spec.ts` cannot log in, clear step-up and assert its final URL unless this
+     * row exists in exactly this shape.
+     */
+    private function seedSuperAdmin(): void
+    {
+        $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Console Operator', self::SUPER_ADMIN_PASSWORD);
+
+        $admin->forceFill([
+            'is_super_admin' => true,
+            'two_factor_confirmed_at' => $admin->two_factor_confirmed_at ?? now(),
+            'two_factor_secret' => null,
+        ])->save();
+    }
+
     private function resolveOrCreateUser(string $email, string $name, string $password): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();

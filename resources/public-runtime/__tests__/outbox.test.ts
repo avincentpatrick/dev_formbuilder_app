@@ -238,21 +238,74 @@ describe('outbox (I10d)', () => {
         expect(await db.outbox.get('fresh')).toBeDefined();
     });
 
-    it('pruneSynced NEVER touches a row that has not been sent, at any age', async () => {
+    it('pruneSynced NEVER touches a row that has not been sent, at any age or depth', async () => {
         // §7.3's "never silently dropped" is the whole contract. A reaper that ate an unsent submission
         // would be the worst possible bug in this file.
-        await enqueue(db, input('pending'));
+        //
+        // ⚠️ THE FIRST VERSION OF THIS CASE WAS VACUOUS, AND ONLY THE MUTATION CHECK SAID SO. It seeded three
+        // unsent rows with an old `created_at` and asserted none were pruned — but the age arm reads
+        // `synced_at ?? updated_at` (recent on an unsent row) and the depth arm needs MORE than the keep cap
+        // to fire, so neither could have triggered even with the status filter deleted. The mutation
+        // "prune every status, not just synced" passed it green.
+        //
+        // It now puts BOTH arms genuinely in range: 25 unsent rows (past the 20 cap) and an old `updated_at`
+        // on one of them. Deleting the `.equals('synced')` filter now destroys real data and says so.
+        for (let i = 0; i < 25; i += 1) {
+            await enqueue(db, input(`p${i}`));
+        }
         await enqueue(db, input('failed'));
         await markNeedsAttention(db, 'failed', 'rejected');
         await enqueue(db, input('conflicted'));
         await markConflict(db, 'conflicted', 'form changed', 'form_updated');
 
-        for (const uuid of ['pending', 'failed', 'conflicted']) {
-            await db.outbox.update(uuid, { created_at: '2020-01-01T00:00:00.000Z' });
+        // Old by every clock the pruner could consult.
+        for (const uuid of ['p0', 'failed', 'conflicted']) {
+            await db.outbox.update(uuid, {
+                created_at: '2020-01-01T00:00:00.000Z',
+                updated_at: '2020-01-01T00:00:00.000Z',
+            });
         }
 
         await pruneSynced(db);
 
-        expect(await db.outbox.count()).toBe(3);
+        expect(await db.outbox.count()).toBe(27);
+        expect(await db.outbox.get('p0')).toBeDefined();
+        expect(await db.outbox.get('failed')).toBeDefined();
+        expect(await db.outbox.get('conflicted')).toBeDefined();
+    });
+});
+
+describe('outbox — a delivered row is terminal (I10d review fix)', () => {
+    it('refuses to move a synced row back to conflict or needs_attention', async () => {
+        // ⚠️ RETENTION REMOVED A GUARD THAT DELETION USED TO PROVIDE FOR FREE. When markSynced() deleted the
+        // row, a late write from a second replay context (the service worker and a tab both draining) hit a
+        // missing key and Dexie changed nothing. Now the row survives — and without an explicit guard it
+        // would be moved back to a RETRYABLE state carrying `answers: {}`, so the respondent would be offered
+        // "Retry now" on a submission the server already has, and the retry would POST an empty payload.
+        // `inFlight`/`rowsInFlight` cannot help: both are module-level, so neither spans the tab↔SW boundary.
+        await enqueue(db, input('u1'));
+        await markSynced(db, 'u1', 'srv-1');
+
+        await markConflict(db, 'u1', 'form changed', 'form_updated');
+        await markNeedsAttention(db, 'u1', 'rejected');
+        await recordAttempt(db, 'u1', 'network');
+        await setAnswers(db, 'u1', { a: 'resurrected' });
+
+        const row = await db.outbox.get('u1');
+        expect(row?.status).toBe('synced');
+        expect(row?.answers).toEqual({});
+        expect(row?.attempts).toBe(0);
+        expect(row?.conflict_code).toBeNull();
+    });
+
+    it('still allows those writes on a row that has NOT been delivered', async () => {
+        // The guard must not make the ordinary lifecycle a no-op.
+        await enqueue(db, input('u1'));
+
+        await recordAttempt(db, 'u1', 'network');
+        await markConflict(db, 'u1', 'form changed', 'form_updated');
+
+        expect((await db.outbox.get('u1'))?.status).toBe('conflict');
+        expect((await db.outbox.get('u1'))?.attempts).toBe(1);
     });
 });

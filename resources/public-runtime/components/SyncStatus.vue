@@ -2,8 +2,9 @@
 /**
  * The offline sync surface (Increment G8b, rebuilt in I10d). Mounted at APP level — not inside a fill
  * session — so it is visible from every screen of the installed PWA, which is what `docs/ux/
- * form-filling-ux-flow.md` §7.3.1 asks for and what makes the confirmation screen the place a respondent
- * naturally looks after submitting.
+ * form-filling-ux-flow.md` §7.1 asks for ("visible from the form's own completion/home view") and §7.3
+ * reinforces with its persistent, non-modal banner. The confirmation screen is exactly where a respondent
+ * looks after submitting, and it is exactly where a session-scoped surface could not appear.
  *
  * Three things changed in I10d, each because the old shape stated or implied something untrue:
  *
@@ -53,7 +54,11 @@ function responses(n: number): string {
 
 const summary = computed(() => {
     if (unsent.value === 0) {
-        return 'Everything on this device has been sent.';
+        // "Everything has been sent" is FALSE for a first-time visitor who has sent nothing — and this surface
+        // now renders on their very first screen. Distinguish the two empty cases.
+        return rows.value.length === 0
+            ? 'Nothing is waiting to be sent from this device.'
+            : 'Everything on this device has been sent.';
     }
 
     const base = `${responses(unsent.value)} on this device ${unsent.value === 1 ? 'has' : 'have'} not been sent yet.`;
@@ -86,7 +91,7 @@ function onDiscard(uuid: string): void {
         <div class="sync-status__bar">
             <MdsBadge v-if="pending > 0" variant="neutral" :label="`${pending} queued`" />
             <MdsBadge v-if="needsAttention > 0" variant="warning" :label="`${needsAttention} failed`" />
-            <MdsBadge v-if="conflict > 0" variant="info" :label="`${conflict} need review`" />
+            <MdsBadge v-if="conflict > 0" variant="info" :label="`${conflict} ${conflict === 1 ? 'needs' : 'need'} review`" />
 
             <MdsButton size="sm" variant="secondary" :loading="syncing" @click="sync.syncNow()">
                 {{ syncing ? 'Syncing…' : 'Sync now' }}
@@ -127,7 +132,7 @@ function onDiscard(uuid: string): void {
             :slug="sync.slug"
             :reviewing-uuid="reviewingUuid"
             @retry="onRetry"
-            @review="reviewConflicts?.()"
+            @review="(uuid: string) => reviewConflicts?.(uuid)"
             @discard="onDiscard"
         />
 

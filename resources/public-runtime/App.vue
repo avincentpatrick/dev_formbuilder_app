@@ -282,8 +282,9 @@ function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): vo
 // Increment G8c — open the review UX for the oldest parked conflict on this form: re-mint the token, re-fetch
 // the current published schema, and re-mount the fill session seeded with the saved answers (re-mapped onto the
 // new schema; a fresh client_submission_uuid is minted by the store). The user reviews and resubmits (or discards).
-async function beginConflictReview(): Promise<void> {
-    const row = await syncOutbox.nextConflict();
+async function beginConflictReview(uuid?: string): Promise<void> {
+    // Named row first (the per-row Review button), else the oldest (the banner's Review).
+    const row = uuid === undefined ? await syncOutbox.nextConflict() : await syncOutbox.conflictRow(uuid);
     if (row === null) {
         await syncOutbox.refresh();
         return;
@@ -353,9 +354,11 @@ function onRestart(): void {
 <template>
     <!--
         I10d — the sync surface is mounted HERE, above the phase machine, not inside RuntimeSession.
-        `docs/ux/form-filling-ux-flow.md` §7.3.1 asks for a persistent, non-modal banner visible from ANY
-        screen inside the PWA; mounted in the session it vanished on exactly the screens a respondent looks
-        at after submitting (confirmation), when a form is unavailable, and while one is still loading.
+        `docs/ux/form-filling-ux-flow.md` §7.1 puts the list "inside the installed PWA — visible from the
+        form's own completion/home view", and §7.3 asks for a persistent, non-modal banner. Mounted inside the
+        fill session this vanished on exactly the screen §7.1 names — the confirmation — as well as when a
+        form is unavailable and while one is loading. (The cited section is §7.1/§7.3; an earlier version of
+        this comment cited a §7.3.1 that does not exist.)
 
         The wrapper is a flex COLUMN and the phase panels below became `flex: 1`, replacing the three
         `min-height: 100vh` rules that each assumed they owned the viewport. Without that, putting anything
@@ -363,8 +366,10 @@ function onRestart(): void {
         `assertClean` would NOT have caught, since it asserts horizontal overflow only.
     -->
     <div class="app-shell">
-        <OfflineIndicator v-if="!online" />
-        <SyncStatus />
+        <div class="app-shell__banner">
+            <OfflineIndicator v-if="!online" />
+            <SyncStatus />
+        </div>
 
         <div v-if="phase === 'loading'" class="app-state">
             <MdsSpinner size="lg" label="Loading form" />
@@ -413,6 +418,21 @@ function onRestart(): void {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+}
+
+/*
+ * The promoted surface has to line up with the runtime's own column, not span the viewport. Both used to
+ * render inside RuntimeShell's notice slot, i.e. inside its centred 44rem column with its padding; hoisted
+ * to a bare flex child they became full-bleed and the offline pill sat against the screen edge.
+ */
+.app-shell__banner {
+    width: 100%;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: var(--mds-space-3) var(--mds-space-4) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-2);
 }
 
 .app-state {

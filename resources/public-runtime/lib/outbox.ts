@@ -93,7 +93,7 @@ async function deleteRow(db: MeridianDb, uuid: string): Promise<void> {
 /** Flag a genuine concurrent-edit conflict (409) for manual resolution (the G8c UX consumes this state). The
  *  `code` records which 409 parked it so the resolve notice can distinguish drift from a server-copy conflict. */
 export function markConflict(db: MeridianDb, uuid: string, error: string, code: string | null = null): Promise<number> {
-    return patch(db, uuid, { status: 'conflict', last_error: error, conflict_code: code });
+    return patchUnsent(db, uuid, { status: 'conflict', last_error: error, conflict_code: code });
 }
 
 /** Conflict rows awaiting the G8c review UX, oldest-first; scoped to one form's `slug` when given (the
@@ -105,20 +105,20 @@ export async function listConflicts(db: MeridianDb, slug?: string): Promise<Outb
 
 /** Flag a row a human must look at: a rejected payload (422), or 5 exhausted retries. Never auto-retried. */
 export function markNeedsAttention(db: MeridianDb, uuid: string, error: string): Promise<number> {
-    return patch(db, uuid, { status: 'needs_attention', last_error: error });
+    return patchUnsent(db, uuid, { status: 'needs_attention', last_error: error });
 }
 
 /** Record a failed network attempt, keeping the row `pending`. Returns the new attempt count for escalation. */
 export async function recordAttempt(db: MeridianDb, uuid: string, error: string): Promise<number> {
     const row = await db.outbox.get(uuid);
     const attempts = (row?.attempts ?? 0) + 1;
-    await patch(db, uuid, { attempts, last_error: error });
+    await patchUnsent(db, uuid, { attempts, last_error: error });
     return attempts;
 }
 
 /** Rewrite a queued row's answers (used to swap `local:` media placeholders for real attachment ids at replay). */
 export function setAnswers(db: MeridianDb, uuid: string, answers: OutboxRow['answers']): Promise<number> {
-    return patch(db, uuid, { answers: plainClone(answers) });
+    return patchUnsent(db, uuid, { answers: plainClone(answers) });
 }
 
 /** Return a pending row to `pending` for a manual retry (from the "needs attention" banner). */
@@ -231,4 +231,32 @@ export async function counts(db: MeridianDb): Promise<OutboxCounts> {
 
 async function patch(db: MeridianDb, uuid: string, changes: Partial<OutboxRow> & { status?: OutboxStatus }): Promise<number> {
     return db.outbox.update(uuid, { ...changes, updated_at: new Date().toISOString() });
+}
+
+/**
+ * ⚠️ A DELIVERED ROW IS TERMINAL, AND THIS GUARD REPLACES ONE THAT USED TO BE FREE.
+ *
+ * Before I10d, `markSynced()` DELETED the row, so any late write from a second replay context — the service
+ * worker and a tab both draining, or two tabs — hit a missing key and Dexie's `update()` changed nothing.
+ * Deletion was doing concurrency work nobody had written down. Retention removes it: the row now survives,
+ * and `markConflict`/`markNeedsAttention`/`recordAttempt`/`setAnswers` would happily move a delivered,
+ * SCRUBBED row back to `conflict` or `needs_attention` — where it is retryable, with `answers: {}`. The
+ * respondent would then be offered "Retry now" on a submission the server already has, and a retry would
+ * POST an empty payload.
+ *
+ * `inFlight`/`rowsInFlight` in replay.ts cannot help: both are module-level, so they are per-JS-context and
+ * do not span the tab↔service-worker boundary. The guard has to live at the write.
+ */
+async function patchUnsent(
+    db: MeridianDb,
+    uuid: string,
+    changes: Partial<OutboxRow> & { status?: OutboxStatus },
+): Promise<number> {
+    const row = await db.outbox.get(uuid);
+
+    if (row === undefined || row.status === 'synced') {
+        return 0;
+    }
+
+    return patch(db, uuid, changes);
 }

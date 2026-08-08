@@ -19,7 +19,7 @@
  * An inline two-step keeps the reference on screen, needs no portal, and moves focus to the SAFE control.
  */
 import { computed, nextTick, ref } from 'vue';
-import { MdsBadge, MdsButton, MdsEmptyState, MdsSpinner } from '@meridian/design-system';
+import { MdsBadge, MdsButton, MdsSpinner } from '@meridian/design-system';
 import { describeRow, type OutboxItemView } from '../lib/outbox-status';
 import type { OutboxRow } from '../lib/db';
 
@@ -39,7 +39,7 @@ const emit = defineEmits<{
 }>();
 
 const confirming = ref<string | null>(null);
-const keepButton = ref<HTMLElement | null>(null);
+const root = ref<HTMLElement | null>(null);
 
 const items = computed<OutboxItemView[]>(() =>
     props.rows
@@ -55,11 +55,24 @@ const items = computed<OutboxItemView[]>(() =>
         ),
 );
 
+/**
+ * Move focus to the SAFE control, never the destructive one — an accidental Enter must not destroy anything.
+ *
+ * ⚠️ QUERIED FROM THE DOM, NOT VIA A TEMPLATE REF, AND THE FIRST VERSION OF THIS WAS DEAD CODE. A
+ * `ref="keepButton"` on a component INSIDE a `v-for` compiles with `ref_for: true`, so Vue assigns an ARRAY
+ * rather than the element — and even unwrapped it would be an `MdsButton` component instance, which exposes
+ * no `focus()`. `keepButton.value?.focus()` was therefore either a no-op or a TypeError, and the docblock
+ * claiming focus moved was false. The adversarial review caught it; nothing in the suite could, because the
+ * assertion was on the emitted event rather than on `document.activeElement`.
+ */
+async function focusSafeControl(): Promise<void> {
+    await nextTick();
+    root.value?.querySelector<HTMLElement>('[data-outbox-keep]')?.focus();
+}
+
 async function askDiscard(uuid: string): Promise<void> {
     confirming.value = uuid;
-    // Focus the SAFE control, never the destructive one — an accidental Enter must not destroy anything.
-    await nextTick();
-    keepButton.value?.focus();
+    await focusSafeControl();
 }
 
 function cancelDiscard(): void {
@@ -70,17 +83,25 @@ function confirmDiscard(uuid: string): void {
     confirming.value = null;
     emit('discard', uuid);
 }
+
+/**
+ * Escape cancels the confirm rather than leaving it armed — the same affordance a dialog would give, which
+ * is part of why an inline two-step is an acceptable substitute for one here.
+ */
+function onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && confirming.value !== null) {
+        event.stopPropagation();
+        cancelDiscard();
+    }
+}
 </script>
 
 <template>
-    <div class="outbox">
-        <MdsEmptyState
-            v-if="items.length === 0"
-            headline="Nothing waiting"
-            description="Responses you finish while offline appear here until they are sent."
-        />
-
-        <ul v-else class="outbox__list">
+    <div ref="root" class="outbox" @keydown="onKeydown">
+        <!-- No empty state here. SyncStatus only mounts this when there ARE rows, and `items` additionally
+             filters out the row under review — so an empty `items` means "your only submission is the one you
+             are reviewing", where "Nothing waiting" would be both wrong and an <h3> above the page's <h1>. -->
+        <ul v-if="items.length > 0" class="outbox__list">
             <li v-for="item in items" :key="item.uuid" class="outbox__item">
                 <div class="outbox__head">
                     <MdsBadge :variant="item.variant" :label="item.label" />
@@ -96,7 +117,7 @@ function confirmDiscard(uuid: string): void {
 
                 <div v-if="confirming === item.uuid" class="outbox__actions">
                     <span class="outbox__confirm">Discard this response? It cannot be recovered.</span>
-                    <MdsButton ref="keepButton" size="sm" variant="secondary" @click="cancelDiscard">
+                    <MdsButton data-outbox-keep size="sm" variant="secondary" @click="cancelDiscard">
                         Keep it
                     </MdsButton>
                     <MdsButton size="sm" variant="destructive" @click="confirmDiscard(item.uuid)">
@@ -105,11 +126,12 @@ function confirmDiscard(uuid: string): void {
                 </div>
 
                 <div v-else class="outbox__actions">
+                    <!-- No `:disabled="item.isSyncing"`: a syncing row is projected as the Syncing state,
+                         which sets canRetry false, so the guard was unreachable. -->
                     <MdsButton
                         v-if="item.canRetry"
                         size="sm"
                         variant="secondary"
-                        :disabled="item.isSyncing"
                         @click="emit('retry', item.uuid)"
                     >
                         Retry now

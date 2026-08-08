@@ -61,7 +61,10 @@ describe('SyncStatus', () => {
 
         expect(wrapper.find('.sync-status').exists()).toBe(true);
         expect(wrapper.text()).toContain('Sync now');
-        expect(wrapper.text()).toContain('Everything on this device has been sent.');
+        // A first-time visitor has sent NOTHING, and this surface now renders on their very first screen —
+        // so "Everything on this device has been sent" would be a false claim. The two empty cases are
+        // distinguished (found by the adversarial review; the earlier assertion pinned the false one).
+        expect(wrapper.text()).toContain('Nothing is waiting to be sent from this device.');
         // The BAR is always on; the LIST is not. The doc requires the action, not a "Nothing waiting" panel
         // above every screen of a first online visit.
         expect(wrapper.find('.outbox').exists()).toBe(false);
@@ -98,6 +101,31 @@ describe('SyncStatus', () => {
         const regions = wrapper.findAll('[aria-live]');
         expect(regions).toHaveLength(1);
         expect(regions[0].text()).toContain('MER-ABC123');
+        wrapper.unmount();
+    });
+
+    it('FORWARDS the clicked row’s uuid to the review handler', async () => {
+        // The bug: `@review="reviewConflicts?.()"` dropped the payload, so the resolver fell back to the
+        // OLDEST conflict while the list renders newest-first. The child's emit was tested; the parent's
+        // BINDING was not, and the mutation that re-drops the uuid survived until this case existed.
+        const review = vi.fn();
+        const sync = fakeSync({ conflict: 2, conflictHere: 2 });
+        sync.rows.value = [
+            outboxRow({ client_submission_uuid: 'newer', status: 'conflict' }),
+            outboxRow({ client_submission_uuid: 'older', status: 'conflict' }),
+        ];
+
+        const wrapper = mount(SyncStatus, {
+            global: { provide: { [SyncOutboxKey as symbol]: sync, [ConflictReviewKey as symbol]: review } },
+        });
+
+        await wrapper
+            .findAll('.outbox__item')[1]
+            .findAll('button')
+            .find((b) => b.text() === 'Review')
+            ?.trigger('click');
+
+        expect(review).toHaveBeenCalledWith('older');
         wrapper.unmount();
     });
 

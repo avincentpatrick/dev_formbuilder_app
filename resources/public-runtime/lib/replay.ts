@@ -138,14 +138,21 @@ async function sendRow(
     rowsInFlight.add(uuid);
     hooks.onRowStart?.(uuid);
 
+    let outcome: RowOutcome | null = null;
+
     try {
-        const outcome = await replayRow(db, fetchFn, row, schemas);
-        hooks.onRowSettled?.(uuid, outcome);
+        outcome = await replayRow(db, fetchFn, row, schemas);
 
         return outcome;
     } finally {
-        // `finally`, so a thrown error cannot strand a row as permanently "sending" in the UI.
+        // BOTH in the `finally`, and the second one is the whole point. `rowsInFlight` is this module's own
+        // bookkeeping; the thing the RESPONDENT sees is `syncingUuids` in useSyncOutbox, which is driven by
+        // `onRowSettled`. Leaving that inside the `try` meant a throw out of replayRow — a Dexie failure, a
+        // fetch that rejects rather than resolving, anything not caught as an ApiError — left the row
+        // rendering "Sending…" forever with every action hidden behind `isSyncing`. `retry` is the honest
+        // outcome for an unfinished attempt: the row is still pending and the next pass will take it.
         rowsInFlight.delete(uuid);
+        hooks.onRowSettled?.(uuid, outcome ?? 'retry');
     }
 }
 

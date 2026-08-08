@@ -53,6 +53,8 @@ export interface SyncOutbox {
     retryOne(uuid: string): Promise<void>;
     /** The oldest unresolved conflict row for this form (Increment G8c), or null — feeds the review UX. */
     nextConflict(): Promise<OutboxRow | null>;
+    /** ONE conflict row on this form by uuid (I10d) — what the per-row Review button resolves. */
+    conflictRow(uuid: string): Promise<OutboxRow | null>;
     /** Drop a row (and its queued media), then refresh the counts. */
     discardSubmission(uuid: string): Promise<void>;
     /** Best-effort: register a Background-Sync tag (no-tab replay) + nudge the active worker to replay now. */
@@ -136,11 +138,14 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         conflict.value = c.conflict;
         rows.value = await listSubmissions(db);
 
-        // Derived from the row list rather than a second indexed count: conflict rows are NEVER pruned, so
-        // the list is exhaustive for this status and cannot disagree with `counts()`.
-        conflictHere.value = rows.value.filter(
-            (row) => row.status === 'conflict' && (options.slug === undefined || row.slug === options.slug),
-        ).length;
+        // ⚠️ FROM AN INDEXED QUERY, NOT FROM `rows`. Deriving it by filtering the list was wrong and the
+        // comment that justified it ("the list is exhaustive for this status") was false: `listSubmissions`
+        // caps at 50 newest-by-created_at across ALL statuses, so on a device carrying a field day's queue an
+        // older conflict falls outside the window. `conflict` comes from an unbounded indexed count, so the
+        // two disagreed — and SyncStatus turns that disagreement into both the Review CTA's visibility AND a
+        // sentence claiming the conflict belongs to another form. The respondent would be told to look
+        // somewhere else for a row that is right here and that they cannot reach.
+        conflictHere.value = (await listConflicts(db, options.slug)).length;
 
         await checkQuota();
     }
@@ -158,9 +163,12 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
                 // respondent something is wrong without telling them what syncing would buy back.
                 const queued = pending.value + needsAttention.value + conflict.value;
                 const used = Math.round(usage / MB);
+                // `usage` is the ORIGIN's total, not the queue's — it includes cached shells, schemas and
+                // media. Saying "N queued, using X MB" would attribute all of it to the queue; the two facts
+                // are reported side by side instead.
                 quotaWarning.value =
-                    `Storage is ${Math.round((usage / quota) * 100)}% full — ` +
-                    `${queued} response${queued === 1 ? '' : 's'} queued, using about ${used} MB. Sync soon to free space.`;
+                    `This site is using about ${used} MB, ${Math.round((usage / quota) * 100)}% of what the browser allows. ` +
+                    `${queued} response${queued === 1 ? '' : 's'} waiting to send — sync soon to free space.`;
             } else {
                 quotaWarning.value = null;
             }
@@ -202,6 +210,16 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
     async function nextConflict(): Promise<OutboxRow | null> {
         const conflicts = await listConflicts(db, options.slug);
         return conflicts[0] ?? null;
+    }
+
+    async function conflictRow(uuid: string): Promise<OutboxRow | null> {
+        const row = await db.outbox.get(uuid);
+
+        // Slug-checked, not just status-checked: the resolver reuses a share-token client bound to ONE form,
+        // so handing it a foreign row would re-mint against the wrong slug.
+        return row !== undefined && row.status === 'conflict' && (options.slug === undefined || row.slug === options.slug)
+            ? row
+            : null;
     }
 
     async function discardSubmission(uuid: string): Promise<void> {
@@ -267,6 +285,7 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         retryNeedsAttention,
         retryOne,
         nextConflict,
+        conflictRow,
         discardSubmission,
         registerBackgroundSync,
         dispose,

@@ -89,7 +89,16 @@ export function describeRow(row: OutboxRow, syncing: boolean, reviewableHere: bo
     switch (row.status) {
         case 'pending':
             return row.attempts > 0
-                ? { ...view, variant: 'warning', label: 'Retrying', detail: 'Couldn’t send yet — we’ll keep trying.' }
+                ? {
+                      ...view,
+                      variant: 'warning',
+                      label: 'Retrying',
+                      detail: 'Couldn’t send yet — we’ll keep trying.',
+                      // §7.3's "Retry now" is specified to BYPASS the exponential backoff, and the backoff state is
+                      // exactly this one. Offering it only on `needs_attention` would put the action
+                      // everywhere except the place the spec named it for.
+                      canRetry: true,
+                  }
                 : { ...view, detail: 'Saved on this device — will send when you’re back online.' };
 
         case 'needs_attention':

@@ -142,6 +142,7 @@ export function fakeSync(over: Counts = {}, slug = 'clinic-intake'): SyncOutbox 
         retryNeedsAttention: vi.fn(async () => {}),
         retryOne: vi.fn(async () => {}),
         nextConflict: vi.fn(async () => null),
+        conflictRow: vi.fn(async () => null),
         discardSubmission: vi.fn(async () => {}),
         registerBackgroundSync: vi.fn(),
         dispose: vi.fn(),

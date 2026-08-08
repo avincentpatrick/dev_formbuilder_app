@@ -97,9 +97,16 @@ it('leaves the worker clean after a job that THREW', function (): void {
     // until I10b the fixture could fail in Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts() BEFORE
     // handle() ran. On that path nothing throws, no tenant context is ever established, and the assertion
     // below passes for completely the wrong reason — so the §D4 mutant-killer was intermittently proving
-    // nothing, silently, and could never go red to say so. Asserting the job actually reached failed_jobs
-    // is what makes the real assertion non-vacuous.
-    expect(DB::table('failed_jobs')->count())->toBe(1);
+    // nothing, silently, and could never go red to say so.
+    //
+    // ⚠️ IT ASSERTS THE EXCEPTION, NOT THE ROW COUNT, AND THE DIFFERENCE IS THE WHOLE POINT. Both paths
+    // write exactly one `failed_jobs` row — the pre-flight `failJob()` raises `JobFailed` just as the throw
+    // path does, and `WorkCommand::listenForEvents()` logs either one. So `count() === 1` would be
+    // satisfied by the vacuous case it was added to exclude. Only the exception's CONTENT distinguishes
+    // "handleForTenant() threw" from "the worker failed the job without ever running it".
+    $failed = DB::table('failed_jobs')->first();
+    expect($failed)->not->toBeNull()
+        ->and($failed->exception)->toContain('Deliberate failure from ExplodingTenantJob');
 
     // MUTANT KILLED: binding the after-edge to JobProcessed — which is what ADR-0007 §D4 literally
     // prescribes. Worker::process raises JobProcessed only on the success path and diverts to

@@ -47,6 +47,11 @@ use RuntimeException;
  * this fixture was the only override in the tree — so real jobs fail through `$maxExceptions`, not
  * through an expired retry window.
  *
+ * The six hours are pinned in `phpunit.xml` (`QUEUE_FAIRNESS_RETRY_WINDOW_HOURS`, forced), because
+ * `config/queue-fairness.php` reads it from env with no floor: without the pin, setting that variable
+ * to 0 anywhere — a CI image, a shared `.env`, a `docker exec -e` while draining a queue — would
+ * restore the flake across the whole suite without touching a line of PHP.
+ *
  * ⚠️ This override MASKS one mutation: changing `TenantAwareJob::$maxExceptions`'s default from 3 is
  * invisible here. `DatabaseWorkerPipelineTest`'s `expect($payload['maxExceptions'])->toBe(3)` on
  * `ProbeTenantJob` is the surviving guard for that default — do not delete it as redundant.

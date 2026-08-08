@@ -186,12 +186,14 @@ it('records a failed job in failed_jobs rather than losing it', function (): voi
 
     $failed = DB::table('failed_jobs')->first();
 
-    expect($failed->queue)->toBe(QueueName::Submissions->value)
-        ->and($failed->exception)->toContain('Deliberate failure from ExplodingTenantJob')
-        // I10b: the negative half, so the old flake cannot come back quietly. When the pre-flight
-        // retryUntil check fired instead of handle(), this row carried the FRAMEWORK's exception and the
-        // assertion above failed as an opaque substring miss. Naming the wrong exception makes a
-        // regression legible at a glance instead of sending the next reader to Worker.php to work out why
-        // a green test went red on a tree that changed nothing but a markdown file.
-        ->and($failed->exception)->not->toContain('MaxAttemptsExceededException');
+    expect($failed->queue)->toBe(QueueName::Submissions->value);
+
+    // I10b: the named-regression check, and it goes FIRST deliberately. When the pre-flight retryUntil
+    // check fires instead of handle(), this row carries the FRAMEWORK's exception — and a `expect()->and()`
+    // chain throws on its first failure, so ordering the positive assertion ahead of this one would leave
+    // this line unreachable in the only scenario it exists for, handing the next reader exactly the opaque
+    // substring miss it is meant to replace. Separate statements rather than a chain, so the order is a
+    // decision on the page rather than an accident of formatting.
+    expect($failed->exception)->not->toContain('MaxAttemptsExceededException');
+    expect($failed->exception)->toContain('Deliberate failure from ExplodingTenantJob');
 });

@@ -24,6 +24,23 @@
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <!--
+            Pin the queue fairness retry window (Increment I10b), for the same reason CENTRAL_DOMAIN below
+            is pinned: it is an invariant of the suite, not a knob.
+
+            `TenantAwareJob::retryUntil()` stamps `now() + retry_window_hours` into every job payload at
+            DISPATCH, and `Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts()` compares that to wall-clock
+            BEFORE `fire()` runs. At a 0-hour window the two reads must land in the same second or the
+            worker fails the job without ever executing it — which is precisely the load-dependent flake
+            I10b removed from `ExplodingTenantJob`. `config/queue-fairness.php` reads
+            QUEUE_FAIRNESS_RETRY_WINDOW_HOURS from env with no floor, and `.env.example` advertises it as
+            tunable, so an ops-side change (draining a stuck queue, a CI image tweak) could reintroduce that
+            flake across the whole suite WITHOUT touching a line of PHP, and nothing would catch it.
+
+            `force` because a stray `docker exec -e` must not be able to reintroduce it either. NO
+            BEHAVIOUR CHANGE: 6 is already the config default.
+        -->
+        <env name="QUEUE_FAIRNESS_RETRY_WINDOW_HOURS" value="6" force="true"/>
+        <!--
             Pin the tenancy central domain for the test suite, the same way DB_DATABASE below pins the
             database. Every host-based test drives `http://{slug}.meridian.test/...`, and stancl's
             identification middleware rejects any host that does not end with a `tenancy.central_domains`

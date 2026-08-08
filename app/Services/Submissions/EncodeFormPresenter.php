@@ -55,7 +55,8 @@ use Illuminate\Support\Collection;
  *    mounts the SAME `createFormRuntime()` on it, so the two channels' step lists are equal BY CONSTRUCTION
  *    rather than by a hand-copied predicate list.
  *  - `version.now`, the session clock, stamped ONCE by the server (see {@see clock()}).
- *  - `steps`, this version's projection under an EMPTY answer document, via {@see StepProjection}. Doc #27 §9
+ *  - `steps`, this version's projection under the answer document being presented — EMPTY on the create page,
+ *    the draft's own answers on a resume (Increment I9b) — via {@see StepProjection}. Doc #27 §9
  *    and the `StepProjection` docblock both name `EncodeFormPresenter` as the class that must consume it.
  *
  * `blocks` STAYS, and the duplication it carries is recorded rather than quietly tolerated: `geo()`,
@@ -106,26 +107,37 @@ final class EncodeFormPresenter
     ) {}
 
     /**
+     * `$draft` hydrates the page from a saved draft (Increment I9b). It is an OPTIONAL THIRD PARAMETER WITH A
+     * DEFAULT on purpose: every existing caller and every existing test compiles unchanged, which is what
+     * keeps the resume feature from being a rewrite of the create page. Pass null (or omit) for the blank
+     * keying form. I9c will pass a finalized submission through the same seam for the edit surface.
+     *
      * @return array<string, mixed>
      */
-    public function present(Form $form, FormVersion $version): array
+    public function present(Form $form, FormVersion $version, ?Submission $draft = null): array
     {
         $sections = $version->sections()->orderBy('sequence')->get();
         $allFields = $version->fields()->orderBy('sequence')->get();
         $fields = $allFields
             ->reject(fn (FormField $f): bool => in_array($f->field_type, self::OMITTED, true));
 
-        // Increment H6a — piping (Doc #26 §3.4). This page serves a BLANK keying form: there is no
-        // submission and therefore no answer document, so every hole renders as the empty string. That is
-        // the contract, not a shortfall — a hole is never emitted as the raw `${key}` token, and §8 records
-        // the same narrowing for a printed OCR form ("prose with a gap", not a substitution).
+        // Increment H6a — piping (Doc #26 §3.4). ~~This page serves a BLANK keying form: there is no
+        // submission and therefore no answer document, so every hole renders as the empty string.~~
+        // AMENDED IN I9b, because the premise stopped being true rather than the rule changing: the page now
+        // ALSO serves a saved draft, and when it does, the stored answers are what the piping renderer reads,
+        // exactly as `SubmissionInboxPresenter` reads them for the detail view. On the blank form the
+        // behaviour is unchanged and every hole still renders as the empty string. In both cases a hole is
+        // never emitted as the raw `${key}` token, and §8 records the same narrowing for a printed OCR form
+        // ("prose with a gap", not a substitution).
         //
         // Note that `OMITTED` still drops `calculated`, which IS a pipeable SOURCE per §3.1. That is fine:
         // a source need not have a row on this page for its consumer's label to be correct, and the source
         // map is built from EVERY field for exactly that reason — including the ones with no row.
         // (Increment H7 un-omitted `hidden`; `calculated` remains omitted.)
         $sources = TemplateSources::fromFields($allFields);
-        $answers = [];
+        $stored = data_get($draft, 'answers.answers');
+        /** @var array<string, mixed> $answers */
+        $answers = is_array($stored) ? $stored : [];
 
         /** @var Collection<string, Collection<int, FormField>> $bySection */
         $bySection = $fields->groupBy(fn (FormField $f): string => $f->form_section_id ?? '');
@@ -202,9 +214,26 @@ final class EncodeFormPresenter
                 'now' => $now,
             ],
             'blocks' => $blocks,
-            // Increment H21c — the step list under an EMPTY answer document: the first paint, and the value
-            // the parity suite and the PDF cross-check compare.
-            'steps' => $this->steps($version, $sections, $allFields, $now),
+            // Increment H21c — the step list at first paint, and the value the parity suite and the PDF
+            // cross-check compare. I9b threads `$answers` through: under an empty document this is byte-
+            // identical to before, but on a RESUME the projection must be computed under the draft's own
+            // answers or the server's first paint shows the empty-document step list while the store
+            // immediately recomputes a different one — a visible one-frame flip on every resume, and a
+            // silent divergence from the parity contract.
+            'steps' => $this->steps($version, $sections, $allFields, $now, $answers),
+            // The draft being resumed, or null on the blank keying form. ONE nullable object rather than
+            // five scalars, so the Vue prop block grows by exactly one entry and `draft === null` is the
+            // single test for "am I in create mode".
+            'draft' => $draft === null ? null : [
+                'id' => $draft->id,
+                'client_submission_uuid' => $draft->client_submission_uuid,
+                'answers' => $answers,
+                'current_step' => $draft->draft_current_step,
+                'completeness_percent' => $draft->completeness_percent,
+                'last_saved_at' => $draft->last_saved_at?->toIso8601String(),
+                'expires_at' => $draft->draft_expires_at?->toIso8601String(),
+            ],
+            'draft_url' => route('forms.submissions.draft', $form),
         ];
     }
 
@@ -225,9 +254,16 @@ final class EncodeFormPresenter
     }
 
     /**
-     * This version's step projection under an empty answer document — the recipe
+     * This version's step projection under `$answers` — the recipe
      * {@see StepGraphInspector::emptyAtOpen()} already uses, reused rather than
      * re-derived.
+     *
+     * `$answers` defaults to `[]`, which is the create page and the pre-I9b behaviour byte for byte, so
+     * `EncodeStepPayloadTest`/`EncodeStepParityTest` are untouched. On a RESUME it carries the draft's own
+     * document, and that is not cosmetic: the store recomputes `visibleSteps` from the restored answers the
+     * instant it mounts, so a server first paint computed under an empty document would flip the step rail
+     * in the first frame and would put the two engines' step lists out of agreement on the one page whose
+     * entire purpose is that they agree.
      *
      * `$allFields` rather than the OMITTED-filtered `$fields`, and the reason is a CONTRACT rather than an
      * observable difference — recorded that way because a mutation proved it. The projection's emptiness
@@ -250,11 +286,12 @@ final class EncodeFormPresenter
      *
      * @param  Collection<int, FormSection>  $sections
      * @param  Collection<int, FormField>  $fields
+     * @param  array<string, mixed>  $answers
      * @return list<array{key: string, section_key: ?string, field_keys: list<string>, is_repeat: bool}>
      */
-    private function steps(FormVersion $version, Collection $sections, Collection $fields, string $now): array
+    private function steps(FormVersion $version, Collection $sections, Collection $fields, string $now, array $answers = []): array
     {
-        $normalized = $this->normalizer->normalize($fields, $sections, []);
+        $normalized = $this->normalizer->normalize($fields, $sections, $answers);
         $result = $this->semantic->validate($version, $normalized, null, $now);
 
         return array_map(

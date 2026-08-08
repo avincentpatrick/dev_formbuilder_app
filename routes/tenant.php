@@ -35,6 +35,7 @@ use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SubmissionController;
+use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
@@ -424,6 +425,23 @@ Route::middleware([
         ->name('forms.submissions.create');
     Route::post('/forms/{form}/submissions', [SubmissionController::class, 'store'])
         ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.store');
+
+    // Save-as-draft for manual encoding (Increment I9b) — PRD Feature #7's last gap. UNGATED twice over, and
+    // both omissions are deliberate: no `feature:save_and_resume` (docs/ux/form-filling-ux-flow.md pins this
+    // as "the one channel never gated behind a paid plan" — losing an hour of transcription is data loss, not
+    // a missing convenience) and no `$form->save_and_resume` check (that column is the author's decision about
+    // RESPONDENTS parking a response, a different question from whether staff may avoid retyping).
+    // Same `can:create` gate as submitting: a draft IS a submissions row, and promoting it is the submission.
+    Route::post('/forms/{form}/submissions/draft', [SubmissionDraftController::class, 'store'])
+        ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.draft');
+
+    // Resume a saved draft — the encode page hydrated with its stored answers. Bound on the SUBMISSION, so
+    // the gate is the bound-model form against a Submission-argument policy method; `promote` is reused
+    // rather than minting a third ability, because "may resume this draft" and "may finalize this draft" are
+    // the same claim. Carries the same OSM tile CSP as the create page — it renders the same geo control.
+    Route::get('/submissions/{submission}/resume', [SubmissionDraftController::class, 'edit'])
+        ->middleware(['can:promote,submission', PublicRuntimeSecurityHeaders::class])
+        ->name('submissions.resume');
 
     // Submissions inbox (Increment F7) — the authenticated read + review + export surface over every pipeline
     // channel. `viewAny`/`view` gate the pages (SubmissionPolicy); row-level visibility (tenant-wide for

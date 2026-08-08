@@ -352,22 +352,39 @@ return Application::configure(basePath: dirname(__DIR__))
         // Reaching here on the guest channel means the form was republished between the token mint and the
         // submit (the guest controller's own current-version check narrows the window; this is the race
         // backstop). Mapped to 409 rather than the generic 500 the missing closure previously produced —
-        // the SPA reloads against the new version. Only the /api/v1 surface; a web (manual-encode) request
-        // is an invariant violation there (the policy requires a published form) and keeps the default.
+        // the SPA reloads against the new version.
+        //
+        // ⚠️ THE WEB ARM EXISTS SINCE I9b, AND ITS ABSENCE WAS ARGUED CORRECTLY UNTIL THEN. The old comment
+        // read: "a web (manual-encode) request is an invariant violation there (the policy requires a
+        // published form) and keeps the default." True while `submit()` was the only web caller — its version
+        // is resolved from `current_published_version_id`, so Stage 2a cannot fail. It is FALSE for
+        // `promote()`, which re-asserts the DRAFT'S PINNED version: a keyer holding a v1 draft while an admin
+        // publishes v2 now reaches this on a real, ordinary flow. Without an arm that is a 500 on a page the
+        // user has just spent ten minutes on.
         $exceptions->render(fn (SubmissionException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage())
-            : null);
+            : back()->with('toast', [
+                'type' => 'error',
+                'message' => 'This form has been updated since the draft was saved, so the draft can no longer be submitted.',
+            ]));
 
         // Submission Pipeline CONTENT conflict (Increment G8c, offline-first-sync-design §5) — the same
         // client_submission_uuid was already persisted with materially DIFFERENT answers (a genuine concurrent
         // edit, not an idempotent replay). A distinct 409 code from submission_version_superseded so the offline
         // client can tell "the form changed" from "another copy of this response already exists"; both route to
         // the same review-and-resubmit UX. The draft save-vs-promote race (H9b) carries its own
-        // `draft_already_finalized` code via SubmissionConflictException::code(). Only /api/v1; a web
-        // (manual-encode) request keeps the default.
+        // `draft_already_finalized` code via SubmissionConflictException::code().
+        //
+        // ⚠️ THE WEB ARM EXISTS SINCE I9b, replacing "Only /api/v1; a web (manual-encode) request keeps the
+        // default." Both causes are now reachable from the encode page: a resumed draft can race its own
+        // promote (`draft_already_finalized`), and Stage 2b went live on this channel the moment it started
+        // sending a `client_submission_uuid` (`submission_conflict` — two tabs on one draft, different
+        // answers). The draft AUTOSAVE endpoint deliberately does NOT rely on this closure: it is a JSON
+        // `fetch`, so it catches locally and returns a typed envelope, because a `back()` redirect is
+        // unreadable to the composable driving it.
         $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, $e->code(), $e->getMessage())
-            : null);
+            : back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]));
 
         // Scheduled-form refusal (Increment H12a) — the form is not accepting a submission right now: not yet
         // open (`form_not_open`), closed past `closes_at` (`form_closed`), or its `max_responses` cap is full

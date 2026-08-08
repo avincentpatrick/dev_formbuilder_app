@@ -27,6 +27,12 @@ final class EncodeSubmissionRequest extends FormRequest
     {
         return [
             'answers' => ['present', 'array'],
+            // NULLABLE here where the draft channel's is `required` (Increment I9b), and the asymmetry is
+            // deliberate: this endpoint must keep working for a direct POST, an old cached page, or any
+            // caller that never opened a draft. When present it does two things — it routes a resumed draft
+            // to `promote()` instead of a second `submit()`, and it makes a double-clicked Submit resolve to
+            // one submission via Stage 2b.
+            'client_submission_uuid' => ['nullable', 'uuid'],
         ];
     }
 
@@ -38,5 +44,12 @@ final class EncodeSubmissionRequest extends FormRequest
         $answers = $this->input('answers', []);
 
         return is_array($answers) ? $answers : [];
+    }
+
+    public function clientSubmissionUuid(): ?string
+    {
+        $uuid = $this->input('client_submission_uuid');
+
+        return is_string($uuid) && $uuid !== '' ? $uuid : null;
     }
 }

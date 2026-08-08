@@ -84,7 +84,7 @@ final class SubmissionDraftService
         $completeness = DraftCompleteness::of($fields, $sections, $normalized);
 
         if ($payload->clientSubmissionUuid !== null) {
-            $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+            $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
             if ($existing !== null) {
                 // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
                 // so a respondent mid-fill is never stranded — no start guard on this branch.
@@ -218,10 +218,31 @@ final class SubmissionDraftService
 
             // The resume cursor moves with each save; `draft_expires_at` is deliberately NOT restamped (a
             // draft's expiry is fixed at creation — the H9a/H10 stamp-once contract the reaper depends on).
+            //
+            // ── I9b CONSIDERED RESTAMPING ON EVERY SAVE AND DECIDED AGAINST IT ─────────────────────────────
+            // The case for restamping is real: `docs/ux/form-filling-ux-flow.md` describes the window as
+            // "inactivity", a keyer or guest actively working on day 29 loses everything on day 30, and
+            // restamping cannot immortalise an ABANDONED draft, because this method is only reached when
+            // somebody is actively saving. I9b makes it likelier to bite, since staff drafts will be more
+            // numerous and longer-lived than guest ones.
+            //
+            // It was rejected on scope, not on merit. Stamp-once is not an unwritten reading here — it is a
+            // deliberate contract with a test named after it ("does not restamp the draft expiry on a later
+            // save (stamp-once)", `GuestDraftRuntimeTest`). Flipping it is a behaviour change to a SHIPPED
+            // GUEST path, made inside an increment about the encode path, and it would land as an amended
+            // assertion in a file I9b otherwise does not touch. Instead I9b makes the deletion VISIBLE rather
+            // than silent — the resume banner names the expiry date — which addresses the failure mode that
+            // actually harms someone (work vanishing without warning) without redefining the window.
+            //
+            // Revisit deliberately, with the guest channel in scope, if a real draft is ever reaped from
+            // under an active keyer. That is the increment where the assertion should be rewritten.
             $row->forceFill([
                 'completeness_percent' => $completeness,
                 'last_saved_at' => now(),
-                'draft_current_step' => $currentStep,
+                // Preserved when the caller sends none (I9b). The submit path builds its payload without a
+                // step, and force-filling null there wiped the resume cursor of any draft whose Submit then
+                // failed Stage 3 — so the keyer was bounced back to step 1 of their own half-finished work.
+                'draft_current_step' => $currentStep ?? $row->draft_current_step,
             ])->save();
 
             return new SubmissionResult($row, created: false);
@@ -277,7 +298,7 @@ final class SubmissionDraftService
             // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
             // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
             if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
-                $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+                $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
                 if ($existing !== null) {
                     return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
                 }
@@ -287,9 +308,32 @@ final class SubmissionDraftService
         }
     }
 
-    private function findByClientUuid(string $uuid): ?Submission
+    /**
+     * Resolve the draft this uuid names, WITHIN one form and one author.
+     *
+     * ⚠️ THE SCOPING IS AUTHORIZATION, NOT TIDINESS (added in I9b). The lookup used to be
+     * `where('client_submission_uuid', $uuid)` alone, which is safe only while every caller's form is pinned
+     * by something the caller cannot choose — true of the guest channel, where the share token fixes the form
+     * and there is no author. It stopped being true the moment an AUTHENTICATED endpoint took the form from
+     * the URL and the uuid from the request body: those are two independent inputs, so a member authorized on
+     * form A could send form B's uuid and have the write land on B's draft, on a form they may hold no grant
+     * on at all. RLS bounds the blast radius to the tenant and no further.
+     *
+     * `$respondentUserId` narrows it again on the encode channel, where a draft genuinely belongs to the
+     * person keying it. Null is the guest case and matches guest rows (`respondent_user_id IS NULL`) — hence
+     * `whereNull`, because `where(col, null)` compiles to `= NULL` and never matches anything.
+     */
+    private function findByClientUuid(string $uuid, string $formId, ?string $respondentUserId): ?Submission
     {
-        return Submission::query()->where('client_submission_uuid', $uuid)->first();
+        return Submission::query()
+            ->where('client_submission_uuid', $uuid)
+            ->where('form_id', $formId)
+            ->when(
+                $respondentUserId === null,
+                fn ($q) => $q->whereNull('respondent_user_id'),
+                fn ($q) => $q->where('respondent_user_id', $respondentUserId),
+            )
+            ->first();
     }
 
     /**

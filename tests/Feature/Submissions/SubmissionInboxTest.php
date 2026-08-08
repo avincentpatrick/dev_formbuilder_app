@@ -184,6 +184,40 @@ it('hides in-progress drafts by default and surfaces them (with completeness) un
             ->where('data.0.completeness_percent', 40));
 });
 
+it('offers resume only on draft rows the viewer may finalize', function (): void {
+    // Increment I9b. Three assertions in one because the interesting part is the CONTRAST: a draft the viewer
+    // may promote, a finalized row (never resumable, whatever the permissions), and a viewer with no claim.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Done']);
+    $draft = seedInboxSubmission($form, $owner, SubmissionStatus::Draft, ['full_name' => 'Partial']);
+    $draft->forceFill(['completeness_percent' => 40, 'last_saved_at' => now()])->save();
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=draft')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', true));
+
+    // A finalized row is never resumable — the route 404s on it, so the button must not be offered either.
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=submitted')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', false));
+
+    // A viewer holds `submissions.view` but no editor capacity, so they may read the draft and not continue it.
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+    enterTenant($tenant->id, $owner->id);
+
+    $this->actingAs($viewer)
+        ->get('http://acme.meridian.test/submissions?status=draft')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', false));
+});
+
 it('lists screened-out submissions in the default view and offers them as a filter', function (): void {
     // I9a. Deliberately the OPPOSITE of the draft rule directly above, and the contrast is the point: a draft
     // was never finalized, so hiding it is a review convenience; a screened-out response WAS finalized and is

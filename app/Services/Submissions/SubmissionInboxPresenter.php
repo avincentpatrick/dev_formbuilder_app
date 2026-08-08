@@ -88,6 +88,17 @@ final class SubmissionInboxPresenter
                 'completeness_percent' => $s->completeness_percent,
                 'last_saved_at' => $s->last_saved_at?->toIso8601String(),
                 'draft_expires_at' => $s->draft_expires_at?->toIso8601String(),
+                // Whether THIS viewer may pick this draft up (Increment I9b).
+                //
+                // ⚠️ EVALUATED ONLY FOR DRAFT ROWS, and that guard is a performance one rather than a
+                // correctness one. `SubmissionPolicy::promote()` consults `ResourceGrantResolver` per row, so
+                // an unguarded call would be 25 grant lookups on every page of the inbox — on a list where
+                // drafts are HIDDEN by default, meaning the common page would pay for 25 answers it never
+                // renders. Short-circuiting on the status keeps the ordinary inbox at zero extra queries and
+                // pays only on the Draft-filtered view, which is the only place the button can appear.
+                'can' => [
+                    'resume' => $s->status === SubmissionStatus::Draft && $user->can('promote', $s),
+                ],
             ])->all(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),

@@ -1,37 +1,21 @@
 <script setup lang="ts">
 /**
- * Ambient "you are offline" pill (Increment G8a), patterned on SavedIndicator.vue. Shown while the device
- * reports offline: the form still renders and autosaves from cache, but submitting is deferred until
- * reconnect. `role="status"` announces the state change once (not on every autosave tick).
+ * Ambient "you are offline" pill (Increment G8a). Shown while the device reports offline: the form still
+ * renders and autosaves from cache, but submitting is deferred until reconnect.
+ *
+ * Rebuilt on `MdsBadge` in I10d (Standing Rule 2 — one shared design system, no exceptions). It had been one
+ * of only two components in the guest runtime hand-rolling its own chrome from raw elements and `--mds-*`
+ * tokens; the conversion deletes all of its scoped CSS and costs no new bytes, because `MdsBadge` was already
+ * pulled into this bundle by the sync surface beside it.
+ *
+ * `role="status"` stays on the wrapper rather than moving inside: it announces the state change once, and
+ * `MdsBadge` is a presentational element with no role of its own to conflict with.
  */
+import { MdsBadge } from '@meridian/design-system';
 </script>
 
 <template>
-    <span class="offline-indicator" role="status">
-        <span class="offline-indicator__dot" aria-hidden="true" />
-        Offline — your answers are saved on this device
+    <span role="status">
+        <MdsBadge variant="neutral" label="Offline — your answers are saved on this device" />
     </span>
 </template>
-
-<style scoped>
-.offline-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mds-space-2);
-    padding: var(--mds-space-1) var(--mds-space-3);
-    border-radius: var(--mds-radius-full);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-caption-font-size);
-    line-height: var(--mds-type-caption-line-height);
-    color: var(--mds-color-text-body);
-    background-color: var(--mds-color-bg-surface);
-    border: 1px solid var(--mds-color-border-default);
-}
-
-.offline-indicator__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-border-strong);
-}
-</style>

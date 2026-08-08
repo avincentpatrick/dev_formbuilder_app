@@ -84,3 +84,66 @@ export function schemaResponse(opts: {
         },
     };
 }
+
+/*
+|--------------------------------------------------------------------------
+| Increment I10d — shared builders for the sync surface.
+|--------------------------------------------------------------------------
+| HERE rather than inside one spec because two component specs need them, and Vitest specs are EXCLUDED from
+| `vue-tsc` (tsconfig.json's `exclude`), so a stale local copy would not fail type-check — it would fail at
+| runtime as "sync.retryOne is not a function", or worse render an empty list and pass green. One fake, one
+| place for it to be stale.
+*/
+
+import { ref } from 'vue';
+import { vi } from 'vitest';
+import type { OutboxRow } from '../lib/db';
+import type { SyncOutbox } from '../composables/useSyncOutbox';
+
+export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
+    return {
+        client_submission_uuid: partial.client_submission_uuid ?? 'u1',
+        slug: partial.slug ?? 'clinic-intake',
+        form_version_id: partial.form_version_id ?? 'ver-1',
+        checksum: partial.checksum ?? 'checksum-abc',
+        answers: partial.answers ?? {},
+        locale: partial.locale ?? 'en',
+        device_id: partial.device_id ?? 'device-1',
+        app_version: partial.app_version ?? '1',
+        submitted_at: partial.submitted_at ?? '2026-08-09T00:00:00.000Z',
+        status: partial.status ?? 'pending',
+        attempts: partial.attempts ?? 0,
+        last_error: partial.last_error ?? null,
+        conflict_code: partial.conflict_code ?? null,
+        server_submission_id: partial.server_submission_id ?? null,
+        synced_at: partial.synced_at ?? null,
+        created_at: partial.created_at ?? '2026-08-09T00:00:00.000Z',
+        updated_at: partial.updated_at ?? '2026-08-09T00:00:00.000Z',
+    };
+}
+
+type Counts = Partial<Record<'pending' | 'needsAttention' | 'conflict' | 'conflictHere', number>>;
+
+export function fakeSync(over: Counts = {}, slug = 'clinic-intake'): SyncOutbox {
+    return {
+        pending: ref(over.pending ?? 0),
+        needsAttention: ref(over.needsAttention ?? 0),
+        conflict: ref(over.conflict ?? 0),
+        conflictHere: ref(over.conflictHere ?? 0),
+        syncing: ref(false),
+        syncingUuids: ref<ReadonlySet<string>>(new Set()),
+        rows: ref<OutboxRow[]>([]),
+        reviewingUuid: ref<string | null>(null),
+        lastAnnouncement: ref(''),
+        quotaWarning: ref<string | null>(null),
+        slug,
+        refresh: vi.fn(async () => {}),
+        syncNow: vi.fn(async () => {}),
+        retryNeedsAttention: vi.fn(async () => {}),
+        retryOne: vi.fn(async () => {}),
+        nextConflict: vi.fn(async () => null),
+        discardSubmission: vi.fn(async () => {}),
+        registerBackgroundSync: vi.fn(),
+        dispose: vi.fn(),
+    };
+}

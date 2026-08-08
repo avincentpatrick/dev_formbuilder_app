@@ -62,7 +62,11 @@ it('rehydrates the encode page from the stored answers', function (): void {
     $this->withoutVite()->actingAs($this->owner)
         ->get("http://acme.meridian.test/submissions/{$draft->id}/resume")
         ->assertInertia(fn ($page) => $page
-            ->component('submissions/Encode')
+            // `false` disables Inertia's page-file existence check, and it is the repo-wide convention for
+            // the same reason `withoutVite()` is: the Pest CI job builds no assets, so the view finder
+            // cannot resolve a page and the assertion fails on Linux while passing on a case-insensitive
+            // dev filesystem. Every other `->component()` call in tests/ passes it.
+            ->component('submissions/Encode', false)
             ->where('draft.id', $draft->id)
             ->where('draft.client_submission_uuid', $draft->client_submission_uuid)
             ->where('draft.answers.full_name', 'Ada Lovelace')
@@ -76,7 +80,7 @@ it('serves the blank create page with a null draft, so the prop is not resume-on
     $this->withoutVite()->actingAs($this->owner)
         ->get("http://acme.meridian.test/forms/{$this->form->id}/submissions/create")
         ->assertInertia(fn ($page) => $page
-            ->component('submissions/Encode')
+            ->component('submissions/Encode', false)
             ->where('draft', null)
             ->has('draft_url'));
 });

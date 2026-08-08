@@ -71,77 +71,16 @@ final class SubmissionDraftController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        // ⚠️ THE EXISTING DRAFT IS RESOLVED HERE, AND ITS VERSION WINS — the same asymmetry
-        // `SubmissionController::store()` carries, which the first draft of THIS file did not.
-        //
-        // `SubmissionDraftService::updateDraft()` writes `form_version_id` and `answers_schema_checksum` onto
-        // the answer row FROM THE PAYLOAD. Resolve the current published version unconditionally and every
-        // autosave tick after a republish writes a head row on v1 with an answer row claiming v2 — plus it
-        // normalises and scores completeness against a schema the draft was never keyed against, so a
-        // renamed or deleted field turns every remaining tick into a 422 the keyer is told is retryable.
-        //
-        // The lookup is scoped to THIS form and THIS user for the reason
-        // `SubmissionDraftService::findByClientUuid()` now argues at length: form and uuid arrive as two
-        // independent inputs on an authenticated endpoint, so an unscoped resolve lets a member authorized on
-        // form A write into form B's draft.
-        $existing = Submission::query()
-            ->where('client_submission_uuid', $request->clientSubmissionUuid())
-            ->where('form_id', $form->id)
-            ->where('respondent_user_id', $user->id)
-            ->where('status', SubmissionStatus::Draft)
-            ->first();
+        // The existing draft and the version to write against, or a typed refusal. Extracted because the
+        // three cases it decides between (resume mine / refuse a foreign uuid / start a new one) are the
+        // controller's real logic, and inlining them pushed store() past the thin-controller gate.
+        $resolved = $this->resolveTarget($request, $form, $user);
 
-        // ⚠️ THE UNIQUENESS DOMAIN IS THE TENANT, NOT THE FORM — `submissions_tenant_client_uuid_unique` is
-        // `(tenant_id, client_submission_uuid)`. So "this uuid is not mine" cannot mean "make a new draft":
-        // the INSERT would violate that index and surface as a 500. It means CONFLICT, and saying so is also
-        // what keeps the scoping above from being bypassable — the refusal is explicit rather than a silent
-        // write into somebody else's row.
-        //
-        // Unreachable from an honest client (the runtime store mints a uuidv7 per session), which is exactly
-        // why it must be handled rather than assumed away.
-        if ($existing === null) {
-            $claimed = Submission::query()
-                ->where('client_submission_uuid', $request->clientSubmissionUuid())
-                ->first(['id', 'form_id', 'respondent_user_id', 'status']);
-
-            if ($claimed !== null) {
-                // Two distinct causes reach here and the composable renders them differently, so they must
-                // not collapse into one code. MINE, on THIS form, but no longer a draft = the two-tab race
-                // (the other tab submitted); anything else = a uuid that was never mine to write to.
-                $mine = $claimed->form_id === $form->id && $claimed->respondent_user_id === $user->id;
-
-                return $mine
-                    ? ApiErrorResponse::make(
-                        409,
-                        'draft_already_finalized',
-                        'This draft has already been submitted and can no longer be saved as a draft.',
-                    )
-                    : ApiErrorResponse::make(
-                        409,
-                        'submission_conflict',
-                        'This draft identifier already belongs to another response.',
-                    );
-            }
+        if ($resolved instanceof JsonResponse) {
+            return $resolved;
         }
 
-        if ($existing !== null) {
-            $version = FormVersion::query()->whereKey($existing->form_version_id)->firstOrFail();
-
-            // A superseded pin is terminal for this draft, and it is reported the way the GUEST channel
-            // reports it rather than as a generic failure: `saveDraft()` would throw
-            // `SubmissionException::versionNotPublished()`, which this controller does not catch and which
-            // the global web arm renders as a redirect the autosave `fetch` cannot read. A typed 409 is what
-            // lets `useServerAutosave` stop permanently and say why.
-            if ($version->status !== FormVersionStatus::Published) {
-                return ApiErrorResponse::make(
-                    409,
-                    'form_updated',
-                    'This form has been updated since the draft was saved, so the draft can no longer be edited.',
-                );
-            }
-        } else {
-            $version = $this->publishedVersion($form);
-        }
+        [$version] = $resolved;
 
         // The tenant's configured draft window; `tenants` is RLS-exempt so this reads under tenant context,
         // and a null column falls back to SubmissionDraftService::DRAFT_TTL_DAYS. Same read the guest
@@ -220,6 +159,76 @@ final class SubmissionDraftController extends Controller
         }
 
         return Inertia::render('submissions/Encode', $presenter->present($form, $version, $submission));
+    }
+
+    /**
+     * Decide what this autosave writes against: the caller's own in-progress draft, or a fresh one.
+     *
+     * ⚠️ THE EXISTING DRAFT'S VERSION WINS, and the first draft of this controller got that wrong.
+     * `SubmissionDraftService::updateDraft()` writes `form_version_id` and `answers_schema_checksum` onto the
+     * answer row FROM THE PAYLOAD. Resolve the currently-published version unconditionally and every tick
+     * after a republish writes a head row on v1 with an answer row claiming v2, normalises against a schema
+     * the draft was never keyed against, and turns a renamed field into a 422 the keyer is told is retryable.
+     *
+     * ⚠️ THE LOOKUP IS SCOPED TO THIS FORM AND THIS USER. On an authenticated endpoint the form comes from
+     * the URL and the uuid from the body — two independent, caller-influenced inputs — so an unscoped resolve
+     * lets a member authorized on form A write into form B's draft. See
+     * {@see SubmissionDraftService::findByClientUuid()} for the same argument at the service layer.
+     *
+     * ⚠️ AND THE UNIQUENESS DOMAIN IS THE TENANT: `submissions_tenant_client_uuid_unique` is
+     * `(tenant_id, client_submission_uuid)`. So "this uuid is not mine" can never mean "create a new draft" —
+     * the INSERT would violate that index and surface as a 500. It is an explicit conflict, and the two causes
+     * are reported separately because the client renders them differently: mine-but-already-submitted is the
+     * two-tab race, anything else was never mine to write to.
+     *
+     * @return array{0: FormVersion}|JsonResponse the version to write against, or the refusal to return
+     */
+    private function resolveTarget(EncodeDraftRequest $request, Form $form, User $user): array|JsonResponse
+    {
+        $uuid = $request->clientSubmissionUuid();
+
+        $existing = Submission::query()
+            ->where('client_submission_uuid', $uuid)
+            ->where('form_id', $form->id)
+            ->where('respondent_user_id', $user->id)
+            ->where('status', SubmissionStatus::Draft)
+            ->first();
+
+        if ($existing !== null) {
+            $version = FormVersion::query()->whereKey($existing->form_version_id)->firstOrFail();
+
+            // A superseded pin is terminal, and it is reported the way the GUEST channel reports it rather
+            // than as a generic failure: `saveDraft()` would throw `SubmissionException::versionNotPublished()`,
+            // which this controller does not catch and whose global web arm is a redirect the autosave
+            // `fetch` cannot read. A typed 409 is what lets the composable stop permanently and say why.
+            return $version->status === FormVersionStatus::Published
+                ? [$version]
+                : ApiErrorResponse::make(
+                    409,
+                    'form_updated',
+                    'This form has been updated since the draft was saved, so the draft can no longer be edited.',
+                );
+        }
+
+        $claimed = Submission::query()
+            ->where('client_submission_uuid', $uuid)
+            ->first(['id', 'form_id', 'respondent_user_id']);
+
+        if ($claimed === null) {
+            return [$this->publishedVersion($form)];
+        }
+
+        return $claimed->form_id === $form->id && $claimed->respondent_user_id === $user->id
+            ? ApiErrorResponse::make(
+                409,
+                'draft_already_finalized',
+                'This draft has already been submitted and can no longer be saved as a draft.',
+            )
+            : ApiErrorResponse::make(
+                409,
+                'submission_conflict',
+                'This draft identifier already belongs to another response.',
+            );
     }
 
     /**

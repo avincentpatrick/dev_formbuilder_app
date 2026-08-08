@@ -36,6 +36,7 @@ use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
+use App\Http\Controllers\Tenant\SubmissionEditController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
@@ -463,6 +464,24 @@ Route::middleware([
     // warrants. Returns a redirect + toast; the artifact arrives by email and on the detail page.
     Route::post('/submissions/{submission}/pdf', [SubmissionInboxController::class, 'generatePdf'])
         ->middleware('can:view,submission')->name('submissions.pdf');
+
+    // Post-submission answer editing (Increment I9c, PRD Feature #12) — correcting a FINALIZED submission's
+    // answers. `can:update,submission` is SubmissionPolicy::update, the first code to consume
+    // `submissions.edit.any/.own` (seeded to Owner/Admin and Form Editor since Phase 0 with nothing behind
+    // them). Note the gate is NOT `can:review`: a Reviewer may decide a submission's outcome and may not
+    // rewrite its answers, which are different powers held by different roles.
+    //
+    // The GET carries the OSM tile CSP for the same reason the create and resume pages do — it renders the
+    // same G5b2 geo control (ADR-0006 D3). The PATCH returns a redirect and needs none.
+    //
+    // Which STATES are editable is not expressed here: a route middleware cannot read the row's status
+    // without a query, and the answer has to be re-asserted under a lock anyway (a reviewer can archive the
+    // row between the page loading and Save). SubmissionAnswerEditService::EDITABLE owns it.
+    Route::get('/submissions/{submission}/edit', [SubmissionEditController::class, 'edit'])
+        ->middleware(['can:update,submission', PublicRuntimeSecurityHeaders::class])
+        ->name('submissions.edit');
+    Route::patch('/submissions/{submission}/answers', [SubmissionEditController::class, 'update'])
+        ->middleware('can:update,submission')->name('submissions.answers.update');
 
     // Attachments (Increment G6) — the shared polymorphic media write path. `store` stages an uploaded file
     // against the form's published version (SubmissionPipeline re-points it to the submission at persist),

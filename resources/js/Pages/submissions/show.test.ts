@@ -54,7 +54,19 @@ const ALL_STATUSES = [
  */
 const SERVER_ARCHIVABLE = ['submitted', 'under_review', 'approved', 'returned'];
 
-function mountAt(status: string, canReview = true) {
+/**
+ * `SubmissionAnswerEditService::EDITABLE`, hand-transcribed under the same caveat as `SERVER_ARCHIVABLE`
+ * above — and with the same compensating lock on the PHP side: `SubmissionAnswerEditTest`'s "accepts exactly
+ * the four finalized non-terminal states" drives the real constant against `SubmissionStatus::cases()`, so
+ * the server's set is pinned to the enum itself and this file pins the client to a transcription of it.
+ *
+ * It happens to equal `SERVER_ARCHIVABLE` today. They are written out separately anyway, because they answer
+ * different questions — "may this be retired" and "may this be corrected" — and collapsing them into one
+ * constant would make a future divergence look like a typo.
+ */
+const SERVER_EDITABLE = ['submitted', 'under_review', 'approved', 'returned'];
+
+function mountAt(status: string, canReview = true, canUpdate = true) {
     return mount(Show, {
         props: {
             submission: {
@@ -73,7 +85,7 @@ function mountAt(status: string, canReview = true) {
                 review: { validator: null, validated_at: null, returned_reason: null, remarks: null },
             },
             blocks: [],
-            can: { review: canReview },
+            can: { review: canReview, update: canUpdate },
             pdf: null,
         },
         global: {
@@ -88,11 +100,25 @@ function mountAt(status: string, canReview = true) {
     });
 }
 
-/** The action-bar button labels currently offered, in DOM order. */
-function offeredActions(status: string): string[] {
-    return mountAt(status)
+/**
+ * The action-bar TRANSITION button labels, in DOM order.
+ *
+ * `:not(a *)` excludes the "Edit answers" affordance (I9c), which is an `MdsButton` wrapped in an Inertia
+ * `<Link>` — a real `<button>` inside an `<a>`. It is navigation, not a transition, and `offeredLinks()`
+ * below is what reads it.
+ */
+function offeredActions(status: string, canReview = true, canUpdate = true): string[] {
+    return mountAt(status, canReview, canUpdate)
         .findAll('header button')
+        .filter((b) => b.element.closest('a') === null)
         .map((b) => b.text().trim());
+}
+
+/** The action-bar LINK labels currently offered, in DOM order — an `<a>` wrapping a button (I9c). */
+function offeredLinks(status: string, canReview = true, canUpdate = true): string[] {
+    return mountAt(status, canReview, canUpdate)
+        .findAll('header a')
+        .map((a) => a.text().trim());
 }
 
 describe('Show.vue — the archive gate (I9a)', () => {
@@ -114,7 +140,46 @@ describe('Show.vue — the archive gate (I9a)', () => {
         expect(offeredActions('under_review')).toEqual(['Return', 'Approve', 'Archive']);
     });
 
-    it('offers nothing at all to a viewer who cannot review', () => {
-        expect(mountAt('submitted', false).findAll('header button')).toHaveLength(0);
+    it('offers nothing at all to a viewer who can neither review nor update', () => {
+        expect(mountAt('submitted', false, false).findAll('header button')).toHaveLength(0);
+    });
+});
+
+/**
+ * Increment I9c — the "Edit answers" gate. Same class of bug as the archive gate above, plus one more: it
+ * hangs off a DIFFERENT permission. `can.update` is `submissions.edit.any/.own`, which a Reviewer does not
+ * hold — folding it into `can.review` would hand every Reviewer the power to rewrite the answers they are
+ * meant to be judging.
+ */
+describe('Show.vue — the edit-answers gate (I9c)', () => {
+    it('offers Edit answers for exactly the statuses the server will accept', () => {
+        const offered = ALL_STATUSES.filter((s) => offeredLinks(s).includes('Edit answers'));
+
+        expect([...offered]).toEqual(SERVER_EDITABLE);
+    });
+
+    it('never offers Edit answers on a screened-out or archived submission', () => {
+        // The two the service refuses by name, each for its own reason: a screened-out row has no answers to
+        // correct and consumes no capacity slot; an archived one is deliberately terminal.
+        expect(offeredLinks('screened_out')).not.toContain('Edit answers');
+        expect(offeredLinks('archived')).not.toContain('Edit answers');
+    });
+
+    it('never offers Edit answers on a draft — that is the resume page, not this one', () => {
+        expect(offeredLinks('draft')).not.toContain('Edit answers');
+    });
+
+    it('withholds it from a user who may review but not update', () => {
+        // The separation this increment turns on, asserted from the client side.
+        expect(offeredLinks('submitted', true, false)).not.toContain('Edit answers');
+        expect(offeredActions('submitted')).toContain('Approve');
+    });
+
+    it('offers it to a user who may update but not review', () => {
+        // The anti-vacuity half, and the real Form Editor case: they hold `submissions.edit.own` and no
+        // review key at all, so this link must not be gated on the review permission by accident.
+        expect(offeredLinks('submitted', false, true)).toContain('Edit answers');
+        // ...and no TRANSITION buttons, which is the half that proves the two gates are independent.
+        expect(offeredActions('submitted', false, true)).toEqual([]);
     });
 });

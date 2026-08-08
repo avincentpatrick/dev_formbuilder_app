@@ -27,12 +27,13 @@ import type { RawField, RawSection } from '../../../public-runtime/lib/types';
 const mocks = vi.hoisted(() => ({
     pageProps: { errors: {} as Record<string, string>, flash: {} as Record<string, unknown> },
     post: vi.fn(),
+    patch: vi.fn(),
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a><slot /></a>' },
-    router: { post: mocks.post },
+    router: { post: mocks.post, patch: mocks.patch },
     usePage: () => ({ props: mocks.pageProps }),
 }));
 
@@ -84,6 +85,10 @@ interface PayloadOptions {
     }>;
     singlePage?: boolean;
     now?: string;
+    draft?: Record<string, unknown> | null;
+    editing?: Record<string, unknown> | null;
+    update_url?: string | null;
+    draft_url?: string | null;
 }
 
 /** The whole `EncodeFormPresenter::present()` payload, as the page receives it. */
@@ -125,6 +130,13 @@ function payload(o: PayloadOptions): Record<string, unknown> {
         // The server's first-paint projection. The store recomputes immediately, so these tests assert what
         // the STORE produced — this is present because the real payload carries it.
         steps: [],
+        // The three mode props (I9b's `draft`, I9c's `editing`/`update_url`). Spelled out rather than left
+        // absent, because the real payload always carries all of them and a fixture that omits a key cannot
+        // catch a component that mishandles its null case. Overridable per test via `o`.
+        draft: o.draft ?? null,
+        editing: o.editing ?? null,
+        update_url: o.update_url ?? null,
+        draft_url: o.draft_url === undefined ? '/forms/form-1/submissions/draft' : o.draft_url,
     };
 }
 
@@ -532,5 +544,193 @@ describe('encode page — repeat groups', () => {
 
         // `max_instances` still bites — it is the abuse guard, and H21a deliberately left it un-narrowed.
         expect(wrapper.text()).toContain('Maximum of 2 reached.');
+    });
+});
+
+/**
+ * Increment I9c — EDIT mode.
+ *
+ * The page now serves three modes off one presenter payload, and the ways they can be confused are the point
+ * of this block: an edit that autosaves down the draft channel writes with no policy check and no audit row;
+ * an edit that POSTs the encode endpoint creates a SECOND submission instead of correcting the first; an
+ * edit blocked by the schedule makes every historical response on a finished survey permanently
+ * uncorrectable.
+ */
+describe('Encode.vue — edit mode (I9c)', () => {
+    /** The create/resume payload above, re-pointed at a finalized submission. */
+    function editPayload(o: { status?: string; demotes?: boolean; acceptance?: string } = {}): Record<string, unknown> {
+        const base = payload({
+            fields: [field({ key: 'comments', label: 'Comments', sequence: 1 })],
+            blocks: [{ key: null, label: null, fields: [blockField({ key: 'comments', label: 'Comments' })] }],
+            singlePage: true,
+            editing: {
+                id: 'sub-1',
+                answers: { comments: 'Original' },
+                status: o.status ?? 'submitted',
+                baseline: 'checksum-baseline-1',
+                demotes_on_save: o.demotes ?? false,
+            },
+            update_url: '/submissions/sub-1/answers',
+            draft_url: null,
+        });
+
+        if (o.acceptance !== undefined) {
+            (base.form as Record<string, unknown>).schedule = {
+                opens_at: null,
+                closes_at: '2020-01-01T00:00:00+00:00',
+                timezone: 'UTC',
+                max_responses: null,
+                acceptance: o.acceptance,
+                remaining: null,
+            };
+        }
+
+        return base;
+    }
+
+    /** The same single-field form in CREATE mode — the control for every edit-only assertion below. */
+    function createPayload(acceptance?: string): Record<string, unknown> {
+        const base = payload({
+            fields: [field({ key: 'comments', label: 'Comments', sequence: 1 })],
+            blocks: [{ key: null, label: null, fields: [blockField({ key: 'comments', label: 'Comments' })] }],
+            singlePage: true,
+        });
+
+        if (acceptance !== undefined) {
+            (base.form as Record<string, unknown>).schedule = {
+                opens_at: null,
+                closes_at: '2020-01-01T00:00:00+00:00',
+                timezone: 'UTC',
+                max_responses: null,
+                acceptance,
+                remaining: null,
+            };
+        }
+
+        return base;
+    }
+
+    beforeEach(() => {
+        mocks.post.mockClear();
+        mocks.patch.mockClear();
+    });
+
+    it('hydrates the answers from `editing`, not from `draft`', () => {
+        const wrapper = mountEncode(editPayload());
+        const id = wrapper.findAll('label')[0].attributes('for');
+
+        expect((wrapper.find(`#${id}`).element as HTMLInputElement).value).toBe('Original');
+    });
+
+    it('PATCHes the submission instead of POSTing a new one', async () => {
+        const wrapper = mountEncode(editPayload());
+        await wrapper.find('form').trigger('submit');
+
+        // The encode POST would CREATE a second submission rather than correct this one.
+        expect(mocks.post).not.toHaveBeenCalled();
+        expect(mocks.patch).toHaveBeenCalledTimes(1);
+        expect(mocks.patch.mock.calls[0][0]).toBe('/submissions/sub-1/answers');
+    });
+
+    it('sends the answers and the baseline, and no client_submission_uuid', async () => {
+        const wrapper = mountEncode(editPayload());
+        await wrapper.find('form').trigger('submit');
+
+        const body = mocks.patch.mock.calls[0][1] as Record<string, unknown>;
+        // No `client_submission_uuid`: the URL already identifies the row, and a second caller-chosen
+        // identifier is the two-independent-inputs shape that produced I9b's cross-form draft hole.
+        expect(Object.keys(body).sort()).toEqual(['answers', 'baseline']);
+        // The concurrency token has to actually travel, or the server's guard has nothing to compare.
+        expect(body.baseline).toBe('checksum-baseline-1');
+        expect((body.answers as Record<string, unknown>).comments).toBe('Original');
+    });
+
+    it('labels the primary action Save changes, not Submit response', () => {
+        expect(mountEncode(editPayload()).find('button[type="submit"]').text()).toContain('Save changes');
+    });
+
+    it('warns BEFORE typing that saving an approved response withdraws the approval', () => {
+        const banner = mountEncode(editPayload({ status: 'approved', demotes: true })).find('.encode__editing');
+
+        expect(banner.exists()).toBe(true);
+        expect(banner.classes()).toContain('encode__editing--warning');
+        // ⚠️ `status`, NOT `alert`, even here. The banner is present at first paint and never changes, and
+        // this page's own autosave note records why that matters: a live region inserted with its content
+        // already in it is not reliably announced, and `alert` interrupts on the readers that do announce it.
+        // The warning is carried by the heading text and the accent.
+        expect(banner.attributes('role')).toBe('status');
+        expect(banner.text()).toContain('withdraws the approval');
+        // The copy must say `under review`, not "the review queue": the service sets `under_review`, so a
+        // reviewer filtering the inbox on Submitted will NOT see it come back.
+        expect(banner.text()).toContain('under review');
+    });
+
+    it('states the plainer message when there is no approval to withdraw', () => {
+        // The anti-vacuity half: a banner that always screamed would teach an editor to ignore it.
+        const banner = mountEncode(editPayload()).find('.encode__editing');
+
+        expect(banner.attributes('role')).toBe('status');
+        expect(banner.classes()).not.toContain('encode__editing--warning');
+        expect(banner.text()).toContain('audit log');
+    });
+
+    it('keeps Save enabled on a CLOSED form, where a new submission would be blocked', () => {
+        // An edit consumes no capacity and creates no response, so assertCanStart/assertCapacity never run on
+        // this path. Blocking here would make every historical response on a finished survey permanently
+        // uncorrectable — the population most likely to need a correction.
+        expect(mountEncode(editPayload({ acceptance: 'closed' })).find('button[type="submit"]').attributes('disabled'))
+            .toBeUndefined();
+
+        // The control: the same acceptance in CREATE mode still disables Submit.
+        expect(mountEncode(createPayload('closed')).find('button[type="submit"]').attributes('disabled'))
+            .toBeDefined();
+    });
+
+    it('suppresses the schedule banner in edit mode, and only in edit mode', () => {
+        // "This form is full" over a working Save button is how a banner teaches someone to distrust the
+        // banners. The paired create-mode assertion is what proves the suppression is mode-specific rather
+        // than the banner simply being broken.
+        expect(mountEncode(editPayload({ acceptance: 'capacity_reached' })).find('.encode__schedule-banner').exists())
+            .toBe(false);
+        expect(mountEncode(createPayload('capacity_reached')).find('.encode__schedule-banner').exists())
+            .toBe(true);
+    });
+
+    it('renders no edit banner at all in create mode', () => {
+        const wrapper = mountEncode(createPayload());
+
+        expect(wrapper.find('.encode__editing').exists()).toBe(false);
+        expect(wrapper.find('button[type="submit"]').text()).toContain('Submit response');
+    });
+
+    it('renders a media answer read-only, with no file input', () => {
+        const wrapper = mountEncode(
+            payload({
+                fields: [field({ key: 'photo', label: 'Photo', field_type: 'file_upload', sequence: 1 })],
+                blocks: [
+                    {
+                        key: null,
+                        label: null,
+                        fields: [blockField({ key: 'photo', field_type: 'file_upload', label: 'Photo' })],
+                    },
+                ],
+                singlePage: true,
+                editing: {
+                    id: 'sub-1',
+                    answers: { photo: [{ id: 'att-1', name: 'scan.png' }] },
+                    status: 'submitted',
+                    baseline: 'checksum-baseline-1',
+                    demotes_on_save: false,
+                },
+                update_url: '/submissions/sub-1/answers',
+                draft_url: null,
+            }),
+        );
+
+        const readOnly = wrapper.find('.encode-readonly-media');
+        expect(readOnly.exists()).toBe(true);
+        // Names the file rather than showing a bare count — an editor is checking it against paper.
+        expect(readOnly.text()).toContain('scan.png');
+        expect(wrapper.find('input[type="file"]').exists()).toBe(false);
     });
 });

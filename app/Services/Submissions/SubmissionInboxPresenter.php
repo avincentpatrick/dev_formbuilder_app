@@ -159,7 +159,16 @@ final class SubmissionInboxPresenter
                 ],
             ],
             'blocks' => $version !== null ? $this->answerBlocks($version, $answers, $submission->locale) : [],
-            'can' => ['review' => $user->can('review', $submission)],
+            // Two SEPARATE abilities, never one flag. `review` decides a submission's outcome; `update`
+            // (I9c) rewrites its answers, and they are held by different roles — a Reviewer has the first
+            // and not the second, an Owner/Admin has both, a Form Editor has `update` on forms they
+            // collaborate on. Collapsing them would hand a Reviewer the power to change the very answers
+            // they are meant to be judging. Both run the real Gate, so the button is offered only where the
+            // route would actually admit the caller.
+            'can' => [
+                'review' => $user->can('review', $submission),
+                'update' => $user->can('update', $submission),
+            ],
             'pdf' => $this->pdfArtifact($submission),
         ];
     }

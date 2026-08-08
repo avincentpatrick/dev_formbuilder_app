@@ -46,7 +46,10 @@ type Submission = {
 const props = defineProps<{
     submission: Submission;
     blocks: Block[];
-    can: { review: boolean };
+    // `update` is I9c's `SubmissionPolicy::update()` — a SEPARATE permission from `review`, held by
+    // Owner/Admin (`submissions.edit.any`) and Form Editor (`.own`), and NOT by Reviewer. Folding it into
+    // `can.review` would hand every Reviewer the power to rewrite the answers they are meant to be judging.
+    can: { review: boolean; update: boolean };
     pdf: PdfArtifact | null;
 }>();
 
@@ -94,6 +97,25 @@ const actions = computed(() => {
         return: s === 'submitted' || s === 'under_review',
         archive: s === 'submitted' || s === 'under_review' || s === 'approved' || s === 'returned',
     };
+});
+
+/**
+ * "Edit answers" (Increment I9c) — a POSITIVE list for the same reason `archive` above is one, and gated on a
+ * DIFFERENT permission (`can.update`, not `can.review`), so it is computed separately rather than folded into
+ * the block above.
+ *
+ * The four states mirror `SubmissionAnswerEditService::EDITABLE` exactly. `SubmissionAnswerEditTest` drives `EDITABLE` against
+ * `SubmissionStatus::cases()`, so the SERVER's set is pinned to the enum itself; `show.test.ts` pins this
+ * client gate against a hand-transcribed copy of it. Two locks, one of them soft — NOT one assertion
+ * spanning both, which an earlier draft of this sentence claimed. `draft` is excluded here even though the controller redirects it to the
+ * resume page: this button belongs to a detail view the inbox only reaches for finalized rows, and offering
+ * "Edit answers" as a synonym for "Resume draft" would be two names for one thing.
+ */
+const canEditAnswers = computed(() => {
+    if (!props.can.update) return false;
+    const s = props.submission.status;
+
+    return s === 'submitted' || s === 'under_review' || s === 'approved' || s === 'returned';
 });
 
 const hasReviewInfo = computed(() => {
@@ -147,6 +169,19 @@ function formatDate(iso: string | null): string {
 
         <PageHeader :title="submission.form_title" icon="submissions">
             <template #actions>
+                <!-- I9c. Tertiary and FIRST, ahead of the review verbs: correcting a record is a different
+                     kind of act from deciding its outcome, and the primary action on this page stays the
+                     decision.
+                     ⚠️ `<Link>` WRAPPING A BUTTON, not `MdsButton as="a"`. Both render an anchor, but the
+                     bare `as="a"` form does a FULL BROWSER RELOAD — it remounts the persistent app shell and
+                     loses client state — and every `as="a"` elsewhere in this tree points at something that
+                     is deliberately not an Inertia page (a `mailto:`, an OAuth redirect, a file stream).
+                     `forms/Index.vue` is the pattern for a button that navigates to another Inertia page.
+                     Getting this wrong would have made navigation INTO the edit page hard while every route
+                     out of it stayed soft. -->
+                <Link v-if="canEditAnswers" :href="`/submissions/${submission.id}/edit`">
+                    <MdsButton variant="tertiary" icon-left="edit">Edit answers</MdsButton>
+                </Link>
                 <MdsButton v-if="actions.review" variant="tertiary" @click="oneClick('under_review')">
                     Mark under review
                 </MdsButton>

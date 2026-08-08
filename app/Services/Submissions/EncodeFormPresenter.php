@@ -7,6 +7,7 @@ namespace App\Services\Submissions;
 use App\Enums\FieldType;
 use App\Enums\PrefillSource;
 use App\Enums\RequiredMode;
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -107,15 +108,30 @@ final class EncodeFormPresenter
     ) {}
 
     /**
-     * `$draft` hydrates the page from a saved draft (Increment I9b). It is an OPTIONAL THIRD PARAMETER WITH A
+     * `$subject` hydrates the page from an EXISTING submission. It is an OPTIONAL THIRD PARAMETER WITH A
      * DEFAULT on purpose: every existing caller and every existing test compiles unchanged, which is what
-     * keeps the resume feature from being a rewrite of the create page. Pass null (or omit) for the blank
-     * keying form. I9c will pass a finalized submission through the same seam for the edit surface.
+     * kept the resume feature from being a rewrite of the create page. Pass null (or omit) for the blank
+     * keying form.
+     *
+     * ── THREE MODES, ONE PARAMETER (I9b added the second, I9c the third) ────────────────────────────────
+     *   - `$subject === null`            → CREATE: a blank keying form.
+     *   - `$subject->status === Draft`   → RESUME (I9b): autosave on, `draft` block populated.
+     *   - any other status               → EDIT (I9c): autosave OFF, `editing` block populated.
+     *
+     * ⚠️ THE MODE IS DERIVED FROM THE ROW'S STATUS, never passed alongside it as a flag. A `bool $editing`
+     * second argument could disagree with `$subject`, and the failure would be silent in the worst direction:
+     * a finalized submission presented in resume mode gets `draft_url`, so the page would autosave a
+     * correction into the draft channel instead of the audited edit one — no exception, no audit row, and the
+     * respondent's original answers overwritten by a path with no ledger entry. The parameter was named
+     * `$draft` until I9c; it is `$subject` now because it is no longer always one.
      *
      * @return array<string, mixed>
      */
-    public function present(Form $form, FormVersion $version, ?Submission $draft = null): array
+    public function present(Form $form, FormVersion $version, ?Submission $subject = null): array
     {
+        $isDraft = $subject !== null && $subject->status === SubmissionStatus::Draft;
+        $draft = $isDraft ? $subject : null;
+        $editing = $isDraft ? null : $subject;
         $sections = $version->sections()->orderBy('sequence')->get();
         $allFields = $version->fields()->orderBy('sequence')->get();
         $fields = $allFields
@@ -135,7 +151,7 @@ final class EncodeFormPresenter
         // map is built from EVERY field for exactly that reason — including the ones with no row.
         // (Increment H7 un-omitted `hidden`; `calculated` remains omitted.)
         $sources = TemplateSources::fromFields($allFields);
-        $stored = data_get($draft, 'answers.answers');
+        $stored = data_get($subject, 'answers.answers');
         /** @var array<string, mixed> $answers */
         $answers = is_array($stored) ? $stored : [];
 
@@ -181,7 +197,7 @@ final class EncodeFormPresenter
             ];
         }
 
-        $now = $this->clock();
+        $now = $this->clock($editing);
 
         return [
             'form' => [
@@ -233,7 +249,29 @@ final class EncodeFormPresenter
                 'last_saved_at' => $draft->last_saved_at?->toIso8601String(),
                 'expires_at' => $draft->draft_expires_at?->toIso8601String(),
             ],
-            'draft_url' => route('forms.submissions.draft', $form),
+            // The submission being CORRECTED (I9c), or null in create/resume mode. Parallel in shape to
+            // `draft` above and mutually exclusive with it by construction — the two can never both be
+            // non-null, which is what lets the page treat "which mode am I in" as a single question.
+            'editing' => $editing === null ? null : [
+                'id' => $editing->id,
+                'answers' => $answers,
+                'status' => $editing->status->value,
+                // The optimistic-concurrency token: the checksum of the document THIS page was rendered
+                // from. It rides back on the PATCH so the server can tell a stale page from a fresh one —
+                // see SubmissionAnswerEditService::edit()'s `$baseline`. Without it two editors, or one
+                // editor pressing browser-Back and re-saving, silently overwrite each other.
+                'baseline' => data_get($editing, 'answers.answers_content_checksum'),
+                // Named on the page so the editor is told BEFORE they start typing that saving will send an
+                // approved submission back for re-review. A consequence discovered at Save is a surprise.
+                'demotes_on_save' => $editing->status === SubmissionStatus::Approved,
+            ],
+            'update_url' => $editing === null ? null : route('submissions.answers.update', $editing),
+            // ⚠️ NULL IN EDIT MODE, and that is a safety property rather than tidiness. This is the autosave
+            // endpoint; an edit must never reach it. If a future refactor left the autosave composable
+            // mounted on the edit page, a null URL makes the mistake a loud client-side failure instead of a
+            // silent write down the draft channel — which has no audit row, no policy check for `update`, and
+            // would overwrite the respondent's answers with no ledger entry that it happened.
+            'draft_url' => $editing === null ? route('forms.submissions.draft', $form) : null,
         ];
     }
 
@@ -247,10 +285,22 @@ final class EncodeFormPresenter
      * `visibleSteps` evaluate `today()`/`now()` against ONE clock. Let the client stamp its own and a keyer
      * working near midnight — or on a machine with a skewed clock — gets a step list that disagrees with the
      * one the server just rendered, on a page whose entire purpose is that the two agree.
+     *
+     * ── ⚠️ EDITING REPLAYS THE SUBMISSION'S OWN CLOCK (I9c), AND OMITTING THIS BREAKS THE AGREEMENT ──────
+     * {@see SubmissionAnswerEditService::edit()} runs Stage 3 under `$submission->submitted_at`, for the
+     * replay reason {@see SemanticValidator::validate()}'s `$now` parameter exists: a `constraint: . <=
+     * today()` must be judged against the day the response was filled, not the day a typo was fixed. This
+     * page therefore has to hand the client the SAME instant, or the two engines disagree by however long
+     * ago the submission was made — the editor would see a field the server prunes, or type a date the
+     * client accepts and the server rejects, on the one page whose entire purpose is that they agree. The
+     * paragraph above is about a keyer near midnight; this is the same failure measured in months.
+     *
+     * Falls back to now() when `submitted_at` is null, which no EDITABLE status should ever have (all four
+     * are finalized) — a defensive default rather than a reachable branch.
      */
-    private function clock(): string
+    private function clock(?Submission $editing = null): string
     {
-        return Carbon::now()->toIso8601String();
+        return $editing?->submitted_at?->toIso8601String() ?? Carbon::now()->toIso8601String();
     }
 
     /**

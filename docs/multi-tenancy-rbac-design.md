@@ -95,8 +95,8 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `forms.delete` | ✓ | ✓ | | | |
 | `forms.collaborators.manage` | ✓ | ✓ | | | |
 | `submissions.create` | ✓ | ✓ | ✓ (own forms) | ✓ (own forms) | |
-| `submissions.edit.any` *(post-submission answer editing — fast-follow)* | ✓ | ✓ | | | |
-| `submissions.edit.own` *(fast-follow)* | | | ✓ (own forms) | | |
+| `submissions.edit.any` *(I9c — post-submission answer editing; `SubmissionPolicy::update()`)* | ✓ | ✓ | | | |
+| `submissions.edit.own` *(I9c — per-form, and requires **editor** capacity: editing answers is an authoring act, the same tightening G10a applied to `submissions.create`)* | | | ✓ (own forms) | | |
 | `submissions.review.any` | ✓ | ✓ | | | |
 | `submissions.review.own` | | | | ✓ | |
 | `submissions.export` | ✓ | ✓ | ✓ (own forms) | ✓ (own forms) | |

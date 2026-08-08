@@ -10,6 +10,8 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Notifications\NotificationPresenter;
+use App\Services\Submissions\SubmissionAnswerEditService;
+use Database\Seeders\RolePermissionSeeder;
 
 /**
  * Authorization for the submissions inbox, review, and export (Increments F4b + F7). Mirrors
@@ -63,11 +65,16 @@ final class SubmissionPolicy
      * runs this very Gate and ships `url: null` so the row renders as plain text — and I8a makes it
      * WORKED, so those links resolve. That presenter needs no change; it starts allowing by itself.
      *
-     * ⚠️ THIS IS `view()` ONLY, NOT `review()` AND NOT A FUTURE `update()`. Reading back what you yourself
+     * ⚠️ THIS IS `view()` ONLY, NOT `review()` AND NOT `update()`. Reading back what you yourself
      * submitted is not a privilege — the answers are already yours, and you typed them. Deciding your own
-     * submission's outcome, or editing it after review, are different questions with different answers;
-     * post-submission editing is I9's vertical and lights up `submissions.edit.any/.own` (seeded since
-     * Phase 0 with no code behind them). Do not widen the neighbours "for symmetry".
+     * submission's outcome, or editing it after review, are different questions with different answers.
+     *
+     * ~~post-submission editing is I9's vertical and lights up `submissions.edit.any/.own` (seeded since
+     * Phase 0 with no code behind them)~~ — **I9c BUILT IT**, and this sentence is struck rather than
+     * deleted because the RULE it states is the part that still holds: {@see self::update()} deliberately
+     * has NO respondent arm. Do not widen the neighbours "for symmetry". (The strike is exceptions-log #6's
+     * lesson applied to this file: a forward-reference that outlives its subject reads as diligence and is
+     * trusted for exactly that reason, so it gets closed in the commit that closes the thing.)
      *
      * `submissions.view` is still required, so this grants nothing to a role that holds no read at all —
      * and guest respondents have no `users` row, so `respondent_user_id` is null for them and the clause
@@ -97,6 +104,53 @@ final class SubmissionPolicy
     {
         return $user->can('submissions.review.any')
             || ($user->can('submissions.review.own') && $this->collaboratesWith($user, $submission->form_id));
+    }
+
+    /**
+     * Correct a finalized submission's answers (Increment I9c) — `docs/PRD.md` §6's "post-submission answer
+     * editing" fast-follow (NOT a numbered PRD feature; #12 is the audit trail, which five other files use
+     * that number for), filed at `docs/feature-backlog.md` §0. It is the first code ever to consume
+     * `submissions.edit.any` / `submissions.edit.own`, seeded to Owner/Admin and Form Editor respectively
+     * since Phase 0 ({@see RolePermissionSeeder}) and documented in multi-tenancy-rbac-design.md §5 with
+     * nothing behind them. Third dormant-key occurrence, after `feedback.view` (I7a) and
+     * `tenant.roles.assign` (I8a).
+     *
+     * Shaped like {@see self::review()} — an `.any` arm that is tenant-wide and an `.own` arm scoped to a
+     * collaborated form — with ONE deliberate difference: the `.own` arm requires EDITOR capacity, where
+     * review()'s accepts either. Editing answers is an AUTHORING act on someone else's response, which is
+     * the same argument G10a used to tighten {@see self::create()} from "either capacity" to Editor: once a
+     * grant can be made against an interior scope node, accepting reviewer capacity here would hand write
+     * access to every submission on every form beneath that node to someone granted only the right to read
+     * and decide. `reviewer` holds neither edit key, so that role cannot reach this at all.
+     *
+     * ⚠️ NO RESPONDENT ARM, and its absence is the decision rather than an omission — {@see self::view()}
+     * argues it at length. I8a gave respondents `view()` so their notification links resolve; letting them
+     * rewrite an answer a reviewer has already read and approved is a different claim entirely, and the
+     * `.own` in `submissions.edit.own` means "forms I collaborate on", never "submissions I authored" — see
+     * the `submissions.edit.own` row of multi-tenancy-rbac-design.md §5's permission table. (Cited by ROW,
+     * not by line number: an earlier draft said "line 99", and the same edit that closed that table's
+     * fast-follow annotation moved it.)
+     *
+     * ⚠️ `submissions.view` IS A CONJUNCT, and it is not redundant belt-and-braces. This is the ONLY gate on
+     * `GET /submissions/{submission}/edit`, which renders the entire stored answer document — so here the
+     * WRITE gate is also the READ gate, which is not true of {@see self::review()} (a PATCH that returns no
+     * data) that this method is otherwise shaped after. It costs nothing against the seeded roles, because
+     * every role holding either edit key already holds `submissions.view`. What it prevents is the next
+     * narrow role: a "Data Correction" role granted `submissions.edit.any` WITHOUT `dashboard.org.view`
+     * would otherwise gain a tenant-wide read of every answer on every form, reachable only by typing the
+     * edit URL — the inbox would list nothing and `/submissions/{id}` would 403, so the leak would be
+     * through the one door nobody thought to test.
+     *
+     * ⚠️ WHICH STATUSES MAY BE EDITED IS **NOT** DECIDED HERE. This answers "may this user edit at all"; the
+     * legal source states live in {@see SubmissionAnswerEditService}, the same split
+     * review()/`$from` already uses. A FormRequest cannot know them either — the row has to be read under a
+     * lock first, or two concurrent edits both pass a pre-check that was true when they read it.
+     */
+    public function update(User $user, Submission $submission): bool
+    {
+        return $user->can('submissions.edit.any')
+            || ($user->can('submissions.edit.own')
+                && $this->grants->holdsOnFormId($user, $submission->form_id, ResourceCapacity::Editor));
     }
 
     /**

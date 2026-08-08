@@ -61,6 +61,11 @@ final class SlackMessageFormatter
                 DomainEventType::SubmissionCreated => "*New submission* — {$formLabel}",
                 DomainEventType::SubmissionApproved => "*Submission approved* — {$formLabel}",
                 DomainEventType::SubmissionReturned => "*Submission returned to the respondent* — {$formLabel}",
+                // I9c. The headline says "answers", not "updated", because a channel reader seeing
+                // "*Submission updated*" cannot tell it apart from a status transition — and this is the one
+                // event that means the recorded DATA changed after the fact, which is the part worth
+                // interrupting someone for. The withdrawn-approval half rides in facts() below.
+                DomainEventType::SubmissionUpdated => "*Submission answers edited* — {$formLabel}",
                 DomainEventType::FormPublished => "*Form published* — {$formLabel}",
                 DomainEventType::FormOpened => "*Form opened for responses* — {$formLabel}",
                 DomainEventType::FormClosed => "*Form closed* — {$formLabel}",
@@ -131,6 +136,15 @@ final class SlackMessageFormatter
             $facts[] = 'as '.self::mrkdwn(str_replace('_', ' ', $data['role']));
         }
 
+        // I9c — an edit to an APPROVED submission withdraws the approval and returns it to the queue. A
+        // channel that saw "*Submission approved*" earlier needs to be told that stopped being true, and a
+        // headline reading only "answers edited" does not say it. Guarded on `=== true` rather than a truthy
+        // check because the key is absent on every other event type, and `null` must not read as "no, it was
+        // not withdrawn" for an event that never had an opinion.
+        if ($eventType === DomainEventType::SubmissionUpdated && ($data['approval_withdrawn'] ?? null) === true) {
+            $facts[] = 'approval withdrawn — back to review';
+        }
+
         return $facts;
     }
 
@@ -144,7 +158,8 @@ final class SlackMessageFormatter
         return match ($eventType) {
             DomainEventType::SubmissionCreated,
             DomainEventType::SubmissionApproved,
-            DomainEventType::SubmissionReturned => 'View submission',
+            DomainEventType::SubmissionReturned,
+            DomainEventType::SubmissionUpdated => 'View submission',
             default => 'Open form',
         };
     }

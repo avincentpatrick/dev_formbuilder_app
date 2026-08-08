@@ -38,6 +38,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property RequiredMode $is_required
  * @property ?IndexedDataType $indexed_data_type
  * @property bool $is_queryable
+ * @property bool $is_pii
+ * @property bool $is_sensitive
  */
 class FormField extends Model implements TenantScoped
 {

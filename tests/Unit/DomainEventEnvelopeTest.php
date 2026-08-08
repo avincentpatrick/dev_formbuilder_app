@@ -11,6 +11,7 @@ use App\Events\MemberInvited;
 use App\Events\SubmissionApproved;
 use App\Events\SubmissionCreated;
 use App\Events\SubmissionReturned;
+use App\Events\SubmissionUpdated;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\Tenant;
@@ -154,4 +155,34 @@ it('never carries an invite token or accept URL in the MemberInvited envelope', 
     expect($encoded)->not->toContain('token')
         ->and($encoded)->not->toContain('invitations/')
         ->and($encoded)->not->toContain('http');
+});
+
+it('builds the SubmissionUpdated envelope to a metadata-only shape that cannot widen unnoticed (I9c)', function (): void {
+    // The pin every other submission event already had. Without it this is the one whose payload could grow
+    // an `answers` key in a later increment and reach every subscribed endpoint and Slack channel silently.
+    $submission = new Submission([
+        'tenant_id' => Uuid::uuid7()->toString(),
+        'form_id' => Uuid::uuid7()->toString(),
+        'status' => SubmissionStatus::UnderReview,
+        'source' => SubmissionSource::Manual,
+    ]);
+    $submission->id = Uuid::uuid7()->toString();
+
+    $editor = new User;
+    $editor->id = Uuid::uuid7()->toString();
+
+    $env = SubmissionUpdated::for($submission, $editor, true)->envelope();
+
+    expect($env['event_type'])->toBe('submission.updated')
+        ->and(array_keys($env['data']))
+        ->toBe(['submission_id', 'form_id', 'edited_by', 'status', 'approval_withdrawn'])
+        ->and($env['data']['approval_withdrawn'])->toBeTrue()
+        ->and($env['data']['status'])->toBe('under_review')
+        // A webhook body and a Slack message are not places for respondent data — nor for the KEY NAMES,
+        // which are schema information a form author may treat as sensitive on their own.
+        ->and($env['data'])->not->toHaveKey('answers');
+
+    foreach ($env['data'] as $value) {
+        expect(is_scalar($value) || is_null($value))->toBeTrue();
+    }
 });

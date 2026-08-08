@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\DomainEventType;
+
 /*
  | Increment E — a cheap in-suite guard on the committed OpenAPI contract (openapi.json). The CI
  | `contract-tests` job does the full Redocly validation + drift-diff against a fresh Scramble export;
@@ -105,4 +107,41 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         // H9b: the guest draft-save + resume-read are equally unauthenticated (token, not bearer).
         ->and($spec['paths']['/public/f/{shareToken}/draft']['post']['security'])->toBe([])
         ->and($spec['paths']['/public/drafts/{resumeToken}']['get']['security'])->toBe([]);
+});
+
+it('keeps the published event_types enum in step with DomainEventType', function (): void {
+    // ⚠️ WRITTEN AFTER I9c SHIPPED THE SPEC STALE. The increment added `submission.updated` to the enum, the
+    // CHECK constraint, the labels and the connector arms — and did not regenerate `openapi.json`, so four
+    // `event_types` enums still advertised seven values while eight FormRequests accepted eight. A generated
+    // client would have rejected a value the API takes. The `contract-tests` CI job compares a fresh export
+    // byte-for-byte and would have caught it there; this catches it in the ordinary suite, which is where
+    // the person who added the case is actually looking.
+    /** @var array<string, mixed> $spec */
+    $spec = json_decode((string) file_get_contents(base_path('openapi.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    $expected = DomainEventType::values();
+    sort($expected);
+
+    // Locate every enum that carries the catalog and assert it carries ALL of it.
+    $enums = [];
+    $walk = static function (array $node) use (&$walk, &$enums): void {
+        foreach ($node as $key => $value) {
+            if (! is_array($value)) {
+                continue;
+            }
+            if ($key === 'enum' && in_array('submission.created', $value, true)) {
+                $enums[] = $value;
+            }
+            $walk($value);
+        }
+    };
+    $walk($spec);
+
+    expect($enums)->not->toBeEmpty('no event_types enum found in openapi.json');
+
+    foreach ($enums as $enum) {
+        $actual = $enum;
+        sort($actual);
+        expect($actual)->toBe($expected);
+    }
 });

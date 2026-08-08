@@ -66,7 +66,11 @@ final class ConnectorEventContextResolver
         $path = match (DomainEventType::tryFrom((string) ($envelope['event_type'] ?? ''))) {
             DomainEventType::SubmissionCreated,
             DomainEventType::SubmissionApproved,
-            DomainEventType::SubmissionReturned => $submissionId === null ? null : "/submissions/{$submissionId}",
+            DomainEventType::SubmissionReturned,
+            // I9c — the detail page, NOT the edit page. A Slack link is followed by whoever is watching the
+            // channel, and `submissions.edit.any/.own` is held by Owner/Admin/Form Editor only; pointing a
+            // Reviewer at an edit URL they cannot open turns an informative message into a 403.
+            DomainEventType::SubmissionUpdated => $submissionId === null ? null : "/submissions/{$submissionId}",
             DomainEventType::FormPublished,
             DomainEventType::FormOpened,
             DomainEventType::FormClosed => $formId === null ? null : "/forms/{$formId}/builder",

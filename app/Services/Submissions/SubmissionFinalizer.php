@@ -11,11 +11,8 @@ use App\Models\FormField;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
-use App\Models\SubmissionAnswerIndex;
 use App\Support\Audit\AuditLogger;
-use App\Support\Tenancy\TenantContext;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The shared Stage-4 tail of the Submission write path (technical-architecture.md §4.1), extracted (Increment
@@ -32,12 +29,22 @@ use Illuminate\Support\Facades\DB;
  * `submission_geo_index` geometry rows; and writes the atomic `created` audit row (H4). Runs entirely inside
  * the caller's persist transaction. It does NOT fire `SubmissionCreated` — that stays a post-commit concern of
  * the caller, fired exactly once when the submission truly becomes a submission.
+ *
+ * The two projections moved out to {@see SubmissionProjectionWriter} in I9c, unchanged, so the answer-edit
+ * path can REPLACE a submission's projections where this one only ever creates them. Nothing about this
+ * class's behaviour changed with that extraction.
+ *
+ * ⚠️ NOT A REUSABLE "SAVE THE ANSWERS" SEAM, despite the name reading like one. It runs
+ * {@see FormAcceptanceGuard::assertCapacity()} and writes an `AuditEvent::Created` row, both correct for a
+ * submission becoming a submission and both wrong for any later mutation of one: an edit routed through here
+ * would 403 on a form that has since hit its `max_responses` cap, and would deposit a "created" ledger entry
+ * for a row that may be months old. I9c's {@see SubmissionAnswerEditService} therefore composes the pieces it
+ * needs rather than calling this.
  */
 final class SubmissionFinalizer
 {
     public function __construct(
-        private readonly AnswerIndexProjector $projector,
-        private readonly GeoIndexProjector $geoProjector,
+        private readonly SubmissionProjectionWriter $projections,
         private readonly AuditLogger $audit,
         private readonly FormAcceptanceGuard $acceptance,
     ) {}
@@ -69,7 +76,7 @@ final class SubmissionFinalizer
         // re-point each staged file's polymorphic owner from its form_field to this submission, and record
         // the flat id list on the answer document (attachment_refs). All inside the persist transaction, so
         // the ownership move can never drift from the answer it belongs to. RLS scopes the update to the tenant.
-        $attachmentIds = $this->collectAttachmentIds($fields, $answers);
+        $attachmentIds = self::collectAttachmentIds($fields, $answers);
         if ($attachmentIds !== []) {
             Attachment::query()->whereIn('id', $attachmentIds)->update([
                 'attachable_type' => 'submission',
@@ -92,8 +99,12 @@ final class SubmissionFinalizer
             ],
         );
 
-        $this->projectIndex($submission, $version, $fields, $answers);
-        $this->projectGeo($submission, $version, $fields, $answers);
+        // The scalar + geo projections. INSERT-only (`write()`, not `rewrite()`) because this row has none
+        // yet — a fresh submit created it moments ago and a promote's draft never projected. I9c extracted
+        // both into {@see SubmissionProjectionWriter} so the answer-edit path can REPLACE them; picking the
+        // wrong method here would re-delete and re-insert on every finalize, which is harmless but wasteful
+        // and would hide a genuine double-projection bug behind an idempotent purge.
+        $this->projections->write($submission, $version, $fields, $answers);
 
         // Stage 4's other insert (technical-architecture §4.1): the `created` audit row, IN this transaction
         // so it is atomic with the submission. Head-row attributes only — deliberately NOT the guest PII
@@ -118,11 +129,16 @@ final class SubmissionFinalizer
      * {@see StructuralAnswerNormalizer} canonical AttachmentRef under a media
      * field key. Feeds both the ownership re-point and the denormalised `attachment_refs` list.
      *
+     * PUBLIC STATIC since I9c, which needs the identical derivation: an answer edit can PRUNE a media answer
+     * (relevance), so it has to rewrite `attachment_refs` from the document it is about to store, or the
+     * denormalised list contradicts the JSONB. Sharing this method is what keeps the two write paths from
+     * each having their own idea of what a media reference is.
+     *
      * @param  Collection<int, FormField>  $fields
      * @param  array<string, mixed>  $answers
      * @return list<string>
      */
-    private function collectAttachmentIds(Collection $fields, array $answers): array
+    public static function collectAttachmentIds(Collection $fields, array $answers): array
     {
         /** @var array<string, true> $mediaKeys */
         $mediaKeys = [];
@@ -146,96 +162,5 @@ final class SubmissionFinalizer
         }
 
         return array_keys($ids);
-    }
-
-    /**
-     * @param  Collection<int, FormField>  $fields
-     * @param  array<string, mixed>  $effectiveAnswers
-     */
-    private function projectIndex(Submission $submission, FormVersion $version, Collection $fields, array $effectiveAnswers): void
-    {
-        /** @var array<string, FormField> $byKey */
-        $byKey = [];
-        foreach ($fields as $field) {
-            $byKey[$field->key] = $field;
-        }
-
-        foreach ($effectiveAnswers as $key => $value) {
-            // Repeat-group instance arrays (keyed by section key) and multi-select lists are never indexed —
-            // only scalar field answers reach the typed index (data-dictionary §8/§9).
-            if (is_array($value)) {
-                continue;
-            }
-
-            $field = $byKey[$key] ?? null;
-            if ($field === null) {
-                continue;
-            }
-
-            $projection = $this->projector->project($field, $value);
-            if ($projection === null) {
-                continue;
-            }
-
-            SubmissionAnswerIndex::create([
-                'submission_id' => $submission->id,
-                'form_version_id' => $version->id,
-                'form_field_id' => $field->id,
-                'field_key' => $field->key,
-                $projection['column'] => $projection['value'],
-            ]);
-        }
-    }
-
-    /**
-     * The PostGIS geometry projection (ADR-0006 D1) — the object-valued sibling of {@see projectIndex},
-     * acting on exactly the top-level geo answers that projectIndex skips (arrays/objects are never
-     * scalar-indexed). Written inside the same persist transaction as the JSONB, so the geometry can
-     * never drift from the source-of-truth envelope (Risk R1). Uses a bound raw insert because the
-     * geometry is built by `ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)` (Blueprint/Eloquent cannot express
-     * a PostGIS function call); `tenant_id` comes from the request GUC the table's FORCE-RLS WITH CHECK
-     * matches. Geo inside a repeatable section is banned at publish, so top-level iteration suffices.
-     *
-     * @param  Collection<int, FormField>  $fields
-     * @param  array<string, mixed>  $effectiveAnswers
-     */
-    private function projectGeo(Submission $submission, FormVersion $version, Collection $fields, array $effectiveAnswers): void
-    {
-        /** @var array<string, FormField> $byKey */
-        $byKey = [];
-        foreach ($fields as $field) {
-            $byKey[$field->key] = $field;
-        }
-
-        $tenantId = TenantContext::currentTenantId();
-
-        foreach ($effectiveAnswers as $key => $value) {
-            $field = $byKey[$key] ?? null;
-            if ($field === null || ! $field->field_type->isGeo()) {
-                continue;
-            }
-
-            $projection = $this->geoProjector->project($field, $value);
-            if ($projection === null) {
-                continue;
-            }
-
-            DB::insert(
-                'INSERT INTO submission_geo_index '
-                .'(tenant_id, submission_id, form_version_id, form_field_id, field_key, '
-                .'geometry_type, captured_accuracy, geom, created_at, updated_at) '
-                .'VALUES (?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), now(), now())',
-                [
-                    $tenantId,
-                    $submission->id,
-                    $version->id,
-                    $field->id,
-                    $field->key,
-                    $projection['geometry_type'],
-                    $projection['captured_accuracy'],
-                    $projection['geojson'],
-                ],
-            );
-        }
     }
 }

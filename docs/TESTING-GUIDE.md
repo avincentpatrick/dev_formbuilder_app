@@ -206,6 +206,36 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
     org-wide — and no approve/return controls anywhere.
 14. As the reviewer or the viewer, try `/audit-log`. **Expect:** a 403 refusal; it is Owner and Admin only.
 
+### 6.1 Correcting a recorded answer (Increment I9c)
+
+A submitted response can be corrected by someone holding `submissions.edit.*` — Owner, Admin, or a Form
+Editor on a form they collaborate on. A Reviewer deliberately **cannot**: deciding a submission's outcome and
+rewriting its answers are different powers.
+
+1. As the **Owner**, open any `submitted` response and press **Edit answers**. **Expect:** the encoding page,
+   pre-filled with the stored answers, headed "Edit answers", with a blue "Editing a recorded response"
+   note. There is no autosave indicator — an edit is an explicit act, not a draft.
+2. Change one answer and press **Save changes**. **Expect:** back on the detail page, toast "Answers
+   updated.", and the new value shown.
+3. Open `/audit-log` and find the newest row. **Expect:** one `submission` / `updated` row, actor = you,
+   showing **only the answer you changed** — old → new. It is a diff, not a full snapshot.
+4. Now **approve** a different response, then press **Edit answers** on it. **Expect:** an amber-accented
+   banner saying the approval will be withdrawn, *before* you type anything.
+5. Change an answer and save. **Expect:** the toast names the consequence ("The approval was withdrawn…"),
+   the status is back to **Under review**, and the Validated-by/Validated-at fields are cleared. The audit
+   log shows this as **one** row, not two.
+6. Try to edit an **archived** response, and a **screened-out** one. **Expect:** no "Edit answers" button on
+   either; typing the URL `/submissions/<id>/edit` by hand redirects you back with the reason. (A
+   screened-out response consumes no response-limit slot, so editing answers into one would quietly consume
+   a paid slot.)
+7. Sign in as **`reviewer@demo.test`** and open a submission. **Expect:** the review buttons, but **no**
+   "Edit answers" button; the URL by hand gives a 403.
+8. Open a response that has a **file** answer and press Edit answers. **Expect:** the file is listed by name
+   and cannot be changed or removed — media editing is a known gap (chapter 17).
+9. **Two tabs, same submission**, both on the edit page. Save in tab A, then save in tab B. **Expect:** tab B
+   is refused with "Someone else changed this submission while you were editing it. Reload the page…", and
+   tab A's correction survives. The same guard catches pressing browser-Back after a save and saving again.
+
 ---
 
 ## 7. Dashboard and analytics — Feature #4
@@ -472,7 +502,6 @@ expected and is not a defect.
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
-| **Post-submission answer editing** | Increment I9c. A submitted response's answers cannot be corrected by anyone, on any channel. |
 | **Production deployment** | Track B, after the application is otherwise complete. |
 
 Anything else that does not work as this guide describes **is** worth reporting.

@@ -130,7 +130,43 @@ it('gives each I3 event its own headline instead of the generic Update arm', fun
 })->with([
     [DomainEventType::SubmissionApproved, '*Submission approved*'],
     [DomainEventType::SubmissionReturned, '*Submission returned to the respondent*'],
+    // I9c. Added to this hand-maintained dataset rather than left to the generic arm: without it the one
+    // event that means the recorded DATA changed would read '*Update* - a form' in the channel.
+    [DomainEventType::SubmissionUpdated, '*Submission answers edited*'],
 ]);
+
+it('names the withdrawn approval on submission.updated, and only when it actually happened', function (): void {
+    $build = static fn (array $data): array => (new SlackMessageFormatter)->build(
+        ['event_type' => DomainEventType::SubmissionUpdated->value, 'occurred_at' => '2026-08-08T09:00:00Z', 'data' => $data],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    $withdrawn = $build(['form_id' => '0198-abc', 'submission_id' => 's-1', 'approval_withdrawn' => true]);
+    expect(json_encode($withdrawn))->toContain('approval withdrawn');
+
+    // A channel that saw '*Submission approved*' earlier has to be told that stopped being true; a channel
+    // watching an ordinary correction must NOT be told an approval was withdrawn.
+    $plain = $build(['form_id' => '0198-abc', 'submission_id' => 's-1', 'approval_withdrawn' => false]);
+    expect(json_encode($plain))->not->toContain('approval withdrawn');
+
+    // The `=== true` guard: on every OTHER event type the key is absent, and `null` must not read as
+    // 'no, it was not withdrawn' for an event that never had an opinion.
+    $absent = $build(['form_id' => '0198-abc', 'submission_id' => 's-1']);
+    expect(json_encode($absent))->not->toContain('approval withdrawn');
+});
+
+it('labels the submission.updated button View submission, not Open form', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::SubmissionUpdated->value,
+            'occurred_at' => '2026-08-08T09:00:00Z',
+            'data' => ['form_id' => '0198-abc', 'submission_id' => 's-1'],
+        ],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    expect($message['blocks'][2]['elements'][0]['text']['text'])->toBe('View submission');
+});
 
 it('labels the button by what it opens, not by whether it is submission.created', function (): void {
     $message = (new SlackMessageFormatter)->build(

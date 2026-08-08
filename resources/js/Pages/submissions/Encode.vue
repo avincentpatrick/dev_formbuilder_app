@@ -105,8 +105,40 @@ const props = defineProps<{
         last_saved_at: string | null;
         expires_at: string | null;
     } | null;
-    draft_url: string;
+    /**
+     * The FINALIZED submission being corrected, or null (Increment I9c). Mutually exclusive with `draft` by
+     * construction — `EncodeFormPresenter` derives both from one `?Submission`, branching on its status — so
+     * "which of the three modes am I in" is answerable without the two ever contradicting each other.
+     */
+    editing: {
+        id: string;
+        answers: Record<string, unknown>;
+        status: string;
+        /**
+         * The optimistic-concurrency token: the checksum of the document THIS page was rendered from. Sent
+         * back on the PATCH so the server can refuse a stale page instead of silently reverting whatever
+         * another editor saved in the meantime — which also covers browser-Back-then-Save.
+         */
+        baseline: string | null;
+        demotes_on_save: boolean;
+    } | null;
+    /** The PATCH target in edit mode; null otherwise. */
+    update_url: string | null;
+    /** The autosave endpoint. NULL IN EDIT MODE — an edit must never reach the draft channel. */
+    draft_url: string | null;
 }>();
+
+/**
+ * Increment I9c. Read this instead of `editing !== null` at each site so the three modes stay one question
+ * with one answer.
+ *
+ * ⚠️ `!= null`, NOT `!== null`, and the difference is not pedantry. `undefined !== null` is TRUE, so a strict
+ * check puts the page into EDIT mode whenever the prop is merely ABSENT — with `editing` undefined, which the
+ * template then dereferences. The presenter always sends the key, so production never hits it; every existing
+ * encode test omits it, and all seventeen of them failed on the strict form. Absent and null mean the same
+ * thing here — "there is no submission being corrected" — and the predicate has to say so.
+ */
+const isEditing = computed(() => props.editing != null);
 
 const page = usePage();
 
@@ -125,7 +157,11 @@ const runtime = createFormRuntime(props as unknown as SchemaResponse, {
     now: props.version.now,
     initialLocale: props.form.default_locale,
     search: '',
-    initialAnswers: props.draft?.answers as Record<string, never> | undefined,
+    // I9c seeds from `editing` on the same footing: the store does not care which kind of stored document it
+    // restores, only that there is one. No uuid is adopted in edit mode — the submission is identified by its
+    // id in the PATCH URL, and minting or adopting an idempotency key here would be a second identifier for a
+    // request that already has an authorized one.
+    initialAnswers: (props.draft?.answers ?? props.editing?.answers) as Record<string, never> | undefined,
     initialClientSubmissionUuid: props.draft?.client_submission_uuid,
 });
 
@@ -267,6 +303,13 @@ function formatInstant(iso: string): string {
 }
 
 const scheduleNotice = computed<{ title: string; body: string } | null>(() => {
+    // I9c — the schedule says nothing about an EDIT. A correction consumes no capacity slot and is not a new
+    // response, so `assertCapacity`/`assertCanStart` never run on this path; telling an editor "this form is
+    // full" over a working Save button is the same defect the resume branch below fixed, in a louder form.
+    if (isEditing.value) {
+        return null;
+    }
+
     const schedule = props.form.schedule;
     switch (schedule.acceptance) {
         case 'opens_soon':
@@ -444,7 +487,10 @@ async function jumpTo(item: { address: string; stepKey: string }): Promise<void>
 const autosaveArmed = ref(false);
 
 const autosave = createServerAutosave({
-    url: props.draft_url,
+    // Empty string in edit mode, where `enabled` is false forever and no request is ever built. The presenter
+    // sends null there deliberately (see `EncodeFormPresenter::present`): an edit autosaved down the draft
+    // channel would overwrite a respondent's answers with no policy check for `update` and no audit row.
+    url: props.draft_url ?? '',
     clientSubmissionUuid: runtime.clientSubmissionUuid,
     answers: runtime.answers,
     currentStepKey: runtime.currentStepKey,
@@ -452,7 +498,12 @@ const autosave = createServerAutosave({
     // form the first tick would 403 while later ones (once a draft exists) succeed — one red flash, then
     // silence. Erring one case strict (`capacity_reached` would actually allow a draft create) is the right
     // side to err on.
-    enabled: computed(() => autosaveArmed.value && (isOpen.value || props.draft !== null)),
+    //
+    // ⚠️ AND NEVER IN EDIT MODE (I9c). An edit is an explicit, audited act with a demotion consequence — a
+    // background tick that silently sends an approved submission back for re-review is the opposite of what
+    // autosave is for. This is the belt to the presenter's null-URL braces; either alone would look
+    // sufficient, which is why both are here.
+    enabled: computed(() => autosaveArmed.value && !isEditing.value && (isOpen.value || props.draft !== null)),
 });
 
 function armAutosave(): void {
@@ -517,11 +568,24 @@ const submitting = ref(false);
  * refusing what the server would have accepted. `capacity_reached` deliberately still blocks: the cap is
  * enforced transactionally at finalize and would 403 anyway.
  */
-const canSubmit = computed(() => isOpen.value || (props.draft !== null && props.form.schedule.acceptance === 'closed'));
+const canSubmit = computed(
+    () =>
+        // I9c — an EDIT is never schedule-gated. It creates no submission, consumes no capacity slot, and the
+        // service runs neither `assertCanStart()` nor `assertCapacity()`. Blocking Save on a closed or full
+        // form would make every historical submission on a finished survey permanently uncorrectable, which
+        // is exactly the population most likely to need a correction.
+        isEditing.value || isOpen.value || (props.draft !== null && props.form.schedule.acceptance === 'closed'),
+);
 
 function submit(): void {
     // Increment H12b — never POST a submission the schedule guard will 403 (the button is disabled too).
     if (!canSubmit.value) {
+        return;
+    }
+
+    if (isEditing.value) {
+        submitEdit();
+
         return;
     }
 
@@ -564,15 +628,69 @@ function submit(): void {
         },
     );
 }
+
+/**
+ * Increment I9c — apply a correction to an already-finalized submission.
+ *
+ * A PATCH to the submission's own route, never the encode POST: that endpoint's whole job is to CREATE a
+ * submission, and reaching it with an existing row's answers would produce a second response rather than
+ * correct the first.
+ *
+ * No `client_submission_uuid` in the body. The submission is identified by the URL, which the policy has
+ * already authorized; adding a caller-chosen second identifier is the two-independent-inputs shape that
+ * produced I9b's cross-form draft hole.
+ *
+ * ⚠️ `preserveState` IS THE OPPOSITE OF THE SUBMIT PATH'S, and deliberately. There, a success remounts the
+ * page so the next entry starts clean. Here, a success REDIRECTS to the detail view, so nothing is preserved
+ * either way — and a 422 must keep every edit the user made, which is what the errors-length check does.
+ * Getting this backwards would silently discard a page of corrections on one failed constraint.
+ */
+function submitEdit(): void {
+    runtime.markSubmitAttempted();
+
+    // Detached from the reactive proxy for the same reason the submit path detaches: Inertia serialises
+    // whatever it is handed, and a keystroke landing mid-flight would change the body under the request.
+    //
+    // The FULL answer map, including the media keys the server is about to discard. Filtering them here
+    // would be the client asserting a rule the server owns — `mergeMedia()` takes media from the STORED
+    // document regardless of what arrives, so sending them changes nothing and omitting them proves nothing.
+    const answers = JSON.parse(JSON.stringify(runtime.answers)) as Record<string, never>;
+
+    router.patch(
+        props.update_url as string,
+        // `baseline` is the whole of this channel's concurrency story — see the prop's docblock. It is sent
+        // even when null so the server's `required` rule rejects a page too old to have one, rather than
+        // letting a blind whole-document write through.
+        { answers, baseline: props.editing?.baseline },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                submitting.value = true;
+            },
+            onFinish: () => {
+                submitting.value = false;
+            },
+            preserveState: (page) => Object.keys(page.props.errors ?? {}).length > 0,
+        },
+    );
+}
 </script>
 
 <template>
     <div class="encode">
-        <Head :title="`Encode — ${form.title}`" />
+        <Head :title="isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`" />
 
-        <PageHeader :title="draft === null ? 'New submission' : 'Continue submission'" icon="submissions">
+        <PageHeader
+            :title="isEditing ? 'Edit answers' : draft === null ? 'New submission' : 'Continue submission'"
+            icon="submissions"
+        >
             <template #breadcrumbs>
-                <Link href="/forms" class="encode__crumb">← Forms</Link>
+                <!-- In edit mode the way back is the submission, not the forms list: the editor arrived from
+                     the detail page and that is where Save returns them. -->
+                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__crumb">
+                    ← Back to submission
+                </Link>
+                <Link v-else href="/forms" class="encode__crumb">← Forms</Link>
             </template>
             <template #actions>
                 <!-- The autosave indicator lives in the header, beside Cancel, because that is where a keyer
@@ -584,13 +702,54 @@ function submit(): void {
                      has to be observing the node before the text changes — so `v-if` here would silently
                      swallow the first "Draft saved". -->
                 <span class="encode__autosave" role="status" aria-live="polite">{{ autosaveLabel ?? '' }}</span>
-                <Link href="/forms" class="encode__cancel">Cancel</Link>
+                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
+                <Link v-else href="/forms" class="encode__cancel">Cancel</Link>
             </template>
         </PageHeader>
 
         <p class="encode__intro">
-            Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            <template v-if="isEditing">
+                Correcting a recorded response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            </template>
+            <template v-else>
+                Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            </template>
         </p>
+
+        <!-- Edit banner (I9c). The demotion is announced BEFORE any typing, not discovered at Save: an
+             editor fixing one character in an approved response is entitled to know that saving withdraws
+             the approval.
+             ⚠️ `role="status"`, NOT `role="alert"`, EVEN FOR THE WARNING — and the reason is written twenty
+             lines above this in the autosave note: a live region that is inserted into the DOM with its
+             content already in it is not reliably announced, because assistive tech has to be observing the
+             node before the text changes. This banner is present at first paint and never changes (
+             `demotes_on_save` is a server prop), so `alert` buys nothing on the readers that ignore
+             load-time alerts and INTERRUPTS on the ones that do not. The warning is carried by the heading
+             text and the accent, which is where it belongs. -->
+        <div
+            v-if="isEditing"
+            class="encode__editing"
+            :class="{ 'encode__editing--warning': editing!.demotes_on_save }"
+            role="status"
+        >
+            <strong class="encode__editing-title">
+                {{ editing!.demotes_on_save ? 'This response has been approved' : 'Editing a recorded response' }}
+            </strong>
+            <span class="encode__editing-body">
+                <template v-if="editing!.demotes_on_save">
+                    <!-- ⚠️ "under review", not "the review queue". The service sets `under_review`, not
+                         `submitted` — a reviewer filtering the inbox on Submitted will NOT see it come back,
+                         and an earlier draft of this sentence promised exactly that. -->
+                    Saving a change withdraws the approval and moves this response back to
+                    <strong>under review</strong>, so a reviewer has to decide it again. Every change is
+                    recorded in the audit log.
+                </template>
+                <template v-else>
+                    You are changing answers that have already been submitted. Every change is recorded in the
+                    audit log, with your name against it.
+                </template>
+            </span>
+        </div>
 
         <!-- Resume banner (I9b). Two jobs: confirm that what is on screen is the keyer's own saved work
              rather than a blank form, and name the expiry, because the reaper HARD-deletes an expired draft
@@ -684,6 +843,7 @@ function submit(): void {
                                 :field="field"
                                 :model-value="flatValue(field.key)"
                                 :error="fieldError(field.key)"
+                                :read-only="isEditing"
                                 @update:model-value="setFlatValue(field.key, $event)"
                             />
                         </div>
@@ -749,6 +909,7 @@ function submit(): void {
                                                         :field="field"
                                                         :model-value="instanceValue(step.sectionKey, index, field.key)"
                                                         :error="instanceError(step.sectionKey, index, field.key)"
+                                                        :read-only="isEditing"
                                                         @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
                                                     />
                                                 </div>
@@ -797,6 +958,7 @@ function submit(): void {
                                     :field="field"
                                     :model-value="flatValue(field.key)"
                                     :error="fieldError(field.key)"
+                                    :read-only="isEditing"
                                     @update:model-value="setFlatValue(field.key, $event)"
                                 />
                             </div>
@@ -806,7 +968,8 @@ function submit(): void {
             </template>
 
             <div class="encode__actions">
-                <Link href="/forms" class="encode__cancel">Cancel</Link>
+                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
+                <Link v-else href="/forms" class="encode__cancel">Cancel</Link>
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
                     type="button"
@@ -816,24 +979,32 @@ function submit(): void {
                 >
                     Back
                 </MdsButton>
+                <!-- ⚠️ IN EDIT MODE, NEXT IS SECONDARY AND SAVE IS ALWAYS PRESENT.
+                     Creating a response is a sequence — you fill step 1, then step 2, and Submit belongs at
+                     the end. CORRECTING one is not: the editor came here to fix a known field, they land on
+                     step 1 because edit mode restores no cursor, and with Save gated behind `isLastStep`
+                     they would have to click Next through every remaining step to commit a one-character fix
+                     on step 6 of 8 — with nothing on screen explaining why Save is missing. Save is
+                     therefore rendered on every step, and Next stays available beside it for reading
+                     through. -->
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isLastStep.value"
                     type="button"
-                    variant="primary"
+                    :variant="isEditing ? 'secondary' : 'primary'"
                     icon-right="chevron-right"
                     @click="goNext"
                 >
                     Next
                 </MdsButton>
                 <MdsButton
-                    v-else
+                    v-if="isEditing || form.single_page_mode || runtime.isTerminal.value || runtime.isLastStep.value"
                     type="submit"
                     variant="primary"
                     icon-left="check"
                     :loading="submitting"
                     :disabled="!canSubmit"
                 >
-                    Submit response
+                    {{ isEditing ? 'Save changes' : 'Submit response' }}
                 </MdsButton>
             </div>
         </form>
@@ -961,6 +1132,48 @@ function submit(): void {
 }
 
 .encode__resume-body {
+    font-size: var(--mds-type-caption-font-size);
+}
+
+/* Edit banner (I9c). Shares the resume banner's shape — same job, different sentence — and takes the
+   border-accent treatment for its warning variant rather than colour alone (WCAG 1.4.1, the rule the
+   schedule banner below records). The accent is what distinguishes "this is a consequence" from "this is
+   context" for a reader who cannot tell the two backgrounds apart. */
+.encode__editing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    margin-bottom: var(--mds-space-4);
+    border-radius: var(--mds-radius-md);
+    background: var(--mds-color-status-info-bg);
+    color: var(--mds-color-status-info-fg);
+}
+
+/* The warning variant follows THIS PAGE'S existing banner convention rather than inventing a fourth one:
+   `.encode__pruned`, `.encode__degraded` and `.encode__schedule-banner` all sit on `bg-surface` with a
+   coloured left accent. An earlier draft tinted the whole background AND added a red rule beside an amber
+   fill — two accent systems at once, on a page that already had one. */
+.encode__editing--warning {
+    background: var(--mds-color-bg-surface);
+    color: var(--mds-color-text-body);
+    border: 1px solid var(--mds-color-border-default);
+    border-left: 4px solid var(--mds-color-status-warning-fg);
+}
+
+.encode__editing--warning .encode__editing-title {
+    color: var(--mds-color-text-heading);
+}
+
+.encode__editing--warning .encode__editing-body {
+    color: var(--mds-color-text-secondary);
+}
+
+.encode__editing-title {
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.encode__editing-body {
     font-size: var(--mds-type-caption-font-size);
 }
 

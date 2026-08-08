@@ -39,10 +39,17 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     await consolePage.goto(`${centralOrigin}/login`, { waitUntil: 'networkidle' });
     await consolePage.getByLabel('Email', { exact: true }).fill('console@meridian.test');
     await consolePage.getByLabel('Password', { exact: true }).fill('meridian-console-2026');
-    await Promise.all([
-        consolePage.waitForLoadState('networkidle'),
-        consolePage.getByRole('button', { name: 'Sign in' }).click(),
-    ]);
+    // Record what the POST actually answered. A bare wait cannot distinguish "never submitted" from
+    // "submitted and rejected" from "submitted, accepted, cookie dropped", and those want different fixes.
+    const seen: string[] = [];
+    consolePage.on('response', (r) => {
+        if (r.request().method() === 'POST' || r.url().includes('/login') || r.url().includes('/admin')) {
+            seen.push(`${r.request().method()} ${r.status()} ${r.url()}`);
+        }
+    });
+
+    await consolePage.getByRole('button', { name: 'Sign in' }).click();
+    await consolePage.waitForLoadState('networkidle');
 
     // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify does
     // not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which reads only
@@ -51,7 +58,14 @@ async function globalSetup(_config: FullConfig): Promise<void> {
 
     if (new URL(consolePage.url()).pathname.startsWith('/login')) {
         const shown = (await consolePage.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
-        throw new Error(`console sign-in did not establish a session (${consolePage.url()}). Page said: ${shown}`);
+        const cookies = (await consolePage.context().cookies()).map((c) => `${c.name}@${c.domain}`).join(', ');
+        throw new Error(
+            `console sign-in did not establish a session (${consolePage.url()}).
+` +
+                `Requests: ${seen.join(' | ')}
+Cookies: ${cookies}
+Page said: ${shown}`,
+        );
     }
 
     await consolePage.context().storageState({ path: 'tests/e2e/.auth/admin.json' });

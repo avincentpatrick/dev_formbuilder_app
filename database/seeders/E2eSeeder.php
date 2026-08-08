@@ -1347,7 +1347,10 @@ class E2eSeeder extends Seeder
                 ['submission_id' => $submission->id],
                 [
                     'form_version_id' => $version->id,
-                    'answers' => $this->sampleAnswers($version),
+                    // Empty for `screened_out` (I9a) — that state MEANS the respondent was shown no
+                    // questions, so a populated document would contradict it on the detail page. The 1:1
+                    // answer row is still written, because the inbox and PDF presenters read through it.
+                    'answers' => $row['status'] === SubmissionStatus::ScreenedOut ? [] : $this->sampleAnswers($version),
                     'attachment_refs' => [],
                 ],
             );
@@ -1517,6 +1520,7 @@ class E2eSeeder extends Seeder
         $u = SubmissionStatus::UnderReview;
         $x = SubmissionStatus::Archived;
         $d = SubmissionStatus::Draft;
+        $so = SubmissionStatus::ScreenedOut;
 
         $chs = 'Community Health Survey';
         $hr = 'Household Roster';
@@ -1562,8 +1566,13 @@ class E2eSeeder extends Seeder
             ['form' => $fts, 'back' => 4, 'hour' => 15, 'status' => $x, 'source' => $api, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
             // ── Branching Router ×2. The d-22 row is the ADVERSARIAL one: offline_sync WITH last_saved_at,
             //    which §D5's `source IN (guest, manual)` restriction must keep out of the denominator.
+            //    The d-5 row carries `screened_out` (I9a), and it is on THIS form deliberately: the Branching
+            //    Router is Doc #27 §4.1's own example — every section gated on a URL-prefilled hidden field —
+            //    so a bare visit is exactly the empty step projection the state is derived from. It was
+            //    CONVERTED from `under_review` rather than appended, so `submissions` (33) and `countable`
+            //    (30) both hold; only the split within the countable rows moved.
             ['form' => $br, 'back' => 22, 'hour' => 9, 'status' => $s, 'source' => $o, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 1800],
-            ['form' => $br, 'back' => 5, 'hour' => 16, 'status' => $u, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $br, 'back' => 5, 'hour' => 16, 'status' => $so, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
             // ── Closed Survey ×1 — capacity-closed, but a direct write is not the ingest path. ────────
             ['form' => $cs, 'back' => 12, 'hour' => 10, 'status' => $s, 'source' => $g, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
             // ── Three UNCONVERTED drafts. Excluded from every countable aggregate by scopeCountable(), so

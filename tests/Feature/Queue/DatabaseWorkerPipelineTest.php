@@ -89,6 +89,10 @@ it('carries a job through the real database queue and re-establishes tenant cont
     // ── §D7: the retry knobs really reached the payload ────────────────────────────────────────
     // maxTries null is the load-bearing one: it proves TenantAwareJob declares NO $tries, so a
     // fairness deferral (which consumes an attempt) cannot fail the job. retryUntil governs instead.
+    // ⚠️ `maxExceptions` here is the LAST guard on TenantAwareJob's default, and it is not redundant with
+    // the failure-path test below (I10b). That test's fixture overrides $maxExceptions to 1 to make the
+    // failure deterministic, so it is blind to the base class's default moving. ProbeTenantJob does not
+    // override it — this line is the only place the 3 is asserted. Do not delete it as duplication.
     expect($payload['maxTries'])->toBeNull()
         ->and($payload['maxExceptions'])->toBe(3)
         ->and($payload['timeout'])->toBe(60)
@@ -183,5 +187,11 @@ it('records a failed job in failed_jobs rather than losing it', function (): voi
     $failed = DB::table('failed_jobs')->first();
 
     expect($failed->queue)->toBe(QueueName::Submissions->value)
-        ->and($failed->exception)->toContain('Deliberate failure from ExplodingTenantJob');
+        ->and($failed->exception)->toContain('Deliberate failure from ExplodingTenantJob')
+        // I10b: the negative half, so the old flake cannot come back quietly. When the pre-flight
+        // retryUntil check fired instead of handle(), this row carried the FRAMEWORK's exception and the
+        // assertion above failed as an opaque substring miss. Naming the wrong exception makes a
+        // regression legible at a glance instead of sending the next reader to Worker.php to work out why
+        // a green test went red on a tree that changed nothing but a markdown file.
+        ->and($failed->exception)->not->toContain('MaxAttemptsExceededException');
 });

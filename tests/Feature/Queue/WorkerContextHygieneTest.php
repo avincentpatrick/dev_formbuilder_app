@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Jobs\ExplodingTenantJob;
@@ -91,6 +92,14 @@ it('leaves the worker clean after a job that THREW', function (): void {
     simulateBareWorker();
 
     workOneJob();
+
+    // I10b — THE PRECONDITION, and it is not ceremony. This test's entire value is that a job THREW, and
+    // until I10b the fixture could fail in Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts() BEFORE
+    // handle() ran. On that path nothing throws, no tenant context is ever established, and the assertion
+    // below passes for completely the wrong reason — so the §D4 mutant-killer was intermittently proving
+    // nothing, silently, and could never go red to say so. Asserting the job actually reached failed_jobs
+    // is what makes the real assertion non-vacuous.
+    expect(DB::table('failed_jobs')->count())->toBe(1);
 
     // MUTANT KILLED: binding the after-edge to JobProcessed — which is what ADR-0007 §D4 literally
     // prescribes. Worker::process raises JobProcessed only on the success path and diverts to

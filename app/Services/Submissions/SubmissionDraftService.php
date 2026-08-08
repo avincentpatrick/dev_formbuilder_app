@@ -17,6 +17,7 @@ use App\Models\SubmissionAnswer;
 use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Submissions\FinalizedStatus;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -132,6 +133,10 @@ final class SubmissionDraftService
         $this->acceptance->assertCanPromote($form, $draft);
 
         $fields = $version->fields()->get();
+        // Loaded for {@see FinalizedStatus} (I9a) — and it is load-bearing rather than tidy. `StepProjection`
+        // walks SECTIONS; hand it an empty collection and every projection is empty, so every promoted draft
+        // would be classified `screened_out` and no promote would ever consume a capacity slot again.
+        $sections = $version->sections()->get();
 
         $stored = SubmissionAnswer::query()->where('submission_id', $draft->id)->firstOrFail();
         /** @var array<string, mixed> $answers */
@@ -152,7 +157,7 @@ final class SubmissionDraftService
         // submit() would store for an equivalent raw submission (submit() hashes its Stage-1 output).
         $checksum = AnswersContentChecksum::of($answers);
 
-        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $final, $checksum, $actorId, $semantic): SubmissionResult {
+        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $sections, $final, $checksum, $actorId, $semantic): SubmissionResult {
             $row = Submission::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             // Already finalized (double-promote, or a concurrent promote won under the lock) — idempotent
@@ -162,7 +167,10 @@ final class SubmissionDraftService
             }
 
             $row->forceFill([
-                'status' => SubmissionStatus::Submitted,
+                // The same determination `SubmissionPipeline::persist()` makes, from the same object, so the
+                // two finalize doors cannot disagree about whether a response consumed a paid slot. It is
+                // written BEFORE `finalize()` runs `assertCapacity()`, which counts this very row.
+                'status' => FinalizedStatus::for($sections, $fields, $semantic),
                 'submitted_at' => now(),
                 'draft_expires_at' => null,
             ])->save();

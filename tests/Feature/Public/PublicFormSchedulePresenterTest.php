@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SubmissionSource;
+use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\User;
 use App\Services\Submissions\PublicFormPresenter;
@@ -78,6 +79,21 @@ it('reports capacity_reached with zero remaining once the cap is full', function
 
     expect($schedule['acceptance'])->toBe('capacity_reached')
         ->and($schedule['remaining'])->toBe(0);
+});
+
+it('does not let a screened-out response eat a slot in the banner', function (): void {
+    // I9a. The banner and `FormAcceptanceGuard::assertCapacity()` must count the SAME rows, so if this
+    // presenter kept the old `status <> 'draft'` predicate it would tell a respondent the form was full
+    // while the guard went on accepting — the exact "the public banner lies" failure the six predicate
+    // sites move together to prevent.
+    $version = scheduledForm($this->tenant, $this->user, ['max_responses' => 1]);
+    $form = Form::findOrFail($version->form_id);
+    seedInboxSubmission($form, $this->user, SubmissionStatus::ScreenedOut, [], SubmissionSource::Guest);
+
+    $schedule = $this->presenter->present($form, $version)['form']['schedule'];
+
+    expect($schedule['acceptance'])->toBe('open')
+        ->and($schedule['remaining'])->toBe(1);
 });
 
 it('leaves remaining null for an uncapped form', function (): void {

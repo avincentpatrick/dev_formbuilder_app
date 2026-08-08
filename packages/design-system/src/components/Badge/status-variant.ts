@@ -27,6 +27,10 @@ const STATUS: Record<string, StatusDescriptor> = {
     // Submission review lifecycle (Increment F7): SubmissionStatus. `draft`/`archived` are shared with the
     // form lifecycle above and intentionally reuse those descriptors.
     submitted: { variant: 'info', label: 'Submitted' },
+    // `screened_out` (Increment I9a) is NEUTRAL, for the same reason `wont_fix`/`disabled`/`revoked` are:
+    // it is a settled non-failure. Nothing went wrong — the respondent finalized a form that had no
+    // questions left to show them — and red would read as "this response errored".
+    screened_out: { variant: 'neutral', label: 'Screened out' },
     under_review: { variant: 'warning', label: 'Under review' },
     approved: { variant: 'success', label: 'Approved' },
     returned: { variant: 'danger', label: 'Returned' },

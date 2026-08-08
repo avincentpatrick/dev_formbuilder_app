@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
-use App\Enums\SubmissionStatus;
 use App\Http\Middleware\RequireFeature;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -78,7 +77,7 @@ final class PublicFormPresenter
 
     /**
      * The scheduled-form runtime block (Increment H12a). `acceptance` is the live label; `remaining` is the
-     * cap headroom (null when uncapped). The live finalized COUNT is taken only when a cap exists, so an
+     * cap headroom (null when uncapped). The live COUNT is taken only when a cap exists, so an
      * uncapped form costs no extra query. The explicit array shape keeps the generated OpenAPI types precise.
      *
      * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
@@ -86,17 +85,22 @@ final class PublicFormPresenter
     private function schedule(Form $form): array
     {
         $cap = $form->max_responses;
-        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+        $consumedCount = $cap === null ? null : $this->capacityCount($form);
 
-        return FormScheduleView::present($form, $finalizedCount);
+        return FormScheduleView::present($form, $consumedCount);
     }
 
-    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
-    private function finalizedCount(Form $form): int
+    /**
+     * The live count of submissions that consumed one of this form's paid slots, RLS-scoped to the tenant —
+     * the DISPLAY twin of `FormAcceptanceGuard::assertCapacity()`'s enforcement COUNT, and identical to
+     * `EncodeFormPresenter::capacityCount()` on purpose. All three use {@see Submission::scopeConsumesCapacity()};
+     * if one of them drifts, this banner tells a respondent the form is full while the guard still accepts.
+     */
+    private function capacityCount(Form $form): int
     {
         return Submission::query()
             ->where('form_id', $form->id)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->consumesCapacity()
             ->count();
     }
 

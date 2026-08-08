@@ -7,7 +7,6 @@ namespace App\Services\Submissions;
 use App\Enums\FieldType;
 use App\Enums\PrefillSource;
 use App\Enums\RequiredMode;
-use App\Enums\SubmissionStatus;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -277,24 +276,28 @@ final class EncodeFormPresenter
 
     /**
      * The scheduled-form runtime block (Increment H12b) — the same wire shape the guest presenter emits, via
-     * the shared {@see FormScheduleView}. The live finalized COUNT is read only when a cap exists.
+     * the shared {@see FormScheduleView}. The live COUNT is read only when a cap exists.
      *
      * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
      */
     private function schedule(Form $form): array
     {
         $cap = $form->max_responses;
-        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+        $consumedCount = $cap === null ? null : $this->capacityCount($form);
 
-        return FormScheduleView::present($form, $finalizedCount);
+        return FormScheduleView::present($form, $consumedCount);
     }
 
-    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
-    private function finalizedCount(Form $form): int
+    /**
+     * The live count of submissions that consumed one of this form's paid slots, RLS-scoped to the tenant.
+     * Textually identical to `PublicFormPresenter::capacityCount()` on purpose — the two are display twins of
+     * `FormAcceptanceGuard::assertCapacity()` and must not drift. See {@see Submission::scopeConsumesCapacity()}.
+     */
+    private function capacityCount(Form $form): int
     {
         return Submission::query()
             ->where('form_id', $form->id)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->consumesCapacity()
             ->count();
     }
 

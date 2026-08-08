@@ -682,7 +682,12 @@ class DemoSeeder extends Seeder
         // hooks that fill `tenant_id` and the uuid key.
         $submission->forceFill(['created_at' => $createdAt])->saveQuietly();
 
-        $answers = $this->demoAnswers($fields, $row['seq']);
+        // A `screened_out` row is the respondent who was shown NO questions (I9a), so a full answer document
+        // would contradict the state on the very page a tester opens to understand it — and its
+        // `completeness_percent` is 0, not 100. Empty rather than absent: the 1:1 answer row still exists,
+        // because `SubmissionInboxPresenter::answerBlocks()` and the PDF presenter both read through it.
+        $screenedOut = $status === SubmissionStatus::ScreenedOut;
+        $answers = $screenedOut ? [] : $this->demoAnswers($fields, $row['seq']);
 
         SubmissionAnswer::updateOrCreate(
             ['submission_id' => $submission->id],
@@ -690,7 +695,11 @@ class DemoSeeder extends Seeder
                 'form_version_id' => $version->id,
                 'answers' => $answers,
                 'attachment_refs' => [],
-                'completeness_percent' => $isDraft ? 40 + ($row['seq'] % 40) : 100,
+                'completeness_percent' => match (true) {
+                    $screenedOut => 0,
+                    $isDraft => 40 + ($row['seq'] % 40),
+                    default => 100,
+                },
                 'last_saved_at' => $row['saved'] ? $createdAt : null,
             ],
         );
@@ -841,9 +850,11 @@ class DemoSeeder extends Seeder
     /**
      * One spec row, derived purely from its index.
      *
-     * The `% 20` distributions are the point: 50% plain submitted, 20% approved, 10% under review, 10%
-     * returned, 5% archived and 5% still draft gives every inbox filter and every Badge variant a non-empty
-     * result. The source mix matters for a different reason — ADR-0011 §D5's completion denominator is
+     * The `% 20` distributions are the point: 45% plain submitted, 5% screened out, 20% approved, 10% under
+     * review, 10% returned, 5% archived and 5% still draft gives every inbox filter and every Badge variant a
+     * non-empty result. The screened-out band (I9a) was taken from `submitted` rather than appended, so the
+     * draft-to-countable ratio this fixture's consumers assert stays exactly where it was — only the split
+     * WITHIN the countable rows moved. The source mix matters for a different reason — ADR-0011 §D5's completion denominator is
      * `last_saved_at IS NOT NULL AND source IN (guest, manual)`, so a fixture that was all one source would
      * render the completion tiles as a suppression state instead of a number.
      *
@@ -858,7 +869,8 @@ class DemoSeeder extends Seeder
             'seq' => $seq,
             'hour' => 8 + ($seq % 9),
             'status' => match (true) {
-                $bucket < 10 => SubmissionStatus::Submitted,
+                $bucket < 9 => SubmissionStatus::Submitted,
+                $bucket < 10 => SubmissionStatus::ScreenedOut,
                 $bucket < 14 => SubmissionStatus::Approved,
                 $bucket < 16 => SubmissionStatus::UnderReview,
                 $bucket < 18 => SubmissionStatus::Returned,

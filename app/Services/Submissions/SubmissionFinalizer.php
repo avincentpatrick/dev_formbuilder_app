@@ -56,8 +56,11 @@ final class SubmissionFinalizer
         ?string $actorId,
     ): void {
         // Scheduled-form response cap (Increment H12a) — the ONE transactional capacity gate, run here so both
-        // finalize paths (submit + promote) share it. The head row already exists (created on submit / flipped
-        // to Submitted on promote) so the live COUNT-under-RLS includes it; a full cap throws and rolls back
+        // finalize paths (submit + promote) share it. The head row already exists and already carries its
+        // finalized status (FinalizedStatus::for, I9a — set at create on submit, at the forceFill on promote),
+        // so the live COUNT-under-RLS includes it whenever it consumes a slot and correctly excludes it when
+        // it is `screened_out`. That ordering is load-bearing: compute the status after this line and a
+        // screened-out respondent would still be counted against the cap. A full cap throws and rolls back
         // this whole persist transaction (uncreating the submit / leaving the draft resumable). No-op for an
         // uncapped form. See FormAcceptanceGuard::assertCapacity for the form-row-lock serialization.
         $this->acceptance->assertCapacity($form);

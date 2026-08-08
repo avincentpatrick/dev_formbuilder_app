@@ -202,7 +202,10 @@ components:
       properties:
         id: { type: string, format: uuid }
         form_version_id: { type: string, format: uuid }
-        status: { type: string, enum: [draft, submitted, under_review, approved, returned, archived] }
+        status: { type: string, enum: [draft, submitted, screened_out, under_review, approved, returned, archived] }
+                 # `screened_out` (I9a) — finalized having been shown no questions; consumes no max_responses slot.
+                 # A consumer that switches exhaustively on this enum must handle it: it is emitted by the
+                 # public guest submit, by the encode channel, and in the `submission.created` webhook payload.
         source: { type: string, enum: [manual, guest, ocr_single, ocr_linelist, offline_sync, api_import] }
   responses:
     ValidationError:

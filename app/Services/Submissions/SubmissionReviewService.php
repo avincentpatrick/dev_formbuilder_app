@@ -94,7 +94,18 @@ final class SubmissionReviewService
         );
     }
 
-    /** Move a non-draft submission to the terminal `archived` retention state. */
+    /**
+     * Move a non-draft submission to the terminal `archived` retention state.
+     *
+     * ⚠️ `SubmissionStatus::ScreenedOut` IS DELIBERATELY ABSENT FROM THIS `$from` LIST — and from the other
+     * three — rather than merely un-added (I9a). It is not a workflow preference: `archived` CONSUMES a
+     * `max_responses` slot and `screened_out` does not ({@see Submission::scopeConsumesCapacity()}),
+     * so archiving a screened-out row would silently convert a non-consuming row into a consuming one and
+     * retroactively overfill a cap that was already at its limit. Any instinct to widen this "so reviewers can
+     * tidy the inbox" has to be answered with a separate `capacity_consumed_at` column, not with a fifth
+     * enum case in this array. `ScreenedOutTest` asserts the accepted set is exactly the four below, so a
+     * future case cannot be waved in without the assertion arguing back.
+     */
     public function archive(Submission $submission, User $reviewer, ?string $remarks = null): Submission
     {
         return $this->apply($submission, [

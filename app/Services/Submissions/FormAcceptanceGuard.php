@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
-use App\Enums\SubmissionStatus;
 use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Models\Form;
 use App\Models\Submission;
@@ -62,10 +61,22 @@ final class FormAcceptanceGuard
 
     /**
      * The response cap (H-map row 233: "transactional COUNT-under-RLS, not a running aggregate"). MUST be
-     * called INSIDE the finalize transaction, AFTER the head row exists (created on submit / flipped to
-     * Submitted on promote), so the live COUNT includes the row being finalized — hence the threshold is
-     * `> max`, not `+1 > max`. The form-row `lockForUpdate` serializes concurrent finalizers on the same form
-     * so two racing submits cannot both slip past the last slot. A null cap takes no lock and no COUNT.
+     * called INSIDE the finalize transaction, AFTER the head row exists (created on submit / given its
+     * finalized status on promote), so the live COUNT includes the row being finalized **whenever that row
+     * consumes a slot** — hence the threshold is `> max`, not `+1 > max`. The form-row `lockForUpdate`
+     * serializes concurrent finalizers on the same form so two racing submits cannot both slip past the last
+     * slot. A null cap takes no lock and no COUNT.
+     *
+     * The qualifier on "includes the row being finalized" is I9a's and it is not pedantry: a `screened_out`
+     * row is written before this runs and is then excluded by the predicate, so for THAT row the count is of
+     * the others alone. The `>` threshold stays correct either way — a non-consuming row cannot push the
+     * count past the cap, which is precisely the outcome the state exists to produce.
+     *
+     * The COUNT is {@see Submission::scopeConsumesCapacity()} and NOT `scopeCountable()`: the cap is a
+     * purchased quantity, so what it counts is rows that consumed a slot — which since I9a excludes
+     * `screened_out` as well as `draft`. Its two display twins, `PublicFormPresenter::capacityCount()` and
+     * `EncodeFormPresenter::capacityCount()`, use the same scope for the same reason. **They move together or
+     * the public banner says "capacity reached" while this guard still accepts.**
      *
      * @throws FormNotAcceptingSubmissionException
      */
@@ -83,7 +94,7 @@ final class FormAcceptanceGuard
 
         $count = Submission::query()
             ->where('form_id', $form->id)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->consumesCapacity()
             ->count();
 
         if ($count > $locked->max_responses) {

@@ -5,19 +5,20 @@ declare(strict_types=1);
 namespace App\Services\Submissions;
 
 use App\Enums\FormVersionStatus;
-use App\Enums\SubmissionStatus;
 use App\Events\SubmissionCreated;
 use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionException;
 use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Submissions\FinalizedStatus;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +107,7 @@ final class SubmissionPipeline
 
         // Stage 4 — transactional persist.
         try {
-            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $form, $fields, $result, $contentChecksum));
+            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $form, $fields, $sections, $result, $contentChecksum));
         } catch (QueryException $e) {
             // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
             // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
@@ -135,9 +136,13 @@ final class SubmissionPipeline
      * JSONB answer document + the typed/geo index projections + the attachment re-point + the `created` audit
      * row) to {@see SubmissionFinalizer} — the identical body {@see SubmissionDraftService::promote()} reuses.
      *
+     * `$sections` is threaded in for {@see FinalizedStatus} alone (I9a). It is NOT re-queried here: `submit()`
+     * already loaded it for Stage 1, and the status must be decided from THIS finalize's own masks.
+     *
      * @param  Collection<int, FormField>  $fields
+     * @param  Collection<int, FormSection>  $sections
      */
-    private function persist(SubmissionPayload $payload, Form $form, Collection $fields, SemanticResult $result, string $contentChecksum): Submission
+    private function persist(SubmissionPayload $payload, Form $form, Collection $fields, Collection $sections, SemanticResult $result, string $contentChecksum): Submission
     {
         $version = $payload->version;
 
@@ -150,7 +155,10 @@ final class SubmissionPipeline
             'form_id' => $version->form_id,
             'form_version_id' => $version->id,
             'respondent_user_id' => $payload->respondentUserId,
-            'status' => SubmissionStatus::Submitted,
+            // Computed HERE, at the create, rather than into a local above — the head row's status is what
+            // `assertCapacity()` counts a few lines later inside `finalize()`, so a value computed early and
+            // then not used is the one mistake this line must make impossible. See {@see FinalizedStatus}.
+            'status' => FinalizedStatus::for($sections, $fields, $result),
             'source' => $payload->source,
             'client_submission_uuid' => $payload->clientSubmissionUuid,
             'guest_token' => $payload->guestToken,

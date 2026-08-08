@@ -6615,10 +6615,11 @@
             },
             "SubmissionStatus": {
                 "type": "string",
-                "description": "Submission review lifecycle (data-dictionary \u00a77). `draft` = started but not yet finalized (the Phase-1 in-session save path and the resting state of a new row); `submitted` = the respondent finalized it and it entered the review queue; `under_review`/`approved`/`returned` are the reviewer transitions (renaming legacy's \"Pending Validation\" to `under_review`); `archived` is a terminal retention state. Every channel funnels into one `SubmissionPipeline`, so this enum is source-agnostic.\n",
+                "description": "Submission review lifecycle (data-dictionary \u00a77). `draft` = started but not yet finalized (the Phase-1 in-session save path and the resting state of a new row); `submitted` = the respondent finalized it and it entered the review queue; `screened_out` = they finalized it having been shown no questions to answer, so it consumes no `max_responses` slot; `under_review`/`approved`/`returned` are the reviewer transitions (renaming legacy's \"Pending Validation\" to `under_review`); `archived` is a terminal retention state. Every channel funnels into one `SubmissionPipeline`, so this enum is source-agnostic.\n",
                 "enum": [
                     "draft",
                     "submitted",
+                    "screened_out",
                     "under_review",
                     "approved",
                     "returned",

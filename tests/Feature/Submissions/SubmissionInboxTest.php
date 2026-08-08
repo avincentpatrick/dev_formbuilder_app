@@ -10,6 +10,7 @@ use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -181,6 +182,37 @@ it('hides in-progress drafts by default and surfaces them (with completeness) un
             ->where('meta.total', 1)
             ->where('data.0.status', 'draft')
             ->where('data.0.completeness_percent', 40));
+});
+
+it('lists screened-out submissions in the default view and offers them as a filter', function (): void {
+    // I9a. Deliberately the OPPOSITE of the draft rule directly above, and the contrast is the point: a draft
+    // was never finalized, so hiding it is a review convenience; a screened-out response WAS finalized and is
+    // a real thing the tenant received. Hiding it would also hide the one shape that makes a badly-built form
+    // visible — a form that screens everyone out shows a page of "Screened out" pills instead of silence.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Done']);
+    seedInboxSubmission($form, $owner, SubmissionStatus::ScreenedOut, []);
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 2)
+            // The filter catalog is `SubmissionStatus::cases()`-derived, so it picked the new option up with
+            // no code change — asserted so that stays true rather than being assumed.
+            ->where('filters.statuses', fn (Collection $statuses): bool => $statuses->contains(
+                fn (array $option): bool => $option === ['value' => 'screened_out', 'label' => 'Screened out'],
+            )));
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=screened_out')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 1)
+            ->where('data.0.status', 'screened_out'));
 });
 
 it('paginates the inbox at 25 per page', function (): void {

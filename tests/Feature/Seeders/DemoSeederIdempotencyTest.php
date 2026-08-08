@@ -170,7 +170,7 @@ it('produces the shape the testing guide describes, at the volume it ships', fun
     // Every status and every source is represented, or an inbox filter renders an empty state the guide
     // tells the tester is populated.
     expect(array_keys($shape['statuses']))
-        ->toBe(['approved', 'archived', 'draft', 'returned', 'submitted', 'under_review']);
+        ->toBe(['approved', 'archived', 'draft', 'returned', 'screened_out', 'submitted', 'under_review']);
     expect(count($shape['sources']))->toBeGreaterThanOrEqual(3);
 
     // A trend needs shape. ~90 buckets with a few genuine holes is what makes zero-filling visible as a

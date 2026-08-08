@@ -104,6 +104,41 @@ it('asks a reviewer to review while telling the owner a submission arrived', fun
         ->toBe(NotificationType::ReviewRequested);
 });
 
+it('does not ask anyone to review a screened-out submission', function (): void {
+    // I9a. `screened_out` is terminal — absent from all four `$from` lists in SubmissionReviewService — so a
+    // reviewer following a "review requested" bell lands on a detail page where every action is refused.
+    //
+    // The paired assertion is the whole test: `submission_received` MUST still fire. Asserting only the
+    // absence would pass against a listener that had stopped notifying anyone at all, and the tenant does
+    // genuinely need to know — a form that screens everyone out is meant to be loud, not silent.
+    $reviewer = tenantMember('reviewer');
+    DB::table('resource_grants')->insert([
+        'id' => Str::uuid7()->toString(),
+        'tenant_id' => $this->tenant->id,
+        'user_id' => $reviewer->id,
+        'scopeable_type' => 'form',
+        'scopeable_id' => $this->form->id,
+        'capacity' => 'reviewer',
+        'includes_descendants' => false,
+        'granted_by' => $this->owner->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $submission = Submission::factory()->create([
+        'form_id' => $this->form->id,
+        'status' => SubmissionStatus::ScreenedOut,
+    ]);
+
+    event(SubmissionCreated::for($submission));
+
+    enterTenant($this->tenant->id, $this->owner->id);
+
+    expect(rowsOfType(NotificationType::SubmissionReceived))->toBe(1)
+        ->and(rowsOfType(NotificationType::ReviewRequested))->toBe(0)
+        ->and(NotificationRecord::query()->forUser($reviewer)->count())->toBe(0);
+});
+
 it('does not tell the encoder about their own submission', function (): void {
     $editor = tenantMember('form_editor');
 

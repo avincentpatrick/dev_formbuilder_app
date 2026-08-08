@@ -36,7 +36,14 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify
     // does not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which
     // reads only the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains the trade.
-    await consolePage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30_000 });
+    await consolePage.waitForLoadState('networkidle');
+
+    // Diagnose rather than time out opaquely: a failed sign-in re-renders /login with the reason, and a
+    // 30s waitForURL would report only "timeout" for what is really a fixture problem.
+    if (new URL(consolePage.url()).pathname.startsWith('/login')) {
+        const shown = (await consolePage.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
+        throw new Error(`console sign-in stayed on /login (${consolePage.url()}). Page said: ${shown}`);
+    }
 
     await consolePage.context().storageState({ path: 'tests/e2e/.auth/admin.json' });
 

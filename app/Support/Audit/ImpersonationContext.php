@@ -90,10 +90,21 @@ final class ImpersonationContext
      */
     private static function fromSession(): ?string
     {
-        if (app()->bound('request') && request()->hasSession()) {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        if (request()->hasSession()) {
             return self::sanitise(request()->session()->get(self::SESSION_KEY));
         }
 
+        // ⚠️ THE `bound('request')` GUARD ABOVE IS LOAD-BEARING, AND REMOVING IT COST TWELVE FAILURES.
+        // Resolving the session MANAGER is not free the way reading an already-attached store is: it
+        // instantiates a driver, and this method runs on EVERY audit write — including inside queued jobs
+        // and scheduled sweeps, which have no request at all. A version that reached for the manager
+        // unconditionally turned five unrelated sweep/reaper/seeder suites red in CI. Confining the
+        // fallback to request-bound contexts keeps the test path working (a feature test seeding via the
+        // `session()` helper is request-bound) while leaving console and queue exactly as they were.
         return app()->bound('session')
             ? self::sanitise(app('session')->driver()->get(self::SESSION_KEY))
             : null;

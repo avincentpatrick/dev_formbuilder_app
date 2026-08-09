@@ -55,6 +55,16 @@ final class EnforceImpersonationTimeout
             return $next($request);
         }
 
+        // ⚠️ `ImpersonationContext::operatorId()` ABOVE AND `$request->session()` HERE ARE NOT THE SAME
+        // STORE, and assuming they were threw a 500 the first time this was exercised. That reader falls
+        // back to the session MANAGER when the request has no attached store; this one would then throw
+        // "Session store not set on request". On a `web` route the two always agree, because `StartSession`
+        // has run — so a request without one is not an impersonated session, it is a route this middleware
+        // has no business on, and passing it through is the correct answer rather than a swallowed error.
+        if (! $request->hasSession()) {
+            return $next($request);
+        }
+
         $deadline = $request->session()->get(ImpersonationService::DEADLINE_SESSION_KEY);
 
         // ⚠️ A MARKER WITH NO DEADLINE IS TREATED AS EXPIRED, WHICH IS THE FAIL-CLOSED DIRECTION. The pair

@@ -63,6 +63,7 @@ const TENANT_ID = '0192e2e0-0000-7000-8000-0000000000aa';
 const FREE_ID = '0192e2e0-0000-7000-8000-0000000000f1';
 const PRO_ID = '0192e2e0-0000-7000-8000-0000000000f2';
 const BUSINESS_ID = '0192e2e0-0000-7000-8000-0000000000f3';
+const MEMBER_ID = '0192e2e0-0000-7000-8000-0000000000b1';
 
 function plan(overrides: Partial<PlanCatalogEntry> = {}): PlanCatalogEntry {
     return {
@@ -164,6 +165,11 @@ function props(overrides: Partial<TenantDetailPageProps> = {}): TenantDetailPage
         },
         features: [{ key: 'webhooks', label: 'Webhooks', plan_grants: true, effective: false, reason: 'tenant_disabled' }],
         domains: { rows: [domainRow()], app_host: 'demo.localhost', public_host: 'forms.example.test' },
+        impersonation: {
+            targets: [
+                { id: MEMBER_ID, name: 'Ada Owner', email: 'ada@demo.test', role: 'Owner', is_owner: true },
+            ],
+        },
         ...overrides,
     };
 }
@@ -353,5 +359,62 @@ describe('admin/TenantDetail', () => {
         mocks.pageProps.errors = { admin: 'That workspace is already suspended.' };
 
         expect(render().get('[role="alert"]').text()).toContain('already suspended');
+    });
+});
+
+/**
+ * Support access — Increment I11b, RBAC §9 resolved decision 1.
+ *
+ * The console half of impersonation. Every eligibility rule is enforced server-side and re-checked at
+ * redemption, so what these cases pin is the part only the page can get wrong: that the operator cannot
+ * reach the POST without passing a confirmation, and that the card degrades honestly when there is nobody
+ * to offer.
+ */
+describe('support access (I11b)', () => {
+    it('lists the members the server offered, with their role', () => {
+        const text = render().text();
+
+        expect(text).toContain('Support access');
+        expect(text).toContain('ada@demo.test');
+        expect(text).toContain('Owner');
+    });
+
+    it('states the consequences before the operator can act', () => {
+        // Not decoration. This is the only place an operator is told that the access is visible to the
+        // workspace and time-limited, and it is what makes the act accountable rather than covert.
+        const text = render().text();
+
+        expect(text).toContain("this workspace's own audit log");
+        expect(text).toContain('30 minutes');
+    });
+
+    it('requires the confirm modal before posting', async () => {
+        const wrapper = render();
+
+        await wrapper.findAll('button').find((button) => button.text() === 'Sign in as')!.trigger('click');
+        expect(mocks.post).not.toHaveBeenCalled();
+
+        // ⭐ THE GUARD THAT MATTERS. The click leaves this origin entirely and lands the operator inside
+        // somebody else's workspace, so the modal is the last point at which "wrong row" is recoverable.
+        // Wire the row button straight to the POST and this is the only case that reddens.
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text().startsWith('Sign in as Ada Owner'))!
+            .trigger('click');
+
+        expect(mocks.post).toHaveBeenCalledWith(
+            `/admin/tenants/${TENANT_ID}/impersonate`,
+            { user_id: MEMBER_ID },
+            expect.objectContaining({ preserveScroll: true }),
+        );
+    });
+
+    it('says so plainly when there is nobody eligible', () => {
+        // A real state, not an edge case: a workspace whose only member is the operator, or whose members
+        // are all platform staff. The empty copy states the RULE rather than rendering a dead control.
+        const text = render({ impersonation: { targets: [] } }).text();
+
+        expect(text).toContain('No one to sign in as');
+        expect(text).toContain('never to your own account');
     });
 });

@@ -13,7 +13,6 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Notifications\NotificationRecipientResolver;
-use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Audit\RedeemedImpersonation;
@@ -21,6 +20,7 @@ use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -96,7 +96,6 @@ final class ImpersonationService
         private readonly AuditLogger $audit,
         private readonly NotificationDispatcher $notifications,
         private readonly NotificationRecipientResolver $recipients,
-        private readonly TenantMembershipService $members,
     ) {}
 
     /**
@@ -218,64 +217,97 @@ final class ImpersonationService
      * "this person is platform staff" — a fact the console has no business rendering into a per-tenant
      * roster. The refusal also arrives at the wrong moment: after the operator has decided who to help.
      *
-     * The roster itself is {@see TenantMembershipService::listMembers()} rather than a second join over
-     * `tenant_users` + `model_has_roles` + `users`. That method already solves the two awkward parts — the
-     * cross-RLS identity read on `pgsql_auth`, and resolving a MATERIALIZED role for an active member
-     * rather than their reserved `invited_role_id` — and a duplicate would drift on both.
+     * ⚠️ DELIBERATELY NOT {@see TenantMembershipService::listMembers()}, THOUGH IT LOOKS LIKE THE SAME
+     * QUERY. That method also lists INVITED members, whose placeholder `users` rows are hidden by the app
+     * connection's join-shape policy, so it resolves identities on the pre-auth `pgsql_auth` connection to
+     * see them. This picker lists ACTIVE members ONLY, every one of whom is visible on the app connection
+     * through `usersVisibilitySql()`'s membership arm — so it needs no cross-connection read.
+     *
+     * That is a correctness argument, not a performance one: {@see self::isEligible()} answers on the app
+     * connection, and a picker sourced from a connection with DIFFERENT visibility rules could offer a row
+     * the guard then refuses. Reading both from the same place is what makes the two agree by construction.
+     * (It also happens to be the difference between a testable method and one that needs committed
+     * fixtures, since `pgsql_auth` is a separate session that cannot see an open test transaction.)
      *
      * @return list<array{id: string, name: string, email: string, role: string, is_owner: bool}>
      */
     public function eligibleTargets(Tenant $tenant, string $operatorId): array
     {
         $tenantId = (string) $tenant->getKey();
+        $ownerId = $tenant->owner_user_id === null ? null : (string) $tenant->owner_user_id;
 
         /** @var list<array{id: string, name: string, email: string, role: string, is_owner: bool}> $rows */
-        $rows = DB::transaction(function () use ($tenant, $tenantId, $operatorId): array {
+        $rows = DB::transaction(function () use ($tenantId, $operatorId, $ownerId): array {
             $savedTenant = TenantContext::currentTenantId();
             $savedUser = TenantContext::currentUserId();
             TenantContext::applyLocal($tenantId);
 
             try {
-                $active = array_values(array_filter(
-                    $this->members->listMembers($tenant),
-                    static fn (array $row): bool => $row['status'] === TenantUserStatus::Active->value
-                        && $row['user_id'] !== $operatorId,
-                ));
+                $memberIds = TenantUser::query()
+                    ->where('status', TenantUserStatus::Active)
+                    ->pluck('user_id')
+                    ->all();
 
-                if ($active === []) {
+                if ($memberIds === []) {
                     return [];
                 }
 
-                // ONE query for the whole roster rather than an is_super_admin read per row. On
-                // `pgsql_auth` to match how listMembers() resolved these same identities: the app
-                // connection's `users` policy would answer for active members too, but reading the flag
-                // over there and the name over here is how two rosters come to disagree.
-                $staff = User::on('pgsql_auth')
-                    ->withTrashed()
-                    ->whereIn('id', array_column($active, 'user_id'))
-                    ->where('is_super_admin', true)
-                    ->pluck('id')
-                    ->all();
+                // Both exclusions in the query rather than a post-filter, so "eligible" is one predicate
+                // the database evaluates: never yourself, never another super-admin.
+                $users = User::query()
+                    ->whereIn('id', $memberIds)
+                    ->whereKeyNot($operatorId)
+                    ->where('is_super_admin', false)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email']);
 
-                return array_values(array_map(
-                    static fn (array $row): array => [
-                        'id' => $row['user_id'],
-                        'name' => $row['name'],
-                        'email' => $row['email'],
-                        'role' => $row['role'],
-                        'is_owner' => $row['is_owner'],
-                    ],
-                    array_filter(
-                        $active,
-                        static fn (array $row): bool => ! in_array($row['user_id'], $staff, true),
-                    ),
-                ));
+                $roles = $this->materializedRoles($users->pluck('id')->all());
+
+                return $users
+                    ->map(static fn (User $user): array => [
+                        'id' => (string) $user->getKey(),
+                        'name' => (string) $user->name,
+                        'email' => (string) $user->email,
+                        'role' => $roles[(string) $user->getKey()] ?? '—',
+                        'is_owner' => $ownerId !== null && $ownerId === (string) $user->getKey(),
+                    ])
+                    ->values()
+                    ->all();
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
         });
 
         return $rows;
+    }
+
+    /**
+     * The role each member actually HOLDS, not the one their invitation reserved.
+     *
+     * `model_has_roles` is team-scoped by RLS, so the adopted context is what makes this the current
+     * tenant's assignment rather than one from another workspace — the same read
+     * {@see TenantMembershipService::listMembers()} makes for its active rows, and the reason a member who
+     * appears in two workspaces shows a different role in each.
+     *
+     * @param  list<string>  $userIds
+     * @return array<string, string>
+     */
+    private function materializedRoles(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        /** @var array<string, string> $map */
+        $map = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->whereIn('model_has_roles.model_id', $userIds)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->pluck('roles.name', 'model_has_roles.model_id')
+            ->map(static fn (mixed $name): string => Str::headline((string) $name))
+            ->all();
+
+        return $map;
     }
 
     /** sha256 hex, matching the column. Never store or log the plaintext. */

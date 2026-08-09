@@ -492,7 +492,7 @@ function formatDay(iso: string | null): string {
                 where its members can see it.
             </p>
 
-            <template #footer>
+            <template #actions>
                 <MdsButton variant="tertiary" @click="pendingTarget = null">Cancel</MdsButton>
                 <MdsButton variant="primary" :loading="impersonating" @click="startImpersonation">
                     Sign in as {{ pendingTarget?.name }}

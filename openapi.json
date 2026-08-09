@@ -5312,6 +5312,13 @@
                             "null"
                         ]
                     },
+                    "acting_as_user_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The platform operator who performed this action while impersonating `user_id`. Null unless\nthe action was taken during an impersonated session."
+                    },
                     "is_system_action": {
                         "type": "boolean"
                     },
@@ -5343,6 +5350,7 @@
                     "new_values",
                     "redacted_fields",
                     "user_id",
+                    "acting_as_user_id",
                     "is_system_action",
                     "ip_address",
                     "user_agent",

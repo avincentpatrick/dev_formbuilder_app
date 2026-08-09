@@ -65,7 +65,10 @@ it('streams a non-empty file with the header and one row per audit entry', funct
     $response = $this->get(auditExportUrl())->assertOk();
     $rows = auditExportRows($response->streamedContent());
 
-    expect($rows[0])->toBe(['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'IP address', 'Changes', 'Redacted fields']);
+    // `Acting as` sits between `Actor` and `IP address` (I11a) — see AuditExporter::HEADERS for why it was
+    // inserted there rather than appended. Asserted as an EQUALITY over the whole header row, so a column
+    // added or moved anywhere in this contract has to be acknowledged here on purpose.
+    expect($rows[0])->toBe(['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'Acting as', 'IP address', 'Changes', 'Redacted fields']);
     // THE assertion that catches a missing applyLocal(): with the GUC torn down, RLS hides every row and
     // this file is a header and nothing else, at HTTP 200.
     expect(count($rows))->toBeGreaterThan(1);

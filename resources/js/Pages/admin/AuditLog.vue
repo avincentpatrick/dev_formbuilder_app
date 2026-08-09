@@ -203,6 +203,15 @@ function summarize(row: AuditRow): string {
                 {{ (row as AuditRow).target.type_label }}
             </template>
 
+            <!--
+                NO impersonation marker here, and its absence is deliberate (I11a). An impersonated action is
+                written under the impersonated TENANT's context, so it carries a `tenant_id` — while this page
+                reads only the `tenant_id IS NULL` slice, twice over (the query's `whereNull` and
+                `audits_platform_select`'s own `AND tenant_id IS NULL`). Such a row therefore cannot reach
+                this table, and `PlatformAuditPresenter` emits `acting_as: null` unconditionally. A `v-if`
+                marker was written here first and was dead code; see that presenter for why making it
+                reachable would mean undoing I7b's deliberate narrowing.
+            -->
             <template #cell-actor="{ row }">
                 {{ (row as AuditRow).actor }}
             </template>
@@ -303,6 +312,22 @@ function summarize(row: AuditRow): string {
 
 .admin-audit__hint {
     margin: 0 0 var(--mds-space-3);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/*
+ * The impersonation marker (I11a) — duplicated from the tenant viewer rather than shared, matching how
+ * these two pages already treat every other cell. They are `scoped`, so the rules cannot reach each other;
+ * extracting them would mean a component for two elements and one text style. The WCAG 1.4.1 note applies
+ * identically: the word "via" is what distinguishes the lines, not the colour.
+ */
+.audit__actor {
+    display: flex;
+    flex-direction: column;
+}
+
+.audit__acting-as {
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
 }

@@ -58,6 +58,7 @@ function row(overrides: Partial<AuditRow> = {}): AuditRow {
             url: '/forms',
         },
         actor: 'Demo Owner',
+        acting_as: null,
         is_system: false,
         ip_address: '203.0.113.4',
         changes: [change()],
@@ -164,6 +165,42 @@ describe('audit log — labels and badges', () => {
         const wrapper = render({ data: [row({ actor: 'System', is_system: true })] });
 
         expect(wrapper.text()).toContain('System');
+        wrapper.unmount();
+    });
+
+    it('carries the impersonation fact into the change modal (I11a)', async () => {
+        // The modal is the surface built for "what exactly happened here", so it is the LAST place the fact
+        // may go missing — and the first draft of this increment updated every other read surface and left
+        // it out. Shared verbatim with the console page, which is why it is tested from this one.
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
+
+        await wrapper.get('button[aria-label="View changes"]').trigger('click');
+
+        const text = wrapper.text();
+        expect(text).toContain('Acting as');
+        expect(text).toContain('Platform operator');
+        wrapper.unmount();
+    });
+
+    it('marks a row an operator drove, without losing the effective actor (I11a)', () => {
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
+
+        // BOTH names, and the "via" prefix. Asserting only that "Platform operator" appears would pass just
+        // as well if the marker had REPLACED the actor — which is the one rendering that would misreport
+        // whose authority the action ran under. The word carries the relationship (WCAG 1.4.1); the colour
+        // difference between the two lines is decoration and cannot be the only signal.
+        expect(wrapper.text()).toContain('Demo Owner');
+        expect(wrapper.text()).toContain('via Platform operator');
+        wrapper.unmount();
+    });
+
+    it('renders no impersonation marker on an ordinary row', () => {
+        const wrapper = render({ data: [row()] });
+
+        // A class assertion, NOT `text()).not.toContain('via')`: a bare substring over the whole page would
+        // redden on any future copy containing "trivial" or "deviation", and could not tell "no marker"
+        // from "marker rendered with empty text".
+        expect(wrapper.find('.audit__acting-as').exists()).toBe(false);
         wrapper.unmount();
     });
 });

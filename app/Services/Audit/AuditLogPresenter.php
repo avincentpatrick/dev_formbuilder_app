@@ -50,6 +50,11 @@ final class AuditLogPresenter
     public function index(User $user, array $filters): array
     {
         $paginator = Audit::query()
+            // ⚠️ `actingAsUser` is deliberately NOT eager-loaded, and adding it would be a defect rather
+            // than an optimisation: `actingAsLabel()` renders a fixed string and never reads the operator's
+            // name, precisely so the tenant cannot learn it. Loading the relation would put that name in
+            // memory on this page for no reader, and would invite the next person to "use what's already
+            // there" — which is exactly how the first draft leaked it.
             ->with('user:id,name')
             ->when($filters['auditable_type'] ?? null, fn ($q, $v) => $q->where('auditable_type', $v))
             ->when($filters['event'] ?? null, fn ($q, $v) => $q->where('event', $v))
@@ -73,6 +78,8 @@ final class AuditLogPresenter
                 'event_label' => $a->event->label(),
                 'target' => $this->target($a, $targets),
                 'actor' => $this->actorLabel($a),
+                // I11a — null on every ordinary row; a label only when platform staff were driving.
+                'acting_as' => $this->actingAsLabel($a),
                 // Derived from `user_id`, NOT from the `is_system_action` column: AuditLogger hard-codes
                 // that column false and exposes no parameter, so it is false on 100% of rows and any UI
                 // branching on it would be unreachable. A null actor is the condition that actually varies.
@@ -140,6 +147,31 @@ final class AuditLogPresenter
         $name = data_get($audit, 'user.name');
 
         return is_string($name) ? $name : 'Unknown user';
+    }
+
+    /**
+     * The operator behind an impersonated action, or null when there was none (I11a).
+     *
+     * ⚠️ A FIXED LABEL, NEVER THE NAME — AND THIS IS A POLICY, NOT A CONSEQUENCE OF RLS. The first version
+     * of this method read `data_get($audit, 'actingAsUser.name')` and fell back to the label, on the stated
+     * grounds that the name "is not reachable anyway": platform staff hold no membership, so the join-shape
+     * `users` policy hides them. **That reasoning was wrong, and adversarial review disproved it against a
+     * live database.** `TenantIsolation::usersVisibilitySql()` is
+     * `id = app.current_user_id OR EXISTS(active tenant_users row in app.current_tenant_id)` — it does not
+     * mention `is_super_admin`, and NOTHING in the schema or the app prevents an operator from also holding
+     * an active membership of the tenant they are impersonating into. For such an operator the relation
+     * resolved and this method returned their real name to every Owner of that workspace.
+     *
+     * So the disclosure is now decided here rather than left to whether a row happens to be visible. RBAC
+     * §9's transparency requirement is that the tenant can see THAT platform staff acted in their
+     * workspace; naming an individual employee to every tenant Owner is a different thing, and one that
+     * would have varied by an unrelated fact about that employee's memberships.
+     *
+     * Because the name is never read, `actingAsUser` is deliberately NOT eager-loaded for this page.
+     */
+    private function actingAsLabel(Audit $audit): ?string
+    {
+        return $audit->acting_as_user_id === null ? null : 'Platform operator';
     }
 
     /**

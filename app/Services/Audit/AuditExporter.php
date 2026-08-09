@@ -61,7 +61,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class AuditExporter
 {
-    private const HEADERS = ['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'IP address', 'Changes', 'Redacted fields'];
+    /**
+     * ⚠️ `Acting as` sits immediately after `Actor` (I11a) — APPENDING it would have been the safer-looking
+     * change and the wrong one. This CSV is a compliance artifact read by humans, and the one question it
+     * exists to answer about an impersonated row is "who really did this"; that belongs beside the actor,
+     * not past `Redacted fields`. Column order is asserted in `AuditExportTest`, so the move is loud.
+     */
+    private const HEADERS = ['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'Acting as', 'IP address', 'Changes', 'Redacted fields'];
 
     /**
      * XLSX's hard per-cell limit is 32,767 characters: openspout writes past it happily and Excel then
@@ -104,6 +110,8 @@ final class AuditExporter
                 TenantContext::applyLocal($tenantId, $userId);
 
                 $this->baseQuery($filters)
+                    // `actingAsUser` is NOT loaded (I11a) — the Acting-as cell is a fixed label and must
+                    // never carry the operator's name. See AuditLogPresenter::actingAsLabel().
                     ->with('user:id,name')
                     // ASC, unlike the screen's newest-first: a ledger reads chronologically in a file.
                     ->orderBy('id')
@@ -199,6 +207,11 @@ final class AuditExporter
             // non-null user_id whose row is invisible under the users join-shape policy is a departed
             // member, not the platform.
             $audit->user_id === null ? 'System' : (is_string($name = data_get($audit, 'user.name')) ? $name : 'Unknown user'),
+            // I11a — empty on every ordinary row, and a FIXED label otherwise. Never the operator's name:
+            // that is a deliberate disclosure policy, not a limit of what is readable here. See
+            // AuditLogPresenter::actingAsLabel() for why the original "RLS hides them anyway" reasoning was
+            // disproved — an operator who also holds a membership of this tenant IS visible.
+            $audit->acting_as_user_id === null ? '' : 'Platform operator',
             (string) $audit->ip_address,
             $this->cap($rendered),
             implode(', ', $audit->redacted_fields ?? []),

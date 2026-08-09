@@ -2,9 +2,16 @@
  * The audit-log page's prop contract (Increment I2), mirrored from `App\Services\Audit\AuditLogPresenter`.
  *
  * Lives beside the components rather than inside `Pages/audit/Index.vue` for the reason
- * `components/analytics/types.ts` does: the page TEST imports these types to build its prop factories, so
- * a fixture that drifts from the real shape fails type-check instead of passing a test against a shape the
- * server never sends.
+ * `components/analytics/types.ts` does: the page tests import these types to build their prop factories,
+ * so a fixture is written against the real shape rather than against whatever the page happens to read.
+ *
+ * ⚠️ THAT IS A CONVENTION, NOT AN ENFORCED GUARANTEE, and this comment used to claim otherwise — it said a
+ * drifting fixture "fails type-check". It does not: `tsconfig.json` EXCLUDES `resources/js/**\/*.test.ts`,
+ * so `vue-tsc` never sees these factories, and Vitest does not type-check either. I11a found this by adding
+ * a required field to `AuditRow` and watching both the type-check and the two page suites stay green with
+ * the fixtures still missing it. Adding a field here therefore obliges you to update every factory BY HAND;
+ * nothing will tell you. (Widening the include is not free — the excluded files use test-only globals — so
+ * the honest fix for now is to stop believing the comment.)
  */
 
 /** A `{value,label}` catalog entry — filter dropdowns everywhere in this app use this shape. */
@@ -51,6 +58,17 @@ export type AuditRow = {
     target: AuditTarget;
     /** A name, or "System" (no actor), or "Unknown user" (an actor whose row is no longer visible). */
     actor: string;
+    /**
+     * The real operator behind an impersonated action (I11a), or null when there was none — which is every
+     * ordinary row. `actor` stays the EFFECTIVE actor whose authority the action ran under, so a row with
+     * both reads "X did this, and an operator was driving X".
+     *
+     * The two viewers legitimately differ in what they can put here, and neither is a placeholder for the
+     * other: the platform console names the operator (it reads over the elevated connection), while the
+     * tenant page can only ever say "Platform operator", because staff hold no membership there and the
+     * join-shape `users` RLS hides the row. Rendering must not assume a name.
+     */
+    acting_as: string | null;
     is_system: boolean;
     ip_address: string | null;
     changes: AuditChange[];

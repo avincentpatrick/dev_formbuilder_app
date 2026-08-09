@@ -52,6 +52,7 @@ function row(overrides: Partial<AuditRow> = {}): AuditRow {
             url: null,
         },
         actor: 'Platform Operator',
+        acting_as: null,
         is_system: false,
         ip_address: '203.0.113.9',
         changes: [change()],
@@ -220,5 +221,16 @@ describe('admin/AuditLog', () => {
         mocks.pageProps.errors = { admin: 'Something went wrong.' };
 
         expect(render().get('[role="alert"]').text()).toContain('Something went wrong.');
+    });
+
+    it('renders no impersonation marker, because such a row cannot reach this page (I11a)', () => {
+        // `PlatformAuditPresenter` emits `acting_as: null` unconditionally — an impersonated action is
+        // tenant-scoped and this viewer reads only the `tenant_id IS NULL` slice. The fixture forces a
+        // non-null value anyway, so this reddens if anyone reintroduces the marker without ALSO widening
+        // `audits_platform_select`, which I7b deliberately narrowed. See PlatformAuditReadTest.
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Dana Operator' })] });
+
+        expect(wrapper.text()).toContain('Demo Owner');
+        expect(wrapper.text()).not.toContain('Dana Operator');
     });
 });

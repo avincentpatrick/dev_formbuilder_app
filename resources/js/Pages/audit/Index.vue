@@ -245,8 +245,20 @@ function summarize(row: AuditRow): string {
                 </div>
             </template>
 
+            <!--
+                The impersonation marker is a SECOND LINE under the actor, not a badge beside the name and
+                not a separate column (I11a). A column would be empty on ~100% of rows and would cost the
+                table a sixth one at 375px, where it already has to fit; a badge would compete with the
+                event badge for the same visual channel. The line only exists when `acting_as` is non-null,
+                so an ordinary ledger looks exactly as it did before this increment.
+            -->
             <template #cell-actor="{ row }">
-                <span>{{ (row as AuditRow).actor }}</span>
+                <div class="audit__actor">
+                    <span>{{ (row as AuditRow).actor }}</span>
+                    <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
+                        via {{ (row as AuditRow).acting_as }}
+                    </span>
+                </div>
             </template>
 
             <template #cell-summary="{ row }">
@@ -374,5 +386,24 @@ function summarize(row: AuditRow): string {
     align-items: center;
     gap: var(--mds-space-2);
     overflow-wrap: anywhere;
+}
+
+/*
+ * The impersonation marker (I11a). A stacked second line rather than an inline suffix, so the actor's own
+ * name keeps its full column width at 375px and the "via …" cannot be mistaken for part of it.
+ *
+ * ⚠️ Colour alone does not carry this — the word "via" does. `--mds-color-text-secondary` on canvas is a
+ * design-system pair that already clears 4.5:1 in both themes, but the reason the prefix is a WORD is
+ * WCAG 1.4.1: a reader who cannot distinguish the two greys must still be able to tell the operator line
+ * from the actor line. Do not "tidy" this into a colour-only or icon-only treatment.
+ */
+.audit__actor {
+    display: flex;
+    flex-direction: column;
+}
+
+.audit__acting-as {
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
 }
 </style>

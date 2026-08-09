@@ -88,6 +88,20 @@ final class PlatformAuditPresenter
                     'url' => null,
                 ],
                 'actor' => $row['actor'],
+                // ⚠️ STRUCTURALLY ALWAYS NULL HERE, and the key exists only because `AuditRow` is shared
+                // with the tenant page. An impersonated action runs inside the impersonated TENANT's
+                // context, so `BelongsToTenant` sets `audits.tenant_id` — while this viewer reads
+                // `whereNull('tenant_id')` through `audits_platform_select`, which itself carries
+                // `AND tenant_id IS NULL`. So an `acting_as_user_id`-bearing row is excluded twice over and
+                // cannot appear on this page. routes/admin.php:77 states the same thing from the other
+                // side: a super-admin action against a specific tenant lands in THAT tenant's ledger.
+                //
+                // The first draft of I11a resolved a name here and rendered a `via …` marker on
+                // `admin/AuditLog.vue`. Both were dead code, and the test that "proved" them hand-wrote a
+                // row with `tenant_id = NULL` AND `acting_as_user_id` set — a shape `AuditLogger` cannot
+                // produce. Removed rather than deferred: making it reachable would mean widening
+                // `audits_platform_select` to the tenant slice, which I7b deliberately narrowed away from.
+                'acting_as' => null,
                 'is_system' => $row['is_system'],
                 'ip_address' => $row['ip_address'],
                 'changes' => AuditDiff::rows(

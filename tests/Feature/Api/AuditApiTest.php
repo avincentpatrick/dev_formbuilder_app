@@ -61,7 +61,7 @@ it('lets an Admin (holding audit_log.view) list the tenant\'s audit rows', funct
     $this->withToken($token)->getJson(auditsUrl())
         ->assertOk()
         ->assertJsonCount(2, 'data')
-        ->assertJsonStructure(['data' => [['id', 'auditable_type', 'auditable_id', 'event', 'user_id', 'is_system_action', 'created_at']], 'meta' => ['has_more']]);
+        ->assertJsonStructure(['data' => [['id', 'auditable_type', 'auditable_id', 'event', 'user_id', 'acting_as_user_id', 'is_system_action', 'created_at']], 'meta' => ['has_more']]);
 });
 
 it('refuses a Viewer even when their token carries the ability (the policy re-checks the user)', function (): void {

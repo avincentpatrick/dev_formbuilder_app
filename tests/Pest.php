@@ -746,9 +746,31 @@ function committedPlainUser(string $email, string $name = 'Ordinary User'): User
  * trait makes `getConnectionName()` return the central connection unconditionally, discarding the
  * override, so the row lands inside the test transaction and the failure surfaces later and elsewhere as
  * an FK violation. The raw query builder is the only way to commit one.
+ *
+ * ⚠️ THE SLUG PREFIX IS ENFORCED, AND THE ENFORCEMENT IS THE POINT. `platform-audit-` is the marker
+ * {@see purgeCommittedPlatformAuditFixtures()} cleans by, so a slug outside it mints a tenant that NOTHING
+ * deletes: RefreshDatabase's rollback cannot reach a committed row, and `migrate:fresh` runs once per
+ * process. I11a proved the cost — one fixture named `impersonated-slice` survived into every later file and
+ * took twelve tests down in seven suites that had nothing to do with it. The two shapes it breaks are the
+ * ones the I7a block above already names: suites that pin the exact `tenants.slug` list
+ * (`DemoSeederIdempotencyTest`, `DatabaseSeederSmokeTest`) and the sweep-command suites, which drain a FIXED
+ * number of queued children on the documented assumption that their own tenant is the only active one — a
+ * second tenant means the drain consumes the STRANGER's job and the test's own tenant is never swept, which
+ * reads as "the sweep did nothing" hundreds of files from the actual cause.
+ *
+ * Throwing here turns that into an immediate failure at the call site. It is the only guard available: the
+ * purge cannot clean what it cannot recognise.
  */
 function committedPlatformTenant(string $slug, string $name = 'Platform Fixture'): Tenant
 {
+    if (! str_starts_with($slug, 'platform-audit-')) {
+        throw new InvalidArgumentException(
+            "committedPlatformTenant() slug must begin with 'platform-audit-', got '{$slug}'. That prefix is "
+            .'the marker purgeCommittedPlatformAuditFixtures() deletes by; a tenant outside it survives '
+            .'RefreshDatabase for the rest of the process and reddens unrelated sweep and seeder suites.'
+        );
+    }
+
     $id = Uuid::uuid7()->toString();
 
     DB::connection('pgsql_privileged')->table('tenants')->insert([
@@ -780,6 +802,9 @@ function committedAudit(
     string $event = 'updated',
     ?array $new = null,
     ?string $auditableId = null,
+    // I11a — the real operator behind an impersonated action. Last and optional, so every existing caller
+    // keeps writing the ordinary shape (this column NULL) without being touched.
+    ?string $actingAsUserId = null,
 ): string {
     $id = Uuid::uuid7()->toString();
 
@@ -787,6 +812,7 @@ function committedAudit(
         'id' => $id,
         'tenant_id' => $tenantId,
         'user_id' => $actorId,
+        'acting_as_user_id' => $actingAsUserId,
         'event' => $event,
         'auditable_type' => $auditableType,
         'auditable_id' => $auditableId ?? $actorId ?? Uuid::uuid7()->toString(),
@@ -818,7 +844,9 @@ function purgeCommittedPlatformAuditFixtures(): void
 {
     $connection = DB::connection('pgsql_privileged');
 
-    // Markers, not ids: a test that dies mid-way is still cleaned up by the next one.
+    // Markers, not ids: a test that dies mid-way is still cleaned up by the next one. ⚠️ The tenant marker
+    // is a CONTRACT, not a convention — {@see committedPlatformTenant()} throws on a slug outside it,
+    // because a fixture this predicate does not match is a fixture nothing ever deletes.
     $tenantIds = $connection->table('tenants')->where('slug', 'like', 'platform-audit-%')->pluck('id')->all();
     $userIds = $connection->table('users')->where('email', 'like', '%@platformaudittest.local')->pluck('id')->all();
 

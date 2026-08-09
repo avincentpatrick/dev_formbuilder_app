@@ -606,6 +606,9 @@ final class SuperAdminService
      */
     private function platformActorNames(Collection $rows): array
     {
+        // `user_id` ONLY. `acting_as_user_id` is deliberately not collected: this viewer reads the
+        // `tenant_id IS NULL` slice, and an impersonated row is tenant-scoped by construction, so no row
+        // reaching here can carry one. See PlatformAuditPresenter for the full argument.
         /** @var list<string> $ids */
         $ids = $rows->pluck('user_id')->filter()->unique()->values()->all();
 

@@ -84,6 +84,12 @@ final class AuditLogger
             'new_values' => $redacted['new'],
             'redacted_fields' => $redacted['redacted_fields'],
             'user_id' => $actorId ?? Auth::id(),
+            // I11a — the REAL human, when that is not the effective actor above. Read ambiently, exactly
+            // like the request metadata below and for the same reason: this is the single write path, and a
+            // tenth parameter would be a thing to forget at fifteen call sites, silently. `user_id` stays
+            // the impersonated user (whose authority the action ran under); this is the operator driving.
+            // NULL on every ordinary row. See ImpersonationContext and rbac §9:433.
+            'acting_as_user_id' => ImpersonationContext::operatorId(),
             'is_system_action' => false,
             'ip_address' => $this->requestIp(),
             'user_agent' => $this->requestUserAgent(),

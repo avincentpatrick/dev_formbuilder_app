@@ -780,6 +780,9 @@ function committedAudit(
     string $event = 'updated',
     ?array $new = null,
     ?string $auditableId = null,
+    // I11a — the real operator behind an impersonated action. Last and optional, so every existing caller
+    // keeps writing the ordinary shape (this column NULL) without being touched.
+    ?string $actingAsUserId = null,
 ): string {
     $id = Uuid::uuid7()->toString();
 
@@ -787,6 +790,7 @@ function committedAudit(
         'id' => $id,
         'tenant_id' => $tenantId,
         'user_id' => $actorId,
+        'acting_as_user_id' => $actingAsUserId,
         'event' => $event,
         'auditable_type' => $auditableType,
         'auditable_id' => $auditableId ?? $actorId ?? Uuid::uuid7()->toString(),

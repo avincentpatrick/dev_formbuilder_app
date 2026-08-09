@@ -52,6 +52,7 @@ function row(overrides: Partial<AuditRow> = {}): AuditRow {
             url: null,
         },
         actor: 'Platform Operator',
+        acting_as: null,
         is_system: false,
         ip_address: '203.0.113.9',
         changes: [change()],
@@ -220,5 +221,15 @@ describe('admin/AuditLog', () => {
         mocks.pageProps.errors = { admin: 'Something went wrong.' };
 
         expect(render().get('[role="alert"]').text()).toContain('Something went wrong.');
+    });
+
+    it('names the operator behind an impersonated row (I11a)', () => {
+        // The console can NAME them, unlike the tenant viewer, because `listPlatformAudits()` reads over the
+        // elevated connection. That asymmetry is the whole reason both pages carry the marker — pinned on
+        // both sides so a future change that collapses them into one presenter has to choose deliberately.
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Dana Operator' })] });
+
+        expect(wrapper.text()).toContain('Demo Owner');
+        expect(wrapper.text()).toContain('via Dana Operator');
     });
 });

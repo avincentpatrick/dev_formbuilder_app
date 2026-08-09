@@ -61,7 +61,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class AuditExporter
 {
-    private const HEADERS = ['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'IP address', 'Changes', 'Redacted fields'];
+    /**
+     * ⚠️ `Acting as` sits immediately after `Actor` (I11a) — APPENDING it would have been the safer-looking
+     * change and the wrong one. This CSV is a compliance artifact read by humans, and the one question it
+     * exists to answer about an impersonated row is "who really did this"; that belongs beside the actor,
+     * not past `Redacted fields`. Column order is asserted in `AuditExportTest`, so the move is loud.
+     */
+    private const HEADERS = ['Timestamp', 'Event', 'Type', 'Target ID', 'Actor', 'Acting as', 'IP address', 'Changes', 'Redacted fields'];
 
     /**
      * XLSX's hard per-cell limit is 32,767 characters: openspout writes past it happily and Excel then
@@ -104,7 +110,10 @@ final class AuditExporter
                 TenantContext::applyLocal($tenantId, $userId);
 
                 $this->baseQuery($filters)
-                    ->with('user:id,name')
+                    // Both actor relations (I11a). On a LAZY stream the N+1 the class docblock warns about
+                    // is worse than on a page: one extra query per exported row, on the one path whose
+                    // entire purpose is flat cost over an unbounded table.
+                    ->with(['user:id,name', 'actingAsUser:id,name'])
                     // ASC, unlike the screen's newest-first: a ledger reads chronologically in a file.
                     ->orderBy('id')
                     ->lazy()
@@ -199,6 +208,12 @@ final class AuditExporter
             // non-null user_id whose row is invisible under the users join-shape policy is a departed
             // member, not the platform.
             $audit->user_id === null ? 'System' : (is_string($name = data_get($audit, 'user.name')) ? $name : 'Unknown user'),
+            // I11a — empty on every ordinary row. The tenant export cannot name the operator for the same
+            // reason the tenant viewer cannot: platform staff hold no membership here, so the join-shape
+            // RLS hides their row. See AuditLogPresenter::actingAsLabel().
+            $audit->acting_as_user_id === null
+                ? ''
+                : (is_string($op = data_get($audit, 'actingAsUser.name')) ? $op : 'Platform operator'),
             (string) $audit->ip_address,
             $this->cap($rendered),
             implode(', ', $audit->redacted_fields ?? []),

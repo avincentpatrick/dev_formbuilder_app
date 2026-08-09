@@ -46,6 +46,27 @@ people entitled to see how their workspace was handled can read it. The platform
 only what belongs to no tenant, which today is the `settings` row above. Cross-tenant audit SEARCH is
 **not built, deliberately** — see RBAC §9.
 
+### 1.2 Who ACTED on each row — two columns, not one (as built, I11a)
+
+`user_id` is the **effective** actor: whose authority the action ran under. `acting_as_user_id` is the
+**real** human when those differ — the platform operator driving an impersonated session — and is `NULL`
+on every ordinary row. Together they satisfy the only requirement RBAC §9:433 states about impersonation,
+and close the risk `security-threat-model.md`:144 names.
+
+Three consequences worth stating once, because each has already caught something:
+
+- **The direction is load-bearing.** `user_id` keeps its existing meaning, so every consumer that predates
+  this column — the actor filter, `audits_tenant_user_idx`, the export's Actor column, `AuditResource` —
+  keeps telling the truth. Reversing the sense would silently re-point all of them at platform staff.
+- **It is written ambiently, at the single write path.** `AuditLogger::record()` reads
+  `ImpersonationContext`, exactly as it reads the request IP; it is not a parameter, because a parameter is
+  a thing to forget at each of ~15 call sites and forgetting it is silent.
+- **The two viewers legitimately disclose different amounts, and that is not a policy either could break.**
+  A tenant reading `/audit-log` sees `via Platform operator`, never a name — staff hold no membership in
+  that tenant, so the join-shape `users` RLS hides the row and no name is reachable. `/admin/audit-log`
+  names them, reading over the elevated connection. `/api/v1` returns the raw id, which is opaque to a
+  tenant caller for the same RLS reason.
+
 ⚠️ **The platform slice is not permanently "settings rows only", and the mechanism is easy to miss.**
 `tenants` has no `SoftDeletes` and `audits.tenant_id` is `nullOnDelete`, so **hard-deleting a tenant
 promotes its entire audit history into `tenant_id IS NULL`** — where it becomes readable at

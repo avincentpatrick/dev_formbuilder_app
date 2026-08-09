@@ -50,7 +50,11 @@ final class AuditLogPresenter
     public function index(User $user, array $filters): array
     {
         $paginator = Audit::query()
-            ->with('user:id,name')
+            // ⚠️ `actingAsUser` is eager-loaded even though it is null on ~100% of rows, and that is the
+            // cheap option, not the expensive one: without it the N rows that DO carry an operator would
+            // each issue their own lookup inside the map below. One extra `whereIn` against an empty set
+            // costs a single query that returns nothing. Same reason `user` is here.
+            ->with(['user:id,name', 'actingAsUser:id,name'])
             ->when($filters['auditable_type'] ?? null, fn ($q, $v) => $q->where('auditable_type', $v))
             ->when($filters['event'] ?? null, fn ($q, $v) => $q->where('event', $v))
             ->when($filters['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))
@@ -73,6 +77,8 @@ final class AuditLogPresenter
                 'event_label' => $a->event->label(),
                 'target' => $this->target($a, $targets),
                 'actor' => $this->actorLabel($a),
+                // I11a — null on every ordinary row; a label only when platform staff were driving.
+                'acting_as' => $this->actingAsLabel($a),
                 // Derived from `user_id`, NOT from the `is_system_action` column: AuditLogger hard-codes
                 // that column false and exposes no parameter, so it is false on 100% of rows and any UI
                 // branching on it would be unreachable. A null actor is the condition that actually varies.
@@ -140,6 +146,32 @@ final class AuditLogPresenter
         $name = data_get($audit, 'user.name');
 
         return is_string($name) ? $name : 'Unknown user';
+    }
+
+    /**
+     * The operator behind an impersonated action, or null when there was none (I11a).
+     *
+     * ⚠️ THE TENANT IS TOLD *THAT* AN OPERATOR ACTED, NEVER *WHICH ONE*, and that is not a policy choice
+     * this method could fail to enforce — it is the only reachable answer. A platform operator has no
+     * membership of this tenant, so the join-shape `users` RLS makes their row invisible from here and
+     * `actingAsUser` resolves to null even though `acting_as_user_id` is a live uuid. Returning a fixed
+     * label is therefore honest about what is knowable; reaching for the name would need the elevated
+     * connection, which is exactly what the PLATFORM viewer has and this one deliberately does not.
+     *
+     * It also happens to be the right disclosure posture. RBAC §9's transparency requirement is that the
+     * tenant can see a super-admin acted in their workspace — which this satisfies — and naming individual
+     * staff to every tenant Owner serves nobody. The operator's identity is not lost: it is on the same row,
+     * readable on `/admin/audit-log`.
+     */
+    private function actingAsLabel(Audit $audit): ?string
+    {
+        if ($audit->acting_as_user_id === null) {
+            return null;
+        }
+
+        $name = data_get($audit, 'actingAsUser.name');
+
+        return is_string($name) ? $name : 'Platform operator';
     }
 
     /**

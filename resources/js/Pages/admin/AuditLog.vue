@@ -203,8 +203,19 @@ function summarize(row: AuditRow): string {
                 {{ (row as AuditRow).target.type_label }}
             </template>
 
+            <!--
+                Same stacked treatment as the tenant viewer (I11a), and deliberately the same wording — the
+                two pages differ only in WHAT they can name, never in how the fact is presented. Here the
+                elevated read resolves the operator, so this line usually carries a real name; over there it
+                reads "via Platform operator" because the join-shape RLS hides staff from a tenant.
+            -->
             <template #cell-actor="{ row }">
-                {{ (row as AuditRow).actor }}
+                <div class="audit__actor">
+                    <span>{{ (row as AuditRow).actor }}</span>
+                    <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
+                        via {{ (row as AuditRow).acting_as }}
+                    </span>
+                </div>
             </template>
 
             <template #cell-summary="{ row }">
@@ -303,6 +314,22 @@ function summarize(row: AuditRow): string {
 
 .admin-audit__hint {
     margin: 0 0 var(--mds-space-3);
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+/*
+ * The impersonation marker (I11a) — duplicated from the tenant viewer rather than shared, matching how
+ * these two pages already treat every other cell. They are `scoped`, so the rules cannot reach each other;
+ * extracting them would mean a component for two elements and one text style. The WCAG 1.4.1 note applies
+ * identically: the word "via" is what distinguishes the lines, not the colour.
+ */
+.audit__actor {
+    display: flex;
+    flex-direction: column;
+}
+
+.audit__acting-as {
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
 }

@@ -8,6 +8,7 @@ use App\Enums\AuditEvent;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Audit\AuditLogPresenter;
 use App\Support\Audit\AuditLogger;
 use Database\Factories\AuditFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,7 @@ use Illuminate\Support\Carbon;
  * @property ?array<string, mixed> $new_values
  * @property ?list<string> $redacted_fields
  * @property ?string $user_id
+ * @property ?string $acting_as_user_id
  * @property bool $is_system_action
  * @property ?string $ip_address
  * @property ?string $user_agent
@@ -80,5 +82,22 @@ class Audit extends Model implements TenantScoped
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The real operator behind an impersonated action (I11a) — null on every ordinary row.
+     *
+     * Subject to the SAME join-shape `users` RLS as {@see user()}, and here that is the common case rather
+     * than the edge one: a platform operator has no tenant membership, so from inside the impersonated
+     * tenant's context this relation resolves to NULL even though the uuid is live. The presenters must
+     * therefore distinguish "nobody was impersonating" (the column is null) from "somebody was, and we
+     * cannot name them" (the column is set, the relation is not) — exactly the three-state problem
+     * {@see AuditLogPresenter::actorLabel()} already solves for `user_id`.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function actingAsUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acting_as_user_id');
     }
 }

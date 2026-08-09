@@ -58,6 +58,7 @@ function row(overrides: Partial<AuditRow> = {}): AuditRow {
             url: '/forms',
         },
         actor: 'Demo Owner',
+        acting_as: null,
         is_system: false,
         ip_address: '203.0.113.4',
         changes: [change()],
@@ -164,6 +165,28 @@ describe('audit log — labels and badges', () => {
         const wrapper = render({ data: [row({ actor: 'System', is_system: true })] });
 
         expect(wrapper.text()).toContain('System');
+        wrapper.unmount();
+    });
+
+    it('marks a row an operator drove, without losing the effective actor (I11a)', () => {
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
+
+        // BOTH names, and the "via" prefix. Asserting only that "Platform operator" appears would pass just
+        // as well if the marker had REPLACED the actor — which is the one rendering that would misreport
+        // whose authority the action ran under. The word carries the relationship (WCAG 1.4.1); the colour
+        // difference between the two lines is decoration and cannot be the only signal.
+        expect(wrapper.text()).toContain('Demo Owner');
+        expect(wrapper.text()).toContain('via Platform operator');
+        wrapper.unmount();
+    });
+
+    it('renders no impersonation marker on an ordinary row', () => {
+        const wrapper = render({ data: [row()] });
+
+        // The negative case matters more than it looks: `acting_as` is null on ~100% of real rows, so a
+        // marker that rendered unconditionally would be invisible in the positive test above and wrong
+        // everywhere else.
+        expect(wrapper.text()).not.toContain('via');
         wrapper.unmount();
     });
 });

@@ -578,6 +578,12 @@ final class SuperAdminService
                     // a null user_id, NOT from the is_system_action column, which AuditLogger hard-codes
                     // false on every row.
                     'actor' => $a->user_id === null ? 'System' : ($names[$a->user_id] ?? 'Unknown user'),
+                    // I11a — the real operator behind an impersonated action. Named here, where the tenant
+                    // viewer can only say "Platform operator": this read runs on the elevated connection,
+                    // so the operator's row is visible even though they belong to no tenant.
+                    'acting_as' => $a->acting_as_user_id === null
+                        ? null
+                        : ($names[$a->acting_as_user_id] ?? 'Unknown operator'),
                     'is_system' => $a->user_id === null,
                     'ip_address' => $a->ip_address,
                     'old_values' => $a->old_values,
@@ -606,8 +612,14 @@ final class SuperAdminService
      */
     private function platformActorNames(Collection $rows): array
     {
+        // BOTH actor columns (I11a). Collecting only `user_id` would leave every impersonated row's
+        // operator resolving to "Unknown operator" — a name this connection can perfectly well read, which
+        // is the whole reason the platform viewer shows one where the tenant viewer cannot. Merged into one
+        // `whereIn` rather than a second query: the two sets overlap heavily in practice.
         /** @var list<string> $ids */
-        $ids = $rows->pluck('user_id')->filter()->unique()->values()->all();
+        $ids = $rows->pluck('user_id')
+            ->merge($rows->pluck('acting_as_user_id'))
+            ->filter()->unique()->values()->all();
 
         if ($ids === []) {
             return [];

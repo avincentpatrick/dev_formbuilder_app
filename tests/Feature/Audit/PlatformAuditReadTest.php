@@ -185,6 +185,28 @@ it('shapes a row the way the shared AuditRow contract expects', function (): voi
         ->and($row['target']['label'])->toBeNull()
         ->and($row['target']['url'])->toBeNull()
         ->and($row['actor'])->toBe('Shape Operator')
+        // I11a — present and null on an ordinary row. Asserting the KEY EXISTS matters as much as its
+        // value: the shared `AuditRow` contract is what `AuditChangeModal` and both pages are typed
+        // against, so a platform row missing the field is a structural divergence, not a cosmetic one.
+        ->and($row)->toHaveKey('acting_as')
+        ->and($row['acting_as'])->toBeNull()
         ->and($row['changes'])->not->toBeEmpty()
         ->and(array_column($row['changes'], 'key'))->toContain('registration.open_signup');
+});
+
+it('names the operator behind an impersonated row, where the tenant viewer cannot', function (): void {
+    $operator = committedSuperAdmin('driver@platformaudittest.local', 'Dana Operator');
+    $member = committedPlainUser('member@platformaudittest.local', 'Mira Member');
+    committedAudit(null, $member->id, 'settings', 'updated', ['registration.open_signup' => false], null, $operator->id);
+
+    $row = app(PlatformAuditPresenter::class)->index([], 1)['data'][0];
+
+    // The asymmetry this increment deliberately builds: this read runs on the elevated connection, so the
+    // operator's row is visible even though they belong to no tenant. `AuditLogPresenter` can only manage
+    // "Platform operator" for exactly the same fact — see ImpersonationAttributionTest.
+    //
+    // `actor` is the MEMBER, not the operator. If a future change ever swaps them, the ledger stops
+    // recording whose authority the action ran under, which is the one thing rbac §9:433 asks it to keep.
+    expect($row['actor'])->toBe('Mira Member')
+        ->and($row['acting_as'])->toBe('Dana Operator');
 });

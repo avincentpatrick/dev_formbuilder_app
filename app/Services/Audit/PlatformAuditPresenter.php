@@ -88,6 +88,7 @@ final class PlatformAuditPresenter
                     'url' => null,
                 ],
                 'actor' => $row['actor'],
+                'acting_as' => $row['acting_as'],
                 'is_system' => $row['is_system'],
                 'ip_address' => $row['ip_address'],
                 'changes' => AuditDiff::rows(

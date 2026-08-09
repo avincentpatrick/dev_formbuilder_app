@@ -24,58 +24,40 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     // `.env` and `.env.example`: the session cookie is HOST-ONLY, so a login on `acme.meridian.test` is
     // simply not sent to `meridian.test`. `routes/tenant.php`'s own header records that correction.
     //
-    // ⚠️ DO NOT WAIT ON THE POST-LOGIN REDIRECT HERE. `fortify.home` is `/dashboard`, which is a TENANT
-    // route — on the central host `InitializeTenancyBySubdomain` cannot resolve a tenant from `meridian.test`
-    // and the landing page is meaningless. The first version of this setup waited for the URL to leave
-    // `/login` and timed out for that reason, not because the credentials were wrong (the diagnostic showed
-    // a CLEAN login form, no validation error). All this step actually needs is the SESSION COOKIE, so it
-    // asserts the session by fetching a console route instead of by watching where Fortify redirects.
+    // ⚠️ THE CONSOLE ROUTE IS VISITED FIRST, AS A GUEST, AND THAT IS THE WHOLE FIX. `Authenticate` answers
+    // with `redirect()->guest(route('login'))`, and `Redirector::guest()` STORES `url.intended` — so
+    // Fortify's `redirect()->intended()` brings the login back HERE. Without it the target is
+    // `fortify.home` = `/dashboard`, a TENANT route: on the central host `InitializeTenancyBySubdomain`
+    // cannot identify a tenant, and bootstrap/app.php answers `NotASubdomainException` with a redirect to
+    // the ABSOLUTE `config('app.url')` — which in CI is the tenant origin. An Inertia XHR cannot follow
+    // that (an external redirect needs `Inertia::location()`'s 409, not a 302), so the visit dies with the
+    // page still sitting on /login and no error rendered.
+    //
+    // ⚠️ AND NEVER `waitForLoadState('networkidle')` AFTER THIS SUBMIT. The login form is an Inertia XHR
+    // (`resources/js/pages/auth/Login.vue` → `form.post`), so the page performs NO document navigation and
+    // that call resolves INSTANTLY against the already-idle previous load. The previous version then raced
+    // ahead to `/admin/settings` before the POST had landed and read a GUEST session — which is what four
+    // CI cycles were spent chasing, and it was never a credentials, CSRF, TOTP or session-driver fault.
+    // `tests/Feature/Auth/CentralHostLoginTest.php` pins the server side of that separately.
+    //
+    // Waiting on the URL is therefore both the sync point AND the session assertion: every candidate below
+    // sits behind `auth`, so arriving at one proves a real authenticated session. `/user/confirm-password`
+    // is the expected landing (step-up, I8a); `/admin/settings` would mean a confirmation was already live.
     //
     // The step-up challenge is deliberately NOT confirmed here — it expires in 900s and this job runs far
     // longer than that. `tests/e2e/support/console.ts` clears it per navigation instead.
     const centralOrigin = baseURL.replace('acme.', '');
     const consolePage = await browser.newPage({ ignoreHTTPSErrors: true });
 
-    await consolePage.goto(`${centralOrigin}/login`, { waitUntil: 'networkidle' });
+    await consolePage.goto(`${centralOrigin}/admin/settings`, { waitUntil: 'networkidle' });
     await consolePage.getByLabel('Email', { exact: true }).fill('console@meridian.test');
     await consolePage.getByLabel('Password', { exact: true }).fill('meridian-console-2026');
-    // Record what the POST actually answered. A bare wait cannot distinguish "never submitted" from
-    // "submitted and rejected" from "submitted, accepted, cookie dropped", and those want different fixes.
-    const seen: string[] = [];
-    consolePage.on('response', (r) => {
-        if (r.request().method() === 'POST' || r.url().includes('/login') || r.url().includes('/admin')) {
-            seen.push(`${r.request().method()} ${r.status()} ${r.url()}`);
-        }
-    });
-
     await consolePage.getByRole('button', { name: 'Sign in' }).click();
-    await consolePage.waitForLoadState('networkidle');
 
-    // Snapshot HERE, immediately after the POST settles. The earlier version grabbed the page only after
-    // navigating on to /admin/settings, by which point any flashed validation error had been consumed and
-    // the snapshot showed a pristine form — which read as "never submitted" when it may well have been
-    // "submitted and rejected". Same class of mistake as asserting on <body>'s text in I10d.
-    const afterLogin = `${consolePage.url()} :: ${(await consolePage.locator('body').innerText())
-        .replace(/\s+/g, ' ')
-        .slice(0, 300)}`;
-
-    // No TOTP hop: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so Fortify does
-    // not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` — which reads only
-    // the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains the trade.
-    await consolePage.goto(`${centralOrigin}/admin/settings`, { waitUntil: 'networkidle' });
-
-    if (new URL(consolePage.url()).pathname.startsWith('/login')) {
-        const shown = (await consolePage.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
-        const cookies = (await consolePage.context().cookies()).map((c) => `${c.name}@${c.domain}`).join(', ');
-        throw new Error(
-            `console sign-in did not establish a session (${consolePage.url()}).
-` +
-                `Requests: ${seen.join(' | ')}
-Cookies: ${cookies}
-After login: ${afterLogin}
-Page said: ${shown}`,
-        );
-    }
+    // No TOTP hop on the way: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so
+    // Fortify does not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` —
+    // which reads only the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains it.
+    await consolePage.waitForURL(/\/(user\/confirm-password|admin\/settings)$/, { timeout: 30_000 });
 
     await consolePage.context().storageState({ path: 'tests/e2e/.auth/admin.json' });
 

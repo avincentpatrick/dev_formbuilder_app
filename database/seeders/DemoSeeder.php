@@ -165,7 +165,14 @@ class DemoSeeder extends Seeder
         $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Platform Admin', self::PASSWORD);
 
         if ($admin->is_super_admin !== true) {
-            $admin->forceFill(['is_super_admin' => true])->save();
+            // ⚠️ `pgsql_privileged`, NOT the default connection. As `meridian_app` this UPDATE affects ZERO
+            // rows, silently: `users` has FORCE row-level security, its SELECT policy is join-shaped and
+            // fails closed with no context, and PostgreSQL applies SELECT policies to an UPDATE whose WHERE
+            // reads a column. A platform admin has no tenant membership, so it is invisible from every
+            // context — a freshly seeded demo database ended up with NO super-admin at all and no error to
+            // say so. See `E2eSeeder::seedSuperAdmin()` for the full argument and
+            // `tests/Feature/Auth/CentralHostLoginTest.php` for the reproduction.
+            $admin->setConnection('pgsql_privileged')->forceFill(['is_super_admin' => true])->save();
         }
     }
 

@@ -1290,20 +1290,28 @@ class E2eSeeder extends Seeder
      * rows at all — idempotency comes from {@see self::resolveOrCreateUser()}, the same primitive every other
      * seeded account uses, plus a `forceFill` that is a no-op on a second run.
      *
-     * Deliberately NOT covered by a case in `E2eSeederIdempotencyTest`, and the reason is worth recording so
-     * nobody adds a broken one: that file asserts through the DEFAULT connection inside a tenant context,
-     * because `pgsql_auth` cannot see `RefreshDatabase`'s uncommitted transaction (its header records the
-     * trap). This operator has NO tenant membership, so the users join-shape RLS policy makes it invisible
-     * from any tenant's context — a test there could only assert “did not throw”, which is the kind of
-     * near-vacuous case this codebase keeps catching in review. What actually proves the fixture is the e2e
-     * itself: `admin-console-axe.spec.ts` cannot log in, clear step-up and assert its final URL unless this
-     * row exists in exactly this shape.
+     * ⚠️ THE PROMOTION MUST RUN ON `pgsql_privileged`, AND THE FIRST VERSION OF THIS METHOD DID NOT.
+     * `$admin->forceFill([...])->save()` on the DEFAULT connection issues `UPDATE users … WHERE id = ?` as
+     * `meridian_app`. `users` carries ENABLE **and FORCE** row-level security ({@see TenantIsolation::enableAndForce()}
+     * applies it even to the table owner, and CI creates the database `OWNER meridian_app`, so the owner
+     * exemption does not save it); the SELECT policy is join-shaped and fails closed with no context, the
+     * permissive carve-out being `TO meridian_auth` only; and PostgreSQL applies SELECT policies to an UPDATE
+     * that reads columns, which `WHERE id = ?` does. This operator has NO tenant membership BY DESIGN, so it
+     * is invisible from every context and the promotion affected ZERO ROWS — silently, with no error, leaving
+     * `is_super_admin` false and the console 404ing behind {@see EnsureSuperAdmin}. Proven, not reasoned:
+     * `tests/Feature/Auth/CentralHostLoginTest.php` reproduces the no-op over the app connection.
+     * `DemoSeeder::ensureSuperAdmin()` had the identical defect and is fixed the same way.
+     *
+     * The same invisibility is why `E2eSeederIdempotencyTest` has no case here: that file asserts through the
+     * DEFAULT connection inside a tenant context, where this row cannot be seen, so a case there could only
+     * assert “did not throw” — the near-vacuous shape this codebase keeps catching in review. The promotion is
+     * covered instead by the connection-level test above, which is where the bug actually lived.
      */
     private function seedSuperAdmin(): void
     {
         $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Console Operator', self::SUPER_ADMIN_PASSWORD);
 
-        $admin->forceFill([
+        $admin->setConnection('pgsql_privileged')->forceFill([
             'is_super_admin' => true,
             'two_factor_confirmed_at' => $admin->two_factor_confirmed_at ?? now(),
             'two_factor_secret' => null,

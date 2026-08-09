@@ -85,6 +85,22 @@ final class NotificationCopy
                 'headline' => 'A webhook endpoint was paused after repeated failures.',
                 'body' => "An endpoint in {$tenantName} stopped accepting deliveries and has been paused. Open it to see the failures and re-enable it.",
             ],
+            // I11b — the Processor-access disclosure §9 requires. Names the MEMBER whose account was used
+            // and never the operator: `AuditLogPresenter::actingAsLabel()` renders platform staff as
+            // "Platform operator" everywhere else, and an email is the one place a leaked name would
+            // outlive the session and sit in an inbox.
+            //
+            // Deliberately not apologetic and not alarming. Support access is a legitimate, contracted act;
+            // the email's job is to make it impossible to have happened unnoticed, and to point at the
+            // ledger where the detail lives.
+            NotificationType::ImpersonationStarted => [
+                'headline' => (self::string($data, 'target_name') ?? 'A member')
+                    .'’s account was accessed by platform support.',
+                'body' => "A platform support operator signed in to {$tenantName} as "
+                    .(self::string($data, 'target_name') ?? 'one of your members')
+                    .' to investigate an issue. Everything they do is recorded in your audit log, marked as'
+                    .' taken by a platform operator.',
+            ],
         };
     }
 
@@ -144,6 +160,10 @@ final class NotificationCopy
             NotificationType::MemberInvited => self::inviteDescription($data),
             NotificationType::WebhookFailed => (self::string($data, 'endpoint_name') ?? 'A webhook endpoint')
                 .' stopped accepting deliveries and has been paused.',
+            // I11b — no tenant name (this row is read inside the workspace) and no operator name (ever).
+            NotificationType::ImpersonationStarted => 'Platform support signed in as '
+                .(self::string($data, 'target_name') ?? 'one of your members')
+                .' to investigate an issue.',
         };
     }
 

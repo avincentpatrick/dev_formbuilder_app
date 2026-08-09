@@ -52,6 +52,20 @@ enum NotificationType: string
     case WebhookFailed = 'webhook_failed';
 
     /**
+     * A platform operator began impersonating one of this workspace's members (I11b).
+     *
+     * ⚠️ APPENDED LAST, and that is not stylistic — the case ORDER is load-bearing (see the class docblock)
+     * and `tests/Unit/NotificationEnumsTest.php` pins it. Inserting this beside a thematically similar case
+     * would reorder the ones after it.
+     *
+     * This is the only type in the catalog raised by an actor who is NOT a member of the tenant. That is
+     * what makes it worth notifying at all: rbac §9's resolved decision 2 is that platform access is
+     * transparent to the affected tenant, and an audit row nobody is looking at is transparency in name
+     * only. The bell is what turns "it is in your log" into "you were told".
+     */
+    case ImpersonationStarted = 'impersonation_started';
+
+    /**
      * Human label for the notification center, the preferences card, and any email subject built from the
      * type alone — one string, three surfaces. Mirrors {@see AuditEvent::label()}, and like it carries no
      * companion `badgeVariant()`: colour is presentation, owned by the TS side (I4).
@@ -66,6 +80,9 @@ enum NotificationType: string
             self::ExportReady => 'Export ready',
             self::MemberInvited => 'Member invited',
             self::WebhookFailed => 'Webhook paused',
+            // The tenant's words, not the operator's — matching AuditEvent::ImpersonationStarted's label,
+            // because the bell row and the ledger row describe the same event to the same reader.
+            self::ImpersonationStarted => 'Platform access',
         };
     }
 
@@ -124,6 +141,11 @@ enum NotificationType: string
             self::SubmissionReceived => ['owner', 'admin', 'form_editor'],
             self::ReviewRequested => ['owner', 'admin', 'reviewer'],
             self::MemberInvited => ['owner', 'admin'],
+            // OWNER ONLY, deliberately narrower than `member_invited`'s owner+admin. §9 frames platform
+            // access as a Processor-access disclosure to the party accountable for the workspace, and the
+            // Owner is that party (`tenants.owner_user_id` is a real column; "Admin" is a delegated role).
+            // Widening it later is additive; narrowing it after people have relied on it is not.
+            self::ImpersonationStarted => ['owner'],
             self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed => [],
         };
     }
@@ -171,6 +193,10 @@ enum NotificationType: string
             self::ExportReady => $submissionId === null ? null : "submissions/{$submissionId}",
             self::MemberInvited => 'members',
             self::WebhookFailed => $endpointId === null ? null : "webhooks/{$endpointId}",
+            // Unconditional, unlike every id-bearing case above: the destination is the tenant's OWN ledger
+            // (`routes/tenant.php`:667), which is where §9 says the access is visible, and there is no
+            // per-row page to deep-link to — `/audit-log` has no `{audit}` detail route by design.
+            self::ImpersonationStarted => 'audit-log',
         };
     }
 
@@ -185,6 +211,7 @@ enum NotificationType: string
             self::ExportReady => 'View submission',
             self::MemberInvited => 'View members',
             self::WebhookFailed => 'View webhook',
+            self::ImpersonationStarted => 'View audit log',
         };
     }
 

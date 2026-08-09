@@ -767,3 +767,47 @@ Opened and merged with no red cycle. **Pest 1965 passed / 7043 assertions** — 
 **2026-08-09 — I12 BUILT: the blank-form print renderer, and with it the WHOLE I-MAP (I0–I12) is complete.** A tenant could build, publish and share a form and had no way to put it on paper; this closes that and is the first link in the OCR purpose chain (the printed form is how the user produces filled scans — it deliberately stops at the artifact and never reaches ingestion). `GET /forms/{form}/versions/{version}/print`, scope-bound, `can:view,form`, shaped after the XLSForm export down to its ABSENCE of side effects (no audit, no metering, no storage — unlike the submission PDF, which is queued precisely because it stores an artifact against the tenant quota). Ungated by plan on purpose: `feature:ocr_single` is Professional+ and printing a blank form is useful with no OCR in the picture. A DRAFT 404s — not a preference, since a draft's `schema_snapshot` is literally `[]` and the request would otherwise 200 with a titled document containing no questions; a SUPERSEDED version still prints, which is the case the OCR chain needs. **Three layout decisions taken with the user (comb boxes; grids/signature print for real while geo/media are marked "not collected on paper"; a printed field key per area) are recorded in the new `docs/ocr-pipeline-design.md` §2.5, which is NORMATIVE for §3** — that doc had no layout requirements at all, so the increment wrote the spec rather than consuming one. **`PrintAnswerArea` is the fourth `default`-less 31-case match and disagrees with `PdfFieldRole` and `OcrFieldEligibility` on purpose, pinned as assertions** (the printed form is the INSTRUMENT, not the extraction target). **THE ORDERING TRAP was the defect most likely to ship looking correct:** `SchemaSnapshotSerializer` sorts by `key` for checksum stability, which is ALPHABETICAL, so rendering the snapshot as it arrives produces a plausibly-shuffled form — the test fixture's key order is the exact reverse of its sequence order so a presence-only assertion cannot pass by accident. **Two dompdf constraints were read out of `vendor/` rather than guessed:** its core fonts are WinAnsi so `U+2610` drops SILENTLY (every box is CSS-bordered, and the test round-trips the RENDERED output through Windows-1252 — source scanning would fail on a Blade comment and pass on an HTML entity, exactly backwards); and a fixed block's offsets are page-CONTENT-relative with `right` never read, which is why `.runhead`'s `top` is negative and its width explicit. **The adversarial review found a shipped correctness defect no test could see:** `cascading_select` was classed as a tick-list, but its option pool is one FLAT list spanning every level, so the paper set "Manila" beside "NCR" as a sibling — a child option offered as an alternative to its own parent; it is now a comb with one captioned run per level. Four more review fixes: a conditional SECTION printed unmarked (the expression lives on the section row, so the per-field marker structurally cannot see it); a field with an unmatched `section_key` VANISHED from the paper silently; an optional `$brand` no caller passed; and the "not collected on paper" marker sharing a class with instructional prose. **New Blade trap worth knowing: `@endif@if` with no space does not compile** — the second directive survives as literal text and fails as a PHP syntax error in the compiled view under `storage/framework/views/`, several frames from the template line. Gates: Pest 3181/0, Vitest 84 FILES/1531, PHPStan 74 = unchanged baseline with zero from the new files, Pint 1099, openapi.json byte-identical; five mutations each reddened its own test and nothing else. **J1 (global search) is next — the J-queue runs before H16b.**
 
 **2026-08-09 — I12 CLOSED (PR #121 merged `3fe606b`, 6/6 CI green, every job with real steps 11–20). THE I-MAP IS COMPLETE: I0–I12 all merged into `phase1-completion`.** CI passed first time with no fixes needed. Local gates on the merged tree: Pest 3181/0 (12,469 assertions), Vitest 84 FILES/1531, PHPStan 74 = unchanged baseline with zero from the new files, Pint 1099, openapi.json byte-identical. **Two process facts earned this session and worth carrying:** (1) an interim full Pest run reported 5 failures in suites the branch does not touch, purely because **Vitest was running concurrently** — the standing "Pest and Vitest sequentially" rule; the clean re-run on the identical tree was 3181/0 and the contended run took 50% longer (1551s vs 1028s), which is the tell, and nothing was diagnosed on the strength of the contended run; (2) that run was piped through `tail -8`, so **the shell exit code was `tail`'s and reported success while Pest had failed** — do not pipe a gate command whose exit status you intend to read. **J1 (global search) is next**, the first row of the J-queue registered by the 2026-08-09 alignment review; the J-queue runs before H16b.
+
+## 2026-08-10 — J1 global search, part one: J1a merged (PR #122), J1b built and pushed
+
+Started the J-queue. Split J1 into five sub-PRs on the I10 rule — the piece that can redden an EXISTING
+green gate goes first — after a three-agent code sweep falsified several premises the tracker carried: there
+is no FTS anywhere (only PostGIS is enabled; ADR-0001's claim that `pg_trgm`/`citext`/`pgcrypto` are on is
+false as-built), **no seeded `search` permission key** (the dormant-key tell does NOT fire — the only
+zero-consumer keys are the `tenant.billing.*` payment stubs), `TopNav.vue`'s deferral is at line 5 and is a
+prose comment rather than a `<slot>`, and PRD §3.7 scopes search to forms/submissions/members/settings —
+**audit rows are not on that list**, and cross-tenant audit search was already deliberately refused.
+
+**J1a (PR #122, 6/6 green)** shipped `MdsTextInput type="search"`, `MdsModal`'s `initialFocus`, the
+`openModalCount` re-export, and **DSR §3.4.1 — a command-palette spec that did not exist anywhere in
+`docs/`**, written before the thing it specifies (the I12 precedent). Its adversarial review returned 35
+findings across two lenses and found a **keyboard trap in the new prop**: by the time `initialFocus`
+resolves the page is already inert, an invalid selector *throws* (and `nextTick` does not route through
+Vue's error handler), a match that cannot take focus is a silent no-op, and either way focus lands on
+`<body>` with Escape and the Tab trap unreachable — WCAG 2.1.2, reached through the prop added to satisfy
+§4.5's "never left stranded". Two more lessons: **a bare HTML tag literal in a `.vue` comment fails the
+Storybook build and nothing else** (its preset preserves comments for docgen; Vitest, vue-tsc and Vite all
+skip them, so three gates stay green and only the merge-blocking one reddens), and **a comment of mine
+asserted a hypothesis as a measurement** — I read happy-dom's `offsetParent` as non-null when it is
+`undefined` and not implemented, which means `focusable()`'s visibility filter is a no-op under Vitest.
+
+**J1b** built the substrate: two generated `tsvector` STORED columns + GIN (not a projection table — that
+would be a third encoding of the form-visibility rule and a second PII store, and `submissions.pii_erased_at`
+has zero writers), `SearchTerms` (load-bearing, not defensive: `to_tsquery('simple','foo &')` raises 42601,
+i.e. a 500 from typing an ampersand), `KeywordFilter`, the extraction of `Form::scopeVisibleTo()` as the list
+twin of `FormPolicy::view`, per-entity arms behind an interface, `GET /search`, and a JavaScript-free nav
+field that absorbs the ~180-assertion e2e blast radius on a static element. 59 tests / 151 assertions.
+
+**The mutation discipline paid for itself four times.** Two mutations refused to redden and each exposed a
+vacuous test: swapping the analytics rule into the form scope was masked because the ARM GATE refuses a
+Viewer first, and flattening the visibility OR was masked because **Laravel's `addNewWheresWithinGroup()`
+groups BOTH slices of the where list, so the next local scope retroactively wraps whatever preceded it**.
+Two request-validation bugs also came from tests rather than reading: a `max:200` rule that contradicted the
+feature's own principle by turning a long paste into a 422-to-nowhere, and a missing `nullable` that made
+every whitespace-only search 422 — because `TrimStrings` + `ConvertEmptyStringsToNull` run before validation
+and deliver `null` with the key present, which a unit-level `validator()` call never reproduces.
+
+J1b is committed and pushed but **not merged**: it still owes the `EXPLAIN` index-usage test (an unused GIN
+index passes all 59 tests — identical rows, only the plan changes), the 375px bounding-box/non-overlap e2e,
+a scope≡policy set-equality test, three doc updates, the gate sweep and its review. J1c is the leak PR and
+the reason the split exists.

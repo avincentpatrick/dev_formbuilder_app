@@ -254,25 +254,34 @@ final class ImpersonationService
 
                 // Both exclusions in the query rather than a post-filter, so "eligible" is one predicate
                 // the database evaluates: never yourself, never another super-admin.
+                /** @var list<array{id: string, name: string, email: string}> $users */
                 $users = User::query()
                     ->whereIn('id', $memberIds)
                     ->whereKeyNot($operatorId)
                     ->where('is_super_admin', false)
                     ->orderBy('name')
-                    ->get(['id', 'name', 'email']);
-
-                $roles = $this->materializedRoles($users->pluck('id')->all());
-
-                return $users
+                    ->get(['id', 'name', 'email'])
+                    // `getAttribute()` rather than `->name`: this model's attributes are database columns
+                    // with no declared properties, so a direct read is untyped to static analysis and the
+                    // shape below is what the page is typed against.
                     ->map(static fn (User $user): array => [
                         'id' => (string) $user->getKey(),
-                        'name' => (string) $user->name,
-                        'email' => (string) $user->email,
-                        'role' => $roles[(string) $user->getKey()] ?? '—',
-                        'is_owner' => $ownerId !== null && $ownerId === (string) $user->getKey(),
+                        'name' => (string) $user->getAttribute('name'),
+                        'email' => (string) $user->getAttribute('email'),
                     ])
                     ->values()
                     ->all();
+
+                $roles = $this->materializedRoles(array_column($users, 'id'));
+
+                return array_map(
+                    static fn (array $row): array => [
+                        ...$row,
+                        'role' => $roles[$row['id']] ?? '—',
+                        'is_owner' => $ownerId !== null && $ownerId === $row['id'],
+                    ],
+                    $users,
+                );
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
@@ -384,7 +393,12 @@ final class ImpersonationService
         try {
             $this->audit->record(
                 $event,
-                'user',
+                // ⚠️ `users`, PLURAL — the alias registered in `AuditableTypes::LABELS` and already written
+                // by three other sites. A singular `user` would not have broken anything visibly: the
+                // label map fails OPEN, so the row would still render as "User". It would simply be a
+                // SECOND alias for one concept, absent from the filter dropdown (`options()` fails closed)
+                // — so an auditor filtering the ledger by User would never see an impersonation.
+                'users',
                 $targetUserId,
                 null,
                 null,

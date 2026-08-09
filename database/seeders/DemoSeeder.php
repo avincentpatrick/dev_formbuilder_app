@@ -966,6 +966,35 @@ class DemoSeeder extends Seeder
                     continue; // append-only: an existing row can never be rewritten, and need not be
                 }
 
+                // ⚠️ THE TWO I11b BOUNDARIES ARE SHAPED LIKE THE REAL THING, not folded into the generic
+                // form/submission rows this loop otherwise produces. Left generic they would read as "a
+                // platform operator started impersonating… a form", with `acting_as_user_id` NULL — an
+                // impersonation row that names no operator, which is the exact fiction this method's
+                // docblock refuses for `redacted_fields`. The tenant viewer renders `acting_as` as the
+                // fixed string "Platform operator" whoever it points at, so the demo row looks precisely
+                // like a production one.
+                if ($event === AuditEvent::ImpersonationStarted || $event === AuditEvent::ImpersonationEnded) {
+                    Audit::query()->forceCreate([
+                        'id' => $id,
+                        'tenant_id' => $tenantId,
+                        'auditable_type' => 'users',
+                        'auditable_id' => (string) $editor->getKey(),
+                        'event' => $event->value,
+                        'old_values' => null,
+                        'new_values' => null,
+                        'redacted_fields' => null,
+                        // The EFFECTIVE actor is the impersonated member; the operator is beside them.
+                        // Different ids on purpose — `audits_acting_as_not_self_check` refuses a row that
+                        // says somebody impersonated themselves.
+                        'user_id' => $editor->getKey(),
+                        'acting_as_user_id' => $owner->getKey(),
+                        'is_system_action' => false,
+                        'created_at' => $at,
+                    ]);
+
+                    continue;
+                }
+
                 // Every third row describes a SUBMISSION rather than a form, and carries the two keys
                 // `AuditRedactor::PII['submission']` names — so the back-dated tail contains genuinely
                 // redacted rows too, rather than only the two live ones below.

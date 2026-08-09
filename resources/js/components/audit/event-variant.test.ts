@@ -42,7 +42,7 @@ describe('auditEventVariant', () => {
         expect(auditEventVariant('')).toBe('neutral');
     });
 
-    it('covers exactly the eight AuditEvent values', () => {
+    it('covers exactly the ten AuditEvent values', () => {
         // The other half of this pair lives in PHP: nothing here can see a new enum case, so a Pest test
         // asserting AuditEvent::cases() reaches the filter catalog is what catches the addition itself.
         expect(Object.keys(EVENT_VARIANT).sort()).toEqual([
@@ -50,6 +50,10 @@ describe('auditEventVariant', () => {
             'created',
             'deleted',
             'exported',
+            // I11b — both boundaries, kept in this sorted list rather than appended, so a case added to the
+            // PHP enum without a band here is a failing diff and not a silently neutral badge.
+            'impersonation_ended',
+            'impersonation_started',
             'permission_changed',
             'published',
             'restored',

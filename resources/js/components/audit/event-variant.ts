@@ -40,6 +40,25 @@ export const EVENT_VARIANT: Record<string, BadgeVariant> = {
     exported: 'warning',
     // Someone's authority changed.
     permission_changed: 'warning',
+    /*
+     * I11b — the two impersonation boundaries.
+     *
+     * `warning` for BOTH, and the pair is deliberate. Every other event in this map describes a member of
+     * the workspace acting on the workspace's own data; these two describe somebody who is NOT a member
+     * being inside it. That is the highest-consequence band this ledger has, and it is precisely what a
+     * compliance reader is scanning for.
+     *
+     * The END row is amber too, which looks like over-signalling and is not. A support session is one
+     * EPISODE with two edges, and colouring the close `neutral` would hide the row that answers "how long
+     * were they in here?" — the second question anyone asks after seeing the first row. An episode with a
+     * loud start and a quiet finish reads as unfinished.
+     *
+     * Not `danger`: red would state that a lawful, contracted support action is a breach. §9's posture is
+     * transparency, not accusation — the fallback comment above about the label being the identity is what
+     * makes amber sufficient here.
+     */
+    impersonation_started: 'warning',
+    impersonation_ended: 'warning',
 };
 
 /** Never throws; an unrecognised event falls back to the routine band. */

@@ -194,19 +194,23 @@ it('shapes a row the way the shared AuditRow contract expects', function (): voi
         ->and(array_column($row['changes'], 'key'))->toContain('registration.open_signup');
 });
 
-it('names the operator behind an impersonated row, where the tenant viewer cannot', function (): void {
+it('cannot show an impersonated row at all, because those rows are tenant-scoped', function (): void {
     $operator = committedSuperAdmin('driver@platformaudittest.local', 'Dana Operator');
     $member = committedPlainUser('member@platformaudittest.local', 'Mira Member');
-    committedAudit(null, $member->id, 'settings', 'updated', ['registration.open_signup' => false], null, $operator->id);
+    $tenant = committedPlatformTenant('impersonated-slice');
 
-    $row = app(PlatformAuditPresenter::class)->index([], 1)['data'][0];
+    // An impersonated action is written under the impersonated TENANT's context, so `BelongsToTenant` sets
+    // `tenant_id` — the strict append-only INSERT policy (`tenant_id = ctx`) requires it. This fixture
+    // therefore writes a TENANT-scoped row, which is the only shape `AuditLogger` can actually produce.
+    committedAudit($tenant->id, $member->id, 'form', 'updated', ['title' => 'x'], null, $operator->id);
 
-    // The asymmetry this increment deliberately builds: this read runs on the elevated connection, so the
-    // operator's row is visible even though they belong to no tenant. `AuditLogPresenter` can only manage
-    // "Platform operator" for exactly the same fact — see ImpersonationAttributionTest.
-    //
-    // `actor` is the MEMBER, not the operator. If a future change ever swaps them, the ledger stops
-    // recording whose authority the action ran under, which is the one thing rbac §9:433 asks it to keep.
-    expect($row['actor'])->toBe('Mira Member')
-        ->and($row['acting_as'])->toBe('Dana Operator');
+    // ⚠️ THE FIRST VERSION OF THIS CASE ASSERTED THE OPPOSITE AND PASSED, because it hand-wrote
+    // `tenant_id = NULL` alongside `acting_as_user_id` — a combination the writer cannot produce. On that
+    // fabricated row the presenter dutifully resolved and rendered the operator's name, "proving" a console
+    // feature that can never fire in production. This viewer reads `whereNull('tenant_id')` THROUGH
+    // `audits_platform_select`, which itself carries `AND tenant_id IS NULL`, so an impersonated row is
+    // excluded twice over. routes/admin.php:77 says the same from the other side.
+    $rows = app(PlatformAuditPresenter::class)->index([], 1)['data'];
+
+    expect($rows)->toBe([], 'a tenant-scoped row must never reach the platform ledger');
 });

@@ -21,12 +21,16 @@ use Illuminate\Http\Request;
  *
  * On `acting_as_user_id` (I11a): an ID, not a name, matching `user_id` beside it — and the disclosure that
  * choice implies was weighed rather than inherited. The tenant WEB viewer deliberately renders only
- * "Platform operator" ({@see AuditLogPresenter::actingAsLabel()}), so exposing a raw
- * uuid here is strictly more than the page shows. It is still the right call: the id is OPAQUE to the
- * caller (platform staff hold no membership, so `/users` cannot resolve it), it discloses no more than the
- * page already does about the FACT of an operator acting, and it lets a tenant correlate several actions to
- * one operator — which serves RBAC §9's transparency posture rather than working against it. A display name
- * would leak staff identity to every API consumer and be unjoinable besides.
+ * "Platform operator" ({@see AuditLogPresenter::actingAsLabel()}), so exposing a raw uuid here is strictly
+ * more than the page shows.
+ *
+ * It is still the right call, on the honest grounds rather than the first ones drafted. (Those claimed the
+ * id is unresolvable because "`/users` cannot resolve it" — there is no `/api/v1/users` endpoint at all,
+ * and the premise it rested on is false anyway: nothing stops an operator also being a member of the
+ * tenant, in which case they DO appear on that tenant's own member list.) What actually justifies it: the
+ * id discloses no more than the page already does about the FACT of an operator acting, it is the only
+ * form an integration can correlate across rows, and correlation serves RBAC §9's transparency posture
+ * rather than working against it. A display NAME would be a further disclosure with no such use.
  *
  * @mixin Audit
  */

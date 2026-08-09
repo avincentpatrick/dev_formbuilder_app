@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Audit;
 
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Support\Str;
 
 /**
  * Who is REALLY at the keyboard, when that is not who the action runs as — Increment I11a.
@@ -53,7 +54,7 @@ final class ImpersonationContext
 
     private static ?string $operatorId = null;
 
-    /** The real operator's id, or null when nobody is impersonating. */
+    /** The real operator's id, or null when nobody is impersonating. Always a uuid or null. */
     public static function operatorId(): ?string
     {
         return self::$operatorId ?? self::fromSession();
@@ -62,7 +63,7 @@ final class ImpersonationContext
     /** Pin an operator for a context that has no session (queue, console) or for a test. */
     public static function set(?string $operatorId): void
     {
-        self::$operatorId = $operatorId;
+        self::$operatorId = self::sanitise($operatorId);
     }
 
     /** Drop the pin and fall back to the session. Call this in a `finally`. */
@@ -73,19 +74,50 @@ final class ImpersonationContext
 
     /**
      * Best-effort session read — null outside an HTTP context, mirroring how {@see AuditLogger} guards its
-     * own request-metadata reads. `app()->bound('session')` is not enough on its own: the session service
-     * resolves in console contexts too but has no started store, and calling `get()` on it throws.
+     * own request-metadata reads.
+     *
+     * ⚠️ TWO SOURCES, AND THE SECOND IS NOT BELT-AND-BRACES. `request()->hasSession()` is only true once
+     * `StartSession` has attached the store to the request instance, which is the real HTTP path — but a
+     * feature test that seeds state with Laravel's `session()` helper writes to the session MANAGER without
+     * that attachment, so a request-only read returns null and every session-driven test silently proves
+     * nothing. The first draft did exactly that and its new case failed on the first run.
+     *
+     * ⚠️ AND NO `isStarted()` GUARD, WHICH WAS THE SECOND WRONG GUESS. It reads false in precisely the
+     * context the fallback exists for — measured: after `session([...])` the store returns the value while
+     * `isStarted()` is still false — so gating on it reinstates the bug it was meant to avoid. The guard is
+     * unnecessary anyway: `Store::get()` reads an attribute bag that is `[]` until something populates it,
+     * so on a console or queue process this returns null without touching a driver.
      */
     private static function fromSession(): ?string
     {
-        if (! app()->bound('request')) {
-            return null;
+        if (app()->bound('request') && request()->hasSession()) {
+            return self::sanitise(request()->session()->get(self::SESSION_KEY));
         }
 
-        $session = request()->hasSession() ? request()->session() : null;
+        return app()->bound('session')
+            ? self::sanitise(app('session')->driver()->get(self::SESSION_KEY))
+            : null;
+    }
 
-        $value = $session?->get(self::SESSION_KEY);
-
-        return is_string($value) && $value !== '' ? $value : null;
+    /**
+     * ⚠️ EVERY PATH IN IS UUID-VALIDATED, AND THE COST OF SKIPPING IT IS NOT A BAD AUDIT ROW — IT IS THE
+     * CALLER'S TRANSACTION.
+     *
+     * This value lands in a `uuid` column via `AuditLogger::record()`, which runs INSIDE the business
+     * transaction it is recording. A non-uuid string reaches PostgreSQL as `SQLSTATE 22P02`, which nothing
+     * catches: the audit INSERT throws, the enclosing transaction rolls back, and the form save or
+     * membership change that triggered it is silently undone. A syntactically valid uuid with no matching
+     * user is `23503` with the same blast radius — reachable for real if an operator's account is deleted
+     * while their impersonated session is live, since `ON DELETE SET NULL` repairs existing rows but does
+     * nothing for the next INSERT.
+     *
+     * Failing CLOSED (attributing nothing) is the right trade against failing the user's actual write. The
+     * read side already learned this: `PlatformAuditFilterRequest` validates the operator filter as a uuid
+     * so the console does not 500 on a cast. This is the write-side equivalent, which the first draft
+     * lacked entirely.
+     */
+    private static function sanitise(mixed $value): ?string
+    {
+        return is_string($value) && Str::isUuid($value) ? $value : null;
     }
 }

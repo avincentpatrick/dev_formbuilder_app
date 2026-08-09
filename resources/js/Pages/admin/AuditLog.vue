@@ -204,18 +204,16 @@ function summarize(row: AuditRow): string {
             </template>
 
             <!--
-                Same stacked treatment as the tenant viewer (I11a), and deliberately the same wording — the
-                two pages differ only in WHAT they can name, never in how the fact is presented. Here the
-                elevated read resolves the operator, so this line usually carries a real name; over there it
-                reads "via Platform operator" because the join-shape RLS hides staff from a tenant.
+                NO impersonation marker here, and its absence is deliberate (I11a). An impersonated action is
+                written under the impersonated TENANT's context, so it carries a `tenant_id` — while this page
+                reads only the `tenant_id IS NULL` slice, twice over (the query's `whereNull` and
+                `audits_platform_select`'s own `AND tenant_id IS NULL`). Such a row therefore cannot reach
+                this table, and `PlatformAuditPresenter` emits `acting_as: null` unconditionally. A `v-if`
+                marker was written here first and was dead code; see that presenter for why making it
+                reachable would mean undoing I7b's deliberate narrowing.
             -->
             <template #cell-actor="{ row }">
-                <div class="audit__actor">
-                    <span>{{ (row as AuditRow).actor }}</span>
-                    <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
-                        via {{ (row as AuditRow).acting_as }}
-                    </span>
-                </div>
+                {{ (row as AuditRow).actor }}
             </template>
 
             <template #cell-summary="{ row }">

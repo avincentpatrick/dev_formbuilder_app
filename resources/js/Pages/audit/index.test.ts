@@ -168,6 +168,20 @@ describe('audit log — labels and badges', () => {
         wrapper.unmount();
     });
 
+    it('carries the impersonation fact into the change modal (I11a)', async () => {
+        // The modal is the surface built for "what exactly happened here", so it is the LAST place the fact
+        // may go missing — and the first draft of this increment updated every other read surface and left
+        // it out. Shared verbatim with the console page, which is why it is tested from this one.
+        const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
+
+        await wrapper.get('button[aria-label="View changes"]').trigger('click');
+
+        const text = wrapper.text();
+        expect(text).toContain('Acting as');
+        expect(text).toContain('Platform operator');
+        wrapper.unmount();
+    });
+
     it('marks a row an operator drove, without losing the effective actor (I11a)', () => {
         const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Platform operator' })] });
 
@@ -183,10 +197,10 @@ describe('audit log — labels and badges', () => {
     it('renders no impersonation marker on an ordinary row', () => {
         const wrapper = render({ data: [row()] });
 
-        // The negative case matters more than it looks: `acting_as` is null on ~100% of real rows, so a
-        // marker that rendered unconditionally would be invisible in the positive test above and wrong
-        // everywhere else.
-        expect(wrapper.text()).not.toContain('via');
+        // A class assertion, NOT `text()).not.toContain('via')`: a bare substring over the whole page would
+        // redden on any future copy containing "trivial" or "deviation", and could not tell "no marker"
+        // from "marker rendered with empty text".
+        expect(wrapper.find('.audit__acting-as').exists()).toBe(false);
         wrapper.unmount();
     });
 });

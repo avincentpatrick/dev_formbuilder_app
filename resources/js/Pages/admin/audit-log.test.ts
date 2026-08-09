@@ -223,13 +223,14 @@ describe('admin/AuditLog', () => {
         expect(render().get('[role="alert"]').text()).toContain('Something went wrong.');
     });
 
-    it('names the operator behind an impersonated row (I11a)', () => {
-        // The console can NAME them, unlike the tenant viewer, because `listPlatformAudits()` reads over the
-        // elevated connection. That asymmetry is the whole reason both pages carry the marker — pinned on
-        // both sides so a future change that collapses them into one presenter has to choose deliberately.
+    it('renders no impersonation marker, because such a row cannot reach this page (I11a)', () => {
+        // `PlatformAuditPresenter` emits `acting_as: null` unconditionally — an impersonated action is
+        // tenant-scoped and this viewer reads only the `tenant_id IS NULL` slice. The fixture forces a
+        // non-null value anyway, so this reddens if anyone reintroduces the marker without ALSO widening
+        // `audits_platform_select`, which I7b deliberately narrowed. See PlatformAuditReadTest.
         const wrapper = render({ data: [row({ actor: 'Demo Owner', acting_as: 'Dana Operator' })] });
 
         expect(wrapper.text()).toContain('Demo Owner');
-        expect(wrapper.text()).toContain('via Dana Operator');
+        expect(wrapper.text()).not.toContain('Dana Operator');
     });
 });

@@ -30,12 +30,19 @@ use Illuminate\Support\Facades\Schema;
  * silently re-point all of them at platform staff. A reader that does not know about impersonation
  * therefore keeps telling the truth, just less of it.
  *
- * ── NULLABLE, AND NO CHECK CONSTRAINT PAIRING IT WITH `user_id` ─────────────────────────────────────────
- * A `CHECK (acting_as_user_id IS NULL OR user_id IS NOT NULL)` was considered and rejected. `user_id` is
- * already nullable for system actions, and the FK is `nullOnDelete` — so deleting the impersonated user
- * legitimately produces a row with a NULL `user_id` and a non-NULL `acting_as_user_id`, which the constraint
- * would then refuse to have existed. Enforcing a shape the retention policy itself breaks turns an
- * append-only ledger into one that cannot honour a deletion.
+ * ── ONE CHECK CONSTRAINT, AND ONE THAT WAS REJECTED ─────────────────────────────────────────────────────
+ * REJECTED: `CHECK (acting_as_user_id IS NULL OR user_id IS NOT NULL)`. `user_id` is already nullable for
+ * system actions and the FK is `nullOnDelete` — so deleting the impersonated user legitimately produces a
+ * row with a NULL `user_id` and a non-NULL `acting_as_user_id`, which the constraint would then refuse to
+ * have existed. Enforcing a shape the retention policy itself breaks turns an append-only ledger into one
+ * that cannot honour a deletion.
+ *
+ * ADDED: `CHECK (acting_as_user_id IS NULL OR acting_as_user_id <> user_id)`. This one encodes a decision
+ * of record — I11's "never yourself" — at the only layer that cannot be bypassed, and it survives the FK
+ * above for free, because `NULL <> x` is NULL and a CHECK passes on NULL. Without it, an I11b bug (or, more
+ * likely, an `impersonator_id` left in the session after exit — nothing clears it today) writes rows saying
+ * a user impersonated themselves: not merely noise, but a ledger entry that reads as an accusation. A DB
+ * error is the right outcome for a state the product says cannot exist.
  *
  * ── `nullOnDelete`, MATCHING `user_id` ──────────────────────────────────────────────────────────────────
  * Never cascade. The table's own docblock argues it: FK actions bypass RLS, and a cascade here would let
@@ -43,12 +50,19 @@ use Illuminate\Support\Facades\Schema;
  * The trade is the same one `user_id` already makes and `AuditLogPresenter::actorLabel()` already renders:
  * a null actor whose row is gone is displayed as unknown, not as absent.
  *
- * ── THE INDEX IS PARTIAL, AND THAT IS THE WHOLE REASON IT IS AFFORDABLE ─────────────────────────────────
- * The only query shape is "rows written during an impersonation" — a compliance question asked rarely and
- * answered over a table whose every OTHER row has this column NULL. A plain btree would index one entry per
- * audit row forever to serve a predicate that excludes ~100% of them. `WHERE acting_as_user_id IS NOT NULL`
- * indexes only the rows that can ever match. It leads with `tenant_id` per ADR-0002 §D1 like the table's
- * other three, and carries an explicit short name because PostgreSQL truncates at NAMEDATALEN = 63.
+ * ── THE INDEX IS PARTIAL, AND IT HAS NO READER YET — SAID PLAINLY RATHER THAN DRESSED UP ────────────────
+ * No surface filters or sorts on this column today: not the tenant viewer's `when()` chain, not the API's
+ * query parameters, not the platform ledger. The first draft of this docblock justified the index with "the
+ * only query shape is rows written during an impersonation", which described a feature nobody had built.
+ *
+ * It is kept anyway, and the honest reason is the shape of the alternative rather than a query that exists:
+ * `audits` is never pruned, so adding an index to it later means building one over an unbounded table on a
+ * live system, while adding it now costs nothing on a column that is NULL everywhere. `WHERE
+ * acting_as_user_id IS NOT NULL` is what makes that true — a plain btree would carry one entry per audit
+ * row forever for a predicate that excludes ~100% of them, whereas this one stays empty until impersonation
+ * is actually used. It leads with `tenant_id` per ADR-0002 §D1 like the table's other three, and carries an
+ * explicit short name because PostgreSQL truncates at NAMEDATALEN = 63. If I11b ships without ever
+ * filtering on it, drop it then.
  *
  * ── NO RLS RE-EMIT ──────────────────────────────────────────────────────────────────────────────────────
  * Alter-only. `audits` already carries its append-only isolation shape and those policies are ROW
@@ -63,9 +77,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('audits', function (Blueprint $table): void {
+            // No `->after()`: PostgresGrammar has no `modifyAfter`, so Laravel discards it silently and the
+            // column lands last in ordinal position regardless. Writing it would suggest a physical order
+            // the database does not have (data-dictionary §13 lists it beside `user_id` for READING, which
+            // is a different thing).
             $table->foreignUuid('acting_as_user_id')
                 ->nullable()
-                ->after('user_id')
                 ->constrained('users')
                 ->nullOnDelete();
         });
@@ -75,10 +92,18 @@ return new class extends Migration
             'CREATE INDEX audits_tenant_acting_as_idx ON audits (tenant_id, acting_as_user_id) '
             .'WHERE acting_as_user_id IS NOT NULL'
         );
+
+        // "Never yourself" (I11's decision of record) enforced where it cannot be bypassed. Passes on NULL
+        // in either column, so it never fights the nullOnDelete FKs.
+        DB::statement(
+            'ALTER TABLE audits ADD CONSTRAINT audits_acting_as_not_self_check '
+            .'CHECK (acting_as_user_id IS NULL OR acting_as_user_id <> user_id)'
+        );
     }
 
     public function down(): void
     {
+        DB::statement('ALTER TABLE audits DROP CONSTRAINT IF EXISTS audits_acting_as_not_self_check');
         DB::statement('DROP INDEX IF EXISTS audits_tenant_acting_as_idx');
 
         Schema::table('audits', function (Blueprint $table): void {

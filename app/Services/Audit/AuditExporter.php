@@ -110,10 +110,9 @@ final class AuditExporter
                 TenantContext::applyLocal($tenantId, $userId);
 
                 $this->baseQuery($filters)
-                    // Both actor relations (I11a). On a LAZY stream the N+1 the class docblock warns about
-                    // is worse than on a page: one extra query per exported row, on the one path whose
-                    // entire purpose is flat cost over an unbounded table.
-                    ->with(['user:id,name', 'actingAsUser:id,name'])
+                    // `actingAsUser` is NOT loaded (I11a) — the Acting-as cell is a fixed label and must
+                    // never carry the operator's name. See AuditLogPresenter::actingAsLabel().
+                    ->with('user:id,name')
                     // ASC, unlike the screen's newest-first: a ledger reads chronologically in a file.
                     ->orderBy('id')
                     ->lazy()
@@ -208,12 +207,11 @@ final class AuditExporter
             // non-null user_id whose row is invisible under the users join-shape policy is a departed
             // member, not the platform.
             $audit->user_id === null ? 'System' : (is_string($name = data_get($audit, 'user.name')) ? $name : 'Unknown user'),
-            // I11a — empty on every ordinary row. The tenant export cannot name the operator for the same
-            // reason the tenant viewer cannot: platform staff hold no membership here, so the join-shape
-            // RLS hides their row. See AuditLogPresenter::actingAsLabel().
-            $audit->acting_as_user_id === null
-                ? ''
-                : (is_string($op = data_get($audit, 'actingAsUser.name')) ? $op : 'Platform operator'),
+            // I11a — empty on every ordinary row, and a FIXED label otherwise. Never the operator's name:
+            // that is a deliberate disclosure policy, not a limit of what is readable here. See
+            // AuditLogPresenter::actingAsLabel() for why the original "RLS hides them anyway" reasoning was
+            // disproved — an operator who also holds a membership of this tenant IS visible.
+            $audit->acting_as_user_id === null ? '' : 'Platform operator',
             (string) $audit->ip_address,
             $this->cap($rendered),
             implode(', ', $audit->redacted_fields ?? []),

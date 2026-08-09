@@ -72,6 +72,16 @@ function side(value: string | null): string {
                     <dt>Actor</dt>
                     <dd>{{ props.row.actor }}</dd>
                 </div>
+                <!--
+                    I11a. This modal is the surface built for "what exactly happened here", so omitting the
+                    impersonation fact here while showing it in the table would hide it on the one screen a
+                    compliance reader opens to find it. Its own row rather than a suffix on Actor, because
+                    `<dt>Actor</dt>` must keep meaning whose authority the action ran under.
+                -->
+                <div v-if="props.row.acting_as" class="audit-detail__meta-row">
+                    <dt>Acting as</dt>
+                    <dd>{{ props.row.acting_as }}</dd>
+                </div>
                 <div class="audit-detail__meta-row">
                     <dt>Target</dt>
                     <dd>

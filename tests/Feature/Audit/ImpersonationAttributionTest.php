@@ -10,6 +10,7 @@ use App\Support\Audit\AuditLogger;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
@@ -62,6 +63,18 @@ function recordImpersonationProbe(User $actor): Audit
     );
 }
 
+it('refuses at the database to record a user impersonating themselves', function (): void {
+    // "Never yourself" is a decision of record (rbac §9), and `audits_acting_as_not_self_check` is where it
+    // is enforced rather than merely intended. The reachable route to violating it is not an I11b coding
+    // error so much as an `impersonator_id` left in the session after exit — nothing clears it today — at
+    // which point the operator's own later actions would file rows saying they impersonated themselves.
+    // That is not noise in a compliance ledger; it reads as an accusation.
+    ImpersonationContext::set((string) $this->owner->id);
+
+    expect(fn () => recordImpersonationProbe($this->owner))
+        ->toThrow(QueryException::class, 'audits_acting_as_not_self_check');
+});
+
 it('leaves acting_as_user_id null when nobody is impersonating', function (): void {
     $audit = recordImpersonationProbe($this->owner);
 
@@ -95,6 +108,33 @@ it('stops recording the operator once the context is forgotten', function (): vo
     expect($after->fresh()->acting_as_user_id)->toBeNull();
 });
 
+it('reads the operator from the SESSION, which is the only path production uses', function (): void {
+    // ⚠️ EVERY OTHER CASE HERE DRIVES `ImpersonationContext::set()` — the override branch. Nothing in the
+    // app writes `impersonator_id` yet (I11b does), so without this case the real production path would be
+    // entirely unexercised and the commit's "written ambiently at the single write path" claim would be
+    // proven only for the test seam. Break `fromSession()` alone — rename the key, invert the
+    // `hasSession()` guard, drop the sanitiser's happy path — and every other case here stays green.
+    //
+    // This is also the ONE assertion that would notice I11b's writer drifting from this reader.
+    session([ImpersonationContext::SESSION_KEY => (string) $this->operator->id]);
+
+    $audit = recordImpersonationProbe($this->owner);
+
+    expect($audit->fresh()->acting_as_user_id)->toBe((string) $this->operator->id);
+});
+
+it('ignores a session value that is not a uuid, rather than failing the caller write', function (): void {
+    // The column is `uuid`, and `AuditLogger` writes INSIDE the caller's transaction. A junk value reaches
+    // PostgreSQL as SQLSTATE 22P02, which nothing catches — so the audit INSERT throws, the enclosing
+    // transaction rolls back, and the form save that triggered it is silently undone. Failing CLOSED
+    // (attributing nothing) is the right trade against failing the user's actual write.
+    session([ImpersonationContext::SESSION_KEY => 'not-a-uuid']);
+
+    $audit = recordImpersonationProbe($this->owner);
+
+    expect($audit->fresh()->acting_as_user_id)->toBeNull();
+});
+
 it('shows the tenant that an operator acted, without naming them', function (): void {
     ImpersonationContext::set((string) $this->operator->id);
     recordImpersonationProbe($this->owner);
@@ -106,12 +146,35 @@ it('shows the tenant that an operator acted, without naming them', function (): 
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('audit/Index', false)
-            // "Platform operator", NOT the operator's name — and this is not a redaction the presenter
-            // chooses, it is the only reachable answer. The operator holds no membership of this tenant, so
-            // the join-shape `users` RLS hides their row and the eager load yields null. See
-            // AuditLogPresenter::actingAsLabel().
             ->where('data.0.acting_as', 'Platform operator')
             ->where('data.0.actor', $this->owner->name));
+});
+
+it('still refuses to name the operator when that operator IS a member of the tenant', function (): void {
+    // ⚠️ THE CASE ABOVE PASSES FOR A REASON THAT DOES NOT GENERALISE, WHICH IS WHY THIS ONE EXISTS. The
+    // first draft justified the fixed label by claiming the name "is not reachable anyway" — platform staff
+    // hold no membership, so the join-shape `users` policy hides them. But
+    // `TenantIsolation::usersVisibilitySql()` is `id = app.current_user_id OR EXISTS(active membership in
+    // app.current_tenant_id)` and says NOTHING about `is_super_admin`; nothing in the schema or the app
+    // stops an operator also being an active member of the tenant they impersonate into. Adversarial review
+    // demonstrated the row IS visible in that case, and the presenter duly rendered the real name to every
+    // Owner of that workspace.
+    //
+    // So the label is now a policy rather than an accident, and this is the case that holds it to that.
+    // Delete the guard in `actingAsLabel()` and the case above stays GREEN while this one reddens.
+    makeActiveMember($this->operator, 'owner');
+
+    ImpersonationContext::set((string) $this->operator->id);
+    recordImpersonationProbe($this->owner);
+    ImpersonationContext::forget();
+
+    $this->withoutVite();
+    $this->actingAs($this->owner)
+        ->get('http://acme.meridian.test/audit-log')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('audit/Index', false)
+            ->where('data.0.acting_as', 'Platform operator'));
 });
 
 it('leaves acting_as null on the tenant page for an ordinary row', function (): void {

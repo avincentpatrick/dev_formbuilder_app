@@ -61,11 +61,22 @@ Three consequences worth stating once, because each has already caught something
 - **It is written ambiently, at the single write path.** `AuditLogger::record()` reads
   `ImpersonationContext`, exactly as it reads the request IP; it is not a parameter, because a parameter is
   a thing to forget at each of ~15 call sites and forgetting it is silent.
-- **The two viewers legitimately disclose different amounts, and that is not a policy either could break.**
-  A tenant reading `/audit-log` sees `via Platform operator`, never a name — staff hold no membership in
-  that tenant, so the join-shape `users` RLS hides the row and no name is reachable. `/admin/audit-log`
-  names them, reading over the elevated connection. `/api/v1` returns the raw id, which is opaque to a
-  tenant caller for the same RLS reason.
+- **The tenant is told THAT an operator acted, never WHICH ONE — and that is an enforced policy, not a
+  side effect of RLS.** `/audit-log` and the CSV render the fixed string `Platform operator`;
+  `actingAsLabel()` never reads the name. The first draft justified the label by claiming the name was
+  unreachable anyway (staff hold no membership, so the join-shape `users` policy hides them) — **that was
+  disproved against a live database**: `usersVisibilitySql()` says nothing about `is_super_admin`, and an
+  operator who ALSO holds an active membership of the impersonated tenant is perfectly visible, at which
+  point the presenter rendered their real name to every Owner of that workspace. It is now decided rather
+  than inherited, and the relation is deliberately not eager-loaded so the name is not even in memory.
+- **`/admin/audit-log` cannot show an impersonated row at all.** An impersonated action is written under the
+  impersonated tenant's context and therefore carries a `tenant_id`, while the console reads the
+  `tenant_id IS NULL` slice through `audits_platform_select` (`AND tenant_id IS NULL`) — excluded twice
+  over. I11a's first draft resolved a name and rendered a marker there; both were dead code, and the test
+  that "proved" them hand-wrote a `tenant_id = NULL` row carrying `acting_as_user_id`, a shape the writer
+  cannot produce. Making the console see these rows would mean widening the very policy I7b narrowed, so
+  the marker was removed instead. **Today `/api/v1`'s opaque uuid is the only surface that identifies the
+  operator at all.**
 
 ⚠️ **The platform slice is not permanently "settings rows only", and the mechanism is easy to miss.**
 `tenants` has no `SoftDeletes` and `audits.tenant_id` is `nullOnDelete`, so **hard-deleting a tenant

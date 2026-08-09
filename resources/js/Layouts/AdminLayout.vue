@@ -234,11 +234,12 @@ function logout(): void {
  * marginally over. Raising the existing breakpoint (which already wraps the bar, frees its height and
  * drops the email) is the whole fix at tablet width.
  *
- * ⚠️ THE BAR WRAPPING IS NOT ENOUGH AT PHONE WIDTH, and I10e is what finally measured that. The claim
- * this comment used to end on — "nothing in CI would ever have caught it: /admin/* is excluded from the
- * Playwright responsive sweep because `superadmin.mfa` needs a TOTP" — is now false in both halves: the
- * MFA gate needs no TOTP (see `E2eSeeder::seedSuperAdmin()`), and `admin-console-axe.spec.ts` scans this
- * shell at all three viewports. Its first run at 375px was RED on both pages in both themes.
+ * ⚠️ THE BAR WRAPPING IS NOT ENOUGH AT PHONE WIDTH, and I10e is what finally measured that. The claim this
+ * comment used to end on — "nothing in CI would ever have caught it: /admin/* is excluded from the
+ * Playwright responsive sweep because `superadmin.mfa` needs a TOTP" — no longer holds. `responsive-axe`
+ * still does not cover /admin/*, but the reason given was wrong (the MFA gate needs no TOTP at all — see
+ * `E2eSeeder::seedSuperAdmin()`), and a separate spec, `admin-console-axe.spec.ts`, now scans this shell at
+ * all three viewports. Its first run at 375px was RED on both pages in both themes.
  *
  * The offender was measured, not guessed: `.admin__nav` is 369px of links starting at x=16, so it runs to
  * 385 against a 375px viewport — a 10px document overflow, identical on /admin/settings and
@@ -249,7 +250,12 @@ function logout(): void {
  * `flex-wrap` on `.admin__nav` is safe HERE and only here: this block has already set the bar to
  * `height: auto`, so a second row of links grows it. Do NOT lift this to the unscoped rule above — against
  * the fixed 56px the second row would be clipped instead, which is the trap the original comment warned
- * about and the reason it was left off in the first place.
+ * about and the reason it was left off in the first place. The explicit `row-gap` is because the 4px
+ * `gap` above was only ever a horizontal one; once the nav wraps it becomes the space BETWEEN two rows of
+ * tap targets, and 4px there reads as a rendering fault rather than as a layout.
+ *
+ * 375px is the tested floor — the Playwright `mobile` project's width. Narrower phones should hold (the
+ * right-hand group wraps to its own line) but nothing measures them.
  */
 @media (max-width: 900px) {
     .admin__bar {
@@ -260,6 +266,7 @@ function logout(): void {
     }
     .admin__nav {
         flex-wrap: wrap;
+        row-gap: var(--mds-space-2);
     }
     .admin__email {
         display: none;

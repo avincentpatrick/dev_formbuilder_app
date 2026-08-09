@@ -50,6 +50,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -165,14 +166,30 @@ class DemoSeeder extends Seeder
         $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Platform Admin', self::PASSWORD);
 
         if ($admin->is_super_admin !== true) {
-            // ⚠️ `pgsql_privileged`, NOT the default connection. As `meridian_app` this UPDATE affects ZERO
-            // rows, silently: `users` has FORCE row-level security, its SELECT policy is join-shaped and
-            // fails closed with no context, and PostgreSQL applies SELECT policies to an UPDATE whose WHERE
-            // reads a column. A platform admin has no tenant membership, so it is invisible from every
-            // context — a freshly seeded demo database ended up with NO super-admin at all and no error to
-            // say so. See `E2eSeeder::seedSuperAdmin()` for the full argument and
-            // `tests/Feature/Auth/CentralHostLoginTest.php` for the reproduction.
-            $admin->setConnection('pgsql_privileged')->forceFill(['is_super_admin' => true])->save();
+            // ⚠️ `pgsql_privileged` AND A ROW-COUNT CHECK, not `$admin->save()` on the default connection.
+            // As `meridian_app` that UPDATE affected ZERO rows, silently: `users` has FORCE row-level
+            // security, its SELECT policy is join-shaped and fails closed with no context, and PostgreSQL
+            // applies SELECT policies to an UPDATE whose WHERE reads a column. A platform admin has no
+            // tenant membership, so it is invisible from every context — a freshly seeded demo database
+            // ended up with NO super-admin at all and nothing said so. It went unnoticed because
+            // `DemoSeederIdempotencyTest` asserts `$admin->is_super_admin` on the IN-MEMORY model that
+            // `forceFill()` had just mutated, which is true whatever the database did.
+            //
+            // A query builder, not the model: `$admin` is memoized in `$resolvedUsers` and handed out by
+            // `seededUsers()`, so `setConnection('pgsql_privileged')` on it would leave the shared instance
+            // permanently bound to the superuser connection for every later caller.
+            // See `E2eSeeder::promoteToSuperAdmin()` for the full argument and the zero-row postcondition,
+            // and `tests/Feature/Auth/CentralHostLoginTest.php` for the reproduction.
+            $privileged = DB::connection('pgsql_privileged');
+            $affected = $privileged->table('users')->where('id', $admin->id)->update(['is_super_admin' => true]);
+
+            if ($affected === 0 && $privileged->table('users')->where('id', $admin->id)->exists()) {
+                throw new RuntimeException(
+                    'Failed to promote '.self::SUPER_ADMIN_EMAIL.' to super-admin: the row exists but the '
+                    .'UPDATE affected zero rows. The pgsql_privileged role is not bypassing FORCE '
+                    .'row-level security on `users`.'
+                );
+            }
         }
     }
 

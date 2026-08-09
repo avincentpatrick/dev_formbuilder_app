@@ -63,6 +63,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -1311,11 +1312,44 @@ class E2eSeeder extends Seeder
     {
         $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Console Operator', self::SUPER_ADMIN_PASSWORD);
 
-        $admin->setConnection('pgsql_privileged')->forceFill([
+        $this->promoteToSuperAdmin((string) $admin->id, $admin->two_factor_confirmed_at ?? now());
+    }
+
+    /**
+     * Promote an operator over `pgsql_privileged`, and REFUSE TO REPORT SUCCESS ON ZERO ROWS.
+     *
+     * A query-builder UPDATE rather than `$model->save()` for one reason: it returns the affected row count,
+     * which is the only observable that distinguishes "promoted" from "silently promoted nothing". Eloquent's
+     * `performUpdate()` discards that number, which is precisely why the original bug could not be seen.
+     *
+     * The postcondition is deliberately conditional on the row being VISIBLE to this connection. Zero rows
+     * means two different things: under `php artisan db:seed` (the real path, and the one CI's e2e job runs)
+     * the row is committed and visible, so zero can only mean the write was refused — a bug, and it throws.
+     * Inside `RefreshDatabase` the row was created on the DEFAULT connection's open transaction and this
+     * separate session genuinely cannot see it, so zero is expected and says nothing. Distinguishing them is
+     * what lets this guard be strict where it matters without breaking `DatabaseSeederSmokeTest`.
+     *
+     * This also covers a hazard the fix itself relies on: `config/database.php` defaults
+     * `DB_PRIVILEGED_USERNAME` to a superuser, but on a managed Postgres where that role is merely the table
+     * OWNER, `FORCE ROW LEVEL SECURITY` still applies and this write would regress to zero rows. Same class
+     * of failure `OcrCompatibilityBackfill::assertPrivilegedRole()` already refuses to ship past.
+     */
+    private function promoteToSuperAdmin(string $userId, mixed $confirmedAt): void
+    {
+        $privileged = DB::connection('pgsql_privileged');
+
+        $affected = $privileged->table('users')->where('id', $userId)->update([
             'is_super_admin' => true,
-            'two_factor_confirmed_at' => $admin->two_factor_confirmed_at ?? now(),
+            'two_factor_confirmed_at' => $confirmedAt,
             'two_factor_secret' => null,
-        ])->save();
+        ]);
+
+        if ($affected === 0 && $privileged->table('users')->where('id', $userId)->exists()) {
+            throw new RuntimeException(
+                "Failed to promote {$userId} to super-admin: the row exists but the UPDATE affected zero rows. "
+                .'The pgsql_privileged role is not bypassing FORCE row-level security on `users`.'
+            );
+        }
     }
 
     private function resolveOrCreateUser(string $email, string $name, string $password): User

@@ -56,15 +56,6 @@ afterEach(function (): void {
 });
 
 /**
- * The e2e fixture's exact shape, committed so `pgsql_auth` can see it.
- *
- * `two_factor_confirmed_at` SET with a NULL `two_factor_secret` is deliberate and is the whole reason
- * I10e needs no TOTP: Fortify's `hasEnabledTwoFactorAuthentication()` requires BOTH columns when
- * `fortify.features.two-factor.confirm` is true, so no challenge is issued, while `EnsureSuperAdminMfa`
- * reads ONLY the timestamp and lets the console through. ⚠️ NOT `UserFactory::confirmedTwoFactor()`,
- * which writes a placeholder secret and would lock the account out permanently.
- */
-/**
  * Model the boundary between two real HTTP requests, which `$this->post()` → `$this->get()` does NOT.
  *
  * ⚠️ WITHOUT THIS, THESE TESTS EXERCISE A STATE PRODUCTION NEVER HAS, and it took the full suite to show
@@ -84,12 +75,25 @@ afterEach(function (): void {
  * Forgetting the guards makes the next request re-resolve from the session through `retrieveById()`, which
  * is both the faithful thing and a free mutation check: delete that method's `setConnection()` and the
  * third case below goes red.
+ *
+ * Prefixed rather than named `endOfRequest()`: Pest loads every test file into ONE process, so a helper this
+ * generically named is a `Cannot redeclare function` fatal waiting for the next suite to want the same word
+ * — the trap `tests/Pest.php` records having paid for twice.
  */
-function endOfRequest(): void
+function consoleEndOfRequest(): void
 {
     app('auth')->forgetGuards();
 }
 
+/**
+ * The e2e fixture's exact shape, committed so `pgsql_auth` can see it.
+ *
+ * `two_factor_confirmed_at` SET with a NULL `two_factor_secret` is deliberate and is the whole reason
+ * I10e needs no TOTP: Fortify's `hasEnabledTwoFactorAuthentication()` requires BOTH columns when
+ * `fortify.features.two-factor.confirm` is true, so no challenge is issued, while `EnsureSuperAdminMfa`
+ * reads ONLY the timestamp and lets the console through. ⚠️ NOT `UserFactory::confirmedTwoFactor()`,
+ * which writes a placeholder secret and would lock the account out permanently.
+ */
 function committedConsoleOperator(string $email = 'operator@consoletest.local'): User
 {
     return User::on('pgsql_privileged')->forceCreate([
@@ -118,8 +122,31 @@ it('authenticates a super-admin through a real POST /login on the central host',
     $this->assertAuthenticated();
     // (3) documents the hazard rather than asserting a good outcome: `fortify.home` is /dashboard, a
     // TENANT route. On the central host it cannot resolve a tenant, so Fortify's success redirect points
-    // somewhere meaningless here. That is a real defect in the flow even when authentication works.
+    // somewhere meaningless here. That is a real defect in the flow even when authentication works, and the
+    // next case is what makes it survivable — so if a later increment gives the central host a real
+    // `fortify.home` and reddens this line, UPDATE it, do not delete the pair.
     $response->assertRedirect('http://meridian.test/dashboard');
+});
+
+it('sends the login back to the console when the operator was bounced from it', function (): void {
+    committedConsoleOperator();
+
+    // THE PREMISE THE E2E globalSetup DEPENDS ON, pinned here so it cannot regress into a 30-second
+    // Playwright timeout with no explanation. `Authenticate` answers a guest with `redirect()->guest()`,
+    // which stores `url.intended`; Fortify's LoginResponse is `redirect()->intended(...)`, so the login
+    // lands back on the console instead of on the unreachable /dashboard above. Anything that stops the
+    // intended URL being recorded — a change to `Authenticate::redirectTo`, a custom LoginResponse, or the
+    // guest hop starting to `expectsJson()` (which suppresses `setIntendedUrl`) — silently reintroduces the
+    // bug that cost four CI cycles.
+    $this->get('http://meridian.test/admin/settings')
+        ->assertRedirect('http://meridian.test/login');
+
+    expect(session('url.intended'))->toBe('http://meridian.test/admin/settings');
+
+    $this->post('http://meridian.test/login', [
+        'email' => 'operator@consoletest.local',
+        'password' => CONSOLE_LOGIN_PASSWORD,
+    ])->assertRedirect('http://meridian.test/admin/settings');
 });
 
 it('carries that session into the console, stopping only at the step-up challenge', function (): void {
@@ -129,7 +156,7 @@ it('carries that session into the console, stopping only at the step-up challeng
         'email' => 'operator@consoletest.local',
         'password' => CONSOLE_LOGIN_PASSWORD,
     ]);
-    endOfRequest();
+    consoleEndOfRequest();
 
     // Fortify's login does NOT set `auth.password_confirmed_at`, so a genuinely-logged-in operator is
     // SUPPOSED to be bounced here. Asserting the step-up target rather than fighting it is the point:
@@ -152,9 +179,14 @@ it('renders the console once the step-up is confirmed', function (): void {
     // before the POST would be discarded and this would fail for a reason that has nothing to do with
     // the console.
     confirmPasswordNow();
-    endOfRequest();
+    consoleEndOfRequest();
 
-    $this->get('http://meridian.test/admin/settings')->assertOk();
+    // `->component(...)`, not a bare `assertOk()`: a 200 alone would also be satisfied by a future change
+    // that renders a different page, or a non-Inertia response, at this URL. `false` disables Inertia's
+    // page-file existence check, for the same reason `withoutVite()` is needed — CI builds no assets.
+    $this->get('http://meridian.test/admin/settings')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('admin/Settings', false));
 });
 
 /*
@@ -177,40 +209,34 @@ it('renders the console once the step-up is confirmed', function (): void {
 | NOT the /login redirect the e2e reports. It is a separate bug; do not let a red here be mistaken for
 | the answer to the one above.
 |
-| Both arms are pinned. Arm 1 keeps the hazard itself under test, so a later "simplification" back to the
-| default connection reddens instead of silently un-promoting the operator; arm 2 proves the fix. The
-| seeder methods are private and their identities are committed on `pgsql_auth`, which RefreshDatabase's
-| transaction cannot see — so the mechanism is tested here, which is where the bug actually lived.
+| ⚠️ ASSERT THE AFFECTED ROW COUNT, NEVER A READ-BACK, and the first two attempts at this test both got it
+| wrong. A read-back cannot see an app-connection write at all: `RefreshDatabase` holds ONE uncommitted
+| transaction on the DEFAULT connection, and `pgsql_privileged` is a separate session, so under READ
+| COMMITTED the assertion passes on transaction isolation whether or not RLS blocked anything — delete every
+| policy on `users` and it stays green. (Worse, in that counterfactual the app-connection UPDATE would hold
+| a row lock inside the open transaction and the next privileged write would block on it forever: a hung
+| suite rather than an informative red.) The count is immune to visibility and is literally the quantity the
+| bug is about. It is also the quantity Eloquent throws away — `performUpdate()` discards it — which is
+| exactly WHY a seeder built on `save()` could fail in total silence.
 */
 it('promotes a membership-less operator only on the privileged connection', function (): void {
     $operator = committedConsoleOperator('promote@consoletest.local');
 
-    // Re-reading on the privileged connection every time: the app connection cannot SEE this row either, so
-    // asserting through Eloquent's default connection would report "absent" whatever actually happened.
-    $stored = fn () => DB::connection('pgsql_privileged')->table('users')->where('id', $operator->id)->first();
-
-    // ⚠️ EACH ARM MUST RE-RESOLVE THE MODEL, exactly as `resolveOrCreateUser()` does. Reusing one instance
-    // across both makes the second `forceFill()` non-dirty — Eloquent synced those attributes clean on the
-    // first save — so `save()` returns true having issued no UPDATE at all, and BOTH arms then pass for a
-    // reason that has nothing to do with row-level security. The first version of this test did exactly
-    // that and its green arm 1 was vacuous.
     $demote = fn () => DB::connection('pgsql_privileged')->table('users')->where('id', $operator->id)
-        ->update(['is_super_admin' => false, 'two_factor_confirmed_at' => null]);
-    $resolve = fn (): User => User::on('pgsql_auth')->where('email', 'promote@consoletest.local')->firstOrFail();
+        ->update(['is_super_admin' => false]);
 
     // ── Arm 1: the shape both seeders shipped. It reports success and changes nothing. ──
     $demote();
-    $resolve()->setConnection((string) config('database.default'))
-        ->forceFill(['is_super_admin' => true, 'two_factor_confirmed_at' => now()])->save();
+    $affectedOverApp = DB::connection((string) config('database.default'))
+        ->table('users')->where('id', $operator->id)->update(['is_super_admin' => true]);
 
-    expect($stored()->is_super_admin)->toBeFalse('the app connection must not be able to promote an invisible row')
-        ->and($stored()->two_factor_confirmed_at)->toBeNull();
+    expect($affectedOverApp)->toBe(0, 'the app connection must not be able to promote a row RLS hides from it');
 
-    // ── Arm 2: the fix. Same resolution, same attributes, privileged connection. ──
-    $demote();
-    $resolve()->setConnection('pgsql_privileged')
-        ->forceFill(['is_super_admin' => true, 'two_factor_confirmed_at' => now()])->save();
+    // ── Arm 2: the fix. Same row, same statement, privileged connection. ──
+    $affectedOverPrivileged = DB::connection('pgsql_privileged')
+        ->table('users')->where('id', $operator->id)->update(['is_super_admin' => true]);
 
-    expect($stored()->is_super_admin)->toBeTrue()
-        ->and($stored()->two_factor_confirmed_at)->not->toBeNull();
+    expect($affectedOverPrivileged)->toBe(1)
+        ->and(DB::connection('pgsql_privileged')->table('users')->where('id', $operator->id)->value('is_super_admin'))
+        ->toBeTrue();
 });

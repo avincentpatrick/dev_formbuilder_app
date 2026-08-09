@@ -1,5 +1,9 @@
 import { chromium, type FullConfig } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
+// The SHARED derivation, not a fourth hand-rolled `baseURL.replace('acme.', '')`. That file exists
+// precisely to stop the copies drifting; a setup that wrote its storage state for one origin while the
+// specs visited another would fail as an unauthenticated scan rather than as a mismatch.
+import { centralOrigin } from './support/hosts';
 
 // Authenticate once as the E2eSeeder's demo Owner and persist the session for every spec/project.
 // The login form (design-system-styled) exposes fields by their <label>, not a name attribute.
@@ -46,8 +50,19 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     //
     // The step-up challenge is deliberately NOT confirmed here — it expires in 900s and this job runs far
     // longer than that. `tests/e2e/support/console.ts` clears it per navigation instead.
-    const centralOrigin = baseURL.replace('acme.', '');
     const consolePage = await browser.newPage({ ignoreHTTPSErrors: true });
+
+    // Kept from the diagnostic that took four CI cycles to build, because the failure this replaced was
+    // opaque and the next one would be too. Without it a regression reports only "Timeout 30000ms exceeded"
+    // — no URL, no cookies, no page text, no request log — and the two most likely regressions are
+    // indistinguishable that way: an operator who was never promoted (superadmin 404s the followed XHR) and
+    // one whose 2FA timestamp is missing (superadmin.mfa sends them to /admin/two-factor).
+    const seen: string[] = [];
+    consolePage.on('response', (r) => {
+        if (r.request().method() === 'POST' || r.url().includes('/login') || r.url().includes('/admin')) {
+            seen.push(`${r.request().method()} ${r.status()} ${r.url()}`);
+        }
+    });
 
     await consolePage.goto(`${centralOrigin}/admin/settings`, { waitUntil: 'networkidle' });
     await consolePage.getByLabel('Email', { exact: true }).fill('console@meridian.test');
@@ -57,7 +72,25 @@ async function globalSetup(_config: FullConfig): Promise<void> {
     // No TOTP hop on the way: the seeded operator has `two_factor_confirmed_at` set with a NULL secret, so
     // Fortify does not consider two-factor ENABLED and issues no challenge, while `EnsureSuperAdminMfa` —
     // which reads only the timestamp — lets the console through. E2eSeeder::seedSuperAdmin() explains it.
-    await consolePage.waitForURL(/\/(user\/confirm-password|admin\/settings)$/, { timeout: 30_000 });
+    //
+    // Matched on PATHNAME, not on the whole URL: a `$`-anchored regex turns any query string a future hop
+    // adds (`?redirect=`, an Inertia `preserveState` push) into a 30-second timeout for a page that
+    // actually arrived, and an unanchored one would equally accept the tenant origin.
+    try {
+        await consolePage.waitForURL(
+            (u) => ['/user/confirm-password', '/admin/settings'].includes(u.pathname),
+            { timeout: 30_000 },
+        );
+    } catch {
+        const shown = (await consolePage.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 400);
+        const cookies = (await consolePage.context().cookies()).map((c) => `${c.name}@${c.domain}`).join(', ');
+        throw new Error(
+            `console sign-in did not reach the console (stopped at ${consolePage.url()}).\n` +
+                `Requests: ${seen.join(' | ')}\nCookies: ${cookies}\nPage said: ${shown}\n` +
+                'A landing on /admin/two-factor means the seeded operator has no `two_factor_confirmed_at`; ' +
+                'on /login, no session was established; a 404 means it was never promoted to super-admin.',
+        );
+    }
 
     await consolePage.context().storageState({ path: 'tests/e2e/.auth/admin.json' });
 

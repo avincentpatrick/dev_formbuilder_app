@@ -120,6 +120,19 @@ Because at least one target persona (M&E/public-health field teams) routinely ha
 
 Multi-tenancy, RBAC, and tenant isolation (routing, queries, jobs, storage, and a Postgres Row-Level-Security backstop) are structural from day one, because retrofitting tenant isolation into a single-tenant system is precisely the kind of rewrite this plan is designed to avoid. Where scale questions are genuinely open (e.g., dedicated-database tenancy for compliance-sensitive customers), the product defers the more expensive answer to a later phase rather than over-building for a need that hasn't yet appeared (see §6, Phase 4).
 
+### 3.7 Frictionless, connected, searchable (added 2026-08-09)
+
+Declared by the product owner as standing principles during the 2026-08-09 alignment review, and recorded here as decisions of record. The product must be:
+
+- **Frictionless** — minimal steps to value, a guided first-run experience (see the Onboarding & Template Content Plan, doc #25), clear defaults everywhere. This extends Principle 3.2 from "usable without a manual" to "fast without a manual."
+- **Gamified** — light progress affordances (a getting-started checklist with a visible progress meter) in Phase 1; a full achievements system (points, badges, streaks, team progress) is wanted but deliberately scheduled as the final increment before production deployment, so it is designed once against the finished feature set rather than retrofitted per feature.
+- **Searchable — global search is non-negotiable.** A tenant-scoped, permission-filtered global search (top-nav plus command palette) over forms, submissions, members, and settings, with keyword filters on every list page. This makes concrete what the Design System Reference (doc #19, §3.4) already specifies for the top nav.
+- **User/workflow-centric** — surfaces are organized around what the user is doing (build → share → collect → review → understand), not around database tables or pages.
+- **Non-duplicative** — a user never re-enters data the system already has, and never rebuilds an artifact another feature already produced (XLSForm import, template instantiation, connector sync all exist to serve this).
+- **Connected** — every object links to its related objects; no dead-end pages. A form is a hub (overview, builder, submissions, analytics, share) rather than a row that fans out into unlinked screens.
+
+These principles govern the "J-queue" (Phase-1 UX Completion) tracked in `PROGRESS.md`.
+
 ---
 
 ## 4. Goals & Success Metrics

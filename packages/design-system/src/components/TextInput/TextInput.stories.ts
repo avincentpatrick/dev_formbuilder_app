@@ -41,9 +41,13 @@ export const DateType: Story = {
     }),
 };
 /**
- * Increment J1a — the keyword-filter and global-search field. Rendered with a value, because the UA's
- * clear affordance (`::-webkit-search-cancel-button`) only exists while the field is non-empty, and it is
- * deliberately not suppressed: axe scanning the EMPTY state would never see it at all.
+ * Increment J1a — the keyword-filter and global-search field.
+ *
+ * Rendered with a value so the docs page shows the state consumers actually ship, including the UA clear
+ * glyph that appears once the field is non-empty. ⚠️ Do NOT read that as axe coverage of the glyph:
+ * `::-webkit-search-cancel-button` lives in a CLOSED user-agent shadow root, and axe walks the light DOM
+ * and open shadow roots only — it cannot reach that node in either state, so no rule evaluates it here or
+ * anywhere. Its size and contrast are unverified by any gate in this repo (see DSR §3.2 note 2).
  *
  * ⚠️ This story's input is `role="searchbox"`, not `textbox` — see TextInput.vue's docblock.
  */

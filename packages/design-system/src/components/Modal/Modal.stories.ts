@@ -60,6 +60,32 @@ export const ConfirmDark: Story = { decorators: [dark] };
  * additional open modal stacks on the last — one dialog live, the rest and the surrounding prose inert. The
  * two `Confirm` stories already overlap that way; this one does not make it worse.
  */
+export const WithBackgroundContent: Story = {
+    tags: ['!autodocs'],
+    render: (args) => ({
+        components: { Modal, Button },
+        setup: () => ({ args }),
+        template: `
+            <div>
+                <div style="padding:var(--mds-space-6);display:flex;flex-direction:column;gap:var(--mds-space-3)">
+                    <h3 style="margin:0">Workspace members</h3>
+                    <p style="margin:0">This column is behind the dialog and is marked inert while it is open.</p>
+                    <Button variant="secondary">Invite member</Button>
+                </div>
+                <Modal v-bind="args">
+                    <p style="margin:0">
+                        This removes <strong>jordan@acme.test</strong> from the workspace.
+                    </p>
+                    <template #actions>
+                        <Button variant="tertiary">Cancel</Button>
+                        <Button variant="destructive">Remove member</Button>
+                    </template>
+                </Modal>
+            </div>
+        `,
+    }),
+};
+
 /**
  * Increment J1a — a dialog whose point is an input, focused on open via `initialFocus`.
  *
@@ -110,32 +136,6 @@ export const InitialFocusDark: Story = {
                     placeholder="Search…"
                 />
             </Modal>
-        `,
-    }),
-};
-
-export const WithBackgroundContent: Story = {
-    tags: ['!autodocs'],
-    render: (args) => ({
-        components: { Modal, Button },
-        setup: () => ({ args }),
-        template: `
-            <div>
-                <div style="padding:var(--mds-space-6);display:flex;flex-direction:column;gap:var(--mds-space-3)">
-                    <h3 style="margin:0">Workspace members</h3>
-                    <p style="margin:0">This column is behind the dialog and is marked inert while it is open.</p>
-                    <Button variant="secondary">Invite member</Button>
-                </div>
-                <Modal v-bind="args">
-                    <p style="margin:0">
-                        This removes <strong>jordan@acme.test</strong> from the workspace.
-                    </p>
-                    <template #actions>
-                        <Button variant="tertiary">Cancel</Button>
-                        <Button variant="destructive">Remove member</Button>
-                    </template>
-                </Modal>
-            </div>
         `,
     }),
 };

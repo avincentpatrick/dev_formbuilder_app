@@ -50,9 +50,15 @@ describe('MdsTextInput — type', () => {
 describe('MdsTextInput — attribute fall-through', () => {
     it('passes aria-label down to the input itself', () => {
         // `inheritAttrs` is deliberately NOT disabled here (unlike Select.vue), and several live call sites
-        // depend on it — AnalyticsFilterBar's bare inputs, every story in this component's file, and J1d's
-        // palette input. Adding `defineOptions({ inheritAttrs: false })` would move the accessible name onto
-        // a wrapper that does not exist, silently unnaming the control. vue-tsc cannot see that; this can.
+        // depend on it. The dependents are the ones passing UNDECLARED attributes — `ChoicesEditor`,
+        // `CascadingEditor`, `GridOptionList`, `ValidationEditor` and `ConditionRow` all pass `aria-label`,
+        // and `TwoFactorChallenge` passes `inputmode="numeric"` + `autocomplete="one-time-code"`, which is
+        // the highest-stakes one since losing `inputmode` degrades a 2FA field on mobile. (`AnalyticsFilterBar`
+        // is NOT among them — it passes only declared props and a declared emit — which is worth naming
+        // because it looks like a dependent and is not.)
+        //
+        // Adding `defineOptions({ inheritAttrs: false })` would move those onto a wrapper that does not
+        // exist, silently unnaming the control. vue-tsc cannot see that; this can.
         const wrapper = mount(TextInput, {
             props: { type: 'search' },
             attrs: { 'aria-label': 'Search submissions' },

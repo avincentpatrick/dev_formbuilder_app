@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import Modal from './Modal.vue';
 import { openModalCount, popModalRoot, pushModalRoot } from './inert-stack';
+// Imported STATICALLY and at the top, not with `await import()` inside the case. The index pulls in all
+// 24 components, which costs ~2.7s under full-suite load and blew the 5s per-test timeout — green in a
+// single-file run, red only in the full suite. As a top-level import the cost lands in module load
+// instead, and it fails HARDER: deleting the re-export breaks the whole file at load rather than one case.
+import { openModalCount as openModalCountFromPackage } from '../../index';
 
 /**
  * Increment I10a — `MdsModal` marks the rest of the page `inert` while open, closing the WCAG 2.4.3 row
@@ -405,6 +410,25 @@ describe('MdsModal — stacking', () => {
  * Neither the Storybook story nor any axe scan can reach this: the runner never presses a key, and a broken
  * `initialFocus` renders identical markup. Vitest is the only gate that can see it.
  */
+describe('MdsModal — the public package surface', () => {
+    it('re-exports openModalCount from the package index, not just from inert-stack', async () => {
+        // The third of J1a's three changes, and it had no gate at all until this case: every other spec
+        // imports from './inert-stack', so deleting the index re-export reddened nothing. J1d's chord guard
+        // consumes it through the package, which is the path that has to keep working.
+        expect(typeof openModalCountFromPackage).toBe('function');
+        expect(openModalCountFromPackage()).toBe(0);
+
+        openModal();
+        await flushPromises();
+
+        // Reads the SAME module instance as the deep import — if the bundler ever gave the package index
+        // its own copy of inert-stack, this would report 0 while the dialog is open and J1d's chord guard
+        // would silently never fire.
+        expect(openModalCountFromPackage()).toBe(1);
+        expect(openModalCount()).toBe(1);
+    });
+});
+
 describe('MdsModal — initialFocus', () => {
     function openWithInput(extra: Record<string, unknown> = {}): Wrapper {
         const wrapper = mount(Modal, {
@@ -432,11 +456,45 @@ describe('MdsModal — initialFocus', () => {
 
     it('falls back to the pre-J1a target when the selector matches nothing', async () => {
         // A consumer whose slot content is v-if'd away must get a focused dialog, never a stranded one.
+        //
+        // Asserts the CLOSE BUTTON specifically, not merely "something inside the panel". `closest()`
+        // matches the element itself, so a panel-focused result satisfies the looser assertion — which
+        // means mutating the expression to `(designated ?? panel.value)`, i.e. deleting the `items[0]`
+        // fallback this case exists to pin, would pass. Naming the control is what makes it fail.
         openWithInput({ initialFocus: '[data-does-not-exist]' });
         await flushPromises();
 
+        expect(document.activeElement?.classList.contains('mds-modal__close')).toBe(true);
+    });
+
+    it('does not strand focus when the selector is INVALID CSS', async () => {
+        // `querySelector('[')` throws a DOMException rather than returning null, and this runs inside a
+        // `nextTick` callback that Vue does not route through its error handler. Unguarded, the throw
+        // escapes as an unhandled rejection AFTER the page was made inert — so the opener is blurred into
+        // an inert subtree, focus lands on <body>, and because onKeydown is bound to the panel, Escape and
+        // the Tab trap are both unreachable. A keyboard trap (WCAG 2.1.2) reached through the prop added
+        // to satisfy DSR 4.5's "never left stranded".
+        openWithInput({ initialFocus: '[' });
+        await flushPromises();
+
         expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
-        expect(document.activeElement?.hasAttribute('data-mds-initial-focus')).toBe(false);
+        expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it('does not strand focus when the target matches but cannot take focus', async () => {
+        // The mode a `?? fallback` on the RETURN VALUE structurally cannot catch: the selector matches, so
+        // the fallback never fires, but `.focus()` on a disabled input is a silent no-op. Reachable in one
+        // refactor — the marker attribute drifting onto a wrapper, or an input disabled while results load.
+        const wrapper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Search', initialFocus: '[data-mds-initial-focus]' },
+            slots: { default: '<input data-mds-initial-focus disabled aria-label="Search" />' },
+        });
+        mounted.push(wrapper);
+        await flushPromises();
+
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
     });
 
     it('without the prop, focuses the CLOSE BUTTON — right for a confirm, wrong for an input', async () => {
@@ -448,10 +506,15 @@ describe('MdsModal — initialFocus', () => {
         // asks for (a cancel-shaped target, so a stray Enter cannot confirm), and ~10 live dialogs rely on
         // it. `initialFocus` opts a dialog out; it must never become the default.
         //
-        // This is assertable here only because happy-dom computes a real `offsetParent` (measured, not
-        // assumed: a probe confirmed it is non-null for an attached element), so `focusable()` returns the
-        // same list a browser would. Had it returned [], focus would have fallen to the panel and this case
-        // would have passed for the wrong reason while proving nothing.
+        // ⚠️ WHAT THIS HARNESS CAN AND CANNOT SEE, MEASURED RATHER THAN ASSUMED. happy-dom 20.10.6 does
+        // not implement `offsetParent` at all — `typeof el.offsetParent === 'undefined'` and
+        // `'offsetParent' in el === false`. So `focusable()`'s `el.offsetParent !== null` filter evaluates
+        // `undefined !== null`, i.e. TRUE for every element, and the list here is a strict SUPERSET of the
+        // browser's (it would include hidden and detached nodes).
+        //
+        // That does not weaken THIS case — the close button is first in DOM order either way, which is the
+        // property being pinned — but it does mean the VISIBILITY half of `focusable()` is unfalsifiable in
+        // Vitest: delete the filter and nothing here reddens. Do not read a green suite as coverage of it.
         openWithInput();
         await flushPromises();
 

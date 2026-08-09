@@ -366,7 +366,12 @@ jobs:
       REDIS_HOST: 127.0.0.1
       CENTRAL_DOMAIN: meridian.test
       APP_ENV: local
-      APP_URL: http://acme.meridian.test:8000
+      # APP_URL is the CENTRAL origin, never a tenant host. TenantUrl::centralHost() composes
+      # `{label}.{app.url host}` for every server-generated tenant link (invites, resume links,
+      # the I11b impersonation redeem); a tenant host here doubles the subdomain into
+      # `acme.acme.meridian.test`, which no /etc/hosts line maps — ERR_NAME_NOT_RESOLVED in the
+      # browser. Latent until I11b because no earlier spec ever NAVIGATED a server-built URL.
+      APP_URL: http://meridian.test:8000
       SESSION_DRIVER: file
       CACHE_STORE: file
       QUEUE_CONNECTION: sync

@@ -37,6 +37,7 @@ use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
+use App\Http\Controllers\Tenant\SearchController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionEditController;
@@ -689,6 +690,26 @@ Route::middleware([
     | rendered from props the list already carries, so the row IS the detail — and a bare {audit} pattern
     | would be the first thing able to shadow /export.
     */
+    /*
+    | Global search (Increment J1b — PRD §3.7, "global search is non-negotiable").
+    |
+    | ⚠️ NO `can:` GATE, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. There is no `search` permission and
+    | none is coined: the RBAC catalog is closed at 29 keys, and a key whose audience is "every authenticated
+    | user" is the dormant-seeded-key anti-pattern this repo has already been bitten by three times.
+    | `ApiAbilities` records the same choice for `read:analytics` — map onto existing permissions instead of
+    | coining a thirtieth. Authorization is ENTIRELY PER-ARM inside SearchService: each arm answers
+    | `allowed()` from an existing key and then applies its own row predicate. A route-level gate would be
+    | either too wide (letting a Reviewer's request reach an arm they may not use) or too narrow (refusing a
+    | Viewer the submissions arm they legitimately hold).
+    |
+    | ⚠️ NO `feature:` GATE EITHER. `PlanCatalog` defines no search key on any tier, so adding one would be
+    | MAKING a pricing decision rather than enforcing one — the I1 share-surface argument.
+    |
+    | A WEB route, never /api/v1: `config/scramble.php` documents only the `api/v1` path, so `openapi.json`
+    | stays byte-identical and the contract-tests job is untouched.
+    */
+    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+
     Route::get('/audit-log', [AuditLogController::class, 'index'])
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
     Route::get('/audit-log/export', [AuditLogController::class, 'export'])

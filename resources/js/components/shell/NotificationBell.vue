@@ -330,17 +330,22 @@ function onFollow(id: string): void {
  * that does NOT trip axe.ts::assertClean's scrollWidth assertion — it CLIPS the panel instead, which is
  * the worse failure because CI stays green over an unreadable popover. Below the mobile breakpoint the
  * panel therefore stops being anchored to the bell and becomes a sheet under the top nav, the same move
- * MdsModal makes at this width. The 64px is TopNav's fixed height; there is no token for it, and inventing
- * one would fail `token-references`.
+ * MdsModal makes at this width.
+ *
+ * The offset is TopNav's fixed height, and it is `--mds-space-16` (64px) rather than a literal. An earlier
+ * version of this comment asserted no such token existed and that inventing one would fail
+ * `token-references`; both halves were false — the token has always been there, DSR 3.4 names it as the
+ * source of that height, and `token-references` is what PROVES it resolves. Corrected in J1b, in the same
+ * commit that pointed TopNav's own `height` at it, so the two cannot drift apart again.
  */
 @media (max-width: 480px) {
     .bell__popover {
         position: fixed;
-        top: 64px;
+        top: var(--mds-space-16);
         inset-inline: var(--mds-space-2);
         width: auto;
         max-width: none;
-        max-block-size: calc(100dvh - 64px - var(--mds-space-4));
+        max-block-size: calc(100dvh - var(--mds-space-16) - var(--mds-space-4));
     }
 
     .bell__list {

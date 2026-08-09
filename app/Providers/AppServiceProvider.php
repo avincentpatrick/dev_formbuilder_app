@@ -34,6 +34,10 @@ use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
+use App\Services\Search\Arms\FormSearchArm;
+use App\Services\Search\Arms\SubmissionSearchArm;
+use App\Services\Search\SearchPresenter;
+use App\Services\Search\SearchService;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Connectors\ConnectorOAuthStateService;
@@ -152,6 +156,19 @@ class AppServiceProvider extends ServiceProvider
         // singleton would leak one user's grant set into the next request.
         $this->app->scoped(AnalyticsFormSet::class);
         $this->app->scoped(AnalyticsMetricsService::class);
+
+        // Global search (J1b, PRD §3.7). The arm LIST is the display order, and it is assembled here rather
+        // than discovered so that adding an arm is a deliberate edit in one reviewable place — J1c appends
+        // the members and settings arms below the two shipped here.
+        //
+        // `scoped` for the same reason as everything above it: each arm resolves visibility through the
+        // request's one ResourceGrantResolver memo, so a singleton would leak one user's grant set into the
+        // next request.
+        $this->app->scoped(SearchService::class, fn ($app): SearchService => new SearchService([
+            $app->make(FormSearchArm::class),
+            $app->make(SubmissionSearchArm::class),
+        ]));
+        $this->app->scoped(SearchPresenter::class);
 
         // Custom-domain TXT lookup (H22a / ADR-0012). `singleton`, NOT `scoped`, and the difference is
         // deliberate rather than incidental: every `scoped` binding above is scoped BECAUSE it memoizes

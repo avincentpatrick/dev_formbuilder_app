@@ -7,11 +7,16 @@ namespace App\Models;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
+use App\Enums\ResourceCapacity;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Policies\FormPolicy;
+use App\Services\Analytics\AnalyticsFormSet;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Forms\FormPresenter;
 use Database\Factories\FormFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -169,5 +174,48 @@ class Form extends Model implements TenantScoped
     public function grants(): MorphMany
     {
         return $this->morphMany(ResourceGrant::class, 'scopeable');
+    }
+
+    /**
+     * The LIST twin of {@see FormPolicy::view()} — "whose form ROW may this user see".
+     * Pinned in both directions by `FormVisibilityScopeTest`.
+     *
+     * Extracted in J1b from {@see FormPresenter::list()}, which had encoded it inline
+     * since G10b. Global search needs the same rule, and this repo's own history says what happens when a
+     * visibility rule is copied instead of shared: `SubmissionPolicy` keeps a docblock pinning its list twin
+     * precisely because "a respondent who could open a row the inbox never lists is exactly the divergence
+     * that pin exists to prevent."
+     *
+     * ⚠️ THIS IS NOT {@see AnalyticsFormSet}'s `visible()`, AND FOLDING THEM WOULD BE
+     * A REAL AUTHORIZATION BUG RATHER THAN A TIDY-UP. That method answers a DIFFERENT question — "whose
+     * SUBMISSIONS may this user aggregate" — and so keys on `dashboard.org.view` with ANY grant capacity, and
+     * returns `Form::withTrashed()`. A **Viewer** holds `dashboard.org.view` and holds **no `forms.*` key at
+     * all**, so under that rule a Viewer would see the title and description of every form in the tenant,
+     * including SOFT-DELETED ones, through global search — while `/forms` correctly shows them nothing.
+     * `AnalyticsFormSet` is the most search-shaped code already in the tree and therefore the obvious thing
+     * to copy; do not.
+     *
+     * Editor capacity, not the null "any capacity" default: this is the authoring rule, so a bare reviewer
+     * grant must not surface a form here with every `can` flag false. Routed through
+     * {@see ResourceGrantResolver::grantedFormIdsQuery()} so it inherits the fail-closed empty set — a user
+     * with no grants matches NOTHING, never an unconstrained query.
+     *
+     * Deliberately adds no `orWhere`, so it needs none of `Submission::scopeVisibleTo()`'s defensive closure;
+     * do not cargo-cult one in. Archive/soft-delete filtering is the CALLER's, because "may I see this row"
+     * and "does this list show archived rows" are different questions.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('forms.edit.any')) {
+            return $query;
+        }
+
+        return $query->whereIn(
+            'forms.id',
+            app(ResourceGrantResolver::class)->grantedFormIdsQuery($user, ResourceCapacity::Editor)
+        );
     }
 }

@@ -142,7 +142,12 @@ it('round-trips every filter through the query string into the resolved declarat
     //
     // Pinned rather than computed: deriving the expected count here would re-implement the very bucketing
     // this case exists to prove reached the database. 2026-03-18 opens the window on a Thursday.
-    Carbon::setTestNow(Carbon::parse('2026-03-18T09:00:00+00:00'));
+    //
+    // `travelTo()` rather than a bare `Carbon::setTestNow()` paired with a reset at the end of the body: a
+    // reset written as the last STATEMENT only runs while the test PASSES, so the first failing assertion
+    // above it would leave the clock pinned for whatever ran next in the process. This restores in
+    // tearDown, on every exit path.
+    $this->travelTo(Carbon::parse('2026-03-18T09:00:00+00:00'));
 
     publishedInboxForm($this->tenant, $this->owner, 'Clinic Intake');
 
@@ -176,8 +181,6 @@ it('round-trips every filter through the query string into the resolved declarat
             // 28 daily buckets but at most 5 weekly ones — 5 exactly, given the pinned Thursday open above.
             ->where('report.range.granularity', 'week')
             ->has('report.series', 5));
-
-    Carbon::setTestNow();
 });
 
 it('labels each breakdown row rather than serving a bare uuid', function (): void {

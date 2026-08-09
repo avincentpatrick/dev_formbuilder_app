@@ -197,7 +197,12 @@ it('shapes a row the way the shared AuditRow contract expects', function (): voi
 it('cannot show an impersonated row at all, because those rows are tenant-scoped', function (): void {
     $operator = committedSuperAdmin('driver@platformaudittest.local', 'Dana Operator');
     $member = committedPlainUser('member@platformaudittest.local', 'Mira Member');
-    $tenant = committedPlatformTenant('impersonated-slice');
+    // ⚠️ THE `platform-audit-` PREFIX IS NOT COSMETIC — it is the marker
+    // `purgeCommittedPlatformAuditFixtures()` cleans by. The first version of this case named the fixture
+    // `impersonated-slice`, which the purge does not match, so a COMMITTED tenant survived every rollback
+    // for the rest of the process and turned twelve unrelated sweep/reaper/rollup/seeder tests red in CI.
+    // `committedPlatformTenant()` now refuses a slug outside the prefix for exactly that reason.
+    $tenant = committedPlatformTenant('platform-audit-impersonated');
 
     // An impersonated action is written under the impersonated TENANT's context, so `BelongsToTenant` sets
     // `tenant_id` — the strict append-only INSERT policy (`tenant_id = ctx`) requires it. This fixture

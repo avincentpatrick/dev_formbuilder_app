@@ -98,13 +98,21 @@ final class ImpersonationContext
             return self::sanitise(request()->session()->get(self::SESSION_KEY));
         }
 
-        // ⚠️ THE `bound('request')` GUARD ABOVE IS LOAD-BEARING, AND REMOVING IT COST TWELVE FAILURES.
-        // Resolving the session MANAGER is not free the way reading an already-attached store is: it
-        // instantiates a driver, and this method runs on EVERY audit write — including inside queued jobs
-        // and scheduled sweeps, which have no request at all. A version that reached for the manager
-        // unconditionally turned five unrelated sweep/reaper/seeder suites red in CI. Confining the
-        // fallback to request-bound contexts keeps the test path working (a feature test seeding via the
-        // `session()` helper is request-bound) while leaving console and queue exactly as they were.
+        // The `bound('request')` guard above is kept on a COST argument, not a measured failure. Resolving
+        // the session MANAGER is not free the way reading an already-attached store is — it instantiates a
+        // driver — and this method runs on EVERY audit write, including inside queued jobs and scheduled
+        // sweeps that have no request at all. Confining the fallback to request-bound contexts keeps the
+        // test path working (a feature test seeding via the `session()` helper IS request-bound) while
+        // leaving console and queue exactly as they were.
+        //
+        // ⚠️ AN EARLIER VERSION OF THIS COMMENT CLAIMED THE UNGUARDED FALLBACK "COST TWELVE FAILURES" AND
+        // REDDENED FIVE SWEEP/REAPER/SEEDER SUITES IN CI. That was a hypothesis written as a measurement,
+        // and the very next CI run — which contained this guard — reproduced all twelve unchanged. The real
+        // cause was in the test harness and nowhere near this file: a COMMITTED tenant fixture whose slug
+        // fell outside the marker `purgeCommittedPlatformAuditFixtures()` cleans by, so it outlived every
+        // rollback and gave the cross-tenant sweeps a second active tenant to fan out over. Recorded here
+        // because the wrong attribution is the more expensive artefact: it points the next reader at a
+        // method that was never implicated.
         return app()->bound('session')
             ? self::sanitise(app('session')->driver()->get(self::SESSION_KEY))
             : null;

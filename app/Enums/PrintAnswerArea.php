@@ -104,8 +104,8 @@ enum PrintAnswerArea: string
     case Omitted = 'omitted';
 
     /**
-     * The TOTAL classification of the 31-case {@see FieldType} catalog: 10 comb / 1 ruled /
-     * 6 choices / 2 grid / 1 signature / 1 prose / 7 unavailable / 1 page break / 2 omitted.
+     * The TOTAL classification of the 31-case {@see FieldType} catalog: 11 comb / 1 ruled /
+     * 5 choices / 2 grid / 1 signature / 1 prose / 7 unavailable / 1 page break / 2 omitted.
      * Deliberately a `match` with NO `default` arm — see the class docblock.
      */
     public static function for(FieldType $type): self
@@ -119,20 +119,35 @@ enum PrintAnswerArea: string
             FieldType::ShortText,
             FieldType::Email, FieldType::Phone, FieldType::Url,
             FieldType::Integer, FieldType::Decimal,
-            FieldType::Date, FieldType::Time, FieldType::Datetime, FieldType::Duration => self::Comb,
+            FieldType::Date, FieldType::Time, FieldType::Datetime, FieldType::Duration,
+
+            // ⚠️ `cascading_select` IS A COMB, NOT A CHOICE LIST, AND THE REASON IS CORRECTNESS
+            // RATHER THAN LENGTH. Its `config.options` is ONE FLAT LIST spanning every level, each
+            // entry carrying its own `level` and `parent`
+            // ({@see \App\Services\Forms\StructuralValidationGate::assertCascadingResolves()}).
+            // Printing that list as a single tick-list would set "Manila" beside "NCR" as if they
+            // were siblings — a child option rendered as an alternative to its own parent, with a
+            // box next to each and no hierarchy anywhere on the page. The screen control never shows
+            // that shape, because it narrows each level by the level above.
+            //
+            // Paper has no way to narrow anything, so the answer is written rather than picked: one
+            // captioned comb run per declared level, which is exactly what a paper address block
+            // has always looked like. See {@see BlankFormPrintPresenter::combGroups()}.
+            FieldType::CascadingSelect => self::Comb,
 
             // ── Free prose: unbounded, so there is nothing to comb ───────────────────────────────
             FieldType::LongText => self::Ruled,
 
-            // ── Author-defined option lists ──────────────────────────────────────────────────────
+            // ── Author-defined option lists, FLAT ones ───────────────────────────────────────────
             // `dropdown` prints identically to `single_select`: a dropdown is a SCREEN affordance
-            // and paper has no such thing, so the options are simply listed. `cascading_select`
-            // carries level/parent metadata alongside value+label, which the print ignores for the
-            // same reason `SchemaValueFormatter::optionLabels()` ignores it — the labels are the
-            // part a person reads. `likert_scale` is one circled row of options, the archetypal
-            // paper instrument.
+            // and paper has no such thing, so the options are simply listed. `likert_scale` is one
+            // circled row of options, the archetypal paper instrument.
+            //
+            // Every type here has a `config.options` whose entries are genuine ALTERNATIVES to one
+            // another — which is what makes a tick-list the honest rendering, and is precisely what
+            // `cascading_select` above does not have.
             FieldType::SingleSelect, FieldType::MultiSelect, FieldType::Dropdown,
-            FieldType::YesNo, FieldType::CascadingSelect,
+            FieldType::YesNo,
             FieldType::LikertScale => self::Choices,
 
             // ── Grids. OCR-`Excluded`, and printed anyway — see the class docblock ───────────────

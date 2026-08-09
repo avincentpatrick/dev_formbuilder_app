@@ -26,15 +26,7 @@
     to this file most likely to destroy the increment's purpose while still rendering something that
     looks deliberate.
 --}}
-@php
-    $hasCaptions = false;
-    foreach ($groups as $group) {
-        if ($group['caption'] !== null) {
-            $hasCaptions = true;
-            break;
-        }
-    }
-@endphp
+@use('Illuminate\Support\Arr')
 <table class="comb">
     <tr>
         @foreach ($groups as $group)
@@ -46,7 +38,7 @@
             @endfor
         @endforeach
     </tr>
-    @if ($hasCaptions)
+    @if (Arr::first($groups, fn (array $g): bool => $g['caption'] !== null) !== null)
         <tr class="comb__caption">
             @foreach ($groups as $group)
                 @if (! $loop->first)

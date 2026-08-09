@@ -84,6 +84,15 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #1a1a1
 .q__hint { margin: 0 0 3pt 0; font-size: 8pt; color: #5a5a5a; }
 .q__note { margin: 0; font-size: 8.5pt; color: #6a6a6a; font-style: italic; }
 
+/* NOT `.q__note`, though the two started identical. A note is prose the respondent is meant to READ
+   (a consent paragraph, an instruction); this is an apology for a missing answer area. Sharing a
+   class would have made them indistinguishable on the page and welded the two together the first
+   time either needed to change. The left rule is what separates them by eye. */
+.q__unavailable {
+    margin: 0; padding-left: 5pt; font-size: 8pt; color: #8a8a8a;
+    border-left: 1.5pt solid #d0d0d0;
+}
+
 /* -- Comb ------------------------------------------------------------------------------------- */
 /* `border-spacing` is what separates the cells, so `border-collapse` MUST stay `separate`: collapsing
    merges every cell wall into one continuous ruled line and the comb stops being a comb. */

@@ -64,7 +64,15 @@
     @foreach ($model['blocks'] as $block)
         <section class="block">
             @if ($block['label'] !== null && $block['label'] !== '')
-                <h2>{{ $block['label'] }}@if ($block['instance'] !== null) {{ $block['instance'] }}@endif</h2>
+                {{-- The directives are spaced apart on purpose: Blade's compiler does not match an
+                     `@if` written immediately against a preceding `@endif`, and leaves the second
+                     one in the output as literal text — which then fails as a PHP syntax error in
+                     the COMPILED view, several frames away from the line that caused it. --}}
+                <h2>
+                    {{ $block['label'] }}
+                    @if ($block['instance'] !== null){{ $block['instance'] }}@endif
+                    @if ($block['conditional'])<span class="q__flag">(if applicable)</span>@endif
+                </h2>
             @endif
 
             @if ($block['description'] !== null)
@@ -101,9 +109,16 @@
                         @elseif ($field['area'] === 'ruled')
                             <div class="ruled"></div>
                         @elseif ($field['area'] === 'choices')
-                            @foreach ($field['options'] as $option)
+                            {{-- @forelse, not @foreach: a choice field with no options cannot be
+                                 published (StructuralValidationGate refuses it), but a hand-built
+                                 snapshot can carry one, and @foreach would print a labelled question
+                                 with NOWHERE TO ANSWER IT. A ruled box degrades to "write it in"
+                                 rather than to a dead end. --}}
+                            @forelse ($field['options'] as $option)
                                 <div class="choice"><span class="choice__box"></span>{{ $option['label'] }}</div>
-                            @endforeach
+                            @empty
+                                <div class="ruled"></div>
+                            @endforelse
                         @elseif ($field['area'] === 'grid')
                             <table class="grid">
                                 <tr>
@@ -128,7 +143,7 @@
                                  leave an enumerator with no prompt to capture the reading by another
                                  means; a writable box would invite them to write into an area
                                  nothing will ever read. --}}
-                            <p class="q__note">Not collected on paper - record this in the app.</p>
+                            <p class="q__unavailable">Not collected on paper - record this in the app.</p>
                         @endif
                     </div>
                 @endif

@@ -276,6 +276,109 @@ it('numbers a repeatable section and honours min_instances up to the printed cap
         ->and(array_column($blocks, 'instance'))->toBe([1, 2, 3, 1, 2, 3, 4, 5, null]);
 });
 
+it('gives a cascading select one captioned comb run per level', function (): void {
+    // The review fix. Its option pool is flat across every level, so it is WRITTEN per level rather
+    // than picked — the shape of a paper address block. Captions come from the level KEY, which is
+    // the identifier an extraction stage maps back to and is short enough to sit over its group.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('address', 'cascading_select', ['config' => [
+                'levels' => [['key' => 'province'], ['key' => 'city'], ['key' => 'barangay']],
+                'options' => [
+                    ['value' => 'ncr', 'label' => 'NCR', 'level' => 'province'],
+                    ['value' => 'manila', 'label' => 'Manila', 'level' => 'city', 'parent' => 'ncr'],
+                ],
+            ]]),
+        ],
+    ]);
+
+    $field = $this->present->present($form, $version)['blocks'][0]['fields'][0];
+
+    expect($field['area'])->toBe('comb')
+        // 30 cells split three ways.
+        ->and($field['comb'])->toBe([
+            ['cells' => 10, 'caption' => 'PROVINCE'],
+            ['cells' => 10, 'caption' => 'CITY'],
+            ['cells' => 10, 'caption' => 'BARANGAY'],
+        ])
+        // ...and emphatically NOT a tick-list that would set Manila beside NCR as its sibling.
+        ->and($field['options'])->toBe([]);
+});
+
+it('still gives a level-less cascading select somewhere to write', function (): void {
+    // StructuralValidationGate refuses to publish one, so this is the hand-built-snapshot path.
+    // Zero groups would render a labelled question with no answer area at all.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [printField('address', 'cascading_select')],
+    ]);
+
+    expect($this->present->present($form, $version)['blocks'][0]['fields'][0]['comb'])
+        ->toBe([['cells' => 24, 'caption' => null]]);
+});
+
+it('truncates a comb caption without cutting a multibyte character in half', function (): void {
+    // `substr` would split the UTF-8 sequence, and Blade's e() is htmlspecialchars(..., 'UTF-8')
+    // with no ENT_SUBSTITUTE — which returns the EMPTY STRING on invalid input. The caption would
+    // not error, it would silently disappear.
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('address', 'cascading_select', ['config' => [
+                'levels' => [['key' => 'rehiyonnglungsod']],
+            ]]),
+        ],
+    ]);
+
+    $caption = $this->present->present($form, $version)['blocks'][0]['fields'][0]['comb'][0]['caption'];
+
+    expect($caption)->toBe('REHIYONNGL')
+        ->and(mb_check_encoding((string) $caption, 'UTF-8'))->toBeTrue();
+});
+
+it('marks a conditional SECTION on its heading, not only conditional fields', function (): void {
+    // Review fix. A `relevant_expression` on a section lives on the section row and its member
+    // fields carry nothing, so the per-field marker cannot see it — a whole block that may not apply
+    // printed with no marker anywhere on the page.
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'maybe', 'label' => 'Pregnancy', 'sequence' => 1, 'is_repeatable' => false, 'relevant_expression' => '${sex} = "f"'],
+            ['key' => 'always', 'label' => 'Always', 'sequence' => 2, 'is_repeatable' => false],
+        ],
+        'fields' => [
+            printField('weeks', 'integer', ['section_key' => 'maybe']),
+            printField('name', 'short_text', ['section_key' => 'always']),
+        ],
+    ]);
+
+    $blocks = $this->present->present($form, $version)['blocks'];
+
+    expect(array_column($blocks, 'conditional'))->toBe([true, false])
+        // The member field itself carries no expression, which is exactly why the section flag is
+        // needed — without it this block would print entirely unmarked.
+        ->and($blocks[0]['fields'][0]['conditional'])->toBeFalse();
+});
+
+it('prints an orphaned field rather than silently losing it', function (): void {
+    // ⚠️ Review fix, and the worst failure this increment could have: a field whose `section_key`
+    // matches no section was grouped into a bucket no loop read, so the QUESTION VANISHED FROM THE
+    // INSTRUMENT with nothing anywhere to say so. The publish path cannot currently produce this
+    // shape — the guard is here because the cost of being wrong is a lost question.
+    [$form, $version] = printFixture([
+        'sections' => [
+            ['key' => 'real', 'label' => 'Real', 'sequence' => 1, 'is_repeatable' => false],
+        ],
+        'fields' => [
+            printField('kept', 'short_text', ['section_key' => 'real', 'sequence' => 0]),
+            printField('orphan', 'short_text', ['section_key' => 'no_such_section', 'sequence' => 1]),
+        ],
+    ]);
+
+    // Printed last, under no heading — but printed.
+    expect(printedKeys($this->present->present($form, $version)))->toBe(['kept', 'orphan']);
+});
+
 it('skips a field type from the future rather than throwing', function (): void {
     // CapabilityFlags' `tryFrom` reasoning, carried here: a snapshot written by a newer schema than
     // the reading code is a row from the future, not a 500. It must not take the whole print with it.

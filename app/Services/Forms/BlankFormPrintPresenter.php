@@ -150,14 +150,16 @@ final class BlankFormPrintPresenter
     private function blocks(array $sections, array $bySection, ?string $locale): array
     {
         $blocks = [];
+        $claimed = [''];
 
         $lead = $this->fieldRows($bySection[''] ?? [], $locale);
         if ($lead !== []) {
-            $blocks[] = ['label' => null, 'description' => null, 'instance' => null, 'fields' => $lead];
+            $blocks[] = ['label' => null, 'description' => null, 'instance' => null, 'conditional' => false, 'fields' => $lead];
         }
 
         foreach ($sections as $section) {
             $key = is_string($section['key'] ?? null) ? $section['key'] : '';
+            $claimed[] = $key;
             $rows = $this->fieldRows($bySection[$key] ?? [], $locale);
 
             if ($rows === []) {
@@ -180,8 +182,35 @@ final class BlankFormPrintPresenter
                     'label' => $label,
                     'description' => $description === '' ? null : $description,
                     'instance' => $repeatable ? $i : null,
+                    // ⚠️ A CONDITIONAL SECTION HAS TO SAY SO ON ITS HEADING, and the per-field flag
+                    // cannot cover it: a `relevant_expression` on the SECTION lives on the section
+                    // row, and its member fields carry nothing. Without this, a whole block that may
+                    // not apply to this respondent printed with no marker anywhere — the enumerator
+                    // would have no way to know the branch existed, which is the same failure the
+                    // per-field marker exists to prevent, one level up.
+                    'conditional' => $this->stringOrNull($section['relevant_expression'] ?? null) !== null,
                     'fields' => $rows,
                 ];
+            }
+        }
+
+        // ⚠️ NOTHING MAY VANISH FROM THE PAPER. A field whose `section_key` matches no section in
+        // the snapshot would otherwise be grouped into a bucket no loop above ever reads, and would
+        // simply not be printed — a QUESTION SILENTLY MISSING FROM THE INSTRUMENT, which is the
+        // worst failure this increment has and the one nobody would notice.
+        //
+        // The serializer cannot currently produce it (a field's `section_key` is looked up from its
+        // own version's sections), so this is unreachable through the publish path today. It is here
+        // because the cost of being wrong is a lost question and the cost of the guard is a loop:
+        // the orphans print at the end, under no heading, rather than not at all.
+        foreach ($bySection as $key => $orphans) {
+            if (in_array($key, $claimed, true)) {
+                continue;
+            }
+
+            $rows = $this->fieldRows($orphans, $locale);
+            if ($rows !== []) {
+                $blocks[] = ['label' => null, 'description' => null, 'instance' => null, 'conditional' => false, 'fields' => $rows];
             }
         }
 
@@ -280,10 +309,67 @@ final class BlankFormPrintPresenter
             FieldType::Integer, FieldType::Decimal => [
                 ['cells' => $this->combCells($field, 10), 'caption' => null],
             ],
+            FieldType::CascadingSelect => $this->cascadingGroups($field),
             default => [
                 ['cells' => $this->combCells($field, self::DEFAULT_COMB_CELLS), 'caption' => null],
             ],
         };
+    }
+
+    /**
+     * One captioned comb run per declared level of a `cascading_select`.
+     *
+     * The screen control narrows each level by the one above it; paper can narrow nothing, so the
+     * answer is WRITTEN per level rather than picked from the flat multi-level option pool (see
+     * {@see PrintAnswerArea}'s note on why printing that pool would be wrong, not merely long).
+     * A captioned run per level is what a paper address block has always looked like.
+     *
+     * Captions come from the level KEY rather than any authored label, for two reasons: the key is
+     * the identifier H18 maps back to, and keys are constrained to a short ASCII-ish token where a
+     * label is free text that could be neither (§2.5.5's WinAnsi constraint, and a 6.5pt caption
+     * has about ten characters of room over its group).
+     *
+     * The per-level width divides the page budget rather than being chosen, so a four-level
+     * hierarchy still fits one line. The floor of 4 keeps a deep hierarchy legible instead of
+     * silently dropping its deepest levels — a form with enough levels to overflow at 4 cells each
+     * has never existed in this product, and §2.5.8 records the bound rather than hiding it.
+     *
+     * @param  array<string, mixed>  $field
+     * @return list<array{cells: int, caption: ?string}>
+     */
+    private function cascadingGroups(array $field): array
+    {
+        /** @var array<string, mixed> $config */
+        $config = is_array($field['config'] ?? null) ? $field['config'] : [];
+        $levels = [];
+
+        foreach ($this->rawList($config, 'levels') as $level) {
+            $key = is_array($level) ? ($level['key'] ?? null) : $level;
+            if (is_string($key) && $key !== '') {
+                $levels[] = $key;
+            }
+        }
+
+        // A cascading select with no declared levels cannot publish (StructuralValidationGate
+        // refuses it), so this is the hand-built-snapshot path: one plain run, never zero groups,
+        // because zero groups renders a labelled question with nowhere to answer it.
+        if ($levels === []) {
+            return [['cells' => self::DEFAULT_COMB_CELLS, 'caption' => null]];
+        }
+
+        $cells = max(4, intdiv(self::MAX_COMB_CELLS, count($levels)));
+
+        return array_map(
+            // mb_* rather than the byte functions: `substr` can cut a UTF-8 sequence in half, and
+            // Blade's `e()` is `htmlspecialchars(..., 'UTF-8')` with no ENT_SUBSTITUTE, which
+            // returns the EMPTY STRING on invalid input — so a truncated multibyte key would not
+            // error, it would silently print no caption at all.
+            static fn (string $key): array => [
+                'cells' => $cells,
+                'caption' => mb_strtoupper(mb_substr($key, 0, 10)),
+            ],
+            $levels,
+        );
     }
 
     /**
@@ -406,6 +492,20 @@ final class BlankFormPrintPresenter
         $value = $entry[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : PHP_INT_MAX;
+    }
+
+    /**
+     * The named list inside a config, entries UNFILTERED — `config.levels` legitimately holds either
+     * maps or bare strings, which {@see self::listAt()} would silently drop.
+     *
+     * @param  array<string, mixed>  $source
+     * @return list<mixed>
+     */
+    private function rawList(array $source, string $key): array
+    {
+        $value = $source[$key] ?? null;
+
+        return is_array($value) && array_is_list($value) ? $value : [];
     }
 
     /**

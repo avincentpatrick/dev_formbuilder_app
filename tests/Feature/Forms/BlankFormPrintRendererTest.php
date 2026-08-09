@@ -203,6 +203,48 @@ it('states on the paper when scans of it cannot be read automatically', function
     expect($this->renderer->html($form, $version))->toContain('cannot be read automatically');
 });
 
+it('survives a form far taller than one page, grids included', function (): void {
+    // Two things are being probed, and neither is visible in the render model.
+    //
+    // `.q` carries `page-break-inside: avoid`, which is right for a short question and a real
+    // question mark for a 40-row grid: an unbreakable box taller than the page has nowhere to go.
+    // And `.runhead` is `position: fixed`, which only earns its place if there is a second page for
+    // it to repeat onto.
+    //
+    // A model-level assertion cannot reach either; this drives the whole engine and asserts the one
+    // thing that is checkable without a PDF parser — that a document this shape is produced at all,
+    // and is bigger than the single-page case.
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Long Survey');
+    $draft = $form->draftVersion;
+
+    $rows = [];
+    for ($i = 0; $i < 40; $i++) {
+        $rows[] = ['value' => "r{$i}", 'label' => "Row {$i}"];
+    }
+
+    addFormField($draft, $this->user, 'big_grid', FieldType::LikertMatrix, 0, ['config' => [
+        'rows' => $rows,
+        'columns' => [
+            ['value' => '1', 'label' => 'Low'],
+            ['value' => '2', 'label' => 'Mid'],
+            ['value' => '3', 'label' => 'High'],
+        ],
+    ]]);
+
+    for ($i = 0; $i < 30; $i++) {
+        addFormField($draft, $this->user, "q{$i}", FieldType::ShortText, $i + 1);
+    }
+
+    $published = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $bytes = $this->renderer->render($form->refresh(), $published);
+
+    [$small, $smallVersion] = printableForm($this->tenant, $this->user, 'Small');
+    $smallBytes = $this->renderer->render($small, $smallVersion);
+
+    expect($bytes)->toStartWith('%PDF-')
+        ->and(strlen($bytes))->toBeGreaterThan(strlen($smallBytes));
+});
+
 it('slugs the download filename, and falls back rather than emitting a bare version', function (): void {
     // The title is tenant-authored free text and reaches a Content-Disposition header. Slugging
     // leaves nothing to inject with; the fallback covers a title that slugs to the empty string.

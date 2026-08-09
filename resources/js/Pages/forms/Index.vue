@@ -399,13 +399,18 @@ function submitRestore(): void {
                             Print blank (I12) — a published version typeset for a pen. Conditioned on
                             `status !== 'draft'` to match the route, which 404s a draft: a draft's
                             schema_snapshot is literally [] and ADR-0013 makes only a published
-                            version's content immutable. NOT gated on `can.edit` the way Restore is —
-                            Restore writes to the draft, this only reads, so it rides the same
-                            `can:view,form` the route enforces and is available to every viewer who
-                            can see the row at all.
+                            version's content immutable.
+
+                            The `can.edit` conjunct looks too strict for a read and is not: the route
+                            gate is `can:view,form`, and FormPolicy::view() DELEGATES TO canEdit() —
+                            the same predicate `can.edit` is built from (`$user->can('update', …)`).
+                            The two sets are identical today, so gating on the flag the page actually
+                            has is what keeps the button from ever appearing where the route would
+                            403. If FormPolicy::view() is ever narrowed away from update(), this
+                            needs a real `can.view` flag from FormPresenter rather than this proxy.
                         -->
                         <MdsButton
-                            v-if="v.status !== 'draft'"
+                            v-if="historyTarget.can.edit && v.status !== 'draft'"
                             variant="tertiary"
                             size="sm"
                             icon-left="download"

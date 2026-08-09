@@ -23,17 +23,20 @@ use App\Enums\PrintAnswerArea;
 function printVerdictTable(): array
 {
     return [
-        // Bounded runs of characters a pen can print into separated boxes (10).
+        // Bounded runs of characters a pen can print into separated boxes (11). `cascading_select`
+        // is here rather than in `choices` because its option pool is one FLAT list spanning every
+        // level — see the dedicated case below.
         'comb' => [
             'short_text', 'email', 'phone', 'url',
             'integer', 'decimal',
             'date', 'time', 'datetime', 'duration',
+            'cascading_select',
         ],
         // Free prose: nothing to comb (1).
         'ruled' => ['long_text'],
-        // Author-defined option lists, each with a box to tick (6).
+        // FLAT option lists whose entries are alternatives to one another (5).
         'choices' => [
-            'single_select', 'multi_select', 'dropdown', 'yes_no', 'cascading_select', 'likert_scale',
+            'single_select', 'multi_select', 'dropdown', 'yes_no', 'likert_scale',
         ],
         // Grids. OCR-excluded and printed anyway — paper has handled grids for centuries (2).
         'grid' => ['matrix', 'likert_matrix'],
@@ -129,6 +132,22 @@ it('disagrees with PdfFieldRole on geo and media — and MUST', function (): voi
     // a respondent never "sees" one; paper takes it literally.
     expect(PdfFieldRole::for(FieldType::PageBreak))->toBe(PdfFieldRole::Omitted)
         ->and(PrintAnswerArea::for(FieldType::PageBreak))->toBe(PrintAnswerArea::PageBreak);
+});
+
+it('combs a cascading select instead of tick-listing its multi-level option pool', function (): void {
+    // ⚠️ Found by the adversarial review, and it is a CORRECTNESS defect rather than a layout one.
+    // A cascading select's `config.options` is ONE FLAT LIST spanning every level, each entry
+    // carrying its own `level` and `parent` (StructuralValidationGate::assertCascadingResolves).
+    // Classifying it as `choices` — which the first draft did, on the strength of it having a
+    // `config.options` at all — printed "Manila" as a tick-box sibling of "NCR": a child option
+    // offered as an alternative to its own parent. The screen control never shows that shape.
+    //
+    // Its four flat siblings stay `choices`, so this is not a blanket retreat from tick-lists.
+    expect(PrintAnswerArea::for(FieldType::CascadingSelect))->toBe(PrintAnswerArea::Comb)
+        ->and(PrintAnswerArea::for(FieldType::SingleSelect))->toBe(PrintAnswerArea::Choices)
+        ->and(PrintAnswerArea::for(FieldType::MultiSelect))->toBe(PrintAnswerArea::Choices)
+        ->and(PrintAnswerArea::for(FieldType::Dropdown))->toBe(PrintAnswerArea::Choices)
+        ->and(PrintAnswerArea::for(FieldType::LikertScale))->toBe(PrintAnswerArea::Choices);
 });
 
 it('puts ink on the page for every area except Omitted', function (): void {

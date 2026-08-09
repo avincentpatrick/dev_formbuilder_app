@@ -67,13 +67,17 @@ final class BlankFormPrintRenderer
      * tenant-authored: the form title, its description, every section heading, every field label and
      * hint, and every option label on every choice list and grid axis.
      *
-     * @param  array<string, string>|null  $brand
+     * The palette is resolved here rather than accepted as a parameter, deliberately unlike
+     * {@see SubmissionPdfRenderer::html()}. That one takes an optional `$brand` so a test can
+     * compare the branded and unbranded documents without standing up a subscription for each;
+     * nothing here needs that, and an optional parameter no caller passes and no test exercises is
+     * an untested branch pretending to be an API.
      */
-    public function html(Form $form, FormVersion $version, ?array $brand = null): string
+    public function html(Form $form, FormVersion $version): string
     {
         return $this->views->make('pdf.blank-form', [
             'model' => $this->presenter->present($form, $version),
-            'brand' => $brand ?? BrandPalette::current(),
+            'brand' => BrandPalette::current(),
         ])->render();
     }
 

@@ -80,6 +80,8 @@ The paper is rendered from a **published version's frozen `schema_snapshot`** �
 - **A SUPERSEDED version still prints,** and H18 depends on it: paper already in the field was printed against the layout of the version live at the time, so re-reading those scans means reprinting *that* version, not the current one.
 - **Relevance is NOT applied.** A blank form is printed before anybody has answered anything, so no `relevant_expression` has an input. Every field prints; a conditional one is marked `(if applicable)` rather than hidden, because an enumerator has to be able to see a branch in order to follow it. **Consequence for §3: a filled scan may legitimately have whole questions blank, and blank does not mean "extraction failed".**
 - Fields print in **authored order** (`section_sequence`, then `sequence`), not in the snapshot's list order — `SchemaSnapshotSerializer` sorts by `key` for checksum stability, which is alphabetical. Ungrouped fields lead, matching `StepProjection::LEAD_STEP_KEY`.
+- **A conditional SECTION is marked on its heading**, not only conditional fields. A section's `relevant_expression` lives on the section row and its member fields carry nothing, so the per-field marker cannot see it — without this a whole block that may not apply prints unmarked.
+- **Nothing may vanish from the paper.** A field whose `section_key` matches no section in the snapshot prints at the end under no heading rather than being silently dropped. The publish path cannot currently produce that shape; the guard exists because the cost of being wrong is a missing question on a field instrument and the cost of the guard is a loop.
 
 ### 2.5.2 The answer areas
 
@@ -87,9 +89,9 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
 
 | Area | Field types | On paper |
 |---|---|---|
-| `comb` | `short_text`, `email`, `phone`, `url`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration` | a row of separated character boxes |
+| `comb` | `short_text`, `email`, `phone`, `url`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration`, `cascading_select` | a row of separated character boxes |
 | `ruled` | `long_text` | one 46pt bordered box |
-| `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `cascading_select`, `likert_scale` | each option listed with a 10pt drawn box |
+| `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `likert_scale` | each option listed with a 10pt drawn box |
 | `grid` | `matrix`, `likert_matrix` | a real table, `config.rows` down, `config.columns` across, a 9pt box per cell |
 | `signature_line` | `signature` | a 30pt ruled line at 60% width |
 | `prose` | `note` | the text, no answer area |
@@ -100,6 +102,10 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
 **Grids and signatures print even though §2 classes them `excluded`.** The printed form is the *instrument*, not the extraction target: paper has handled grids for centuries, and dropping them would mean the printed form is not the form. Such a version simply is not OCR-eligible, and the footer says so (below). **§3's extraction stage should not expect a `grid` or `signature_line` region to yield an answer** — those areas exist for the human, and their versions never reach the OCR channel.
 
 **Geo and media get no box on purpose.** Omitting them would leave an enumerator with no prompt to capture the reading by another means; printing a writable box would invite somebody to write a coordinate into an area nothing will ever read.
+
+**`cascading_select` is combed, not tick-listed, and the reason is correctness rather than length.** Its `config.options` is *one flat list spanning every level*, each entry carrying its own `level` and `parent` (`StructuralValidationGate::assertCascadingResolves()`). Rendering that pool as a single tick-list would set "Manila" beside "NCR" as a sibling — a child option offered as an alternative to its own parent, which is a shape the screen control never shows, because it narrows each level by the one above. Paper can narrow nothing, so the answer is **written per level**: one captioned comb run per declared level (§2.5.3), captioned with the level **key**. **§3 should therefore expect a cascading answer as N handwritten level values in printed order, not as a selection.**
+
+**Every other `choices` type has a flat pool whose entries are genuine alternatives**, which is what makes a tick-list the honest rendering there.
 
 ### 2.5.3 Comb geometry — the ICR contract
 
@@ -115,6 +121,7 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
   - `duration` → `HRS` (3) · `MIN` (2)
 
   **This is why a handwritten date is machine-readable at all**: `03/04` is the 3rd of April or the 4th of March depending on who filled it in, and no recognizer can recover that from the ink. **§3 must parse dates positionally from these groups, never as free text.**
+- **`cascading_select` gets one captioned run per declared level**, captioned with the uppercased level key (truncated to 10 characters, which is roughly what fits over a group at 6.5pt). Per-level width divides the 30-cell budget — a 3-level hierarchy gets 10 cells each — with a floor of 4 so a deep hierarchy degrades legibly instead of silently dropping its deepest levels. A hierarchy deep enough to overflow at 4 cells per level would exceed the page; the floor is a documented bound, not a guarantee.
 
 ### 2.5.4 The field-key stamp
 
@@ -139,6 +146,7 @@ The footer states, per version and re-derived from that version's own frozen byt
 ### 2.5.8 Known limitations, recorded rather than guessed at
 
 - **One locale per print.** The form's `default_locale` is used for every label, hint and option label; there is no "print this in Tagalog" affordance. A real gap for multi-locale forms, and the natural place to close it is a validated `?locale=` against `forms.supported_locales`.
+- **⚠️ A form authored outside the WinAnsi repertoire does not print correctly, and fails SILENTLY.** The same constraint as §2.5.5, seen from the other side: dompdf's core fonts cover Latin-1 plus a couple of dozen extras, so a label in Chinese, Japanese, Arabic, Greek, Cyrillic or Thai drops or mangles with no error. The renderer test cannot catch this — it deliberately uses an ASCII-only fixture so it measures the *templates* — and this product has no such tenant today. Closing it means shipping an embedded TrueType font and a `@font-face`, which the §5 security posture currently forbids (`isRemoteEnabled = false` plus a chroot), so it is a real increment and not a config change. **Anything beyond Latin script is out of scope until then.**
 - **No answer-area sizing from content.** A `long_text` box is a fixed 46pt regardless of what the question asks for.
 - **No fiducial/registration marks.** If the bake-off shows the provider needs corner anchors for deskew, they belong in `.runhead`'s stylesheet and would be drawn as bordered elements for the same WinAnsi reason.
 

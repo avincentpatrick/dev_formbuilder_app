@@ -13,6 +13,16 @@
  *
  * Actions go in the #actions slot (one primary button, bottom-right -- the one-primary rule, 3.1).
  */
+/*
+ * ⚠️ DO NOT WRITE A BARE HTML TAG LITERAL IN A COMMENT IN THIS FILE (J1a, learned the hard way).
+ * A `<`+`header`+`>` inside this docblock fails the STORYBOOK build only, as
+ * "Modal.vue (358:817): Element is missing end tag" -- a line past the end of the file, naming no
+ * construct you can see. Storybook's vue3-vite preset preserves comments for docgen, so the SFC
+ * parser tokenizes comment bodies that Vitest, vue-tsc and the app's own Vite build all skip; those
+ * three stay green, and only the merge-blocking a11y job goes red. Note the pre-existing `body` tag
+ * literals below survive it, so "but there is one right there" is not evidence it is safe.
+ * Name the CSS class instead -- more precise anyway, since it is greppable.
+ */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import Icon from '../Icon/Icon.vue';
 import { popModalRoot, pushModalRoot } from './inert-stack';
@@ -25,6 +35,40 @@ const props = withDefaults(
         // Teleport the overlay to <body> (default). Set false to render in place -- used by the axe
         // stories so the scanner (scoped to #storybook-root) can see the dialog.
         teleport?: boolean;
+        /**
+         * A CSS selector, resolved INSIDE the panel, for the control that should receive focus on open.
+         * Omitted (the default) keeps the pre-J1a behaviour byte-for-byte: `focusable()[0] ?? panel`.
+         *
+         * ⚠️ WHAT THE DEFAULT ACTUALLY DOES, STATED PRECISELY BECAUSE IT IS RIGHT HALF THE TIME.
+         * `focusable()` queries the whole panel in DOM order, and `.mds-modal__header` -- which carries
+         * `.mds-modal__close` -- precedes `.mds-modal__body`, so every modal opens focused on its own
+         * Close button. For the destructive confirmations that were this component's first consumers that
+         * is BENIGN, and for the same reason DSR 4.5 gives when it asks for "a designated initial-focus
+         * target -- e.g. the cancel button by default for destructive confirmations, so an accidental
+         * `Enter` press doesn't confirm a destructive action": a stray Enter dismisses instead of deleting.
+         *
+         * Be precise about the gap, though, because it is easy to overclaim: 4.5 names the CANCEL button
+         * and this focuses the CLOSE (X) affordance, which 3.6 enumerates as a separate required element
+         * with a different accessible name. The safety property matches; the control does not. Nothing here
+         * satisfies the second half of 4.5's sentence -- that is what this prop finally supplies.
+         *
+         * It is wrong for the other shape: a dialog whose POINT is an input opens focused on the one
+         * control that throws the user's intent away. J1d's command palette is the first of those, and a
+         * palette that opens on Close is not a palette. So this prop does not replace the default -- it
+         * makes the choice explicit for the dialogs where the DOM-order accident does not land well, and
+         * it must NOT become the default: 41 `MdsModal` call sites across 28 files rely on today's
+         * behaviour, and most of them are confirmations.
+         *
+         * A selector rather than a ref/element, because the target lives in the CONSUMER's slot content:
+         * a ref would have to be threaded back out through the slot, and an element prop would be null on
+         * the first `nextTick` for exactly the mount-open case `immediate: true` exists to serve.
+         *
+         * Falls back to today's behaviour whenever the selector fails to move focus -- it matches nothing,
+         * it is invalid CSS, or it matches something that cannot take focus. All three are verified rather
+         * than assumed; see the comment at the call site for why the page being already inert makes a
+         * silent failure here a keyboard trap rather than a cosmetic slip.
+         */
+        initialFocus?: string;
     }>(),
     { closeLabel: 'Close', teleport: true },
 );
@@ -100,7 +144,45 @@ function takePage() {
         ownedRoot = backdrop.value;
         pushModalRoot(ownedRoot);
         const items = focusable();
-        (items[0] ?? panel.value)?.focus();
+
+        // ── THE DESIGNATED TARGET, AND WHY IT IS TRIED-THEN-VERIFIED RATHER THAN TRUSTED ───────────
+        // By this line the page is ALREADY inert and scroll-locked (pushModalRoot, above). So every way
+        // this lookup can fail to move focus ends in the same place: the opener still holds focus, the
+        // opener is now inside an inert subtree, the UA drops focus to the document body -- and because
+        // `onKeydown` is bound to the panel, ESCAPE AND THE TAB TRAP BOTH BECOME UNREACHABLE. That is a
+        // keyboard trap (WCAG 2.1.2) and the exact "never left stranded" outcome DSR 4.5 forbids, reached
+        // through the prop that was added to serve 4.5. It is worth six lines to make structurally
+        // impossible rather than one line to leave as a consumer's problem.
+        //
+        // THREE FAILURE MODES, none of which a `?? fallback` on the RETURN VALUE can catch:
+        //   1. An invalid selector THROWS. `querySelector('[')` is a DOMException, not a null return, and
+        //      this callback runs inside `nextTick`, which does not route through Vue's error handler --
+        //      so the throw escapes as an unhandled rejection and `.focus()` never runs at all.
+        //   2. A MATCH THAT CANNOT TAKE FOCUS is a silent no-op: a disabled input, a `display: none`
+        //      element, or a plain wrapper the marker attribute drifted onto during a refactor.
+        //   3. A match outside the panel -- prevented by scoping the query to `panel`, which also keeps a
+        //      page-level element carrying the same marker from pulling focus out of the dialog.
+        //
+        // The target is deliberately NOT filtered through `focusable()` first: that query drops anything
+        // whose `offsetParent` is null (a `position: fixed` descendant, or an element inside a wrapper
+        // that generates no box), and a palette input silently falling back to Close would be
+        // indistinguishable from the bug this prop exists to fix. Verifying AFTER the fact gets the
+        // permissiveness and the safety net at once.
+        let designated: HTMLElement | null = null;
+        if (props.initialFocus) {
+            try {
+                designated = panel.value?.querySelector<HTMLElement>(props.initialFocus) ?? null;
+            } catch {
+                designated = null;
+            }
+        }
+        designated?.focus();
+
+        // The safety net. `contains()` is true for the panel itself, so a panel-focused fallback is not
+        // re-run. When no selector was given this is simply the pre-J1a path, unchanged.
+        if (panel.value && !panel.value.contains(document.activeElement)) {
+            (items[0] ?? panel.value).focus();
+        }
     });
 }
 

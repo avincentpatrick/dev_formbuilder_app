@@ -40,10 +40,38 @@ export const DateType: Story = {
         template: '<TextInput v-bind="args" aria-label="Visit date" />',
     }),
 };
+/**
+ * Increment J1a — the keyword-filter and global-search field.
+ *
+ * Rendered with a value so the docs page shows the state consumers actually ship, including the UA clear
+ * glyph that appears once the field is non-empty. ⚠️ Do NOT read that as axe coverage of the glyph:
+ * `::-webkit-search-cancel-button` lives in a CLOSED user-agent shadow root, and axe walks the light DOM
+ * and open shadow roots only — it cannot reach that node in either state, so no rule evaluates it here or
+ * anywhere. Its size and contrast are unverified by any gate in this repo (see DSR §3.2 note 2).
+ *
+ * ⚠️ This story's input is `role="searchbox"`, not `textbox` — see TextInput.vue's docblock.
+ */
+export const Search: Story = {
+    args: { type: 'search', modelValue: 'clinic intake' },
+    render: (args) => ({
+        components: { TextInput },
+        setup: () => ({ args }),
+        template: '<TextInput v-bind="args" aria-label="Search submissions" />',
+    }),
+};
 export const Invalid: Story = { args: { invalid: true, modelValue: 'not-an-email' } };
 export const Disabled: Story = { args: { disabled: true, modelValue: 'locked@example.org' } };
 export const Dark: Story = { args: { modelValue: 'jordan@example.org' }, decorators: [dark] };
 export const InvalidDark: Story = {
     args: { invalid: true, modelValue: 'not-an-email' },
     decorators: [dark],
+};
+export const SearchDark: Story = {
+    args: { type: 'search', modelValue: 'clinic intake' },
+    decorators: [dark],
+    render: (args) => ({
+        components: { TextInput },
+        setup: () => ({ args }),
+        template: '<TextInput v-bind="args" aria-label="Search submissions" />',
+    }),
 };

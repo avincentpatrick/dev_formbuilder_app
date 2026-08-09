@@ -31,6 +31,31 @@ test.use({ storageState: 'tests/e2e/.auth/admin.json' });
 const TENANT_ID_PATH = '/admin/tenants';
 
 test('an operator signs in to a workspace, is warned, and can leave', async ({ page }) => {
+    /*
+     * ⚠️ DOUBLE THE DEFAULT TIMEOUT, AND THIS IS NOT PADDING. Measured locally at 53.6s against the 60s
+     * default — and the run before it FAILED at 60s with no code change between them, which is the
+     * definition of a flake on a merge-blocking gate. The duration is inherent rather than fixable by
+     * tightening a selector: this single test performs SIX full document navigations (console list, tenant
+     * detail, the cross-origin hop, the cross-origin return, and the logout probe) because it is the only
+     * spec that crosses an origin at all, and each one is a cold Laravel boot rather than an SPA visit.
+     *
+     * Splitting it would be worse, not better: the hop, the banner and the exit are one causal chain, and
+     * three specs would each have to re-establish the impersonated session to check the next link.
+     */
+    test.setTimeout(150_000);
+
+    /*
+     * ONE VIEWPORT. `playwright.config.ts` declares mobile/tablet/desktop, and every other spec in this
+     * suite legitimately wants all three because they are AXE and RESPONSIVE sweeps — layout is their
+     * subject. This is a FLOW test: what it proves is that a session cookie does not cross a host and a
+     * token handoff does, which is identical at 375px and 1440px. Running it three times would add ~2.5
+     * minutes to a ~13-minute merge-blocking job to re-measure the same booleans.
+     *
+     * Layout coverage for the surfaces it touches is not lost — the banner and the console card are
+     * design-system components, scanned by the design-system axe job at every breakpoint.
+     */
+    test.skip(test.info().project.name !== 'desktop', 'flow test — viewport is not its subject');
+
     // 1 — reach the workspace's console page. `openConsole` clears the step-up interstitial if the
     //     15-minute window has aged out mid-run.
     await openConsole(page, TENANT_ID_PATH);
@@ -64,7 +89,9 @@ test('an operator signs in to a workspace, is warned, and can leave', async ({ p
 
     // And the tenant session is genuinely gone rather than merely navigated away from: the workspace now
     // answers with its login page. Without this, an "exit" that only redirected would pass.
-    await page.goto(`${tenantOrigin}/dashboard`, { waitUntil: 'networkidle' });
+    // `load`, not `networkidle`: the login page this lands on polls nothing, so networkidle buys only a
+    // 500ms settle timer on the slowest step of the slowest spec in the suite.
+    await page.goto(`${tenantOrigin}/dashboard`);
     await expect(page).toHaveURL(/\/login/);
 });
 

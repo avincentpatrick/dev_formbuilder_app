@@ -178,6 +178,14 @@ const historyTarget = ref<FormRow | null>(null);
 const restoreTarget = ref<{ form: FormRow; version: FormVersionRow } | null>(null);
 const restoring = reactive({ busy: false });
 
+// ── Printable blank form (I12) ────────────────────────────────────────────
+// A streamed PDF download, so it navigates the browser rather than making an Inertia visit — the
+// `exportXlsform()` pattern from the builder. An Inertia <Link> here would fetch the bytes as an XHR
+// and then find no page component to swap in.
+function printBlank(form: FormRow, version: FormVersionRow): void {
+    window.location.href = `/forms/${form.id}/versions/${version.id}/print`;
+}
+
 function submitRestore(): void {
     if (!restoreTarget.value) return;
     restoring.busy = true;
@@ -386,15 +394,35 @@ function submitRestore(): void {
                         <strong>v{{ v.version_number }}</strong>
                         <MdsBadge v-bind="statusVariant(v.status)" />
                     </span>
-                    <MdsButton
-                        v-if="historyTarget.can.edit && v.status !== 'draft'"
-                        variant="tertiary"
-                        size="sm"
-                        icon-left="clock"
-                        @click="restoreTarget = { form: historyTarget, version: v }"
-                    >
-                        Restore
-                    </MdsButton>
+                    <span class="forms__version-actions">
+                        <!--
+                            Print blank (I12) — a published version typeset for a pen. Conditioned on
+                            `status !== 'draft'` to match the route, which 404s a draft: a draft's
+                            schema_snapshot is literally [] and ADR-0013 makes only a published
+                            version's content immutable. NOT gated on `can.edit` the way Restore is —
+                            Restore writes to the draft, this only reads, so it rides the same
+                            `can:view,form` the route enforces and is available to every viewer who
+                            can see the row at all.
+                        -->
+                        <MdsButton
+                            v-if="v.status !== 'draft'"
+                            variant="tertiary"
+                            size="sm"
+                            icon-left="download"
+                            @click="printBlank(historyTarget, v)"
+                        >
+                            Print blank
+                        </MdsButton>
+                        <MdsButton
+                            v-if="historyTarget.can.edit && v.status !== 'draft'"
+                            variant="tertiary"
+                            size="sm"
+                            icon-left="clock"
+                            @click="restoreTarget = { form: historyTarget, version: v }"
+                        >
+                            Restore
+                        </MdsButton>
+                    </span>
                 </li>
             </ul>
             <template #actions>
@@ -502,5 +530,13 @@ function submitRestore(): void {
     align-items: center;
     gap: var(--mds-space-2);
     color: var(--mds-color-text-body);
+}
+
+/* Two actions per row since I12, so they need their own flex context — the row's own
+   `justify-content: space-between` would otherwise push them to opposite ends of the modal. */
+.forms__version-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
 }
 </style>

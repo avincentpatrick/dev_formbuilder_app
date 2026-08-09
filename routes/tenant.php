@@ -21,6 +21,7 @@ use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
+use App\Http\Controllers\Tenant\FormPrintController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
 use App\Http\Controllers\Tenant\FormScheduleController;
@@ -335,6 +336,22 @@ Route::middleware([
     // export's read gate); parse failures reject the file UPFRONT, before the draft is touched.
     Route::post('/forms/{form}/draft/xlsform-import', [FormXlsformController::class, 'import'])
         ->middleware(['can:update,form', 'feature:xlsform_export'])->name('forms.xlsform.import');
+
+    // Printable blank form (Increment I12) — a published version typeset for a pen, and the artifact
+    // the OCR chain's filled scans are produced FROM (`docs/ocr-pipeline-design.md` §2.5). Shaped
+    // after the XLSForm export directly above it: {version} scope-bound to {form}, gated `can:view,form`
+    // (a read/derive of the form's own structure), delivered as a file rather than an Inertia visit.
+    //
+    // UNGATED by plan, deliberately. The obvious-looking `feature:ocr_single` would be wrong twice:
+    // that key is Professional+ in PlanCatalog, and printing a blank form is useful with no OCR
+    // anywhere in the picture — a field team printing forms to fill by hand and key in later needs
+    // nothing from the OCR pipeline. Same posture as I1's share surface and the submission PDF.
+    //
+    // A DRAFT version 404s, in the controller rather than here: a route middleware cannot read the
+    // bound row's status without a query, and the reasoning belongs next to the abort.
+    Route::get('/forms/{form}/versions/{version}/print', FormPrintController::class)
+        ->scopeBindings()
+        ->middleware('can:view,form')->name('forms.print');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly

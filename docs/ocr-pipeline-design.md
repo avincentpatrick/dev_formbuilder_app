@@ -66,7 +66,91 @@ The type classification is **total** over the 31-case `FieldType` catalog (`app/
 
 ---
 
+## 2.5 The Printed Blank Form (Increment I12)
+
+**This section is normative for §3. The extraction stage must be written against the layout described here, because this is the layout the scans will physically have.** Until I12 there was no way to put a form on paper at all, so §3's "one photo/scan of one filled paper form" had no producer inside this product; `GET /forms/{form}/versions/{version}/print` is that producer.
+
+Implemented by `App\Services\Forms\BlankFormPrintPresenter` (the render model), `BlankFormPrintRenderer` + `resources/views/pdf/blank-form.blade.php` (typesetting), and `FormPrintController`. Layout decisions were taken with the user on 2026-08-09 and are decisions of record.
+
+### 2.5.1 What is printed, and from what
+
+The paper is rendered from a **published version's frozen `schema_snapshot`** — the same bytes `ocr_compatible` was computed from at publish (`PublishService` step 8) and the same bytes an extraction stage will map a region back against. `CapabilityFlags`'s "one input shape ⇒ one extraction ⇒ nothing to drift" argument binds here too, so the renderer has no live-row path.
+
+- **A DRAFT is refused (404).** ADR-0013 makes only a published version immutable, and a draft's `schema_snapshot` is literally `[]`, so without the guard the request would return a titled document containing no questions.
+- **A SUPERSEDED version still prints,** and H18 depends on it: paper already in the field was printed against the layout of the version live at the time, so re-reading those scans means reprinting *that* version, not the current one.
+- **Relevance is NOT applied.** A blank form is printed before anybody has answered anything, so no `relevant_expression` has an input. Every field prints; a conditional one is marked `(if applicable)` rather than hidden, because an enumerator has to be able to see a branch in order to follow it. **Consequence for §3: a filled scan may legitimately have whole questions blank, and blank does not mean "extraction failed".**
+- Fields print in **authored order** (`section_sequence`, then `sequence`), not in the snapshot's list order — `SchemaSnapshotSerializer` sorts by `key` for checksum stability, which is alphabetical. Ungrouped fields lead, matching `StepProjection::LEAD_STEP_KEY`.
+
+### 2.5.2 The answer areas
+
+Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less match over the 31-case `FieldType` catalog — the fourth in the `OcrFieldEligibility` / `PdfFieldRole` / `PipingEligibility` family. **It deliberately disagrees with both of its nearest siblings and must not be collapsed into either** (pinned by `tests/Unit/Forms/PrintAnswerAreaTest.php`):
+
+| Area | Field types | On paper |
+|---|---|---|
+| `comb` | `short_text`, `email`, `phone`, `url`, `integer`, `decimal`, `date`, `time`, `datetime`, `duration` | a row of separated character boxes |
+| `ruled` | `long_text` | one 46pt bordered box |
+| `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `cascading_select`, `likert_scale` | each option listed with a 10pt drawn box |
+| `grid` | `matrix`, `likert_matrix` | a real table, `config.rows` down, `config.columns` across, a 9pt box per cell |
+| `signature_line` | `signature` | a 30pt ruled line at 60% width |
+| `prose` | `note` | the text, no answer area |
+| `unavailable` | `geopoint`, `geotrace`, `geoshape`, `file_upload`, `image_capture`, `audio_capture`, `video_capture` | the label, then *"Not collected on paper - record this in the app."*, and **no writing area** |
+| `page_break` | `page_break` | a hard `page-break-before` |
+| `omitted` | `hidden`, `calculated` | nothing at all |
+
+**Grids and signatures print even though §2 classes them `excluded`.** The printed form is the *instrument*, not the extraction target: paper has handled grids for centuries, and dropping them would mean the printed form is not the form. Such a version simply is not OCR-eligible, and the footer says so (below). **§3's extraction stage should not expect a `grid` or `signature_line` region to yield an answer** — those areas exist for the human, and their versions never reach the OCR channel.
+
+**Geo and media get no box on purpose.** Omitting them would leave an enumerator with no prompt to capture the reading by another means; printing a writable box would invite somebody to write a coordinate into an area nothing will ever read.
+
+### 2.5.3 Comb geometry — the ICR contract
+
+**Comb fields (one box per character) are the single biggest handwriting-recognition win available in a layout decision**, because character segmentation is free when the characters are pre-separated. This is the layout H1d's bake-off must score ICR against.
+
+- **Cell 14pt wide × 16pt tall, on a 15.5pt pitch** (1.5pt of horizontal `border-spacing`), a 0.6pt `#7a7a7a` border. About 4.94mm of writing width.
+- **Maximum 30 cells per run**, derived from the page rather than chosen: A4 minus 16mm margins leaves 178mm, and 30 cells at this pitch occupy ~164mm. The cell is *not* shrunk to fit more — a comb narrower than about 5mm stops being comfortable to hand-print in, which costs exactly the accuracy the comb buys. An authored `max_length` narrows the run; anything above 30 clamps (dompdf clips an over-wide table rather than wrapping it).
+- **Default run 24 cells**; `integer`/`decimal` default to 10.
+- **Date and time comb into FIXED, CAPTIONED groups**, separated by a 7pt borderless spacer with the caption centred under its group:
+  - `date` → `DD` (2) · `MM` (2) · `YYYY` (4)
+  - `time` → `HH` (2) · `MM` (2)
+  - `datetime` → `DD` (2) · `MM` (2) · `YYYY` (4) · `HH` (2) · `MM` (2)
+  - `duration` → `HRS` (3) · `MIN` (2)
+
+  **This is why a handwritten date is machine-readable at all**: `03/04` is the 3rd of April or the 4th of March depending on who filled it in, and no recognizer can recover that from the ink. **§3 must parse dates positionally from these groups, never as free text.**
+
+### 2.5.4 The field-key stamp
+
+**Every answer area carries its field `key` printed beside the label** — 7pt monospace, `#9a9a9a`, right-floated on the label line. This is what lets an extraction stage map a scanned region back to a field unambiguously, and it survives a page being scanned rotated or out of sequence. `omitted` fields contribute no key, because they contribute no area.
+
+### 2.5.5 Page identity, and why there is no barcode
+
+The running head repeats on **every page** (a `position: fixed` block) and carries the form title, `v{n}`, and **the first 8 characters of the version `checksum`** in monospace.
+
+- **No barcode, no QR, no logo.** `ext-gd` is absent from the app container and from all four CI jobs, so a raster would render on a developer's machine and throw in the pipeline (the H23a4 finding). The identity travels as printed text.
+- **No page numbers.** dompdf's page counters go through `page_text()`, its inline-PHP API, and `isPhpEnabled` is false by security contract (`piping-output-encoding-design.md` §5).
+- **⚠️ Every box is drawn in CSS, never typed as a glyph.** dompdf's built-in fonts are the PDF core fonts and are WinAnsi-encoded; `U+2610` BALLOT BOX is not in that repertoire and dompdf drops or mangles it *silently*. `BlankFormPrintRendererTest` renders an ASCII-only fixture and asserts the whole output round-trips through Windows-1252, which is the WinAnsi repertoire.
+
+### 2.5.6 Repeat groups
+
+A repeatable section prints `min_instances` numbered blank copies (default 1), **capped at 5**. `max_instances` is frequently null or large and an unbounded roster would print until the paper ran out; the enumerator's real recourse is a second copy of the sheet. Note that any repeat group makes the version ineligible under §2 clause 2, so these never reach the OCR channel — the cap is a paper-usability decision, not an extraction one.
+
+### 2.5.7 What the paper says about itself
+
+The footer states, per version and re-derived from that version's own frozen bytes via `CapabilityFlags::isOcrCompatible()`, whether *"Scans of this form can be read automatically"* or *"cannot be read automatically; responses must be keyed in."* It is deliberately not read off `forms.capability_flags`, which describes only the currently published version and is stale for a superseded one — the §2 as-built note's standing warning to H18a/H19, honoured here.
+
+### 2.5.8 Known limitations, recorded rather than guessed at
+
+- **One locale per print.** The form's `default_locale` is used for every label, hint and option label; there is no "print this in Tagalog" affordance. A real gap for multi-locale forms, and the natural place to close it is a validated `?locale=` against `forms.supported_locales`.
+- **No answer-area sizing from content.** A `long_text` box is a fixed 46pt regardless of what the question asks for.
+- **No fiducial/registration marks.** If the bake-off shows the provider needs corner anchors for deskew, they belong in `.runhead`'s stylesheet and would be drawn as bordered elements for the same WinAnsi reason.
+
+### 2.5.9 Delivery
+
+`GET /forms/{form}/versions/{version}/print`, `->scopeBindings()`, gated `can:view,form` — the XLSForm export's shape exactly. **Ungated by plan**: `feature:ocr_single` would be wrong twice over (that key is Professional+, and printing a blank form is useful with no OCR anywhere in the picture). Synchronous, no job, and — like `XlsformExporter` and unlike the submission PDF — **no audit row and no metering**, because nothing is stored and no respondent data is disclosed.
+
+---
+
 ## 3. Extraction & Confidence Scoring
+
+> **⚠️ Read §2.5 before implementing this section.** Since I12 this product PRINTS the paper it later reads, so the extraction stage is no longer guessing at an arbitrary scan's layout — it consumes a known one. Three consequences bind directly: field regions are identified by the **printed field-key stamp** (§2.5.4) rather than by position alone; **dates and times must be parsed positionally from their captioned comb groups** (§2.5.3), never as free text; and **a blank answer is not an extraction failure**, because a blank form prints every question including the ones a respondent's own branching would have hidden (§2.5.1).
 
 - The OCR provider (Google Cloud Vision or equivalent, per the architecture plan's external-system choice) returns per-field extracted text plus a provider-native confidence score, normalized into this product's own `0–100` scale.
 - **Confidence thresholds** (a concrete, tunable-later default, not a hard architectural constant):
@@ -111,5 +195,6 @@ The type classification is **total** over the 31-case `FieldType` catalog (`app/
 
 - Auto-detection of *which* channel a scan belongs to (single vs. linelist) — the user explicitly chooses the endpoint/mode upfront; there is no automatic classification of an ambiguous upload.
 - Confidence-threshold tuning per tenant or per field (today's thresholds, §3, are global defaults) — a plausible Phase 4+ enhancement if real usage data shows the defaults are miscalibrated for specific use cases, not built speculatively now.
-- Handwriting-recognition accuracy improvements beyond what the chosen OCR provider natively offers — this document orchestrates around the provider's capability, it does not attempt to improve the provider's own model.
+- Handwriting-recognition accuracy improvements beyond what the chosen OCR provider natively offers — this document orchestrates around the provider's capability, it does not attempt to improve the provider's own model. **Note the one lever this product does hold, and has already pulled: the LAYOUT is ours** (§2.5), and comb fields buy character segmentation before the provider's model ever runs. Further layout-side levers (fiducial marks, drop-out ink colours, a per-page identity block) are §2.5.8's recorded limitations, not this bullet's subject.
+- Printing a blank form in a locale other than the form's default; content-aware answer-area sizing; fiducial/registration marks — all §2.5.8, deferred with their reasons rather than dropped.
 - OCR-specific field-level audit trail beyond what `docs/audit-compliance-logging-spec.md` already covers for ordinary submission review actions.

@@ -178,6 +178,14 @@ const historyTarget = ref<FormRow | null>(null);
 const restoreTarget = ref<{ form: FormRow; version: FormVersionRow } | null>(null);
 const restoring = reactive({ busy: false });
 
+// ── Printable blank form (I12) ────────────────────────────────────────────
+// A streamed PDF download, so it navigates the browser rather than making an Inertia visit — the
+// `exportXlsform()` pattern from the builder. An Inertia <Link> here would fetch the bytes as an XHR
+// and then find no page component to swap in.
+function printBlank(form: FormRow, version: FormVersionRow): void {
+    window.location.href = `/forms/${form.id}/versions/${version.id}/print`;
+}
+
 function submitRestore(): void {
     if (!restoreTarget.value) return;
     restoring.busy = true;
@@ -386,15 +394,40 @@ function submitRestore(): void {
                         <strong>v{{ v.version_number }}</strong>
                         <MdsBadge v-bind="statusVariant(v.status)" />
                     </span>
-                    <MdsButton
-                        v-if="historyTarget.can.edit && v.status !== 'draft'"
-                        variant="tertiary"
-                        size="sm"
-                        icon-left="clock"
-                        @click="restoreTarget = { form: historyTarget, version: v }"
-                    >
-                        Restore
-                    </MdsButton>
+                    <span class="forms__version-actions">
+                        <!--
+                            Print blank (I12) — a published version typeset for a pen. Conditioned on
+                            `status !== 'draft'` to match the route, which 404s a draft: a draft's
+                            schema_snapshot is literally [] and ADR-0013 makes only a published
+                            version's content immutable.
+
+                            The `can.edit` conjunct looks too strict for a read and is not: the route
+                            gate is `can:view,form`, and FormPolicy::view() DELEGATES TO canEdit() —
+                            the same predicate `can.edit` is built from (`$user->can('update', …)`).
+                            The two sets are identical today, so gating on the flag the page actually
+                            has is what keeps the button from ever appearing where the route would
+                            403. If FormPolicy::view() is ever narrowed away from update(), this
+                            needs a real `can.view` flag from FormPresenter rather than this proxy.
+                        -->
+                        <MdsButton
+                            v-if="historyTarget.can.edit && v.status !== 'draft'"
+                            variant="tertiary"
+                            size="sm"
+                            icon-left="download"
+                            @click="printBlank(historyTarget, v)"
+                        >
+                            Print blank
+                        </MdsButton>
+                        <MdsButton
+                            v-if="historyTarget.can.edit && v.status !== 'draft'"
+                            variant="tertiary"
+                            size="sm"
+                            icon-left="clock"
+                            @click="restoreTarget = { form: historyTarget, version: v }"
+                        >
+                            Restore
+                        </MdsButton>
+                    </span>
                 </li>
             </ul>
             <template #actions>
@@ -502,5 +535,13 @@ function submitRestore(): void {
     align-items: center;
     gap: var(--mds-space-2);
     color: var(--mds-color-text-body);
+}
+
+/* Two actions per row since I12, so they need their own flex context — the row's own
+   `justify-content: space-between` would otherwise push them to opposite ends of the modal. */
+.forms__version-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
 }
 </style>

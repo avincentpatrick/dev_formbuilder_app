@@ -13,6 +13,16 @@
  *
  * Actions go in the #actions slot (one primary button, bottom-right -- the one-primary rule, 3.1).
  */
+/*
+ * ⚠️ DO NOT WRITE A BARE HTML TAG LITERAL IN A COMMENT IN THIS FILE (J1a, learned the hard way).
+ * A `<`+`header`+`>` inside this docblock fails the STORYBOOK build only, as
+ * "Modal.vue (358:817): Element is missing end tag" -- a line past the end of the file, naming no
+ * construct you can see. Storybook's vue3-vite preset preserves comments for docgen, so the SFC
+ * parser tokenizes comment bodies that Vitest, vue-tsc and the app's own Vite build all skip; those
+ * three stay green, and only the merge-blocking a11y job goes red. Note the pre-existing `body` tag
+ * literals below survive it, so "but there is one right there" is not evidence it is safe.
+ * Name the CSS class instead -- more precise anyway, since it is greppable.
+ */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import Icon from '../Icon/Icon.vue';
 import { popModalRoot, pushModalRoot } from './inert-stack';
@@ -25,6 +35,34 @@ const props = withDefaults(
         // Teleport the overlay to <body> (default). Set false to render in place -- used by the axe
         // stories so the scanner (scoped to #storybook-root) can see the dialog.
         teleport?: boolean;
+        /**
+         * A CSS selector, resolved INSIDE the panel, for the control that should receive focus on open.
+         * Omitted (the default) keeps the pre-J1a behaviour byte-for-byte: `focusable()[0] ?? panel`.
+         *
+         * ⚠️ WHAT THE DEFAULT ACTUALLY DOES, STATED PRECISELY BECAUSE IT IS RIGHT HALF THE TIME.
+         * `focusable()` queries the whole panel in DOM order, and `.mds-modal__header` -- which carries
+         * `.mds-modal__close` -- precedes `.mds-modal__body`, so every modal opens focused on its own
+         * Close button. For the destructive confirmations that were this component's first consumers that
+         * is ACCIDENTALLY CORRECT, and it is verbatim what DSR §4.5 asks for: "a designated initial-focus
+         * target -- e.g. the cancel button by default for destructive confirmations, so an accidental
+         * `Enter` press doesn't confirm a destructive action".
+         *
+         * It is wrong for the other shape: a dialog whose POINT is an input opens focused on the one
+         * control that throws the user's intent away. J1d's command palette is the first of those, and a
+         * palette that opens on Close is not a palette. So this prop does not replace the default -- it
+         * makes the choice explicit for the dialogs where the DOM-order accident does not land well.
+         *
+         * DSR §4.5 has specified the designated-target half since this component was written; it had
+         * simply never been built, because until now nothing needed it.
+         *
+         * A selector rather than a ref/element, because the target lives in the CONSUMER's slot content:
+         * a ref would have to be threaded back out through the slot, and an element prop would be null on
+         * the first `nextTick` for exactly the mount-open case `immediate: true` exists to serve.
+         *
+         * Falls back to today's behaviour when the selector matches nothing, so a consumer whose slot
+         * content is v-if'd away gets a focused dialog rather than a stranded one.
+         */
+        initialFocus?: string;
     }>(),
     { closeLabel: 'Close', teleport: true },
 );
@@ -100,7 +138,16 @@ function takePage() {
         ownedRoot = backdrop.value;
         pushModalRoot(ownedRoot);
         const items = focusable();
-        (items[0] ?? panel.value)?.focus();
+        // The designated target is resolved against the panel and deliberately NOT filtered through
+        // `focusable()`: that query drops anything whose `offsetParent` is null, which is every descendant
+        // of a `display: contents` wrapper. Consumers wrap slot content routinely, and a palette input that
+        // silently fell back to Close would be indistinguishable from the bug this prop exists to fix.
+        // Falling back through `items[0]` keeps the pre-J1a path exactly when no selector is given or the
+        // selector matches nothing.
+        const designated = props.initialFocus
+            ? (panel.value?.querySelector<HTMLElement>(props.initialFocus) ?? null)
+            : null;
+        (designated ?? items[0] ?? panel.value)?.focus();
     });
 }
 

@@ -547,6 +547,7 @@ Governing rule: **help text occupies its layout slot even when absent from a hid
 | Input | Default | Hover | Focus | Error | Disabled | Notes |
 |---|---|---|---|---|---|---|
 | **Text / Textarea** | `--mds-neutral-300` border, `--mds-neutral-0` fill | `--mds-neutral-400` border | Focus ring (§4.2) + `--mds-primary-600` border | `--mds-danger-600` border + error icon suffix | `--mds-neutral-100` fill, `--mds-neutral-400` text, border removed | Textarea has a resize handle only on the vertical axis; min-height = 3 lines |
+| **Search** *(added J1a)* | Identical to Text — same border, fill, radius and `min-height: 40px` | Same as text | Same as text | Not applicable (a keyword query has no invalid state; a query that matches nothing is an empty state, §3.3) | Same as text | `MdsTextInput type="search"`. See the three binding notes below. |
 | **Select / Dropdown** | Same as text input, trailing chevron icon | Same | Same, plus open-state elevation `--mds-shadow-3` on the option panel | Same as text | Same as text | Combobox variants (searchable, cascading) follow the ARIA pattern in §4.5 |
 | **Checkbox** | `--mds-radius-sm` box, `--mds-neutral-300` border | Border darkens to `--mds-neutral-400` | Focus ring around the box | Border + adjacent error text | Reduced-opacity box, no interaction | Checked state fills `--mds-primary-600` with a white check glyph — never relies on fill color alone (the glyph itself is the non-color signifier) |
 | **Radio** | Circular, same border logic as checkbox | Same | Same | Same | Same | Selected state: `--mds-primary-600` filled inner dot |
@@ -554,6 +555,12 @@ Governing rule: **help text occupies its layout slot even when absent from a hid
 | **Date picker** | Text-input trigger + calendar icon | Same as text input | Same, plus the calendar panel opens at `--mds-shadow-4` | Same as text input | Same as text input | Calendar panel is full keyboard-navigable (arrow keys move by day, `PageUp`/`PageDown` by month) per §4.3 |
 | **File upload** | Dashed-border drop zone, `--mds-neutral-300` border, upload icon + "drop files or browse" text | Border darkens on drag-over to `--mds-primary-400`, background tints `--mds-primary-50` | Focus ring around the zone (keyboard-triggerable "browse" is a real button, not a bare `<input type=file>` styled invisible) | Border becomes `--mds-danger-600` + inline error text (e.g., file too large, wrong type) | Reduced-opacity zone, non-interactive | Per-file rows show a thumbnail/icon, filename, size, a determinate progress bar (§3.9) during upload, and a remove action |
 | **Signature capture** *(Phase 1 field type placeholder)* | Bordered canvas region, `--mds-neutral-300` border, faint baseline guide + "Sign here" placeholder text (`--mds-color-text-secondary`) | N/A (touch/pointer surface, not a hover-driven control) | Focus ring around the canvas boundary when reached via keyboard (a "Clear signature" button remains keyboard-operable even though the drawing surface itself is pointer/touch-primary) | Border becomes `--mds-danger-600` + error text ("Signature required") | Reduced-opacity canvas, non-interactive | A visible "Clear" text button always accompanies the canvas; the component is a placeholder for full interaction/rendering spec ownership by the eventual Signature field-type implementation, but the **container, states, and label/help/error attachment** specified here are final and binding now |
+
+**Three binding notes on the search input (added J1a).**
+
+1. **Its implicit role is `searchbox`, not `textbox`.** Every test locator for one of these — Playwright or Vitest — must be `getByRole('searchbox')`. A `getByRole('textbox')` finds nothing, and the failure reads as "the input is missing", which points at the wrong file.
+2. **The user-agent clear button (`::-webkit-search-cancel-button`) is deliberately NOT suppressed.** It is a real affordance — the one-tap "clear the query" every mobile user already knows — and removing it without building a replacement is a net loss. Its ~14px box does **not** violate WCAG 2.5.8 (Target Size, Minimum), because SC 2.5.8's *User-Agent Control* exception applies verbatim: "the size of the target is determined by the user agent and is not modified by the author." Do not "fix" this by hiding it.
+3. **No `appearance` reset is applied.** The box model is fully authored (border, padding, radius, `min-height`), which modern engines honour on a search field. `appearance: none` is precisely the change that kills the cancel button in WebKit — i.e. the opposite of note 2. Playwright runs Desktop Chrome at all three viewports, so Safari's rendering of this type is **unverified here**; recorded rather than assumed.
 
 **Governing layout rule**: every form input's label, control, help text, and error message stack **vertically, left-aligned to the same edge**, at `--mds-space-2` internal gaps, inside a `FormField` wrapper that itself sits in the page's field-stack at `--mds-space-4` between fields and `--mds-space-6` between sections — no page hand-rolls its own label/input spacing.
 
@@ -581,6 +588,50 @@ The data table is the single most-used composite component (submissions inbox, f
 ### 3.4 Navigation
 
 **Top nav** (part of the Authenticated App Shell, §3.0): tenant/account switcher (left), global search (center, expandable on mobile), notification bell + avatar/account menu (right). Fixed height (`--mds-space-16` = 64px), `--mds-shadow-1` separating it from content on scroll.
+
+> **Implementation status (J1): the centre region is BUILT, and it is a two-state control rather than the single inline field the line above implies.** At ≥601px it is a real `<form role="search" method="GET" action="/search">` wrapping a `MdsTextInput type="search"`; at ≤600px it collapses to an icon-only link to `/search`. Both states are ordinary navigation that works with JavaScript disabled. The ⌘K palette (§3.4.1) is an **accelerator layered over** that field, never its only entry point. The tenant/account switcher half of the line remains unbuilt.
+>
+> The stale `TopNav.vue` comment deferring both to increment **C3** was wrong twice over — C3 closed without building either, and the field is a J1 deliverable. Corrected in the same increment.
+
+#### 3.4.1 Global search and the command palette *(added J1a; PRD §3.7 makes global search a non-negotiable product requirement)*
+
+**The trigger, and why it is two states.** At ≥601px the nav renders a real search form. Below that it is an icon-only link: the bar at 375px already carries a hamburger, a wordmark, and four right-hand controls, and `TopNav.vue`'s own note records only ~31px of headroom at the `extra_large` type scale *before* a search field existed. The centre region therefore carries `min-width: 0` like its two siblings — without it a flex item's automatic minimum size is its content width, and the bar is pushed wider than the viewport rather than the field shrinking.
+
+⚠️ **`.app-shell` is `overflow-x: clip`, so the standard `documentElement.scrollWidth` overflow assertion is structurally blind to anything in this bar.** A mis-sized centre region is *clipped and invisible*, not caught — the scan stays green over an unreadable nav. Any change here must be asserted with a **bounding-box containment + non-overlap** check at 375px under `extra_large` + the dyslexia face, which is the workaround already used for the notification panel.
+
+**The palette is a dialog, not an anchored panel.** It is built on `MdsModal`, which supplies the entire hard half: the `inert` stack and its paint-order handling, the scroll lock, Escape with `stopPropagation`, the Tab trap, return-focus, and the ≤480px full-screen sheet that is exactly the right mobile palette. A bespoke floating panel is forbidden by §3.6, and an anchored listbox in the nav would hit the `overflow-x: clip` trap above from the other direction.
+
+**Keyboard model.**
+
+| Key | Behaviour |
+|---|---|
+| `Ctrl/Cmd + K` | Opens. Registered as a **capture-phase** `document` listener — bubble phase is silently dead on any page whose editor calls `stopPropagation()`, and "from anywhere" is the entire point. Calls `preventDefault()`, because Firefox and Safari bind this chord to their own address bars. |
+| `Ctrl/Cmd + K` while open | Closes (toggle). |
+| `Ctrl/Cmd + K` while another dialog is open | **No-op**, guarded by `openModalCount()`. The user has an unfinished blocking task; `inert-stack` would legitimately *stack* the palette on top of it, after which `popModalRoot`'s contract correctly declines to return focus. Refusing is the honest behaviour. |
+| Inside an `<input>` / `<textarea>` / contenteditable | **Fires — deliberately no tag guard.** A modifier chord does not collide with typing, and the builder's editors are exactly where a user wants it. |
+| `Escape` | `MdsModal`'s own handler. Nothing to build. |
+| `↓` / `↑` | Move the active option over the flattened list, wrapping, with `preventDefault()` (otherwise the caret jumps). **DOM focus never leaves the input.** |
+| `Home` / `End` | First / last option. |
+| `Enter` | Activate the highlighted option; with no list, go to `/search?q=…`. |
+| `Tab` | `MdsModal`'s trap. Only the input and the close button are tabbable — rows are not, by design. |
+
+⚠️ **`/` is NOT a shortcut, and this is a conformance decision rather than a preference.** WCAG **2.1.4 Character Key Shortcuts is Level A**, and it requires a single-character shortcut to be disableable, remappable, or active only on focus. Shipping a bare `/` would oblige us to build a shortcut-preference UI to stay conformant, and would need a tag guard that breaks silently inside any `role="textbox"`. `Ctrl/Cmd+K` is a modifier combination and is explicitly exempt. **Do not re-propose `/`.**
+
+**ARIA.** The palette implements the ARIA 1.2 Combobox pattern of §4.5: a `role="combobox"` input with `aria-autocomplete="list"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant` tracking the highlighted option **without moving DOM focus**; the results are a `role="listbox"` of `role="option"` children carrying `aria-selected`.
+
+- **`aria-controls` and `aria-activedescendant` are omitted, never left dangling.** axe's `aria-valid-attr-value` fails a reference to a non-existent id, and the empty-query state renders no listbox at all.
+- **Options are `role="option"` on a `<div>`, never `<button>`.** §4.3's "custom interactives must be real semantic elements" rule governs **standalone controls** — its own examples are icon-only buttons and custom select triggers — not the descendants of a composite widget. A `<button role="option">` inside a listbox trips axe's `nested-interactive` **and** breaks `aria-activedescendant`. Keyboard operability here is supplied by the combobox input, which *is* a real control. This tension is resolved here, in writing, so it is not "fixed" later into a violation.
+- ⚠️ **The palette's live region must live INSIDE the dialog.** `inert` removes the background from the accessibility tree, so *every* `aria-live` region outside an open modal stops announcing and nothing replays on close (§4.5's I10a amendment). The result count is announced by a `role="status"` inside the panel. The palette must **not** become a second `data-mds-inert-exempt` surface; that exemption belongs to the toast host alone.
+- Initial focus goes to the input via `MdsModal`'s `initialFocus` prop. Without it focus lands on **Close** — `focusable()` walks the panel in DOM order and the header precedes the body — which is the §4.5 designated-initial-focus target finally being built rather than a palette-specific workaround.
+- The chord path moves focus to the trigger **before** opening, so the modal captures a focusable opener rather than `<body>`, whose `.focus()` is a silent no-op. Otherwise closing a keyboard-opened palette strands focus — the outcome §4.5 forbids.
+
+**Results shape — the palette and the results page deliberately differ.** The palette **groups by entity**, caps each group at 5, appends a synthetic *"See all N results"* option so `Enter` always means "activate the highlighted option", and never paginates. The `/search` page **ranks flat across entities** and paginates, because relevance *across* types is the point of a global search and "page 2 of a grouped list" is incoherent. Both are right for their surface; the asymmetry is intentional.
+
+**Auto-highlight consequence, recorded rather than left to be discovered:** the first option is highlighted whenever a non-empty list arrives, which keeps `aria-activedescendant` valid and makes `Enter` useful. A screen-reader user therefore hears the first result on each debounce tick. That is the documented behaviour of `aria-autocomplete="list"` with auto-highlight, and it is the price of `Enter` doing something.
+
+**Disclosure rule (binding on every search surface).** Zero-result copy is **byte-identical** whether nothing matched or everything that matched is invisible to this user — one string, one code path, no branch that could produce a different message. Never `illustration="lock"` on a zero-result search: a padlock *is* the disclosure, since it says something is there. Counts are computed after permission filtering, and a section the user may not search is **absent**, never rendered as "0".
+
+**Consolidation trigger.** The combobox is hand-rolled in the app tree because the increment that owns the ~15 missing primitives (`MdsCombobox`, `MdsTabs`, `MdsMenu`, an input-adornment wrapper) runs *after* this one, and generalising a palette — whose options are navigation targets, which writes no value back, and which has no persisting selection — would produce the wrong primitive. **When `MdsCombobox` is built, the command palette is its first refactor target.** Logged in `exceptions-log.md`.
 
 **Sidebar nav**: primary section links (Forms, Submissions, Dashboard, Settings), each with an icon + label. States: default, hover (`--mds-neutral-100` background), active/current-section (`--mds-primary-50` background + `--mds-primary-700` text + a left-edge `--mds-primary-600` accent bar — again, never color alone: the accent bar and bold weight are the non-color signifiers), and a collapsed (icon-only, tooltip-on-hover/focus) state used at the tablet breakpoint (§6).
 

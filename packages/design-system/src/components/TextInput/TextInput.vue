@@ -3,12 +3,43 @@
  * The shared single-line text input. Consumes semantic tokens only; pairs with FormField
  * (which supplies :id / :describedby / :invalid). Error styling is a border change that ALWAYS
  * accompanies FormField's icon + text — never color alone (WCAG 1.4.1).
+ *
+ * ── `type="search"` (Increment J1a, DSR §3.2) ────────────────────────────────────────────────────
+ * Added for global search's nav field and the list-page keyword filters. It is a pure widening: the
+ * default is still `'text'` and no existing call site passes it, so no rendered input changes.
+ *
+ * TWO CONSEQUENCES, both easy to trip over later:
+ *
+ *   1. ⚠️ THE IMPLICIT ROLE BECOMES `searchbox`, NOT `textbox`. Any Playwright or Vitest locator for
+ *      one of these must be `getByRole('searchbox')`. A `getByRole('textbox')` finds nothing and the
+ *      failure reads as "the input is missing", which points at the wrong file.
+ *
+ *   2. ⚠️ `::-webkit-search-cancel-button` IS DELIBERATELY NOT SUPPRESSED. It is a genuine affordance
+ *      — the one-tap "clear the query" every mobile user already knows — and removing it without
+ *      building a replacement is a net loss. It does NOT violate WCAG 2.5.8 (Target Size, Minimum)
+ *      despite being ~14px: SC 2.5.8's User-Agent Control exception applies verbatim ("the size of the
+ *      target is determined by the user agent and is not modified by the author"). Do not "fix" this.
+ *
+ * No `appearance` reset is applied either. The box model here is fully authored (border, padding,
+ * border-radius, min-height), which is what modern engines honour on a search field; adding
+ * `appearance: none` is the change that would kill the cancel button in WebKit, i.e. the opposite of
+ * what point 2 wants. Playwright runs Desktop Chrome at all three viewports, so Safari's rendering of
+ * this type is genuinely unverified here — noted rather than guessed at.
  */
 withDefaults(
     defineProps<{
         modelValue?: string;
         id?: string;
-        type?: 'text' | 'email' | 'password' | 'tel' | 'url' | 'date' | 'time' | 'datetime-local';
+        type?:
+            | 'text'
+            | 'email'
+            | 'password'
+            | 'tel'
+            | 'url'
+            | 'date'
+            | 'time'
+            | 'datetime-local'
+            | 'search';
         name?: string;
         autocomplete?: string;
         placeholder?: string;

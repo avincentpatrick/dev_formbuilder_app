@@ -19,6 +19,18 @@ export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';
 export { default as MdsModal } from './components/Modal/Modal.vue';
+/**
+ * How many blocking dialogs currently own the page (Increment J1a).
+ *
+ * Promoted from `inert-stack.ts`'s test seam to the public surface because the app genuinely needs the
+ * predicate: J1d's ⌘K palette must REFUSE to open over an existing modal. `inert-stack` would happily
+ * stack it -- and `popModalRoot`'s contract then correctly declines to return focus to a dialog that is
+ * no longer topmost, so the user lands on a page with an unfinished blocking task behind a palette.
+ *
+ * The package exposes exactly one entry point ("." -> ./src/index.ts in package.json), so a deep import
+ * is not available to consumers; this re-export is the only way to reach it.
+ */
+export { openModalCount } from './components/Modal/inert-stack';
 export { default as MdsToast } from './components/Toast/Toast.vue';
 export { default as MdsToastHost } from './components/Toast/ToastHost.vue';
 export { default as MdsDataTable } from './components/DataTable/DataTable.vue';

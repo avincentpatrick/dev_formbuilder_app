@@ -171,7 +171,12 @@ export function popModalRoot(root: HTMLElement): void {
     syncScrollLock();
 }
 
-/** Test seam — the depth is otherwise only observable through its side effects. */
+/**
+ * How many blocking dialogs currently own the page. Public since J1a (re-exported from the package
+ * index): a consumer that opens a dialog from a GLOBAL affordance — a keyboard chord, a toast action —
+ * has no other way to know it would be stacking onto an unfinished one. Also the test seam, since the
+ * depth is otherwise observable only through its side effects.
+ */
 export function openModalCount(): number {
     return stack.length;
 }

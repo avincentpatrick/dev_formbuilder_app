@@ -40,10 +40,34 @@ export const DateType: Story = {
         template: '<TextInput v-bind="args" aria-label="Visit date" />',
     }),
 };
+/**
+ * Increment J1a — the keyword-filter and global-search field. Rendered with a value, because the UA's
+ * clear affordance (`::-webkit-search-cancel-button`) only exists while the field is non-empty, and it is
+ * deliberately not suppressed: axe scanning the EMPTY state would never see it at all.
+ *
+ * ⚠️ This story's input is `role="searchbox"`, not `textbox` — see TextInput.vue's docblock.
+ */
+export const Search: Story = {
+    args: { type: 'search', modelValue: 'clinic intake' },
+    render: (args) => ({
+        components: { TextInput },
+        setup: () => ({ args }),
+        template: '<TextInput v-bind="args" aria-label="Search submissions" />',
+    }),
+};
 export const Invalid: Story = { args: { invalid: true, modelValue: 'not-an-email' } };
 export const Disabled: Story = { args: { disabled: true, modelValue: 'locked@example.org' } };
 export const Dark: Story = { args: { modelValue: 'jordan@example.org' }, decorators: [dark] };
 export const InvalidDark: Story = {
     args: { invalid: true, modelValue: 'not-an-email' },
     decorators: [dark],
+};
+export const SearchDark: Story = {
+    args: { type: 'search', modelValue: 'clinic intake' },
+    decorators: [dark],
+    render: (args) => ({
+        components: { TextInput },
+        setup: () => ({ args }),
+        template: '<TextInput v-bind="args" aria-label="Search submissions" />',
+    }),
 };

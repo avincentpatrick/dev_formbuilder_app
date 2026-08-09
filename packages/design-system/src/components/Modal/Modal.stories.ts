@@ -1,6 +1,7 @@
 import type { Meta, StoryObj, Decorator } from '@storybook/vue3';
 import Modal from './Modal.vue';
 import Button from '../Button/Button.vue';
+import TextInput from '../TextInput/TextInput.vue';
 
 const dark: Decorator = (story) => {
     document.documentElement.setAttribute('data-theme-mode', 'dark');
@@ -59,6 +60,60 @@ export const ConfirmDark: Story = { decorators: [dark] };
  * additional open modal stacks on the last — one dialog live, the rest and the surrounding prose inert. The
  * two `Confirm` stories already overlap that way; this one does not make it worse.
  */
+/**
+ * Increment J1a — a dialog whose point is an input, focused on open via `initialFocus`.
+ *
+ * ⚠️ WHAT THIS PROVES IS THE MARKUP, NOT THE FOCUS. axe cannot assert where focus landed, and the runner
+ * visits the story without pressing anything, so a broken `initialFocus` renders identically and the story
+ * stays green. The behaviour — including the fallback when the selector matches nothing, and byte-identical
+ * behaviour when the prop is absent — is pinned in `Modal.test.ts`, where the mutations redden.
+ *
+ * What it DOES earn: the search field inside a dialog goes through the merge-blocking axe scan in both
+ * themes, which is the composition J1d's command palette ships and the one place a contrast pairing between
+ * `--mds-color-input-bg` and the dialog's surface would be caught.
+ *
+ * `!autodocs` for the reason the file already records: every story here renders `open: true`, so each extra
+ * one stacks on the docs page.
+ */
+export const InitialFocus: Story = {
+    tags: ['!autodocs'],
+    args: { title: 'Search', initialFocus: '[data-mds-initial-focus]' },
+    render: (args) => ({
+        components: { Modal, TextInput },
+        setup: () => ({ args }),
+        template: `
+            <Modal v-bind="args">
+                <TextInput
+                    data-mds-initial-focus
+                    type="search"
+                    aria-label="Search forms, submissions, members and settings"
+                    placeholder="Search…"
+                />
+            </Modal>
+        `,
+    }),
+};
+
+export const InitialFocusDark: Story = {
+    tags: ['!autodocs'],
+    args: { title: 'Search', initialFocus: '[data-mds-initial-focus]' },
+    decorators: [dark],
+    render: (args) => ({
+        components: { Modal, TextInput },
+        setup: () => ({ args }),
+        template: `
+            <Modal v-bind="args">
+                <TextInput
+                    data-mds-initial-focus
+                    type="search"
+                    aria-label="Search forms, submissions, members and settings"
+                    placeholder="Search…"
+                />
+            </Modal>
+        `,
+    }),
+};
+
 export const WithBackgroundContent: Story = {
     tags: ['!autodocs'],
     render: (args) => ({

@@ -10,6 +10,7 @@ import { usePage } from '@inertiajs/vue3';
 import { MdsToastHost } from '@meridian/design-system';
 import TopNav from '@/components/shell/TopNav.vue';
 import Sidebar from '@/components/shell/Sidebar.vue';
+import ImpersonationBanner from '@/components/shell/ImpersonationBanner.vue';
 import { useToast } from '@/composables/useToast';
 
 const drawerOpen = ref(false);
@@ -48,6 +49,11 @@ function onKeydown(event: KeyboardEvent): void {
 
 <template>
     <div class="app-shell" @keydown="onKeydown">
+        <!-- I11b — ABOVE the nav, not inside the content region. A support session is a property of the
+             whole window, not of the page being viewed, and a fluid page (the builder) owns its own scroll
+             and would carry the banner out of view on the one screen where forgetting matters most. Renders
+             nothing at all when nobody is impersonating, which is every ordinary request. -->
+        <ImpersonationBanner />
         <TopNav :scrolled="scrolled" @toggle-drawer="drawerOpen = !drawerOpen" />
         <div class="app-shell__body">
             <Sidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />

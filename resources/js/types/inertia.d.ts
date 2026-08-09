@@ -96,7 +96,19 @@ export interface EntitlementSnapshot {
 
 declare module '@inertiajs/core' {
     interface PageProps {
-        auth: { user: AppUser | null; can: AppAbilities };
+        auth: {
+            user: AppUser | null;
+            can: AppAbilities;
+            /**
+             * Increment I11b — non-null only while a platform operator is driving this session.
+             *
+             * ⚠️ CARRIES NO OPERATOR IDENTITY, AND MUST NOT GROW ONE. `AuditLogPresenter::actingAsLabel()`
+             * returns the fixed string "Platform operator" as a POLICY (I11a's review found the real name
+             * reaching a tenant page whenever the operator also held a membership). This prop renders on
+             * every request in the application, which makes it the widest possible place to undo that.
+             */
+            impersonating: { exit_url: string } | null;
+        };
         ui: {
             theme: UiTheme;
             /** The tenant's active brand ramp (H23a3), or null. Theme => role => #RRGGBB. */

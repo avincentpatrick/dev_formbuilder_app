@@ -58,10 +58,16 @@ final class TenantDetailPresenter
         private readonly SuperAdminService $superAdmin,
         private readonly CustomDomainService $domains,
         private readonly DomainPresenter $domainRows,
+        private readonly ImpersonationService $impersonation,
     ) {}
 
-    /** @return array<string, mixed> */
-    public function show(Tenant $tenant): array
+    /**
+     * @param  string|null  $operatorId  the signed-in super-admin, for the I11b impersonation picker.
+     *                                   Nullable so an unauthenticated render (there is none today) omits
+     *                                   the card rather than offering an unbounded target list.
+     * @return array<string, mixed>
+     */
+    public function show(Tenant $tenant, ?string $operatorId = null): array
     {
         $snapshot = $this->superAdmin->tenantSnapshot($tenant);
         $catalog = $this->planCatalog();
@@ -100,6 +106,21 @@ final class TenantDetailPresenter
                 'rows' => $this->domainList($tenant, $publicHost),
                 'app_host' => TenantUrl::appHost($tenant),
                 'public_host' => $publicHost,
+            ],
+            /*
+             * I11b — the impersonation picker (rbac §9 resolved decision 1).
+             *
+             * ⚠️ THE LIST IS ALREADY FILTERED TO ELIGIBLE TARGETS, so the page renders what it is given
+             * and decides nothing. A console that showed every member and greyed the refused ones would
+             * have to explain WHY, and the honest explanation for the super-admin case is "this person is
+             * platform staff" — a fact this per-tenant roster has no business disclosing.
+             *
+             * An empty array is a real and expected state (a workspace whose only member is the operator,
+             * or one whose members are all staff), and the page says so rather than rendering a dead
+             * control.
+             */
+            'impersonation' => [
+                'targets' => $operatorId === null ? [] : $this->impersonation->eligibleTargets($tenant, $operatorId),
             ],
         ];
     }

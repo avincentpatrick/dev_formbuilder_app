@@ -22,6 +22,10 @@ it('pins the case order, because the DB CHECKs are generated from it', function 
         'export_ready',
         'member_invited',
         'webhook_failed',
+        // I11b — APPENDED, never inserted. The two CHECK-recreate migrations that widen the constraints
+        // are generated from this list, so a case slotted in beside a thematic sibling would rewrite the
+        // vocabulary of every case after it.
+        'impersonation_started',
     ]);
 });
 
@@ -74,6 +78,10 @@ it('names only real roles, and only for the types that address a role', function
         }
     }
 
+    // I11b — Owner only, narrower than member_invited's owner+admin. Pinned because widening it later is
+    // additive but narrowing it after Admins have come to expect the notice is not.
+    expect(NotificationType::ImpersonationStarted->recipientRoles())->toBe(['owner']);
+
     // The four types whose recipient is a specific person the emitting site already knows.
     foreach ([
         NotificationType::SubmissionReturned,
@@ -105,7 +113,11 @@ it('points each type at one destination, shared by the bell and the email', func
         ->and(NotificationType::SubmissionReturned->pathFor($submission))->toBe('submissions/sub-1')
         ->and(NotificationType::ExportReady->pathFor($submission))->toBe('submissions/sub-1')
         ->and(NotificationType::MemberInvited->pathFor([]))->toBe('members')
-        ->and(NotificationType::WebhookFailed->pathFor(['webhook_endpoint_id' => 'wh-1']))->toBe('webhooks/wh-1');
+        ->and(NotificationType::WebhookFailed->pathFor(['webhook_endpoint_id' => 'wh-1']))->toBe('webhooks/wh-1')
+        // I11b — unconditional, and asserted with an EMPTY payload on purpose: this is the only type whose
+        // destination does not depend on an id, so a future "return null when the payload is thin" tidy-up
+        // would silently break the one link §9 requires to work.
+        ->and(NotificationType::ImpersonationStarted->pathFor([]))->toBe('audit-log');
 });
 
 it('returns no path rather than a broken one when the payload lacks its identifier', function (): void {

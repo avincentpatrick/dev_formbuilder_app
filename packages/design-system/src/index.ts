@@ -13,6 +13,8 @@ export { default as MdsEmptyState } from './components/EmptyState/EmptyState.vue
 export { default as MdsSegmentedControl } from './components/SegmentedControl/SegmentedControl.vue';
 export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
 export { default as MdsBadge } from './components/Badge/Badge.vue';
+export { default as MdsBanner } from './components/Banner/Banner.vue';
+export { type BannerTone } from './components/Banner/Banner.vue';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';

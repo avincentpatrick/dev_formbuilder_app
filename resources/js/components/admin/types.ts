@@ -125,10 +125,27 @@ export type TenantDomains = {
     public_host: string;
 };
 
+/**
+ * A member this operator may impersonate (Increment I11b).
+ *
+ * ⚠️ THE SERVER HAS ALREADY APPLIED EVERY ELIGIBILITY RULE — never yourself, never another super-admin,
+ * ACTIVE membership only. There is deliberately no `eligible` flag to re-decide here: a second copy of the
+ * rule on the client is a second copy to drift, and the POST re-checks all three anyway (a membership can
+ * be revoked between this page rendering and the operator clicking).
+ */
+export type ImpersonationTarget = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    is_owner: boolean;
+};
+
 export type TenantDetailPageProps = {
     tenant: TenantIdentity;
     plan: TenantPlan;
     usage: TenantUsage;
     features: FeatureRow[];
     domains: TenantDomains;
+    impersonation: { targets: ImpersonationTarget[] };
 };

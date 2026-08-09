@@ -50,9 +50,15 @@ final class TenantAdminController extends Controller
      * tenant context on the central host, so every valid id would 404. {@see FeedbackConsoleController}
      * states the rule in full; this is the one place in the console that is legitimately exempt from it.
      */
-    public function show(Tenant $tenant): Response
+    public function show(Request $request, Tenant $tenant): Response
     {
-        return Inertia::render('admin/TenantDetail', $this->detail->show($tenant));
+        // The operator's own id reaches the presenter so the I11b picker can exclude them from their own
+        // target list — "never yourself" enforced where the operator can SEE it, not only where the POST
+        // refuses it.
+        return Inertia::render(
+            'admin/TenantDetail',
+            $this->detail->show($tenant, (string) $request->user()?->getAuthIdentifier()),
+        );
     }
 
     public function suspend(Request $request, Tenant $tenant): RedirectResponse

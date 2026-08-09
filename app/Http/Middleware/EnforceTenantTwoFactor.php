@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\SettingKey;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Audit\ImpersonationContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -62,6 +63,26 @@ final class EnforceTenantTwoFactor
         $user = $request->user();
 
         if ($user === null || $user->two_factor_confirmed_at !== null) {
+            return $next($request);
+        }
+
+        // ⚠️ AN IMPERSONATED SESSION IS EXEMPT, AND THIS ONE EXEMPTION IS NOT STRUCTURAL BECAUSE IT CANNOT
+        // BE (I11b). Every other carve-out in this file is a route outside the group; this one depends on
+        // SESSION STATE, not on which URL was asked for, so a route list could not express it.
+        //
+        // Without it the feature is unusable in exactly the workspaces most likely to need support: the
+        // operator lands on /dashboard, this redirects them to the enrollment interstitial, and the only
+        // action available there is to ENROL A SECOND FACTOR ON SOMEBODY ELSE'S ACCOUNT — a credential the
+        // operator would hold and the member would not know existed. Bouncing them is not the safe failure
+        // it looks like.
+        //
+        // The authority being trusted is not the impersonated member's. It is the console stack the grant
+        // came through: `superadmin` + `superadmin.mfa` (the operator's OWN confirmed 2FA, unconditional
+        // rather than per-tenant) + `step-up` (a password confirmation in the last 15 minutes). The policy
+        // this gate enforces — "this workspace requires its MEMBERS to enrol" — has no opinion about
+        // platform staff, who are not members. `ImpersonationContext` is the reader rather than a bare
+        // session key so the guard cannot drift from the writer, and it is uuid-validated on the way in.
+        if (ImpersonationContext::operatorId() !== null) {
             return $next($request);
         }
 

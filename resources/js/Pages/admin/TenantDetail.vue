@@ -38,7 +38,12 @@ import {
     type IconName,
 } from '@meridian/design-system';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import type { ConsoleDomainRow, TenantDetailPageProps, UsageRow } from '@/components/admin/types';
+import type {
+    ConsoleDomainRow,
+    ImpersonationTarget,
+    TenantDetailPageProps,
+    UsageRow,
+} from '@/components/admin/types';
 
 const props = defineProps<TenantDetailPageProps>();
 
@@ -141,6 +146,50 @@ const domainColumns: DataTableColumn[] = [
     { key: 'status', header: 'Status' },
     { key: 'last_checked_at', header: 'Last checked' },
 ];
+
+/* ── Support access (I11b) ───────────────────────────────────────────────────────────────────────────── */
+
+const targetColumns: DataTableColumn[] = [
+    { key: 'name', header: 'Member' },
+    { key: 'email', header: 'Email' },
+    { key: 'role', header: 'Role' },
+    { key: 'actions', header: '' },
+];
+
+const pendingTarget = ref<ImpersonationTarget | null>(null);
+const impersonating = ref(false);
+const impersonationError = ref<string | null>(null);
+
+/**
+ * ⚠️ NO `onSuccess`, AND ITS ABSENCE IS THE POINT. The server answers a 409 `Inertia::location()` pointing
+ * at the TENANT'S OWN HOST, which the Inertia client turns into a full browser navigation — this page is
+ * gone before any success callback could run. Only the failure arm is wired.
+ *
+ * `onError` is reachable and real: eligibility is re-checked server-side at mint, so a member removed
+ * between this page rendering and the click comes back as a validation error on `user_id` rather than a
+ * navigation.
+ */
+function startImpersonation(): void {
+    const target = pendingTarget.value;
+
+    if (!target) return;
+
+    impersonating.value = true;
+    impersonationError.value = null;
+
+    router.post(
+        `/admin/tenants/${props.tenant.id}/impersonate`,
+        { user_id: target.id },
+        {
+            preserveScroll: true,
+            onError: (errors) => {
+                impersonationError.value = errors.user_id ?? 'That member could not be signed in as.';
+                pendingTarget.value = null;
+            },
+            onFinish: () => (impersonating.value = false),
+        },
+    );
+}
 
 function formatDate(iso: string | null): string {
     if (!iso) return '—';
@@ -373,6 +422,83 @@ function formatDay(iso: string | null): string {
                 </template>
             </MdsDataTable>
         </MdsCard>
+
+        <!--
+            I11b — support access (RBAC §9 resolved decision 1).
+
+            Deliberately the LAST card on the page. It is the highest-consequence control in the console —
+            it signs the operator in to a customer's workspace with a real member's authority — and putting
+            it under the read-only cards means an operator has scrolled past what the workspace actually
+            looks like before reaching for it. Most support questions are answered by the four cards above.
+        -->
+        <MdsCard class="admin-td__section">
+            <template #header>
+                <h2 class="admin-td__card-title">Support access</h2>
+            </template>
+
+            <p class="admin-td__note">
+                Signing in as a member records an entry in <strong>this workspace's own audit log</strong>,
+                notifies its owner, and marks everything you do as taken by a platform operator. The session
+                ends automatically after 30 minutes.
+            </p>
+
+            <MdsDataTable
+                :columns="targetColumns"
+                :rows="impersonation.targets"
+                caption="Members you can sign in as"
+                row-key="id"
+            >
+                <template #cell-name="{ row }">
+                    {{ (row as ImpersonationTarget).name }}
+                    <MdsBadge v-if="(row as ImpersonationTarget).is_owner" variant="info" label="Owner" />
+                </template>
+                <template #cell-actions="{ row }">
+                    <MdsButton
+                        variant="secondary"
+                        size="sm"
+                        :disabled="impersonating"
+                        @click="pendingTarget = row as ImpersonationTarget"
+                    >
+                        Sign in as
+                    </MdsButton>
+                </template>
+                <template #empty>
+                    <MdsEmptyState
+                        illustration="default"
+                        headline="No one to sign in as"
+                        description="Support access is limited to active members who are not platform staff, and never to your own account."
+                    />
+                </template>
+            </MdsDataTable>
+
+            <p v-if="impersonationError" class="admin-td__error" role="alert">{{ impersonationError }}</p>
+        </MdsCard>
+
+        <!-- Confirmation is not ceremony here: the click leaves this origin entirely and lands the operator
+             inside somebody else's workspace, so the modal is the last point at which "wrong row" is
+             recoverable. It names the member, which the row already did, and states the two consequences
+             the operator is accountable for. -->
+        <MdsModal
+            :open="pendingTarget !== null"
+            title="Sign in to this workspace?"
+            @close="pendingTarget = null"
+        >
+            <p>
+                You will be signed in to <strong>{{ tenant.name }}</strong> as
+                <strong>{{ pendingTarget?.name }}</strong> with that member's full permissions.
+            </p>
+            <p>
+                The workspace owner is notified, and the access is recorded in the workspace's audit log
+                where its members can see it.
+            </p>
+
+            <template #actions>
+                <MdsButton variant="tertiary" @click="pendingTarget = null">Cancel</MdsButton>
+                <MdsButton variant="primary" :loading="impersonating" @click="startImpersonation">
+                    Sign in as {{ pendingTarget?.name }}
+                </MdsButton>
+            </template>
+        </MdsModal>
 
         <MdsModal
             :open="pendingAction !== null"

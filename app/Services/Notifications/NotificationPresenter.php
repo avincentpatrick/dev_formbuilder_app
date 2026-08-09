@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Notifications;
 
 use App\Enums\NotificationType;
+use App\Models\Audit;
 use App\Models\Notification;
 use App\Models\Submission;
 use App\Models\User;
@@ -220,6 +221,15 @@ final class NotificationPresenter
             NotificationType::MemberInvited => $canSeeMembers,
             NotificationType::WebhookFailed => $hasWebhooks
                 && $this->allows($user, 'view', $endpoints[$this->payloadId($notification, 'webhook_endpoint_id')] ?? null),
+            // I11b — the row links to the tenant's own ledger, so the question is exactly the one
+            // `routes/tenant.php` asks of /audit-log itself. A CLASS check rather than the `allows()`
+            // helper above because there is no target row: this notification points at a page, not at a
+            // record, which is also why `pathFor()` needs no id from the payload.
+            //
+            // In practice the recipient is the Owner and always passes. It is gated anyway because the
+            // recipient ROLE is a decision that can be widened later (the enum's `recipientRoles()` says
+            // so), and a link that 403s is a worse bell row than one that is not a link.
+            NotificationType::ImpersonationStarted => Gate::forUser($user)->allows('viewAny', Audit::class),
         };
     }
 

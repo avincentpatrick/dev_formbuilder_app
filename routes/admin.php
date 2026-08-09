@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\FeedbackConsoleController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\PlatformAuditController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\TenantAdminController;
@@ -59,6 +60,16 @@ Route::domain((string) config('tenancy.central_domain'))
             // Assign (or change) a tenant's plan — admin-assigned, no Cashier (H5a / ADR-0008). The service
             // adopts the affected tenant's context and audits it through the H4 AuditLogger.
             Route::post('/tenants/{tenant}/plan', [TenantAdminController::class, 'assignPlan'])->name('admin.tenants.assign-plan');
+
+            // Start an impersonation (I11b, RBAC §9 resolved decision 1). ⚠️ The TARGET arrives as a raw
+            // uuid in the BODY, never as a second route-model binding: binding resolves on the app
+            // connection, which has no tenant context here, so `usersVisibilitySql()` would 404 every valid
+            // member id. The `{feedback}` routes above make the same choice for the same reason.
+            //
+            // ⚠️ The response is `Inertia::location()` (409), NEVER a redirect. The destination is the
+            // tenant's own host — a different origin — and an Inertia XHR cannot follow a 302 to one.
+            Route::post('/tenants/{tenant}/impersonate', [ImpersonationController::class, 'store'])
+                ->whereUuid('tenant')->name('admin.tenants.impersonate');
 
             // Cross-tenant user list — exercises the `superadmin_bypass` RLS carve-out via SuperAdminService.
             Route::get('/users', [TenantAdminController::class, 'users'])->name('admin.users.index');

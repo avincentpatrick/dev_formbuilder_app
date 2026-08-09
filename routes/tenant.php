@@ -29,6 +29,7 @@ use App\Http\Controllers\Tenant\FormShareController;
 use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
+use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\NotificationController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\Tenant\TenantSettingsController;
 use App\Http\Controllers\Tenant\TwoFactorRequiredController;
 use App\Http\Controllers\Tenant\WebhookController;
 use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\EnforceImpersonationTimeout;
 use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
@@ -101,6 +103,12 @@ Route::middleware([
     // redirects to is registered in its OWN group below, outside this one — see that group's header for
     // why the exemption is structural rather than a path allow-list.
     EnforceTenantTwoFactor::class,
+    // EnforceImpersonationTimeout (I11b) — the 30-minute hard cap. AFTER `auth` (it logs out the user it
+    // finds) and after EstablishTenantDatabaseContext (the closing audit row is tenant-scoped and needs the
+    // RLS GUC), so it is named last for the same reason EnforceTenantTwoFactor is. Deliberately absent from
+    // the ARRIVAL group above: the deadline is written by that request, so a gate reading "no stamp yet"
+    // there would end every session in the act of creating it.
+    EnforceImpersonationTimeout::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
@@ -668,6 +676,16 @@ Route::middleware([
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
     Route::get('/audit-log/export', [AuditLogController::class, 'export'])
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.export');
+
+    /*
+    | End an impersonated session (I11b). Inside the authenticated group, and no `can:` gate — the caller
+    | IS the impersonated member as far as authorization is concerned, and there is no permission that
+    | means "may stop being impersonated". What actually gates it is the session marker: the controller
+    | writes the closing ledger row only when one is present, so a member who POSTs here on an ordinary
+    | session simply gets logged out, which is a thing they could already do.
+    */
+    Route::post('/impersonate/exit', [ImpersonationSessionController::class, 'destroy'])
+        ->name('impersonate.exit');
 });
 
 /*
@@ -694,6 +712,40 @@ Route::middleware([
     AppSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/two-factor/required', TwoFactorRequiredController::class)->name('two-factor.required');
+});
+
+/*
+| Impersonation ARRIVAL (Increment I11b, RBAC §9 resolved decision 1) — the cross-host handoff the console
+| minted. Its own group for the same structural reason the invitation group below has one: it runs the
+| subdomain tenant-context pipeline WITHOUT `auth`.
+|
+| `SESSION_DOMAIN` is null, so the session cookie is HOST-ONLY — a super-admin authenticated on the central
+| console has NO session here, and requiring one would be circular in exactly the way it is for an invitee
+| who is not a member yet. Tenant context IS established, which is what makes the strict-RLS token row
+| visible and what scopes the lookup: a token minted for another workspace does not resolve on this host.
+|
+| ⚠️ THE 2FA EXEMPTION IS NOT DRAWN HERE, and that is the one carve-out in this file that is deliberately
+| NOT structural. `EnforceTenantTwoFactor` is absent from this group because the group has no `auth` — but
+| the operator's NEXT request lands on /dashboard inside the authenticated group above, where the gate does
+| apply. It has to recognise an impersonated session from the SESSION, not from a path, so the exemption
+| lives in that middleware. See its docblock for why bouncing an operator to a member's enrollment page is
+| worse than letting them through.
+|
+| No `throttle` beyond the global web limiter: the token is single-use, 60-second, 256 bits of CSPRNG
+| output looked up by sha256 digest. There is nothing here to guess at a rate that matters, and a limiter
+| keyed on IP would be a denial-of-service surface against the operator rather than a defence.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    // AppSecurityHeaders (I1): frame-ancestors 'none' on the request that mints an authenticated session
+    // for platform staff — precisely the shape of act that must not happen inside somebody's iframe.
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/impersonate/{token}', [ImpersonationSessionController::class, 'show'])
+        ->name('impersonate.consume');
 });
 
 /*

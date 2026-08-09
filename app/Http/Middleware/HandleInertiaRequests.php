@@ -9,6 +9,7 @@ use App\Models\ScopeNode;
 use App\Models\User;
 use App\Services\Branding\TenantBrandingService;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Audit\ImpersonationContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -52,6 +53,24 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                 ] : null,
+                /*
+                 * I11b — is this session being driven by platform staff? Null on every ordinary request,
+                 * which is all but a handful in the deployment's lifetime.
+                 *
+                 * ⚠️ A BOOLEAN AND A URL, NEVER THE OPERATOR'S IDENTITY. The whole of I11a's S2 finding was
+                 * that the operator's real name must not reach a tenant surface — `actingAsLabel()` returns
+                 * the fixed string "Platform operator" unconditionally for that reason, and this prop
+                 * renders on EVERY page in the application, which would make it the widest possible place
+                 * to undo it. The banner needs to say THAT it is happening and offer the way out; it does
+                 * not need to say who.
+                 *
+                 * Shared rather than passed per-page because the banner belongs to the app shell: a page
+                 * that forgot to send it would silently render an impersonated session as a normal one,
+                 * which is the one failure mode this surface cannot have.
+                 */
+                'impersonating' => ImpersonationContext::operatorId() === null ? null : [
+                    'exit_url' => route('impersonate.exit'),
+                ],
                 // Ability gates the shell/pages need (e.g. the Members nav item + its row actions).
                 // Computed FAIL-CLOSED: on tenant routes EstablishTenantDatabaseContext has set the
                 // Spatie permissions team by the time this share() renders (and resets it in

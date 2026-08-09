@@ -339,9 +339,29 @@ it('gives every documented login a working password', function (): void {
 
     // The super-admin must be flagged AND unenrolled: a pre-enrolled account would carry a placeholder TOTP
     // secret no authenticator can reproduce, locking the console instead of saving a step.
+    //
     $admin = $people[DemoSeeder::SUPER_ADMIN_EMAIL];
-    expect($admin->is_super_admin)->toBeTrue()
-        ->and($admin->two_factor_confirmed_at)->toBeNull();
+    expect($admin->two_factor_confirmed_at)->toBeNull();
+
+    // ⚠️ `is_super_admin` IS DELIBERATELY NOT ASSERTED HERE, and the deletion of that assertion is the
+    // point. It used to read `expect($admin->is_super_admin)->toBeTrue()`, which was VACUOUS and is how a
+    // real bug survived: `seededUsers()` hands back the seeder's MEMOIZED model instances, and
+    // `ensureSuperAdmin()` had just `forceFill()`ed the flag onto that very object, so it was true whatever
+    // the database did. It stayed green while the promotion UPDATE was being silently refused by row-level
+    // security and a freshly seeded demo database had no super-admin at all.
+    //
+    // It cannot simply be re-pointed at the database, because under RefreshDatabase there is nothing to
+    // point at: `resolveOrCreateUser()` creates this row on the DEFAULT connection inside the open
+    // transaction, so `pgsql_privileged` is a separate session that cannot see it (verified — the row reads
+    // back null), and the promotion therefore affects zero rows in THIS context and only this one. The real
+    // path is `php artisan db:seed`, which CI's e2e job runs with no wrapping transaction; there the write
+    // is guarded by `ensureSuperAdmin()`'s own zero-row postcondition, which THROWS. That guard, not an
+    // assertion here, is what makes a revert to the app connection loud.
+    //
+    // The tripwire below is what keeps this comment honest: if a future change commits the seeded identity
+    // outside the transaction, this goes red and the real assertion becomes possible — write it then.
+    expect(DB::connection('pgsql_privileged')->table('users')->where('id', $admin->id)->exists())
+        ->toBeFalse('the seeded identity is now visible cross-session — assert is_super_admin from the DB');
 });
 
 it('gives every active member a membership and a role', function (): void {

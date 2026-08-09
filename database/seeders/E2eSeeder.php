@@ -63,6 +63,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -80,6 +81,11 @@ class E2eSeeder extends Seeder
     private const OWNER_EMAIL = 'demo@meridian.test';
 
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
+
+    /** The central-domain console operator (Increment I10e) — see seedSuperAdmin(). */
+    private const SUPER_ADMIN_EMAIL = 'console@meridian.test';
+
+    private const SUPER_ADMIN_PASSWORD = 'meridian-console-2026';
 
     private const PENDING_EMAIL = 'pending@meridian.test';
 
@@ -112,6 +118,10 @@ class E2eSeeder extends Seeder
         if (! $tenant->domains()->where('domain', 'acme')->exists()) {
             $tenant->domains()->create(['domain' => 'acme']);
         }
+
+        // I10e — the central-domain console operator. Before the tenant work below and deliberately outside
+        // it: this writes one central `users` row and touches nothing tenant-scoped.
+        $this->seedSuperAdmin();
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
         $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
@@ -1255,6 +1265,93 @@ class E2eSeeder extends Seeder
     }
 
     /** Resolve an existing identity on the pre-auth connection (users RLS hides non-members), or create it. */
+    /**
+     * The central-domain console operator, for Increment I10e's admin-console accessibility scan.
+     *
+     * ⚠️ THIS FIXTURE ASSERTS SOMETHING UNTRUE ABOUT THE ACCOUNT, AND THAT IS A DELIBERATE, BOUNDED TRADE.
+     * It sets `two_factor_confirmed_at` while leaving `two_factor_secret` NULL — a state no real enrolment
+     * produces. It works because the two gates read different things: {@see EnsureSuperAdminMfa} checks ONLY
+     * `two_factor_confirmed_at`, so the console opens; Fortify's `hasEnabledTwoFactorAuthentication()`
+     * additionally requires a SECRET when `fortify.features.two-factor.confirm` is true (it is), so login
+     * issues no TOTP challenge. The account therefore reaches `/admin/*` in one POST, with no authenticator
+     * app and no TOTP implementation in the test suite.
+     *
+     * Acceptable ONLY because this is an accessibility gate, not a security one: the middleware's real
+     * behaviour — that an unenrolled super-admin is redirected to `admin.mfa.setup` — is covered in Pest by
+     * `SuperAdminConsoleTest`, and nothing here weakens that. If a future increment wants to e2e the
+     * ENROLMENT flow, it needs a genuine TOTP, not this.
+     *
+     * ⚠️ DO NOT reuse `UserFactory::confirmedTwoFactor()`. It writes `encrypt('PLACEHOLDERSECRET')`, which
+     * flips `hasEnabledTwoFactorAuthentication()` to TRUE and makes the account TOTP-challenged at login with
+     * a secret nobody can compute against — a permanent lockout. `DemoSeeder::ensureSuperAdmin()` carries the
+     * same warning for the same reason, and deliberately leaves its own admin UNENROLLED so a human can
+     * complete the real flow. These two seeders want opposite things and both are right.
+     *
+     * Idempotent, and outside the tenant transaction: it writes one central `users` row and no tenant-scoped
+     * rows at all — idempotency comes from {@see self::resolveOrCreateUser()}, the same primitive every other
+     * seeded account uses, plus a `forceFill` that is a no-op on a second run.
+     *
+     * ⚠️ THE PROMOTION MUST RUN ON `pgsql_privileged`, AND THE FIRST VERSION OF THIS METHOD DID NOT.
+     * `$admin->forceFill([...])->save()` on the DEFAULT connection issues `UPDATE users … WHERE id = ?` as
+     * `meridian_app`. `users` carries ENABLE **and FORCE** row-level security ({@see TenantIsolation::enableAndForce()}
+     * applies it even to the table owner, and CI creates the database `OWNER meridian_app`, so the owner
+     * exemption does not save it); the SELECT policy is join-shaped and fails closed with no context, the
+     * permissive carve-out being `TO meridian_auth` only; and PostgreSQL applies SELECT policies to an UPDATE
+     * that reads columns, which `WHERE id = ?` does. This operator has NO tenant membership BY DESIGN, so it
+     * is invisible from every context and the promotion affected ZERO ROWS — silently, with no error, leaving
+     * `is_super_admin` false and the console 404ing behind {@see EnsureSuperAdmin}. Proven, not reasoned:
+     * `tests/Feature/Auth/CentralHostLoginTest.php` reproduces the no-op over the app connection.
+     * `DemoSeeder::ensureSuperAdmin()` had the identical defect and is fixed the same way.
+     *
+     * The same invisibility is why `E2eSeederIdempotencyTest` has no case here: that file asserts through the
+     * DEFAULT connection inside a tenant context, where this row cannot be seen, so a case there could only
+     * assert “did not throw” — the near-vacuous shape this codebase keeps catching in review. The promotion is
+     * covered instead by the connection-level test above, which is where the bug actually lived.
+     */
+    private function seedSuperAdmin(): void
+    {
+        $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Console Operator', self::SUPER_ADMIN_PASSWORD);
+
+        $this->promoteToSuperAdmin((string) $admin->id, $admin->two_factor_confirmed_at ?? now());
+    }
+
+    /**
+     * Promote an operator over `pgsql_privileged`, and REFUSE TO REPORT SUCCESS ON ZERO ROWS.
+     *
+     * A query-builder UPDATE rather than `$model->save()` for one reason: it returns the affected row count,
+     * which is the only observable that distinguishes "promoted" from "silently promoted nothing". Eloquent's
+     * `performUpdate()` discards that number, which is precisely why the original bug could not be seen.
+     *
+     * The postcondition is deliberately conditional on the row being VISIBLE to this connection. Zero rows
+     * means two different things: under `php artisan db:seed` (the real path, and the one CI's e2e job runs)
+     * the row is committed and visible, so zero can only mean the write was refused — a bug, and it throws.
+     * Inside `RefreshDatabase` the row was created on the DEFAULT connection's open transaction and this
+     * separate session genuinely cannot see it, so zero is expected and says nothing. Distinguishing them is
+     * what lets this guard be strict where it matters without breaking `DatabaseSeederSmokeTest`.
+     *
+     * This also covers a hazard the fix itself relies on: `config/database.php` defaults
+     * `DB_PRIVILEGED_USERNAME` to a superuser, but on a managed Postgres where that role is merely the table
+     * OWNER, `FORCE ROW LEVEL SECURITY` still applies and this write would regress to zero rows. Same class
+     * of failure `OcrCompatibilityBackfill::assertPrivilegedRole()` already refuses to ship past.
+     */
+    private function promoteToSuperAdmin(string $userId, mixed $confirmedAt): void
+    {
+        $privileged = DB::connection('pgsql_privileged');
+
+        $affected = $privileged->table('users')->where('id', $userId)->update([
+            'is_super_admin' => true,
+            'two_factor_confirmed_at' => $confirmedAt,
+            'two_factor_secret' => null,
+        ]);
+
+        if ($affected === 0 && $privileged->table('users')->where('id', $userId)->exists()) {
+            throw new RuntimeException(
+                "Failed to promote {$userId} to super-admin: the row exists but the UPDATE affected zero rows. "
+                .'The pgsql_privileged role is not bypassing FORCE row-level security on `users`.'
+            );
+        }
+    }
+
     private function resolveOrCreateUser(string $email, string $name, string $password): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();

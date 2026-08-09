@@ -15,7 +15,15 @@ use Illuminate\Support\Facades\Route;
 | The platform-operations console (RBAC §9). Loaded by bootstrap/app.php's withRouting(then:) inside
 | the `web` group. Constrained to the single central host (config, not raw env — survives route:cache)
 | so it is not served on tenant subdomains. Middleware:
-|   - auth        — a logged-in user (session established centrally; SESSION_DOMAIN spans subdomains).
+|   - auth        — a logged-in user, signed in ON THIS HOST. ⚠️ This line used to read "session
+|                   established centrally; SESSION_DOMAIN spans subdomains", which was never true here:
+|                   `SESSION_DOMAIN` is null in both `.env` and `.env.example`, so the session cookie is
+|                   HOST-ONLY and a login on `acme.meridian.test` is simply not sent to `meridian.test`.
+|                   It works because Fortify registers /login with `domain => null`, so an operator signs
+|                   in on the central host itself. `routes/tenant.php` corrected the identical sentence for
+|                   its own group; `docs/adr/0009` lists both files as carrying it. I10e is what forced the
+|                   measurement — the console e2e needs a SECOND browser context and a second storage-state
+|                   file for exactly this reason, and would be unnecessary if the claim were true.
 |   - superadmin  — 404 unless the user's global is_super_admin flag is set (non-disclosure).
 |   - superadmin.mfa — redirect to enrollment unless the super-admin has confirmed 2FA (security §8).
 |   - step-up (I8a)  — PRD Feature #14 names "the super-admin console" as a high-blast-radius surface, so

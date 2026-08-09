@@ -59,10 +59,10 @@ const pages = [
     // viewports × two themes. The E2E demo user is the Owner and E2eSeeder puts acme on Business, so
     // `can_manage` is true and the Modules list renders populated rather than empty.
     //
-    // The PLATFORM half (/admin/settings) is deliberately NOT here: playwright.config.ts's header records
-    // that central-domain admin pages are excluded because `superadmin.mfa` needs a TOTP in CI. Its
-    // primitives are axe-covered by the Storybook job; see docs/feature-backlog.md for the row that owns
-    // closing that gap.
+    // The PLATFORM half (/admin/settings) is not here because it is not a TENANT page — it lives on the
+    // central host, behind a super-admin session this file's storageState is not. It IS scanned now, in
+    // `admin-console-axe.spec.ts` (I10e), which carries its own session; the TOTP the old note blamed
+    // turned out not to be needed at all.
     { name: 'Settings', path: '/settings' },
     // The workspace's own feedback (I7a, PRD Feature #11). `E2eSeeder::seedFeedback()` puts one row in
     // each of the four FeedbackStatus states, which is what makes this scan worth running: the four map
@@ -70,10 +70,8 @@ const pages = [
     // about the other three. The last fixture row also carries a long unbroken URL inside the remarks
     // cell — the 375px overflow trap that has now caught Domains and the Audit log.
     //
-    // The PLATFORM console (/admin/feedback) is deliberately NOT here, on the same footing as
-    // /admin/settings: playwright.config.ts records that central-domain admin pages are excluded because
-    // `superadmin.mfa` needs a TOTP in CI. Its primitives are axe-covered by the Storybook job, and its
-    // behaviour by resources/js/Pages/admin/feedback.test.ts.
+    // The PLATFORM console (/admin/feedback) is on the same footing as /admin/settings: central host,
+    // super-admin session, so it is scanned by `admin-console-axe.spec.ts` (I10e) rather than here.
     { name: 'Feedback', path: '/feedback' },
     // The step-up re-authentication page (I8c, scanning what I8a made load-bearing). It sits behind
     // `auth`, which is why it is HERE and not in auth-axe.spec.ts with the genuinely unauthenticated

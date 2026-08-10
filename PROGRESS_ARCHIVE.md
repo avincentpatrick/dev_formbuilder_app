@@ -943,3 +943,30 @@ the same commit: an explicit role="combobox" overrides type="search"'s implicit 
 locator differs from every other search field's — precisely the failure mode that note exists to prevent.
 
 Gates: Pest 3294/0 (12,781 assertions), Pint 1128, PHPStan 23, controller-gate, vue-tsc.
+
+## 2026-08-10 — J1d merged (#125). Four of five J1 sub-PRs done; J1e mapped but not started
+
+J1d merged 6/6 after one round of review fixes, and the fixes are the point of the entry. CI found a real
+accessibility bug that the unit tests structurally could not: below the 480px breakpoint `#topnav-search`
+is `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured `<body>` and
+closing the palette stranded focus — the outcome DSR §4.5 forbids. Every Vitest case passed and always
+would, because happy-dom has no layout engine and cannot distinguish a hidden element from a visible one.
+The opener is now a list resolved by checkVisibility(), falling back to the compact icon link. Two of the
+gates were also lying: the "fires from inside a text field" case clicked the nav searchbox, which does not
+exist at 375px, and the Escape case asserted only "not BODY", which would pass on any arbitrary focus
+target. Both strengthened. The palette's live region was failing color-contrast intermittently and is now
+visually hidden — §3.4.1 requires it inside the dialog, not visible, and a flaky gate is worse than none.
+
+J1e was mapped with a six-agent fan-out and deliberately NOT started, because the map changed its size:
+three of the six lists (forms, webhooks, members) have no filter parameter, no filter bar and no
+empty_reason at all, so J1e is building filter surfaces from scratch on three pages plus adding `q` to
+three, plus the audit narrowing, plus the LibraryPicker migration. A half-applied pattern across six lists
+cannot merge, and starting it with insufficient room would have left exactly the state Standing Rule 1
+forbids. The whole recon — the per-list table with file:line, the one pattern, four hazards and the two
+non-negotiable security constraints — is written into the J1e block in Current Status so the next session
+starts from the map rather than redrawing it.
+
+Session totals across J1b, J1c and J1d: Pest 3199 -> 3294, Vitest 85 -> 87 files, PHPStan local 74 -> 23,
+and four PRs merged at 6/6 with real steps. Every one of them was caught out by something a green local
+suite could not see — unreachable indexes, a non-existent design token, a cross-tenant connection, and a
+focus target that does not exist at mobile.

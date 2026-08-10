@@ -11,6 +11,7 @@ use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Services\Entitlements\UsageMeter;
 use App\Support\Export\SpreadsheetCell;
+use App\Support\Search\SearchTerms;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +51,7 @@ final class SubmissionExporter
     ) {}
 
     /**
-     * @param  array{status?: ?string, source?: ?string}  $filters
+     * @param  array{status?: ?string, source?: ?string, q?: ?SearchTerms}  $filters
      * @param  'csv'|'xlsx'  $format
      */
     public function stream(Form $form, array $filters, string $format): StreamedResponse
@@ -100,13 +101,17 @@ final class SubmissionExporter
      * The RLS-scoped, filtered submission query for this form. Rebuilt (not cloned) each call so the
      * count/version-pluck pass and the streaming pass are independent statements.
      *
-     * @param  array{status?: ?string, source?: ?string}  $filters
+     * @param  array{status?: ?string, source?: ?string, q?: ?SearchTerms}  $filters
      * @return Builder<Submission>
      */
     private function baseQuery(Form $form, array $filters): Builder
     {
         return Submission::query()
             ->where('form_id', $form->id)
+            // The inbox's own predicate (J1e), so a keyword-filtered view and its Export button agree.
+            // `matchingKeyword` is a no-op on empty terms, so an export launched from anywhere else is
+            // byte-identical to before.
+            ->matchingKeyword($filters['q'] ?? SearchTerms::parse(null))
             ->when($filters['status'] ?? null, fn (Builder $q, string $v): Builder => $q->where('status', $v))
             ->when($filters['source'] ?? null, fn (Builder $q, string $v): Builder => $q->where('source', $v));
     }

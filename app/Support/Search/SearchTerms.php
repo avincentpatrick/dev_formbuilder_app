@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Search;
 
+use App\Services\Search\Arms\SubmissionSearchArm;
+use App\Services\Tenancy\TenantMembershipService;
+
 /**
  * A parsed, sanitised search query (Increment J1b).
  *
@@ -41,8 +44,26 @@ final readonly class SearchTerms
 
     /**
      * The shortest hex run treated as a submission reference. Eight is the first canonical uuid group, which
-     * is both what a support ticket quotes and short enough to type. Below that the `LIKE` would match a
-     * meaningful fraction of any tenant's submissions and stop being a lookup.
+     * is both what a support ticket quotes and short enough to type.
+     *
+     * ⚠️ THE ORIGINAL JUSTIFICATION FOR 8 WAS WRONG, AND THE CORRECTION IS KEPT BECAUSE IT CHANGES WHAT THIS
+     * FEATURE PROMISES. It read: "Below that the `LIKE` would match a meaningful fraction of any tenant's
+     * submissions and stop being a lookup." That is true of a RANDOM uuid and false of a **uuidv7**, which
+     * is what `submissions.id` is: the first 12 hex characters are a 48-bit millisecond timestamp, so the
+     * first EIGHT are its top 32 bits — identical for every row created inside the same ~49-day window.
+     * Measured in J1e, not reasoned: two submissions seeded milliseconds apart share them.
+     *
+     * So an 8-character reference already narrows to a time window rather than to a row. It is not a
+     * disclosure (every caller is bounded by its own visibility scope), it is the lookup not being one.
+     *
+     * **Raising this constant alone would make things worse, which is why J1e did not.** The inbox and the
+     * command palette both DISPLAY `substr($id, 0, 8)`, and {@see SubmissionSearchArm}'s
+     * contract is that what is shown can be pasted back in — a longer minimum would refuse the very string
+     * the product prints. Real randomness in a uuidv7 does not begin until hex position 14, so a selective
+     * prefix means displaying ~16 characters, i.e. a different reference format. That is the "real short
+     * handle" the arm already files for J2, and it is one change, not two.
+     *
+     * A FULL uuid pasted in is an exact lookup and always has been; `ListKeywordFilterTest` pins both halves.
      */
     public const int MIN_UUID_PREFIX = 8;
 
@@ -164,6 +185,50 @@ final readonly class SearchTerms
             static fn (string $token): string => '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $token).'%',
             $this->tokens
         );
+    }
+
+    /**
+     * The IN-PHP twin of {@see KeywordFilter::applyLike()}: every token must appear in at least one of
+     * `$values` — AND across tokens, OR across values (Increment J1e).
+     *
+     * ⚠️ IT LIVES HERE, BESIDE `likePatterns()`, BECAUSE THE TWO MUST NOT DRIFT. The members roster is the
+     * one list in the product whose keyword filter runs in PHP rather than in SQL, and it does so for a
+     * security reason rather than a convenience one — see {@see TenantMembershipService::listMembers()}
+     * and `MemberSearchArm`'s docblock. Two encodings of "what counts as a match" would let the roster and
+     * the search arm disagree about the same two people; one method with two renderings cannot.
+     *
+     * ⚠️ NO ESCAPING IS NEEDED HERE, AND THAT ASYMMETRY IS THE POINT RATHER THAN AN OVERSIGHT. `%` and `_`
+     * are wildcards to `ILIKE` and ordinary characters to `str_contains`, so the `ESCAPE '!'` dance
+     * {@see likePatterns()} documents has no counterpart on this path. A future reader comparing the two
+     * methods should not "fix" the difference.
+     *
+     * Tokens are already lowercased by {@see parse()}; the values are lowered here so the comparison is
+     * case-insensitive in the same way `ILIKE` is. `mb_strtolower`, not `strtolower`: the corpus is
+     * multilingual by construction, which is the reason `parse()` splits on `\p{L}` in the first place.
+     */
+    public function matchesAny(string ...$values): bool
+    {
+        if ($this->tokens === []) {
+            return true;
+        }
+
+        $haystacks = array_map(static fn (string $v): string => mb_strtolower($v), $values);
+
+        foreach ($this->tokens as $token) {
+            $hit = false;
+            foreach ($haystacks as $haystack) {
+                if (str_contains($haystack, $token)) {
+                    $hit = true;
+                    break;
+                }
+            }
+
+            if (! $hit) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function uuidPrefix(): ?string

@@ -515,8 +515,14 @@ it finds **forms** and **submissions**, and nothing else yet. §18 lists what it
    matched as a prefix, so a partial word still finds things (other forms whose description mentions a
    survey come back too, which is correct). Now search `surveys`. **Expect:** nothing at all. Words are
    matched literally, so a plural finds no singular; §18 explains why that trade was taken deliberately.
-9. Search for the **first 8+ characters of a submission's reference** (copy one from `/submissions`).
-   **Expect:** that submission. Fewer than 8 characters deliberately does not do a prefix lookup.
+9. Copy a **full submission reference** from a row on `/submissions` (open the row; the detail page shows
+   the whole id) and search it. **Expect:** that one submission. Fewer than 8 characters deliberately does
+   not do a prefix lookup at all. ⚠️ **An 8-character reference is a time window, not a lookup, and that is
+   measured rather than assumed (J1e).** Submission ids are uuidv7, whose first 8 hex characters are the top
+   32 bits of a millisecond timestamp — so they are *identical* for every submission created in the same
+   ~49-day window, and the demo corpus was seeded in one go. Searching the 8 characters the inbox displays
+   returns most of the tenant's submissions. Nothing is disclosed that the viewer could not already see; the
+   short reference simply is not selective. Making it one means a real short handle, which is filed for J2.
 10. Sign in as `reviewer@demo.test` and search `health`. **Expect:** a Submissions group and **no Forms
     group at all** — not an empty Forms group showing "0". A reviewer holds no forms permission, and the
     feature's rule is that a section you may not search is *absent*, because a "0" would itself tell you
@@ -531,9 +537,73 @@ it finds **forms** and **submissions**, and nothing else yet. §18 lists what it
 14. As `viewer@demo.test`, search `members`. **Expect:** **no Members group and no Members page row.** A
     Viewer cannot reach the roster, so neither the people nor the destination is offered — and again,
     absent rather than shown-and-locked.
-15. As owner, search `invited`. **Expect:** the pending invitation is **not** found. Pending invites are
-    deliberately not searchable (§18); they are still listed on `/members`, where you can see and cancel
-    them.
+15. As owner, search `invited`. **Expect:** the pending invitation is **not** found by GLOBAL search.
+    Pending invites are deliberately not searchable there; they are still listed on `/members`, where you
+    can see and cancel them — and where §17.1's roster filter *does* find them. That asymmetry is deliberate
+    and is explained in step 17.1.7 below.
+
+### 17.1 Searching *inside* a list — the six keyword filters (J1e)
+
+Global search is a destination. These are the boxes on the lists themselves: every row-list page now has a
+**Filters** section with a **Search** field. Press **Enter** (or click away) to run it — it deliberately does
+**not** search as you type, because each of these is a full page load.
+
+**What each box matches, and what it refuses.** The refusals are decisions, not gaps; every one of them is
+something the page *displays* but does not search, which is the case worth knowing about.
+
+| Page | Matches | Deliberately does **not** match |
+|---|---|---|
+| `/forms` | title, description, slug | archived forms — they are hidden from this list, filter or no filter |
+| `/submissions` | reviewer remarks, return reason, the **parent form's title**, a full reference | **answer text** (§18 — the PII rule), respondent name |
+| `/members` | name, email — **including pending invites** | nothing on the page; this box searches everything the roster shows |
+| `/webhooks` | endpoint name, URL | the **Scope** column (which form it listens to) — that wants its own dropdown, not a substring match |
+| `/feedback` | remarks, the page route | the reporter's name |
+| `/audit-log` | the target **form's title**, the **actor's name or email** | ⚠️ **the before/after values** — see step 17.1.8 |
+
+1. `/forms` · owner. Search `health`. **Expect:** only *Community Health Survey 2026*. Search `surve`.
+   **Expect:** *Community Health Survey 2026* **and** *Staff Feedback 2025* — the second matches on its
+   description, and prefix matching is why a partial word works at all.
+2. Still on `/forms`, search `zzzznothing`. **Expect:** *"No matching forms"* with a **Clear search** button.
+   ⚠️ **It must never say "Create your first form".** That is the exact bug this increment fixed: before it,
+   the empty state was unconditional, so the first search that matched nothing would have told a workspace
+   with six forms that it had none — and offered to make one.
+3. Clear the box and press Enter. **Expect:** all five non-archived forms back, newest-updated first. The
+   ordering only switches to relevance while a query is in force.
+4. `/submissions` · owner. Search `patient`. **Expect:** several hundred rows — every submission whose
+   **form** is *Patient Intake*. The count in the paginator drops accordingly. (No demo submission carries
+   reviewer remarks, so the remarks branch has nothing to find in seeded data; add a remark from a
+   submission's review panel and search a word from it to see that branch work.)
+5. Still on `/submissions`, combine the keyword with the **Status** dropdown, e.g. `patient` + *Returned*.
+   **Expect:** the two narrow **together**. A page that showed all returned submissions, or all Patient
+   Intake ones, would mean one filter had replaced the other.
+6. With `patient` in the box, click **Export CSV**. **Expect:** the file contains only what is on screen.
+   The keyword travels with the download deliberately.
+7. `/members` · owner. Search `elena`. **Expect:** *Elena Editor*. Search `invited`. **Expect:** ⚠️ **the
+   pending invitation IS found here**, unlike in global search (step 15). Not an inconsistency: this page
+   has already fetched and rendered that person, so filtering the list it is showing reveals nothing new —
+   whereas global search would have to go and fetch them, and the database policy that makes members
+   visible admits only *active* ones.
+8. `/audit-log` · owner. Search `patient`. **Expect:** the ledger rows whose **target** is the *Patient
+   Intake* form. Now search `olivia`. **Expect:** every row **Olivia Owner** was the actor on — a much
+   larger set. ⚠️ **Now try to find a row by something in its Changes column** — open any row with a
+   redacted field, note a value, and search it. **Expect: nothing.** The keyword never reads the before/after
+   diff, and that is a security rule rather than a limitation: those values are what redaction exists to
+   hide, so a box that matched them would confirm a hidden value to the very person it was hidden from.
+9. With a keyword in force on `/audit-log`, click **Export CSV**. **Expect:** the file matches the screen.
+   *"I exported what I was looking at"* is a compliance guarantee on this page specifically.
+10. `/feedback` · owner. Search `filter`. **Expect:** the *"Could the inbox remember my last filter?"*
+    report. Search `analytics`. **Expect:** the *"Please add a pie chart"* report — matched on its **page**
+    rather than its text.
+11. `/webhooks` · owner. **The demo data seeds no endpoints**, so add one first (any name and an
+    `https://` URL), then search part of its name and part of its URL. **Expect:** it is found by either.
+12. **On every one of the six**, type `foo &` and press Enter. **Expect:** an ordinary page. Then paste a
+    very long paragraph. **Expect:** it searches the first 200 characters and **the box re-renders showing
+    only those 200** — what is on screen always matches what ran. Then type only spaces and press Enter.
+    **Expect:** the unfiltered list, never a validation error.
+13. **On every one of the six**, confirm the search box **stays usable while the page reloads**. Type,
+    press Enter, and keep typing immediately. **Expect:** the caret stays in the box and no characters are
+    lost. (The dropdowns beside it *do* grey out during the reload — that is correct for a dropdown and
+    wrong for a text field.)
 
 ---
 
@@ -554,7 +624,10 @@ expected and is not a defect.
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
 | **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its reference, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |
 | **Typo tolerance and word stemming** | **Not built, deliberately.** Searching "submission" will not find "submissions" except through the prefix match, and a misspelling finds nothing. Words are indexed literally, which is what lets a form titled "The A Team" be found by "the" — English stemming would strip that title to almost nothing and make it unfindable by its own name. Fuzzy matching needs a database extension and is a later decision. |
-| **The ⌘K command palette** | Increment J1d. Search today is the top-bar field and the results page; the keyboard palette is next. |
+| ~~**The ⌘K command palette**~~ | ✅ Built in J1d — press ⌘K (Ctrl+K on Windows) anywhere in the app. |
+| **Searching a list by a column the list shows** | Partially deliberate. Three refusals are named in §17.1's table — the webhooks **Scope** column, the feedback **reporter**, and a submission's **respondent**. Each wants its own dropdown rather than a substring match that would make one box mean several things; none is a data-access limitation. |
+| **A short, quotable submission reference** | Not built. The 8-character id fragment the inbox displays is a uuidv7 timestamp prefix and is not selective (§17 step 9) — a real short handle is filed for J2. A full reference works as an exact lookup today. |
+| **Pagination on the forms list** | Not built. `/forms` loads every non-archived form at once and sorts client-side; the keyword filter narrows that array rather than paging it. Fine at demo scale, and the row to watch if a workspace ever holds hundreds of forms. |
 | **Searching audit rows** | **Not built, deliberately** — not deferred, and not scheduled. A keyword search over an audit diff would read exactly the values redaction exists to remove, and the console-side equivalent was refused for the same reason. |
 | **Finding a pending invitation by search** | **Not built, deliberately.** A person who has been invited but has not accepted is not yet visible to the workspace at the database level — the isolation rule that keeps one workspace's people out of another's search is the same rule that hides them. They are listed on `/members`, which is where you cancel or resend. |
 | **A search index** | There is none, by measurement rather than omission. PostgreSQL will not use a text index on a table protected by row-level security, so one was built, proven unreachable, and removed. Searching is bounded by your workspace instead, which is fast at any realistic size. Recorded in `SearchIndexUsageTest` and the two `2026_08_11_*` migrations. |

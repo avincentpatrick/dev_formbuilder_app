@@ -10,6 +10,9 @@ use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Support\Search\KeywordFilter;
+use App\Support\Search\SearchTerms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -22,10 +25,19 @@ final class FormPresenter
     public function __construct(private readonly ResourceGrantResolver $grants) {}
 
     /**
+     * The rows for the forms list, optionally narrowed by a keyword.
+     *
+     * ⚠️ `$terms` IS OPTIONAL AND MUST STAY OPTIONAL. `FormListScopingTest` calls this with one argument and
+     * passing UNEDITED is J1b's stated proof that extracting `Form::scopeVisibleTo()` moved nothing — a
+     * proof that evaporates the moment the test has to be touched to accommodate a signature change. The
+     * same reasoning made J1c's roster parameter optional.
+     *
      * @return list<array<string, mixed>>
      */
-    public function list(User $user): array
+    public function list(User $user, ?SearchTerms $terms = null): array
     {
+        $terms ??= SearchTerms::parse(null);
+
         $forms = Form::query()
             ->with(['versions' => fn ($q) => $q->orderByDesc('version_number')])
             // Scope to what the viewer can actually author (Increment G10b). Until G10b this returned every
@@ -39,7 +51,28 @@ final class FormPresenter
             // every form in the tenant. The proof this extraction moved nothing is that
             // `FormListScopingTest` passes unedited.
             ->visibleTo($user)
+            // The keyword predicate, in the SAME composition `FormSearchArm::builder()` uses (J1e), so a
+            // `?q=` on this page and the same word in global search cannot return different forms.
+            // `FormListKeywordParityTest` asserts the two row sets are equal rather than trusting that.
+            //
+            // ⚠️ `KeywordFilter::apply()` emits its own closure group, and that is what makes the NEXT line
+            // safe. The archived filter must AND with the keyword, never replace it or re-associate against
+            // one branch of it; the trap is spelling either one as an `orWhere`.
+            ->tap(fn (Builder $q) => KeywordFilter::apply($q, $terms, 'forms.search_vector'))
+            // A DISPLAY filter, not a visibility rule — which is why it lives here and not in the scope, and
+            // why `FormSearchArm` keeps its own copy: a search result must not offer a row this list refuses
+            // to show. An archived form whose title matches `?q` therefore stays hidden, which is pinned.
             ->where('status', '!=', FormStatus::Archived->value)
+            // ⚠️ RANK ONLY UNDER A QUERY, AND THE CONDITION IS THE POINT. `ts_rank` over an empty tsquery
+            // scores every row 0.0, so an unconditional rank would leave the ordering to whatever the
+            // planner did next and silently discard `updated_at` on the ordinary, unfiltered page — the
+            // list's entire information design, changed by a feature nobody was using at the time.
+            // `updated_at` stays behind it as the tiebreaker, which is the shape `FormSearchArm` uses (rank,
+            // then a stable second key).
+            ->when(
+                ! $terms->isEmpty(),
+                fn (Builder $q) => $q->orderByRaw(KeywordFilter::rankSql('forms.search_vector'), [$terms->tsQuery()])
+            )
             ->orderByDesc('updated_at')
             ->get();
 

@@ -970,3 +970,78 @@ Session totals across J1b, J1c and J1d: Pest 3199 -> 3294, Vitest 85 -> 87 files
 and four PRs merged at 6/6 with real steps. Every one of them was caught out by something a green local
 suite could not see — unreachable indexes, a non-existent design token, a cross-tenant connection, and a
 focus target that does not exist at mobile.
+
+## 2026-08-11 — J1e built: `q` on the six row-lists, and the third encoding the recon missed
+
+The last J1 sub-PR. Search stopped being only a destination: every row-list narrows in place. Two new
+design-system components (`MdsFilterBar`, `MdsSearchField`), `q` on all six presenters **and on both
+exports**, `empty_reason` everywhere, `LibraryPicker` migrated onto `MdsTextInput`, 42 new Pest cases,
+15 new Vitest cases, 6 new e2e scans. The user took two decisions up front (Enter/blur rather than a
+debounce, because each of these is a full Inertia render; and normalise the submissions inbox's old-style
+filter bar rather than leave two surfaces).
+
+**The recon mapped six lists and missed a third encoding of the audit filter — the one that would have
+shipped a lie.** `AuditLogController` hands ONE `filters()` array to both `AuditLogPresenter::index()` and
+`AuditExporter::stream()`, and `AuditExporter::baseQuery()` was an independent copy of the same five
+`->when()` clauses, with `recordSelfReferentialExport()` a third site listing them. The page builds the
+download URL from the same `queryParams()` it navigates with, precisely so "I exported what I was looking
+at" is a compliance guarantee — so adding `q` to the presenter alone would have shown three rows on screen
+and streamed four thousand, and no existing test compared the two. Extracted to `AuditFilterQuery` FIRST,
+with `AuditLogPageTest` + `AuditExportTest` passing UNEDITED as the proof it moved nothing. Same defect one
+surface over, also closed: the inbox's Export button now carries `q`.
+
+**A test written to assert one row got two, and corrected a shipped docblock: an 8-character submission
+reference is not a lookup, it is a ~49-day window.** `SearchTerms::MIN_UUID_PREFIX` justified 8 on the
+grounds that anything shorter "would match a meaningful fraction of any tenant's submissions and stop being
+a lookup" — true of a random uuid, false of a **uuidv7**, whose first 12 hex characters are a 48-bit
+millisecond timestamp, so the first eight are its top 32 bits and identical across the window. Confirmed
+directly (`019fec56-91cb…` / `019fec56-91ce…`), not reasoned. **The constant was deliberately NOT raised:**
+the inbox and the palette both DISPLAY `substr($id, 0, 8)` and the arm's contract is that what is shown can
+be pasted back in, so raising it alone would refuse the very string the product prints; real randomness
+starts at hex 14, so a selective prefix means a different reference format — the "real short handle" already
+filed for J2, one change rather than two. A full uuid is an exact lookup and always was.
+
+**The adversarial review found that the clamp echo had no reader.** Every presenter carefully echoes
+`SearchTerms::raw()` so the box shows what actually ran; nothing on the client read it after mount, because
+`selected.q` is seeded once and `preserveState: true` keeps it. A 300-character paste would have sat in the
+box over results computed from 200, re-submitting on every Enter because the two never matched.
+`MdsSearchField` now adopts `applied` when it changes — guarded on "the user has not typed since they hit
+Enter", because this input is deliberately never disabled and overwriting someone mid-word is the worse bug.
+
+**Both security constraints held and are pinned structurally rather than by outcome.** Members filters in
+PHP over `$rows`, after the `pgsql_auth` hop: `MembersRosterFilterTest` listens on that connection and fails
+if the user's text appears in a binding, because an outcome-only test would pass equally against an
+implementation that leaked and filtered the leak out afterwards. Its fixture seeds identities COMMITTED on
+`pgsql_privileged`, and for this file that is load-bearing — `pgsql_auth` is a separate session that cannot
+see `RefreshDatabase`'s uncommitted rows, so a factory-created "belongs to no tenant" row would be invisible
+to a leaking query too and the sharpest assertion would prove nothing. Audit narrows to target + actor
+subqueries; the pinning case seeds a distinctive token into `new_values` and requires it unfindable *while*
+a target-title search still works, so the refusal cannot decay into a dead parameter. Both branches keep
+`@@`/`ILIKE` inside subqueries against `forms`/`users`, so every predicate on `audits` stays leakproof and
+therefore still index-promotable under RLS — J1b's finding applied forward rather than rediscovered.
+
+**Two components went into the package for a coverage reason, not a taxonomy one.** Storybook globs
+`packages/design-system/src/**` only, so an app-tree component gets no story and no `checkA11y` scan at all
+(exceptions-log #9) — and the contract these carry is the one axe structurally never sees: `heading-order`
+fails only when `PageHeader`'s h1 and `MdsEmptyState`'s h3 are adjacent, i.e. only when a list is empty,
+which every seeded e2e scan avoids. `responsive-axe.spec.ts` gains six filtered-to-zero scans that assert
+the empty state actually rendered before scanning it. The keyword input has no `disabled` prop at all.
+
+**J1a's Storybook trap was avoided rather than re-paid:** both new docblocks name elements in prose instead
+of angle brackets, with the reason recorded — the surviving `<button>`/`<select>`/`<label>` literals
+elsewhere in the package prove some tags are safe, which is exactly why "there is one right there" is not
+evidence.
+
+**The submissions inbox's old empty state was already wrong before `q` existed** — it inferred "did you
+filter?" on the client and could not see `countable()`, the server's own display default hiding drafts, so
+an inbox holding nothing but drafts told a reviewer that responses "appear here as forms are filled out".
+Now server-computed, with `countable()` deliberately not counted as a filter.
+
+**TESTING-GUIDE §17.1's per-list table was run as real queries against a freshly seeded demo corpus** rather
+than reasoned about — which is how it was found that the demo seeds no webhook endpoints and no submission
+remarks, so two steps say so instead of promising rows that are not there.
+
+Two new local-gate facts: **the full Pest suite now exhausts the container's 128M PHP limit** and dies with
+a fatal in `routes/tenant.php` partway through, which reads like a route bug and is not (`php -d
+memory_limit=2G vendor/bin/pest`); and **Vitest is 90 files on disk** while full runs reported 79 then 83
+under load — the standing drop, re-confirmed.

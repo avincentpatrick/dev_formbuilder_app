@@ -60,6 +60,22 @@ const themes = ['light', 'dark'] as const;
  * only their dialog call would be a different change with a different risk. Filed to the backlog instead.
  */
 async function scan(page: Page, label: string): Promise<void> {
+    // ⚠️ PARK THE POINTER FIRST — THIS FILE SCANS AFTER EVERY CLICK, WHICH IS WHY IT NEEDS THIS MOST.
+    // `assertClean()` in `support/axe.ts` has done this since it was written, with the reason in its own
+    // words: "a parked cursor over a primary button reads its lighter hover bg and mis-flags its contrast —
+    // a test artifact, not a real violation." This spec never adopted it, and it is the spec that walks
+    // config tabs and section buttons with `.click()` and then scans immediately — so the cursor is left
+    // sitting on whatever it last pressed, and at 375px the toolbar is close enough to the canvas that it
+    // lands under a toolbar button.
+    //
+    // That is not a hypothetical: `.mds-button--secondary` is `background-color: transparent` and its ONLY
+    // opaque state is `:hover`, which fills it with `--mds-color-action-primary-tint`. J1e's CI read exactly
+    // that — `#7da9c4` on `#1d4260`, 4.17 — on `header.builder__toolbar`'s secondary button, at mobile and
+    // dark only, on a branch that touches no token, no `Button.vue` and no `Builder.vue`. This file's
+    // standing reputation for contrast flakes at mobile+dark (the `:159` "known flake", I11a's empty-canvas
+    // case) is very likely the same artifact, unmeasured until now.
+    await page.mouse.move(0, 0);
+
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     );

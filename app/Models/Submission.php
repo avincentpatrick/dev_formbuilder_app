@@ -12,6 +12,8 @@ use App\Models\Concerns\TenantScoped;
 use App\Policies\SubmissionPolicy;
 use App\Services\Analytics\AnswerValueAggregator;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Search\SearchService;
+use App\Support\Search\SearchTerms;
 use Database\Factories\SubmissionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -266,6 +268,75 @@ class Submission extends Model implements TenantScoped
             $scoped
                 ->whereIn('form_id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user))
                 ->orWhere('respondent_user_id', $user->getKey());
+        });
+    }
+
+    /**
+     * THE keyword predicate for a submission (Increment J1e) — reviewer remarks and returned reason (through
+     * the generated `search_vector`), the parent form's title, or a reference prefix.
+     *
+     * ⚠️ IT IS A SCOPE, AND IT IS SHARED, AND BOTH HALVES ARE THE POINT. It was `SubmissionSearchArm`'s
+     * private builder until J1e gave the INBOX a keyword box; leaving it there would have meant two
+     * encodings of "what does searching a submission mean", which is how a search result and the list it
+     * links into start disagreeing. Being a scope rather than a static helper is what earns the
+     * {@see Builder::callScope()} wrapping that {@see scopeVisibleTo()}'s docblock explains at length —
+     * composing an OR onto a builder that already carries one is precisely the hazard here, since the inbox
+     * stacks status/form/source filters on top.
+     *
+     * ⚠️ ANSWER TEXT IS NOT MATCHED — a user decision taken 2026-08-09, with the four supporting arguments in
+     * `2026_08_11_000002_add_search_vector_to_submissions.php`. The short version: GDPR erasure has no writer
+     * yet (`submissions.pii_erased_at` has zero writers), so a second store of answer text is one nothing can
+     * scrub. Do not widen this scope without reading them.
+     *
+     * A NO-OP on empty terms, so the inbox can `->matchingKeyword($terms)` unconditionally on a bare visit.
+     * The arms never reach it empty ({@see SearchService::results()} short-circuits), so
+     * this costs the search path nothing.
+     *
+     * ⚠️ NO `ts_rank` ORDERING GOES WITH THIS. Most matches come from the form-title or reference branches,
+     * which contribute NOTHING to `submissions.search_vector` — ranking on that vector would sort the
+     * majority of results by a score of zero and produce an order that looks meaningful and is not. Both
+     * callers order by `id DESC` (uuidv7 → recency), which is what the inbox has always shown.
+     *
+     * @param  Builder<Submission>  $query
+     * @return Builder<Submission>
+     */
+    public function scopeMatchingKeyword(Builder $query, SearchTerms $terms): Builder
+    {
+        if ($terms->isEmpty()) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $match) use ($terms): void {
+            $match->whereRaw(
+                "submissions.search_vector @@ to_tsquery('simple', ?)",
+                [$terms->tsQuery()]
+            );
+
+            // Scoped to the tenant only, NOT to `Form::scopeVisibleTo()`, and that is deliberate: a Reviewer
+            // holds no `forms.*` key, so form visibility would be empty for them — and the form title is the
+            // only label the inbox has ever shown them for their own submissions. Applying it would make a
+            // reviewer's own work unfindable by the one word they know it by. The submission rows are still
+            // bounded by `visibleTo`; the title only decides which of the rows they can ALREADY see match.
+            $match->orWhereIn('submissions.form_id', function ($sub) use ($terms): void {
+                $sub->select('id')
+                    ->from('forms')
+                    ->whereRaw("forms.search_vector @@ to_tsquery('simple', ?)", [$terms->tsQuery()]);
+            });
+
+            $prefix = $terms->uuidPrefix();
+            if ($prefix !== null) {
+                // A scan, and bounded to stay one by RLS plus the caller's visibility scope. Deliberately
+                // NOT indexed — `submissions` has no reference column, and the right fix is a real short
+                // handle (filed for J2), not an index on a cast.
+                //
+                // ⚠️ AN EIGHT-CHARACTER PREFIX IS NOT A UNIQUE LOOKUP, and an earlier version of this
+                // comment claimed a collision was "vanishingly unlikely". Under uuidv7 it is CERTAIN: those
+                // characters are the top 32 bits of a millisecond timestamp and are shared by every row
+                // created in the same ~49-day window. See {@see SearchTerms::MIN_UUID_PREFIX} for the
+                // measurement and for why raising the constant alone would make it worse. A full uuid is
+                // still an exact match, which is the case a support ticket can actually rely on.
+                $match->orWhereRaw('submissions.id::text LIKE ?', [$prefix.'%']);
+            }
         });
     }
 }

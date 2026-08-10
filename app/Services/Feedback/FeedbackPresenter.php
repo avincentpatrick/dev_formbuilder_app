@@ -7,6 +7,10 @@ namespace App\Services\Feedback;
 use App\Enums\FeedbackStatus;
 use App\Models\FeedbackReport;
 use App\Services\Audit\AuditLogPresenter;
+use App\Support\Search\KeywordFilter;
+use App\Support\Search\ListEmptyReason;
+use App\Support\Search\SearchTerms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -33,13 +37,29 @@ final class FeedbackPresenter
     /**
      * One page of this tenant's feedback.
      *
-     * @param  array{status?: ?string}  $filters
+     * ⚠️ `q` MATCHES `remarks` AND `route`, NOT THE REPORTER'S NAME. The two matched columns are this
+     * page's whole content — what was said and where — and both are rendered in the table. The reporter is
+     * a `users` relation, so matching it means a subquery for one column, and the page already offers no
+     * reporter filter to pair it with; adding one is a better answer than making the keyword box quietly
+     * mean three things. Recorded in TESTING-GUIDE §17's per-list table as a decision, not an omission.
+     *
+     * `applyLike` rather than a tsvector: `feedback_reports` has no generated column, `remarks` is free
+     * prose a tenant reads in dozens rather than thousands, and J1b measured that an index on `~~*` would
+     * be unreachable under RLS regardless.
+     *
+     * @param  array{status?: ?string, q?: ?SearchTerms}  $filters
      * @return array<string, mixed>
      */
     public function index(array $filters): array
     {
+        $terms = $filters['q'] ?? SearchTerms::parse(null);
+
         $paginator = FeedbackReport::query()
             ->with(['user:id,name', 'resolver:id,name'])
+            ->tap(fn (Builder $q) => KeywordFilter::applyLike($q, $terms, [
+                'feedback_reports.remarks',
+                'feedback_reports.route',
+            ]))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->orderByDesc('submitted_at')
             ->paginate(self::PER_PAGE)
@@ -72,15 +92,19 @@ final class FeedbackPresenter
             ],
             'filters' => [
                 'statuses' => FeedbackStatus::options(),
-                'applied' => ['status' => $filters['status'] ?? null],
+                'applied' => [
+                    'status' => $filters['status'] ?? null,
+                    // The CLAMPED string, so the box re-renders what actually ran (J1e).
+                    'q' => $terms->raw(),
+                ],
             ],
             // Server-computed, one prop, one meaning — the I2 rule. "Filtered to zero" inferred on the
-            // client breaks the moment the server defaults or clamps anything.
-            'empty_reason' => match (true) {
-                $items->isNotEmpty() => null,
-                ($filters['status'] ?? null) !== null => 'no_matches',
-                default => 'no_rows',
-            },
+            // client breaks the moment the server defaults or clamps anything. Shared with the other five
+            // lists since J1e so the two strings cannot be misspelled apart.
+            'empty_reason' => ListEmptyReason::for(
+                $items->isNotEmpty(),
+                ($filters['status'] ?? null) !== null || ! $terms->isEmpty(),
+            ),
         ];
     }
 }

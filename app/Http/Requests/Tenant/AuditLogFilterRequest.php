@@ -7,6 +7,7 @@ namespace App\Http\Requests\Tenant;
 use App\Enums\AuditEvent;
 use App\Http\Controllers\Api\V1\AuditApiController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
+use App\Support\Search\SearchTerms;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -49,6 +50,14 @@ final class AuditLogFilterRequest extends FormRequest
             'from' => ['sometimes', 'date_format:Y-m-d'],
             'to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:from'],
             'format' => ['sometimes', Rule::in(['csv', 'xlsx'])],
+            // ⚠️ `nullable` AND NO `max:`, BOTH LOAD-BEARING, BOTH COPIED FROM {@see SearchRequest::rules()}
+            // RATHER THAN REASONED ABOUT AGAIN. `TrimStrings` + `ConvertEmptyStringsToNull` run BEFORE
+            // validation, so `?q=%20%20%20` arrives as a PRESENT key with a null value — `sometimes` does
+            // not skip it and `string` fails it, which 422s every whitespace-only search including one a
+            // user produces by clearing the box and pressing Enter. And a length cap would turn a long
+            // paste into a 422, i.e. into this class's own "redirects back to nowhere" failure; every bound
+            // in this feature lives in {@see SearchTerms::parse()}, where it degrades instead of refusing.
+            'q' => ['sometimes', 'nullable', 'string'],
         ];
     }
 
@@ -65,7 +74,12 @@ final class AuditLogFilterRequest extends FormRequest
      * inputs repopulate from what the SERVER applied — a control that disagrees with the filter in force
      * is the page reporting one thing and doing another.
      *
-     * @return array{auditable_type: ?string, event: ?string, user_id: ?string, from: ?CarbonImmutable, to: ?CarbonImmutable, from_raw: ?string, to_raw: ?string}
+     * `q` arrives PARSED, as a {@see SearchTerms}, rather than as a string for each consumer to sanitise.
+     * That is the same "shared by the page and the export so the two cannot diverge" argument one level
+     * deeper: the parse is where the clamping, the tokenising and the `to_tsquery` safety live, and a raw
+     * string here would be an invitation for one of the two callers to do its own.
+     *
+     * @return array{auditable_type: ?string, event: ?string, user_id: ?string, from: ?CarbonImmutable, to: ?CarbonImmutable, from_raw: ?string, to_raw: ?string, q: SearchTerms}
      */
     public function filters(): array
     {
@@ -80,6 +94,7 @@ final class AuditLogFilterRequest extends FormRequest
             'to' => $to === null ? null : CarbonImmutable::parse($to)->endOfDay(),
             'from_raw' => $from,
             'to_raw' => $to,
+            'q' => SearchTerms::parse($this->stringOrNull('q')),
         ];
     }
 

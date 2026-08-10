@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Search\ListEmptyReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,6 +23,7 @@ use Inertia\Response;
  */
 final class MemberController extends Controller
 {
+    use ReadsKeywordFilter;
     use ResolvesTenant;
 
     /** Roles an Admin may assign (Owner is established only via ownership transfer, §5). */
@@ -33,11 +36,24 @@ final class MemberController extends Controller
 
     public function __construct(private readonly TenantMembershipService $memberships) {}
 
-    public function index(): Response
+    /**
+     * The roster, optionally narrowed by a keyword (J1e).
+     *
+     * ⚠️ THE FILTER IS APPLIED IN PHP INSIDE {@see TenantMembershipService::listMembers()}, NOT IN A QUERY,
+     * and that method's ⚠️ block is the required reading before touching this call. The short version: the
+     * identities come off `pgsql_auth`, where there is no tenant boundary of any kind, and a user-supplied
+     * predicate on that connection is a measured cross-tenant leak.
+     */
+    public function index(Request $request): Response
     {
+        $terms = $this->keyword($request);
+        $members = $this->memberships->listMembers($this->currentTenant(), $terms);
+
         return Inertia::render('members/Index', [
-            'members' => $this->memberships->listMembers($this->currentTenant()),
+            'members' => $members,
             'assignableRoles' => self::ASSIGNABLE_ROLES,
+            'filters' => ['applied' => ['q' => $terms->raw()]],
+            'empty_reason' => ListEmptyReason::for($members !== [], ! $terms->isEmpty()),
         ]);
     }
 

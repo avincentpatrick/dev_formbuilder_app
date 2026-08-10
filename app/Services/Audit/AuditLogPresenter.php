@@ -12,7 +12,10 @@ use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Webhooks\WebhookEndpointPresenter;
 use App\Support\Audit\AuditableTypes;
 use App\Support\Audit\AuditDiff;
+use App\Support\Audit\AuditFilterQuery;
 use App\Support\Audit\AuditLogger;
+use App\Support\Search\ListEmptyReason;
+use App\Support\Search\SearchTerms;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -44,23 +47,25 @@ final class AuditLogPresenter
     /**
      * One page of the tenant's ledger, plus the filter catalogs and the export capability.
      *
-     * @param  array{auditable_type?: ?string, event?: ?string, user_id?: ?string, from?: ?CarbonInterface, to?: ?CarbonInterface, from_raw?: ?string, to_raw?: ?string}  $filters
+     * @param  array{auditable_type?: ?string, event?: ?string, user_id?: ?string, from?: ?CarbonInterface, to?: ?CarbonInterface, from_raw?: ?string, to_raw?: ?string, q?: ?SearchTerms}  $filters
      * @return array<string, mixed>
      */
     public function index(User $user, array $filters): array
     {
-        $paginator = Audit::query()
+        $query = Audit::query()
             // ⚠️ `actingAsUser` is deliberately NOT eager-loaded, and adding it would be a defect rather
             // than an optimisation: `actingAsLabel()` renders a fixed string and never reads the operator's
             // name, precisely so the tenant cannot learn it. Loading the relation would put that name in
             // memory on this page for no reader, and would invite the next person to "use what's already
             // there" — which is exactly how the first draft leaked it.
-            ->with('user:id,name')
-            ->when($filters['auditable_type'] ?? null, fn ($q, $v) => $q->where('auditable_type', $v))
-            ->when($filters['event'] ?? null, fn ($q, $v) => $q->where('event', $v))
-            ->when($filters['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))
-            ->when($filters['from'] ?? null, fn ($q, $v) => $q->where('created_at', '>=', $v))
-            ->when($filters['to'] ?? null, fn ($q, $v) => $q->where('created_at', '<=', $v))
+            ->with('user:id,name');
+
+        // ⚠️ THE FILTER CHAIN IS SHARED WITH THE EXPORT (J1e) — see {@see AuditFilterQuery}, which also
+        // holds the reason `q` narrows to target and actor and is NEVER a text search over the redacted
+        // jsonb diff. Until J1e this page and `AuditExporter::baseQuery()` each spelled the clauses out,
+        // while the page built the export's URL from its own filter params: one chain is what makes
+        // "I exported what I was looking at" true rather than merely intended.
+        $paginator = AuditFilterQuery::apply($query, $filters)
             ->orderByDesc('id') // uuidv7 → recency on audits_tenant_recent_idx (tenant_id, id)
             ->paginate(self::PER_PAGE)
             ->withQueryString();
@@ -110,16 +115,17 @@ final class AuditLogPresenter
                     // reporting one thing and doing another.
                     'from' => $filters['from_raw'] ?? null,
                     'to' => $filters['to_raw'] ?? null,
+                    // Same rule, one layer down: `SearchTerms::raw()` is the CLAMPED, trimmed string the
+                    // server actually acted on, so a 300-character paste re-renders as the 200 characters
+                    // that ran. Echoing back the untouched input would put a box on screen disagreeing with
+                    // the result set beneath it.
+                    'q' => ($filters['q'] ?? null)?->raw(),
                 ],
             ],
             // Server-computed, one prop, one meaning. Inferring "filtered to zero" on the client from
             // `data.length === 0 && someFilterSet` breaks the moment the server defaults or clamps
             // anything — it would tell an owner holding 5,000 rows that nothing was ever recorded.
-            'empty_reason' => match (true) {
-                $items->isNotEmpty() => null,
-                $this->hasAnyFilter($filters) => 'no_matches',
-                default => 'no_rows',
-            },
+            'empty_reason' => ListEmptyReason::for($items->isNotEmpty(), AuditFilterQuery::hasAnyFilter($filters)),
             // Always true on a page you can reach, and the key exists anyway: it is the seam a future
             // split between reading and exporting the ledger would need. No separate `audit_log.export`
             // permission was coined, because the audience would be identical — `audit_log.view` is already
@@ -278,17 +284,5 @@ final class AuditLogPresenter
         }
 
         return $options;
-    }
-
-    /** @param  array<string, mixed>  $filters */
-    private function hasAnyFilter(array $filters): bool
-    {
-        foreach (['auditable_type', 'event', 'user_id', 'from', 'to'] as $key) {
-            if (($filters[$key] ?? null) !== null) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

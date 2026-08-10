@@ -19,6 +19,7 @@ use App\Services\Admin\SuperAdminService;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use App\Support\Branding\BrandPalette;
+use App\Support\Search\SearchTerms;
 use App\Support\Tenancy\TenantContext;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Support\Facades\DB;
@@ -464,9 +465,36 @@ final class TenantMembershipService
      * active members resolve their materialized role from `model_has_roles` (team-scoped by RLS); pending
      * members show their reserved `invited_role_id`.
      *
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * ⚠️ `$terms` FILTERS IN PHP, OVER `$rows`, AFTER THE `pgsql_auth` HOP. NEVER IN THE QUERY BELOW.
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * The paragraph above says why the hop is safe: the id set is already tenant-bounded, and this method
+     * adds no predicate of its own. A KEYWORD IS A PREDICATE, and pushing one into that `whereIn` would
+     * repeal the only reason the hop is defensible. J1c measured what that costs on the seeded corpus — a
+     * demo admin running `email ILIKE '%o%'`:
+     *
+     *   on pgsql_auth   -> 8 rows, INCLUDING owner@northwind.test  (another tenant's user)
+     *   on the app conn -> 6 rows, demo's active members only
+     *
+     * So the filter runs here, in PHP, over rows that are already this tenant's by construction. It is not
+     * a compromise: `$rows` is one roster — tens to low hundreds — and {@see SearchTerms::matchesAny()} is
+     * the same AND-across-tokens/OR-across-fields rule `KeywordFilter::applyLike()` gives in SQL, so the
+     * roster and `MemberSearchArm` agree about what matches. **The standing rule, broader than this file
+     * and recorded in RBAC §9: no user-supplied predicate may ever run on `pgsql_auth`.**
+     *
+     * ⚠️ ONE DELIBERATE ASYMMETRY WITH GLOBAL SEARCH, AND IT RUNS THE SAFE DIRECTION. This filter finds
+     * PENDING INVITES; `MemberSearchArm` structurally cannot, because `users_visibility` admits only
+     * `tu.status = 'active'` and RLS applies at every reference to `users` (measured in J1c, not reasoned).
+     * That is correct on both sides: this page has ALREADY fetched those identities and renders them, so
+     * filtering the list it is showing discloses nothing new — while global search must not go and fetch
+     * them. `MembersRosterFilterTest` pins both directions so the asymmetry cannot be "fixed" by accident.
+     *
+     * `$terms` is OPTIONAL so `MembersIndexTest` passes unedited, for the reason J1b records about
+     * `FormListScopingTest`.
+     *
      * @return list<array{user_id: string, name: string, email: string, status: string, role: string, is_owner: bool, joined_at: ?string, invited_at: ?string}>
      */
-    public function listMembers(Tenant $tenant): array
+    public function listMembers(Tenant $tenant, ?SearchTerms $terms = null): array
     {
         $memberships = TenantUser::query()
             ->whereIn('status', [TenantUserStatus::Active->value, TenantUserStatus::Invited->value])
@@ -498,6 +526,12 @@ final class TenantMembershipService
         $rows = [];
         foreach ($memberships as $m) {
             $user = $users[$m->user_id];
+
+            // The keyword gate — see the ⚠️ block on this method. Applied HERE rather than in a `->where()`
+            // above, and applied to the SAME two fields the roster renders and `MemberSearchArm` matches.
+            if ($terms !== null && ! $terms->matchesAny((string) $user->name, (string) $user->email)) {
+                continue;
+            }
 
             if ($m->status === TenantUserStatus::Active) {
                 $roleValue = $activeRoleByUser[$m->user_id] ?? null;

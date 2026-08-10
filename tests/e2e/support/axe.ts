@@ -38,6 +38,21 @@ export async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<v
         if (t === 'dark') document.documentElement.setAttribute('data-theme-mode', 'dark');
         else document.documentElement.removeAttribute('data-theme-mode');
     }, theme);
+
+    // ⚠️ AND THEN WAIT FOR THE FLIP TO ACTUALLY LAND, WHICH THE PARAGRAPH ABOVE PROMISED AND DID NOT DO.
+    // Collapsing transitions to 1ms shortens the window; it does not close it. `setAttribute` only
+    // invalidates style — the recalc and paint happen on a later frame — so a scan issued immediately
+    // afterwards can still read the OLD foreground against the NEW background. J1e hit both halves of that
+    // window on `builder-axe.spec.ts:104` at mobile: one run read `#7da9c4` on `#1d4260` (4.17, mostly
+    // flipped) and the next read `#1c4b72` on `#123350` (1.42, dark-on-dark) across 309 lines of
+    // violations — the "233 violations at once = styles not settled" shape this repo already had on record
+    // as a standing flake in the same file.
+    //
+    // Two frames, not one: the first callback fires BEFORE the paint that applies the recalculated style,
+    // so a single `requestAnimationFrame` still returns too early.
+    await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
 }
 
 export type Personalization = {

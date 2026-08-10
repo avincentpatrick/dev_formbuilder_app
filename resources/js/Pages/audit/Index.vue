@@ -25,9 +25,11 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsIconButton,
     MdsPagination,
+    MdsSearchField,
     MdsSelect,
     MdsTextInput,
     type DataTableColumn,
@@ -53,6 +55,7 @@ const selected = reactive({
     user_id: props.filters.applied.user_id ?? '',
     from: props.filters.applied.from ?? '',
     to: props.filters.applied.to ?? '',
+    q: props.filters.applied.q ?? '',
 });
 
 const eventOptions = [{ value: '', label: 'All events' }, ...props.filters.events];
@@ -76,6 +79,7 @@ function queryParams(extra: Record<string, string | number> = {}): Record<string
     if (selected.user_id) params.user_id = selected.user_id;
     if (selected.from) params.from = selected.from;
     if (selected.to) params.to = selected.to;
+    if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
 
@@ -104,6 +108,7 @@ function clearFilters(): void {
     selected.user_id = '';
     selected.from = '';
     selected.to = '';
+    selected.q = '';
     visit({}, true);
 }
 
@@ -159,66 +164,74 @@ function summarize(row: AuditRow): string {
         </PageHeader>
 
         <!--
-            The <h2> is load-bearing, not decorative: PageHeader renders the <h1> and MdsEmptyState renders
-            an <h3>, so dropping it makes axe's heading-order fail ONLY in the empty state — i.e. only on a
-            database the seeder did not populate.
+            The <h2> this page used to hand-roll now lives inside MdsFilterBar (J1e), which carries the
+            reason it must stay unconditional. Same markup, one definition, six pages.
         -->
-        <section class="audit__filters" aria-labelledby="audit-filters-heading">
-            <h2 id="audit-filters-heading" class="audit__filters-heading">Filters</h2>
-
-            <div class="audit__filters-grid">
-                <MdsFormField label="Event" input-id="audit-event">
-                    <MdsSelect
-                        id="audit-event"
-                        v-model="selected.event"
-                        :options="eventOptions"
-                        :disabled="busy"
-                        @update:model-value="applyFilters"
-                    />
-                </MdsFormField>
-                <MdsFormField label="Type" input-id="audit-type">
-                    <MdsSelect
-                        id="audit-type"
-                        v-model="selected.auditable_type"
-                        :options="typeOptions"
-                        :disabled="busy"
-                        @update:model-value="applyFilters"
-                    />
-                </MdsFormField>
-                <MdsFormField label="Actor" input-id="audit-actor">
-                    <MdsSelect
-                        id="audit-actor"
-                        v-model="selected.user_id"
-                        :options="actorOptions"
-                        :disabled="busy"
-                        @update:model-value="applyFilters"
-                    />
-                </MdsFormField>
-                <!--
-                    Labelled MdsFormFields rather than Inbox.vue's bare aria-label selects: a date input's
-                    only visible affordance is browser chrome (mm/dd/yyyy), which says nothing about WHICH
-                    end of the range it is.
-                -->
-                <MdsFormField label="From" input-id="audit-from">
-                    <MdsTextInput
-                        id="audit-from"
-                        v-model="selected.from"
-                        type="date"
-                        :disabled="busy"
-                        @change="applyFilters"
-                    />
-                </MdsFormField>
-                <MdsFormField label="To" input-id="audit-to">
-                    <MdsTextInput
-                        id="audit-to"
-                        v-model="selected.to"
-                        type="date"
-                        :disabled="busy"
-                        @change="applyFilters"
-                    />
-                </MdsFormField>
-            </div>
-        </section>
+        <MdsFilterBar>
+            <!--
+                ⚠️ THE KEYWORD MATCHES THE TARGET AND THE ACTOR, NEVER THE DIFF, and the placeholder says so
+                in the one place a user will read it. `AuditFilterQuery` holds the security reasoning: the
+                before/after values are redaction's whole job, so a box that searched them would confirm the
+                secrets the page is careful not to print.
+            -->
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search the ledger"
+                placeholder="Form title or actor name"
+                @submit="applyFilters"
+            />
+            <MdsFormField label="Event" input-id="audit-event">
+                <MdsSelect
+                    id="audit-event"
+                    v-model="selected.event"
+                    :options="eventOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Type" input-id="audit-type">
+                <MdsSelect
+                    id="audit-type"
+                    v-model="selected.auditable_type"
+                    :options="typeOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Actor" input-id="audit-actor">
+                <MdsSelect
+                    id="audit-actor"
+                    v-model="selected.user_id"
+                    :options="actorOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <!--
+                Labelled MdsFormFields, never a bare aria-label select: a date input's only visible
+                affordance is browser chrome (mm/dd/yyyy), which says nothing about WHICH end of the range
+                it is. J1e brought the submissions inbox onto the same rule.
+            -->
+            <MdsFormField label="From" input-id="audit-from">
+                <MdsTextInput
+                    id="audit-from"
+                    v-model="selected.from"
+                    type="date"
+                    :disabled="busy"
+                    @change="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="To" input-id="audit-to">
+                <MdsTextInput
+                    id="audit-to"
+                    v-model="selected.to"
+                    type="date"
+                    :disabled="busy"
+                    @change="applyFilters"
+                />
+            </MdsFormField>
+        </MdsFilterBar>
 
         <p class="audit__hint">Newest first. The ledger is append-only — entries are never edited or removed.</p>
 
@@ -291,7 +304,7 @@ function summarize(row: AuditRow): string {
                     v-if="empty_reason === 'no_matches'"
                     illustration="search"
                     headline="No matching activity"
-                    description="Try widening the date range or removing a filter."
+                    description="Try a different keyword, widen the date range, or remove a filter. The keyword matches a row's target and its actor — not the values inside a change."
                 >
                     <template #action>
                         <MdsButton variant="secondary" @click="clearFilters">Clear filters</MdsButton>
@@ -319,24 +332,7 @@ function summarize(row: AuditRow): string {
 </template>
 
 <style scoped>
-.audit__filters {
-    margin-bottom: var(--mds-space-5);
-}
-
-.audit__filters-heading {
-    margin: 0 0 var(--mds-space-3);
-    font-size: var(--mds-type-label-font-size);
-    font-weight: var(--mds-font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--mds-color-text-secondary);
-}
-
-.audit__filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--mds-space-3);
-}
+/* The three `.audit__filters*` rules moved into MdsFilterBar verbatim (J1e) — geometry unchanged. */
 
 .audit__hint {
     margin: 0 0 var(--mds-space-3);

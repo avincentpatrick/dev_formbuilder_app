@@ -857,3 +857,47 @@ Gates: Pest 3265/0 (12,685 assertions), Vitest 85 files/1542, Pint 1120, PHPStan
 three lint gates, vue-tsc, build, `openapi.json` byte-identical. E2E and Storybook axe could NOT be run
 locally — CI is their only authority, and `tests/e2e/search-nav.spec.ts` records that its first CI run is
 its real first run. J1c is next and is the leak PR.
+
+## 2026-08-10 — J1b merged (#123), and J1c built: the leak PR, measured rather than argued
+
+J1b merged 6/6 with real steps, including the two gates that could not be run locally — and
+`search-nav.spec.ts` passed on its first real CI execution.
+
+J1c is the reason J1 was split at this seam, and the hazard stopped being theoretical before any code was
+written. `TenantMembershipService::listMembers()` resolves identities on `pgsql_auth`, whose
+`users_auth_select ... USING (true)` policy exists so the pre-auth login path can resolve an identity with
+no tenant context; `users` has no `tenant_id` column, so on that connection there is no tenant boundary at
+all. It is safe there only because its id set comes from an RLS-bounded `tenant_users` read BEFORE the hop
+and it adds no predicate of its own. Measured on the seeded corpus, one tenant's admin running
+`email ILIKE '%o%'`: 8 rows on `pgsql_auth` including `owner@northwind.test` — another tenant's user — and
+6 on the app connection. So the members arm runs on the default connection, and the standing rule is now
+written into RBAC §9: no user-supplied predicate may ever run on `pgsql_auth`.
+
+Three things only mutation or a real query could have told us. The arm's own `whereExists` over
+`tenant_users` is not merely belt-and-braces: `meridian_auth` is granted SELECT/UPDATE on `users` and
+nothing else, so that predicate cannot execute on the pre-auth connection — swapping the arm there reddens
+11 cases loudly instead of silently returning every tenant's members, which is precisely the failure mode
+an arm written without it would have. Pending invites are structurally unreachable on the app connection
+even through a `tenant_users` join (the join returns the 6 actives and drops the invited row, whose
+`tenant_users` row is perfectly visible), so "active only" is a recorded decision with a measurement and
+the fix — if ever needed — is a policy decision about `users_visibility`, never a connection hop. And the
+`ESCAPE '!'` on the ILIKE is load-bearing because `SearchTerms` KEEPS underscore in its token class, so an
+unescaped `m_ria` matches `maria`.
+
+The tracker's own instruction to add a `users.search_vector` migration was overturned on evidence:
+`SearchTerms::parse()` splits `ana@acme.org` three ways while PostgreSQL's parser emits one `email` lexeme,
+so a tsvector could never match an email search — and an index would be unreachable regardless, since J1b
+measured `~~`/`~~*` at `proleakproof = f`, the same wall that removed the GIN indexes.
+
+Two smaller findings worth carrying. A source-text lint failed on its own documentation — the first draft
+grepped `MemberSearchArm` for `pgsql_auth` and matched the docblock that exists to explain why not to use
+it; stripping comments with `token_get_all` first makes the lint assert what it claims. And PHPStan's local
+baseline turned out to be mostly a missing-annotation gap rather than a tooling quirk: `User` carried 2
+`@property` annotations where `Form` carries 28, so adding three (id, name, email — each verified NOT NULL
+against the live schema) cleared 51 pre-existing errors and took local from 74 to 23, which is the "~22
+phantoms" the tracker had estimated.
+
+`ShellAbilities` was extracted from `HandleInertiaRequests` so the sidebar and the search catalog consume
+one definition of "which destinations may this user reach" rather than two.
+
+Gates: Pest 3286/0 (12,752 assertions), Pint 1127, PHPStan 23, three lint gates.

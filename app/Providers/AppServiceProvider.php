@@ -34,7 +34,9 @@ use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Entitlements\QuotaGuard;
+use App\Services\Search\Arms\DestinationSearchArm;
 use App\Services\Search\Arms\FormSearchArm;
+use App\Services\Search\Arms\MemberSearchArm;
 use App\Services\Search\Arms\SubmissionSearchArm;
 use App\Services\Search\SearchPresenter;
 use App\Services\Search\SearchService;
@@ -157,9 +159,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(AnalyticsFormSet::class);
         $this->app->scoped(AnalyticsMetricsService::class);
 
-        // Global search (J1b, PRD §3.7). The arm LIST is the display order, and it is assembled here rather
-        // than discovered so that adding an arm is a deliberate edit in one reviewable place — J1c appends
-        // the members and settings arms below the two shipped here.
+        // Global search (J1b + J1c, PRD §3.7). The arm LIST is the display order, and it is assembled here
+        // rather than discovered so that adding an arm is a deliberate edit in one reviewable place.
+        //
+        // The order is PRD §3.7's own — "forms, submissions, members, and settings" — which is also the
+        // useful order: the two content arms a user searches all day come first, and the navigation arm
+        // last, where it acts as the fallback when nothing matched by content.
         //
         // `scoped` for the same reason as everything above it: each arm resolves visibility through the
         // request's one ResourceGrantResolver memo, so a singleton would leak one user's grant set into the
@@ -167,6 +172,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(SearchService::class, fn ($app): SearchService => new SearchService([
             $app->make(FormSearchArm::class),
             $app->make(SubmissionSearchArm::class),
+            $app->make(MemberSearchArm::class),
+            $app->make(DestinationSearchArm::class),
         ]));
         $this->app->scoped(SearchPresenter::class);
 

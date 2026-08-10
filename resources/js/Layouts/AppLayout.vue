@@ -8,6 +8,7 @@
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { MdsToastHost } from '@meridian/design-system';
+import CommandPalette from '@/components/shell/CommandPalette.vue';
 import TopNav from '@/components/shell/TopNav.vue';
 import Sidebar from '@/components/shell/Sidebar.vue';
 import ImpersonationBanner from '@/components/shell/ImpersonationBanner.vue';
@@ -74,6 +75,15 @@ function onKeydown(event: KeyboardEvent): void {
             </main>
         </div>
         <MdsToastHost :toasts="toasts" @dismiss="dismiss" />
+        <!--
+            Mounted HERE, beside the toast host, because this is the SINGLE persistent AppLayout instance:
+            the palette's open state is module-scoped, so mounting it per-page would bind the ⌘K chord once
+            per navigation. Deliberately NOT in AdminLayout — the central console has no tenant to search.
+
+            The opener selector is the nav search field, so a chord-opened palette returns focus somewhere
+            real on close rather than to <body>, whose .focus() is a silent no-op.
+        -->
+        <CommandPalette opener-selector="#topnav-search" />
     </div>
 </template>
 

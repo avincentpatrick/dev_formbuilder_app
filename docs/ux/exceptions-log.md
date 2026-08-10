@@ -246,3 +246,47 @@ type), so it follows theme mode and accent like everything else. It is covered i
 `tests/e2e/responsive-axe.spec.ts` at three viewports × two themes — the **first central-domain page in that
 matrix**, which is legitimate because the standing exclusion recorded in `playwright.config.ts` is
 specifically about `superadmin.mfa` needing a TOTP in CI, and `/` requires no authentication at all.
+
+---
+
+## #9 — Hand-rolled ARIA combobox in the command palette (`resources/js/components/shell/CommandPalette.vue`)
+
+**Introduced:** Phase 1 completion · Increment J1d (the ⌘K command palette).
+
+**What deviates:** DSR §4.3 says custom interactives are real semantic elements, and §1.3 says a widget
+needed in more than one place belongs in the design system. The palette's result rows are `<div
+role="option">` inside a `<div role="listbox">`, driven by `aria-activedescendant` — not buttons, not a
+shared `MdsCombobox`, and not a roving `tabindex`. It is the first modal in the product with **no action
+row**, which §3.6's "no modal ships without all four" would otherwise forbid.
+
+**Why:** Three separate reasons, each of which the DSR itself anticipates.
+
+The markup is not a choice. A `<button role="option">` trips axe's `nested-interactive` **and** breaks
+`aria-activedescendant`, and `<li>` inside a listbox fails `aria-required-children`. §4.5's named ARIA 1.2
+Combobox pattern requires DOM focus to stay on the input while the active option changes — which is the
+exact opposite of §4.3's roving-`tabindex` rule for composites. DSR §3.4.1 resolves that conflict in
+§4.5's favour *for this pattern*, and §4.3 keeps governing composites with no text entry. So the deviation
+is a spec decision already taken, recorded here because the code looks like a violation to a reader who
+has only read §4.3.
+
+The missing action row is the same shape of argument: §3.6 was written for the destructive confirmations
+this component was built for, where a primary and a cancel are the whole point. A palette has no decision
+to confirm — every option IS the action — and adding a disabled "OK" would be a control that never does
+anything.
+
+It is hand-rolled rather than a primitive because the increment that owns the ~15 missing primitives
+(`MdsCombobox`, `MdsTabs`, `MdsMenu`, an input-adornment wrapper) runs **after** this one. Generalising a
+palette whose options are heterogeneous — forms, submissions, members, destinations, and a synthetic "see
+all" row — into a reusable API from a single consumer would be inventing the API from one example. DSR
+§1.3's own consolidation trigger is three-plus undocumented deviations for the same need; this is the
+first, and it is documented.
+
+**⚠️ Coverage note, recorded because a green gate will otherwise be misread.** Storybook globs
+`packages/design-system/src/**/*.stories.@(ts|tsx)` only, so this app-tree component gets **no story and
+no `checkA11y` scan**. The `design-system-a11y` job passing says nothing whatsoever about this file. Its
+only automated accessibility gate is `tests/e2e/command-palette.spec.ts`, and its ARIA contract — the
+things axe cannot see, such as an `aria-activedescendant` that points at a non-existent id — is asserted
+directly in `CommandPalette.test.ts`.
+
+**Retire when:** the primitives increment lands `MdsCombobox`. At that point this component should become
+a consumer of it, and this entry should be deleted rather than amended.

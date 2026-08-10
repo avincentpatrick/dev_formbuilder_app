@@ -523,6 +523,17 @@ it finds **forms** and **submissions**, and nothing else yet. §18 lists what it
     something exists that you cannot see.
 11. Still as the reviewer, confirm the **count badge matches the number of rows listed**. A badge that
     over-counts would be disclosing rows you are not allowed to see.
+12. Back as owner, search a colleague's name or part of their email, e.g. `elena` or `demo.test`.
+    **Expect:** a **Members** group. Search `maria` (nobody). **Expect:** no Members group at all.
+13. Search `people`, then `dns`, then `history`. **Expect:** a **Settings & pages** group taking you to
+    Members, Domains and the Audit log respectively — you do not have to know the product's word for a
+    page to find it.
+14. As `viewer@demo.test`, search `members`. **Expect:** **no Members group and no Members page row.** A
+    Viewer cannot reach the roster, so neither the people nor the destination is offered — and again,
+    absent rather than shown-and-locked.
+15. As owner, search `invited`. **Expect:** the pending invitation is **not** found. Pending invites are
+    deliberately not searchable (§18); they are still listed on `/members`, where you can see and cancel
+    them.
 
 ---
 
@@ -543,7 +554,9 @@ expected and is not a defect.
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
 | **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its reference, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |
 | **Typo tolerance and word stemming** | **Not built, deliberately.** Searching "submission" will not find "submissions" except through the prefix match, and a misspelling finds nothing. Words are indexed literally, which is what lets a form titled "The A Team" be found by "the" — English stemming would strip that title to almost nothing and make it unfindable by its own name. Fuzzy matching needs a database extension and is a later decision. |
-| **Searching members, settings or audit rows** | Members and settings pages are increment J1c; the command palette is J1d. **Audit rows are refused outright, not scheduled** — a keyword search over an audit diff would read exactly the values redaction exists to remove. |
+| **The ⌘K command palette** | Increment J1d. Search today is the top-bar field and the results page; the keyboard palette is next. |
+| **Searching audit rows** | **Not built, deliberately** — not deferred, and not scheduled. A keyword search over an audit diff would read exactly the values redaction exists to remove, and the console-side equivalent was refused for the same reason. |
+| **Finding a pending invitation by search** | **Not built, deliberately.** A person who has been invited but has not accepted is not yet visible to the workspace at the database level — the isolation rule that keeps one workspace's people out of another's search is the same rule that hides them. They are listed on `/members`, which is where you cancel or resend. |
 | **A search index** | There is none, by measurement rather than omission. PostgreSQL will not use a text index on a table protected by row-level security, so one was built, proven unreachable, and removed. Searching is bounded by your workspace instead, which is fast at any realistic size. Recorded in `SearchIndexUsageTest` and the two `2026_08_11_*` migrations. |
 | **Production deployment** | Track B, after the application is otherwise complete. |
 

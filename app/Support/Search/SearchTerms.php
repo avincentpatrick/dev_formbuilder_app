@@ -133,6 +133,39 @@ final readonly class SearchTerms
         return implode(' & ', $terms);
     }
 
+    /**
+     * One `%token%` pattern per token, for the arms that match with `ILIKE` instead of a tsvector
+     * (Increment J1c). Bind these; never interpolate them.
+     *
+     * ── ⚠️ WHY THE MEMBERS ARM IS NOT FULL-TEXT, WHICH IS A DECISION AND NOT A SHORTCUT ─────────────────
+     * The obvious symmetry — give `users` a `search_vector` like `forms` and `submissions` — cannot work,
+     * and the reason is in `parse()` directly above. PostgreSQL's default parser emits `ana@acme.org` as a
+     * SINGLE `email` lexeme, while `parse()` splits on everything outside `\p{L}\p{N}_` and yields
+     * `ana & acme & org:*`. Those can never match, so an admin searching a domain to find everyone on it
+     * would get nothing. Fixing that needs a second tokeniser, which is the one thing this feature refuses.
+     *
+     * Two further reasons, both measured in J1b rather than assumed: an index would be unreachable anyway
+     * (`~~` and `~~*` are `proleakproof = f`, the same wall that removed the two GIN indexes — `pg_trgm` is
+     * no escape hatch either), and `users` has no `tenant_id`, so any index on it is a cross-tenant object
+     * indexing PII on a table with no erasure path. The candidate set after the `tenant_users` join is one
+     * tenant's roster — tens to low hundreds — so a scan over it is the honest shape.
+     *
+     * ⚠️ `_` AND `%` ARE ESCAPED EVEN THOUGH `parse()` STRIPS `%`. Underscore SURVIVES tokenisation (it is
+     * in the keep-class), so an unescaped `a_c` would match "abc" — a real wrong-result bug, not a
+     * theoretical one. `%` is escaped anyway so this method does not silently depend on the tokeniser's
+     * class staying narrow. The escape character is `!` rather than `\`: a backslash would have to survive
+     * PHP string escaping AND `standard_conforming_strings`, and getting that wrong fails silently.
+     *
+     * @return list<string>
+     */
+    public function likePatterns(): array
+    {
+        return array_map(
+            static fn (string $token): string => '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $token).'%',
+            $this->tokens
+        );
+    }
+
     public function uuidPrefix(): ?string
     {
         return $this->uuidPrefix;

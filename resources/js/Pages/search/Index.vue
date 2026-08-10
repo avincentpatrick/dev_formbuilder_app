@@ -109,7 +109,7 @@ function clearFilters(): void {
                         v-model="keyword"
                         type="search"
                         name="q"
-                        placeholder="Search forms and submissions"
+                        placeholder="Search this workspace"
                         @keyup.enter="visit"
                     />
                 </MdsFormField>
@@ -134,7 +134,7 @@ function clearFilters(): void {
             v-if="empty_reason === 'no_query'"
             illustration="search"
             headline="Search your workspace"
-            description="Find forms and submissions by keyword, or paste a submission reference."
+            description="Find forms, submissions, members and pages by keyword, or paste a submission reference."
         />
 
         <!--

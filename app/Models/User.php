@@ -36,6 +36,9 @@ use Spatie\Permission\Traits\HasRoles;
  * join-shape `users` RLS policy (self + active co-tenant membership). The connection stays the default
  * (`meridian_app`); the pre-auth read path lives entirely in App\Auth\RlsAwareUserProvider.
  *
+ * @property string $id
+ * @property string $name
+ * @property string $email
  * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
  * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
  */

@@ -80,6 +80,50 @@ final class KeywordFilter
     }
 
     /**
+     * The `ILIKE` twin of {@see apply()}, for entities with no tsvector (Increment J1c). Every token must
+     * match at least one of the columns — AND across tokens, OR across columns — which mirrors what
+     * `tsQuery()` does with `&` and keeps the two arms' behaviour recognisably the same.
+     *
+     * ⚠️ THE OUTER CLOSURE GROUP IS LOAD-BEARING FOR EXACTLY THE REASON {@see apply()}'s IS, and the
+     * per-token inner group is a SECOND one that matters just as much: without it, `(a OR b) AND (c OR d)`
+     * would flatten to `a OR b AND c OR d`, and a two-word member search would return everyone matching
+     * either word in either column. Both groups are emitted here, unconditionally, so associativity is a
+     * property of this helper rather than of every call site's discipline.
+     *
+     * ⚠️ `ESCAPE '!'` MUST MATCH {@see SearchTerms::likePatterns()}, which escapes with `!`. Read that
+     * method's docblock before changing either — a mismatch silently turns a literal underscore back into
+     * a wildcard.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  list<literal-string>  $qualifiedColumns
+     * @return Builder<TModel>
+     */
+    public static function applyLike(Builder $query, SearchTerms $terms, array $qualifiedColumns): Builder
+    {
+        if ($terms->isEmpty() || $qualifiedColumns === []) {
+            return $query;
+        }
+
+        foreach ($qualifiedColumns as $column) {
+            self::assertColumn($column);
+        }
+
+        $patterns = $terms->likePatterns();
+
+        return $query->where(function (Builder $outer) use ($patterns, $qualifiedColumns): void {
+            foreach ($patterns as $pattern) {
+                $outer->where(function (Builder $inner) use ($pattern, $qualifiedColumns): void {
+                    foreach ($qualifiedColumns as $column) {
+                        $inner->orWhereRaw("{$column} ILIKE ? ESCAPE '!'", [$pattern]);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
      * The ORDER BY fragment. Bind `$terms->tsQuery()` as the single parameter.
      *
      * ⚠️ THE REGCONFIG HERE MUST MATCH THE GENERATED COLUMN'S, AND A MISMATCH IS SILENT — BUT SILENT IN THE

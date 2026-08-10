@@ -37,7 +37,8 @@ export type FeedbackPageProps = {
     meta: PageMeta;
     filters: {
         statuses: FilterOption[];
-        applied: { status: string | null };
+        /** `q` is the CLAMPED string the server ran, not the raw input — see `SearchTerms::raw()` (J1e). */
+        applied: { status: string | null; q: string | null };
     };
     empty_reason: EmptyReason;
 };

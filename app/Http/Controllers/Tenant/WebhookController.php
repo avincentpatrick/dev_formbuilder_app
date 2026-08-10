@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Enums\WebhookEndpointStatus;
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreWebhookRequest;
 use App\Http\Requests\Tenant\UpdateWebhookRequest;
@@ -34,6 +35,8 @@ use Inertia\Response;
  */
 final class WebhookController extends Controller
 {
+    use ReadsKeywordFilter;
+
     public function __construct(private readonly WebhookEndpointService $service) {}
 
     /** The endpoints list, plan cap/quota summary, and create-modal option catalogs. */
@@ -42,7 +45,7 @@ final class WebhookController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('webhooks/Index', $presenter->index($user));
+        return Inertia::render('webhooks/Index', $presenter->index($user, $this->keyword($request)));
     }
 
     /** One endpoint's detail + its paginated delivery log + the edit-modal catalogs. */

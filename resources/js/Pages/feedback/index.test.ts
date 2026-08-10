@@ -54,7 +54,7 @@ function props(overrides: Partial<FeedbackPageProps> = {}): FeedbackPageProps {
                 { value: 'resolved', label: 'Resolved' },
                 { value: 'wont_fix', label: "Won't fix" },
             ],
-            applied: { status: null },
+            applied: { status: null, q: null },
         },
         empty_reason: null,
         ...overrides,

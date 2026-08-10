@@ -43,6 +43,12 @@ export { default as MdsToast } from './components/Toast/Toast.vue';
 export { default as MdsToastHost } from './components/Toast/ToastHost.vue';
 export { default as MdsDataTable } from './components/DataTable/DataTable.vue';
 export type { DataTableColumn } from './components/DataTable/DataTable.vue';
+// The shared list-page filter surface (J1e). In the PACKAGE rather than the app tree on purpose: Storybook
+// globs `packages/design-system/src/**` only, so an app-tree component gets no story and no `checkA11y`
+// scan at all (exceptions-log #9). FilterBar's whole reason for existing is a heading-order contract that
+// only fails in the empty state, which is exactly the kind of thing a scan should be catching for us.
+export { default as MdsFilterBar } from './components/FilterBar/FilterBar.vue';
+export { default as MdsSearchField } from './components/SearchField/SearchField.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';
 export { default as MdsTimeSeriesChart } from './components/TimeSeriesChart/TimeSeriesChart.vue';
 export { default as MdsBarChart } from './components/BarChart/BarChart.vue';

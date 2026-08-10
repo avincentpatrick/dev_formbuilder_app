@@ -13,8 +13,10 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsModal,
+    MdsSearchField,
     MdsSegmentedControl,
     MdsTextInput,
     statusVariant,
@@ -36,6 +38,8 @@ type Member = {
 const props = defineProps<{
     members: Member[];
     assignableRoles: { value: string; label: string }[];
+    filters: { applied: { q: string | null } };
+    empty_reason: 'no_matches' | 'no_rows' | null;
 }>();
 
 const page = usePage();
@@ -47,6 +51,31 @@ const columns: DataTableColumn[] = [
     { key: 'role', header: 'Role' },
     { key: 'status', header: 'Status' },
 ];
+
+// ── Keyword filter (J1e) ────────────────────────────────────────────────
+//
+// ⚠️ IT IS A SERVER ROUND-TRIP, NOT A `computed()` OVER `members`, EVEN THOUGH THE WHOLE ROSTER IS ALREADY
+// ON THIS PAGE. Filtering here in JavaScript would be cheaper and would look identical — and it would put
+// the one list whose identities come off the pre-auth connection outside the server's reach, so the next
+// person to add pagination or a directory sync inherits a filter nobody can see from PHP.
+// `TenantMembershipService::listMembers()` owns the predicate, in PHP, over rows it already bounded.
+const selected = reactive({ q: props.filters.applied.q ?? '' });
+const busy = ref(false);
+
+function applyFilters(): void {
+    router.get('/members', selected.q ? { q: selected.q } : {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
+function clearFilters(): void {
+    selected.q = '';
+    applyFilters();
+}
 
 // ── Invite ──────────────────────────────────────────────────────────────
 const inviteOpen = ref(false);
@@ -161,7 +190,17 @@ function canChangeRole(row: Member): boolean {
             </template>
         </PageHeader>
 
-        <MdsDataTable :columns="columns" :rows="members" caption="Workspace members" row-key="user_id">
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search members"
+                placeholder="Name or email"
+                @submit="applyFilters"
+            />
+        </MdsFilterBar>
+
+        <MdsDataTable :columns="columns" :rows="members" :loading="busy" caption="Workspace members" row-key="user_id">
             <template #cell-status="{ value }">
                 <MdsBadge v-bind="statusVariant(String(value))" />
             </template>
@@ -198,6 +237,17 @@ function canChangeRole(row: Member): boolean {
             </template>
             <template #empty>
                 <MdsEmptyState
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching members"
+                    description="Nobody on this roster matches that name or email. Pending invites are searched too."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear search</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else
                     headline="No members yet"
                     description="Invite a teammate to collaborate in this workspace."
                 >

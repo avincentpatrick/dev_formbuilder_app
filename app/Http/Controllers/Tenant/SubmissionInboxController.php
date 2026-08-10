@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Submissions\ExportSubmissionsRequest;
 use App\Models\Form;
@@ -27,6 +28,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class SubmissionInboxController extends Controller
 {
+    use ReadsKeywordFilter;
+
     public function index(Request $request, SubmissionInboxPresenter $presenter): Response
     {
         /** @var User $user */
@@ -36,6 +39,7 @@ final class SubmissionInboxController extends Controller
             'form_id' => $this->query($request, 'form_id'),
             'status' => $this->query($request, 'status'),
             'source' => $this->query($request, 'source'),
+            'q' => $this->keyword($request),
         ]));
     }
 

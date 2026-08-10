@@ -97,6 +97,38 @@ for (const p of pages) {
     }
 }
 
+// ── The FILTERED-TO-ZERO state (J1e) ──────────────────────────────────────────────────────────────────
+//
+// ⚠️ EVERY SCAN ABOVE RUNS AGAINST A SEEDED DATABASE, SO NONE OF THEM HAS EVER RENDERED AN EMPTY STATE ON
+// A LIST PAGE. That is precisely the combination J1e's `MdsFilterBar` heading protects: `PageHeader`
+// renders the `<h1>` and `MdsEmptyState` renders an `<h3>`, with a populated `MdsDataTable` contributing no
+// heading at all — so `heading-order` can only fail once the table is empty. A `?q` matching nothing is now
+// the easiest way to reach that state, and the only one available to a scan that must not mutate data.
+//
+// Three pages rather than six: forms, members and webhooks are the three that had NO filter surface before
+// this increment, so their `<h2>`, their empty-state branch and their `no_matches` copy are all new here.
+// The other three shipped a filter bar in I2/I7a and their empty states were already reachable.
+const filteredToZero = [
+    { name: 'Forms', path: '/forms?q=zzzznothingmatchesthis' },
+    { name: 'Members', path: '/members?q=zzzznothingmatchesthis' },
+    { name: 'Webhooks', path: '/webhooks?q=zzzznothingmatchesthis' },
+];
+
+for (const p of filteredToZero) {
+    for (const theme of themes) {
+        test(`${p.name} filtered to zero (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+            await page.goto(p.path, { waitUntil: 'networkidle' });
+            await forceTheme(page, theme);
+
+            // The state has to be the one we think it is, or this becomes six passing scans of a populated
+            // table. `No matching` is the shared prefix of all three empty-state headlines.
+            await expect(page.getByRole('heading', { name: /No matching/i })).toBeVisible();
+
+            await assertClean(page, `${p.name} filtered to zero`);
+        });
+    }
+}
+
 // The interactive builder (D4a). Reached via the form title link on the list (no id in the URL); the
 // page auto-selects the first field on load, so the config panel + tabs are mounted for the scan. The
 // full interaction-driven pass (opening dialogs, keyboard reorder + aria-live) is D4b.

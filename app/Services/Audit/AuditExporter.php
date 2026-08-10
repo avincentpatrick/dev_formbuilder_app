@@ -13,8 +13,10 @@ use App\Services\Entitlements\UsageMeter;
 use App\Services\Submissions\SubmissionExporter;
 use App\Support\Audit\AuditableTypes;
 use App\Support\Audit\AuditDiff;
+use App\Support\Audit\AuditFilterQuery;
 use App\Support\Audit\AuditLogger;
 use App\Support\Export\SpreadsheetCell;
+use App\Support\Search\SearchTerms;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -82,7 +84,7 @@ final class AuditExporter
     ) {}
 
     /**
-     * @param  array{auditable_type?: ?string, event?: ?string, user_id?: ?string, from?: ?CarbonInterface, to?: ?CarbonInterface, from_raw?: ?string, to_raw?: ?string}  $filters
+     * @param  array{auditable_type?: ?string, event?: ?string, user_id?: ?string, from?: ?CarbonInterface, to?: ?CarbonInterface, from_raw?: ?string, to_raw?: ?string, q?: ?SearchTerms}  $filters
      * @param  'csv'|'xlsx'  $format
      */
     public function stream(User $user, array $filters, string $format): StreamedResponse
@@ -153,6 +155,13 @@ final class AuditExporter
      * — the file honestly records that it was produced — and excluding `audit_log` rows from the query to
      * hide it would make the export lie about the ledger's contents.
      *
+     * ⚠️ EVERY FILTER MUST APPEAR HERE, AND `q` IS THE ONE THAT MAKES THAT RULE VISIBLE (J1e). The point of
+     * this row is that a later reader can tell WHICH SLICE of the ledger left the building; a keyword that
+     * narrowed a 4,000-row pull to three and went unrecorded would leave a ledger entry claiming a far wider
+     * export than happened. The CLAMPED raw string is recorded, not the tsquery — `SearchTerms::raw()` is
+     * exactly what the server acted on, whereas `foo & bar:*` is an implementation detail nobody auditing
+     * this in a year should have to decode.
+     *
      * @param  array<string, mixed>  $filters
      */
     private function recordSelfReferentialExport(?string $tenantId, array $filters, string $format, User $user): void
@@ -160,6 +169,8 @@ final class AuditExporter
         if ($tenantId === null) {
             return;
         }
+
+        $terms = $filters['q'] ?? null;
 
         $this->audit->record(
             AuditEvent::Exported,
@@ -172,6 +183,7 @@ final class AuditExporter
                 'user_id' => $filters['user_id'] ?? null,
                 'from' => $filters['from_raw'] ?? null,
                 'to' => $filters['to_raw'] ?? null,
+                'q' => $terms instanceof SearchTerms ? $terms->raw() : null,
             ],
             actorId: (string) $user->getKey(),
         );
@@ -228,17 +240,19 @@ final class AuditExporter
     /**
      * The RLS-scoped, filtered ledger query.
      *
+     * ⚠️ THE CHAIN IS {@see AuditFilterQuery}'s, SHARED WITH THE PAGE, AND SHARING IT IS NOT TIDINESS. Until
+     * J1e this method spelled the clauses out for itself while `AuditLogPresenter::index()` spelled the same
+     * five out again — and `audit/Index.vue` builds this endpoint's URL from the SAME `queryParams()` it
+     * navigates with, precisely so "I exported what I was looking at" is a guarantee rather than a hope. A
+     * filter that reached one copy and not the other would silently break it. Read that class before adding
+     * a sixth clause anywhere.
+     *
      * @param  array<string, mixed>  $filters
      * @return Builder<Audit>
      */
     private function baseQuery(array $filters): Builder
     {
-        return Audit::query()
-            ->when($filters['auditable_type'] ?? null, fn ($q, $v) => $q->where('auditable_type', $v))
-            ->when($filters['event'] ?? null, fn ($q, $v) => $q->where('event', $v))
-            ->when($filters['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))
-            ->when($filters['from'] ?? null, fn ($q, $v) => $q->where('created_at', '>=', $v))
-            ->when($filters['to'] ?? null, fn ($q, $v) => $q->where('created_at', '<=', $v));
+        return AuditFilterQuery::apply(Audit::query(), $filters);
     }
 
     private function writer(string $format): WriterInterface

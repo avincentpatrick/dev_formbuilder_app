@@ -13,9 +13,11 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsIconButton,
     MdsModal,
+    MdsSearchField,
     MdsTextInput,
     MdsTextarea,
     statusVariant,
@@ -59,10 +61,40 @@ type FormRow = {
 
 type ScopeOption = { id: string; name: string; parent_id: string | null; is_active: boolean };
 
-defineProps<{ forms: FormRow[]; scopes: ScopeOption[] }>();
+const props = defineProps<{
+    forms: FormRow[];
+    scopes: ScopeOption[];
+    filters: { applied: { q: string | null } };
+    /** Server-computed (J1e). See the `#empty` slot for what this page used to claim without it. */
+    empty_reason: 'no_matches' | 'no_rows' | null;
+}>();
 
 const page = usePage();
 const canManageScopes = computed(() => page.props.auth.can.manageScopes);
+
+// ── Keyword filter (J1e) ────────────────────────────────────────────────
+const selected = reactive({ q: props.filters.applied.q ?? '' });
+const busy = ref(false);
+
+/**
+ * Filtering REPLACES the history entry — the Inbox contract, and the reason is sharper for a keyword than
+ * for a select: typing four words one Enter at a time would otherwise leave four dead entries between the
+ * user and wherever they came from.
+ */
+function applyFilters(): void {
+    router.get('/forms', selected.q ? { q: selected.q } : {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
+function clearFilters(): void {
+    selected.q = '';
+    applyFilters();
+}
 
 // ── Scope picker (G10b2) ────────────────────────────────────────────────
 const scopeTarget = ref<FormRow | null>(null);
@@ -220,7 +252,17 @@ function submitRestore(): void {
             </template>
         </PageHeader>
 
-        <MdsDataTable :columns="columns" :rows="forms" caption="Forms" row-key="id">
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search forms"
+                placeholder="Title, description or slug"
+                @submit="applyFilters"
+            />
+        </MdsFilterBar>
+
+        <MdsDataTable :columns="columns" :rows="forms" :loading="busy" caption="Forms" row-key="id">
             <template #cell-title="{ row }">
                 <Link v-if="row.can.edit" :href="`/forms/${row.id}/builder`" class="forms__title-link">
                     {{ row.title }}
@@ -302,7 +344,26 @@ function submitRestore(): void {
                 </div>
             </template>
             <template #empty>
+                <!--
+                    ⚠️ THIS SLOT USED TO BE THE "Create your first form" BRANCH ALONE, AND THAT WAS THE
+                    SINGLE MOST VISIBLE DEFECT J1e HAD TO FIX. The moment this page took a `?q`, an
+                    established tenant searching for a word no form contains would have been told it had no
+                    forms at all — and offered a button to make one. The branch is server-computed
+                    (`empty_reason`) rather than inferred from `selected.q`, because the client cannot see
+                    what the server clamped or defaulted; see AuditLogPresenter for the rule.
+                -->
                 <MdsEmptyState
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching forms"
+                    description="No form's title, description or slug matches that. Try fewer words, or clear the search."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear search</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else
                     headline="Create your first form"
                     description="Start from a ready-made template, or build one from a blank canvas."
                 >

@@ -6,13 +6,15 @@
  * (disabled at the plan cap — the server also hard-blocks). Selecting an endpoint opens its detail + delivery
  * log. Assembled entirely from shared design-system components.
  */
-import { computed, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsIconButton,
+    MdsSearchField,
     MdsStatTile,
     MdsBadge,
     statusVariant,
@@ -47,6 +49,8 @@ const props = defineProps<{
     forms: Option[];
     eventTypes: Option[];
     can: { create: boolean };
+    filters: { applied: { q: string | null } };
+    empty_reason: 'no_matches' | 'no_rows' | null;
 }>();
 
 const columns: DataTableColumn[] = [
@@ -62,6 +66,25 @@ const atCap = computed(
 );
 
 const createOpen = ref(false);
+
+// ── Keyword filter (J1e) ────────────────────────────────────────────────
+const selected = reactive({ q: props.filters.applied.q ?? '' });
+const busy = ref(false);
+
+function applyFilters(): void {
+    router.get('/webhooks', selected.q ? { q: selected.q } : {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
+function clearFilters(): void {
+    selected.q = '';
+    applyFilters();
+}
 
 function formatQuota(q: Quota): string {
     const used = q.used.toLocaleString();
@@ -103,7 +126,17 @@ function openEndpoint(id: string): void {
 
         <ZapierRecipe class="webhooks__recipe" />
 
-        <MdsDataTable :columns="columns" :rows="data" caption="Webhook endpoints" row-key="id">
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search endpoints"
+                placeholder="Name or URL"
+                @submit="applyFilters"
+            />
+        </MdsFilterBar>
+
+        <MdsDataTable :columns="columns" :rows="data" :loading="busy" caption="Webhook endpoints" row-key="id">
             <template #cell-url="{ row }">
                 <span class="webhooks__url">{{ (row as EndpointRow).url }}</span>
             </template>
@@ -126,6 +159,17 @@ function openEndpoint(id: string): void {
             </template>
             <template #empty>
                 <MdsEmptyState
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching endpoints"
+                    description="Endpoints are matched on their name and URL — the Scope column is not searched."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear search</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else
                     illustration="default"
                     headline="No webhook endpoints"
                     description="Add an endpoint to receive real-time events when submissions arrive or forms change."

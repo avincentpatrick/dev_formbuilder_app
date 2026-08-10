@@ -111,7 +111,12 @@ final readonly class SubmissionSearchArm implements SearchArm
      * form-title or reference clauses, which contribute nothing to `submissions.search_vector` — so ranking
      * on that vector would sort the majority of results by a score of zero and produce an order that looks
      * meaningful and is not. Recency (`id DESC`, uuidv7) is the honest ordering for a submission list and is
-     * what the inbox already uses.
+     * what the inbox already uses. The reasoning now lives on the scope, since both callers depend on it.
+     *
+     * ⚠️ THE MATCH PREDICATE MOVED TO {@see Submission::scopeMatchingKeyword()} IN J1e, WHEN THE INBOX GAINED
+     * A KEYWORD BOX. It is the same three branches, invoked AS A SCOPE so `Builder::callScope()` keeps
+     * wrapping the OR — read that method before changing what a submission match means, and note that the
+     * arm's whole test file passes UNEDITED across the move, which is the proof it moved nothing.
      *
      * @return Builder<Submission>
      */
@@ -120,26 +125,6 @@ final readonly class SubmissionSearchArm implements SearchArm
         return Submission::query()
             ->visibleTo($user)
             ->countable()
-            ->where(function (Builder $match) use ($terms): void {
-                $match->whereRaw(
-                    "submissions.search_vector @@ to_tsquery('simple', ?)",
-                    [$terms->tsQuery()]
-                );
-
-                $match->orWhereIn('submissions.form_id', function ($sub) use ($terms): void {
-                    $sub->select('id')
-                        ->from('forms')
-                        ->whereRaw("forms.search_vector @@ to_tsquery('simple', ?)", [$terms->tsQuery()]);
-                });
-
-                $prefix = $terms->uuidPrefix();
-                if ($prefix !== null) {
-                    // A scan, and bounded to stay one: RLS plus `visibleTo` plus the eight-hex-character
-                    // minimum, which makes a collision vanishingly unlikely. Deliberately NOT indexed —
-                    // `submissions` has no reference column, and the right fix is a real short handle
-                    // (filed for J2), not an index on a cast.
-                    $match->orWhereRaw('submissions.id::text LIKE ?', [$prefix.'%']);
-                }
-            });
+            ->matchingKeyword($terms);
     }
 }

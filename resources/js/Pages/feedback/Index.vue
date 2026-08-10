@@ -19,10 +19,12 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsIconButton,
     MdsModal,
     MdsPagination,
+    MdsSearchField,
     MdsSelect,
     statusVariant,
     type DataTableColumn,
@@ -40,7 +42,10 @@ const columns: DataTableColumn[] = [
     { key: 'status', header: 'Status' },
 ];
 
-const selected = reactive({ status: props.filters.applied.status ?? '' });
+const selected = reactive({
+    status: props.filters.applied.status ?? '',
+    q: props.filters.applied.q ?? '',
+});
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 
 const detailRow = ref<FeedbackRow | null>(null);
@@ -49,6 +54,7 @@ const busy = ref(false);
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
     const params: Record<string, string | number> = {};
     if (selected.status) params.status = selected.status;
+    if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
 
@@ -73,6 +79,7 @@ function goToPage(page: number): void {
 
 function clearFilters(): void {
     selected.status = '';
+    selected.q = '';
     visit({}, true);
 }
 
@@ -104,24 +111,27 @@ function excerpt(text: string): string {
         <PageHeader title="Feedback" icon="feedback" />
 
         <!--
-            The <h2> is load-bearing: PageHeader renders the <h1> and MdsEmptyState renders an <h3>, so
-            dropping it fails axe's heading-order ONLY in the empty state — i.e. only on a fresh workspace.
+            The <h2> this page used to hand-roll now lives inside MdsFilterBar (J1e), along with the reason
+            it must stay unconditional. Same markup, one definition, six pages.
         -->
-        <section class="fbl__filters" aria-labelledby="feedback-filters-heading">
-            <h2 id="feedback-filters-heading" class="fbl__filters-heading">Filters</h2>
-
-            <div class="fbl__filters-grid">
-                <MdsFormField label="Status" input-id="feedback-status">
-                    <MdsSelect
-                        id="feedback-status"
-                        v-model="selected.status"
-                        :options="statusOptions"
-                        :disabled="busy"
-                        @update:model-value="applyFilters"
-                    />
-                </MdsFormField>
-            </div>
-        </section>
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search feedback"
+                placeholder="Remarks or page"
+                @submit="applyFilters"
+            />
+            <MdsFormField label="Status" input-id="feedback-status">
+                <MdsSelect
+                    id="feedback-status"
+                    v-model="selected.status"
+                    :options="statusOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+        </MdsFilterBar>
 
         <p class="fbl__hint">
             Newest first. Reports are handled by the platform support team — the status here is theirs to
@@ -219,24 +229,7 @@ function excerpt(text: string): string {
 </template>
 
 <style scoped>
-.fbl__filters {
-    margin-bottom: var(--mds-space-5);
-}
-
-.fbl__filters-heading {
-    margin: 0 0 var(--mds-space-3);
-    font-size: var(--mds-type-label-font-size);
-    font-weight: var(--mds-font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--mds-color-text-secondary);
-}
-
-.fbl__filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--mds-space-3);
-}
+/* The three `.fbl__filters*` rules moved into MdsFilterBar verbatim (J1e) — geometry unchanged. */
 
 .fbl__hint {
     margin: 0 0 var(--mds-space-3);

@@ -455,6 +455,21 @@ A third note joins the two above, and it is the one this increment adds:
 
 `MemberSearchArm` therefore runs on the default connection, where the join-shape policy *is* the boundary, and carries its own `whereExists` over `tenant_users` as well — not redundancy: `meridian_auth` is granted `SELECT, UPDATE` on `users` **and nothing else**, so that predicate cannot execute on the pre-auth connection at all, which turns a would-be silent cross-tenant leak into a hard failure. `SearchMemberConnectionTest` pins the rule three ways: a runtime `QueryExecuted` guard, a comment-stripped source assertion on the arm, and a directory sweep over the whole search namespace that will catch an arm nobody has written yet.
 
+### 9.1 The list-page keyword filters (J1e)
+
+Every row-list page takes a `?q`. These are not search *arms* — they narrow a list the viewer is already authorized to be looking at — so they coin no permission and change no gate; the route's existing `can:` middleware and the presenter's existing row rule both apply first, unchanged. Three of them are nonetheless authorization-relevant enough to record here.
+
+**The members roster filters in PHP, over rows the `pgsql_auth` hop has already bounded.** This is §9's standing rule arriving one increment later on the same method: `listMembers()` is safe on that connection only because it adds no predicate, and a keyword *is* a predicate. `TenantMembershipService::listMembers(Tenant, ?SearchTerms)` therefore builds its rows exactly as before and applies `SearchTerms::matchesAny()` to each one afterwards. The candidate set is one roster — tens to low hundreds — so the scan is the honest shape, not a compromise. `MembersRosterFilterTest` asserts this **structurally**: it listens on `pgsql_auth` and fails if the user's text ever appears in a binding there. An outcome-only test would pass just as happily against an implementation that fetched every tenant's matching users and filtered the leak out in PHP afterwards.
+
+**Its one deliberate asymmetry with the search arm, which runs the safe direction.** The roster's `q` **finds pending invitations**; `MemberSearchArm` structurally cannot (the measurement two paragraphs up). Both are correct: `/members` has already fetched and rendered those identities, so filtering the list it is showing discloses nothing new — while global search would have to go and fetch them. Pinned in both directions so neither half can be "made consistent" by accident.
+
+**The audit log's `q` narrows to target and actor, and never reads the diff.** It resolves to `(auditable_type = 'form' AND auditable_id IN (matching forms)) OR user_id IN (matching users)`. The refusal above — that a keyword over `old_values`/`new_values` is a channel over exactly what `AuditRedactor` removes — is *why*, and it holds whether the search is a global arm or a filter on the page itself. Two properties keep it that way rather than leaving it to discipline:
+
+  - The forms and users subqueries confine the non-leakproof operators (`@@`, `ILIKE`) to `forms` and `users`; every predicate on `audits` stays `=`/`IN` over plain columns, which is also what keeps `audits_tenant_auditable_idx` and `audits_tenant_user_idx` reachable under RLS (J1b's leakproof measurement, applied forward).
+  - The users subquery runs on the **default** connection, per the standing rule.
+
+  `AuditKeywordFilterTest` seeds a distinctive token into a diff and requires it to be unfindable *while* a target-title search still works — so the refusal cannot degrade into a dead parameter unnoticed.
+
 **Resolved decisions (2026-07-05, decided with the product owner rather than silently picked):**
 
 1. **Impersonation — deferred.** The platform console does **not** support "log in as this user" in Phase 0. It is a large security surface and would need an `acting_as_user_id`-style `audits` column (and the `audits` table itself, which does not exist until Phase 1) to keep a super-admin's own actions distinguishable from actions taken while impersonating. Revisit when support tooling genuinely requires it; design the `acting_as_user_id` column alongside the Phase-1 `audits` table if so.

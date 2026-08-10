@@ -19,6 +19,8 @@ use App\Policies\SubmissionPolicy;
 use App\Services\Forms\FormPresenter;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
+use App\Support\Search\ListEmptyReason;
+use App\Support\Search\SearchTerms;
 use Illuminate\Support\Collection;
 
 /**
@@ -47,14 +49,22 @@ final class SubmissionInboxPresenter
     /**
      * The paginated, filtered inbox list plus the filter option catalogs and the export capability.
      *
-     * @param  array{form_id?: ?string, status?: ?string, source?: ?string}  $filters
+     * ⚠️ `q` IS {@see Submission::scopeMatchingKeyword()}, THE SAME PREDICATE `SubmissionSearchArm` USES.
+     * It was that arm's private builder until J1e; sharing it is what stops a global-search hit and the
+     * inbox it links into from disagreeing about whether a row matches. Read the scope before widening what
+     * a submission match means — in particular, answer text is deliberately not in it.
+     *
+     * @param  array{form_id?: ?string, status?: ?string, source?: ?string, q?: ?SearchTerms}  $filters
      * @return array<string, mixed>
      */
     public function list(User $user, array $filters): array
     {
+        $terms = $filters['q'] ?? SearchTerms::parse(null);
+
         $paginator = Submission::query()
             ->visibleTo($user)
             ->with(['form:id,title', 'respondent:id,name'])
+            ->matchingKeyword($terms)
             ->when($filters['form_id'] ?? null, fn ($q, $v) => $q->where('form_id', $v))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             // Hide in-progress drafts (H10) unless the status filter explicitly asks for them. The inbox is a
@@ -120,10 +130,41 @@ final class SubmissionInboxPresenter
                     'form_id' => $filters['form_id'] ?? null,
                     'status' => $filters['status'] ?? null,
                     'source' => $filters['source'] ?? null,
+                    'q' => $terms->raw(),
                 ],
             ],
+            // ⚠️ SERVER-COMPUTED (J1e), REPLACING A CLIENT-SIDE INFERENCE THAT WAS ALREADY WRONG ON THIS
+            // PAGE. `Inbox.vue` used to pick its empty illustration from `selected.form_id || status ||
+            // source`, which cannot see the one filter the SERVER applies on its own: `countable()` hides
+            // in-progress drafts unless a status is chosen. So an inbox holding nothing but drafts rendered
+            // "Responses appear here as forms are filled out" — telling a reviewer nothing had arrived while
+            // the rows sat one dropdown away. That is exactly the failure the I2 rule names.
+            'empty_reason' => ListEmptyReason::for($items->isNotEmpty(), $this->hasAnyFilter($filters, $terms)),
             'can' => ['export' => $user->can('submissions.export')],
         ];
+    }
+
+    /**
+     * Whether the viewer narrowed anything.
+     *
+     * ⚠️ `countable()` IS NOT COUNTED HERE, AND THAT IS THE HONEST ANSWER RATHER THAN THE CONVENIENT ONE.
+     * It is a display DEFAULT rather than a choice the viewer made, so a bare inbox holding only drafts is
+     * genuinely `no_rows` from the reviewer's point of view: they have no completed responses. The hint
+     * above the table already tells them drafts are hidden and how to see them, which is the right place
+     * for that sentence — an empty state reading "no matching submissions" when they filtered nothing would
+     * be a different lie from the one this prop fixes.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function hasAnyFilter(array $filters, SearchTerms $terms): bool
+    {
+        foreach (['form_id', 'status', 'source'] as $key) {
+            if (($filters[$key] ?? null) !== null) {
+                return true;
+            }
+        }
+
+        return ! $terms->isEmpty();
     }
 
     /**

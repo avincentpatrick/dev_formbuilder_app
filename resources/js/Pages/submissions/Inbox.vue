@@ -5,16 +5,26 @@
  * with status Badges, filters (form / status / source), server pagination, and a per-form streamed export.
  * Export is enabled only once a single form is chosen (its columns are that form's fields). Assembled entirely
  * from shared design-system components (no page-local styling beyond layout).
+ *
+ * ── J1e NORMALISED THIS PAGE'S FILTER BAR, AND IT WAS THE ODD ONE OUT ────────────────────────────────────
+ * It used to be three bare `aria-label` selects in a plain `<div>` — no visible labels, no `<h2>`, and an
+ * empty state whose "did you filter?" branch was inferred on the CLIENT. That inference was already wrong:
+ * it could not see `countable()`, the server's own display default that hides in-progress drafts, so an
+ * inbox holding nothing but drafts told a reviewer that responses "appear here as forms are filled out".
+ * All six list pages now share `MdsFilterBar` + a server-computed `empty_reason`.
  */
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import {
     MdsBadge,
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
+    MdsFormField,
     MdsIconButton,
     MdsPagination,
+    MdsSearchField,
     MdsSelect,
     statusVariant,
     type DataTableColumn,
@@ -50,9 +60,10 @@ const props = defineProps<{
         forms: Option[];
         statuses: Option[];
         sources: Option[];
-        applied: { form_id: string | null; status: string | null; source: string | null };
+        applied: { form_id: string | null; status: string | null; source: string | null; q: string | null };
     };
     can: { export: boolean };
+    empty_reason: 'no_matches' | 'no_rows' | null;
 }>();
 
 const columns: DataTableColumn[] = [
@@ -68,32 +79,61 @@ const selected = reactive({
     form_id: props.filters.applied.form_id ?? '',
     status: props.filters.applied.status ?? '',
     source: props.filters.applied.source ?? '',
+    q: props.filters.applied.q ?? '',
 });
 
 const formOptions = [{ value: '', label: 'All forms' }, ...props.filters.forms];
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 const sourceOptions = [{ value: '', label: 'All sources' }, ...props.filters.sources];
 
+/** Marks the table busy while a filter round-trip is in flight — the audit viewer's contract. */
+const busy = ref(false);
+
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
     const params: Record<string, string | number> = {};
     if (selected.form_id) params.form_id = selected.form_id;
     if (selected.status) params.status = selected.status;
     if (selected.source) params.source = selected.source;
+    if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
 
+function visit(params: Record<string, string | number>, replace: boolean): void {
+    router.get('/submissions', params, {
+        preserveState: true,
+        preserveScroll: true,
+        ...(replace ? { replace: true } : {}),
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
 function applyFilters(): void {
-    router.get('/submissions', queryParams(), { preserveState: true, preserveScroll: true, replace: true });
+    visit(queryParams(), true);
 }
 
 function goToPage(page: number): void {
-    router.get('/submissions', queryParams({ page }), { preserveState: true, preserveScroll: true });
+    visit(queryParams({ page }), false);
 }
 
+function clearFilters(): void {
+    selected.form_id = '';
+    selected.status = '';
+    selected.source = '';
+    selected.q = '';
+    visit({}, true);
+}
+
+/**
+ * ⚠️ THE KEYWORD GOES INTO THE EXPORT URL, AND OMITTING IT WOULD BE THE DEFECT RATHER THAN THE SAFE CHOICE.
+ * This button reads "export what I am looking at"; a `?q` the page applied and the download ignored would
+ * stream rows the reviewer cannot see on screen. `ExportSubmissionsRequest` carries `q` for this reason.
+ */
 function download(format: 'csv' | 'xlsx'): void {
     const params = new URLSearchParams({ format });
     if (selected.status) params.set('status', selected.status);
     if (selected.source) params.set('source', selected.source);
+    if (selected.q) params.set('q', selected.q);
     window.location.href = `/forms/${selected.form_id}/submissions/export?${params.toString()}`;
 }
 
@@ -122,32 +162,53 @@ function formatDate(iso: string | null): string {
             </template>
         </PageHeader>
 
-        <div class="inbox__filters">
-            <MdsSelect
-                v-model="selected.form_id"
-                :options="formOptions"
-                aria-label="Filter by form"
-                @update:model-value="applyFilters"
+        <MdsFilterBar>
+            <!--
+                The keyword box is FIRST and carries no `:disabled` — see MdsSearchField for why disabling a
+                focused text input mid-round-trip eats the caret. The three selects keep `:disabled="busy"`,
+                which is right for a one-shot control.
+            -->
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search submissions"
+                placeholder="Remarks, form title or reference"
+                @submit="applyFilters"
             />
-            <MdsSelect
-                v-model="selected.status"
-                :options="statusOptions"
-                aria-label="Filter by status"
-                @update:model-value="applyFilters"
-            />
-            <MdsSelect
-                v-model="selected.source"
-                :options="sourceOptions"
-                aria-label="Filter by source"
-                @update:model-value="applyFilters"
-            />
-        </div>
+            <MdsFormField label="Form" input-id="inbox-form">
+                <MdsSelect
+                    id="inbox-form"
+                    v-model="selected.form_id"
+                    :options="formOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Status" input-id="inbox-status">
+                <MdsSelect
+                    id="inbox-status"
+                    v-model="selected.status"
+                    :options="statusOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Source" input-id="inbox-source">
+                <MdsSelect
+                    id="inbox-source"
+                    v-model="selected.source"
+                    :options="sourceOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+        </MdsFilterBar>
 
         <p v-if="!selected.status" class="inbox__hint">
             In-progress drafts are hidden. Choose the <strong>Draft</strong> status to see them.
         </p>
 
-        <MdsDataTable :columns="columns" :rows="data" caption="Submissions" row-key="id">
+        <MdsDataTable :columns="columns" :rows="data" :loading="busy" caption="Submissions" row-key="id">
             <template #cell-status="{ row }">
                 <div class="inbox__status">
                     <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" />
@@ -187,7 +248,18 @@ function formatDate(iso: string | null): string {
             </template>
             <template #empty>
                 <MdsEmptyState
-                    :illustration="selected.form_id || selected.status || selected.source ? 'search' : 'default'"
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching submissions"
+                    description="Try a different keyword, or clear the filters to see everything."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear filters</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else
+                    illustration="default"
                     headline="No submissions"
                     description="Responses appear here as forms are filled out through any channel."
                 />
@@ -205,17 +277,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.inbox__filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mds-space-3);
-    margin-bottom: var(--mds-space-5);
-}
-
-.inbox__filters :deep(.mds-select) {
-    min-width: 12rem;
-}
-
 .inbox__hint {
     margin: 0 0 var(--mds-space-3);
     font-size: var(--mds-type-body-sm-font-size);

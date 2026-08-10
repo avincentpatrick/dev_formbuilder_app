@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreFeedbackRequest;
 use App\Models\FeedbackReport;
@@ -28,6 +29,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class FeedbackController extends Controller
 {
+    use ReadsKeywordFilter;
+
     public function __construct(private readonly FeedbackPresenter $presenter) {}
 
     /** The workspace's own reports — read-only; the status lifecycle belongs to the platform console. */
@@ -37,6 +40,7 @@ final class FeedbackController extends Controller
 
         return Inertia::render('feedback/Index', $this->presenter->index([
             'status' => is_string($status) && $status !== '' ? $status : null,
+            'q' => $this->keyword($request),
         ]));
     }
 

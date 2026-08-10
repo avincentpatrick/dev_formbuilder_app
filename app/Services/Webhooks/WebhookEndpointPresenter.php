@@ -13,6 +13,10 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Search\KeywordFilter;
+use App\Support\Search\ListEmptyReason;
+use App\Support\Search\SearchTerms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -38,17 +42,36 @@ final class WebhookEndpointPresenter
     /**
      * The endpoints list, the plan cap/quota summary, and the create-modal option catalogs.
      *
+     * ⚠️ `$terms` MATCHES `name` AND `url`, AND DELIBERATELY NOT THE FORM COLUMN. Both matched columns are
+     * already rendered in the table, so the filter can only ever hide rows the viewer could see. The Form
+     * column is a SCOPE rather than a description — "which form does this endpoint listen to" — and the
+     * right control for it is a form `<select>` beside the keyword box, not a substring match that would
+     * make `?q=clinic` mean two unrelated things at once. Filed rather than smuggled in; recorded in
+     * TESTING-GUIDE §17's per-list table so it reads as a decision and not an oversight.
+     *
+     * `applyLike` rather than a tsvector: `webhook_endpoints` has no generated column and would not benefit
+     * from one — J1b measured `~~*` at `proleakproof = f`, so an index would be unreachable under RLS
+     * anyway, and a tenant's endpoint list is tens of rows bounded by a plan cap.
+     *
      * @return array<string, mixed>
      */
-    public function index(User $user): array
+    public function index(User $user, ?SearchTerms $terms = null): array
     {
+        $terms ??= SearchTerms::parse(null);
+
         $endpoints = WebhookEndpoint::query()
             ->with('form:id,title')
+            ->tap(fn (Builder $q) => KeywordFilter::applyLike($q, $terms, [
+                'webhook_endpoints.name',
+                'webhook_endpoints.url',
+            ]))
             ->latest('created_at')
             ->get();
 
         return [
             'data' => $endpoints->map(fn (WebhookEndpoint $e): array => $this->row($e))->all(),
+            'filters' => ['applied' => ['q' => $terms->raw()]],
+            'empty_reason' => ListEmptyReason::for($endpoints->isNotEmpty(), ! $terms->isEmpty()),
             'summary' => [
                 'endpoints' => [
                     'used' => $this->entitlements->usage(UsageMetric::WebhookEndpointsCount),

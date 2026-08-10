@@ -87,6 +87,13 @@ export type AuditFilters = {
         user_id: string | null;
         from: string | null;
         to: string | null;
+        /**
+         * The CLAMPED keyword the server ran (`SearchTerms::raw()`), not the raw input — J1e. It narrows to
+         * the row's TARGET and ACTOR only; `AuditFilterQuery` records why searching the redacted diff is a
+         * disclosure channel rather than a feature. The platform console has no twin: its rows are all
+         * `settings` targets with super-admin actors, so neither branch would ever match anything.
+         */
+        q: string | null;
     };
 };
 

@@ -710,6 +710,18 @@ Route::middleware([
     */
     Route::get('/search', [SearchController::class, 'index'])->name('search.index');
 
+    /*
+    | The ⌘K palette's type-ahead (J1d). Same group, same absence of `can:`/`feature:` gates, same reasoning
+    | as the page above — authorization is entirely per-arm, and this endpoint adds no surface the page does
+    | not already expose.
+    |
+    | ⚠️ THROTTLED, AND THE PAGE IS NOT. This one fires on a debounce tick rather than on a navigation, so
+    | it is the only search route where a stuck client can loop. 120/min leaves comfortable headroom over a
+    | fast typist behind a 250 ms debounce (~4/s peak), while still bounding a runaway.
+    */
+    Route::get('/search/suggest', [SearchController::class, 'suggest'])
+        ->middleware('throttle:120,1')->name('search.suggest');
+
     Route::get('/audit-log', [AuditLogController::class, 'index'])
         ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
     Route::get('/audit-log/export', [AuditLogController::class, 'export'])

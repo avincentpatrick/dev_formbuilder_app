@@ -74,6 +74,17 @@ const initialQuery = computed(() => {
                     placeholder="Search"
                     autocomplete="off"
                 />
+                <!--
+                    The ⌘K discoverability hint (J1d). A keyboard shortcut nobody can find is a feature
+                    that does not exist, and this is the only surface that advertises it.
+
+                    ⚠️ `aria-hidden`, and NOT a button. It is decoration: the chord is a document-level
+                    capture listener, so this element does nothing when clicked and must not be announced
+                    as though it could. It is also positioned INSIDE the existing form rather than added as
+                    a new flex child, so it cannot change the nav's flex distribution — the geometry
+                    `tests/e2e/search-nav.spec.ts` guards, which `assertClean` is structurally blind to.
+                -->
+                <kbd class="topnav__search-hint" aria-hidden="true">⌘K</kbd>
             </form>
             <a class="topnav__search-compact" href="/search" aria-label="Search this workspace">
                 <MdsIcon name="search" size="md" aria-hidden="true" />
@@ -162,6 +173,35 @@ const initialQuery = computed(() => {
     pointer-events: none;
 }
 
+.topnav__search-hint {
+    /*
+     * Absolutely positioned so it takes NO part in the flex layout — the nav's width distribution is
+     * exactly what it was before this element existed, which is what keeps the J1b geometry spec honest.
+     * Padding-right on the input below reserves the space it sits over.
+     */
+    position: absolute;
+    right: var(--mds-space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-family: inherit;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+    background-color: var(--mds-color-bg-sunken);
+    border-radius: var(--mds-radius-sm);
+    padding: 0 var(--mds-space-1);
+}
+
+/*
+ * Hidden below the tablet band: at 1024px and under there is not room for a hint beside the query, and
+ * below 480px the field is replaced by an icon link anyway. DSR §3.4.1 scopes the hint to desktop.
+ */
+@media (max-width: 1024px) {
+    .topnav__search-hint {
+        display: none;
+    }
+}
+
 .topnav__search :deep(.mds-input) {
     /*
      * Room for the magnifier. The rest of the box model stays the primitive's own.
@@ -175,6 +215,7 @@ const initialQuery = computed(() => {
      * ends at 28px, and 40px leaves a 12px gap that mirrors the 12px inset on its other side.
      */
     padding-left: var(--mds-space-10);
+    padding-right: var(--mds-space-10);
 }
 
 /* The compact state's target is the full 44x44 §4.4 asks for, even though the glyph is 24. */

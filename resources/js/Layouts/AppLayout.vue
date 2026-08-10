@@ -8,6 +8,7 @@
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { MdsToastHost } from '@meridian/design-system';
+import CommandPalette from '@/components/shell/CommandPalette.vue';
 import TopNav from '@/components/shell/TopNav.vue';
 import Sidebar from '@/components/shell/Sidebar.vue';
 import ImpersonationBanner from '@/components/shell/ImpersonationBanner.vue';
@@ -74,6 +75,17 @@ function onKeydown(event: KeyboardEvent): void {
             </main>
         </div>
         <MdsToastHost :toasts="toasts" @dismiss="dismiss" />
+        <!--
+            Mounted HERE, beside the toast host, because this is the SINGLE persistent AppLayout instance:
+            the palette's open state is module-scoped, so mounting it per-page would bind the ⌘K chord once
+            per navigation. Deliberately NOT in AdminLayout — the central console has no tenant to search.
+
+            The openers are the nav's two search affordances, in preference order — and it is a LIST
+            because only one of them exists at a time: below 480px the field is `display: none` and the
+            compact icon link takes over. Passing just the field stranded focus at 375px (CI caught it),
+            since `.focus()` on a hidden element is a silent no-op and MdsModal then captures <body>.
+        -->
+        <CommandPalette :opener-selectors="['#topnav-search', '.topnav__search-compact']" />
     </div>
 </template>
 

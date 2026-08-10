@@ -901,3 +901,45 @@ phantoms" the tracker had estimated.
 one definition of "which destinations may this user reach" rather than two.
 
 Gates: Pest 3286/0 (12,752 assertions), Pint 1127, PHPStan 23, three lint gates.
+
+## 2026-08-10 — J1c merged (#124), and J1d built: the ⌘K palette
+
+J1c merged 6/6 with real steps. J1d is the command palette, and it is mostly an exercise in not
+re-answering questions the substrate already answered: `GET /search/suggest` reuses `SearchRequest` and
+`SearchService` unchanged, so every gate, predicate and absent-not-zero rule is inherited and the endpoint
+adds no authorization surface. What is new is the transport and the widget.
+
+Plain JSON, never an Inertia partial — a partial re-dispatches the CURRENT page's controller on every
+request, so each debounce tick on the builder would re-run a full builder render to fetch five rows. No
+`counts` key, because `hasMore` already comes free from the arms' limit+1 overfetch and a real COUNT(*)
+per arm is the wrong shape on a keystroke path; omitting it also keeps the count-disclosure question off
+the hot path entirely. `no-store, private`, because the payload is permission-filtered per user and a
+shared cache serving one member's results to another is the disclosure the arms exist to prevent arriving
+through the transport. Throttled, because it is the only search route a stuck client can loop.
+
+The `openModalCount()` lag is the design detail worth remembering. MdsModal pushes onto the inert stack
+inside `nextTick` but releases synchronously, so the count lags `open` on the way up only. A handler that
+checked the count first would see its own palette as "somebody else's dialog" and could never toggle it
+shut — reordering the two guards reddens exactly that case and nothing else, which is the mutation that
+proves the ordering is load-bearing. Checking our own ref first fixes it without an await, and the await
+would have been actively worse: an async handler surrenders preventDefault()'s synchronous window and the
+browser takes ⌘K for its address bar.
+
+The ARIA contract is asserted in Vitest rather than left to axe, because axe does not resolve an
+aria-activedescendant id — a dangling one, which is worse than an absent one since the screen reader then
+announces nothing, passes every scan. Options are div[role=option] inside div[role=listbox] (a button
+trips nested-interactive and breaks activedescendant; li fails aria-required-children), DOM focus never
+leaves the input, and the live region lives inside the dialog because inert silences everything outside an
+open modal. Storybook globs the design-system package only, so this app-tree component gets no story and
+no checkA11y scan at all; command-palette.spec.ts is its only automated a11y gate, and exceptions-log #9
+records that so a green design-system-a11y job is not misread as coverage.
+
+One repeat offence, caught earlier this time: I reached for `--mds-color-surface-active`, which does not
+exist. Checking every token against tokens.css BEFORE the first test run is J1b's --mds-space-9 lesson
+actually applied rather than merely written down. The ⌘K hint is absolutely positioned inside the existing
+form rather than added as a new flex child, so it cannot shift the nav's flex distribution — the geometry
+search-nav.spec.ts guards and assertClean is structurally blind to. DSR §3.2's locator note is amended in
+the same commit: an explicit role="combobox" overrides type="search"'s implicit searchbox, so the palette's
+locator differs from every other search field's — precisely the failure mode that note exists to prevent.
+
+Gates: Pest 3294/0 (12,781 assertions), Pint 1128, PHPStan 23, controller-gate, vue-tsc.

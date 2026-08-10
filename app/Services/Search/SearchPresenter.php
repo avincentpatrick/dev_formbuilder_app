@@ -59,6 +59,40 @@ final readonly class SearchPresenter
     }
 
     /**
+     * The ⌘K palette's payload (Increment J1d) — plain JSON, never an Inertia response.
+     *
+     * ⚠️ NO `counts` KEY, AND THAT IS A DELIBERATE DIFFERENCE FROM {@see index()}. `hasMore` already comes
+     * free from the arms' `limit + 1` overfetch, so the palette gets its "there is more" signal without a
+     * second query — whereas `counts()` runs a real `COUNT(*)` per arm, which is the wrong shape on a path
+     * that fires on every debounce tick. Omitting it also keeps the count-disclosure question off the hot
+     * path entirely rather than answering it twice.
+     *
+     * Everything else is inherited unchanged: the same arms, the same gates, the same absent-not-zero rule
+     * for a refused arm. **This endpoint adds no authorization surface** — it is `index()` with a smaller
+     * limit and a smaller envelope, which is why it reuses `SearchRequest` rather than minting a second
+     * contract that could drift from it.
+     *
+     * @return array<string, mixed>
+     */
+    public function suggest(User $user, SearchTerms $terms): array
+    {
+        $results = $this->search->results($user, $terms, null, SearchService::PER_ENTITY_PREVIEW);
+
+        return [
+            'q' => $terms->raw(),
+            'groups' => array_map(fn (SearchArmResult $r): array => [
+                'entity' => $r->entity->value,
+                'label' => $r->entity->label(),
+                'items' => $r->rows,
+                'has_more' => $r->hasMore,
+            ], $results),
+            // Always present, even with no query, so the client never has to construct a URL itself and the
+            // "See all results" option has one source of truth.
+            'see_all_url' => '/search?q='.rawurlencode((string) $terms->raw()),
+        ];
+    }
+
+    /**
      * One prop, one meaning, computed on the server — the rule `AuditLogPresenter` records.
      *
      * ⚠️ `no_permitted_scopes` IS UNREACHABLE FOR EVERY SEEDED ROLE TODAY (all five hold `submissions.view`)

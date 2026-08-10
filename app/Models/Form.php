@@ -7,11 +7,16 @@ namespace App\Models;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
+use App\Enums\ResourceCapacity;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Policies\FormPolicy;
+use App\Services\Analytics\AnalyticsFormSet;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Forms\FormPresenter;
 use Database\Factories\FormFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -169,5 +174,64 @@ class Form extends Model implements TenantScoped
     public function grants(): MorphMany
     {
         return $this->morphMany(ResourceGrant::class, 'scopeable');
+    }
+
+    /**
+     * The LIST twin of {@see FormPolicy::view()} — "whose form ROW may this user see".
+     * Pinned in both directions by `FormVisibilityScopeTest`.
+     *
+     * Extracted in J1b from {@see FormPresenter::list()}, which had encoded it inline
+     * since G10b. Global search needs the same rule, and this repo's own history says what happens when a
+     * visibility rule is copied instead of shared: `SubmissionPolicy` keeps a docblock pinning its list twin
+     * precisely because "a respondent who could open a row the inbox never lists is exactly the divergence
+     * that pin exists to prevent."
+     *
+     * ⚠️ THIS IS NOT {@see AnalyticsFormSet}'s `visible()`, AND FOLDING THEM WOULD BE
+     * A REAL AUTHORIZATION BUG RATHER THAN A TIDY-UP. That method answers a DIFFERENT question — "whose
+     * SUBMISSIONS may this user aggregate" — and so keys on `dashboard.org.view` with ANY grant capacity, and
+     * returns `Form::withTrashed()`. A **Viewer** holds `dashboard.org.view` and holds **no `forms.*` key at
+     * all**, so under that rule a Viewer would see the title and description of every form in the tenant,
+     * including SOFT-DELETED ones, through global search — while `/forms` correctly shows them nothing.
+     * `AnalyticsFormSet` is the most search-shaped code already in the tree and therefore the obvious thing
+     * to copy; do not.
+     *
+     * Editor capacity, not the null "any capacity" default: this is the authoring rule, so a bare reviewer
+     * grant must not surface a form here with every `can` flag false. Routed through
+     * {@see ResourceGrantResolver::grantedFormIdsQuery()} so it inherits the fail-closed empty set — a user
+     * with no grants matches NOTHING, never an unconstrained query.
+     *
+     * Deliberately adds no `orWhere`, so it needs none of `Submission::scopeVisibleTo()`'s defensive closure;
+     * do not cargo-cult one in. Archive/soft-delete filtering is the CALLER's, because "may I see this row"
+     * and "does this list show archived rows" are different questions.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('forms.edit.any')) {
+            return $query;
+        }
+
+        $granted = app(ResourceGrantResolver::class)->grantedFormIdsQuery($user, ResourceCapacity::Editor);
+
+        // ⚠️ `forms.edit.own` IS THE POLICY'S SECOND CONJUNCT AND IT IS LOAD-BEARING — an Editor grant
+        // ALONE does not confer visibility. The first draft of this scope omitted it, and
+        // `FormVisibilityScopeTest` is what found the divergence: a Reviewer or Viewer holding an Editor
+        // grant was inside the scope's set and outside `FormPolicy::view()`'s, i.e. a list that offers a
+        // row whose builder refuses to open. Nothing observed it in production only because BOTH live
+        // callers — the `can:viewAny,Form` middleware on `/forms` and `FormSearchArm::allowed()` — refuse
+        // those roles one layer up. That masking is exactly J1b's recorded mutation-survivor pattern, and
+        // it is not a reason to leave the rule wrong.
+        //
+        // Fail closed INSIDE the subquery, where `grantedFormIdsQuery()` already keeps its own empty-set
+        // guard: its OR is closure-grouped, so this conjunct ANDs with the whole group rather than
+        // re-associating against one branch of it, and the outer `whereIn` shape stays identical on both
+        // paths.
+        if (! $user->can('forms.edit.own')) {
+            $granted->whereRaw('false');
+        }
+
+        return $query->whereIn('forms.id', $granted);
     }
 }

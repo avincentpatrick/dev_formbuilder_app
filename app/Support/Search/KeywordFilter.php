@@ -37,6 +37,13 @@ final class KeywordFilter
      * A qualified column is code-authored, never request data — but it is interpolated into SQL, so it is
      * validated anyway. The check is what lets a reader confirm there is no injection surface here without
      * having to audit every call site, and it is the same posture `TenantIsolation` takes for identifiers.
+     *
+     * The `literal-string` types on the callers are the STATIC half of that same argument: PHPStan refuses
+     * to pass anything request-derived into these methods at all, so the runtime check below is a backstop
+     * rather than the only guard. It is also what lets `whereRaw()`/`orderByRaw()` accept the composed SQL,
+     * since a literal-string concatenated with literal-strings stays literal.
+     *
+     * @param  literal-string  $qualifiedColumn
      */
     private static function assertColumn(string $qualifiedColumn): void
     {
@@ -53,6 +60,7 @@ final class KeywordFilter
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
+     * @param  literal-string  $qualifiedColumn
      * @return Builder<TModel>
      */
     public static function apply(Builder $query, SearchTerms $terms, string $qualifiedColumn): Builder
@@ -74,11 +82,33 @@ final class KeywordFilter
     /**
      * The ORDER BY fragment. Bind `$terms->tsQuery()` as the single parameter.
      *
-     * ⚠️ THE REGCONFIG HERE MUST MATCH THE GENERATED COLUMN'S, AND A MISMATCH IS SILENT. Both are the SQL
-     * literal `'simple'`, never a bound parameter — `to_tsquery(?, ?)` would need a `::regconfig` cast and
-     * would invite a future refactor to make it dynamic. If the two ever diverge the query still returns
-     * rows; it just stops using the GIN index and degrades to a sequential scan, which no functional test can
-     * see. `SearchIndexUsageTest` reads the actual plan for exactly this reason.
+     * ⚠️ THE REGCONFIG HERE MUST MATCH THE GENERATED COLUMN'S, AND A MISMATCH IS SILENT — BUT SILENT IN THE
+     * **CORRECTNESS** DIMENSION, NOT THE PERFORMANCE ONE. Both are the SQL literal `'simple'`, never a bound
+     * parameter — `to_tsquery(?, ?)` would need a `::regconfig` cast and would invite a future refactor to
+     * make it dynamic.
+     *
+     * An earlier draft of this note claimed a mismatch would "stop using the GIN index and degrade to a
+     * sequential scan, which no functional test can see". All three clauses were wrong, and the correction is
+     * worth keeping because the wrong version sends you off to build the wrong guard:
+     *
+     *   - There is no index to lose. The search vectors carry no GIN at all — see 2026_08_11_000001's
+     *     "THERE IS NO GIN INDEX" section for the RLS/leakproof measurement that explains why.
+     *   - Even if there were one, a regconfig mismatch would not cost it. An index on a STORED `tsvector`
+     *     **column** is matched on the operator and the column; the right-hand side only has to be
+     *     rel-independent, and `to_tsquery('english', ?)` is IMMUTABLE and qualifies exactly as `'simple'`
+     *     does. (Plan-sensitivity to the regconfig is real for the EXPRESSION-index idiom,
+     *     `GIN (to_tsvector('simple', title))` — conflating the two idioms is how the note went wrong.)
+     *   - What actually changes is WHICH ROWS COME BACK. `'english'` stems, so a search for "running" looks
+     *     for `run` in a vector storing `running`; and it strips stopwords, so "the" lowers to an EMPTY
+     *     tsquery, which matches no row at all. A functional case over one such word sees it immediately —
+     *     `SearchRegconfigParityTest` is that guard.
+     *
+     * `SearchIndexUsageTest` exists for a different question entirely: whether a keyword predicate on an
+     * RLS-protected table can become an index qual in this deployment, and what bounds the work when it
+     * cannot.
+     *
+     * @param  literal-string  $qualifiedColumn
+     * @return literal-string
      */
     public static function rankSql(string $qualifiedColumn): string
     {

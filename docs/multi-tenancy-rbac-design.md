@@ -428,6 +428,22 @@ A third note joins the two above, and it is the one this increment adds:
 
 - **A console read over a table whose base policy is NOT nullable-global needs a carve-out narrowed to the slice it actually serves, not the generic bypass.** The unrestricted gate is a sensible default only where the platform slice is already public; on a strict or append-only table it is a silent, enormous widening. Use `TenantIsolation::platformRowsBypass()` (ADR-0002 §D3's I7b amendment), and name the policy outside the `*_superadmin_*` prefix so a `pg_policies` sweep for unrestricted reads stays honest.
 
+**Per-entity search visibility (Increment J1b, PRD §3.7).** Global search coins **no new permission key** — the catalog stays closed at 29. Each entity is one arm behind an interface, and each arm reuses the gate its own list page already uses, so "what may I find" can never drift from "what may I open". Three rules govern the table:
+
+1. **The arm gate runs first.** A refused arm is **ABSENT from the response**, never rendered as a group with zero results — a `0` is a claim about how much exists, an absent key is the truth. This is binding on every search surface (`docs/ux/design-system-reference.md` §3.4.1).
+2. **Counts are computed after permission filtering**, from the same builder as the rows (`SearchCountLeakTest`). A badge reading "3" over a list of 1 discloses that two invisible rows exist, which is a leak with no row leaving the database.
+3. **The row rule is the policy's, never analytics'.** `Form::scopeVisibleTo()` is the list twin of `FormPolicy::view()` and is pinned to it in both directions by `FormVisibilityScopeTest`.
+
+| Entity | Arm gate | Row rule | Owner / Admin | Form Editor | Reviewer | Viewer |
+|---|---|---|---|---|---|---|
+| Forms | `viewAny` on `Form` (`forms.create` \| `.edit.any` \| `.edit.own`) | `Form::scopeVisibleTo()`, Editor capacity, non-archived | ✓ every non-archived form | ✓ editor-granted only | ✗ **arm refused** | ✗ **arm refused** |
+| Submissions | `viewAny` on `Submission` | `Submission::scopeVisibleTo()` + `countable()`; matches own vector, the FORM's title, or a ≥8-char reference prefix | ✓ every non-draft | ✓ granted forms | ✓ granted forms | ✓ per `submissions.view` |
+| Audit rows | — | — | ✗ **not an entity** | ✗ | ✗ | ✗ |
+
+⚠️ **Audit rows are not on this list, and adding them would be a widening rather than a completion** — see the refusal recorded immediately above. The same reasoning that rejected `applySuperAdminBypass('audits', ['SELECT'])` for the console applies to a tenant-side search arm: a keyword search over `old_values`/`new_values` is a channel over precisely the data `AuditRedactor` exists to remove, and `AuditableTypes::label()` fails open, so a newly-registered alias is un-redacted until someone remembers to add it. `App\Enums\SearchEntity`'s docblock carries the same warning at the code.
+
+⚠️ **A future member-search arm must run on the DEFAULT connection.** `users_auth_select … USING (true)` (§6's fourth RLS shape) exists to let the pre-auth login path resolve an identity with no tenant context, and on `pgsql_auth` there is no tenant boundary of any kind — `users` has no `tenant_id` column at all. `TenantMembershipService::listMembers()` is safe there only because its id set is derived from an RLS-bounded `tenant_users` read *before* the connection hop. **The standing rule: no user-supplied predicate may ever run on `pgsql_auth`.** A keyword search that copied that idiom would return every matching user in the deployment.
+
 **Resolved decisions (2026-07-05, decided with the product owner rather than silently picked):**
 
 1. **Impersonation — deferred.** The platform console does **not** support "log in as this user" in Phase 0. It is a large security surface and would need an `acting_as_user_id`-style `audits` column (and the `audits` table itself, which does not exist until Phase 1) to keep a super-admin's own actions distinguishable from actions taken while impersonating. Revisit when support tooling genuinely requires it; design the `acting_as_user_id` column alongside the Phase-1 `audits` table if so.

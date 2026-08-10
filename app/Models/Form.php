@@ -213,9 +213,25 @@ class Form extends Model implements TenantScoped
             return $query;
         }
 
-        return $query->whereIn(
-            'forms.id',
-            app(ResourceGrantResolver::class)->grantedFormIdsQuery($user, ResourceCapacity::Editor)
-        );
+        $granted = app(ResourceGrantResolver::class)->grantedFormIdsQuery($user, ResourceCapacity::Editor);
+
+        // ⚠️ `forms.edit.own` IS THE POLICY'S SECOND CONJUNCT AND IT IS LOAD-BEARING — an Editor grant
+        // ALONE does not confer visibility. The first draft of this scope omitted it, and
+        // `FormVisibilityScopeTest` is what found the divergence: a Reviewer or Viewer holding an Editor
+        // grant was inside the scope's set and outside `FormPolicy::view()`'s, i.e. a list that offers a
+        // row whose builder refuses to open. Nothing observed it in production only because BOTH live
+        // callers — the `can:viewAny,Form` middleware on `/forms` and `FormSearchArm::allowed()` — refuse
+        // those roles one layer up. That masking is exactly J1b's recorded mutation-survivor pattern, and
+        // it is not a reason to leave the rule wrong.
+        //
+        // Fail closed INSIDE the subquery, where `grantedFormIdsQuery()` already keeps its own empty-set
+        // guard: its OR is closure-grouped, so this conjunct ANDs with the whole group rather than
+        // re-associating against one branch of it, and the outer `whereIn` shape stays identical on both
+        // paths.
+        if (! $user->can('forms.edit.own')) {
+            $granted->whereRaw('false');
+        }
+
+        return $query->whereIn('forms.id', $granted);
     }
 }

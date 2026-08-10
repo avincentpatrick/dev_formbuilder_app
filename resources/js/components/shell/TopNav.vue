@@ -163,8 +163,18 @@ const initialQuery = computed(() => {
 }
 
 .topnav__search :deep(.mds-input) {
-    /* Room for the magnifier. The rest of the box model stays the primitive's own. */
-    padding-left: var(--mds-space-9);
+    /*
+     * Room for the magnifier. The rest of the box model stays the primitive's own.
+     *
+     * ⚠️ THE SPACE SCALE HAS NO 7 AND NO 9. It runs 0,1,2,3,4,5,6,8,10,12,16,20,24 — this first shipped as
+     * `--mds-space-9`, which resolves to nothing, so the padding silently collapsed to the primitive's own
+     * and the icon overlapped the caret. `token-references.test.ts` is the gate that catches it; check the
+     * scale before reaching for a step that "should" exist.
+     *
+     * 40px is arithmetic, not taste: the icon is `sm` (16px) at `left: var(--mds-space-3)` (12px), so it
+     * ends at 28px, and 40px leaves a 12px gap that mirrors the 12px inset on its other side.
+     */
+    padding-left: var(--mds-space-10);
 }
 
 /* The compact state's target is the full 44x44 §4.4 asks for, even though the glyph is 24. */

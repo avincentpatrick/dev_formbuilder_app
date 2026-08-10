@@ -54,18 +54,50 @@ use Illuminate\Support\Facades\DB;
  * top. The slug is de-hyphenated because `clinic-intake` should be findable by "intake"; it is weighted last
  * because it is a URL fragment, not prose.
  *
- * ── THE INDEX, AND ONE OMISSION STATED RATHER THAN HIDDEN ─────────────────────────────────────────────────
- * A plain `USING GIN (search_vector)`. A multicolumn `GIN (tenant_id, search_vector)` — which would let one
- * index serve the RLS tenant predicate and the match together — requires the `btree_gin` extension, and only
- * `postgis` is enabled in this deployment. Postgres bitmap-ANDs the GIN result against the tenant predicate
- * served by the existing `(tenant_id, ...)` B-trees, which is correct and adequate at Phase-1 volumes on the
- * single box of ADR-0005. If search latency ever shows up against `docs/non-functional-requirements.md` §1,
- * `CREATE EXTENSION btree_gin` is a one-line privileged migration mirroring 2026_07_12_000001 and is the first
- * thing to reach for. It is deliberately NOT added speculatively: ADR-0001:56 already claims three extensions
- * that are not actually enabled, and a fourth claimed-but-unused one makes that record worse.
+ * ── ⚠️ THERE IS NO GIN INDEX ON THIS COLUMN, AND THAT IS A MEASUREMENT, NOT AN OVERSIGHT ─────────────────
+ * The first draft of this migration shipped `CREATE INDEX forms_search_vector_idx ON forms USING GIN
+ * (search_vector) WHERE deleted_at IS NULL` and argued, in this docblock, that "Postgres bitmap-ANDs the GIN
+ * result against the tenant predicate served by the existing `(tenant_id, ...)` B-trees". **That was false,
+ * and every functional test passed over it** — identical rows come back either way; only the plan differs.
  *
- * `WHERE deleted_at IS NULL` is provable from any `Form::query()` because the SoftDeletes global scope emits
- * exactly that predicate — the argument 2026_08_03_000001 makes for its own partial indexes.
+ * **PostgreSQL will not let a non-leakproof clause become an index qual on a relation carrying RLS quals.**
+ * `match_clause_to_index()` opens by rejecting any clause that fails
+ * `restriction_is_securely_promotable()`, which passes only when the clause's `security_level` is at
+ * `rel->baserestrict_min_security` or the clause is leakproof. An RLS policy qual sits *below* every
+ * ORM-emitted `WHERE`, so on this FORCE-RLS table the search predicate is always at the higher level — and
+ * `@@` is not leakproof. Measured on PG 17.0.5 rather than argued:
+ *
+ *   SELECT p.proleakproof FROM pg_operator o JOIN pg_proc p ON p.oid = o.oprcode
+ *   WHERE o.oprname = '@@' AND o.oprleft = 'tsvector'::regtype AND o.oprright = 'tsquery'::regtype;
+ *   -- ts_match_vq(tsvector,tsquery) | proleakproof = f
+ *
+ * The controlled experiment, one variable, same rows and same session (it is `SearchIndexUsageTest`'s
+ * `rls_probe` case, so it runs on every suite): a 5,000-row table with a GIN on its tsvector plans as
+ * `Bitmap Index Scan`; ENABLE + FORCE one tenant policy on it and the identical query becomes a `Seq Scan`
+ * with the match demoted to a `Filter`. **Penalising sequential scans to a cost of 10^10 does not bring the
+ * index back**, which is what proves this is eligibility and not the cost model.
+ *
+ * `btree_gin` would not have rescued it either — the blocker is clause eligibility, not index shape — so the
+ * "reach for `CREATE EXTENSION btree_gin` first" advice this docblock used to carry has been removed rather
+ * than left to send the next author down a dead end.
+ *
+ * ── WHAT BOUNDS THE WORK INSTEAD, WHICH IS THE PROPERTY WORTH DEFENDING ───────────────────────────────────
+ * The RLS tenant qual *is* securely promotable (it sits at the minimum security level by construction), so it
+ * becomes the index condition and the search predicate is applied as a heap filter over one tenant's rows.
+ * Measured, again with sequential scans penalised so the shape is not a small-table artefact:
+ *
+ *   Index Scan using forms_tenant_id_id_unique on forms
+ *     Index Cond: (tenant_id = ...)
+ *     Filter: ((deleted_at IS NULL) AND (status <> 'archived') AND (search_vector @@ '''clin'':*'::tsquery))
+ *
+ * That is O(this tenant's forms), which is microseconds at Phase-1 volumes on the single box of ADR-0005 and
+ * stops being adequate somewhere around 10^5–10^6 forms in ONE tenant. The honest options at that point are a
+ * lexeme side-table keyed `(tenant_id, form_id, lexeme COLLATE "C")` — whose btree operators ARE leakproof
+ * (measured: `texteq`/`text_lt`/`text_ge` are all `proleakproof = t`), so a range-scanned prefix survives RLS
+ * where `@@` cannot — or a deliberate, user-approved `ALTER FUNCTION ... LEAKPROOF`. Note that `pg_trgm` is
+ * NOT an escape hatch: `~~` and `~~*` measure `proleakproof = f`, so it hits this same wall.
+ * Neither is built, because building either now would be speculative. The column stays because the `@@`
+ * filter and `ts_rank` ordering both still need it; only the unreachable index is gone.
  *
  * ── LOCKS ────────────────────────────────────────────────────────────────────────────────────────────────
  * `ADD COLUMN ... GENERATED ... STORED` takes ACCESS EXCLUSIVE and REWRITES THE TABLE — heavier than the SHARE
@@ -88,18 +120,10 @@ return new class extends Migration
             ."setweight(to_tsvector('simple', coalesce(replace(public_slug, '-', ' '), '')), 'C')"
             .') STORED'
         );
-
-        DB::statement(
-            'CREATE INDEX forms_search_vector_idx ON forms USING GIN (search_vector) '
-            .'WHERE deleted_at IS NULL'
-        );
     }
 
     public function down(): void
     {
-        // Index first. Dropping the column would cascade to it anyway, but an explicit order keeps the
-        // rollback readable and makes a partial failure diagnosable.
-        DB::statement('DROP INDEX IF EXISTS forms_search_vector_idx');
         DB::statement('ALTER TABLE forms DROP COLUMN IF EXISTS search_vector');
     }
 };

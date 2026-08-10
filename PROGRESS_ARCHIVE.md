@@ -811,3 +811,49 @@ J1b is committed and pushed but **not merged**: it still owes the `EXPLAIN` inde
 index passes all 59 tests — identical rows, only the plan changes), the 375px bounding-box/non-overlap e2e,
 a scope≡policy set-equality test, three doc updates, the gate sweep and its review. J1c is the leak PR and
 the reason the split exists.
+
+## 2026-08-10 — J1b finished: the search substrate, and the two GIN indexes it had to remove
+
+J1b's owed work is done and the increment is ready to merge, but the headline is that finishing it
+REVERSED one of its own design decisions. The `EXPLAIN` index-usage test was written to catch a silent
+failure, and it caught one: **both GIN indexes were structurally unreachable.** PostgreSQL refuses to
+promote a non-leakproof clause to an index qual on a relation carrying RLS quals
+(`restriction_is_securely_promotable()`), `@@` is not leakproof, and `forms`/`submissions` are ENABLE'd
+AND FORCE'd for a role that is neither superuser nor bypassrls — so the match was always a heap Filter.
+All 59 of J1b's other tests passed over it, because identical rows come back either way and only the plan
+differs. Measured on PG 17.0.5 three independent ways: `ts_match_vq` is `proleakproof = f`; a 5,000-row
+probe table loses its GIN the instant one tenant policy is applied via the production generator, same
+session and same rows; and penalising sequential scans to cost 10^10 does not bring it back, which is what
+proves this is eligibility and not the cost model. `LIKE`/`ILIKE` measure non-leakproof too, so `pg_trgm`
+is no escape hatch — plain btree comparison is, which is the shape to reach for if this is ever revisited.
+The submissions index had a SECOND, RLS-independent reason: its arm's three-branch OR carries an ANY
+SubLink that stays a `SubPlan`, so `generate_bitmap_or_paths()` abandons the whole OR. Both indexes
+dropped with the user's decision; the columns stay because `@@` and `ts_rank` still need them; the tenant
+predicate is what bounds the work and it IS promotable.
+
+**J1b as pushed would have failed CI three times over, and none of it was visible locally until the full
+sweep** — the branch had never had a CI run. Five real PHPStan L8 errors in the search files (fixed by
+typing the qualified column `literal-string`, which also makes the no-injection argument static rather
+than only runtime, plus `array_values()`); `TopNav.vue` referencing `--mds-space-9`, which does not exist
+(the scale skips 7 and 9), so the padding silently collapsed and the magnifier overlapped the caret; and a
+cross-test pollution bug in the new set-equality test, which minted a global role on `pgsql_privileged` —
+outside RefreshDatabase's transaction, therefore COMMITTED — and reddened `RbacRlsTest` a hundred files
+later while every single-file run passed.
+
+The owed set-equality test found a real divergence: `Form::scopeVisibleTo()` never checked
+`forms.edit.own`, so a Reviewer or Viewer holding an Editor grant sat inside the scope and outside
+`FormPolicy::view()` — reachable under the SHIPPED role matrix, masked only because both live callers gate
+on `viewAny` first, which is the same masking that made an earlier J1b mutation survive. Fixed fail-closed
+inside the subquery; `FormListScopingTest` still passes unedited.
+
+Three lessons worth carrying: a `pgsql_privileged` write commits and leaks (and an `afterEach` cleanup
+would deadlock on the FK, since it runs before the rollback); Pest's `toContain()` is variadic, so a
+"message" second argument is silently asserted as a second needle; and a failure message that does not
+print what it SAW costs an hour — "found 0" told nothing until it listed the statements it had seen.
+Doc claims were run as real queries against the seeded demo corpus rather than reasoned about, which
+corrected two steps naming the wrong seeder's accounts and one keyword matching no demo form.
+
+Gates: Pest 3265/0 (12,685 assertions), Vitest 85 files/1542, Pint 1120, PHPStan 74 = baseline delta 0,
+three lint gates, vue-tsc, build, `openapi.json` byte-identical. E2E and Storybook axe could NOT be run
+locally — CI is their only authority, and `tests/e2e/search-nav.spec.ts` records that its first CI run is
+its real first run. J1c is next and is the leak PR.

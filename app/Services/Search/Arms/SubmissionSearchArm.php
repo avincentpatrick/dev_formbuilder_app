@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Search\Arms;
 
 use App\Enums\SearchEntity;
+use App\Models\Form;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Search\SearchArm;
@@ -68,10 +69,14 @@ final readonly class SubmissionSearchArm implements SearchArm
                 // The reference a support ticket quotes. `SearchTerms::uuidPrefix()` accepts the same shape,
                 // so what is displayed is what can be pasted back in.
                 'title' => mb_substr($s->id, 0, 8),
-                'subtitle' => trim(($s->form?->title ?? 'Unknown form').' · '.$s->status->label()),
+                'subtitle' => trim($this->formLabel($s).' · '.$s->status->label()),
                 'url' => '/submissions/'.$s->id,
             ])
             ->all();
+
+        // `array_values` for the same reason as `FormSearchArm`: a `list<...>` that static analysis can
+        // prove, rather than one the code merely promises.
+        $rows = array_values($rows);
 
         return SearchArmResult::fromOverfetch($this->entity(), $rows, $limit);
     }
@@ -79,6 +84,26 @@ final readonly class SubmissionSearchArm implements SearchArm
     public function count(User $user, SearchTerms $terms): int
     {
         return $this->builder($user, $terms)->count();
+    }
+
+    /**
+     * The form's title, or a placeholder when the relation does not resolve.
+     *
+     * ⚠️ THE NULL BRANCH IS REACHABLE EVEN THOUGH `submissions.form_id` IS NOT NULL. `Form` is
+     * soft-deleted, so the `belongsTo` applies the SoftDeletes global scope and returns null for a
+     * trashed form — while the submission row itself survives and is still perfectly visible in the
+     * inbox. PHPStan reads `BelongsTo<Form, $this>` as non-nullable and therefore called the `?->` here
+     * redundant; the annotation below is what records that the generic is not the runtime truth. Written
+     * as a method rather than inlined so the reasoning has somewhere to live.
+     */
+    private function formLabel(Submission $submission): string
+    {
+        // Read through the relation accessor rather than the magic property: `getRelationValue()` is typed
+        // `mixed`, which is the honest type here, and lets the null branch be expressed as a real check
+        // instead of a `?->` that static analysis insists is dead.
+        $form = $submission->getRelationValue('form');
+
+        return $form instanceof Form ? $form->title : 'Unknown form';
     }
 
     /**

@@ -5,7 +5,7 @@
 **Status:** Living document, written in Increment I6 (2026-08-07) and kept current as increments land. This is
 the walkthrough the product owner drives the whole application from: it visits every surface that is built,
 in the order a real user would meet them, against the fixture `Database\Seeders\DemoSeeder` creates. It is
-also a deliberate record of what is **not** built — §17 lists that, so a missing feature reads as a known
+also a deliberate record of what is **not** built — §18 lists that, so a missing feature reads as a known
 gap rather than a bug you found.
 
 **How to read:** Each chapter is a numbered list of steps. Every step names the **URL**, the **account** to
@@ -80,14 +80,20 @@ a pending row to show. That is intended.
 
 1. `/dashboard` · owner. Look at the left sidebar. **Expect:** Forms, Submissions, Dashboard, Analytics,
    Members, Scopes, Audit log, Webhooks, Integrations, Domains, Settings. Every one of them is a real page.
-2. Open the account menu (top right) → **Settings**, or go to `/settings`.
-3. **Appearance card** — switch the theme mode between Light, Dark and System. **Expect:** the whole app
+2. Look at the **centre of the top bar**. **Expect:** a search field labelled "Search this workspace".
+   Type `health` and press **Enter without touching the mouse**. **Expect:** the results page at
+   `/search?q=health`, listing *Community Health Survey 2026*. This is an ordinary HTML form, so it works
+   with JavaScript disabled — §17 walks through what it does and does not find.
+3. Narrow the browser to **375px wide**. **Expect:** the search field is replaced by a magnifying-glass
+   icon that links to `/search`, the wordmark stays readable, and nothing overlaps the notification bell.
+4. Open the account menu (top right) → **Settings**, or go to `/settings`.
+5. **Appearance card** — switch the theme mode between Light, Dark and System. **Expect:** the whole app
    re-colours immediately, with no reload and no flash of the wrong theme.
-4. Change the **accent colour**. **Expect:** buttons, links and focus rings change together; text contrast
+6. Change the **accent colour**. **Expect:** buttons, links and focus rings change together; text contrast
    stays readable in both themes.
-5. Change the **text size**. **Expect:** type scales across the app; layout does not break at the largest step.
-6. Turn on the **dyslexia-friendly font**. **Expect:** the typeface changes app-wide.
-7. Resize the browser to a narrow phone width (or use device emulation at 375px). **Expect:** the sidebar
+7. Change the **text size**. **Expect:** type scales across the app; layout does not break at the largest step.
+8. Turn on the **dyslexia-friendly font**. **Expect:** the typeface changes app-wide.
+9. Resize the browser to a narrow phone width (or use device emulation at 375px). **Expect:** the sidebar
    collapses to a menu button, nothing overflows horizontally, and every page remains usable. Try this on
    `/submissions` and `/analytics` specifically — they are the densest.
 
@@ -384,7 +390,7 @@ rewriting its answers are different powers.
 5. Redeliver a past delivery. **Expect:** a new attempt is recorded.
 6. **Rotate the signing secret.** **Expect:** the new secret is shown once and never again.
 7. `/integrations` · owner. **Expect:** a provider catalogue. Slack is connectable; Google Sheets and Airtable
-   are backend-only for now (see §17).
+   are backend-only for now (see §18).
 8. `/domains` · owner. **Expect:** the custom-domain surface. Claim a domain. **Expect:** a DNS TXT record to
    add and a **Verify** button. Verification will not succeed unless you actually control the domain — that is
    correct. **Do not expect to activate one**: activation is an operator command run after a certificate is
@@ -487,7 +493,40 @@ This is the chapter that checks the thing a multi-tenant product must never get 
 
 ---
 
-## 17. What is *not* built yet
+## 17. Searching — PRD §3.7
+
+Global search is one field in the top bar and one results page. It is deliberately narrow at this stage:
+it finds **forms** and **submissions**, and nothing else yet. §18 lists what it refuses and why.
+
+1. `/dashboard` · owner. Type `health` into the top-bar search and press Enter. **Expect:** `/search?q=health`
+   with a **Forms** group containing *Community Health Survey 2026*, and a count badge beside the heading.
+   Each group caps at 5 with a "Show more" link.
+2. Click **Show more** on Forms. **Expect:** the same page filtered to that one entity, with a higher cap.
+3. Search `assessment`. **Expect:** *Field Site Assessment*. Search `patient`. **Expect:** *Patient Intake*.
+4. Search for something no form has, e.g. `zzzznotathing`. **Expect:** a single "No results" panel — **not**
+   an error, and not a partial page.
+5. Type only spaces and submit. **Expect:** the ordinary "start typing" state. **It must never show a
+   validation error** — every bound in this feature degrades instead of refusing.
+6. Paste a very long paragraph into the field and submit. **Expect:** it searches the first part and returns
+   a page. Again, never a 422.
+7. Type `foo &` or `((` and submit. **Expect:** an ordinary results page. These are PostgreSQL text-search
+   operators and a naive implementation would return a 500 here.
+8. Search `surve`. **Expect:** *Community Health Survey 2026* among the results — the last word you type is
+   matched as a prefix, so a partial word still finds things (other forms whose description mentions a
+   survey come back too, which is correct). Now search `surveys`. **Expect:** nothing at all. Words are
+   matched literally, so a plural finds no singular; §18 explains why that trade was taken deliberately.
+9. Search for the **first 8+ characters of a submission's reference** (copy one from `/submissions`).
+   **Expect:** that submission. Fewer than 8 characters deliberately does not do a prefix lookup.
+10. Sign in as `reviewer@demo.test` and search `health`. **Expect:** a Submissions group and **no Forms
+    group at all** — not an empty Forms group showing "0". A reviewer holds no forms permission, and the
+    feature's rule is that a section you may not search is *absent*, because a "0" would itself tell you
+    something exists that you cannot see.
+11. Still as the reviewer, confirm the **count badge matches the number of rows listed**. A badge that
+    over-counts would be disclosing rows you are not allowed to see.
+
+---
+
+## 18. What is *not* built yet
 
 Everything above is built. These are known, deliberate gaps — if you go looking for them, their absence is
 expected and is not a defect.
@@ -502,6 +541,10 @@ expected and is not a defect.
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
+| **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its reference, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |
+| **Typo tolerance and word stemming** | **Not built, deliberately.** Searching "submission" will not find "submissions" except through the prefix match, and a misspelling finds nothing. Words are indexed literally, which is what lets a form titled "The A Team" be found by "the" — English stemming would strip that title to almost nothing and make it unfindable by its own name. Fuzzy matching needs a database extension and is a later decision. |
+| **Searching members, settings or audit rows** | Members and settings pages are increment J1c; the command palette is J1d. **Audit rows are refused outright, not scheduled** — a keyword search over an audit diff would read exactly the values redaction exists to remove. |
+| **A search index** | There is none, by measurement rather than omission. PostgreSQL will not use a text index on a table protected by row-level security, so one was built, proven unreachable, and removed. Searching is bounded by your workspace instead, which is fast at any realistic size. Recorded in `SearchIndexUsageTest` and the two `2026_08_11_*` migrations. |
 | **Production deployment** | Track B, after the application is otherwise complete. |
 
 Anything else that does not work as this guide describes **is** worth reporting.

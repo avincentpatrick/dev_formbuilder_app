@@ -70,6 +70,11 @@ final readonly class FormSearchArm implements SearchArm
             ])
             ->all();
 
+        // `SearchArmResult` takes a `list<...>`, and a mapped Eloquent collection's `all()` is only an
+        // `array<int, ...>` as far as static analysis is concerned. `array_values` is what makes it a
+        // provable list rather than a promised one.
+        $rows = array_values($rows);
+
         return SearchArmResult::fromOverfetch($this->entity(), $rows, $limit);
     }
 

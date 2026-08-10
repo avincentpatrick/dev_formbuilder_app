@@ -1045,3 +1045,21 @@ Two new local-gate facts: **the full Pest suite now exhausts the container's 128
 a fatal in `routes/tenant.php` partway through, which reads like a route bug and is not (`php -d
 memory_limit=2G vendor/bin/pest`); and **Vitest is 90 files on disk** while full runs reported 79 then 83
 under load — the standing drop, re-confirmed.
+
+**2026-08-11 — J1e MERGED (PR #126, `59971c3`, 6/6 CI green with real steps 11–20). J1 IS COMPLETE; J2 is next.**
+CI found the one thing no local gate could, and the FIRST answer was wrong: `builder-axe.spec.ts:104` (mobile,
+dark) failed, was re-run on the theory that it was that file's documented flake, and **failed again**. Abandoning
+the flake theory and reading the two runs' numbers is what solved it — they DISAGREED (`#7da9c4` on `#1d4260`,
+4.17, mostly-flipped; then `#1c4b72` on `#123350`, 1.42, dark-on-dark, across 309 lines), and two different
+INTERMEDIATE colours is a timing signature rather than a palette change. J1e touches no token, no `Button.vue`,
+no `Builder.vue`, and its only builder component is `v-else` on a tab that test never opens. Both causes were
+harness defects already solved elsewhere in the repo and never adopted in that file: (1) its LOCAL `scan()`
+never parked the pointer, while shared `assertClean()` has done `page.mouse.move(0, 0)` since it was written
+with the reason in its own words — and it is the spec that `.click()`s tabs and buttons then scans immediately,
+over a `.mds-button--secondary` that is `background-color: transparent` whose only opaque state is `:hover`;
+(2) `forceTheme()` collapsed transitions to 1ms and commented about intermediate reads but never waited —
+`setAttribute` invalidates style and the recalc and paint land on a later frame (two rAFs, since the first fires
+before the paint). **Fixing both took the E2E job from 464 passed / 1 failed / 1–3 flaky to 466 / 0 / 0 FLAKY**,
+which retires the `:159` "known flake, do not chase" entry and very likely I11a's empty-canvas one: they were
+this artifact all along. Merged gates: Pest 3336/0 (13,194 assertions), Vitest 90 files/1583, PHPStan 23 delta 0,
+Pint 1135, controller-gate 83, openapi.json byte-identical, e2e 466/0/0.

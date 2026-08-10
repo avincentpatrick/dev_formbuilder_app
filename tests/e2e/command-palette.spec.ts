@@ -44,10 +44,21 @@ test.describe('command palette', () => {
     test('opens even from inside a text field, deliberately', async ({ page }) => {
         // A modifier chord does not collide with typing, and the builder's editors are exactly where a
         // user wants it — DSR §3.4.1 records that there is no tag guard on purpose.
-        const navSearch = page.getByRole('searchbox', { name: 'Search this workspace' });
-        await navSearch.click();
-        await navSearch.type('cl');
+        //
+        // ⚠️ THE FIELD IS INJECTED RATHER THAN BORROWED FROM THE NAV, and CI is why. The first version
+        // clicked the nav searchbox, which does not exist at 375px — below the 480px breakpoint it is
+        // `display: none` and the compact icon link replaces it — so the click timed out at mobile and
+        // passed everywhere else. A temporary textarea tests the actual property (a chord fired from
+        // inside a text field) at every viewport, without depending on which affordance the layout
+        // happens to be showing.
+        await page.evaluate(() => {
+            const field = document.createElement('textarea');
+            field.id = 'chord-probe';
+            document.body.appendChild(field);
+            field.focus();
+        });
 
+        await page.locator('#chord-probe').type('cl');
         await page.keyboard.press(CHORD);
 
         await expect(page.getByRole('dialog', { name: 'Search' })).toBeVisible();
@@ -91,11 +102,24 @@ test.describe('command palette', () => {
         await page.keyboard.press('Escape');
         await expect(page.getByRole('dialog', { name: 'Search' })).toBeHidden();
 
-        // ⚠️ NOT `<body>`. The chord path focuses the nav field before opening precisely so MdsModal
-        // captures a focusable opener — `document.body.focus()` is a silent no-op, and a keyboard user
-        // would otherwise be stranded, which is the outcome DSR §4.5 forbids.
-        const active = await page.evaluate(() => document.activeElement?.tagName ?? '');
-        expect(active).not.toBe('BODY');
+        // ⚠️ NOT `<body>`. The chord path focuses a VISIBLE nav affordance before opening precisely so
+        // MdsModal captures a focusable opener — `document.body.focus()` is a silent no-op, and a keyboard
+        // user would otherwise be stranded, which is the outcome DSR §4.5 forbids.
+        //
+        // This is the case that caught the real bug: passing only `#topnav-search` stranded focus at
+        // 375px, where that field is `display: none`. The assertion NAMES the element rather than merely
+        // ruling out BODY, because "not BODY" would also pass if focus landed somewhere arbitrary — and a
+        // weak assertion here is what would let the same class of bug back in.
+        const active = await page.evaluate(() => ({
+            tag: document.activeElement?.tagName ?? '',
+            id: document.activeElement?.id ?? '',
+            cls: document.activeElement?.className ?? '',
+        }));
+
+        expect(active.tag, `focus was stranded on ${active.tag}`).not.toBe('BODY');
+
+        const isNavSearch = active.id === 'topnav-search' || String(active.cls).includes('topnav__search-compact');
+        expect(isNavSearch, `focus returned to ${active.tag}#${active.id}.${active.cls} instead of a nav search control`).toBe(true);
     });
 
     test('finds a page by a word the product does not use for it', async ({ page }) => {

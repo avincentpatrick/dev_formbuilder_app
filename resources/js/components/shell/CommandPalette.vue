@@ -45,13 +45,39 @@ interface Option {
 }
 
 const props = defineProps<{
-    /** The control to return focus to, and to focus before opening so the modal never captures <body>. */
-    openerSelector?: string;
+    /**
+     * Candidate controls to focus before opening, in preference order — the modal captures whichever one
+     * is focused as its return-focus target.
+     *
+     * ⚠️ A LIST, NOT ONE SELECTOR, AND CI IS WHAT PROVED IT HAD TO BE. The first version took a single
+     * selector (`#topnav-search`) and stranded focus at 375px: below the 480px breakpoint that field is
+     * `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured `<body>` and
+     * closing the palette left focus nowhere. Every unit test passed — happy-dom has no layout, so nothing
+     * there can distinguish a hidden element from a visible one. Only the browser at a real viewport could.
+     */
+    openerSelectors?: string[];
 }>();
 
-const { open } = useCommandPalette(() =>
-    props.openerSelector ? document.querySelector<HTMLElement>(props.openerSelector) : null
-);
+/**
+ * `checkVisibility()` is the honest question and Chromium answers it. happy-dom implements neither it nor
+ * a real `offsetParent` — J1a MEASURED that as `undefined` rather than `null`, which is why the fallback is
+ * written to treat every candidate as visible under Vitest. The real guard for this is the e2e spec.
+ */
+function isVisible(element: HTMLElement): boolean {
+    if (typeof element.checkVisibility === 'function') return element.checkVisibility();
+
+    return element.offsetParent !== null;
+}
+
+const { open } = useCommandPalette(() => {
+    for (const selector of props.openerSelectors ?? []) {
+        const candidate = document.querySelector<HTMLElement>(selector);
+
+        if (candidate !== null && isVisible(candidate)) return candidate;
+    }
+
+    return null;
+});
 
 const listboxId = useId();
 const optionIdPrefix = useId();
@@ -318,7 +344,7 @@ function indexOf(groupIndex: number, itemIndex: number): number {
                 accessibility tree, so a live region in the shell would stop announcing entirely and
                 nothing replays on close.
             -->
-            <p class="palette__status" role="status">
+            <p class="palette__label" role="status">
                 <template v-if="busy">Searching…</template>
                 <template v-else-if="hasOptions">{{ options.length - 1 }} results</template>
             </p>
@@ -387,10 +413,19 @@ function indexOf(groupIndex: number, itemIndex: number): number {
     font-weight: 600;
 }
 
-.palette__empty,
-.palette__status {
+.palette__empty {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
 }
+
+/*
+ * ⚠️ THE LIVE REGION IS VISUALLY HIDDEN, and that is a fix rather than the original design. Rendered
+ * visibly it failed axe's `color-contrast` intermittently — the "Searching…" state flashes for one debounce
+ * and axe measured it mid-transition — which made the palette's own a11y gate flaky, and a flaky gate is
+ * worse than no gate. It reuses `.palette__label`'s clip-rect because it is exactly the same thing: text
+ * that exists for assistive tech and duplicates what the list already shows visually. DSR §3.4.1 requires
+ * the region to be INSIDE the dialog (inert silences anything outside an open modal); it does not require
+ * it to be seen.
+ */
 </style>

@@ -80,10 +80,12 @@ function onKeydown(event: KeyboardEvent): void {
             the palette's open state is module-scoped, so mounting it per-page would bind the ⌘K chord once
             per navigation. Deliberately NOT in AdminLayout — the central console has no tenant to search.
 
-            The opener selector is the nav search field, so a chord-opened palette returns focus somewhere
-            real on close rather than to <body>, whose .focus() is a silent no-op.
+            The openers are the nav's two search affordances, in preference order — and it is a LIST
+            because only one of them exists at a time: below 480px the field is `display: none` and the
+            compact icon link takes over. Passing just the field stranded focus at 375px (CI caught it),
+            since `.focus()` on a hidden element is a silent no-op and MdsModal then captures <body>.
         -->
-        <CommandPalette opener-selector="#topnav-search" />
+        <CommandPalette :opener-selectors="['#topnav-search', '.topnav__search-compact']" />
     </div>
 </template>
 

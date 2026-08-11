@@ -361,7 +361,19 @@ for (const theme of themes) {
         await page.goto('/submissions', { waitUntil: 'networkidle' });
         await page.getByRole('button', { name: 'View submission' }).first().click();
         await page.waitForURL(/\/submissions\/[0-9a-f-]{36}$/, { timeout: 30_000 });
-        await page.getByRole('link', { name: 'Back to submissions' }).waitFor({ state: 'visible', timeout: 10_000 });
+        // J2c replaced this page's hand-rolled `← Back to submissions` link — its ONLY navigation, and one
+        // that went to the global inbox while the h1 printed the form's title unlinked — with a four-crumb
+        // `MdsBreadcrumb` in `PageHeader`'s slot, so the old settle locator matches nothing. This is the
+        // SECOND time this exact substitution has broken a settle locator (J2b did it to `← Forms` on the
+        // analytics page, twenty lines up), and both times CI was the only gate that could see it: the e2e
+        // suite does not run locally. **Grep `tests/e2e/` for a string you are deleting from a page.**
+        //
+        // Waiting on the trail's landmark rather than on any one crumb's text: `MdsBreadcrumb` names it
+        // "Breadcrumb" by default, it is rendered from a server-provided payload, and it does not change
+        // when the trail's depth or labels do — which is what a settle signal should be.
+        await page
+            .getByRole('navigation', { name: 'Breadcrumb' })
+            .waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Submission detail');
     });

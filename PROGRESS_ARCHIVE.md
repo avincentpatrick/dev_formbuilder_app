@@ -1355,3 +1355,7 @@ The fix **branches rather than relaxes**, and the distinction is the whole point
 would have retired a §D12 gate to make a change pass. The interactive path now proves more than the old
 assertion did — links present, sr-only table deliberately absent, `.mds-bar__summary` present, every plotted
 category named in the tree, and the page's unconditional paired `MdsDataTable` still carrying the full list.
+
+**Merged as PR #130 (`30f8778`), 6/6 with real steps (11–20 each, so genuinely executed rather than an
+outage). CI reconciles: Pest 3475 passed / 0 failed (13,973 assertions), +78 on J2c's 3397; E2E 478 passed /
+0 failed / 0 FLAKY, holding the zero-flaky run J2c's `settlePaint()` first achieved.**

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme } from './support/axe';
+import { forceTheme, settlePaint } from './support/axe';
 import { openBuilder } from './support/navigate';
 
 // Accessibility + interaction gate for the builder's question-library picker (Increment G9b): the left-pane
@@ -20,6 +20,11 @@ async function openSurveyBuilder(page: Page): Promise<void> {
 // tag set. Scoped rather than whole-page so it gates the new UI, not the toolbar builder-axe already covers.
 async function scanLeftPane(page: Page, label: string): Promise<void> {
     await page.mouse.move(0, 0);
+
+    // Wait for the un-hover to PAINT — see `support/axe.ts`'s `assertClean`: parking the pointer starts a
+    // transition on the control it left, and a scan issued on the same frame can read an intermediate
+    // foreground against a settled background. J2b's CI flaked on exactly that in `builder-axe`.
+    await settlePaint(page);
     const results = await new AxeBuilder({ page })
         .include('.builder__pane--left')
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

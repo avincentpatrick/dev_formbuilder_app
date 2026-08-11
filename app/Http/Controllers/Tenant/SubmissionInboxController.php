@@ -14,6 +14,7 @@ use App\Policies\SubmissionPolicy;
 use App\Services\Submissions\SubmissionExporter;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPdfRequestService;
+use App\Support\Forms\FormTabSet;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -41,6 +42,39 @@ final class SubmissionInboxController extends Controller
             'source' => $this->query($request, 'source'),
             'q' => $this->keyword($request),
         ]));
+    }
+
+    /**
+     * One form's responses — `GET /forms/{form}/submissions` (Increment J2c), the Responses tab of the form
+     * hub's strip.
+     *
+     * The SAME presenter method as {@see index()}, given the bound form; the page it renders is the same
+     * Inertia component too. That is the whole design: J1e's audit-export defect was one filter chain
+     * spelled twice, and a per-form inbox is the most tempting place in this codebase to spell a third.
+     *
+     * The tab set is composed HERE rather than in the presenter, following {@see FormAnalyticsController}:
+     * every tab is a gate question, and the presenter deliberately reads nothing about who is asking beyond
+     * the row-visibility scope it already applies.
+     *
+     * ⚠️ TWO GATES ON THE ROUTE, AND THE SECOND ONE IS NOT DECORATION. `can:viewAny,Submission` is the
+     * inbox's own gate but says nothing about WHICH form, so alone it would let any member with
+     * `submissions.view` open this page for any form in the tenant and read its TITLE above an empty list.
+     * `can:viewOverview,form` is the bound-form half. See `routes/tenant.php`.
+     */
+    public function forForm(Request $request, Form $form, SubmissionInboxPresenter $presenter): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('submissions/Inbox', [
+            ...$presenter->list($user, [
+                'status' => $this->query($request, 'status'),
+                'source' => $this->query($request, 'source'),
+                'q' => $this->keyword($request),
+            ], $form),
+            'form' => ['id' => $form->id, 'title' => $form->title],
+            'tabs' => FormTabSet::for($form, $user),
+        ]);
     }
 
     public function show(Request $request, Submission $submission, SubmissionInboxPresenter $presenter): Response

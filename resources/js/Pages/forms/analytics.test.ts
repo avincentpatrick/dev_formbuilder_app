@@ -73,7 +73,7 @@ function render(overrides: Partial<FormReport> = {}): VueWrapper {
             // an empty list, which would make every assertion about it vacuously true.
             tabs: [
                 { key: 'overview', label: 'Overview', href: '/forms/f1', icon: 'forms' as const },
-                { key: 'submissions', label: 'Responses', href: '/submissions?form_id=f1', icon: 'submissions' as const },
+                { key: 'submissions', label: 'Responses', href: '/forms/f1/submissions', icon: 'submissions' as const },
                 { key: 'builder', label: 'Builder', href: '/forms/f1/builder', icon: 'edit' as const },
                 { key: 'analytics', label: 'Analytics', href: '/forms/f1/analytics', icon: 'chart-bar' as const },
             ],

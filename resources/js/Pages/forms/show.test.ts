@@ -82,7 +82,7 @@ const FORM_ID = '018f0000-0000-7000-8000-000000000001';
 
 const OWNER_TABS: Tab[] = [
     { key: 'overview', label: 'Overview', href: `/forms/${FORM_ID}`, icon: 'forms' },
-    { key: 'submissions', label: 'Responses', href: `/submissions?form_id=${FORM_ID}`, icon: 'submissions' },
+    { key: 'submissions', label: 'Responses', href: `/forms/${FORM_ID}/submissions`, icon: 'submissions' },
     { key: 'builder', label: 'Builder', href: `/forms/${FORM_ID}/builder`, icon: 'edit' },
     { key: 'analytics', label: 'Analytics', href: `/forms/${FORM_ID}/analytics`, icon: 'chart-bar' },
 ];
@@ -252,14 +252,15 @@ describe('form hub — the version panel', () => {
 
 describe('form hub — links, and the two places one would be a lie', () => {
     it('takes the Responses tile href from the tab set rather than rebuilding the URL', () => {
-        // ⚠️ The href is `/submissions?form_id=…` until J2c builds the per-form list. Reading it back off
-        // the tab is what makes that a ONE-LINE server change; a page that rebuilt `/forms/{id}/submissions`
-        // here would quietly ship a 404 the moment the two spellings diverged.
+        // ⚠️ THIS ASSERTION CHANGED IN J2c AND THE PAGE DID NOT — which is the whole point of it. The strip
+        // pointed at `/submissions?form_id=…` until the per-form route existed; swapping one line in
+        // `FormTabSet` moved the tile too, because it reads the href back off the tab set. A page that
+        // rebuilt the URL here would have kept shipping the old one, silently.
         const wrapper = render();
         const tiles = wrapper.findAllComponents({ name: 'StatTile' });
         const responses = tiles.find((t) => t.props('label') === 'Responses');
 
-        expect(responses?.props('href')).toBe(`/submissions?form_id=${FORM_ID}`);
+        expect(responses?.props('href')).toBe(`/forms/${FORM_ID}/submissions`);
 
         wrapper.unmount();
     });

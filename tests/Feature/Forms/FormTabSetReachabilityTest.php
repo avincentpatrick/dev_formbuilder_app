@@ -78,13 +78,17 @@ it('offers a tab whose href resolves to a real page', function (string $key): vo
 
 it('points Responses at a destination that survives a form with no responses at all', function (): void {
     /*
-     * ⚠️ THE CASE THAT JUSTIFIES THE CHOSEN HREF, and it is a measurement rather than an argument.
+     * ⚠️ A FORM WITH NO RESPONSES IS THE STATE THIS TAB IS MOST LIKELY TO BE CLICKED IN, and it used to be
+     * the state the destination handled worst.
      *
-     * The inbox's own form dropdown is derived from SUBMISSIONS (`SubmissionInboxPresenter::formOptions()`),
-     * so a brand-new form is not among its options — which is what makes "just link to the filtered inbox"
-     * look unsafe. It is safe, and this proves it: the filter is read as a plain query string and composed
-     * as a bare `where`, with no `Rule::in` anywhere, so filtering by a form with zero rows yields an empty
-     * list rather than a 422. (Fixing the dropdown itself is J2c's.)
+     * When the href was the filtered global inbox, this case proved the link was merely SAFE: the filter is
+     * read as a plain query string and composed as a bare `where`, so a form with zero rows yielded an empty
+     * list rather than a 422 — even though the inbox's own dropdown, derived from SUBMISSIONS, could not
+     * offer that form at all. J2c fixed both ends: the href is now the form's own responses page, and
+     * `formOptions()` lists forms the reader may open rather than forms that already have answers.
+     *
+     * The case stays, pointed at the new route, because what it really guards is unchanged — the strip must
+     * not offer a destination that only works once data exists.
      */
     $empty = publishedInboxForm($this->tenant, $this->owner, 'Nobody Has Answered This');
 
@@ -94,6 +98,32 @@ it('points Responses at a destination that survives a form with no responses at 
         ->actingAs($this->owner)
         ->get('http://acme.meridian.test'.$tab['href'])
         ->assertSuccessful();
+});
+
+it('withholds Responses from a member who could not open the form itself', function (): void {
+    /*
+     * ⚠️ THE J2c CONJUNCT, AND IT IS WHAT TURNS THIS FILE'S CENTRAL CLAIM INTO A THEOREM.
+     *
+     * The Responses tab used to be gated on `viewAny,Submission` ALONE, which says nothing about WHICH form.
+     * That was sound only by luck: every shipped role that holds `submissions.view` also satisfies
+     * `viewOverview` on a form it can reach. A member holding the permission WITHOUT the form-level half
+     * would have been offered a tab whose route then 403s — the strip lying, which is the one thing it must
+     * never do. The route carries both gates; so now does the tab.
+     *
+     * ⚠️ NO SHIPPED ROLE CAN REACH THIS STATE, so this is a fail-closed structural guard rather than a rule
+     * a user can observe — the same standing as `FormPolicy::viewOverview()`'s own `dashboard.form.view`
+     * conjunct after its mutation survived. Deleting either half of the `&&` in `FormTabSet` reddens this
+     * case and nothing else, which is exactly why it is written with a synthetic member.
+     */
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['submissions.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $keys = array_column(FormTabSet::for($this->form, $stranger), 'key');
+
+    expect($keys)->not->toContain('submissions');
 });
 
 it('omits the tabs a Viewer cannot reach rather than offering them', function (): void {

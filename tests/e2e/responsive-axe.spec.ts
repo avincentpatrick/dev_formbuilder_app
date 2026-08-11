@@ -206,6 +206,42 @@ for (const theme of themes) {
     });
 }
 
+// One form's responses (J2c) — `/forms/{form}/submissions`, the hub's Responses tab.
+//
+// ⚠️ SCANNED SEPARATELY FROM `/submissions` EVEN THOUGH IT IS THE SAME COMPONENT, and that is the point of
+// having it here: the two modes render a DIFFERENT composition. This one adds a breadcrumb trail and a tab
+// strip above the filter bar and drops a table column, so it is the only mode where the page carries two
+// navigation landmarks and two `aria-current="page"` elements at once — precisely the shape axe's
+// `landmark-unique` exists to catch, and one a scan of the global inbox can never reach.
+//
+// Reached by clicking the hub's Responses TAB rather than by a literal path: the id is minted by the seeder
+// (the uuid-route house rule), and walking the strip is also what proves the tab J2c repointed actually
+// arrives somewhere at every viewport, including 375px where `MdsTabNav` scrolls horizontally.
+for (const theme of themes) {
+    test(`Form responses (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Community Health Survey' })
+            .getByRole('link', { name: 'Community Health Survey' })
+            .click();
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page
+            .getByRole('navigation', { name: 'Community Health Survey' })
+            .getByRole('link', { name: 'Responses' })
+            .click();
+        // Anchored on `/submissions`: without the `$` this also matches `/submissions/create` and
+        // `/submissions/export`, both of which live under the same prefix.
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/submissions$/, { timeout: 30_000 });
+        // Settle on the strip — the last thing the page renders, and it only appears once the server's tab
+        // set has arrived.
+        await page.getByRole('navigation', { name: 'Community Health Survey' })
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Form responses');
+    });
+}
+
 // The builder's LOGIC view (H21d1) — the read-derived branching rail, scanned at all three viewports in
 // light + dark. The 375px pass is the one that matters and is Doc #27 §9's explicit obligation for this
 // row: an author's own expression is the widest thing on the page and it must WRAP, never scroll, so the

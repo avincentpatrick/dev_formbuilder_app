@@ -22,8 +22,15 @@ vi.mock('@inertiajs/vue3', () => ({
     useForm: () => ({ reason: '', remarks: '', processing: false, errors: {}, patch: vi.fn(), reset: vi.fn() }),
 }));
 
+// ⚠️ `#breadcrumbs` RENDERS TOO, AND IT DID NOT UNTIL J2c — which is why this page's navigation could be
+// replaced wholesale without a single case in this file noticing. The old `← Back to submissions` link sat
+// OUTSIDE `PageHeader` entirely; the trail that replaced it lives in the slot, and a mock that drops the
+// slot silently drops the thing under test.
 vi.mock('@/components/shell/PageHeader.vue', () => ({
-    default: { name: 'PageHeader', template: '<header><slot name="actions" /></header>' },
+    default: {
+        name: 'PageHeader',
+        template: '<header><slot name="breadcrumbs" /><slot name="actions" /></header>',
+    },
 }));
 
 // Imported AFTER the mocks so the component resolves them.
@@ -181,5 +188,29 @@ describe('Show.vue — the edit-answers gate (I9c)', () => {
         expect(offeredLinks('submitted', false, true)).toContain('Edit answers');
         // ...and no TRANSITION buttons, which is the half that proves the two gates are independent.
         expect(offeredActions('submitted', false, true)).toEqual([]);
+    });
+});
+
+describe('the way back (Increment J2c)', () => {
+    it('leads to the form, and to that form’s own responses, not just to the global inbox', () => {
+        // ⚠️ THE DEAD END THIS PAGE USED TO BE. Its only navigation was `← Back to submissions`, pointing at
+        // the global inbox — so a reviewer who arrived from one form could not return to it, while the h1
+        // above printed that form's TITLE as unlinked text. `FormHubController`'s docblock names this as one
+        // of the three dead ends the hub was built to end.
+        //
+        // Four crumbs because the page genuinely is four deep, and `MdsBreadcrumb` renders the LAST as text
+        // whatever it carries — so ending at "Responses" would print the per-form list's name unreachable,
+        // which is the same defect one level down.
+        const wrapper = mountAt('submitted');
+        const crumbs = wrapper.findComponent({ name: 'Breadcrumb' });
+
+        expect(crumbs.props('items')).toEqual([
+            { label: 'Forms', href: '/forms' },
+            { label: 'Survey', href: '/forms/f1' },
+            { label: 'Responses', href: '/forms/f1/submissions' },
+            { label: 'Response' },
+        ]);
+
+        wrapper.unmount();
     });
 });

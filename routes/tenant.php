@@ -520,6 +520,25 @@ Route::middleware([
         ->middleware('can:review,submission')->name('submissions.review');
     Route::get('/forms/{form}/submissions/export', [SubmissionInboxController::class, 'export'])
         ->middleware('can:export,'.Submission::class.',form')->name('forms.submissions.export');
+    // One form's responses (Increment J2c) — the Responses tab of the form hub's strip, and the destination
+    // `FormTabSet` pointed at the filtered global inbox for until this route existed.
+    //
+    // ⚠️ DECLARED AFTER `/submissions/create` (above) AND `/submissions/export` (immediately above), the
+    // H14 static-segment rule: those are more specific URIs on the same prefix, and a bare `{form}/submissions`
+    // registered first is fine for THESE two (their extra segment disambiguates) but the ordering is kept
+    // uniform so the next author adding a `/forms/{form}/submissions/{something}` does not have to notice.
+    // Note a GET here answered **405** rather than 404 before J2c — `forms.submissions.store` already owns
+    // this exact URI on POST — which is the same "the URI matched but the method did not" shape that hid the
+    // missing form hub until J2b.
+    //
+    // ⚠️ TWO GATES, the `forms.scope` precedent above. `can:viewAny,Submission` is the inbox's own gate and
+    // is what `FormTabSet` keys the Responses tab on; `can:viewOverview,form` is what bounds the {form}
+    // binding, without which any member holding `submissions.view` could read ANY form's title above an
+    // empty list. Together they admit all five roles, scoped — which `FormTabSetReachabilityTest` requires,
+    // since it drives this URL as a plain Viewer.
+    Route::get('/forms/{form}/submissions', [SubmissionInboxController::class, 'forForm'])
+        ->middleware(['can:viewOverview,form', 'can:viewAny,'.Submission::class])
+        ->name('forms.submissions.index');
     // Queued single-submission PDF (Increment H17). POST, not GET: it has side effects (an audit row, a
     // metered export, a queued job). Gates on `can:view` rather than the per-form `can:export` used
     // above — the file contains exactly the one submission the user is already permitted to read on

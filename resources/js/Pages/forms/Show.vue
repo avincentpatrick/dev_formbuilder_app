@@ -159,9 +159,11 @@ const crumbs = computed<BreadcrumbItem[]>(() => [
 /**
  * The Responses destination, taken from the tab set rather than rebuilt here.
  *
- * The strip's href is `/submissions?form_id=…` until J2c builds the per-form list, and reading it back is
- * what makes that a one-line change server-side instead of a hunt for every place the client guessed the
- * same URL. `undefined` when the reader has no Responses tab, which is also the gate for the tile's link.
+ * Reading it back off the tab set rather than rebuilding it is what made J2c a ONE-LINE server change: the
+ * strip pointed at the filtered global inbox until that increment built `/forms/{form}/submissions`, and no
+ * client-side URL had to be hunted down when it moved. Keep it that way.
+ *
+ * `undefined` when the reader has no Responses tab, which is also the gate for the tile's link.
  */
 const responsesHref = computed(() => props.tabs.find((t) => t.key === 'submissions')?.href);
 

@@ -50,20 +50,29 @@ final class FormTabSet
             $tabs[] = ['key' => 'overview', 'label' => 'Overview', 'href' => $base, 'icon' => 'forms'];
         }
 
-        // `viewAny,Submission` is the inbox's own gate, and the per-form list J2c builds carries the same one.
+        // The per-form responses list (J2c). Until that route existed this pointed at the filtered global
+        // inbox, `/submissions?form_id=`, because `/forms/{form}/submissions` answered 405 — and a strip
+        // whose second item did not resolve would have shipped the exact dead end this row was opened to
+        // remove. It now points at the real page; nothing else had to change, because `forms/Show.vue` reads
+        // the Responses TILE's href back off this array rather than rebuilding the URL.
         //
-        // ⚠️ THE HREF IS THE FILTERED INBOX, NOT `/forms/{form}/submissions`, BECAUSE THAT ROUTE DOES NOT
-        // EXIST YET. It is J2c's, and a strip whose second item 404s would ship the exact dead end this row
-        // was opened to remove. `?form_id=` is not a stand-in either — it is the same filter the inbox has
-        // applied since I9, read as a plain query string by `SubmissionInboxController` and composed as a
-        // bare `where` by `SubmissionInboxPresenter`, so a form with zero responses filters correctly rather
-        // than 422-ing on a list of forms-that-have-submissions. J2c swaps this ONE line and the tile that
-        // reuses it on the hub follows automatically.
-        if ($user->can('viewAny', Submission::class)) {
+        // ⚠️ BOTH CONJUNCTS, AND THEY ARE THE ROUTE'S TWO GATES SPELLED ONCE MORE — DELIBERATELY, NOT BY
+        // DUPLICATION. `viewAny,Submission` alone is what this tab used to test, and it was sound only by
+        // luck: it says nothing about WHICH form, so a member holding `submissions.view` without
+        // `dashboard.form.view` (or without a grant on this form) would have been OFFERED a tab that then
+        // 403s. Adding `viewOverview` makes "the strip offered it" imply "the reader can reach it", which is
+        // the property `FormTabSetReachabilityTest` asserts and could not otherwise guarantee.
+        //
+        // ⚠️ AND LIKE `viewOverview`'s OWN `dashboard.form.view` CONJUNCT, NO SHIPPED ROLE CAN OBSERVE THIS.
+        // All five hold `submissions.view`, and all five satisfy `viewOverview` on a form they can reach at
+        // all, so deleting either half here reddens nothing until a synthetic member exists. It is a
+        // fail-closed guard, labelled as one rather than presented as a live rule — the same honesty J2b's
+        // surviving mutation forced onto `FormPolicy`.
+        if ($user->can('viewOverview', $form) && $user->can('viewAny', Submission::class)) {
             $tabs[] = [
                 'key' => 'submissions',
                 'label' => 'Responses',
-                'href' => '/submissions?form_id='.$form->id,
+                'href' => $base.'/submissions',
                 'icon' => 'submissions',
             ];
         }

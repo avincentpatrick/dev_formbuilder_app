@@ -6,11 +6,35 @@ import AxeBuilder from '@axe-core/playwright';
  * public-runtime scan): assert no horizontal overflow (Feature #5's responsive contract) and zero WCAG 2.2 AA
  * violations, and force the dark theme so axe measures the dark palette on the real composed page.
  */
+/**
+ * Wait for the next paint to actually land.
+ *
+ * Two frames, not one: the first callback fires BEFORE the paint that applies the recalculated style, so a
+ * single `requestAnimationFrame` still returns too early. Exported because BOTH things this module does to a
+ * page before scanning it — flipping the theme and parking the pointer — invalidate style and settle a frame
+ * later, and only one of them used to wait.
+ */
+export async function settlePaint(page: Page): Promise<void> {
+    await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+}
+
 export async function assertClean(page: Page, label: string): Promise<void> {
     // Park the pointer off every control so axe measures resting styles, not a `:hover` state left over from
     // the test's last click (a parked cursor over a primary button reads its lighter hover bg and mis-flags
     // its contrast — a test artifact, not a real violation).
     await page.mouse.move(0, 0);
+
+    // ⚠️ AND WAIT FOR THE UN-HOVER TO PAINT — the half J1e left behind, and it came back to collect.
+    // Moving the pointer off a control starts a transition on the control it left, exactly as flipping the
+    // theme starts one on everything; "collapsing the window is not closing it" applies identically. J2b's
+    // CI run flaked on `builder-axe.spec.ts` "share panel, live link (dark)" with 93 violations reporting
+    // `#6f99b5` on `#123350` — the background settled to the real dark `bg-surface` token while the
+    // FOREGROUND was still an intermediate that appears in no token file, over
+    // `.share__row--actions > .mds-button--secondary`: the button the test had just clicked. A `transparent`
+    // secondary button whose only opaque state is `:hover` is precisely the shape that produces this.
+    await settlePaint(page);
 
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -48,11 +72,7 @@ export async function forceTheme(page: Page, theme: 'light' | 'dark'): Promise<v
     // violations — the "233 violations at once = styles not settled" shape this repo already had on record
     // as a standing flake in the same file.
     //
-    // Two frames, not one: the first callback fires BEFORE the paint that applies the recalculated style,
-    // so a single `requestAnimationFrame` still returns too early.
-    await page.evaluate(
-        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-    );
+    await settlePaint(page);
 }
 
 export type Personalization = {

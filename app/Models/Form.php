@@ -237,4 +237,44 @@ class Form extends Model implements TenantScoped
 
         return $query->whereIn('forms.id', $granted);
     }
+
+    /**
+     * The LIST twin of {@see FormPolicy::viewOverview()} — "whose form may this user OPEN", which is a
+     * different and wider question from {@see scopeVisibleTo()}'s "whose form may this user AUTHOR"
+     * (Increment J2c).
+     *
+     * ⚠️ THE TWO SCOPES ARE NOT INTERCHANGEABLE AND SUBSTITUTING ONE FOR THE OTHER IS SILENT, NOT LOUD.
+     * `scopeVisibleTo()` above keys on `forms.edit.any` / `forms.edit.own`, and a **Reviewer and a Viewer
+     * hold neither** — so using it to build the submissions inbox's form dropdown returns an EMPTY list for
+     * exactly the two roles the inbox exists for, while every test written with an Owner passes. That is why
+     * this exists rather than a second caller of the authoring scope. `SubmissionInboxPresenterTest` pins
+     * the Reviewer case for that reason.
+     *
+     * It is byte-for-byte {@see FormPolicy::viewOverview()}'s second conjunct, and deliberately so: the
+     * dropdown must offer exactly the forms whose hub the reader may already open, no more and no less. The
+     * `dashboard.form.view` conjunct is NOT repeated here — a scope answers "which rows", the policy answers
+     * "may you at all", and the route carries the policy. Repeating it would put a permission check inside a
+     * query where it cannot be seen by the gate that matters.
+     *
+     * ⚠️ `grantedFormIdsQuery($user)` WITH NO CAPACITY, never `ResourceCapacity::Editor`: a Reviewer's grant
+     * is reviewer capacity, so an editor-capacity check would refuse the single role this was widened for —
+     * the same trap `viewOverview()` records for `holdsAny()` versus `holds(Editor)`. It inherits that
+     * method's fail-closed empty set, so a user with no grants matches NOTHING rather than everything.
+     *
+     * ⚠️ NO `withTrashed()`, unlike {@see AnalyticsFormSet::visible()}. Soft-deleted forms stay out, which
+     * is exactly what the inbox's dropdown did before J2c — so this changes no behaviour there, and widening
+     * it would be a separate decision about a separate question. Archive/status filtering is likewise the
+     * CALLER's, for the reason `scopeVisibleTo()` states.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeReadableBy(Builder $query, User $user): Builder
+    {
+        if ($user->can('dashboard.org.view')) {
+            return $query;
+        }
+
+        return $query->whereIn('forms.id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
+    }
 }

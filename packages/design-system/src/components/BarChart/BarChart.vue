@@ -30,9 +30,18 @@
  * either way, so nothing gains "a dozen unlabelled images". With no hrefs the rendered output is
  * byte-identical to before J2a — which is what `BarChart.test.ts` asserts, in both directions.
  *
+ * ⚠️ AND THE sr-ONLY DATA TABLE COMES OFF WITH IT, which is not an optimisation. Un-pruning the plot
+ * exposes its labels and values to a screen reader for the first time; leaving the table rendered as well
+ * announced the entire dataset TWICE — the summary, then every row, then every row again. The table is the
+ * plot's ALTERNATIVE, so it is rendered when the plot is an image and not when the plot is readable. It
+ * stays whenever `tableVisible`, which is a visible feature rather than an alternative.
+ *
  * The VALUE is deliberately outside the anchor. The link goes to the category, not to its count, and
  * "Clinic Intake" is the accessible name a reader needs; "Clinic Intake 128" reads as a single odd label
- * and makes every link name change whenever the data moves.
+ * and makes every link name change whenever the data moves. **`MdsTabNav` deliberately does the opposite**
+ * with its badge, and the rule the two share is: a count belongs INSIDE the name when it describes the
+ * destination ("Submissions 128" — how much is behind this link), and outside it when it is the data being
+ * plotted.
  */
 import { computed } from 'vue';
 import { coord } from '../../charts/scale';
@@ -90,8 +99,15 @@ const accessibleSummary = computed(() => {
 
 const isEmpty = computed(() => props.data.length === 0);
 
-/** See the docblock: one linked datum is enough to take the plot out of `role="img"`. */
-const isInteractive = computed(() => props.data.some((d) => d.href !== undefined));
+/**
+ * See the docblock: one linked datum is enough to take the plot out of `role="img"`.
+ *
+ * ⚠️ `Boolean(d.href)` MUST STAY THE SAME PREDICATE THE TEMPLATE USES (`v-if="bar.href"`). An earlier
+ * version tested `!== undefined` here while the template tested truthiness, so `href: ''` — the obvious
+ * shape of a `cond ? url : ''` call site — stripped `role="img"` AND its label AND rendered zero links:
+ * the worst of both structures, for no benefit, with every test still green.
+ */
+const isInteractive = computed(() => props.data.some((d) => Boolean(d.href)));
 </script>
 
 <template>
@@ -128,7 +144,16 @@ const isInteractive = computed(() => props.data.some((d) => d.href !== undefined
             </div>
         </div>
 
-        <div class="mds-bar__table-wrap" :class="{ 'mds-bar__table-wrap--sr': !tableVisible }">
+        <!-- ⚠️ The sr-only table is the plot's ALTERNATIVE, so it is not rendered when the plot is itself
+             readable. Dropping `role="img"` un-prunes the plot's labels and values, and leaving the table
+             in as well made a screen reader announce the whole dataset TWICE — summary, then every row,
+             then every row again. Kept whenever `tableVisible`, which is a deliberate visible feature
+             rather than an alternative. -->
+        <div
+            v-if="tableVisible || !isInteractive"
+            class="mds-bar__table-wrap"
+            :class="{ 'mds-bar__table-wrap--sr': !tableVisible }"
+        >
             <table class="mds-bar__table">
                 <caption>{{ title }}</caption>
                 <thead>

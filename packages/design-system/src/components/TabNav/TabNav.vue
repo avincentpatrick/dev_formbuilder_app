@@ -41,10 +41,30 @@
  *
  * ── Colour is never the only channel ───────────────────────────────────────────────────────────────────
  * The active item carries three signals: the 2px underline, a heavier weight, and `aria-current`. The label
- * colour moves from secondary to heading — both verified on `bg-surface` in both themes, which is why this
- * does not reach for `action-primary-fg` (H21d1: a foreground that is fine in light can fail in dark, and
- * the accent ramps are re-pointed per theme and per brand).
+ * colour moves from secondary to heading — both verified on `bg-surface` in both themes.
+ *
+ * ⚠️ THE UNDERLINE IS `action-primary-fg`, AND THE OBVIOUS-LOOKING `action-primary-bg` IS A REAL WCAG 1.4.11
+ * FAILURE. This component shipped with `-bg` first — DSR §3.4 specifies "`--mds-primary-600` 2px", and `-bg`
+ * is that token's semantic name in light. But `-bg` is a FILL, and the only contrast the system guarantees
+ * for it is against the text printed ON it: {@see BRAND_RAMP_PAIRINGS} pairs `bg` solely with `on_primary`.
+ * Against the surface behind it there is no guarantee at all, and in dark there is a failure — `-bg` is
+ * `primary-500` `#2E6789` on `bg-surface` `#123350` = **2.12:1**, and `1.95:1` under the teal accent. The
+ * underline is a non-text UI component and owes 3:1.
+ *
+ * `action-primary-fg` is the token that carries exactly the guarantee needed, for every tenant brand rather
+ * than just the two shipped accents: the ramp pairs `fg` against BOTH `surface` and `canvas`, in BOTH
+ * themes, at `TEXT_MIN` (4.5:1) — comfortably over 3:1, by construction and not by spot measurement.
+ * Measured anyway: 9.14:1 light, 5.17:1 dark, 7.48:1 light-teal, 5.16:1 dark-teal. `ConfigPanel.vue` already
+ * uses this token for the same job. **axe never checks border contrast, so no gate would have caught this.**
+ *
+ * ── The badge IS part of the link's accessible name, deliberately, and MdsBarChart does the opposite ────
+ * "Submissions 128" is what this link is: a navigation item whose count tells the reader how much is behind
+ * it before they spend a page load. A bar chart's value is the DATUM rather than a property of the
+ * destination, and there are a dozen of them, so `MdsBarChart` keeps the value outside its anchor. The rule
+ * the two share: a count belongs in the name when it describes the DESTINATION, and outside it when it is
+ * the data being plotted.
  */
+import { computed } from 'vue';
 import Badge from '../Badge/Badge.vue';
 import Icon from '../Icon/Icon.vue';
 import type { IconName } from '../Icon/icons';
@@ -62,7 +82,7 @@ export interface TabNavItem {
     badge?: string | number;
 }
 
-defineProps<{
+const props = defineProps<{
     items: TabNavItem[];
     /** The `key` of the item representing the page currently open. */
     current: string;
@@ -73,17 +93,29 @@ defineProps<{
      */
     ariaLabel: string;
 }>();
+
+/**
+ * The active item resolved ONCE, by index.
+ *
+ * ⚠️ Comparing `item.key === current` per row looks equivalent and is not: two items sharing a key render
+ * TWO `aria-current="page"` elements, which is an ARIA error, and Vue emits no duplicate-key warning on
+ * initial mount so nothing anywhere reports it. `-1` when nothing matches is the correct answer and stays
+ * one — a strip whose `current` names no item marks nothing rather than defaulting to the first.
+ */
+const currentIndex = computed(() => props.items.findIndex((item) => item.key === props.current));
 </script>
 
 <template>
-    <nav class="mds-tabnav" :aria-label="ariaLabel">
-        <ul class="mds-tabnav__list">
-            <li v-for="item in items" :key="item.key" class="mds-tabnav__item">
+    <nav v-if="items.length > 0" class="mds-tabnav" :aria-label="ariaLabel">
+        <!-- `role="list"` survives `list-style: none`, which Safari/VoiceOver otherwise strips list
+             semantics for — the same fix and the same reason as `NotificationBell.vue`'s panel list. -->
+        <ul class="mds-tabnav__list" role="list">
+            <li v-for="(item, index) in items" :key="item.key" class="mds-tabnav__item">
                 <a
                     class="mds-tabnav__link"
-                    :class="{ 'is-current': item.key === current }"
+                    :class="{ 'is-current': index === currentIndex }"
                     :href="item.href"
-                    :aria-current="item.key === current ? 'page' : undefined"
+                    :aria-current="index === currentIndex ? 'page' : undefined"
                 >
                     <Icon v-if="item.icon" :name="item.icon" size="sm" />
                     <span class="mds-tabnav__label">{{ item.label }}</span>
@@ -151,10 +183,13 @@ defineProps<{
     border-bottom-color: var(--mds-color-border-strong);
 }
 
+/* `-fg`, NEVER `-bg` — see the docblock. `-bg` is a fill guaranteed only against the text printed on it,
+   and measures 2.12:1 against the dark surface; `-fg` is guaranteed against surface AND canvas in both
+   themes for every tenant brand by BRAND_RAMP_PAIRINGS. axe does not check border contrast. */
 .mds-tabnav__link.is-current {
     color: var(--mds-color-text-heading);
     font-weight: var(--mds-font-weight-semibold);
-    border-bottom-color: var(--mds-color-action-primary-bg);
+    border-bottom-color: var(--mds-color-action-primary-fg);
 }
 
 /* Inset, like MdsDataTable's scroll region and for the same reason: the strip spans the full content width,

@@ -202,6 +202,46 @@ describe('MdsBarChart — linked categories', () => {
         wrapper.unmount();
     });
 
+    it('drops the sr-only table in the interactive shape, so the data is announced ONCE', () => {
+        // Un-pruning the plot exposes its labels and values for the first time. Leaving the alternative
+        // table rendered as well announced summary → every row → every row again. Found by the J2a
+        // adversarial review; no gate sees it, because duplicated content is valid HTML.
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        expect(wrapper.find('.mds-bar__table-wrap').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('keeps the table when it was asked for VISIBLY, which is a feature and not an alternative', () => {
+        const wrapper = mount(BarChart, {
+            props: { data: linked, title: 'Top forms', tableVisible: true },
+        });
+
+        const wrap = wrapper.get('.mds-bar__table-wrap');
+        expect(wrap.classes()).not.toContain('mds-bar__table-wrap--sr');
+        expect(wrapper.findAll('tbody tr')).toHaveLength(3);
+
+        wrapper.unmount();
+    });
+
+    it('treats an EMPTY href as no link, using one predicate for the role and the anchor', () => {
+        // `:href="row.can.view ? url : ''"` is the obvious call-site shape. With `!== undefined` here and
+        // truthiness in the template, this input stripped `role="img"` AND its aria-label AND rendered no
+        // links at all — three wrongs at once, with every other case in this file still green.
+        const wrapper = mount(BarChart, {
+            props: { data: [{ key: 'a', label: 'Clinic Intake', value: 42, href: '' }], title: 'Top forms' },
+        });
+
+        expect(wrapper.get('.mds-bar__plot').attributes('role')).toBe('img');
+        expect(wrapper.get('.mds-bar__plot').attributes('aria-label')).toContain('Clinic Intake');
+        expect(wrapper.findAll('.mds-bar__plot a')).toHaveLength(0);
+        expect(wrapper.find('.mds-bar__summary').exists()).toBe(false);
+        expect(wrapper.find('.mds-bar__table-wrap').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
     it('still hides every track from assistive tech in the interactive shape', () => {
         // The tracks lost their `role="img"` umbrella; without `aria-hidden` they would become a dozen
         // unlabelled graphics — the exact failure the original docblock rejected.

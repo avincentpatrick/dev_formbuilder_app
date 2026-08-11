@@ -4,17 +4,22 @@
  *
  * §3.4's rule: used on any screen nested more than one level below a primary sidebar section — Forms →
  * *[Form Name]* → Submissions → *[Response]*. Every crumb is a real link except the last, which is plain
- * text carrying `aria-current="page"`. It mounts through `PageHeader`'s `breadcrumbs` slot, which has
- * existed with zero consumers since the shell was written and is the seam this was always meant to fill.
+ * text carrying `aria-current="page"`. It mounts through `PageHeader`'s `breadcrumbs` slot.
+ *
+ * That slot has TWO consumers already — `Pages/forms/Analytics.vue` and `Pages/submissions/Encode.vue` —
+ * each rendering a single hand-rolled back link inside it. (An earlier draft of this docblock said "zero",
+ * which was wrong and materially so: those two need only their link swapped, while the four below sit
+ * outside `PageHeader` entirely and need the slot adopting first.)
  *
  * ⚠️ NO HTML TAG IS SPELLED WITH ANGLE BRACKETS ANYWHERE IN THIS COMMENT, AND THAT IS DELIBERATE — see
  * `FilterBar.vue`'s docblock for the Storybook build failure that rule exists to prevent.
  *
  * ── Why this is a component and not six more scoped-CSS back links ─────────────────────────────────────
- * Six pages hand-roll a single back link with its own class and its own rule set: the form analytics page,
- * the builder, the submission detail, the encode screen, the webhook detail and the connector rule detail.
- * The exceptions log's own threshold — "three-plus undocumented deviations for the same need signal a
- * missing shared component" — was crossed twice over before this existed.
+ * Six pages hand-roll a single back link with its own class and its own rule set: the form analytics page
+ * and the encode screen (both inside the slot), plus the builder, the submission detail, the webhook detail
+ * and the connector rule detail (all four outside `PageHeader`). The exceptions log's own threshold —
+ * "three-plus undocumented deviations for the same need signal a missing shared component" — was crossed
+ * twice over before this existed.
  *
  * ── The last crumb is NOT a link, and that is the substantive contract ─────────────────────────────────
  * A self-link is a WCAG 2.4.4 nuisance (a destination that goes nowhere) and, more practically, it makes
@@ -53,9 +58,13 @@ function isLast(index: number, length: number): boolean {
 </script>
 
 <template>
-    <nav class="mds-breadcrumb" :aria-label="ariaLabel ?? 'Breadcrumb'">
-        <ol class="mds-breadcrumb__list">
-            <li v-for="(item, index) in items" :key="index" class="mds-breadcrumb__item">
+    <nav v-if="items.length > 0" class="mds-breadcrumb" :aria-label="ariaLabel ?? 'Breadcrumb'">
+        <!-- `role="list"` survives `list-style: none`, which Safari/VoiceOver otherwise strips list
+             semantics for. Load-bearing here: the separators are `aria-hidden` precisely BECAUSE the list
+             structure is what conveys the relationship, so losing that structure would leave a screen
+             reader with an unpunctuated run of words. -->
+        <ol class="mds-breadcrumb__list" role="list">
+            <li v-for="(item, index) in items" :key="`${index}-${item.label}`" class="mds-breadcrumb__item">
                 <a
                     v-if="item.href && !isLast(index, items.length)"
                     class="mds-breadcrumb__link"

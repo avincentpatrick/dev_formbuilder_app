@@ -94,6 +94,25 @@ describe('MdsBreadcrumb', () => {
         wrapper.unmount();
     });
 
+    it('keeps list semantics that `list-style: none` would otherwise strip', () => {
+        // Load-bearing here rather than merely correct: the separators are `aria-hidden` BECAUSE the list
+        // structure conveys the relationship, so a Safari/VoiceOver reader who loses that structure gets
+        // an unpunctuated run of words. Found by the J2a adversarial review.
+        const wrapper = mount(Breadcrumb, { props: { items: trail } });
+
+        expect(wrapper.get('ol').attributes('role')).toBe('list');
+
+        wrapper.unmount();
+    });
+
+    it('renders NOTHING at all for an empty trail, rather than an empty named landmark', () => {
+        const wrapper = mount(Breadcrumb, { props: { items: [] } });
+
+        expect(wrapper.find('nav').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
     it('accepts an override name so two trails on one page are distinguishable', () => {
         const wrapper = mount(Breadcrumb, { props: { items: trail, ariaLabel: 'Form location' } });
 

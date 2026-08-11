@@ -57,6 +57,12 @@ describe('MdsTabNav — navigation, not the ARIA tabs widget', () => {
         expect(wrapper.html()).not.toContain('tablist');
         expect(wrapper.find('[role="tab"]').exists()).toBe(false);
         expect(wrapper.find('[aria-selected]').exists()).toBe(false);
+        // The substring check above is weak on its own and the `[role="tab"]` selector is exact-match, so
+        // neither would catch `role="tab presentation"`. The links must carry NO explicit role at all —
+        // an anchor with an href is already a link.
+        for (const link of wrapper.findAll('a')) {
+            expect(link.attributes('role')).toBeUndefined();
+        }
 
         wrapper.unmount();
     });
@@ -114,15 +120,58 @@ describe('MdsTabNav — navigation, not the ARIA tabs widget', () => {
         wrapper.unmount();
     });
 
+    it('marks aria-current ONCE even when two items share a key', () => {
+        // A per-row `item.key === current` comparison renders TWO `aria-current="page"` elements here —
+        // an ARIA error — and Vue emits no duplicate-key warning on initial mount, so nothing reports it.
+        // Resolving the active item once by index is what makes this structurally impossible.
+        // Found by the J2a adversarial review.
+        const wrapper = mountNav('dup', [
+            { key: 'dup', label: 'First', href: '/1' },
+            { key: 'dup', label: 'Second', href: '/2' },
+        ]);
+
+        const current = wrapper.findAll('[aria-current]');
+        expect(current).toHaveLength(1);
+        expect(current[0].text()).toContain('First');
+        expect(wrapper.findAll('.is-current')).toHaveLength(1);
+
+        wrapper.unmount();
+    });
+
+    it('renders NOTHING at all for an empty item set', () => {
+        // Reachable: the `ReducedForRole` story's own premise is that refused destinations are absent, so
+        // a role permitted none would otherwise get an empty named landmark plus a stray full-width rule
+        // with 20px of margin under it.
+        const wrapper = mountNav('overview', []);
+
+        expect(wrapper.find('nav').exists()).toBe(false);
+        expect(wrapper.html()).toBe('<!--v-if-->');
+
+        wrapper.unmount();
+    });
+
+    it('keeps list semantics that `list-style: none` would otherwise strip', () => {
+        // Safari/VoiceOver drops list semantics from a list styled `list-style: none`. This repo already
+        // knows it — `NotificationBell.vue` carries the same fix with the same comment.
+        const wrapper = mountNav();
+
+        expect(wrapper.get('ul').attributes('role')).toBe('list');
+
+        wrapper.unmount();
+    });
+
     it('does not make the scroll region a focus stop', () => {
         // Deliberately unlike MdsDataTable. axe's `scrollable-region-focusable` fires only on a scrollable
         // region with no focusable descendants; every item here is a link, so a tabindex would add a
         // redundant stop in front of the very links it would exist to reach.
-        const wrapper = mountNav();
+        //
+        // The role assertion is `list`, NOT absent: `role="list"` is there to survive `list-style: none`
+        // (see the case above). What must never appear is MdsDataTable's `role="group"`, which exists
+        // solely to name a focus stop this element does not have.
+        const list = mountNav().get('.mds-tabnav__list');
 
-        expect(wrapper.get('.mds-tabnav__list').attributes('tabindex')).toBeUndefined();
-        expect(wrapper.get('.mds-tabnav__list').attributes('role')).toBeUndefined();
-
-        wrapper.unmount();
+        expect(list.attributes('tabindex')).toBeUndefined();
+        expect(list.attributes('role')).toBe('list');
+        expect(list.attributes('aria-label')).toBeUndefined();
     });
 });

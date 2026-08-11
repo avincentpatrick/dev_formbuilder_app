@@ -111,6 +111,28 @@ final class SubmissionInboxPresenter
         /** @var Collection<int, Submission> $items */
         $items = collect($paginator->items());
 
+        // ⚠️ WHICH OF THESE ROWS MAY HAVE THEIR FORM LINKED, RESOLVED ONCE FOR THE PAGE.
+        //
+        // The row set is strictly WIDER than form readability, so "the row is listed" does not imply "its
+        // form opens" — and an unconditional link is a 403 or a 404 dressed as navigation. Two real paths,
+        // both reachable today: (1) `Submission::scopeVisibleTo()` has a **respondent arm**
+        // (`respondent_user_id = me`) that `viewOverview` has no counterpart for, so a keyer whose grant was
+        // revoked still sees rows they encoded and would be offered a link that 403s; (2) a SOFT-DELETED
+        // form makes `formTitle()` render an em dash, and route-model binding excludes trashed rows — so
+        // the inbox would have printed "—" as a live hyperlink to a 404.
+        //
+        // One query for the page rather than a policy call per row: `readableBy` is the same predicate the
+        // route's gate composes, narrowed to the form ids actually on screen (at most PER_PAGE of them).
+        // The alternative — `$user->can('viewOverview', $form)` per row — is the 25-grant-lookup shape the
+        // `can.resume` note below already refuses.
+        $linkableFormIds = $items->isEmpty()
+            ? collect()
+            : Form::query()
+                ->readableBy($user)
+                ->whereIn('forms.id', $items->pluck('form_id')->unique()->all())
+                ->pluck('id')
+                ->flip();
+
         return [
             'data' => $items->map(fn (Submission $s): array => [
                 'id' => $s->id,
@@ -140,6 +162,10 @@ final class SubmissionInboxPresenter
                 // pays only on the Draft-filtered view, which is the only place the button can appear.
                 'can' => [
                     'resume' => $s->status === SubmissionStatus::Draft && $user->can('promote', $s),
+                    // Whether THIS viewer may open the row's FORM (J2c). See `$linkableFormIds` above — the
+                    // row being listed does not imply the form opens, so the client keys the link off this
+                    // rather than off the presence of `form_id`.
+                    'open_form' => $linkableFormIds->has($s->form_id),
                 ],
             ])->all(),
             'meta' => [

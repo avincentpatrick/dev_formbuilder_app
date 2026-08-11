@@ -20,6 +20,7 @@ import {
     type BreadcrumbItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 
 type FieldRow = { key: string; label: string; value: string };
 /**
@@ -72,7 +73,7 @@ const props = defineProps<{
  * the root.
  */
 const crumbs = computed<BreadcrumbItem[]>(() => [
-    { label: 'Forms', href: '/forms' },
+    formsCrumb(),
     { label: props.submission.form_title, href: `/forms/${props.submission.form_id}` },
     { label: 'Responses', href: `/forms/${props.submission.form_id}/submissions` },
     { label: 'Response' },

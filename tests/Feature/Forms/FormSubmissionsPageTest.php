@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
@@ -177,15 +179,42 @@ it('keeps the inbox display default: drafts are hidden until asked for', functio
 
 });
 
-it('offers export, which on this page needs no form to be chosen first', function (): void {
-    // On the global inbox the Export button is hidden until a form is picked (its columns are that form's
-    // fields). Here the route IS a form, so the affordance is unconditional — the win that made reusing the
-    // component worth it rather than merely cheaper.
+it('offers export against the bound form, with no form_id echoed as a chosen filter', function (): void {
+    // ⚠️ AN EARLIER VERSION OF THIS CASE ASSERTED ONLY `can.export === true`, which is
+    // `$user->can('submissions.export')` for an Owner and is byte-identical on `/submissions`. It named a
+    // per-form behaviour and tested a permission — it would have passed against any implementation,
+    // including one that never bound the form at all.
+    //
+    // What actually makes Export unconditional here is that the PAGE supplies the form: `filters.applied
+    // .form_id` is the route's form, which is what the client's export href reads. Assert that pairing.
     seedCountableAt($this->form, CarbonImmutable::now()->subDay());
 
     $this->withoutVite()
         ->actingAs($this->owner)
         ->get(formSubmissionsPageUrl((string) $this->form->id))
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->where('can.export', true)->etc());
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('can.export', true)
+            ->where('filters.applied.form_id', (string) $this->form->id)
+            ->where('form.id', (string) $this->form->id)
+            ->etc());
+});
+
+it('marks a row openable only when the reader may open its form', function (): void {
+    // ⚠️ THE ROW SET IS WIDER THAN FORM READABILITY, so "listed" does not imply "linkable" — found by the
+    // J2c adversarial review, not by a gate. `Submission::scopeVisibleTo()` has a RESPONDENT arm
+    // (`respondent_user_id = me`) that `FormPolicy::viewOverview()` has no counterpart for, so a keyer whose
+    // grant is revoked keeps seeing rows they encoded while the form behind them 403s. Without
+    // `can.open_form` the inbox rendered that as a live link.
+    $reviewer = User::factory()->create();
+    makeActiveMember($reviewer, 'reviewer');
+    makeCollaborator($this->form, $reviewer, ResourceCapacity::Reviewer);
+    app(ResourceGrantResolver::class)->forget();
+    seedCountableAt($this->form, CarbonImmutable::now()->subDay());
+
+    $this->withoutVite()
+        ->actingAs($reviewer)
+        ->get(formSubmissionsPageUrl((string) $this->form->id))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('data.0.can.open_form', true)->etc());
 });

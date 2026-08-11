@@ -23,9 +23,14 @@
  * is precisely what two copies of a filter surface do to each other. `SubmissionInboxPresenter::list()` is
  * shared for the same reason one layer down.
  *
- * ⚠️ EVERY NAVIGATION GOES THROUGH `baseUrl`. Three places used to hard-code `/submissions` — the filter
- * visit, "Clear filters" and the export href — and on the per-form page the first two would have thrown the
- * reader back onto the global inbox, which is the dead end this row exists to remove.
+ * ⚠️ EVERY INERTIA VISIT THIS PAGE MAKES GOES THROUGH `baseUrl` — and note the scope of that claim, because
+ * an earlier version of this sentence overstated it. `visit()` is the single call site (the filter round-trip
+ * and "Clear filters" both route through it), and on the per-form page a hard-coded `/submissions` there
+ * would have thrown the reader back onto the global inbox, which is the dead end this row exists to remove.
+ * The other outbound URLs are deliberately NOT `baseUrl`-derived and must not be "tidied" into it: the export
+ * href is a different endpoint (`/forms/{id}/submissions/export`, which never contained `/submissions`
+ * alone), the row form-link targets `/forms/{id}`, and the two row actions target `/submissions/{id}` in
+ * BOTH modes — a submission's detail page is not nested under the form.
  */
 import { computed, reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -48,6 +53,7 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 
 type Option = { value: string; label: string };
 
@@ -69,7 +75,10 @@ type SubmissionRow = {
     draft_expires_at: string | null;
     // Increment I9b — whether THIS viewer may pick the draft up. False on every non-draft row by
     // construction, so the button is not merely hidden by CSS on rows it would 404 on.
-    can: { resume: boolean };
+    // Increment J2c — `open_form` is whether they may open the row's FORM, which is NOT implied by the row
+    // being listed: the visibility scope has a respondent arm the form policy has no counterpart for, and a
+    // soft-deleted form binds to nothing.
+    can: { resume: boolean; open_form: boolean };
 };
 
 type Meta = { current_page: number; last_page: number; total: number; per_page: number };
@@ -107,7 +116,7 @@ const baseUrl = computed(() => (props.form ? `/forms/${props.form.id}/submission
 const crumbs = computed<BreadcrumbItem[]>(() =>
     props.form
         ? [
-              { label: 'Forms', href: '/forms' },
+              formsCrumb(),
               { label: props.form.title, href: `/forms/${props.form.id}` },
               { label: 'Responses' },
           ]
@@ -308,9 +317,19 @@ function formatDate(iso: string | null): string {
                  three dead ends the hub was built to end. Rendered only in global mode, because the per-form
                  page drops the column entirely. -->
             <template #cell-form_title="{ row }">
-                <Link :href="`/forms/${(row as SubmissionRow).form_id}`" class="inbox__form-link">
+                <!-- ⚠️ GATED ON `can.open_form`, NEVER ON THE PRESENCE OF `form_id`. The inbox lists rows a
+                     reader may see; it does not follow that they may open the FORM behind one. An
+                     unconditional link here 403s for a keyer whose grant was revoked (the visibility
+                     scope's respondent arm) and 404s on a soft-deleted form — whose title renders as an em
+                     dash, so it would have shipped "—" as a live hyperlink. -->
+                <Link
+                    v-if="(row as SubmissionRow).can?.open_form"
+                    :href="`/forms/${(row as SubmissionRow).form_id}`"
+                    class="inbox__form-link"
+                >
                     {{ (row as SubmissionRow).form_title }}
                 </Link>
+                <span v-else>{{ (row as SubmissionRow).form_title }}</span>
             </template>
             <template #cell-status="{ row }">
                 <div class="inbox__status">

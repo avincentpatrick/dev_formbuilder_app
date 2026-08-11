@@ -42,6 +42,7 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 import ShareModal from '@/components/forms/ShareModal.vue';
 import type { ShareProps } from '@/components/forms/types';
 
@@ -150,7 +151,7 @@ const versionLabel = computed(() => {
 
 // ── Navigation ───────────────────────────────────────────────────────────────────────────────────────────
 const crumbs = computed<BreadcrumbItem[]>(() => [
-    { label: 'Forms', href: '/forms' },
+    formsCrumb(),
     // No href: this IS the form's page. `MdsBreadcrumb` would render the last crumb as text regardless, but
     // passing one would still be a claim that there is somewhere else to go.
     { label: props.form.title },

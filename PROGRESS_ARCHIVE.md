@@ -1155,3 +1155,98 @@ across `59971c3` → `d80730d` → `f250519` → HEAD as 2,607 → 2,607 → 2,6
 exactly on `FormHubGateTest` and the +18 on this session's two files. CI runs `php artisan test` while the
 tracker documents `vendor/bin/pest`, which is the likeliest divergence. Report the DELTA, not the absolute —
 the PHPStan lesson applied one gate over.
+
+## 2026-08-11 — JR registered: the Vivid Product re-skin, chosen from rendered mockups and deliberately not started
+
+**No code was written and no repo file changed except this tracker pair.** The session ran alongside
+another agent's live J2c work (25 staged files); every investigation agent was held strictly read-only
+and the two tracker edits were surgical inserts rather than rewrites, for exactly that reason.
+
+The user judged the UI **"too plain"** and asked for options. The diagnosis was measured rather than
+asserted: `packages/design-system/tokens/*.json` shows thirty individually-safe choices compounding —
+system fonts only, radii stopping at 12px, `shadow-1` at **5% alpha**, primary `#1C4B72` with brass and
+teal barely used, a flat 36/30/24/20/16 type scale. Four directions were then rendered in full across
+Login / Dashboard / Forms list / Form builder, each with WCAG ratios computed from its own hex values so
+no direction could win on looks and die at the contrast gate. The user chose **01 · Vivid Product**.
+Every palette was derived from colours the app already owns, so none of the four was a rebrand and all
+survive H23a's tenant ramp.
+
+A follow-up question — *"there is white space on the left and right of the list pages"* and *"is this
+mobile responsive?"* — was answered by a 12-agent workflow (3 recon → 4 independent proposals → 4
+adversarial verifiers → judge; the judge died mid-stream and the call was made from the material).
+**Both answers changed on contact with the code.** The gutter is arithmetic, not taste: `max-width: 1200px`
+beside a 240px sidebar gives 0 gutter at 1440px — Playwright's desktop viewport — and 240px each side at
+1920px, which is why nothing ever caught it. And the app is **considerably more responsive than the
+session's first reply claimed** (drawer, hamburger, full-bleed modals, table card-collapse, chart and
+toast relayout all shipped); the real gap is the **481–1024px band**, where `MdsDataTable` does nothing
+and every dense table becomes a sideways scroller — a defect the component's own source already names.
+That, not the gutter, is the strongest argument for JR3's card grid.
+
+Three findings worth more than the feature they came from. **A `min-width: 1025px` rule fires its widest
+layout at the narrowest content box**, because the sidebar steps 240 → 64px at that boundary (1025px box
+= 721px; 1024px box = 896px) — enrichment must key off the container. **Renaming a form has exactly one
+call site in the entire client**, a row action on the page being redesigned, so a routine tidy of those
+actions would delete the capability product-wide. And **the forms list already receives a `description`
+for every row and renders it nowhere** — the `feedback_reports` "nothing reads it" smell, found a third time.
+
+JR is sequenced **after J2 and before J3**, correcting this session's own first answer of "before J4":
+J3 builds new auth UI, so a re-skin landing after it would rebuild those pages twice. Full spec with every
+measurement and file:line citation is in plan `what-is-the-status-modular-torvalds.md`; the two published
+artifacts are the visual spec and are linked from the JR block in Current Status.
+
+## 2026-08-11 — J2b merged at #128, and J2c: one form's responses
+
+**J2b sat complete-but-unpushed, so no CI job had ever seen it.** Opening the PR was the whole point: five
+jobs went green (Pest 3370/0) and E2E returned **81 failures across four spec files**, every one a
+`waitForURL` timeout with the cause printed in the log — `navigated to "/forms/{uuid}"` while waiting for the
+builder glob. Not a flake and not a regression: J2b repointed `forms/Index.vue`'s row title at the hub, and
+`/forms` has **no builder row-action at all** (its `edit` icon is *Rename form*, a modal), so the title link
+was the only way in and the way in is now the hub's Builder tab. The navigation was spelled **six times** —
+J1e's "the second caller is the one that lies" from the other direction, since the copies did not disagree
+with each other, they all agreed with a page that had moved. One shared helper, net −10 lines. A docblock
+trap paid en route: the builder glob's two asterisks and slash CLOSE a block comment, and the file then fails
+to parse with "Missing semicolon" pointing at an apostrophe four lines below.
+
+**J2c built `GET /forms/{form}/submissions`.** The hub's Responses tile followed with no client change,
+because it reads its href back off the shared tab set — J2b's stated design paying off in one line. One
+component serves both routes (`form` prop present or absent) and one presenter method serves both queries
+(optional `?Form $boundForm`), so every existing caller and test passed unedited; a second page would have
+spelled the filter bar, the URL builder, the export href and the empty-state branching twice. The namespace
+already held `create`, `store`, `draft` and a per-form `export`, so a GET there answered **405, not 404**.
+
+**The dropdown could not name a form with no responses** — derived from submissions, it could answer every
+question except the one it is most often asked. Now `Form::scopeReadableBy()`, byte-for-byte
+`FormPolicy::viewOverview()`, coining no key. Not `scopeVisibleTo()`: that is the authoring scope and returns
+the empty set for a Reviewer and a Viewer, the two roles that live in this inbox. Nothing in the repository
+had ever asserted `filters.forms`.
+
+**The adversarial review returned twelve substantiated findings and the first is J2c shipping the defect this
+row exists to remove.** Its own new breadcrumbs opened with a hard `href: '/forms'` — a route gated on
+`viewAny,Form`, which a Reviewer and a Viewer hold none of, on four pages both can reach. A tenant 403 is a
+bare Blade page, so it is a dead end with no way back, and it is invisible to every gate we run because
+`MdsBreadcrumb` renders an href-less crumb as text. The strip already had this property and the trail did
+not: `FormTabSetReachabilityTest` issues a real request per tab href; breadcrumbs have no equivalent, which
+J2d should build. Two more: the row→form link could 403 (the visibility scope's respondent arm has no form
+counterpart) or 404 (a soft-deleted form renders "—", which shipped as a live hyperlink), and
+`scopeReadableBy`'s docblock argued away a conjunct with a claim — "the route carries the policy" — that is
+false for the scope's only path. Also four tests that could not fail, four false docblock claims, and
+`encode.test.ts` still dropping the `#breadcrumbs` slot: the identical omission fixed in `show.test.ts` one
+file earlier.
+
+**Two defects were caught by predicting a mutation rather than running one.** `hasAnyFilter()`'s `form_id`
+skip was dead code, because `forForm()` never puts `form_id` in `$filters` — so `empty_reason` depended on a
+controller continuing to omit a key rather than on a rule stated in the presenter. And the export-after-clear
+case called `wrapper.vm.clearFilters?.()`, which no-ops under `<script setup>` and passed against both
+implementations.
+
+**⛔ AND THE FINDING THAT OUTLIVES THE INCREMENT: THE LOCAL FULL-SUITE PEST RUN SILENTLY DROPS WHOLE TEST
+FILES.** It surfaced only because the delta would not reconcile — 23 cases added, +16 collected. **330
+`*Test.php` files exist on disk; a full `--list-tests` collects 285.** The 45 missing are overwhelmingly
+`tests/Feature/Forms/` — **40 of its 44 classes**, including both of J2c's new files. Run that directory
+alone and all 44 collect (365 tests); run it inside `tests/Feature` and 4 survive. Not memory (identical at
+2G and 6G), not a stale cache (none exists), and not stable across trees. **This is the ~321-test local-vs-CI
+gap J2b documented as unexplained**, and J2b's proof checked the wrong invariant: "collected equals executed"
+shows only that the runner ran what it collected, and the companion `Unit + Feature = total` check was
+self-referential. The correct local check is the FILE COUNT, exactly as for Vitest. Until the root cause is
+closed, a local full-suite Pest absolute *or delta* is not reportable; CI is the authority and an increment's
+own tests are verified by running their files directly.

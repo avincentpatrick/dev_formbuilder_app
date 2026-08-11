@@ -247,14 +247,22 @@ class Form extends Model implements TenantScoped
      * `scopeVisibleTo()` above keys on `forms.edit.any` / `forms.edit.own`, and a **Reviewer and a Viewer
      * hold neither** — so using it to build the submissions inbox's form dropdown returns an EMPTY list for
      * exactly the two roles the inbox exists for, while every test written with an Owner passes. That is why
-     * this exists rather than a second caller of the authoring scope. `SubmissionInboxPresenterTest` pins
-     * the Reviewer case for that reason.
+     * this exists rather than a second caller of the authoring scope. `SubmissionInboxTest` pins the
+     * Reviewer-with-a-grant case for that reason.
      *
-     * It is byte-for-byte {@see FormPolicy::viewOverview()}'s second conjunct, and deliberately so: the
-     * dropdown must offer exactly the forms whose hub the reader may already open, no more and no less. The
-     * `dashboard.form.view` conjunct is NOT repeated here — a scope answers "which rows", the policy answers
-     * "may you at all", and the route carries the policy. Repeating it would put a permission check inside a
-     * query where it cannot be seen by the gate that matters.
+     * It is byte-for-byte {@see FormPolicy::viewOverview()} — **both** conjuncts, and the first one is here
+     * because an earlier version of this docblock argued it away with a claim that is false.
+     *
+     * ⚠️ THAT ARGUMENT WAS: "the `dashboard.form.view` conjunct is not repeated here, because a scope answers
+     * 'which rows', the policy answers 'may you at all', and the route carries the policy." **No route on
+     * this scope's only path checks it.** `formOptions()` is reached from
+     * `SubmissionInboxController::index()` on `GET /submissions`, whose sole gate is `can:viewAny,Submission`
+     * = `submissions.view`. Without the conjunct, a principal holding `submissions.view` +
+     * `dashboard.org.view` but NOT `dashboard.form.view` would enumerate every form title in the tenant
+     * while being refused every one of those hubs. No shipped role can reach that state — all five hold the
+     * key — so it is a fail-closed guard exactly like the one inside `viewOverview()` itself, and it is
+     * stated as one rather than delegated to a gate that does not exist. Deleting the sentence was the other
+     * honest option; keeping the guard is the better one.
      *
      * ⚠️ `grantedFormIdsQuery($user)` WITH NO CAPACITY, never `ResourceCapacity::Editor`: a Reviewer's grant
      * is reviewer capacity, so an editor-capacity check would refuse the single role this was widened for —
@@ -271,6 +279,11 @@ class Form extends Model implements TenantScoped
      */
     public function scopeReadableBy(Builder $query, User $user): Builder
     {
+        // The policy's FIRST conjunct, fail-closed. See the docblock: no route on this scope's path checks it.
+        if (! $user->can('dashboard.form.view')) {
+            return $query->whereRaw('false');
+        }
+
         if ($user->can('dashboard.org.view')) {
             return $query;
         }

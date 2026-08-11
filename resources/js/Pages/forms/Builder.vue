@@ -31,6 +31,7 @@ import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
@@ -42,7 +43,7 @@ const { selection, saving, canUndo, canRedo, conflict, library } = store;
  * was back to the list.
  */
 const crumbs = computed<BreadcrumbItem[]>(() => [
-    { label: 'Forms', href: '/forms' },
+    formsCrumb(),
     { label: props.form.title, href: `/forms/${props.form.id}` },
     { label: 'Builder' },
 ]);

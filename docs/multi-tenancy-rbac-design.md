@@ -196,6 +196,31 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > the boundary that did **not** move: soft-deleted forms stay out, because `readableBy` adds no
 > `withTrashed()` — unlike `AnalyticsFormSet::visible()`, which answers a different question.
 >
+> **And one NARROWING in the same change, recorded because a widening alone would be a half-truth.**
+> `Submission::scopeVisibleTo()` admits a row on `respondent_user_id = me` — a **respondent arm** that
+> `viewOverview` has no counterpart for. The old submissions-derived dropdown therefore offered a form a
+> reader could reach *only* by having answered it; `readableBy` does not. That reader still sees those rows
+> and can no longer filter to them by form. Accepted: the alternative is a dropdown whose entries do not all
+> correspond to forms the reader may open, which is the defect below.
+>
+> ⚠️ **THE SAME ASYMMETRY IS WHY AN INBOX ROW'S FORM TITLE IS NOT UNCONDITIONALLY A LINK.** The row set is
+> strictly wider than form readability, so *"this row is listed"* does not imply *"its form opens"*. Two live
+> paths: a keyer whose grant was revoked keeps seeing rows they encoded (the respondent arm) while
+> `/forms/{id}` 403s them; and a **soft-deleted** form renders its title as an em dash while binding to
+> nothing, so an unguarded link shipped `—` as a hyperlink to a 404. The row payload carries
+> `can.open_form`, resolved once per page against `readableBy` rather than per row against the policy.
+>
+> ⚠️ **AND `/forms` ITSELF IS NOT REACHABLE BY EVERY ROLE THAT CAN REACH THE PAGES LINKING TO IT** — the
+> defect J2c's adversarial review found in its own new breadcrumbs. That route gates on `viewAny,Form` =
+> `forms.create | forms.edit.any | forms.edit.own`, which a **Reviewer and a Viewer hold none of**, while
+> both can reach the form hub, a form's responses, a submission and the encode screen. A hard `href:
+> '/forms'` hands them a bare 403 with no way back. `formsCrumb()` (`resources/js/composables/`) drops the
+> href — keeping the crumb as text — off `ShellAbilities`' existing `manageForms`, which is computed from
+> the identical ability the route's middleware evaluates. **The tab strip already had this property and the
+> trail did not:** `FormTabSet` resolves each tab's gate server-side and `FormTabSetReachabilityTest` issues
+> a real request per href, so a tab cannot be offered to a reader the route refuses. Breadcrumbs had no
+> equivalent, and nothing structural yet enforces one — J2d should extend the reachability idiom to trails.
+>
 > **The route composes both halves, and neither alone is sufficient.** `can:viewAny,Submission` says nothing
 > about *which* form — with it alone, any member holding `submissions.view` (all five roles) could open any
 > form's responses page and read its **title** above an empty list, because an empty list is not a refusal.

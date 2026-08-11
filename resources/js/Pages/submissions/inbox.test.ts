@@ -22,6 +22,9 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
+    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
+    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
     router: { get: mocks.get, visit: mocks.visit },
@@ -56,7 +59,7 @@ function row(overrides: Props = {}): Props {
         completeness_percent: null,
         last_saved_at: null,
         draft_expires_at: null,
-        can: { resume: false },
+        can: { resume: false, open_form: true },
         ...overrides,
     };
 }
@@ -115,10 +118,43 @@ describe('submissions inbox — the global list', () => {
         wrapper.unmount();
     });
 
+    it('renders the form title as PLAIN TEXT when the reader may not open that form', () => {
+        // ⚠️ THE ROW SET IS WIDER THAN FORM READABILITY — `Submission::scopeVisibleTo()` has a respondent
+        // arm `FormPolicy::viewOverview()` has no counterpart for, and a soft-deleted form renders its title
+        // as an em dash. J2c's first draft linked unconditionally, so those rows shipped a live link to a
+        // 403 (and, for the em dash, "—" as a hyperlink to a 404). Found by the adversarial review.
+        const wrapper = render(globalProps({ data: [row({ can: { resume: false, open_form: false } })] }));
+
+        expect(wrapper.text()).toContain('Clinic Intake');
+        expect(wrapper.findAll('a').some((a) => a.attributes('href') === `/forms/${FORM_ID}`)).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('drops the href from the Forms crumb for a reader who cannot open /forms', () => {
+        // ⚠️ `/forms` GATES ON `can:viewAny,Form` — `forms.create | forms.edit.any | forms.edit.own` — and a
+        // Reviewer and a Viewer hold NONE of them, while both can reach this page. A hard `href: '/forms'`
+        // hands exactly those readers a bare 403 with no way back, which is the dead end J2 exists to
+        // remove, arriving through the component built to remove it. `MdsBreadcrumb` renders an href-less
+        // crumb as text, so the broken and correct versions are visually identical — no gate sees this.
+        const wrapper = render(perFormProps());
+        const items = wrapper.findComponent({ name: 'Breadcrumb' }).props('items') as Array<Record<string, unknown>>;
+
+        // The mock above grants `manageForms`, so this asserts the LINK branch; the refused branch is pinned
+        // in `useFormsCrumb.test.ts`, which can vary the ability without re-mocking Inertia per case.
+        expect(items[0]).toEqual({ label: 'Forms', href: '/forms' });
+
+        wrapper.unmount();
+    });
+
     it('shows the Form column and the Form dropdown', () => {
+        // ⚠️ `findAll('th')`, NOT `wrapper.text()).toContain('Form')`. `MdsFormField label="Form"` renders a
+        // visible `<label>Form</label>` for the dropdown, so a text assertion stays green with the COLUMN
+        // deleted — it would have been measuring the control it is not about. Its per-form twin below got
+        // this right first; this one did not, which is how the asymmetry was found.
         const wrapper = render(globalProps());
 
-        expect(wrapper.text()).toContain('Form');
+        expect(wrapper.findAll('th').map((th) => th.text())).toContain('Form');
         expect(wrapper.find('#inbox-form').exists()).toBe(true);
 
         wrapper.unmount();
@@ -198,15 +234,29 @@ describe('submissions inbox — one form’s responses', () => {
 
         wrapper.findComponent({ name: 'SearchField' }).vm.$emit('submit');
 
-        expect(mocks.get.mock.calls[0]?.[1]).not.toHaveProperty('form_id');
+        // ⚠️ ASSERT THE VISIT HAPPENED FIRST. `expect(undefined).not.toHaveProperty(...)` passes, so without
+        // this line a broken `@submit` binding — no visit at all — would satisfy the case below.
+        expect(mocks.get).toHaveBeenCalledTimes(1);
+        expect(mocks.get.mock.calls[0][1]).not.toHaveProperty('form_id');
 
         wrapper.unmount();
     });
 
-    it('offers Export without a form having been chosen first', () => {
-        // On the global inbox Export is hidden until a form is picked (its columns are that form's fields).
-        // Here the route IS a form, so the affordance is unconditional.
-        const wrapper = render(perFormProps());
+    it('offers Export with NO applied form_id at all, which the old gate required', () => {
+        // ⚠️ `filters.applied.form_id: null` IS THE POINT OF THIS FIXTURE. `perFormProps()` normally seeds it
+        // with the bound form (which is what the server sends), and that seeds `selected.form_id` truthy —
+        // so the OLD `v-if="can.export && selected.form_id"` renders Export too and the case cannot tell the
+        // implementations apart. Nulling it isolates the route-bound form as the only thing that can be
+        // satisfying the condition.
+        const wrapper = render(
+            perFormProps({
+                filters: {
+                    statuses: [{ value: 'submitted', label: 'Submitted' }],
+                    sources: [{ value: 'guest', label: 'Guest link' }],
+                    applied: { form_id: null, status: null, source: null, q: null },
+                },
+            }),
+        );
 
         expect(wrapper.text()).toContain('Export CSV');
 

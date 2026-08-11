@@ -12,6 +12,9 @@ import type { FormReport } from '@/components/analytics/types';
  */
 
 vi.mock('@inertiajs/vue3', () => ({
+    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
+    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a :href="$attrs.href"><slot /></a>' },
 }));

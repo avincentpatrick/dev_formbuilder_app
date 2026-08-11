@@ -237,6 +237,34 @@ it('offers a REVIEWER the form they hold a grant on, which the authoring scope w
         ));
 });
 
+it('offers an EMPTY dropdown to a member who reads submissions but holds no dashboard.form.view', function (): void {
+    // ⚠️ THE FAIL-CLOSED CONJUNCT INSIDE `Form::scopeReadableBy()`, pinned rather than merely asserted.
+    // An earlier draft of that scope omitted `dashboard.form.view` and justified it with "the route carries
+    // the policy" — which is FALSE for this scope's only path: `GET /submissions` gates on
+    // `can:viewAny,Submission` alone. Without the conjunct this member enumerates every form title in the
+    // tenant on the strength of `dashboard.org.view`, while `/forms/{id}` refuses them every one.
+    //
+    // Unreachable by any shipped role (all five hold the key), so this is a structural guard and is labelled
+    // as one — the same standing as `FormPolicy::viewOverview()`'s identical conjunct.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    publishedInboxForm($tenant, $owner, 'Should Not Be Enumerable');
+
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['submissions.view', 'dashboard.org.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($stranger)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('filters.forms', []));
+});
+
 it('carries form_id on every inbox row so the form name can be linked', function (): void {
     // Increment J2c. `detail()` has shipped `form_id` since F7 while the LIST row did not, so the inbox
     // printed a form's title on every row and linked none of them — one of the three dead ends
@@ -254,6 +282,41 @@ it('carries form_id on every inbox row so the form name can be linked', function
         ->assertInertia(fn ($page) => $page
             ->where('data.0.form_id', (string) $form->id)
             ->where('data.0.form_title', 'Linked Form')
+            ->where('data.0.can.open_form', true)
+            ->etc());
+});
+
+it('refuses to mark a row openable when the reader may see the ROW but not its FORM', function (): void {
+    // ⚠️ THE ROW SET IS STRICTLY WIDER THAN FORM READABILITY, AND THIS IS THE GAP.
+    // `Submission::scopeVisibleTo()` admits a row on `respondent_user_id = me` — an arm
+    // `FormPolicy::viewOverview()` has no counterpart for. So a member who ENCODED a submission keeps seeing
+    // it after their grant is revoked (or was never granted), while `/forms/{id}` 403s for them. J2c's first
+    // draft linked the form title unconditionally, which turns that into a live link to a refusal.
+    //
+    // Built with the synthetic-member idiom: a role-less member holding only `submissions.view`, so they
+    // fail `readableBy` on both conjuncts while the respondent arm still surfaces their own row.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner, 'Not Openable');
+
+    $keyer = User::factory()->create();
+    makeActiveMember($keyer, 'viewer');
+    $keyer->syncRoles([]);
+    $keyer->syncPermissions(['submissions.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    seedInboxSubmission($form, $keyer, SubmissionStatus::Submitted, ['full_name' => 'Mine']);
+
+    $this->actingAs($keyer)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            // The row IS visible — the respondent arm — which is what makes the guard necessary rather
+            // than theoretical. If this ever goes to 0 the case is proving nothing.
+            ->where('meta.total', 1)
+            ->where('data.0.can.open_form', false)
             ->etc());
 });
 

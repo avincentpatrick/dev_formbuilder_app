@@ -34,6 +34,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import {
@@ -145,12 +146,15 @@ const isEditing = computed(() => props.editing != null);
  * this payload, so no presenter change was needed — which is the fix: the non-editing crumb used to be a
  * bare `← Forms`, sending a keyer who arrived from one form back to the list of all of them.
  *
- * ⚠️ THE TAIL MUST KEEP AGREEING WITH THE CANCEL ACTION, which appears TWICE in this template (the header
- * and the sticky footer). In edit mode both name the submission; otherwise both name the form. Three sites,
- * one rule — they were changed together and must stay that way.
+ * ⚠️ THE TRAIL AND THE CANCEL ACTION MUST KEEP NAMING THE SAME DESTINATION — AND IT IS NOT THE TAIL. An
+ * earlier version of this note said "the tail must agree with Cancel", which is false in both modes and
+ * would lead an author following it literally to break the invariant it exists to protect. The tail is where
+ * you ARE ("Edit answers", "New response" / "Continue response"); Cancel is where you LEAVE TO, which is the
+ * crumb immediately BEFORE the tail: the submission in edit mode, the form otherwise. Cancel appears TWICE
+ * in this template — the header and the sticky footer — so three sites move together.
  */
 const crumbs = computed<BreadcrumbItem[]>(() => [
-    { label: 'Forms', href: '/forms' },
+    formsCrumb(),
     { label: props.form.title, href: `/forms/${props.form.id}` },
     ...(isEditing.value
         ? [

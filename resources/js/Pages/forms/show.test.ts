@@ -24,6 +24,9 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ visit: vi.fn(), post: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
+    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
+    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
     router: { visit: mocks.visit, post: mocks.post },

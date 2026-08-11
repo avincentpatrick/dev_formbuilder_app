@@ -112,8 +112,14 @@ it('withholds Responses from a member who could not open the form itself', funct
      *
      * ⚠️ NO SHIPPED ROLE CAN REACH THIS STATE, so this is a fail-closed structural guard rather than a rule
      * a user can observe — the same standing as `FormPolicy::viewOverview()`'s own `dashboard.form.view`
-     * conjunct after its mutation survived. Deleting either half of the `&&` in `FormTabSet` reddens this
-     * case and nothing else, which is exactly why it is written with a synthetic member.
+     * conjunct after its mutation survived.
+     *
+     * ⚠️ THIS CASE COVERS THE `viewOverview` HALF ONLY, and an earlier version of this comment claimed it
+     * covered both ("deleting either half reddens this case and nothing else"). It does not: this member
+     * fails `viewOverview` outright, so removing the `viewAny` conjunct leaves the tab still correctly
+     * withheld and the case GREEN. That is the same species of error — a hypothesis written down as a
+     * measurement — that J2b's surviving mutation forced out of `FormPolicy`, in the increment that cites
+     * it. The case below covers the other half.
      */
     $stranger = User::factory()->create();
     makeActiveMember($stranger, 'viewer');
@@ -124,6 +130,27 @@ it('withholds Responses from a member who could not open the form itself', funct
     $keys = array_column(FormTabSet::for($this->form, $stranger), 'key');
 
     expect($keys)->not->toContain('submissions');
+});
+
+it('withholds Responses from a member who may open the form but not read submissions', function (): void {
+    /*
+     * The OTHER half of the `&&`, and it needs its own fixture because the two conjuncts fail for different
+     * members. This one satisfies `viewOverview` outright — `dashboard.form.view` plus `dashboard.org.view`
+     * — and holds no `submissions.view`, so only the second conjunct can withhold the tab. Delete that
+     * conjunct and this case reddens; delete the first and the case above does.
+     *
+     * Also unreachable by any shipped role, for the same reason: all five hold `submissions.view`.
+     */
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['dashboard.form.view', 'dashboard.org.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $keys = array_column(FormTabSet::for($this->form, $stranger), 'key');
+
+    expect($keys)->toContain('overview')
+        ->and($keys)->not->toContain('submissions');
 });
 
 it('omits the tabs a Viewer cannot reach rather than offering them', function (): void {

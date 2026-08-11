@@ -23,7 +23,13 @@
  */
 import { computed } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { MdsStatTile } from '@meridian/design-system';
+import {
+    MdsBreadcrumb,
+    MdsStatTile,
+    MdsTabNav,
+    type BreadcrumbItem,
+    type TabNavItem,
+} from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import AnalyticsChartsCard from '@/components/analytics/AnalyticsChartsCard.vue';
 import { conversionTile, medianTile } from '@/components/analytics/draft-metrics';
@@ -33,7 +39,25 @@ import type { FormReport } from '@/components/analytics/types';
 const props = defineProps<{
     form: { id: string; title: string };
     report: FormReport;
+    /**
+     * The form's tab strip (J2b), resolved server-side by `FormTabSet` and composed in the CONTROLLER rather
+     * than in `FormAnalyticsPresenter` — each tab is a gate question, and this page's presenter deliberately
+     * reads nothing about who is asking. Without it this page is a dead end: it was one of the six screens
+     * that could only get back to `/forms`, never to the form it is describing.
+     */
+    tabs: TabNavItem[];
 }>();
+
+/**
+ * Three crumbs, not two: the form's title must be a LINK, and `MdsBreadcrumb` renders the last item as text
+ * whatever it carries. A two-crumb trail ending in the title would therefore print the hub's name with no
+ * way to reach it — which is the exact dead end this increment exists to remove.
+ */
+const crumbs = computed<BreadcrumbItem[]>(() => [
+    { label: 'Forms', href: '/forms' },
+    { label: props.form.title, href: `/forms/${props.form.id}` },
+    { label: 'Response statistics' },
+]);
 
 const conversion = computed(() => conversionTile(props.report.drafts));
 const median = computed(() => medianTile(props.report.drafts));
@@ -56,9 +80,13 @@ const deltaLabel = computed(
 
         <PageHeader title="Response statistics" icon="chart-bar">
             <template #breadcrumbs>
-                <Link href="/forms" class="fa__crumb">← Forms</Link>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
             </template>
         </PageHeader>
+
+        <!-- `:ariaLabel` in camelCase deliberately — see the same call on `forms/Show.vue`; the kebab
+             spelling type-checks as an HTML attribute and leaves the required prop missing. -->
+        <MdsTabNav :items="tabs" current="analytics" :ariaLabel="form.title" :link-component="Link" />
 
         <p class="fa__intro">
             Responses to <strong>{{ form.title }}</strong> over the last 30 days.
@@ -101,15 +129,6 @@ const deltaLabel = computed(
 </template>
 
 <style scoped>
-.fa__crumb {
-    color: var(--mds-color-text-secondary);
-    text-decoration: none;
-}
-
-.fa__crumb:hover {
-    text-decoration: underline;
-}
-
 .fa__intro {
     margin: 0 0 var(--mds-space-1);
     color: var(--mds-color-text-body);

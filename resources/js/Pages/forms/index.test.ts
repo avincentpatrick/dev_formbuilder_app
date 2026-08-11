@@ -106,6 +106,45 @@ describe('forms list — the empty state no longer lies', () => {
     });
 });
 
+describe('forms list — the row title reaches the form (J2b)', () => {
+    /**
+     * The title linked to `/forms/{id}/builder` and only `v-if="row.can.edit"`, because the builder was the
+     * only per-form page that existed and it refuses everyone else. A reader who could see the row and not
+     * edit it therefore got inert text and no way into the form at all.
+     *
+     * Both halves are asserted, and the second is the one worth having: an implementation that merely
+     * repointed the href while keeping the `v-if` would satisfy the first case and still leave a Reviewer
+     * staring at unclickable text.
+     */
+    const row = (canEdit: boolean) => ({
+        id: 'form-1',
+        title: 'Clinic Intake',
+        status: 'published',
+        current_version: 2,
+        draft_version: null,
+        updated_at: '2026-08-01T00:00:00+00:00',
+        scope_node_id: null,
+        versions: [],
+        can: { edit: canEdit, publish: false, analytics: false, encode: false, archive: false },
+    });
+
+    it('links the title to the hub, not to the builder', () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null });
+
+        expect(wrapper.get('.forms__title-link').attributes('href')).toBe('/forms/form-1');
+
+        wrapper.unmount();
+    });
+
+    it('links it for a reader who cannot edit, where it used to render inert text', () => {
+        const wrapper = render({ forms: [row(false)], empty_reason: null });
+
+        expect(wrapper.get('.forms__title-link').attributes('href')).toBe('/forms/form-1');
+
+        wrapper.unmount();
+    });
+});
+
 describe('forms list — the keyword filter', () => {
     it('renders a search field seeded from what the server applied', () => {
         const wrapper = render({ filters: { applied: { q: 'clinic' } } });

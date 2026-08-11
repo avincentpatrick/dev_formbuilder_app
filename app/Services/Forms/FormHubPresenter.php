@@ -12,6 +12,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Policies\FormPolicy;
 use App\Support\Forms\FormScheduleView;
+use App\Support\Forms\FormTabSet;
 use Illuminate\Support\Collection;
 
 /**
@@ -37,10 +38,11 @@ use Illuminate\Support\Collection;
  * search arms follow and ADR-0011 §D9's absent-not-locked doctrine: a key with an empty value is a claim,
  * an absent key is the truth. The Vue page keys the Share tab off its presence.
  *
- * ── THE TAB SET IS COMPUTED HERE, NOT IN THE PAGE ──────────────────────────────────────────────────────
+ * ── THE TAB SET IS COMPUTED SERVER-SIDE, AND IT LIVES IN {@see FormTabSet} ─────────────────────────────
  * Each tab's gate is a policy question, so resolving them server-side keeps "which destinations exist for
  * this reader" in one place and makes it assertable in Pest rather than only in Vitest. A refused tab is
- * ABSENT from the array; nothing renders a disabled destination.
+ * ABSENT from the array; nothing renders a disabled destination. It was a private method here until the
+ * analytics page needed the identical strip — see that class for why one encoding rather than two.
  */
 final class FormHubPresenter
 {
@@ -79,7 +81,7 @@ final class FormHubPresenter
                 'published_at' => $v->published_at?->toIso8601String(),
             ])->all(),
             'recent' => $this->recent($form, $user),
-            'tabs' => $this->tabs($form, $user),
+            'tabs' => FormTabSet::for($form, $user),
             'can' => [
                 'edit' => $canUpdate,
                 'publish' => $user->can('publish', $form),
@@ -96,47 +98,6 @@ final class FormHubPresenter
         }
 
         return $payload;
-    }
-
-    /**
-     * The destinations this reader actually has, in reading order: what the form IS, what came back, how it
-     * is built, what it says, how it goes out.
-     *
-     * ⚠️ Overview is unconditional because reaching this method already means passing `viewOverview`. The
-     * others each name the gate their own route carries, so the strip cannot offer a tab that 403s — the
-     * defect `forms/Index.vue` shipped for a while, where a row action outlived the ability behind it.
-     *
-     * @return list<array{key: string, label: string, href: string, icon: string}>
-     */
-    private function tabs(Form $form, User $user): array
-    {
-        $base = '/forms/'.$form->id;
-
-        $tabs = [
-            ['key' => 'overview', 'label' => 'Overview', 'href' => $base, 'icon' => 'forms'],
-        ];
-
-        // `viewAny,Submission` is the inbox's own gate; the per-form list (J2c) carries the same one.
-        if ($user->can('viewAny', Submission::class)) {
-            $tabs[] = [
-                'key' => 'submissions',
-                'label' => 'Responses',
-                'href' => $base.'/submissions',
-                'icon' => 'submissions',
-            ];
-        }
-
-        if ($user->can('update', $form)) {
-            $tabs[] = ['key' => 'builder', 'label' => 'Builder', 'href' => $base.'/builder', 'icon' => 'edit'];
-        }
-
-        // `can:view,form` — the analytics route's gate, deliberately UNCHANGED by J2b's widening.
-        // `FormAnalyticsGateTest` pins its refusals and passes unedited.
-        if ($user->can('view', $form)) {
-            $tabs[] = ['key' => 'analytics', 'label' => 'Analytics', 'href' => $base.'/analytics', 'icon' => 'chart-bar'];
-        }
-
-        return $tabs;
     }
 
     /**

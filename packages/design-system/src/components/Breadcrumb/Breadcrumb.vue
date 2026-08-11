@@ -33,7 +33,22 @@
  * would be announced by some screen readers as content). Left as a literal chevron glyph rather than an
  * `MdsIcon`: at caption size an SVG stroke renders heavier than the surrounding text and the trail stops
  * reading as one line.
+ *
+ * ── `linkComponent` — an SPA visit without this package importing a router (J2b) ────────────────────────
+ * A crumb renders as a bare anchor by default, which in an Inertia application is a full document load: the
+ * persistent app shell is rebuilt and every piece of long-lived client state re-initialises. This package
+ * imports nothing from Inertia and must not start, because Storybook renders it with no router present — so
+ * the consumer passes its own link element and the crumb renders through a dynamic component instead. The
+ * default is the string `'a'`, which is what keeps every existing story and the whole of `Breadcrumb.test.ts`
+ * correct unedited; those files passing untouched is the evidence this added a capability rather than
+ * changed a behaviour.
+ *
+ * ⚠️ It applies to the LINK crumbs only. The last crumb is not a link and must not become one — see the
+ * paragraph above; routing it through `linkComponent` would reintroduce exactly the self-link this component
+ * exists to refuse.
  */
+import type { Component } from 'vue';
+
 export interface BreadcrumbItem {
     label: string;
     /**
@@ -43,14 +58,23 @@ export interface BreadcrumbItem {
     href?: string;
 }
 
-defineProps<{
-    items: BreadcrumbItem[];
-    /**
-     * Names the landmark. Defaults to "Breadcrumb", the conventional name; override only when a page
-     * renders two trails, because axe's `landmark-unique` distinguishes navigation landmarks by name.
-     */
-    ariaLabel?: string;
-}>();
+withDefaults(
+    defineProps<{
+        items: BreadcrumbItem[];
+        /**
+         * Names the landmark. Defaults to "Breadcrumb", the conventional name; override only when a page
+         * renders two trails, because axe's `landmark-unique` distinguishes navigation landmarks by name.
+         */
+        ariaLabel?: string;
+        /**
+         * What a LINK crumb renders as. Defaults to a plain anchor; an Inertia application passes its own
+         * Link so a crumb is a client visit rather than a document load. The last crumb is unaffected — it
+         * is never a link. See the docblock: the default is load-bearing.
+         */
+        linkComponent?: Component | string;
+    }>(),
+    { linkComponent: 'a' },
+);
 
 function isLast(index: number, length: number): boolean {
     return index === length - 1;
@@ -65,11 +89,12 @@ function isLast(index: number, length: number): boolean {
              reader with an unpunctuated run of words. -->
         <ol class="mds-breadcrumb__list" role="list">
             <li v-for="(item, index) in items" :key="`${index}-${item.label}`" class="mds-breadcrumb__item">
-                <a
+                <component
+                    :is="linkComponent"
                     v-if="item.href && !isLast(index, items.length)"
                     class="mds-breadcrumb__link"
                     :href="item.href"
-                >{{ item.label }}</a>
+                >{{ item.label }}</component>
                 <span
                     v-else
                     class="mds-breadcrumb__current"

@@ -263,11 +263,22 @@ function submitRestore(): void {
         </MdsFilterBar>
 
         <MdsDataTable :columns="columns" :rows="forms" :loading="busy" caption="Forms" row-key="id">
+            <!--
+                J2b. Two changes, one line: the destination is the form's HUB rather than the builder, and
+                the link is UNCONDITIONAL.
+
+                It pointed at `/forms/{id}/builder` because that was the only per-form page that existed, and
+                it was `v-if="row.can.edit"` because that route refuses everyone else — so a reader who could
+                see the row but not edit it got inert text and no way into the form at all. `/forms/{id}` is
+                gated `viewOverview`, which every role that can reach this list already satisfies, so the
+                title is now a link for all of them. `FormListHubLinkTest` pins that pairing; if `viewAny`
+                and `viewOverview` ever diverge, this needs a real per-row flag rather than the assumption.
+
+                (Pulled forward from J2d's dead-end sweep, which owns the rest of the inbound links. Without
+                it the hub would have shipped with no route to it from the forms list.)
+            -->
             <template #cell-title="{ row }">
-                <Link v-if="row.can.edit" :href="`/forms/${row.id}/builder`" class="forms__title-link">
-                    {{ row.title }}
-                </Link>
-                <span v-else>{{ row.title }}</span>
+                <Link :href="`/forms/${row.id}`" class="forms__title-link">{{ row.title }}</Link>
             </template>
             <template #cell-status="{ value }">
                 <MdsBadge v-bind="statusVariant(String(value))" />

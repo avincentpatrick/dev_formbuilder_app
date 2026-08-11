@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { markRaw } from 'vue';
 import TabNav from './TabNav.vue';
 import type { TabNavItem } from './TabNav.vue';
 
@@ -173,5 +174,51 @@ describe('MdsTabNav — navigation, not the ARIA tabs widget', () => {
         expect(list.attributes('tabindex')).toBeUndefined();
         expect(list.attributes('role')).toBe('list');
         expect(list.attributes('aria-label')).toBeUndefined();
+    });
+
+    /**
+     * J2b. The strip is a form's primary navigation, so a bare anchor here means a full document load on
+     * every tab switch — the persistent app shell torn down and rebuilt. The app passes Inertia's Link
+     * instead, and this package still imports no router.
+     *
+     * `href` must arrive as a real PROP rather than a fallthrough attribute: Inertia's Link declares it, and
+     * a version binding it as an attribute would render a working-looking anchor that never becomes a client
+     * visit. `aria-current` must survive the substitution too — it is one of the two non-colour channels
+     * marking the active item.
+     */
+    it('renders each item through an injected component, prop and aria-current intact', () => {
+        // `markRaw`, and it is not test hygiene — it is the call-site contract. A component object handed
+        // through a reactive props bag gets deep-proxied, which Vue warns about explicitly. Inertia's real
+        // Link is a module-level import and therefore already raw, so the app never trips it; a stub
+        // declared inline inside a mount call would, and the warning would then read as a defect in this
+        // component rather than in the fixture.
+        const Stub = markRaw({
+            name: 'RouterLinkStub',
+            props: { href: { type: String, required: true } },
+            template: '<a class="stub" :href="href"><slot /></a>',
+        });
+
+        const wrapper = mount(TabNav, {
+            props: { items, current: 'submissions', ariaLabel: 'Clinic Intake', linkComponent: Stub },
+        });
+
+        const stubs = wrapper.findAllComponents(Stub);
+
+        expect(stubs).toHaveLength(3);
+        expect(stubs.map((s) => s.props('href'))).toEqual([
+            '/forms/abc',
+            '/forms/abc/submissions',
+            '/forms/abc/builder',
+        ]);
+        expect(wrapper.findAll('[aria-current="page"]')).toHaveLength(1);
+        expect(wrapper.get('[aria-current="page"]').text()).toContain('Submissions');
+
+        wrapper.unmount();
+    });
+
+    it('still renders plain anchors when nothing is injected — the default is load-bearing', () => {
+        // Every story, every J2a call site and every other case in this file depends on it, and Storybook
+        // renders these components with no router present at all.
+        expect(mountNav().get('.mds-tabnav__link').element.tagName).toBe('A');
     });
 });

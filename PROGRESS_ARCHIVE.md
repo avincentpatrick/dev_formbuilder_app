@@ -1098,3 +1098,50 @@ the file mutated it out; no shipped role can distinguish the two, the conjunct s
 is a capacity store rather than a permission store, and a synthetic member now pins it. Gates: Pest 332 in
 tests/Feature/Forms, Pint clean, controller-gate passed, **PHPStan 20 — DOWN from the 23 baseline**, because
 three `@property` timestamp annotations on `Form` cleared the new phantom plus three pre-existing ones.
+
+## 2026-08-11 — J2b finished: the form hub's Vue half, and the dead link it nearly shipped
+
+`GET /forms/{form}` had a route, a gate and a presenter but **no page** — `FormHubController` rendered
+`forms/Show`, which did not exist on disk. This session built it, gave it inbound links, and paid J2b's doc
+debt (the server half committed zero docs; `viewOverview` appeared nowhere in `docs/`).
+
+**The finding worth keeping: the strip's own second tab was a 404.** `FormHubPresenter::tabs()` emitted
+`/forms/{form}/submissions`, which is **J2c's route and does not exist yet** — so the page opened to remove
+dead ends would have shipped one in its primary navigation. It now points at `/submissions?form_id={id}`,
+verified safe by reading the code rather than hoping: the inbox takes `form_id` as a plain query string with
+no `Rule::in` and composes it as a bare `where`, so a form with zero responses filters to an empty list
+instead of 422-ing against a dropdown derived from forms-that-have-submissions. The durable fix is
+`FormTabSetReachabilityTest` — a dataset issuing a REAL request per tab href, one request per case because
+the tenant GUC is torn down on the way out. Mutating the href back reddens exactly two of its cases.
+
+**`MdsTabNav` and `MdsBreadcrumb` gained `linkComponent` (user decision).** Both rendered bare anchors, so
+every tab and crumb click was a full document load that tore down the persistent `AppLayout`. The package
+imports zero Inertia by design, so the element is injected instead; the default stays `'a'`, and both J2a
+specs plus every story pass **unedited**. Two things only the tests show: the injected component must receive
+`href` as a real prop (a fallthrough attribute renders a working-looking anchor that never becomes a client
+visit), and the call site must `markRaw` it. In a template the prop is `:ariaLabel` — `vue-tsc` treats the
+kebab spelling as an HTML attribute and then reports the required prop as missing.
+
+**Two more user decisions:** the builder takes the breadcrumb ONLY, not the strip (a three-pane workspace on
+a `height:100%` grid cannot spare a second header row), and `forms/Index.vue`'s row title was pulled forward
+from J2d — it linked to the builder and only for a role that could edit, so a non-editor saw inert text and
+the hub would otherwise have had no inbound link at all.
+
+**Three things the page refuses to do, each recorded where someone would add it.** The Last-response tile
+carries no href, because `max(submitted_at)` and `orderByDesc('id')` can name different rows. A recent row
+links only when the Responses tab is present — provable, since `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`,
+and unobservable in production because all five roles hold `submissions.view`, so it is labelled a
+fail-closed guard exactly like the `dashboard.form.view` conjunct. And a form's sub-page always takes THREE
+crumbs: `MdsBreadcrumb` renders the last as text, so a two-crumb trail prints the hub's name with no link on
+it — the dead end intact, with a separator.
+
+**Two type/markup traps paid once.** A `MdsDataTable` row shape must be a `type` alias, never an interface —
+TypeScript grants the implicit index signature only to the former, and as interfaces the failure cascades
+into every `#cell-*` slot binding `Record<string, unknown>`. And the panel headings are unconditional `h2`s:
+`heading-order` fails only when a panel is EMPTY, which for a brand-new form is both at once — a state no
+seeded e2e fixture can reach, so it is pinned in Vitest.
+
+Gates: Forms + Analytics Pest 453/0 (1,970 assertions) with `FormAnalyticsGateTest` and `BuilderRoutesTest`
+**unedited**; Vitest 93 files; PHPStan 20 (delta 0); Pint clean; controller-gate 43, migration-lint 63,
+job-payload-lint 28; vue-tsc clean; build clean; `openapi.json` byte-identical. Four mutations run, each
+reddening exactly one case.

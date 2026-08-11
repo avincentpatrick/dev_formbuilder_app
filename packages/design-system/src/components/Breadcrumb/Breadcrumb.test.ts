@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { markRaw } from 'vue';
 import Breadcrumb from './Breadcrumb.vue';
 import type { BreadcrumbItem } from './Breadcrumb.vue';
 
@@ -117,6 +118,47 @@ describe('MdsBreadcrumb', () => {
         const wrapper = mount(Breadcrumb, { props: { items: trail, ariaLabel: 'Form location' } });
 
         expect(wrapper.get('nav').attributes('aria-label')).toBe('Form location');
+
+        wrapper.unmount();
+    });
+
+    /**
+     * J2b. The app passes Inertia's Link so a crumb is a client visit rather than a document load; this
+     * package must never import a router to make that possible, so the element is injected.
+     *
+     * Two directions matter, and the second is the one a naive implementation gets wrong: the substituted
+     * component must receive `href` as a real PROP (Inertia's Link declares it — bound as a plain attribute
+     * it would land in `$attrs` and the visit would never happen), and it must NOT reach the last crumb,
+     * which is not a link at all. Routing every crumb through it would resurrect the self-link this
+     * component's whole contract refuses.
+     */
+    it('renders link crumbs through an injected component, and never the current one', () => {
+        // `markRaw` for the reason TabNav.test.ts records: a component object handed through a reactive
+        // props bag gets deep-proxied and Vue warns. Inertia's Link is a module-level import and already
+        // raw, so the real call site never trips it.
+        const Stub = markRaw({
+            name: 'RouterLinkStub',
+            props: { href: { type: String, required: true } },
+            template: '<a class="stub" :href="href"><slot /></a>',
+        });
+
+        const wrapper = mount(Breadcrumb, { props: { items: trail, linkComponent: Stub } });
+
+        const stubs = wrapper.findAllComponents(Stub);
+
+        expect(stubs).toHaveLength(2);
+        expect(stubs.map((s) => s.props('href'))).toEqual(['/forms', '/forms/abc']);
+        expect(wrapper.get('[aria-current="page"]').element.tagName).toBe('SPAN');
+
+        wrapper.unmount();
+    });
+
+    it('still renders plain anchors when nothing is injected — the default is load-bearing', () => {
+        // Every story, every other case in this file and every J2a call site depends on it. A default that
+        // drifted to a router component would break Storybook, which renders with no router present.
+        const wrapper = mount(Breadcrumb, { props: { items: trail } });
+
+        expect(wrapper.get('.mds-breadcrumb__link').element.tagName).toBe('A');
 
         wrapper.unmount();
     });

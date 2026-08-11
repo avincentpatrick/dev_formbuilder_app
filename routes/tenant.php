@@ -21,6 +21,7 @@ use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
+use App\Http\Controllers\Tenant\FormHubController;
 use App\Http\Controllers\Tenant\FormPrintController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
@@ -311,6 +312,19 @@ Route::middleware([
     Route::post('/forms/templates/{template}/instantiate', [FormTemplateController::class, 'instantiate'])
         ->middleware(['can:create,'.Form::class, 'feature:form_templates'])->name('forms.templates.instantiate');
 
+    // The form hub (Increment J2b, PRD §3.7 "a form is a hub … rather than a row that fans out into
+    // unlinked screens"). ⚠️ REGISTERED AFTER /forms/templates ABOVE — the H14 static-segment rule; a
+    // {form} pattern declared first would capture `templates` as a form id.
+    //
+    // ⚠️ `can:viewOverview,form`, NOT `can:view,form`. FormPolicy::view delegates to canEdit, so it admits
+    // the same set as `update` and refuses a Reviewer and a Viewer — the two roles that arrive here from
+    // the inbox, the audit ledger and global search, and the whole reason this page exists. The analytics
+    // route below keeps `can:view,form` deliberately unchanged; FormAnalyticsGateTest pins its refusals.
+    //
+    // Until J2b a GET here matched the URI but not the method, so it answered 405 rather than 404 — which
+    // is why nothing in the product could link to a form and every such link went to /forms or the builder.
+    Route::get('/forms/{form}', FormHubController::class)
+        ->middleware('can:viewOverview,form')->name('forms.show');
     Route::patch('/forms/{form}', [FormController::class, 'update'])
         ->middleware('can:update,form')->name('forms.update');
     Route::post('/forms/{form}/archive', [FormController::class, 'archive'])

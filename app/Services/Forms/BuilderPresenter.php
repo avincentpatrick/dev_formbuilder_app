@@ -15,12 +15,8 @@ use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
-use App\Models\Tenant;
-use App\Support\Forms\FormSlug;
-use App\Support\Tenancy\TenantUrl;
 use DateTimeZone;
 use Illuminate\Support\Collection;
-use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 /**
  * Read model for the interactive builder (Increment D4a). Hydrates the form's current draft version into
@@ -30,6 +26,13 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  */
 final class BuilderPresenter
 {
+    /**
+     * The share block moved to {@see FormSharePresenter} in J2b, unchanged, because the form hub needs the
+     * same payload and two encodings of "what is this form's public link" is J1e's audit-export defect over
+     * again. `BuilderRoutesTest` and `ShareModal.test.ts` pass unedited, which is the proof it moved nothing.
+     */
+    public function __construct(private readonly FormSharePresenter $share) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -79,7 +82,7 @@ final class BuilderPresenter
                 'default_locale' => $form->default_locale,
                 'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),
             ],
-            'share' => $this->share($form),
+            'share' => $this->share->present($form),
             'draft' => $draft ? [
                 'id' => $draft->id,
                 'version_number' => $draft->version_number,
@@ -94,75 +97,6 @@ final class BuilderPresenter
             // Rule::in(DateTimeZone::listIdentifiers()) — a client-built list could drift and 422.
             'timezones' => DateTimeZone::listIdentifiers(),
         ];
-    }
-
-    /**
-     * The share surface's read model (Increment I1, PRD Feature #3) — everything the Share modal needs to
-     * describe the form's public link without guessing at any of it.
-     *
-     * ── THE URL IS COMPOSED HERE, NEVER IN THE BROWSER ────────────────────────────────────────────────
-     * `TenantUrl` has two arms and picking between them is a security decision (its class docblock): `to()`
-     * is the APP arm and never returns a custom domain; `toPublic()` prefers one. A custom host serves the
-     * guest runtime and nothing else (ADR-0012 §D1, from ADR-0009 §D2), so a respondent-facing link is
-     * `toPublic()` by definition. There is no JS-side URL helper and no Ziggy in this app precisely so that
-     * this cannot be re-decided per page: building the link from `window.location` in the modal would emit
-     * the app host and silently hand every custom-domain tenant the wrong URL to print on a flyer.
-     * `DomainPresenter` states the same rule for its own row: the public host is READ from `TenantUrl`,
-     * never re-derived.
-     *
-     * `public_url` is null whenever the slug is — the modal renders a "no link yet" state rather than a
-     * plausible-looking URL that 404s. Same for `is_published`: all three of GuestFormController's gates
-     * answer 404, so a live-looking link on an unpublished form would be a link to a dead end with no
-     * explanation attached.
-     *
-     * `suggested_slug` is computed server-side through the same {@see FormSlug} the XLSForm importer uses, so
-     * the editor opens on a value that is already free rather than one the author discovers is taken only
-     * after a 422.
-     *
-     * @return array<string, mixed>
-     */
-    private function share(Form $form): array
-    {
-        $tenant = $this->tenantFor($form);
-
-        $slug = $form->public_slug;
-
-        return [
-            'public_slug' => $slug,
-            'allow_guest_submissions' => $form->allow_guest_submissions,
-            // Spam protection (I8b) — saved by the same button as the two above, which is why it lives in
-            // this block rather than in one of its own.
-            'bot_challenge' => $form->bot_challenge->value,
-            'guest_rate_limit_per_minute' => $form->guest_rate_limit_per_minute,
-            'suggested_slug' => $slug ?? FormSlug::suggest($form),
-            'is_published' => $form->current_published_version_id !== null,
-            'public_host' => TenantUrl::publicHost($tenant),
-            'public_url' => $slug === null ? null : TenantUrl::toPublic($tenant, 'f/'.$slug),
-        ];
-    }
-
-    /**
-     * The tenant whose hosts serve this form — taken from the FORM, not from ambient state.
-     *
-     * The container binding is used when it is already the right tenant, which is the normal HTTP path and
-     * spares a query on every builder render. Otherwise the form's own `tenant_id` answers it. That fallback
-     * is not defensive padding: `app(TenantContract::class)` resolves to NULL wherever stancl's tenancy was
-     * never initialized — a console command, a queued job, and any test that establishes the RLS context with
-     * `enterTenant()` (which sets the GUC but binds no Tenant). A pre-existing schedule test called
-     * `present()` that way and turned this into a TypeError the moment the share block landed.
-     *
-     * Reading it off the form is also simply more correct: the form row carries the authoritative
-     * `tenant_id`, so the answer cannot disagree with the record being presented.
-     */
-    private function tenantFor(Form $form): Tenant
-    {
-        $bound = app()->bound(TenantContract::class) ? app(TenantContract::class) : null;
-
-        if ($bound instanceof Tenant && $bound->getKey() === $form->tenant_id) {
-            return $bound;
-        }
-
-        return Tenant::query()->whereKey($form->tenant_id)->firstOrFail();
     }
 
     /**

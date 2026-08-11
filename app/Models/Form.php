@@ -57,6 +57,9 @@ use Illuminate\Support\Carbon;
  * @property string $timezone
  * @property ?int $max_responses
  * @property ?FormScheduleState $schedule_state
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $deleted_at
  */
 class Form extends Model implements TenantScoped
 {

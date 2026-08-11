@@ -12,6 +12,7 @@ use App\Models\ScopeNode;
 use App\Models\User;
 use App\Services\Dashboard\DashboardMetricsService;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Forms\FormHubLink;
 
 /**
  * The labelled analytics REPORT — range, prior range, total, series, breakdown, drafts (Increment I10c).
@@ -75,7 +76,7 @@ final class AnalyticsReportBuilder
             'breakdown' => [
                 ...$breakdown,
                 'axis' => $query->axis->value,
-                'rows' => $this->labelRows($query->axis, $breakdown['rows']),
+                'rows' => $this->labelRows($query->axis, $breakdown['rows'], $user),
                 'unassigned_label' => $this->unassignedLabel($query->axis),
                 'has_unassigned_bucket' => $query->axis->hasUnassignedBucket(),
             ],
@@ -98,10 +99,21 @@ final class AnalyticsReportBuilder
      * into `unassigned`) and is kept anyway rather than asserted away: it costs one line and its absence
      * would be a fatal on a shape change rather than a wrong label.
      *
+     * ⚠️ `label` AND `url` ANSWER DIFFERENT QUESTIONS, AND THE `withTrashed()` BELOW IS WHY (Increment J2d).
+     * Naming a bucket is not the same as being able to open it: a soft-deleted form legitimately appears here
+     * as a named bar — that is what `withTrashed()` is for — while `/forms/{form}` binds through the default
+     * scope and 404s on it. {@see FormHubLink::pathsFor()} answers the reachability half and omits every id
+     * it will not vouch for, so `?? null` is the whole guard and a deleted form keeps its name without
+     * becoming a broken link.
+     *
+     * `url` is null on every non-Form axis by construction: a source, a status and a locale are values, not
+     * entities, and there is no page to send anyone to. The KEY is still emitted on those axes so the two
+     * bags keep one shape.
+     *
      * @param  list<array{key: string|null, count: int}>  $rows
-     * @return list<array{key: string|null, label: string, count: int}>
+     * @return list<array{key: string|null, label: string, count: int, url: string|null}>
      */
-    private function labelRows(AnalyticsAxis $axis, array $rows): array
+    private function labelRows(AnalyticsAxis $axis, array $rows, User $user): array
     {
         /** @var list<string> $ids */
         $ids = array_values(array_filter(array_column($rows, 'key'), 'is_string'));
@@ -121,11 +133,14 @@ final class AnalyticsReportBuilder
             AnalyticsAxis::Source, AnalyticsAxis::Status, AnalyticsAxis::Locale => '',
         };
 
+        $urls = $axis === AnalyticsAxis::Form ? FormHubLink::pathsFor($user, $ids) : [];
+
         return array_map(fn (array $row): array => [
             ...$row,
             'label' => $row['key'] === null
                 ? $this->unassignedLabel($axis)
                 : ($names[$row['key']] ?? $this->enumLabel($axis, $row['key']) ?? $missing),
+            'url' => $row['key'] === null ? null : ($urls[$row['key']] ?? null),
         ], $rows);
     }
 

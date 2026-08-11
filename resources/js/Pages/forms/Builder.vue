@@ -16,7 +16,6 @@ import {
     MdsCheckbox,
     MdsModal,
     MdsSegmentedControl,
-    type BreadcrumbItem,
 } from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
@@ -31,22 +30,11 @@ import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
 const { selection, saving, canUndo, canRedo, conflict, library } = store;
 
-/**
- * The toolbar's path trail (J2b), replacing the hand-rolled "← Forms" link. The middle crumb is the point:
- * it reaches the form's HUB, which before this increment had no route at all, so the builder's only way out
- * was back to the list.
- */
-const crumbs = computed<BreadcrumbItem[]>(() => [
-    formsCrumb(),
-    { label: props.form.title, href: `/forms/${props.form.id}` },
-    { label: 'Builder' },
-]);
 
 // Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
 // Each is server-gated on its route; this only spares a 402 click.

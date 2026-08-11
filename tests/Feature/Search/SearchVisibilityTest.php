@@ -105,49 +105,106 @@ it('does not let an editor find a SAME-TENANT form they hold no grant on', funct
         ->not->toContain('Clinic Referral');
 });
 
-it('refuses the forms arm entirely to a reviewer and a viewer', function (): void {
-    // Neither role holds ANY `forms.*` key, so `FormPolicy::viewAny` is false and the arm never runs.
-    //
-    // ⚠️ THE COUNT KEY MUST BE ABSENT, NOT ZERO. A `0` is a claim ("there are no forms"); an absent key is
-    // the truth ("you cannot ask"). Mutation: return 0 for a refused arm instead of omitting it, and this
-    // reddens — which is the count-leak guard.
-    foreach ([$this->reviewer, $this->viewer] as $user) {
-        $props = app(SearchPresenter::class)->index($user, SearchTerms::parse('clinic'), null);
-
-        expect(array_column($props['data'], 'entity'))->not->toContain(SearchEntity::Form->value)
-            ->and($props['counts'])->not->toHaveKey(SearchEntity::Form->value)
-            ->and(array_column($props['filters']['entities'], 'value'))
-            ->not->toContain(SearchEntity::Form->value);
-    }
+it('offers a viewer the forms arm, scoped, rather than refusing it', function (): void {
+    /*
+     * ⚠️ THIS CASE WAS INVERTED IN J2d, AND THE INVERSION IS THE POINT (user decision, 2026-08-11).
+     *
+     * It used to assert that a Reviewer and a Viewer got NO forms arm at all, because the arm gated on
+     * `viewAny,Form` = `forms.create | forms.edit.any | forms.edit.own` and neither role holds any of the
+     * three. That was correct for J1b and became a dead end once J2b opened the form HUB to all five roles:
+     * a Viewer could open a form's overview from the inbox and could not find that form by name.
+     *
+     * The arm now gates on `dashboard.form.view` and scopes on `Form::scopeReadableBy()`. A Viewer holds
+     * `dashboard.org.view`, so their set is every non-archived form — exactly the set `/forms/{form}` would
+     * let them open. It discloses nothing new: the inbox has rendered `form_title` to both roles since F7.
+     */
+    expect(searchedFormTitles($this->viewer))
+        ->toContain('Clinic Intake')
+        ->toContain('Clinic Referral')
+        ->not->toContain('Clinic Archive')
+        ->not->toContain('Payroll Register');
 });
 
-it('refuses a viewer at the ARM GATE, before the scope is ever consulted', function (): void {
-    // Written this way after a mutation refused to redden and exposed the first draft as vacuous.
-    //
-    // The first version of this case claimed to prove that borrowing `AnalyticsFormSet`'s rule would show a
-    // Viewer every form. It cannot: `FormPolicy::viewAny` is `forms.create || forms.edit.any ||
-    // forms.edit.own`, a Viewer holds NONE of the three, so `allowed()` refuses the arm and the scope never
-    // runs. Swapping the scope's predicate left all ten cases green.
-    //
-    // That is defence in depth working, and it is worth pinning as what it actually is — but it means this
-    // case proves the GATE, not the scope. The two cases below prove the scope, on the roles that can
-    // actually observe it.
-    expect($this->viewer->can('dashboard.org.view'))->toBeTrue()
+it('scopes a reviewer to granted forms rather than handing them the tenant', function (): void {
+    /*
+     * The other half of the widening, and the half that would be a disclosure bug if it were wrong. A
+     * Reviewer holds `dashboard.form.view` but NOT `dashboard.org.view`, so `scopeReadableBy()` falls to the
+     * granted-forms subquery. Both directions in one case: the granted form appears, the same-tenant
+     * ungranted one does not — a one-way assertion cannot tell "the predicate works" from "the fixture was
+     * empty", the lesson this file already records.
+     *
+     * ⚠️ THE GRANT IS REVIEWER CAPACITY, which is the whole reason this is `readableBy` and not
+     * `visibleTo`: the authoring scope demands EDITOR capacity, so it would return the empty set for the one
+     * role the widening was for, while every owner-fixtured case stayed green.
+     */
+    makeCollaborator($this->visible, $this->reviewer, ResourceCapacity::Reviewer);
+
+    expect(searchedFormTitles($this->reviewer))
+        ->toContain('Clinic Intake')
+        ->not->toContain('Clinic Referral');
+});
+
+it('omits the forms arm for a member without dashboard.form.view', function (): void {
+    /*
+     * ⚠️ THE COUNT KEY MUST BE ABSENT, NOT ZERO. A `0` is a claim ("there are no forms"); an absent key is
+     * the truth ("you cannot ask"). Mutation: return 0 for a refused arm instead of omitting it and this
+     * reddens — the count-leak guard, preserved verbatim from the case this replaced.
+     *
+     * ⚠️ THE ACTOR IS SYNTHETIC BECAUSE NO SHIPPED ROLE CAN REACH THIS STATE — all five hold
+     * `dashboard.form.view`. `FormSearchArm::allowed()` is a fail-closed guard now rather than a live
+     * refusal, and is labelled as one there; this case is what keeps it from being dead code.
+     */
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['submissions.view', 'dashboard.org.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $props = app(SearchPresenter::class)->index($stranger, SearchTerms::parse('clinic'), null);
+
+    expect(array_column($props['data'], 'entity'))->not->toContain(SearchEntity::Form->value)
+        ->and($props['counts'])->not->toHaveKey(SearchEntity::Form->value)
+        ->and(array_column($props['filters']['entities'], 'value'))
+        ->not->toContain(SearchEntity::Form->value);
+});
+
+it('reaches a viewer through the SCOPE rather than through any forms.* key', function (): void {
+    /*
+     * The permission shape behind the case above, pinned separately so the reason a Viewer now sees forms is
+     * unambiguous: it is `dashboard.org.view` inside `scopeReadableBy()`, NOT any `forms.*` key. If someone
+     * later "fixes" the widening by granting Viewers `forms.edit.own`, this reddens and says so — which
+     * matters, because that change would also hand them the builder.
+     *
+     * ⚠️ WHAT THIS CASE USED TO SAY WAS ITSELF A CORRECTION, AND THE HISTORY IS WORTH KEEPING. Its first
+     * draft claimed to prove that borrowing `AnalyticsFormSet`'s rule would show a Viewer every form; it
+     * could not, because the arm gate refused the Viewer before the scope ever ran, and swapping the scope's
+     * predicate left all ten cases green. The gate no longer refuses them, so the scope is now genuinely
+     * load-bearing for this role — which is what the two cases above exercise.
+     */
+    expect($this->viewer->can('dashboard.form.view'))->toBeTrue()
+        ->and($this->viewer->can('dashboard.org.view'))->toBeTrue()
         ->and($this->viewer->can('forms.edit.any'))->toBeFalse()
         ->and($this->viewer->can('forms.edit.own'))->toBeFalse()
-        ->and($this->viewer->can('forms.create'))->toBeFalse()
-        ->and(searchedFormTitles($this->viewer))->toBe([]);
+        ->and($this->viewer->can('forms.create'))->toBeFalse();
 });
 
-it('requires EDITOR capacity, so a bare reviewer grant surfaces nothing', function (): void {
-    // ⚠️ THIS IS THE CASE THAT DISTINGUISHES THE POLICY RULE FROM THE ANALYTICS RULE, and the reason it has
-    // to exist: `form_editor` holds no `dashboard.org.view`, so under `AnalyticsFormSet::visible()` it would
-    // fall through to `grantedFormIdsQuery($user)` with a NULL capacity — i.e. ANY grant, including a bare
-    // Reviewer one. Mutation: change `ResourceCapacity::Editor` to `null` in `Form::scopeVisibleTo()`, or
-    // swap the whole predicate for the analytics rule, and this reddens. Nothing else does.
+it('accepts ANY capacity, so a bare reviewer grant does surface its form', function (): void {
+    /*
+     * ⚠️ ALSO INVERTED IN J2d, AND FOR THE SAME REASON THE ARM GATE WAS. This case used to assert that a
+     * reviewer-capacity grant surfaced nothing, because `Form::scopeVisibleTo()` demands EDITOR capacity —
+     * correct for an AUTHORING scope and wrong for "which forms may I open". `scopeReadableBy()` passes no
+     * capacity at all, deliberately, and its own docblock records why: an editor-capacity check refuses the
+     * single role the widening exists for.
+     *
+     * ⚠️ THE ANALYTICS RULE IS STILL NOT THIS RULE, and the distinction this case used to carry has been
+     * moved rather than dropped. `AnalyticsFormSet::visible()` keys on `dashboard.org.view` ALONE (no
+     * `dashboard.form.view` conjunct) and returns `Form::withTrashed()`. The conjunct is pinned by "omits the
+     * forms arm for a member without dashboard.form.view" above; the trashed half by "excludes soft-deleted
+     * forms for an ORG-WIDE reader too" below. Swapping in the analytics predicate reddens both.
+     */
     makeCollaborator($this->hidden, $this->editor, ResourceCapacity::Reviewer);
 
-    expect(searchedFormTitles($this->editor))->not->toContain('Clinic Referral');
+    expect(searchedFormTitles($this->editor))->toContain('Clinic Referral');
 });
 
 it('excludes archived forms, matching what /forms shows', function (): void {

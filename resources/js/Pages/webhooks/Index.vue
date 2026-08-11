@@ -7,7 +7,7 @@
  * log. Assembled entirely from shared design-system components.
  */
 import { computed, reactive, ref } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsDataTable,
@@ -35,6 +35,8 @@ type EndpointRow = {
     event_types: string[];
     form_id: string | null;
     form_title: string | null;
+    /** The form's hub path, server-resolved; null when the reader cannot open it or it no longer exists. */
+    form_url: string | null;
     secret_masked: string;
     disabled_reason: string | null;
     consecutive_failure_count: number;
@@ -146,8 +148,14 @@ function openEndpoint(id: string): void {
             <template #cell-event_types="{ row }">
                 {{ (row as EndpointRow).event_types.length }}
             </template>
+            <!-- J2d — the Scope column names a form and now reaches it. `form_url` is server-resolved and
+                 absent whenever the reader could not open the hub (or the form is gone), so this is a link
+                 iff the destination exists; the text fallback is exactly what this cell rendered before. -->
             <template #cell-form_title="{ row }">
-                {{ (row as EndpointRow).form_title ?? 'All forms' }}
+                <Link v-if="(row as EndpointRow).form_url" :href="(row as EndpointRow).form_url!">
+                    {{ (row as EndpointRow).form_title }}
+                </Link>
+                <template v-else>{{ (row as EndpointRow).form_title ?? 'All forms' }}</template>
             </template>
             <template #row-actions="{ row }">
                 <MdsIconButton

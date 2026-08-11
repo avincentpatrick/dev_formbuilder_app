@@ -39,8 +39,16 @@ export interface ScopeNodeOption extends Option {
     is_active: boolean;
 }
 
+/**
+ * A form the report can be filtered to. Extends `Option` with the form's own page (J2d) — null when the
+ * reader cannot open it or it has been archived, so a chip degrades to plain text rather than a 404.
+ */
+export interface FormOption extends Option {
+    url: string | null;
+}
+
 export interface FilterOptions {
-    forms: Option[];
+    forms: FormOption[];
     scope_nodes: ScopeNodeOption[];
     locales: Option[];
     axes: Option[];
@@ -67,6 +75,12 @@ export interface BreakdownRow {
     key: string | null;
     label: string;
     count: number;
+    /**
+     * The bucket's own page, server-resolved (J2d). Non-null only on the `form` axis, and only for a form
+     * this reader can actually open — a soft-deleted form still gets a LABEL (the plot must name it) and
+     * never a url, because `/forms/{form}` would 404 on it.
+     */
+    url: string | null;
 }
 
 export interface Breakdown {

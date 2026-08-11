@@ -77,6 +77,7 @@ type Props = {
     versions: Array<{ id: string; version_number: number; status: string; published_at: string | null }>;
     recent: Array<{ id: string; status: string; source_label: string; submitted_at: string | null }>;
     tabs: Tab[];
+    crumbs: { label: string; href?: string }[];
     can: { edit: boolean; publish: boolean; encode: boolean; template: boolean };
     share?: Record<string, unknown>;
 };
@@ -135,6 +136,8 @@ function props(overrides: Partial<Props> = {}): Props {
             { id: 'sub-2', status: 'approved', source_label: 'Manual entry', submitted_at: '2026-08-09T10:00:00+00:00' },
         ],
         tabs: OWNER_TABS,
+        // J2d — server-resolved by `CrumbTrail`. The hub's trail is two crumbs: the root and this page.
+        crumbs: [{ label: 'Forms', href: '/forms' }, { label: 'Clinic Intake' }],
         can: { edit: true, publish: true, encode: true, template: true },
         share: SHARE,
         ...overrides,
@@ -149,6 +152,8 @@ function render(overrides: Partial<Props> = {}): VueWrapper {
 function readerProps(overrides: Partial<Props> = {}): Partial<Props> {
     return {
         tabs: VIEWER_TABS,
+        // A Viewer holds no `forms.*` key, so `/forms` 403s for them and the root crumb loses its href.
+        crumbs: [{ label: 'Forms' }, { label: 'Clinic Intake' }],
         can: { edit: false, publish: false, encode: false, template: false },
         share: undefined,
         ...overrides,

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Forms\FormHubLink;
 use App\Support\Search\KeywordFilter;
 use App\Support\Search\ListEmptyReason;
 use App\Support\Search\SearchTerms;
@@ -68,8 +69,12 @@ final class WebhookEndpointPresenter
             ->latest('created_at')
             ->get();
 
+        // The reachable subset for THIS reader, resolved ONCE for the page — one query over the form ids
+        // actually on screen, never a policy call per row.
+        $formUrls = FormHubLink::pathsFor($user, $endpoints->pluck('form_id')->filter()->values()->all());
+
         return [
-            'data' => $endpoints->map(fn (WebhookEndpoint $e): array => $this->row($e))->all(),
+            'data' => $endpoints->map(fn (WebhookEndpoint $e): array => $this->row($e, $formUrls))->all(),
             'filters' => ['applied' => ['q' => $terms->raw()]],
             'empty_reason' => ListEmptyReason::for($endpoints->isNotEmpty(), ! $terms->isEmpty()),
             'summary' => [
@@ -107,7 +112,7 @@ final class WebhookEndpointPresenter
         $items = collect($paginator->items());
 
         return [
-            'endpoint' => $this->detail($endpoint),
+            'endpoint' => $this->detail($endpoint, FormHubLink::pathsFor($user, array_filter([$endpoint->form_id]))),
             'deliveries' => [
                 'data' => $items->map(fn (WebhookDelivery $d): array => $this->deliveryRow($d))->all(),
                 'meta' => [
@@ -129,9 +134,10 @@ final class WebhookEndpointPresenter
     /**
      * A list-row projection of an endpoint (never carries the secret).
      *
+     * @param  array<string, string>  $formUrls  id => hub path, for the ids this reader may open
      * @return array<string, mixed>
      */
-    private function row(WebhookEndpoint $endpoint): array
+    private function row(WebhookEndpoint $endpoint, array $formUrls = []): array
     {
         return [
             'id' => $endpoint->id,
@@ -141,6 +147,12 @@ final class WebhookEndpointPresenter
             'event_types' => $endpoint->event_types,
             'form_id' => $endpoint->form_id,
             'form_title' => $this->formTitle($endpoint),
+            // ⚠️ SERVER-RESOLVED, NOT DERIVED ON THE CLIENT FROM `form_title === null` (Increment J2d).
+            // That inference reads as equivalent and is a coincidence: it holds only because the eager load
+            // above omits `withTrashed()`, which is ALSO why a deleted form's endpoint currently mislabels
+            // its scope as "All forms". Add `withTrashed()` for a better label — a fix this seam now makes
+            // safe — and a client-derived link would start 404ing silently. Absent key => no link.
+            'form_url' => $endpoint->form_id === null ? null : ($formUrls[$endpoint->form_id] ?? null),
             'secret_masked' => $endpoint->maskedSecret(),
             'disabled_reason' => $endpoint->disabled_reason,
             'consecutive_failure_count' => $endpoint->consecutive_failure_count,
@@ -153,12 +165,13 @@ final class WebhookEndpointPresenter
     /**
      * The row projection plus the detail-only fields the Show page renders.
      *
+     * @param  array<string, string>  $formUrls
      * @return array<string, mixed>
      */
-    private function detail(WebhookEndpoint $endpoint): array
+    private function detail(WebhookEndpoint $endpoint, array $formUrls = []): array
     {
         return [
-            ...$this->row($endpoint),
+            ...$this->row($endpoint, $formUrls),
             'signing_algorithm' => $endpoint->signing_algorithm,
             'secret_previous_expires_at' => $this->iso($endpoint->secret_previous_expires_at),
             'updated_at' => $this->iso($endpoint->updated_at),

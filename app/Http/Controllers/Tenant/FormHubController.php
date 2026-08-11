@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\User;
 use App\Policies\FormPolicy;
 use App\Services\Forms\FormHubPresenter;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -37,6 +38,12 @@ final class FormHubController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('forms/Show', $presenter->show($form, $user));
+        // The trail is composed HERE for the reason `FormAnalyticsController` states about the tab strip:
+        // every crumb is a gate question, and the presenter deliberately reads nothing about who is asking.
+        // Keeping it out of the presenter is also why `FormHubPageTest` passes unedited.
+        return Inertia::render('forms/Show', [
+            ...$presenter->show($form, $user),
+            'crumbs' => CrumbTrail::forms($user)->current($form->title),
+        ]);
     }
 }

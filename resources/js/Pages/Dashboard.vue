@@ -50,13 +50,13 @@ interface Trends {
     total: { current: number; prior: number; change: number | null };
     series: { bucket: string; count: number }[];
     top_forms: {
-        rows: { key: string | null; label: string; count: number }[];
+        rows: { key: string | null; label: string; count: number; url: string | null }[];
         other: { count: number; categories: number } | null;
         unassigned: number;
     };
     // I10c — the same shape as `top_forms`, deliberately, so one client-side builder reads both.
     channels: {
-        rows: { key: string | null; label: string; count: number }[];
+        rows: { key: string | null; label: string; count: number; url: string | null }[];
         other: { count: number; categories: number } | null;
         unassigned: number;
     };
@@ -73,6 +73,13 @@ const props = defineProps<{
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const canCreate = computed(() => page.props.auth.can.manageForms);
+// J2d — one ability per DESTINATION, read from the same `ShellAbilities` map the sidebar and the command
+// palette read. `/dashboard` itself is ungated, so a tile linking somewhere gated is the J2c defect over
+// again: `/forms` is `viewAny,Form` (a Reviewer and a Viewer hold none of its three keys) and `/members` is
+// `tenant.members.invite` (Owner/Admin only) while the Members TILE renders for anyone with
+// `dashboard.org.view` — which a Viewer has.
+const canManageMembers = computed(() => page.props.auth.can.manageMembers);
+const canViewSubmissions = computed(() => page.props.auth.can.viewSubmissions);
 
 const number = (value: number): string => value.toLocaleString();
 
@@ -85,15 +92,37 @@ const rangeLabel = computed(() =>
 );
 
 const tiles = computed(() => {
-    const list: { label: string; value: string; icon: IconName; caption?: string }[] = [
-        { label: 'Forms', value: number(props.kpis.forms), icon: 'forms' },
-        { label: 'Submissions', value: number(props.kpis.submissions), icon: 'submissions', caption: 'All time' },
+    const list: { label: string; value: string; icon: IconName; caption?: string; href?: string }[] = [
+        {
+            label: 'Forms',
+            value: number(props.kpis.forms),
+            icon: 'forms',
+            ...(canCreate.value ? { href: '/forms' } : {}),
+        },
+        {
+            label: 'Submissions',
+            value: number(props.kpis.submissions),
+            icon: 'submissions',
+            caption: 'All time',
+            ...(canViewSubmissions.value ? { href: '/submissions' } : {}),
+        },
     ];
     if (props.kpis.members !== null) {
-        list.push({ label: 'Members', value: number(props.kpis.members), icon: 'users' });
+        list.push({
+            label: 'Members',
+            value: number(props.kpis.members),
+            icon: 'users',
+            ...(canManageMembers.value ? { href: '/members' } : {}),
+        });
     }
     // Deliberately not range-scoped: `acceptingFormsCount()` is a right-NOW state (published, inside its
     // window, under its response cap), so the caption says so rather than letting it read as a period total.
+    // ⚠️ DELIBERATELY NOT A LINK, and the reason is the same one that makes the other three safe. This
+    // counts forms that are published AND inside their window AND under their response cap; `/forms` has no
+    // filter expressing that set, so linking it would land the reader on a list whose length disagrees with
+    // the number they just clicked. A destination that does not answer the question asked is the defect this
+    // sweep removes, not an instance of it. The three trend tiles below are unlinked for the twin reason:
+    // they are period-scoped, and `/submissions` is an all-time inbox.
     list.push({
         label: 'Accepting responses',
         value: number(props.trends.forms_accepting),
@@ -199,6 +228,7 @@ const goToForms = () => router.visit('/forms');
                 :value="tile.value"
                 :icon="tile.icon"
                 :caption="tile.caption"
+                :href="tile.href"
             />
         </div>
 

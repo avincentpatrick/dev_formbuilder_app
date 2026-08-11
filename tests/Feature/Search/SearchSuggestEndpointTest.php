@@ -78,9 +78,29 @@ it('is never stored by a shared cache', function (): void {
 });
 
 it('omits an arm the caller may not use, rather than returning it empty', function (): void {
-    // A Reviewer holds no `forms.*` key, so the forms arm is REFUSED — and a refused arm must be absent.
-    // An empty group would itself disclose that a forms section exists and has nothing they may see.
-    $entities = collect($this->actingAs($this->reviewer)->getJson('http://acme.meridian.test/search/suggest?q=clinic')->json('groups'))
+    /*
+     * A REFUSED arm must be absent: an empty group would itself disclose that a forms section exists and
+     * has nothing this caller may see. That rule is unchanged; only the actor demonstrating it moved.
+     *
+     * ⚠️ THE ACTOR WAS A REVIEWER UNTIL J2d, AND IS NOW SYNTHETIC. `FormSearchArm` used to gate on
+     * `viewAny,Form`, which a Reviewer fails — so a Reviewer was the natural example of a refused arm. J2d
+     * re-gated it on `dashboard.form.view` and scoped it with `Form::scopeReadableBy()` (user decision), so
+     * a Reviewer is now ADMITTED and merely scoped to their grants. No shipped role can be refused this arm
+     * any more, which makes `allowed()` a fail-closed guard — and this case is what stops that guard being
+     * dead code.
+     *
+     * ⚠️ A REVIEWER WITH NO GRANTS NOW GETS AN *EMPTY* FORMS GROUP, and that is correct rather than a
+     * regression of the rule above. `SearchService::results()` has always kept an ALLOWED arm that matched
+     * nothing — an Owner searching a term no form matches gets the same empty group — because "you may ask,
+     * and there are none" is a different statement from "you may not ask".
+     */
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['submissions.view', 'dashboard.org.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $entities = collect($this->actingAs($stranger)->getJson('http://acme.meridian.test/search/suggest?q=clinic')->json('groups'))
         ->pluck('entity')
         ->all();
 

@@ -101,6 +101,7 @@ interface PayloadOptions {
     editing?: Record<string, unknown> | null;
     update_url?: string | null;
     draft_url?: string | null;
+    cancel_url?: string | null;
 }
 
 /** The whole `EncodeFormPresenter::present()` payload, as the page receives it. */
@@ -148,6 +149,26 @@ function payload(o: PayloadOptions): Record<string, unknown> {
         draft: o.draft ?? null,
         editing: o.editing ?? null,
         update_url: o.update_url ?? null,
+        // J2d — the trail and Cancel both come from the server now. `cancel_url` is `CrumbTrail::exitFrom()`,
+        // the crumb BEFORE the tail: the submission in edit mode, the form otherwise. Spelled out here for
+        // the reason the note below already gives about the mode props.
+        crumbs: o.editing
+            ? [
+                  { label: 'Forms', href: '/forms' },
+                  { label: 'Intake', href: '/forms/form-1' },
+                  { label: 'Responses', href: '/forms/form-1/submissions' },
+                  { label: 'Response', href: `/submissions/${o.editing.id}` },
+                  { label: 'Edit answers' },
+              ]
+            : [
+                  { label: 'Forms', href: '/forms' },
+                  { label: 'Intake', href: '/forms/form-1' },
+                  { label: o.draft ? 'Continue response' : 'New response' },
+              ],
+        cancel_url:
+            o.cancel_url === undefined
+                ? (o.editing ? `/submissions/${o.editing.id}` : '/forms/form-1')
+                : o.cancel_url,
         draft_url: o.draft_url === undefined ? '/forms/form-1/submissions/draft' : o.draft_url,
     };
 }

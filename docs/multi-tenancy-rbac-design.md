@@ -219,7 +219,24 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > the identical ability the route's middleware evaluates. **The tab strip already had this property and the
 > trail did not:** `FormTabSet` resolves each tab's gate server-side and `FormTabSetReachabilityTest` issues
 > a real request per href, so a tab cannot be offered to a reader the route refuses. Breadcrumbs had no
-> equivalent, and nothing structural yet enforces one — J2d should extend the reachability idiom to trails.
+> equivalent, and nothing structural yet enforced one.
+>
+> **✅ CLOSED BY J2d, and it found two live defects on the way.** `formsCrumb()` is **deleted**; every trail
+> is now built server-side by `App\Support\Navigation\CrumbTrail`, which asks each destination's own gate per
+> crumb, and `CrumbTrailReachabilityTest` reads the trail back off the real Inertia response and navigates
+> every href. Both defects it exposed were on `submissions/Show.vue`, whose route gates on
+> `can:view,submission` ALONE: (1) `SubmissionPolicy::view()`'s **respondent arm** has no counterpart in
+> `FormPolicy::viewOverview()`, so a keyer whose grant was revoked opened the page and got a 403 from both
+> middle crumbs; (2) a **soft-deleted form** made those same crumbs render an em dash as a live hyperlink to
+> a 404, since `/forms/{form}` binds through the default scope. A refused CRUMB keeps its label and loses its
+> href — deliberately unlike a refused TAB, which is absent, because dropping a crumb renumbers the trail and
+> makes one page render a different depth per role.
+>
+> **The idiom now covers three surfaces**, and each application found something a string assertion could not:
+> the tab strip (J2b), the trail (J2d), and search — `DestinationReachabilityTest` drives every
+> `DestinationCatalog` URL and requires an **Inertia** response, which is what caught `/notifications` being
+> a JSON endpoint offered as a page, while `SearchResultReachabilityTest` navigates the URL each search arm
+> emits as the narrowest role that receives it.
 >
 > **The route composes both halves, and neither alone is sufficient.** `can:viewAny,Submission` says nothing
 > about *which* form — with it alone, any member holding `submissions.view` (all five roles) could open any

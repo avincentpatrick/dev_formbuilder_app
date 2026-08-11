@@ -37,6 +37,8 @@ type EndpointDetail = {
     event_types: string[];
     form_id: string | null;
     form_title: string | null;
+    /** The form's hub path, server-resolved; null when the reader cannot open it or it no longer exists. */
+    form_url: string | null;
     secret_masked: string;
     disabled_reason: string | null;
     consecutive_failure_count: number;
@@ -201,7 +203,13 @@ function formatDate(iso: string | null): string {
                         <dt>Events</dt>
                         <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
                     </div>
-                    <div class="detail__meta-row"><dt>Scope</dt><dd>{{ endpoint.form_title ?? 'All forms' }}</dd></div>
+                    <div class="detail__meta-row">
+                        <dt>Scope</dt>
+                        <dd>
+                            <Link v-if="endpoint.form_url" :href="endpoint.form_url">{{ endpoint.form_title }}</Link>
+                            <template v-else>{{ endpoint.form_title ?? 'All forms' }}</template>
+                        </dd>
+                    </div>
                     <div class="detail__meta-row"><dt>Signing</dt><dd>{{ endpoint.signing_algorithm }}</dd></div>
                     <div class="detail__meta-row"><dt>Secret</dt><dd class="detail__mono">{{ endpoint.secret_masked }}</dd></div>
                     <div v-if="endpoint.secret_previous_expires_at" class="detail__meta-row">

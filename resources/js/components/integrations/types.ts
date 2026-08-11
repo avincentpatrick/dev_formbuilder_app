@@ -53,6 +53,8 @@ export type RuleRow = {
     event_types: string[];
     form_id: string | null;
     form_title: string | null;
+    /** The form's hub path, server-resolved (J2d); null when the reader cannot open it or it is gone. */
+    form_url: string | null;
     channel_id: string | null;
     channel_name: string | null;
     status: string;

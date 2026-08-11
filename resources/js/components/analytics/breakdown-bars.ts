@@ -14,6 +14,10 @@ import type { Breakdown } from './types';
  *   · The Other bucket is NEUTRAL (`--mds-chart-other`), never a recycled hue, so it cannot read as a peer
  *     category (ADR-0011 §D11). The full set stays in the paired data table and in the export — nothing is
  *     hidden, only un-plotted.
+ *
+ * ⚠️ THE TWO AGGREGATE BUCKETS ARE DELIBERATELY UNLINKED (J2d), and it falls out of the shapes above rather
+ * than needing a special case: `unassigned` and `other` are not entities, so neither is built from a row and
+ * neither carries a `url`. `BarChart.test.ts` already pins that an aggregate bucket stays inert.
  */
 export function breakdownBars(breakdown: Breakdown): BarDatum[] {
     const bars: BarDatum[] = breakdown.rows.map((row) => ({
@@ -22,6 +26,11 @@ export function breakdownBars(breakdown: Breakdown): BarDatum[] {
         key: row.key ?? 'unassigned-row',
         label: row.label,
         value: row.count,
+        // ⚠️ `?? undefined`, NEVER `?? ''` (J2d). `MdsBarChart` treats an EMPTY href as "interactive", so a
+        // falsy-to-empty-string mapping strips `role="img"`, its accessible name AND the sr-only table while
+        // rendering zero links — the exact defect J2a's review caught in the chart itself, arriving from the
+        // caller's side. `BarChart.test.ts` pins the component half; `breakdown-bars.test.ts` pins this one.
+        href: row.url ?? undefined,
     }));
 
     if (breakdown.unassigned > 0) {

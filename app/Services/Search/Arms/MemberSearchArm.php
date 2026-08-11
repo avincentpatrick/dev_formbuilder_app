@@ -106,7 +106,18 @@ final readonly class MemberSearchArm implements SearchArm
                 // The email is the disambiguator — two people can share a name, and the isolation test
                 // asserts on this field for exactly that reason.
                 'subtitle' => $member->email,
-                'url' => '/members',
+                // The roster FILTERED TO THIS PERSON (J2d), not the bare roster. Choosing "Ada Lovelace"
+                // from the palette and landing on an unfiltered list of two hundred people is a result that
+                // answers a different question from the one asked.
+                //
+                // ⚠️ EMAIL, NOT NAME, and it is the same reason the subtitle is: two members can share a
+                // name, so filtering by it can still leave the reader hunting. `TenantMembershipService`
+                // matches `q` against BOTH fields, so the email narrows to exactly one row.
+                //
+                // ⚠️ `rawurlencode`, NOT `urlencode` — the latter encodes a space as `+`, and `+` is legal in
+                // an email local part (`ada+forms@…`), so the round trip would silently search for a
+                // different address than the one displayed.
+                'url' => '/members?q='.rawurlencode((string) $member->email),
             ])
             ->all();
 

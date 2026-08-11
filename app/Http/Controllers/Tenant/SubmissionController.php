@@ -19,7 +19,9 @@ use App\Services\Submissions\PrunedAnswerReport;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPipeline;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,9 +50,24 @@ use Inertia\Response;
  */
 final class SubmissionController extends Controller
 {
-    public function create(Form $form, EncodeFormPresenter $presenter): Response
+    /**
+     * ⚠️ THE MODE IS KNOWN HERE BY CONSTRUCTION, which is why the trail is composed in the controller.
+     * `Encode.vue` used to re-derive it client-side from `isEditing` / `draft === null` and branch three
+     * crumbs on the answer — a conditional that could disagree with the route that rendered it. This route
+     * is the "new response" one; there is nothing to infer.
+     */
+    public function create(Request $request, Form $form, EncodeFormPresenter $presenter): Response
     {
-        return Inertia::render('submissions/Encode', $presenter->present($form, $this->publishedVersion($form)));
+        /** @var User $user */
+        $user = $request->user();
+
+        $crumbs = CrumbTrail::forms($user)->form($form)->current('New response');
+
+        return Inertia::render('submissions/Encode', [
+            ...$presenter->present($form, $this->publishedVersion($form)),
+            'crumbs' => $crumbs,
+            'cancel_url' => CrumbTrail::exitFrom($crumbs),
+        ]);
     }
 
     public function store(

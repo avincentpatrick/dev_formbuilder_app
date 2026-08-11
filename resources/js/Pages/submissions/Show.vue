@@ -20,7 +20,6 @@ import {
     type BreadcrumbItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 
 type FieldRow = { key: string; label: string; value: string };
 /**
@@ -62,22 +61,28 @@ const props = defineProps<{
     // `can.review` would hand every Reviewer the power to rewrite the answers they are meant to be judging.
     can: { review: boolean; update: boolean };
     pdf: PdfArtifact | null;
+    /**
+     * The trail back, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * ⚠️ THIS PAGE IS WHY J2d EXISTS. THE TWO MIDDLE CRUMBS WERE BOTH LIVE DEFECTS.
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * J2c built them here as hard-coded `/forms/${form_id}` and `/forms/${form_id}/submissions`, on a route
+     * gated ONLY by `can:view,submission`:
+     *
+     *  • `SubmissionPolicy::view()` admits a RESPONDENT (`respondent_user_id = me`), an arm
+     *    `FormPolicy::viewOverview()` has no counterpart for. A keyer whose grant was revoked, or whose form
+     *    was re-scoped, opened this page and got a **403 with no way back** from both crumbs.
+     *  • A SOFT-DELETED form makes `form_title` render `—` and excludes the row from route-model binding, so
+     *    the page printed **an em dash as a live hyperlink to a 404** — the exact defect
+     *    `SubmissionInboxPresenter` had already fixed on the inbox ROW, surviving on the page that row links
+     *    to.
+     *
+     * Neither was visible to any gate: `MdsBreadcrumb` renders an href-less crumb as text, so broken and
+     * correct look identical to vue-tsc, to axe and to every snapshot. Do not rebuild this client-side.
+     */
+    crumbs: BreadcrumbItem[];
 }>();
-
-/**
- * The trail back (Increment J2c). `submission.form_id` has been in this payload since F7 — `detail()`
- * carried it while the LIST row did not — so no presenter change was needed here, only a reader.
- *
- * The middle two crumbs are the point: the form's hub, and that form's own responses list. A reviewer who
- * arrived from either can return to it, which is what "no dead-end pages" means on the page furthest from
- * the root.
- */
-const crumbs = computed<BreadcrumbItem[]>(() => [
-    formsCrumb(),
-    { label: props.submission.form_title, href: `/forms/${props.submission.form_id}` },
-    { label: 'Responses', href: `/forms/${props.submission.form_id}/submissions` },
-    { label: 'Response' },
-]);
 
 /**
  * Queue a PDF (Increment H17).

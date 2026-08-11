@@ -15,6 +15,7 @@ use App\Services\Submissions\SubmissionExporter;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPdfRequestService;
 use App\Support\Forms\FormTabSet;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -74,15 +75,35 @@ final class SubmissionInboxController extends Controller
             ], $form),
             'form' => ['id' => $form->id, 'title' => $form->title],
             'tabs' => FormTabSet::for($form, $user),
+            'crumbs' => CrumbTrail::forms($user)->form($form)->current('Responses'),
         ]);
     }
 
+    /**
+     * One submission — and the page J2d's trail was built for.
+     *
+     * ⚠️ ITS TWO MIDDLE CRUMBS WERE THE INCREMENT'S HEADLINE DEFECT, both live. This route gates on
+     * `can:view,submission` ALONE, which admits a **respondent** ({@see SubmissionPolicy::view()}'s third
+     * arm) that `viewOverview` has no counterpart for — so a keyer whose grant was revoked reached this page
+     * and got a 403 from both hard-coded crumbs. And a soft-deleted form made the same two render `—` as a
+     * live hyperlink to a 404. {@see CrumbTrail} resolves both by asking the destinations' own gates.
+     *
+     * ⚠️ `$submission->form` IS THE NULLABLE RELATION, DELIBERATELY, not a `Form::withTrashed()` lookup.
+     * Its null for a trashed form is the soft-delete signal, and `detail()` has already eager-loaded it, so
+     * this costs no query.
+     */
     public function show(Request $request, Submission $submission, SubmissionInboxPresenter $presenter): Response
     {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('submissions/Show', $presenter->detail($user, $submission));
+        return Inertia::render('submissions/Show', [
+            ...$presenter->detail($user, $submission),
+            'crumbs' => CrumbTrail::forms($user)
+                ->form($submission->form)
+                ->formSubmissions($submission->form)
+                ->current('Response'),
+        ]);
     }
 
     public function export(ExportSubmissionsRequest $request, Form $form, SubmissionExporter $exporter): StreamedResponse

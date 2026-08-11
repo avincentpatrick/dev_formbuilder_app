@@ -23,9 +23,11 @@ use App\Services\Submissions\EncodeFormPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Navigation\CrumbTrail;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -134,8 +136,11 @@ final class SubmissionDraftController extends Controller
      * finalize this" are the same claim about the same row. Minting a third ability for one route would put
      * two answers in the tree for one question.
      */
-    public function edit(Submission $submission, EncodeFormPresenter $presenter): Response|RedirectResponse
+    public function edit(Request $request, Submission $submission, EncodeFormPresenter $presenter): Response|RedirectResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+
         // A state guard, not an authorization one — hence 404 rather than 403. A finalized submission has no
         // resume surface at all; it is not that this user may not resume it.
         abort_unless($submission->status === SubmissionStatus::Draft, 404);
@@ -158,7 +163,15 @@ final class SubmissionDraftController extends Controller
                 ]);
         }
 
-        return Inertia::render('submissions/Encode', $presenter->present($form, $version, $submission));
+        // Resume mode, known by construction: this route exists only for a draft, so the tail is
+        // "Continue response" with no client-side branch on `draft === null` to get wrong.
+        $crumbs = CrumbTrail::forms($user)->form($form)->current('Continue response');
+
+        return Inertia::render('submissions/Encode', [
+            ...$presenter->present($form, $version, $submission),
+            'crumbs' => $crumbs,
+            'cancel_url' => CrumbTrail::exitFrom($crumbs),
+        ]);
     }
 
     /**

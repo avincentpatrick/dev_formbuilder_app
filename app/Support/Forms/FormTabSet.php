@@ -43,7 +43,9 @@ final class FormTabSet
      */
     public static function for(Form $form, User $user): array
     {
-        $base = '/forms/'.$form->id;
+        // J2d: the hub's path is spelled once, in `FormHubLink`, so the strip and every crumb, tile, bar,
+        // chip, audit row and search hit that names a form agree by construction rather than by grep.
+        $base = FormHubLink::path($form->id);
         $tabs = [];
 
         if ($user->can('viewOverview', $form)) {

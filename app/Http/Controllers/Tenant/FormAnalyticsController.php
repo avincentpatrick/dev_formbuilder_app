@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\User;
 use App\Services\Analytics\FormAnalyticsPresenter;
 use App\Support\Forms\FormTabSet;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,6 +46,11 @@ final class FormAnalyticsController extends Controller
         return Inertia::render('forms/Analytics', [
             ...$presenter->show($form, $user),
             'tabs' => FormTabSet::for($form, $user),
+            // J2d: the trail, by the same argument as the strip. The hub crumb was a hard-coded
+            // `/forms/${form.id}` in this page's client `computed` — safe by derivation (`can:view,form`
+            // implies `viewOverview` for all five shipped roles) but not by construction, which is the
+            // difference this class exists to make.
+            'crumbs' => CrumbTrail::forms($user)->form($form)->current('Response statistics'),
         ]);
     }
 }

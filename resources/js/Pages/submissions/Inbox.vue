@@ -53,7 +53,6 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 
 type Option = { value: string; label: string };
 
@@ -99,6 +98,13 @@ const props = defineProps<{
     form?: { id: string; title: string };
     /** The form's tab strip, resolved server-side by `FormTabSet`. Present exactly when `form` is. */
     tabs?: TabNavItem[];
+    /**
+     * The trail, resolved server-side by `CrumbTrail` (J2d). Present exactly when `form` is — the GLOBAL
+     * inbox is a root page and its controller emits no `crumbs` key at all, which is why this is optional
+     * rather than an empty array: absence is the honest encoding of "this page has no trail", and it keeps
+     * `inbox.test.ts`'s "renders no Breadcrumb and no TabNav" case meaningful.
+     */
+    crumbs?: BreadcrumbItem[];
 }>();
 
 /**
@@ -108,20 +114,6 @@ const props = defineProps<{
  */
 const baseUrl = computed(() => (props.form ? `/forms/${props.form.id}/submissions` : '/submissions'));
 
-/**
- * Three crumbs on the per-form page, never two: `MdsBreadcrumb` renders the LAST item as text whatever it
- * carries, so a trail ending at the form's title would print the hub's name with no way to reach it — the
- * dead end intact, with a separator. Same rule as `forms/Analytics.vue`.
- */
-const crumbs = computed<BreadcrumbItem[]>(() =>
-    props.form
-        ? [
-              formsCrumb(),
-              { label: props.form.title, href: `/forms/${props.form.id}` },
-              { label: 'Responses' },
-          ]
-        : [],
-);
 
 /**
  * The Form column is dropped on the per-form page — every row would carry the same value, and it is already
@@ -233,7 +225,7 @@ function formatDate(iso: string | null): string {
             <!-- The form's own name is the middle crumb and the strip's accessible name, so the h1 stays the
                  PAGE's name — the `forms/Analytics.vue` split, not the hub's (where the title IS the form). -->
             <template v-if="form" #breadcrumbs>
-                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+                <MdsBreadcrumb :items="crumbs ?? []" :link-component="Link" />
             </template>
             <template #actions>
                 <!-- On the per-form page Export needs no form to be chosen: the route already is one. -->

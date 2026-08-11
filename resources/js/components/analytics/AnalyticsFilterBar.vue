@@ -11,6 +11,7 @@
 // Every control emits `apply` with a PATCH rather than mutating a shared object: the page owns the
 // declaration, re-seeds it from what the SERVER applied, and this component never guesses.
 import { computed, ref } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import {
     MdsBadge,
     MdsButton,
@@ -38,6 +39,11 @@ const selectedForms = computed(() =>
         // A form removed since the link was shared still needs a removable chip, or the user cannot
         // clear a filter they can see is applied.
         label: props.options.forms.find((option) => option.value === id)?.label ?? 'Unknown form',
+        // J2d — the chip reaches the form it names. Null for an id with no matching option, which is the
+        // 'Unknown form' case above: a form removed since the link was shared is a guaranteed 404, so it
+        // falls out UNLINKABLE by construction rather than needing a special case. Same for an archived
+        // form, whose option the server emits with a null url.
+        url: props.options.forms.find((option) => option.value === id)?.url ?? null,
     })),
 );
 
@@ -204,7 +210,10 @@ function reset(): void {
 
             <ul v-if="selectedForms.length > 0" class="analytics__chips">
                 <li v-for="form in selectedForms" :key="form.id" class="analytics__chip">
-                    <MdsBadge :label="form.label" />
+                    <Link v-if="form.url" :href="form.url" class="analytics__chip-link">
+                        <MdsBadge :label="form.label" />
+                    </Link>
+                    <MdsBadge v-else :label="form.label" />
                     <MdsIconButton
                         icon="close"
                         size="sm"

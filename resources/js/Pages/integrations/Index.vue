@@ -12,7 +12,7 @@
  * Assembled entirely from shared design-system components.
  */
 import { computed, ref } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import {
     MdsBadge,
     MdsButton,
@@ -200,8 +200,13 @@ function channelLabel(rule: RuleRow): string {
                     <template #cell-event_types="{ row }">
                         {{ (row as RuleRow).event_types.length }}
                     </template>
+                    <!-- J2d — see `webhooks/Index.vue`: `form_url` is server-resolved, absent when the
+                         reader cannot open the hub or the form is gone. -->
                     <template #cell-form_title="{ row }">
-                        {{ (row as RuleRow).form_title ?? 'All forms' }}
+                        <Link v-if="(row as RuleRow).form_url" :href="(row as RuleRow).form_url!">
+                            {{ (row as RuleRow).form_title }}
+                        </Link>
+                        <template v-else>{{ (row as RuleRow).form_title ?? 'All forms' }}</template>
                     </template>
                     <template #cell-status="{ row }">
                         <MdsBadge v-bind="statusVariant((row as RuleRow).status)" />

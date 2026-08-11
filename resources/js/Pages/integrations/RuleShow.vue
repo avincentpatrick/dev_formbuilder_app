@@ -159,7 +159,10 @@ function formatDate(iso: string | null): string {
                     </div>
                     <div class="detail__meta-row">
                         <dt>Scope</dt>
-                        <dd>{{ rule.form_title ?? 'All forms' }}</dd>
+                        <dd>
+                            <Link v-if="rule.form_url" :href="rule.form_url">{{ rule.form_title }}</Link>
+                            <template v-else>{{ rule.form_title ?? 'All forms' }}</template>
+                        </dd>
                     </div>
                 </dl>
             </MdsCard>

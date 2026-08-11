@@ -16,7 +16,9 @@ use App\Models\User;
 use App\Policies\SubmissionPolicy;
 use App\Services\Submissions\EncodeFormPresenter;
 use App\Services\Submissions\SubmissionAnswerEditService;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,8 +50,11 @@ final class SubmissionEditController extends Controller
      * button on the detail page, so the useful response is to put them back there with the reason. A 403
      * would also be a lie — they may well hold `submissions.edit.any`; it is the ROW that is not editable.
      */
-    public function edit(Submission $submission, EncodeFormPresenter $presenter): Response|RedirectResponse
+    public function edit(Request $request, Submission $submission, EncodeFormPresenter $presenter): Response|RedirectResponse
     {
+        /** @var User $editor */
+        $editor = $request->user();
+
         // A draft is editable, just not HERE. Its answers belong to I9b's resume page, which has the autosave,
         // the completeness meter and the resume cursor this surface deliberately lacks. Redirecting rather
         // than refusing means a stale "Edit answers" link on a row that was never finalized still lands
@@ -69,7 +74,28 @@ final class SubmissionEditController extends Controller
 
         [$form, $version] = $this->context($submission);
 
-        return Inertia::render('submissions/Encode', $presenter->present($form, $version, $submission));
+        /*
+         * The five-crumb trail, which `Encode.vue` used to build by branching on `isEditing`. Edit mode is
+         * the only one that reaches this route, so there is nothing to infer.
+         *
+         * ⚠️ `$form` HERE IS NEVER TRASHED — `context()` `firstOrFail()`s it, so a soft-deleted form 404s
+         * before this line. The `?Form` branch in `CrumbTrail::form()` is therefore unreachable from this
+         * caller, deliberately: the guard belongs on the detail page, where the relation really can be null.
+         *
+         * Cancel returns to the submission, which is the crumb before the tail — derived rather than
+         * spelled, because the template names it twice and could drift in either place.
+         */
+        $crumbs = CrumbTrail::forms($editor)
+            ->form($form)
+            ->formSubmissions($form)
+            ->submission($submission)
+            ->current('Edit answers');
+
+        return Inertia::render('submissions/Encode', [
+            ...$presenter->present($form, $version, $submission),
+            'crumbs' => $crumbs,
+            'cancel_url' => CrumbTrail::exitFrom($crumbs),
+        ]);
     }
 
     /**

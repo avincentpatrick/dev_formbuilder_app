@@ -93,6 +93,13 @@ function perFormProps(overrides: Props = {}): Props {
         ...globalProps(),
         filters: { ...filtersWithoutForms, applied: { form_id: FORM_ID, status: null, source: null, q: null } },
         form: { id: FORM_ID, title: 'Clinic Intake' },
+        // J2d — server-resolved. The GLOBAL inbox deliberately gets no `crumbs` key at all (a root page has
+        // no trail), which is what keeps the "renders neither a breadcrumb nor a tab strip" case meaningful.
+        crumbs: [
+            { label: 'Forms', href: '/forms' },
+            { label: 'Clinic Intake', href: `/forms/${FORM_ID}` },
+            { label: 'Responses' },
+        ],
         tabs: [
             { key: 'overview', label: 'Overview', href: `/forms/${FORM_ID}`, icon: 'forms' },
             { key: 'submissions', label: 'Responses', href: `/forms/${FORM_ID}/submissions`, icon: 'submissions' },
@@ -131,18 +138,32 @@ describe('submissions inbox — the global list', () => {
         wrapper.unmount();
     });
 
-    it('drops the href from the Forms crumb for a reader who cannot open /forms', () => {
-        // ⚠️ `/forms` GATES ON `can:viewAny,Form` — `forms.create | forms.edit.any | forms.edit.own` — and a
-        // Reviewer and a Viewer hold NONE of them, while both can reach this page. A hard `href: '/forms'`
-        // hands exactly those readers a bare 403 with no way back, which is the dead end J2 exists to
-        // remove, arriving through the component built to remove it. `MdsBreadcrumb` renders an href-less
-        // crumb as text, so the broken and correct versions are visually identical — no gate sees this.
-        const wrapper = render(perFormProps());
-        const items = wrapper.findComponent({ name: 'Breadcrumb' }).props('items') as Array<Record<string, unknown>>;
+    it('renders an href-less Forms crumb as text rather than defaulting it back to /forms', () => {
+        /*
+         * ⚠️ `/forms` GATES ON `can:viewAny,Form` — `forms.create | forms.edit.any | forms.edit.own` — and a
+         * Reviewer and a Viewer hold NONE of them while both reach this page. A hard `href: '/forms'` hands
+         * exactly those readers a bare 403 with no way back.
+         *
+         * ⚠️ J2d MOVED THE DECISION TO THE SERVER, so this case moved with it: it no longer asserts which
+         * branch a client composable picked (there is no composable), but that the page RENDERS a refused
+         * crumb as refused. `CrumbTrailGateTest` proves the server withholds it for the right roles; this is
+         * the other end of the same wire, and it is what would catch a page "helpfully" restoring the href.
+         */
+        const wrapper = render(
+            perFormProps({
+                crumbs: [
+                    { label: 'Forms' },
+                    { label: 'Clinic Intake', href: `/forms/${FORM_ID}` },
+                    { label: 'Responses' },
+                ],
+            }),
+        );
 
-        // The mock above grants `manageForms`, so this asserts the LINK branch; the refused branch is pinned
-        // in `useFormsCrumb.test.ts`, which can vary the ability without re-mocking Inertia per case.
-        expect(items[0]).toEqual({ label: 'Forms', href: '/forms' });
+        const trail = wrapper.findComponent({ name: 'Breadcrumb' });
+
+        // One link only — the form's hub. `Forms` is text and the tail always is.
+        expect(trail.findAll('a')).toHaveLength(1);
+        expect(trail.findAll('a')[0]?.attributes('href')).toBe(`/forms/${FORM_ID}`);
 
         wrapper.unmount();
     });
@@ -184,7 +205,9 @@ describe('submissions inbox — the global list', () => {
 });
 
 describe('submissions inbox — one form’s responses', () => {
-    it('renders the three-crumb trail and marks Responses current in the strip', () => {
+    it('passes the server trail through and marks Responses current in the strip', () => {
+        // Pass-through, not a spelled-out expectation: J2d made `CrumbTrail` the author of these three
+        // crumbs, so what this page owes is to render them untouched.
         const wrapper = render(perFormProps());
 
         const crumbs = wrapper.findComponent({ name: 'Breadcrumb' });

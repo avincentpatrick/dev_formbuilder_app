@@ -74,7 +74,12 @@ function render(overrides: Partial<FormReport> = {}): VueWrapper {
             // The form's tab strip (J2b), resolved server-side by `FormTabSet`. A full four-tab set rather
             // than an empty one so the strip actually renders here: `MdsTabNav` renders nothing at all for
             // an empty list, which would make every assertion about it vacuously true.
-            tabs: [
+            crumbs: [
+        { label: 'Forms', href: '/forms' },
+        { label: 'Clinic Intake', href: '/forms/f1' },
+        { label: 'Response statistics' },
+    ],
+    tabs: [
                 { key: 'overview', label: 'Overview', href: '/forms/f1', icon: 'forms' as const },
                 { key: 'submissions', label: 'Responses', href: '/forms/f1/submissions', icon: 'submissions' as const },
                 { key: 'builder', label: 'Builder', href: '/forms/f1/builder', icon: 'edit' as const },

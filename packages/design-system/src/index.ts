@@ -49,6 +49,15 @@ export type { DataTableColumn } from './components/DataTable/DataTable.vue';
 // only fails in the empty state, which is exactly the kind of thing a scan should be catching for us.
 export { default as MdsFilterBar } from './components/FilterBar/FilterBar.vue';
 export { default as MdsSearchField } from './components/SearchField/SearchField.vue';
+// The per-resource navigation strip and the path trail (J2a), both in the package for the same coverage
+// reason as FilterBar above. `TabNav` is NOT the ARIA tabs widget DSR §3.4 also specifies — its items are
+// links that load a page, so it is a navigation landmark with `aria-current`, and dressing it in tab roles
+// would strip every non-active destination out of the tab sequence. Read its docblock before "upgrading"
+// it; the in-page tablist remains J4's, under the name `Tabs`.
+export { default as MdsTabNav } from './components/TabNav/TabNav.vue';
+export type { TabNavItem } from './components/TabNav/TabNav.vue';
+export { default as MdsBreadcrumb } from './components/Breadcrumb/Breadcrumb.vue';
+export type { BreadcrumbItem } from './components/Breadcrumb/Breadcrumb.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';
 export { default as MdsTimeSeriesChart } from './components/TimeSeriesChart/TimeSeriesChart.vue';
 export { default as MdsBarChart } from './components/BarChart/BarChart.vue';

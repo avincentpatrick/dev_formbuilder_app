@@ -129,3 +129,128 @@ describe('MdsBarChart — geometry and colour', () => {
         wrapper.unmount();
     });
 });
+
+/**
+ * Increment J2a. The dashboard's "Top forms" chart named five forms and led nowhere, while
+ * `breakdown-bars.ts` had each form's uuid in hand and discarded it.
+ *
+ * ⚠️ THE CASE THAT MATTERS IS THE `role="img"` REMOVAL, AND NO GATE BUT THIS ONE SEES IT. An element with
+ * `role="img"` is a leaf: everything inside it leaves the accessibility tree. A link rendered inside the
+ * plot is therefore not "a link with a poor name" — it does not exist for a screen reader at all, while
+ * remaining perfectly clickable with a mouse and perfectly green under axe, which has no rule for
+ * interactive content buried in an image.
+ */
+describe('MdsBarChart — linked categories', () => {
+    const linked: BarDatum[] = [
+        { key: 'a', label: 'Clinic Intake', value: 42, href: '/forms/a' },
+        { key: 'b', label: 'Household Roster', value: 18, href: '/forms/b' },
+        { key: 'c', label: 'Other (3 categories)', value: 9, neutral: true },
+    ];
+
+    it('takes the plot OUT of role="img" as soon as one datum is linked', () => {
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        const plot = wrapper.get('.mds-bar__plot');
+        expect(plot.attributes('role')).toBeUndefined();
+        expect(plot.attributes('aria-label')).toBeUndefined();
+
+        wrapper.unmount();
+    });
+
+    it('keeps the summary sentence, moved to a visually-hidden paragraph', () => {
+        // Dropping `role="img"` would otherwise silently delete the chart's one-sentence overview — the
+        // thing §D12 requires — and every assertion above would still pass.
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        const summary = wrapper.get('.mds-bar__summary').text();
+        expect(summary).toContain('3 categories, 69 in total');
+        expect(summary).toContain('Largest: Clinic Intake, 42');
+
+        wrapper.unmount();
+    });
+
+    it('links only the datums that carry an href, leaving the aggregated bucket inert', () => {
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        const links = wrapper.findAll('.mds-bar__plot a');
+        expect(links).toHaveLength(2);
+        expect(links.map((a) => a.attributes('href'))).toEqual(['/forms/a', '/forms/b']);
+        // "Other (3 categories)" names no single object, so it must not become a link to one.
+        expect(links.map((a) => a.text())).not.toContain('Other (3 categories)');
+
+        wrapper.unmount();
+    });
+
+    it('leaves the value OUTSIDE the link, so the accessible name is the category alone', () => {
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        expect(wrapper.findAll('.mds-bar__plot a')[0].text()).toBe('Clinic Intake');
+
+        wrapper.unmount();
+    });
+
+    it('renders the STATIC shape byte-for-byte when no datum is linked', () => {
+        // The other direction, and the one a careless refactor breaks: `isInteractive` collapsing to a
+        // constant true would leave every case above green while silently removing `role="img"` from the
+        // twelve charts already shipped.
+        const wrapper = mount(BarChart, { props: { data: forms, title: 'Top forms' } });
+
+        expect(wrapper.get('.mds-bar__plot').attributes('role')).toBe('img');
+        expect(wrapper.find('.mds-bar__summary').exists()).toBe(false);
+        expect(wrapper.findAll('.mds-bar__plot a')).toHaveLength(0);
+
+        wrapper.unmount();
+    });
+
+    it('drops the sr-only table in the interactive shape, so the data is announced ONCE', () => {
+        // Un-pruning the plot exposes its labels and values for the first time. Leaving the alternative
+        // table rendered as well announced summary → every row → every row again. Found by the J2a
+        // adversarial review; no gate sees it, because duplicated content is valid HTML.
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        expect(wrapper.find('.mds-bar__table-wrap').exists()).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('keeps the table when it was asked for VISIBLY, which is a feature and not an alternative', () => {
+        const wrapper = mount(BarChart, {
+            props: { data: linked, title: 'Top forms', tableVisible: true },
+        });
+
+        const wrap = wrapper.get('.mds-bar__table-wrap');
+        expect(wrap.classes()).not.toContain('mds-bar__table-wrap--sr');
+        expect(wrapper.findAll('tbody tr')).toHaveLength(3);
+
+        wrapper.unmount();
+    });
+
+    it('treats an EMPTY href as no link, using one predicate for the role and the anchor', () => {
+        // `:href="row.can.view ? url : ''"` is the obvious call-site shape. With `!== undefined` here and
+        // truthiness in the template, this input stripped `role="img"` AND its aria-label AND rendered no
+        // links at all — three wrongs at once, with every other case in this file still green.
+        const wrapper = mount(BarChart, {
+            props: { data: [{ key: 'a', label: 'Clinic Intake', value: 42, href: '' }], title: 'Top forms' },
+        });
+
+        expect(wrapper.get('.mds-bar__plot').attributes('role')).toBe('img');
+        expect(wrapper.get('.mds-bar__plot').attributes('aria-label')).toContain('Clinic Intake');
+        expect(wrapper.findAll('.mds-bar__plot a')).toHaveLength(0);
+        expect(wrapper.find('.mds-bar__summary').exists()).toBe(false);
+        expect(wrapper.find('.mds-bar__table-wrap').exists()).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('still hides every track from assistive tech in the interactive shape', () => {
+        // The tracks lost their `role="img"` umbrella; without `aria-hidden` they would become a dozen
+        // unlabelled graphics — the exact failure the original docblock rejected.
+        const wrapper = mount(BarChart, { props: { data: linked, title: 'Top forms' } });
+
+        for (const track of wrapper.findAll('svg.mds-bar__track')) {
+            expect(track.attributes('aria-hidden')).toBe('true');
+        }
+
+        wrapper.unmount();
+    });
+});

@@ -130,3 +130,79 @@ describe('MdsStatTile — honest states (ADR-0011 §D5)', () => {
         wrapper.unmount();
     });
 });
+
+/** Increment J2a — every tile on the dashboard named something and led nowhere. */
+describe('MdsStatTile — the optional link', () => {
+    it('stays a plain container when no href is supplied', () => {
+        // SEVENTEEN call sites predate this prop (counted, across seven files). The default must remain a
+        // non-interactive element, or the app gains 17 tab stops that go nowhere.
+        const wrapper = mount(StatTile, { props: { label: 'Forms', value: 3, icon: 'forms' } });
+
+        expect(wrapper.element.tagName).toBe('DIV');
+        expect(wrapper.attributes('href')).toBeUndefined();
+        expect(wrapper.classes()).not.toContain('mds-stat-tile--link');
+        wrapper.unmount();
+    });
+
+    it('becomes a real anchor when one is', () => {
+        // An anchor, not a div with a click handler: the latter has no role, no accessible name, no
+        // keyboard route and no default hover affordance, and would fail the axe job that gates this
+        // package while looking identical in a screenshot.
+        const wrapper = mount(StatTile, {
+            props: { label: 'Forms', value: 3, icon: 'forms', href: '/forms' },
+        });
+
+        expect(wrapper.element.tagName).toBe('A');
+        expect(wrapper.attributes('href')).toBe('/forms');
+        expect(wrapper.classes()).toContain('mds-stat-tile--link');
+        wrapper.unmount();
+    });
+
+    it('stays a plain container for an EMPTY href, and grows no bogus attribute', () => {
+        // `:href="row.can.view ? url : ''"` is the obvious call-site shape, and ADR-0011 §D9's
+        // absent-not-locked doctrine pushes callers toward exactly that ternary. An unguarded `:href`
+        // bound `href=""` onto the DIV — invalid HTML, not a link, and no `--link` class, so it looked
+        // exactly like the inert tile it used to be. Found by the J2a adversarial review.
+        const wrapper = mount(StatTile, { props: { label: 'Forms', value: 3, icon: 'forms', href: '' } });
+
+        expect(wrapper.element.tagName).toBe('DIV');
+        expect(wrapper.attributes('href')).toBeUndefined();
+        wrapper.unmount();
+    });
+
+    it('puts the tile\'s WHOLE text inside the link, asserted exactly so it cannot drift', () => {
+        // ⚠️ The first version of this case asserted `toContain('Submissions')` under the title "takes its
+        // accessible name from the value and label" — which is true of literally any implementation that
+        // renders the props, including the one shipped, whose name also carries the delta and the caption.
+        // A test that cannot fail its own title is worse than no test.
+        //
+        // ⚠️ AND THIS ASSERTS `textContent`, NOT THE ACCESSIBLE NAME, which is a real distinction rather
+        // than pedantry: neither happy-dom nor vue-test-utils computes an accessible name, and a browser
+        // inserts separators between block-level descendants that the raw concatenation below does not
+        // have ("1,284Submissions" here reaches a screen reader as "1,284 Submissions"). What this case
+        // actually pins is the SET of content inside the anchor — which is what the name is computed from,
+        // and the thing that silently grows when a prop is added.
+        const wrapper = mount(StatTile, {
+            props: {
+                label: 'Submissions',
+                value: '1,284',
+                icon: 'submissions',
+                href: '/submissions',
+                delta: 12.4,
+                deltaLabel: 'vs. previous 30 days',
+                caption: 'of 48 saved drafts',
+            },
+        });
+
+        const link = wrapper.get('a');
+        expect(link.text().replace(/\s+/g, ' ').trim()).toBe(
+            '1,284Submissions +12.4%vs. previous 30 daysof 48 saved drafts',
+        );
+        // The glyph stays decorative — a linked tile must not start announcing its icon.
+        expect(wrapper.get('.mds-stat-tile__badge').attributes('aria-hidden')).toBe('true');
+        // No aria-label: one would REPLACE the name above and hide the delta from screen-reader users
+        // while sighted readers keep seeing it.
+        expect(link.attributes('aria-label')).toBeUndefined();
+        wrapper.unmount();
+    });
+});

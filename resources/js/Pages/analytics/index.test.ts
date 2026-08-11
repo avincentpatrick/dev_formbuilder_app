@@ -107,7 +107,7 @@ function report(overrides: Partial<Report> = {}): Report {
 
 function filters(): FilterOptions {
     return {
-        forms: [{ value: 'f1', label: 'Community Health Survey' }],
+        forms: [{ value: 'f1', label: 'Community Health Survey', url: '/forms/f1' }],
         scope_nodes: [{ value: 'n1', label: 'Luzon', depth: 0, is_active: true }],
         locales: [
             { value: 'en', label: 'en' },

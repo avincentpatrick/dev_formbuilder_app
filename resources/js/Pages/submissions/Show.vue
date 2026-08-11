@@ -73,10 +73,11 @@ const props = defineProps<{
      *  • `SubmissionPolicy::view()` admits a RESPONDENT (`respondent_user_id = me`), an arm
      *    `FormPolicy::viewOverview()` has no counterpart for. A keyer whose grant was revoked, or whose form
      *    was re-scoped, opened this page and got a **403 with no way back** from both crumbs.
-     *  • A SOFT-DELETED form makes `form_title` render `—` and excludes the row from route-model binding, so
-     *    the page printed **an em dash as a live hyperlink to a 404** — the exact defect
-     *    `SubmissionInboxPresenter` had already fixed on the inbox ROW, surviving on the page that row links
-     *    to.
+     *  • A SOFT-DELETED form makes `form_title` render `—` and excludes the row from route-model binding,
+     *    so an unguarded trail prints an em dash as a live hyperlink to a 404. ⚠️ FAIL-CLOSED RATHER THAN
+     *    LIVE: nothing in the product soft-deletes a form today (no delete route; `FormService::archive()`
+     *    sets `status`, never `deleted_at`), so this half is a guard for the feature that adds one. An
+     *    archived form's hub resolves 200 and stays linked.
      *
      * Neither was visible to any gate: `MdsBreadcrumb` renders an href-less crumb as text, so broken and
      * correct look identical to vue-tsc, to axe and to every snapshot. Do not rebuild this client-side.

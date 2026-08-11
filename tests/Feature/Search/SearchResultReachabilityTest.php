@@ -124,6 +124,10 @@ it('hands a member result the roster FILTERED to that member', function (): void
      * in PHP over the already-bounded roster, so a wrong param name would render the full list with a 200
      * and no test spelling the URL would notice.
      */
+    // A second member, so "one row came back" is a measurement rather than a tautology.
+    $stranger = committedTenantIdentity('Grace Hopper');
+    makeActiveMember($stranger, 'viewer');
+
     $props = app(SearchPresenter::class)->index($this->owner, SearchTerms::parse($this->owner->name), null);
 
     $url = null;
@@ -141,10 +145,11 @@ it('hands a member result the roster FILTERED to that member', function (): void
         ->assertInertia(fn ($page) => $page
             ->component('members/Index', false)
             ->where('filters.applied.q', $this->owner->email)
-            // ⚠️ `members`, and the count is the assertion that matters. The tenant holds TWO members by
-            // this point (this owner and the reviewer fixture is not built here — but the roster would grow
-            // with any future fixture), so asserting the filter NARROWED is what proves `?q=` was read at
-            // all: a wrong parameter name renders the unfiltered roster with a perfectly good 200.
+            // ⚠️ THE COUNT ONLY MEANS SOMETHING BECAUSE A SECOND MEMBER EXISTS, and an earlier version of
+            // this case asserted `has('members', 1)` against a roster that held exactly ONE — true by
+            // construction, and green against a completely unfiltered list. The stranger seeded above is
+            // what makes the narrowing observable; without them the only real assertions here are the URL
+            // string and the echoed `q`.
             ->has('members', 1)
             ->where('members.0.email', $this->owner->email)
             ->etc());

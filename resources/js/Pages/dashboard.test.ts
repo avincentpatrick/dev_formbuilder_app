@@ -337,19 +337,24 @@ describe('Dashboard — the KPI tiles link, but only where the reader may go (J2
          * renders for anyone with `dashboard.org.view`, which a Viewer has. Unconditional hrefs would hand
          * both roles a bare 403.
          */
+        // ⚠️ `try/finally`, BECAUSE `mocks.pageProps` IS HOISTED AND SHARED. Restoring after the assertion
+        // means a FAILING assertion leaks `manageForms: false` into every later test in this file — one
+        // failure becomes a cascade whose messages point at the wrong cases.
         mocks.pageProps.auth.can.manageForms = false;
         mocks.pageProps.auth.can.manageMembers = false;
 
-        const wrapper = render();
-        const hrefs = wrapper
-            .findAll('.dash__stats a')
-            .map((a) => a.attributes('href'));
+        try {
+            const wrapper = render();
+            const hrefs = wrapper
+                .findAll('.dash__stats a')
+                .map((a) => a.attributes('href'));
 
-        expect(hrefs).toEqual(['/submissions']);
-
-        mocks.pageProps.auth.can.manageForms = true;
-        mocks.pageProps.auth.can.manageMembers = true;
-        wrapper.unmount();
+            expect(hrefs).toEqual(['/submissions']);
+            wrapper.unmount();
+        } finally {
+            mocks.pageProps.auth.can.manageForms = true;
+            mocks.pageProps.auth.can.manageMembers = true;
+        }
     });
 
     it('never links the Accepting-responses tile, whose number no list can reproduce', () => {

@@ -356,4 +356,26 @@ function reset(): void {
     justify-content: flex-end;
     margin-top: var(--mds-space-3);
 }
+
+/* J2d — the chip's link. It wraps the badge rather than replacing it, so the rule is only about colour
+   inheritance and the focus ring; the badge supplies its own surface. `-fg` per the J2a 1.4.11 finding. */
+.analytics__chip-link {
+    color: inherit;
+    text-decoration: none;
+    border-radius: var(--mds-radius-sm);
+}
+
+/* ⚠️ `:deep()`, because the badge is a CHILD COMPONENT's element. A `scoped` block stamps this component's
+   `data-v-*` onto its own template nodes only, so a bare `.mds-badge` selector here compiles to something
+   that matches nothing and the hover affordance would silently never appear — the same class of
+   invisible-failure this increment is about, one layer down. `TopNav.vue` and `Templates.vue` use the same
+   escape hatch for the same reason. */
+.analytics__chip-link:hover :deep(.mds-badge) {
+    text-decoration: underline;
+}
+
+.analytics__chip-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
 </style>

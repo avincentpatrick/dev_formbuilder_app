@@ -65,10 +65,19 @@ it('spells the hub path exactly as the route does', function (): void {
 
 it('omits a soft-deleted form, which is the 404 this class exists to prevent', function (): void {
     /*
-     * ⚠️ THE HEADLINE CASE. `/forms/{form}` uses DEFAULT route-model binding — no `Route::bind`, no
+     * ⚠️ A GUARD FOR A STATE THE PRODUCT CANNOT CURRENTLY REACH, LABELLED AS ONE.
+     *
+     * The mechanism: `/forms/{form}` uses DEFAULT route-model binding — no `Route::bind`, no
      * `resolveRouteBinding()` override — so a trashed form 404s there, while `AuditLogPresenter` and
-     * `DashboardMetricsService` both resolve its TITLE on purpose. Without this omission the audit ledger
-     * would render `form.archived` rows as live hyperlinks to a 404: the row most worth clicking, broken.
+     * `DashboardMetricsService` resolve its TITLE on purpose.
+     *
+     * ⚠️ BUT NOTHING SOFT-DELETES A FORM TODAY: no delete route, no `$form->delete()` in `app/`, and
+     * `FormService::archive()` only sets `status` + `archived_at`. An earlier version of this comment
+     * claimed the audit ledger "would render `form.archived` rows as live hyperlinks to a 404" — false
+     * twice over, since archiving is not deleting and an archived form's hub resolves 200.
+     *
+     * The case stays because `SoftDeletes` is on the model and a delete feature would otherwise reintroduce
+     * the bug silently. It is a fail-closed guard, not a fix.
      */
     $this->form->delete();
 
@@ -136,9 +145,13 @@ it('drops a chart bucket key instead of 500ing the page that carries one', funct
      *
      * Written to assert that aggregate buckets simply have no entry, it instead raised **SQLSTATE 22P02,
      * "invalid input syntax for type uuid: 'unassigned'"** — `forms.id` is a Postgres `uuid` column, so a
-     * `whereIn` carrying a bucket key is a 500 on the dashboard, not an empty result. Both charts that
-     * consume `pathsFor()` emit those keys BY DESIGN beside real uuids (`'unassigned'` for submissions with
-     * no form, `'other'` for the top-N remainder), so every one of the six call sites would have hit it.
+     * `whereIn` carrying a bucket key is a 500, not an empty result.
+     *
+     * ⚠️ NO LIVE CALLER PASSES SUCH A KEY, AND AN EARLIER VERSION OF THIS COMMENT CLAIMED ALL SIX WOULD.
+     * `AnalyticsMetricsService::breakdown()` hoists both aggregates into SIBLING keys, so `rows` carries
+     * only real uuids, and both chart call sites `array_filter` besides. This case pins the SEAM's contract
+     * — a public helper six surfaces call must not be a 500 waiting for the first careless argument — and
+     * not a bug any of them had.
      *
      * It is a Postgres-only failure — SQLite coerces the same query to a harmless no-match — so no amount of
      * reasoning about the array shape would have surfaced it, and a CI-only discovery would have read as a

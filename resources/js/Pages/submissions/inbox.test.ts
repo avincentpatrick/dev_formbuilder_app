@@ -22,8 +22,9 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
-    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
-    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    // ⚠️ RETAINED, THOUGH THE CRUMB NO LONGER READS IT. J2d moved the trail server-side and deleted
+    // `formsCrumb()`; this mock stays only because `usePage()` is still resolved elsewhere in the
+    // page's tree, and removing an Inertia mock key is how a fresh, unrelated failure appears.
     usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },

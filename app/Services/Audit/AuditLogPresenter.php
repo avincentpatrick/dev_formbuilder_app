@@ -217,8 +217,13 @@ final class AuditLogPresenter
      * ⚠️ TWO QUERIES, AND THE SPLIT IS THE WHOLE POINT (Increment J2d). The `withTrashed()` query above
      * answers **what is this row's target CALLED**; {@see FormHubLink::pathsFor()} answers **can this reader
      * open it**, which excludes trashed rows because `/forms/{form}` binds through the default scope.
-     * Collapsing them back into one — linking every id the label query resolved — would put a live hyperlink
-     * to a 404 on exactly the `form.archived` and `form.deleted` rows, the rows a ledger exists for.
+     *
+     * ⚠️ THE ROWS THAT PAYOFF NAMES ARE NOT `form.archived`, AND SAYING SO WAS A MISTAKE THIS COMMENT USED
+     * TO MAKE. `FormService::archive()` sets `status` and `archived_at` and never calls `delete()`, while
+     * neither `scopeReadableBy()` nor `viewOverview()` reads status — so an archived form's hub resolves 200
+     * and its ledger row links correctly either way. The split protects SOFT-DELETED targets, which no
+     * product path produces today (there is no delete route for a form): a fail-closed guard for the feature
+     * that adds one, not a live fix. Labelled as such rather than left reading like a shipped bug.
      *
      * @param  Collection<int, Audit>  $items
      * @return array<string, array{label: string, url: ?string}>

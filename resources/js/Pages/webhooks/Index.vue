@@ -152,7 +152,7 @@ function openEndpoint(id: string): void {
                  absent whenever the reader could not open the hub (or the form is gone), so this is a link
                  iff the destination exists; the text fallback is exactly what this cell rendered before. -->
             <template #cell-form_title="{ row }">
-                <Link v-if="(row as EndpointRow).form_url" :href="(row as EndpointRow).form_url!">
+                <Link v-if="(row as EndpointRow).form_url" :href="(row as EndpointRow).form_url!" class="scope-link">
                     {{ (row as EndpointRow).form_title }}
                 </Link>
                 <template v-else>{{ (row as EndpointRow).form_title ?? 'All forms' }}</template>
@@ -230,5 +230,23 @@ function openEndpoint(id: string): void {
     font-family: var(--mds-font-family-mono);
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* J2d — the Scope column's form link. `-fg`, never `-bg`: the J2a WCAG 1.4.11 finding, and the same token
+   `inbox__form-link` and `forms__title-link` already use. There is no global `a` reset in this app, so an
+   unclassed link renders in browser-default #0000EE — the one-design-system rule caught by review. */
+.scope-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.scope-link:hover {
+    text-decoration: underline;
+}
+
+.scope-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 </style>

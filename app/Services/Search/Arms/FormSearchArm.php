@@ -132,7 +132,13 @@ final readonly class FormSearchArm implements SearchArm
             ->readableBy($user)
             ->tap(fn (Builder $q) => KeywordFilter::apply($q, $terms, 'forms.search_vector'))
             // A display filter, not a visibility rule — which is why it lives here and not in the scope.
-            // It matches `/forms`, so a search result cannot offer a row the forms list refuses to show.
+            //
+            // ⚠️ ITS ORIGINAL REASON NO LONGER COVERS EVERY ROLE. It was "it matches `/forms`, so a search
+            // result cannot offer a row the forms list refuses to show" — true while the arm's audience was
+            // exactly `/forms`'s audience, and only half-true after J2d: a Reviewer and a Viewer now receive
+            // form results and cannot open `/forms` at all. The filter stays because an archived form is a
+            // put-away thing on every surface, and the hub it now links to renders one perfectly well; it is
+            // simply no longer justified by parity with a list two roles never see.
             ->where('forms.status', '!=', FormStatus::Archived->value);
     }
 }

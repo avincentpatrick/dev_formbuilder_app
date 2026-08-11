@@ -77,7 +77,7 @@ it('offers an entitled Owner every destination in the catalog, and no more', fun
      * test rather than an untested URL, which is the failure mode of a hand-written dataset beside an
      * authored list.
      *
-     * And it is what reddens if anyone re-adds `notifications`, or adds a fourteenth row without a
+     * And it is what reddens if anyone re-adds `notifications`, or adds a thirteenth row without a
      * reachability case. Compare `FormTabSetReachabilityTest`'s key-set case, which exists for exactly this.
      */
     $keys = array_column(app(DestinationCatalog::class)->visibleTo($this->owner), 'key');

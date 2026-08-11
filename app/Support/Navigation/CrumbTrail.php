@@ -28,12 +28,21 @@ use App\Support\Forms\FormTabSet;
  *     `can:view,submission` — whose **respondent arm** (`respondent_user_id = me`) {@see FormPolicy::viewOverview()}
  *     has no counterpart for. A keyer whose grant was revoked, or whose form was re-scoped, opened the page
  *     and got a **403 with no way back** from both middle crumbs. Tenant 403s render a bare Blade page.
- *   • the same two crumbs 404'd whenever the form was soft-deleted, rendering the em dash
- *     {@see SubmissionInboxPresenter::formTitle()} produces as a **live hyperlink**.
+ *   • the same two crumbs would 404 for a SOFT-DELETED form, rendering the em dash
+ *     {@see SubmissionInboxPresenter::formTitle()} produces as a live hyperlink. ⚠️ **THIS ONE IS
+ *     FAIL-CLOSED, NOT LIVE, AND AN EARLIER VERSION OF THIS NOTE CLAIMED OTHERWISE.** Checking it is what
+ *     corrected it: `Form` uses `SoftDeletes`, but there is no `Route::delete` for a form and no
+ *     `$form->delete()` anywhere in `app/` — `FormService::archive()` sets `status` and `archived_at` and
+ *     never deletes. So the state is reachable only from a fixture today. The guard stays because the
+ *     feature that adds a delete would otherwise resurrect the bug silently; it is labelled as a guard
+ *     rather than presented as a shipped defect, which is the same honesty `formSubmissions()`'s second
+ *     conjunct gets below.
  *
- * Both are the defect `SubmissionInboxPresenter` fixed on the inbox ROW in J2c — one surface over, on the
- * page the row links to. Neither was visible to any gate we run: `MdsBreadcrumb` renders an href-less crumb
- * as text, so broken and correct are identical to vue-tsc, to axe and to every snapshot.
+ * The FIRST is genuinely live — `DELETE /resource-grants/{resourceGrant}` exists, so grant revocation
+ * reaches that state — and both are the defect `SubmissionInboxPresenter` fixed on the inbox ROW in J2c, one
+ * surface over, on the page the row links to. Neither was visible to any gate we run: `MdsBreadcrumb`
+ * renders an href-less crumb as text, so broken and correct are identical to vue-tsc, axe and every
+ * snapshot.
  *
  * ── ONE DELIBERATE DIFFERENCE FROM `FormTabSet`, SO NOBODY "ALIGNS" THE TWO ────────────────────────────
  * A refused TAB is absent. A refused CRUMB keeps its label and loses only its href. Dropping the crumb

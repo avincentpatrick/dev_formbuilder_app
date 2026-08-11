@@ -88,7 +88,7 @@ final class DashboardMetricsService
      * failure `breakdown-bars.ts` already names for the "Other" bucket — and would advertise OCR and API
      * import, which are unbuilt, as available and unused.
      *
-     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, channels: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
+     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int, url: string|null}>, other: array{count: int, categories: int}|null, unassigned: int}, channels: array{rows: list<array{key: string|null, label: string, count: int, url: null}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
      */
     public function trendsForUser(User $user): array
     {

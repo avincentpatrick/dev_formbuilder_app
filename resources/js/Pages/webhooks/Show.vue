@@ -206,7 +206,7 @@ function formatDate(iso: string | null): string {
                     <div class="detail__meta-row">
                         <dt>Scope</dt>
                         <dd>
-                            <Link v-if="endpoint.form_url" :href="endpoint.form_url">{{ endpoint.form_title }}</Link>
+                            <Link v-if="endpoint.form_url" :href="endpoint.form_url" class="scope-link">{{ endpoint.form_title }}</Link>
                             <template v-else>{{ endpoint.form_title ?? 'All forms' }}</template>
                         </dd>
                     </div>
@@ -418,5 +418,23 @@ function formatDate(iso: string | null): string {
         grid-template-columns: 1fr;
         gap: var(--mds-space-1);
     }
+}
+
+/* J2d — the Scope column's form link. `-fg`, never `-bg`: the J2a WCAG 1.4.11 finding, and the same token
+   `inbox__form-link` and `forms__title-link` already use. There is no global `a` reset in this app, so an
+   unclassed link renders in browser-default #0000EE — the one-design-system rule caught by review. */
+.scope-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.scope-link:hover {
+    text-decoration: underline;
+}
+
+.scope-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 </style>

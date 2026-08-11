@@ -114,9 +114,11 @@ final readonly class MemberSearchArm implements SearchArm
                 // name, so filtering by it can still leave the reader hunting. `TenantMembershipService`
                 // matches `q` against BOTH fields, so the email narrows to exactly one row.
                 //
-                // ⚠️ `rawurlencode`, NOT `urlencode` — the latter encodes a space as `+`, and `+` is legal in
-                // an email local part (`ada+forms@…`), so the round trip would silently search for a
-                // different address than the one displayed.
+                // `rawurlencode` for RFC 3986 percent-encoding. ⚠️ AN EARLIER VERSION OF THIS COMMENT
+                // JUSTIFIED IT WITH A FAILURE THAT DOES NOT EXIST — that `urlencode` would mangle a `+` in
+                // an address like `ada+forms@…`. Measured: both functions render that address identically
+                // (`ada%2Bforms%40x.com`); they differ only on the SPACE character, which cannot appear in
+                // an unquoted address. The choice is right and the old reason was invented.
                 'url' => '/members?q='.rawurlencode((string) $member->email),
             ])
             ->all();

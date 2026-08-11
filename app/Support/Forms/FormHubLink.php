@@ -21,7 +21,14 @@ use Illuminate\Support\Str;
  * hub: {@see DashboardMetricsService} and {@see AuditLogPresenter} both use `withTrashed()`, on purpose —
  * "a soft-deleted form otherwise renders as a bare uuid on the very row recording that it was archived".
  * Naming a form and reaching it are therefore different questions, and a link that assumes they are the same
- * ships a 404 on precisely the rows most worth reading.
+ * would ship a 404 on rows worth reading.
+ *
+ * ⚠️ THAT DIVERGENCE IS CURRENTLY LATENT, AND THIS DOCBLOCK SAYS SO RATHER THAN OVERSTATING ITS OWN VALUE.
+ * No product path soft-deletes a form: `Form` uses `SoftDeletes` and `FormPolicy::delete()` exists, but
+ * there is no delete route and no `$form->delete()` in `app/`, and `FormService::archive()` sets `status` +
+ * `archived_at` only — an ARCHIVED form's hub resolves 200 and stays linked everywhere. What is genuinely
+ * live is the reader half: `readableBy` refuses a form the caller holds no grant on, which the audit ledger
+ * and both charts can otherwise name.
  *
  * ── THE PREDICATE, AND WHY EVERY OTHER CANDIDATE IS A COINCIDENCE ──────────────────────────────────────
  * `/forms/{form}` resolves through DEFAULT route-model binding (there is no `Route::bind` and no
@@ -43,8 +50,14 @@ use Illuminate\Support\Str;
  * {@see pathsFor()} returns a map missing every id it will not vouch for — trashed, hard-deleted, or
  * out-of-grant alike, with no branch distinguishing them. A caller that forgets the guard gets `null` and
  * renders text, which is the pre-J2d behaviour; there is no spelling of the call that produces a bad link.
- * The cost is one PK-indexed query per surface over an already-bounded id list. That query buys the removal
- * of a silent failure mode no test naturally covers, and is the right trade.
+ *
+ * The cost is one PK-indexed query per surface. ⚠️ FIVE OF THE SIX CALL SITES PASS A GENUINELY BOUNDED LIST
+ * (one page of audit rows, the top-N chart rows, one endpoint, one rule); `AnalyticsPresenter::formOptions()`
+ * is the exception — it feeds every form the reader can see, on every `/analytics` render, and could fold
+ * this into the query directly above it. Left as-is because that surface already runs an unbounded
+ * `whereIn` of its own and merging them is an optimisation with its own correctness question (the label
+ * query needs `withTrashed()` and this one must not have it); recorded here so the next author sees the
+ * asymmetry rather than inheriting a claim that every site is bounded.
  */
 final class FormHubLink
 {
@@ -69,13 +82,22 @@ final class FormHubLink
      * guard at every call site and there is no third state to handle. An empty input short-circuits, because
      * `whereIn('id', [])` is a query worth not issuing on a dashboard that may have no forms at all.
      *
-     * ⚠️ NON-UUID ENTRIES ARE DROPPED BEFORE THE QUERY, AND THAT IS A CRASH GUARD, NOT TIDINESS.
-     * `forms.id` is a Postgres `uuid` column, so a `whereIn` carrying `'unassigned'` raises SQLSTATE 22P02
-     * — "invalid input syntax for type uuid" — which surfaces as a **500 on the dashboard**, not as an empty
-     * result. And callers feed this raw BUCKET KEYS by design: the top-forms and breakdown charts both carry
-     * `'unassigned'` / `'other'` aggregate rows beside real uuids. Filtering here rather than at each of the
-     * six call sites is the point of the seam; `FormHubLinkTest` reproduces the crash directly, because it
-     * was found by writing that case rather than by reasoning about it.
+     * ⚠️ NON-UUID ENTRIES ARE DROPPED BEFORE THE QUERY, AND THAT IS A CRASH GUARD RATHER THAN TIDINESS —
+     * BUT NO LIVE CALLER CAN FIRE IT TODAY, AND THE FIRST VERSION OF THIS NOTE CLAIMED OTHERWISE.
+     *
+     * The mechanism is real: `forms.id` is a Postgres `uuid` column, so a `whereIn` carrying `'unassigned'`
+     * raises SQLSTATE 22P02 — "invalid input syntax for type uuid" — a **500**, not an empty result, and
+     * SQLite would coerce it silently. `FormHubLinkTest` reproduces it directly.
+     *
+     * What this note used to say was that the charts "feed this raw bucket keys by design … every one of the
+     * six call sites would have hit it". **That is false**, and checking it is what corrected it:
+     * `AnalyticsMetricsService::breakdown()` hoists both aggregates into SIBLING keys (`unassigned` is
+     * summed into an int and `continue`d; the top-N remainder becomes `other`), so `rows` only ever carries
+     * real uuids — and both chart call sites additionally `array_filter` before calling. The other four pass
+     * `auditable_id`, `form_id` or a plucked `forms.id`.
+     *
+     * The filter STAYS, labelled as what it is: a fail-closed guard on a public seam whose whole purpose is
+     * that six call sites need not each remember to sanitise. It is not evidence that any of them forgot.
      *
      * ⚠️ THE PARAMETER IS `mixed[]` ON PURPOSE, NOT `list<string>`. Callers hand this raw chart-bucket keys
      * and plucked column values — `'unassigned'`, `'other'`, nulls, non-list arrays — and the whole point of

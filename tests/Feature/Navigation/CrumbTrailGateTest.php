@@ -117,15 +117,24 @@ it('refuses both form crumbs to a respondent who can open the submission but not
 it('refuses both form crumbs when the form is soft-deleted, and labels it as the inbox does', function (): void {
     /*
      * ══════════════════════════════════════════════════════════════════════════════════════════════════
-     * ⚠️ DEFECT 2, ALSO LIVE, AND IT AFFECTS EVERY ROLE INCLUDING AN OWNER.
+     * ⚠️ A FAIL-CLOSED GUARD, NOT A LIVE DEFECT — AND THIS COMMENT USED TO SAY THE OPPOSITE.
      * ══════════════════════════════════════════════════════════════════════════════════════════════════
-     * `/forms/{form}` uses default route-model binding, which excludes trashed rows, while
-     * `SubmissionInboxPresenter::formTitle()` renders a soft-deleted form's title as `—`. So the page
-     * printed **an em dash as a live hyperlink to a 404**, twice — the literal defect that presenter's own
-     * comment names, surviving one surface over on the page it links to.
+     * The mechanism is real: `/forms/{form}` uses default route-model binding, which excludes trashed rows,
+     * while `SubmissionInboxPresenter::formTitle()` renders a soft-deleted form's title as `—`. An
+     * unguarded trail would print an em dash as a live hyperlink to a 404, twice.
      *
-     * The label agreeing with `formTitle()` is the point: a reader who saw an em dash in the inbox must see
-     * an em dash here, not a title implying a page that no longer exists.
+     * But NO PRODUCT PATH SOFT-DELETES A FORM. `Form` uses `SoftDeletes` and `FormPolicy::delete()` exists,
+     * yet there is no `Route::delete` for a form and no `$form->delete()` call anywhere in `app/`;
+     * `FormService::archive()` sets `status` + `archived_at` and never deletes. The `$this->form->delete()`
+     * below is therefore a fixture reaching a state the product cannot, which is exactly what makes this a
+     * guard rather than a fix — and saying so is the difference between this file and the class of docblock
+     * this repo keeps having to correct.
+     *
+     * ⚠️ AND NOTE WHAT AN ARCHIVED FORM DOES INSTEAD: it resolves 200. `scopeReadableBy()` carries no status
+     * filter and `viewOverview()` never reads status, so archiving a form does NOT unlink it anywhere.
+     *
+     * The label agreeing with `formTitle()` is still the point: a reader who saw an em dash in the inbox
+     * must see an em dash here, not a title implying a page that does not exist.
      */
     $submission = seedInboxSubmission($this->form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
     $this->form->delete();

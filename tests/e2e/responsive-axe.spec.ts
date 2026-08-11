@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 // Composed-page responsive + accessibility gate. Each authenticated tenant page is scanned at the
 // three reference viewports (the config's projects) in light AND dark for zero WCAG 2.2 AA violations,
@@ -129,14 +130,13 @@ for (const p of filteredToZero) {
     }
 }
 
-// The interactive builder (D4a). Reached via the form title link on the list (no id in the URL); the
+// The interactive builder (D4a). Reached by clicking through the list and then the HUB's Builder tab (no id
+// in the URL) — see `support/navigate`, which owns that two-step walk for all six specs that need it; the
 // page auto-selects the first field on load, so the config panel + tabs are mounted for the scan. The
 // full interaction-driven pass (opening dialogs, keyboard reorder + aria-live) is D4b.
 for (const theme of themes) {
     test(`Builder (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Community Health Survey' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Community Health Survey');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Builder');
@@ -212,9 +212,7 @@ for (const theme of themes) {
 // `assertClean` horizontal-overflow check is doing real work here rather than being a formality.
 for (const theme of themes) {
     test(`Builder logic view (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Logic Notices Demo');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         // The server-derived notice, so the widest state of the card is on screen when the scan runs.
@@ -232,9 +230,7 @@ for (const theme of themes) {
 // three times (H12b, H14, H15b), and this is the deepest control nesting the builder has.
 for (const theme of themes) {
     test(`Builder condition editor (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Logic Notices Demo');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();

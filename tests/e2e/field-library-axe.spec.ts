@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { forceTheme } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 // Accessibility + interaction gate for the builder's question-library picker (Increment G9b): the left-pane
 // Library toggle lists the platform-seeded questions (E2eSeeder runs PlatformFieldLibrarySeeder), inserting
@@ -10,10 +11,9 @@ import { forceTheme } from './support/axe';
 
 const themes = ['light', 'dark'] as const;
 
-async function openBuilder(page: Page): Promise<void> {
-    await page.goto('/forms', { waitUntil: 'networkidle' });
-    await page.getByRole('link', { name: 'Community Health Survey' }).click();
-    await page.waitForURL('**/builder', { timeout: 30_000 });
+/** This spec always drives the same seeded form; the shared helper takes the title explicitly. */
+async function openSurveyBuilder(page: Page): Promise<void> {
+    await openBuilder(page, 'Community Health Survey');
 }
 
 // Axe scan scoped to the left pane (the Fields ⇄ Library toggle + the active picker), mirroring builder-axe's
@@ -35,7 +35,7 @@ async function scanLeftPane(page: Page, label: string): Promise<void> {
 
 for (const theme of themes) {
     test(`Library picker — ${theme}`, async ({ page }) => {
-        await openBuilder(page);
+        await openSurveyBuilder(page);
         await page.getByRole('button', { name: 'Library' }).click();
         // Scope to the picker — the seeded form's canvas may already contain a same-named field.
         const picker = page.locator('.library');
@@ -46,7 +46,7 @@ for (const theme of themes) {
 }
 
 test('inserting a library question adds a field to the draft', async ({ page }) => {
-    await openBuilder(page);
+    await openSurveyBuilder(page);
     await page.getByRole('button', { name: 'Library' }).click();
     // Scope the insert to the picker (the canvas may hold a same-named field).
     await page.locator('.library').getByRole('button', { name: /Full name/ }).click();
@@ -55,7 +55,7 @@ test('inserting a library question adds a field to the draft', async ({ page }) 
 });
 
 test('a field can be saved to the library from its config panel', async ({ page }) => {
-    await openBuilder(page);
+    await openSurveyBuilder(page);
     // The builder auto-selects the first field → open its Advanced tab → Save to library (one click).
     await page.getByRole('tab', { name: 'Advanced' }).click();
     await page.getByRole('button', { name: 'Save to library' }).click();

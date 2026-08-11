@@ -14,8 +14,8 @@ function breakdown(overrides: Partial<Breakdown> = {}): Breakdown {
     return {
         axis: 'form',
         rows: [
-            { key: 'f1', label: 'Clinic Intake', count: 9 },
-            { key: 'f2', label: 'Household Roster', count: 4 },
+            { key: 'f1', label: 'Clinic Intake', count: 9, url: null },
+            { key: 'f2', label: 'Household Roster', count: 4, url: null },
         ],
         other: null,
         unassigned: 0,
@@ -101,11 +101,78 @@ describe('breakdownTableRows', () => {
     it('tabulates the Other bucket’s total alongside the plotted rows', () => {
         const rows = breakdownTableRows(breakdown({ other: { count: 7, categories: 3 } }));
 
+        // ⚠️ NO `url` KEY: `breakdownTableRows()` is the TEXT equivalent and carries no destination — only
+        // `breakdownBars()` gained one in J2d. The two shapes are deliberately not the same.
         expect(rows.at(-1)).toEqual({ key: 'other', label: 'Other (3 forms)', count: 7 });
     });
 
     it('omits an Unassigned row on an axis that cannot have one', () => {
         // `form_id` is NOT NULL, so an Unassigned row there would invent a bucket.
         expect(breakdownTableRows(breakdown()).map((r) => r.key)).toEqual(['f1', 'f2']);
+    });
+});
+
+
+describe('breakdownBars — the href mapping (Increment J2d)', () => {
+    it('maps a row url onto the datum href, and leaves an unlinkable row without one', () => {
+        /*
+         * ⚠️ THE MIXED FIXTURE IS LOAD-BEARING. With one linked row, an always-link mutation
+         * (`href: '/forms/' + row.key`) passes; with one unlinked row, a never-link mutation passes. Only
+         * both together fail each.
+         *
+         * The null row is the real product case: a soft-deleted form is still NAMED in the plot (the
+         * presenter resolves its title with `withTrashed()` deliberately) and must not be reachable,
+         * because `/forms/{form}` binds through the default scope and 404s on it.
+         */
+        const bars = breakdownBars({
+            axis: 'form',
+            rows: [
+                { key: 'f1', label: 'Clinic Intake', count: 9, url: '/forms/f1' },
+                { key: 'f2', label: 'Deleted form', count: 4, url: null },
+            ],
+            other: null,
+            unassigned: 0,
+            unassigned_label: 'Unassigned',
+            has_unassigned_bucket: true,
+        });
+
+        expect(bars.map((b) => b.href)).toEqual(['/forms/f1', undefined]);
+    });
+
+    it('never maps a missing url to an empty string, which would silently disable the chart', () => {
+        /*
+         * ⚠️ `?? ''` IS THE TRAP, AND IT LOOKS IDENTICAL TO `?? undefined` AT THE CALL SITE.
+         * `MdsBarChart` treats the PRESENCE of an href as "interactive", so an empty string strips
+         * `role="img"`, its accessible name and the sr-only table while rendering zero links — a chart that
+         * is both unreadable and un-navigable. J2a's review caught this inside the component; this is the
+         * same defect arriving from the caller.
+         */
+        const bars = breakdownBars({
+            axis: 'form',
+            rows: [{ key: 'f1', label: 'Clinic Intake', count: 9, url: null }],
+            other: null,
+            unassigned: 0,
+            unassigned_label: 'Unassigned',
+            has_unassigned_bucket: true,
+        });
+
+        expect(bars[0]?.href).toBeUndefined();
+        expect(bars[0]?.href).not.toBe('');
+    });
+
+    it('leaves both aggregate buckets unlinked, because neither is an entity', () => {
+        const bars = breakdownBars({
+            axis: 'form',
+            rows: [{ key: 'f1', label: 'Clinic Intake', count: 9, url: '/forms/f1' }],
+            other: { count: 7, categories: 3 },
+            unassigned: 2,
+            unassigned_label: 'Unassigned',
+            has_unassigned_bucket: true,
+        });
+
+        const buckets = bars.filter((b) => b.key === 'unassigned' || b.key === 'other');
+
+        expect(buckets).toHaveLength(2);
+        expect(buckets.every((b) => b.href === undefined)).toBe(true);
     });
 });

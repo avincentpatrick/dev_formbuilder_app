@@ -31,7 +31,6 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 import AnalyticsChartsCard from '@/components/analytics/AnalyticsChartsCard.vue';
 import { conversionTile, medianTile } from '@/components/analytics/draft-metrics';
 import { dateLabel, rangeLabel as formatRange } from '@/components/analytics/bucket-label';
@@ -47,18 +46,18 @@ const props = defineProps<{
      * that could only get back to `/forms`, never to the form it is describing.
      */
     tabs: TabNavItem[];
+    /**
+     * The trail, resolved server-side by `CrumbTrail` (J2d) — same argument as the strip above, one crumb at
+     * a time. It is still three crumbs and never two, for the reason that outlived the client version:
+     * `MdsBreadcrumb` renders the LAST item as text whatever it carries, so a trail ending at the form's
+     * title would print the hub's name with no way to reach it — the dead end intact, with a separator.
+     *
+     * ⚠️ THE HUB CRUMB WAS HARD-CODED HERE AND WAS SAFE ONLY BY DERIVATION: this route gates on
+     * `can:view,form`, which does not imply `viewOverview` — the two merely coincide across the five shipped
+     * roles. Do not rebuild it locally.
+     */
+    crumbs: BreadcrumbItem[];
 }>();
-
-/**
- * Three crumbs, not two: the form's title must be a LINK, and `MdsBreadcrumb` renders the last item as text
- * whatever it carries. A two-crumb trail ending in the title would therefore print the hub's name with no
- * way to reach it — which is the exact dead end this increment exists to remove.
- */
-const crumbs = computed<BreadcrumbItem[]>(() => [
-    formsCrumb(),
-    { label: props.form.title, href: `/forms/${props.form.id}` },
-    { label: 'Response statistics' },
-]);
 
 const conversion = computed(() => conversionTile(props.report.drafts));
 const median = computed(() => medianTile(props.report.drafts));

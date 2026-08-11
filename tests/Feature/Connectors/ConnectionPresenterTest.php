@@ -76,8 +76,9 @@ it('projects a connection and its rules with a fixed key set and no credentials'
         ->and(json_encode($props))->not->toContain('xoxe-secret');
 
     expect(array_keys($row['rules'][0]))->toEqualCanonicalizing([
-        'id', 'connection_id', 'name', 'event_types', 'form_id', 'form_title', 'channel_id', 'channel_name',
-        'status', 'consecutive_failure_count', 'last_success_at', 'last_failure_at', 'created_at',
+        'id', 'connection_id', 'name', 'event_types', 'form_id', 'form_title', 'form_url', 'channel_id',
+        'channel_name', 'status', 'consecutive_failure_count', 'last_success_at', 'last_failure_at',
+        'created_at',
     ]);
 });
 

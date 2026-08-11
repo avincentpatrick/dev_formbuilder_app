@@ -1264,3 +1264,94 @@ additions one for one — 10 gate + 9 page + 6 inbox + 2 reachability. **E2E 478
 and 0 FLAKY**, the first zero-flaky run since J1e, which is `settlePaint()` working: J2b's run carried one,
 and its cause was measured (an intermediate foreground over a settled background, on the button the test had
 just clicked) rather than shrugged at.
+
+---
+
+## 2026-08-11 — J2d, the dead-end sweep, and the two gate defects the breadcrumb was hiding
+
+Every surface that NAMES a form now reaches it, and the trail finally gained the property the tab strip has
+had since J2b. `rbac §9` had filed this by name — "breadcrumbs have no equivalent, and nothing structural yet
+enforces one" — and closing it is what turned a link sweep into a defect hunt.
+
+**`formsCrumb()` is deleted; trails are server-built by `App\Support\Navigation\CrumbTrail`.** Seven
+controllers emit a `crumbs` prop and six client `computed`s are gone. The argument is not tidiness: an href
+inside a client `computed` lives somewhere **no Pest test can reach**, which is precisely how J2c shipped a
+`/forms` crumb that 403s for a Reviewer and a Viewer. `CrumbTrailReachabilityTest` reads the trail back off
+the real Inertia response and navigates every href, so nothing is transcribed and a test cannot quietly agree
+with a page that has moved. A refused CRUMB keeps its label and loses only its href — the deliberate opposite
+of a refused TAB, because dropping a crumb renumbers the trail and makes one page render a different DEPTH
+per role.
+
+**One live defect, one guard, and the adversarial review is what separated them.** `submissions/Show.vue` is
+gated on `can:view,submission` ALONE, and `SubmissionPolicy::view()` admits a **respondent** — an arm
+`viewOverview()` has no counterpart for — so a keyer whose grant was revoked (a live route) opened the page
+and got a 403 from both middle crumbs. That one is real and is pinned by a request asserting the 403. Its
+soft-deleted-form twin was written up as equally live and **is not**: `Form` uses `SoftDeletes` but no delete
+route exists and nothing in `app/` calls `$form->delete()`, while `FormService::archive()` only sets `status`
+and `archived_at` — an archived form's hub resolves **200** and stays linked. Four docblocks had inherited
+that overclaim and were corrected to say "fail-closed guard" instead. This is the same species of error J2b's
+surviving mutation forced out of `FormPolicy`, caught one increment later by review rather than by a gate.
+
+**`FormHubLink` is the only place `/forms/{id}` is spelled.** `pathsFor()` returns only ids
+`Form::scopeReadableBy()` vouches for — byte-for-byte `viewOverview()` **and** carrying no `withTrashed()` —
+so it answers both questions the route asks: will binding resolve it, and will the gate admit this reader.
+Naming a form and reaching it are different questions, which is why the audit ledger and both charts keep
+their `withTrashed()` label query beside it rather than collapsing the two. Its own test found a **crash
+before any consumer existed**: `forms.id` is a Postgres `uuid` column, so a `whereIn` carrying a chart bucket
+key raises SQLSTATE 22P02 — a 500, which SQLite would have coerced to a harmless no-match.
+
+**`/notifications` was a live palette defect that no status code could flag.** `DestinationCatalog` offered
+it as a page; it is `NotificationController::index(): JsonResponse`, and the route block says so outright.
+Both consumers hand catalog URLs to the Inertia router, so choosing it hard-navigated the user onto raw JSON
+— a **200 with the wrong content type**, which is exactly why the only test covering that file
+(`toStartWith('/')`) never saw it. Deleted, keywords folded into `/settings`, and
+`DestinationReachabilityTest` now drives all twelve rows requiring an **Inertia** response, with gating driven
+from the CATALOG rather than the routes.
+
+**`FormSearchArm` widened to `readableBy` (user decision), and the widening is what made its URL change
+provable.** A Reviewer and a Viewer had been getting zero form results while J2b had opened the hub to all
+five roles. Repointing the URL off `/forms/{id}/builder` could not have been proven by navigation before —
+every role the arm served could open the builder too — but those two roles cannot, so
+`SearchResultReachabilityTest` navigating what they are handed catches the old href outright. Three
+`SearchVisibilityTest` cases were inverted, each recording what it used to assert and why.
+
+**The review returned 15 findings and the most user-visible was the dullest.** Five new links shipped as
+unstyled raw anchors: there is no global `a` reset in this app, so they rendered browser-default blue on four
+pages — a one-design-system violation that every green gate was blind to. It also caught three docblocks
+whose justification was **invented rather than measured** (`urlencode` and `rawurlencode` differ only on a
+space, which cannot appear in an address; the bucket-key crash no live caller can trigger; an archived-row
+payoff that archiving does not produce), a **vacuous** member-narrowing assertion against a one-member
+roster, a shared Vitest mock mutated without `try/finally`, and a `ConnectorEventContextResolver` that had
+changed a live Slack destination with **no test at all**. It now has four.
+
+**Gates: Pest 1346/1346 across the nine affected directories, with `tests/Feature/Forms`, `Submissions` and
+`Analytics` passing UNEDITED (855/855) as the proof the trail migration moved nothing; Vitest 94 FILES /
+1669; PHPStan 20 = delta 0; Pint clean 1,151; vue-tsc clean; `openapi.json` BYTE-IDENTICAL by fresh export +
+diff; controller-gate 43, migration-lint 63, job-payload-lint 28; Playwright compile-check 480.** Five
+mutations were predicted before being run and all five behaved as predicted — two live, two reddening only
+their synthetic case and shipping labelled as fail-closed guards.
+
+**`committedTenantIdentity()` was promoted into `tests/Pest.php` on its fourth copy.** Any test that renders
+`/members` needs it: `listMembers()` resolves identities on `pgsql_auth`, a separate session that cannot see
+`RefreshDatabase`'s uncommitted rows, and indexes with `$users[$m->user_id]` — so a `User::factory()` member
+500s the page on an undefined array key. It reads exactly like a product bug and is a fixture one.
+
+**CI then found two things no local gate could, and one of them defeats the control the last two increments
+installed.** The first was mine outright: `ConnectorDeepLinkTest` asserted a full absolute URL and passed
+locally, then failed all three dataset rows in CI, because the scheme is config-driven and defaults to
+`https` — `http` only in the dev container. Assert the PATH; a server-generated absolute URL is not a
+literal.
+
+The second is worth more. `analytics-axe.spec.ts` requires every bar chart's sr-only table to tabulate every
+plotted category, and making the form axis linkable **by design** drops that table: one linked datum takes
+the plot out of `role="img"`, which un-prunes every label and value into the accessibility tree and turns the
+table into a duplicate that announces the dataset twice. I ran the J2b/J2c grep over `tests/e2e/` for deleted
+strings and it correctly found nothing — because this is not a locator matching a label, it is a
+**behavioural contract asserted structurally**. The standing lesson needs its complement: grep for the
+strings you delete, and reason about the contracts you change. The Vitest twin of that very assertion was
+predicted and updated in the same increment; only a gate that cannot run locally caught its e2e counterpart.
+
+The fix **branches rather than relaxes**, and the distinction is the whole point: "a table OR some links"
+would have retired a §D12 gate to make a change pass. The interactive path now proves more than the old
+assertion did — links present, sr-only table deliberately absent, `.mds-bar__summary` present, every plotted
+category named in the tree, and the page's unconditional paired `MdsDataTable` still carrying the full list.

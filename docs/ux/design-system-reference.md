@@ -695,6 +695,32 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 > **⚠️ AS-BUILT (J2b): THE STRIP SHIPS ON THE HUB AND THE ANALYTICS PAGE, AND DELIBERATELY *NOT* ON THE BUILDER** (user decision, 2026-08-11). `forms/Builder.vue` is a three-pane workspace on a `grid-template-rows: auto 1fr; height: 100%` grid with a bespoke fixed toolbar rather than `PageHeader`; a second ~44px header row costs vertical space on the one screen in the product that cannot spare it. It takes the **breadcrumb alone** — `Forms / {title} / Builder`, with the middle crumb reaching the hub — which is enough to end the dead end the strip exists to remove. This is the governing-layout rule holding rather than bending: breadcrumbs carry path context, and a workspace that has one does not also need the strip to say where it is.
 >
 > **Three crumbs, not two, wherever a form's sub-page adopts the trail** (the builder and the analytics page both). `MdsBreadcrumb` renders the last item as text whatever it carries, so the natural-looking `Forms / {title}` would print the hub's name **with no link on it** — the dead end intact, now with a separator. The trail must end on the page you are actually standing on.
+
+> **As-built note (J2d) — EVERY TRAIL IS SERVER-BUILT NOW, AND `formsCrumb()` IS GONE.** Trails are composed
+> by `App\Support\Navigation\CrumbTrail`, which asks each destination's own gate per crumb and hands the page
+> a `crumbs` prop; the six client `computed`s and the `useFormsCrumb` composable were deleted. The reason is
+> not tidiness: a crumb's href lived in a client `computed` where **no Pest test could reach it**, and J2c had
+> already shipped a `/forms` crumb that 403s for a Reviewer and a Viewer through exactly that gap. Two more
+> live defects were found the same way on `submissions/Show.vue` — a respondent-only reader 403ing off both
+> middle crumbs, and a soft-deleted form rendering an em dash as a live link to a 404. **Do not rebuild a
+> trail in a page component**; if a page needs one, its controller composes it.
+>
+> **A refused CRUMB keeps its label and loses only its href — the deliberate opposite of `MdsTabNav`, where a
+> refused item is ABSENT.** Both are correct for their own shape and the difference must not be "aligned":
+> dropping a crumb renumbers the trail and makes one page render a different DEPTH per role, which destroys
+> the only thing a breadcrumb conveys; a tab strip has no such structure to lose, so ADR-0011 §D9's
+> absent-not-locked doctrine applies there and text-degradation applies here.
+>
+> **The tail is enforced by the type, not by a convention.** `CrumbTrail::current()` returns the finished
+> array rather than `self`, so there is no spelling of a trail whose last crumb carries an href. That matters
+> because the component renders the last item as text whatever it carries: an href leaking onto the tail is
+> invisible in the browser, in Vitest and to axe, and would surface only as a dead payload key a later author
+> trusts. `CrumbTrailReachabilityTest` is the only place it is observable.
+>
+> **Page tests assert PASS-THROUGH, never a spelled-out trail.** A page owes one thing now — rendering the
+> server's array untouched — plus one case proving an href-less middle crumb really renders as text, which is
+> what would catch a page "helpfully" restoring a default href. Which crumbs are linked for which role is
+> `CrumbTrailGateTest`'s question, against the real gates.
 >
 > **⚠️ AS-BUILT (J2c): THE STRIP NOW SHIPS ON A THIRD PAGE — `/forms/{form}/submissions` — AND THAT PAGE IS THE SAME VUE COMPONENT AS THE GLOBAL INBOX.** `submissions/Inbox.vue` serves both routes, switching on the **presence** of a `form` prop the server omits entirely on `/submissions` (absent, never empty — the same rule the hub's `share` block follows). A second component was the alternative and was rejected for the J1e reason: the filter bar, the URL builder, the export href and the empty-state branching would each have been spelled twice, and two copies of a filter surface are what the audit-export defect was made of. Per-form mode adds the trail and the strip, drops the Form column and the Form dropdown, and makes Export unconditional — the route already *is* a form, so the global inbox's "pick a form first" precondition is satisfied by construction.
 >

@@ -108,6 +108,41 @@ function apiMember(string $roleName): User
     return $user;
 }
 
+/**
+ * A COMMITTED identity, visible to the separate `pgsql_auth` session (Increment J2d).
+ *
+ * ⚠️ ANY TEST THAT RENDERS `/members` NEEDS THIS, and the failure without it looks like a product bug rather
+ * than a fixture one. `TenantMembershipService::listMembers()` resolves identities on the `pgsql_auth`
+ * connection and indexes the result with `$users[$m->user_id]`, its comment noting that "the FK then
+ * guarantees the keyed map contains every id". That guarantee is real in production and false inside a test:
+ * `pgsql_auth` is a separate SESSION and cannot see `RefreshDatabase`'s uncommitted rows, so a
+ * `User::factory()` member has a `tenant_users` row and no visible identity — and the page 500s on an
+ * undefined array key.
+ *
+ * ⚠️ PROMOTED HERE ON THE FOURTH COPY. `MembersIndexTest::committedMemberUser()`,
+ * `MembersRosterFilterTest::committedIdentity()` and two J2d reachability suites each needed the identical
+ * six lines; the three existing copies stay where they are because each file's docblock makes its local one
+ * load-bearing, but nothing new should add a fifth. This file's own header records the rule (a fixture
+ * defined inside one test file resolves only when THAT file is loaded, so a single-file run of any other
+ * suite dies with "call to undefined function").
+ *
+ * ⚠️ RANDOM EMAIL, AND NEVER DELETED IN AN `afterEach`. These rows outlive the transaction and are cleaned
+ * only by `migrate:fresh`; a fixed address collides on the second run and pollutes every later file, and a
+ * DELETE deadlocks against the open locks.
+ */
+function committedTenantIdentity(string $name = 'Committed Member'): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => Str::lower(Str::random(12)).'@identity.test',
+        'password' => Hash::make('secret-password-123'),
+    ]);
+    $user->setConnection((string) config('database.default'));
+
+    return $user;
+}
+
 /** Create an active membership + assign its tenant-scoped role (requires enterTenant already called). */
 function makeActiveMember(User $user, string $roleName): void
 {

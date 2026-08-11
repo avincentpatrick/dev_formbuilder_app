@@ -6,6 +6,8 @@
 // payload stopped being the builder's. It is imported here rather than re-exported: one live import path
 // per type, so two pages cannot end up depending on two names for one shape.
 
+import type { BreadcrumbItem } from '@meridian/design-system';
+
 import type { ShareProps } from '@/components/forms/types';
 
 export type Uid = string;
@@ -157,6 +159,15 @@ export interface BuilderPageProps {
     library: LibraryItem[];
     // The canonical IANA identifier list for the Schedule modal's timezone select (Increment H12b).
     timezones: string[];
+    /**
+     * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * The builder takes the breadcrumb and NOT the tab strip (user decision, J2b) — it is a three-pane
+     * workspace on a `height: 100%` grid and a second header row costs the one screen that cannot spare it —
+     * so this trail is its only way back, which is why the hub crumb being hard-coded mattered:
+     * `can:update,form` does not imply `viewOverview`, it merely coincides with it across the shipped roles.
+     */
+    crumbs: BreadcrumbItem[];
 }
 
 // A group in the canvas: an optional owning section plus its ordered fields. `section === null` is the

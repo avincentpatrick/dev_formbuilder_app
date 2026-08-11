@@ -8,32 +8,45 @@ use App\Enums\FormStatus;
 use App\Enums\SearchEntity;
 use App\Models\Form;
 use App\Models\User;
+use App\Policies\FormPolicy;
 use App\Services\Search\SearchArm;
 use App\Services\Search\SearchArmResult;
+use App\Support\Forms\FormHubLink;
 use App\Support\Search\KeywordFilter;
 use App\Support\Search\SearchTerms;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Gate;
 
 /**
- * Forms, matched on title / description / slug (Increment J1b).
+ * Forms, matched on title / description / slug (Increment J1b; re-aimed and widened in J2d).
  *
- * ⚠️ THE VISIBILITY RULE IS `Form::scopeVisibleTo()`, WHICH IS THE POLICY'S, NOT ANALYTICS'.
- * Read that scope's docblock before changing anything here. The short version: `AnalyticsFormSet::visible()`
- * is the most search-shaped code already in the tree and is the wrong rule — it keys on `dashboard.org.view`,
- * which a **Viewer** holds while holding no `forms.*` key at all, so borrowing it would hand every Viewer the
- * title and description of every form in the tenant (including soft-deleted ones) through this arm, while
- * `/forms` correctly shows them nothing.
+ * ⚠️ THE VISIBILITY RULE IS `Form::scopeReadableBy()` AS OF J2d, AND THE CHANGE IS DELIBERATE — WITH ONE
+ * WRONG ANSWER RULED OUT FIRST. `AnalyticsFormSet::visible()` remains the wrong rule and always was: it keys
+ * on `dashboard.org.view` ALONE and carries `withTrashed()`, so borrowing it would hand a reader the title of
+ * every form in the tenant INCLUDING SOFT-DELETED ONES. `scopeReadableBy()` is not that scope — it is
+ * byte-for-byte {@see FormPolicy::viewOverview()}, both conjuncts, with no `withTrashed()`, and it is the
+ * exact question `GET /forms/{form}` asks. So every row this arm returns is a page its reader can open.
+ *
+ * ── WHY IT WIDENED (user decision, 2026-08-11) ────────────────────────────────────────────────────────────
+ * Until J2d the arm gated on `viewAny,Form` = `forms.create | forms.edit.any | forms.edit.own`, so a
+ * **Reviewer and a Viewer got no form results at all** — while J2b had opened the form hub to all five roles
+ * and J2c had given them a per-form responses list. A reader who can open a form's hub from the inbox but
+ * cannot find that form by name is the dead end this whole row exists to remove, arriving through the
+ * feature built to remove it.
+ *
+ * It discloses nothing new: both roles already read every submission of every form they can reach, and the
+ * inbox has always rendered `form_title` to them. What they gain is the DESCRIPTION as a matchable field,
+ * scoped to forms they may open.
  *
  * ── ROLE OUTCOMES, STATED SO THEY ARE A DECISION RATHER THAN AN ARTEFACT ──────────────────────────────────
- *   Owner / Admin (`forms.edit.any`)  every non-archived form
- *   Form Editor                       only forms they hold an EDITOR grant on, directly or via a scope node
- *   Reviewer                          arm REFUSED — holds no `forms.*` key, so `viewAny` is false
- *   Viewer                            arm REFUSED — same reason
+ *   Owner / Admin       every non-archived form (they hold `dashboard.org.view`)
+ *   Viewer              every non-archived form — same reason, and consistent with the hub they can open
+ *   Form Editor         only forms they hold a grant on, at ANY capacity
+ *   Reviewer            only forms they hold a grant on — the arm no longer refuses them outright
  *
- * A Reviewer or Viewer still sees form TITLES through the submissions arm, because the inbox has always
- * rendered `form_title` to them. That is pre-existing and this arm does not widen it: what they cannot do is
- * find a form by its DESCRIPTION, which no surface has ever shown them.
+ * ⚠️ ANY CAPACITY, NOT `ResourceCapacity::Editor`. A Reviewer's grant is reviewer capacity, so an
+ * editor-capacity check would refuse the single role this was widened for — the trap `scopeReadableBy()` and
+ * `viewOverview()` both record. `scopeVisibleTo()` (the AUTHORING scope) has that check, which is precisely
+ * why it is not used here.
  */
 final readonly class FormSearchArm implements SearchArm
 {
@@ -44,11 +57,24 @@ final readonly class FormSearchArm implements SearchArm
 
     public function allowed(User $user): bool
     {
-        // The same gate `/forms` uses. Deliberately NOT a new `search.*` permission: the RBAC catalog is
-        // closed at 29 keys, and a key whose audience is "every authenticated user" is the dormant-key
-        // anti-pattern this repo has already been bitten by three times. `ApiAbilities` records the same
-        // choice for `read:analytics` — map onto existing permissions rather than coining a thirtieth.
-        return Gate::forUser($user)->allows('viewAny', Form::class);
+        // The same gate the arm's DESTINATION uses — `dashboard.form.view`, `viewOverview`'s first conjunct
+        // and the class-level half of it. J2d moved this off `viewAny,Form` (the `/forms` LIST gate), which
+        // refused a Reviewer and a Viewer outright; see the class docblock for why that was a dead end.
+        //
+        // Deliberately NOT a new `search.*` permission: the RBAC catalog is closed at 29 keys, and a key
+        // whose audience is "every authenticated user" is the dormant-key anti-pattern this repo has already
+        // been bitten by three times. `ApiAbilities` records the same choice for `read:analytics` — map onto
+        // existing permissions rather than coining a thirtieth.
+        //
+        // ⚠️ ALL FIVE SHIPPED ROLES HOLD `dashboard.form.view`, so this method is now a fail-closed guard
+        // rather than a live refusal; the real narrowing is `scopeReadableBy()` in `builder()`, which is
+        // where a member with the key but no org-wide visibility and no grants gets an empty result rather
+        // than a refused arm. Labelled as one, not presented as a rule a user can observe.
+        //
+        // ⚠️ THE PERMISSION DIRECTLY, NOT A NEW POLICY METHOD. `viewOverview` is per-form by nature and there
+        // is no form here; minting a `viewOverviewAny` to wrap one `can()` would add a second place the rule
+        // is written for no reader. `scopeReadableBy()` spells the same conjunct the same way.
+        return $user->can('dashboard.form.view');
     }
 
     public function search(User $user, SearchTerms $terms, int $limit): SearchArmResult
@@ -66,7 +92,14 @@ final readonly class FormSearchArm implements SearchArm
                 // backing value rather than adding one: a display helper on an enum is a change every
                 // consumer inherits, and J1b has no second caller to justify it.
                 'subtitle' => ucfirst($form->status->value),
-                'url' => '/forms/'.$form->id.'/builder',
+                // The HUB, not the builder (J2d). `/forms/{id}/builder` is `can:update,form` → `canEdit()`,
+                // which refuses the two roles this arm was just widened for — a result they could find and
+                // not open. `path()` rather than `pathsFor()` because reachability is already proven by the
+                // scope this very query runs under: `readableBy` IS `viewOverview`, so a row cannot be
+                // returned to a reader the hub would refuse. `SearchResultReachabilityTest` GETs this exact
+                // URL as a Viewer and as a granted Reviewer — the two narrowest roles reaching this arm, and
+                // the two the builder would have 403'd.
+                'url' => FormHubLink::path($form->id),
             ])
             ->all();
 
@@ -96,10 +129,16 @@ final readonly class FormSearchArm implements SearchArm
     private function builder(User $user, SearchTerms $terms): Builder
     {
         return Form::query()
-            ->visibleTo($user)
+            ->readableBy($user)
             ->tap(fn (Builder $q) => KeywordFilter::apply($q, $terms, 'forms.search_vector'))
             // A display filter, not a visibility rule — which is why it lives here and not in the scope.
-            // It matches `/forms`, so a search result cannot offer a row the forms list refuses to show.
+            //
+            // ⚠️ ITS ORIGINAL REASON NO LONGER COVERS EVERY ROLE. It was "it matches `/forms`, so a search
+            // result cannot offer a row the forms list refuses to show" — true while the arm's audience was
+            // exactly `/forms`'s audience, and only half-true after J2d: a Reviewer and a Viewer now receive
+            // form results and cannot open `/forms` at all. The filter stays because an archived form is a
+            // put-away thing on every surface, and the hub it now links to renders one perfectly well; it is
+            // simply no longer justified by parity with a list two roles never see.
             ->where('forms.status', '!=', FormStatus::Archived->value);
     }
 }

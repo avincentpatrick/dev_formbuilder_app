@@ -17,6 +17,7 @@ use App\Services\Analytics\AnalyticsReportBuilder;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Entitlements\EntitlementService;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Forms\FormHubLink;
 use Carbon\CarbonImmutable;
 
 /**
@@ -87,7 +88,7 @@ final class DashboardMetricsService
      * failure `breakdown-bars.ts` already names for the "Other" bucket — and would advertise OCR and API
      * import, which are unbuilt, as available and unused.
      *
-     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, channels: array{rows: list<array{key: string|null, label: string, count: int}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
+     * @return array{range: array{from: string, to: string, timezone: string}, total: array{current: int, prior: int, change: float|null}, series: list<array{bucket: string, count: int}>, top_forms: array{rows: list<array{key: string|null, label: string, count: int, url: string|null}>, other: array{count: int, categories: int}|null, unassigned: int}, channels: array{rows: list<array{key: string|null, label: string, count: int, url: null}>, other: array{count: int, categories: int}|null, unassigned: int}, forms_accepting: int, drafts: array<string, mixed>}
      */
     public function trendsForUser(User $user): array
     {
@@ -135,7 +136,7 @@ final class DashboardMetricsService
             'series' => $this->analytics->series($query, $user),
             'top_forms' => [
                 ...$topForms,
-                'rows' => $this->labelFormRows($topForms['rows']),
+                'rows' => $this->labelFormRows($topForms['rows'], $user),
             ],
             // Shaped identically to `top_forms` on purpose. `Dashboard.vue` already documents why the three
             // client-side breakdown keys are named on the page rather than widened into the prop; a second,
@@ -163,10 +164,15 @@ final class DashboardMetricsService
      * submissions are still countable — and a plain lookup would return no row for it, leaving a bar with a
      * number and no name. The fallback below is for a HARD-deleted form only, which is genuinely unnamed.
      *
+     * ⚠️ AND THAT IS EXACTLY WHY `url` IS A SECOND QUESTION (Increment J2d). The `withTrashed()` lookup
+     * above names a soft-deleted form on purpose; `/forms/{form}` binds through the DEFAULT scope and 404s
+     * on it. {@see FormHubLink::pathsFor()} omits every id it will not vouch for — trashed, hard-deleted or
+     * out-of-grant alike — so a deleted form keeps its bar and its name and simply is not a link.
+     *
      * @param  list<array{key: string|null, count: int}>  $rows
-     * @return list<array{key: string|null, label: string, count: int}>
+     * @return list<array{key: string|null, label: string, count: int, url: string|null}>
      */
-    private function labelFormRows(array $rows): array
+    private function labelFormRows(array $rows, User $user): array
     {
         $ids = array_values(array_filter(array_column($rows, 'key')));
 
@@ -178,11 +184,14 @@ final class DashboardMetricsService
                 ->pluck('title', 'id')
                 ->all();
 
+        $urls = FormHubLink::pathsFor($user, $ids);
+
         return array_map(
             static fn (array $row): array => [
                 'key' => $row['key'],
                 'label' => $row['key'] === null ? 'Unassigned' : ($titles[$row['key']] ?? 'Deleted form'),
                 'count' => $row['count'],
+                'url' => $row['key'] === null ? null : ($urls[$row['key']] ?? null),
             ],
             $rows,
         );
@@ -211,8 +220,15 @@ final class DashboardMetricsService
      * The null arm is unreachable today (`breakdown()` diverts nulls into `unassigned`) and is kept for one
      * line rather than asserted away, matching `labelFormRows()`.
      *
+     * ⚠️ `url` IS EMITTED AND ALWAYS NULL, WHICH IS NOT AN OVERSIGHT (Increment J2d). A channel is a VALUE,
+     * not an entity — there is no `/sources/manual` to open — so no row here can carry a destination. The
+     * key is still present so the two bags keep the identical shape this class argues for elsewhere, and so
+     * the client's one bar builder reads both without branching. It also matters for accessibility: because
+     * no datum is linked, this chart keeps `role="img"` and its sr-only data table, while the Top-forms
+     * chart correctly loses both (`MdsBarChart` — a link inside `role="img"` would be unreachable).
+     *
      * @param  list<array{key: string|null, count: int}>  $rows
-     * @return list<array{key: string|null, label: string, count: int}>
+     * @return list<array{key: string|null, label: string, count: int, url: null}>
      */
     private function labelSourceRows(array $rows): array
     {
@@ -223,6 +239,7 @@ final class DashboardMetricsService
                     ? 'Unassigned'
                     : (SubmissionSource::tryFrom($row['key'])?->label() ?? $row['key']),
                 'count' => $row['count'],
+                'url' => null,
             ],
             $rows,
         );

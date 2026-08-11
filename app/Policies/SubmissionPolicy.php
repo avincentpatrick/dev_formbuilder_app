@@ -131,15 +131,30 @@ final class SubmissionPolicy
      * not by line number: an earlier draft said "line 99", and the same edit that closed that table's
      * fast-follow annotation moved it.)
      *
-     * ⚠️ `submissions.view` IS A CONJUNCT, and it is not redundant belt-and-braces. This is the ONLY gate on
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+     * ⚠️ THIS BLOCK USED TO OPEN "`submissions.view` IS A CONJUNCT" — AND IT IS NOT ONE. READ THE CODE BELOW.
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+     * Found by the J2d adversarial review, and it is the same species of error J2b's surviving mutation
+     * forced out of `FormPolicy`: a hypothesis written down as a measurement, then trusted by everyone who
+     * read it afterwards. `update()` returns `edit.any || (edit.own && holdsOnFormId(Editor))`. There is no
+     * `submissions.view` term anywhere in it.
+     *
+     * **THE ARGUMENT THE OLD TEXT MADE IS SOUND; ONLY ITS TENSE WAS WRONG.** This is the ONLY gate on
      * `GET /submissions/{submission}/edit`, which renders the entire stored answer document — so here the
-     * WRITE gate is also the READ gate, which is not true of {@see self::review()} (a PATCH that returns no
-     * data) that this method is otherwise shaped after. It costs nothing against the seeded roles, because
-     * every role holding either edit key already holds `submissions.view`. What it prevents is the next
-     * narrow role: a "Data Correction" role granted `submissions.edit.any` WITHOUT `dashboard.org.view`
-     * would otherwise gain a tenant-wide read of every answer on every form, reachable only by typing the
-     * edit URL — the inbox would list nothing and `/submissions/{id}` would 403, so the leak would be
-     * through the one door nobody thought to test.
+     * WRITE gate is also the READ gate, unlike {@see self::review()} (a PATCH that returns no data) which
+     * this method is otherwise shaped after. A future narrow role — a "Data Correction" role granted
+     * `submissions.edit.any` WITHOUT `submissions.view` — would today gain a tenant-wide read of every
+     * answer on every form, reachable only by typing the edit URL: the inbox would list nothing and
+     * `/submissions/{id}` would 403, so the leak would be through the one door nobody thought to test.
+     *
+     * **NO SHIPPED ROLE CAN REACH IT** — all five hold `submissions.view` — so this is a latent gap, not a
+     * live one, which is why J2d recorded it instead of silently closing it: adding the conjunct is an
+     * authorization NARROWING and belongs to the user, not to a link-sweep increment.
+     *
+     * The code's ACTUAL behaviour is now pinned rather than assumed:
+     * `CrumbTrailGateTest`'s "withholds the submission crumb from a member who may edit answers but not read
+     * the row" builds exactly that synthetic actor and demonstrates they pass this gate. If the conjunct is
+     * ever added, that case is the one that will redden and say so.
      *
      * ⚠️ WHICH STATUSES MAY BE EDITED IS **NOT** DECIDED HERE. This answers "may this user edit at all"; the
      * legal source states live in {@see SubmissionAnswerEditService}, the same split

@@ -291,6 +291,32 @@ function submitRestore(): void {
             </template>
             <template #row-actions="{ row }">
                 <div class="forms__actions">
+                    <!-- J2d (user decision, 2026-08-11) — the one-click way back into the builder. J2b
+                         repointed this row's TITLE at the form hub, which was right (the hub is readable by
+                         all five roles while the builder is not), but it left an editor two clicks from the
+                         page they spend their day in: title → hub → Builder tab.
+
+                         ⚠️ THIS IS AN ADDITION BESIDE THE `edit` ICON, NEVER A REPLACEMENT FOR IT. That icon
+                         is *Rename form*, and its modal is the ONLY call site of `PATCH /forms/{form}` in
+                         the entire client — "tidying" the two together would delete the only way to rename a
+                         form anywhere in the product.
+
+                         ⚠️ `layout`, NOT `edit`, AND THE MISMATCH WITH THE TAB STRIP IS THE LESSER EVIL.
+                         `FormTabSet` gives the Builder tab `edit`, so matching it would have been the
+                         obvious choice — and it would have put TWO identical glyphs in this row with
+                         different labels and different destinations, which is worse than one glyph differing
+                         across two surfaces. The icon set has no `pencil` to separate them with. `layout`
+                         also reads as the three-pane canvas it opens.
+
+                         `v-if="row.can.edit"` is the builder route's own `can:update,form`, so a non-editor
+                         is offered nothing rather than an action that 403s. -->
+                    <MdsIconButton
+                        v-if="row.can.edit"
+                        icon="layout"
+                        label="Open builder"
+                        size="sm"
+                        @click="router.visit(`/forms/${row.id}/builder`)"
+                    />
                     <!-- I10c — the per-form statistics page (PRD #4's Form Owner/Editor view). `chart-bar`
                          matches the Analytics nav glyph deliberately: the association is the point, and the
                          glyph-uniqueness rule applies to the sidebar, not to row actions. -->

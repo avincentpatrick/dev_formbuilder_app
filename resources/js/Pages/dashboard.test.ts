@@ -24,7 +24,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     pageProps: {
-        auth: { user: { name: 'Demo Owner' }, can: { manageForms: true, viewAnalytics: false } },
+        auth: {
+            user: { name: 'Demo Owner' },
+            // J2d — one ability per tile DESTINATION. `/dashboard` is ungated while `/forms` and
+            // `/members` are not, so a tile that links unconditionally is a 403 for the roles that can
+            // reach this page and not that one.
+            can: { manageForms: true, viewAnalytics: false, manageMembers: true, viewSubmissions: true },
+        },
         entitlements: { features: { advanced_analytics: false } },
     },
     visit: vi.fn(),
@@ -61,7 +67,11 @@ function trends(overrides: Record<string, unknown> = {}) {
             bucket: `2026-07-${String(5 + i).padStart(2, '0')}`.replace(/-(3[2-9]|4\d)$/, '-30'),
             count: 0,
         })),
-        top_forms: { rows: [{ key: 'f1', label: 'Clinic Intake', count: 9 }], other: null, unassigned: 0 },
+        top_forms: {
+            rows: [{ key: 'f1', label: 'Clinic Intake', count: 9, url: '/forms/f1' }],
+            other: null,
+            unassigned: 0,
+        },
         channels: { rows: [{ key: 'guest', label: 'Guest link', count: 9 }], other: null, unassigned: 0 },
         forms_accepting: 5,
         drafts: {
@@ -231,8 +241,11 @@ describe('Dashboard — the breakdown', () => {
         const wrapper = render({
             top_forms: {
                 rows: [
-                    { key: 'f1', label: 'Clinic Intake', count: 9 },
-                    { key: 'f2', label: 'Household Roster', count: 4 },
+                    { key: 'f1', label: 'Clinic Intake', count: 9, url: '/forms/f1' },
+                    // ⚠️ NO URL: a soft-deleted form still earns a NAMED bar (the presenter resolves its
+                    // title with `withTrashed()` on purpose) and must not be a link, because
+                    // `/forms/{form}` binds through the default scope and 404s on it.
+                    { key: 'f2', label: 'Household Roster', count: 4, url: null },
                 ],
                 other: { count: 7, categories: 3 },
                 unassigned: 2,
@@ -265,6 +278,95 @@ describe('Dashboard — the breakdown', () => {
 
         expect(forms.find('.mds-bar__plot').exists()).toBe(false);
         expect(forms.text()).toContain('No responses in this period');
+        wrapper.unmount();
+    });
+
+    it('links a top-forms bar to its hub, and leaves a deleted form’s bar inert', () => {
+        /*
+         * ⚠️ THE MIXED FIXTURE IS THE TEST. A one-row fixture cannot tell "every bar is linked" from "the
+         * right bars are linked", and an always-link mutation (`href: '/forms/' + key`) would pass it. The
+         * second row carries `url: null` — the soft-deleted case — so exactly one link is correct.
+         *
+         * The aggregate buckets are inert by construction rather than by a special case: neither
+         * `unassigned` nor `other` is built from a row, so neither can carry a url.
+         */
+        const wrapper = render({
+            top_forms: {
+                rows: [
+                    { key: 'f1', label: 'Clinic Intake', count: 9, url: '/forms/f1' },
+                    { key: 'f2', label: 'Household Roster', count: 4, url: null },
+                ],
+                other: { count: 7, categories: 3 },
+                unassigned: 2,
+            },
+        });
+
+        const forms = card(wrapper, 'Top forms');
+        const links = forms.findAll('a');
+
+        expect(links).toHaveLength(1);
+        expect(links[0]?.attributes('href')).toBe('/forms/f1');
+        // Every bar still NAMES its form, linked or not — the plot must not go quiet for a deleted one.
+        expect(forms.findAll('.mds-bar__label').map((n) => n.text())).toEqual([
+            'Clinic Intake',
+            'Household Roster',
+            'Unassigned',
+            'Other (3 forms)',
+        ]);
+
+        wrapper.unmount();
+    });
+});
+
+describe('Dashboard — the KPI tiles link, but only where the reader may go (J2d)', () => {
+    it('links the three list tiles for a reader holding every ability', () => {
+        const wrapper = render();
+        const hrefs = wrapper
+            .findAll('.dash__stats a')
+            .map((a) => a.attributes('href'));
+
+        expect(hrefs).toEqual(['/forms', '/submissions', '/members']);
+        wrapper.unmount();
+    });
+
+    it('leaves the Forms and Members tiles inert for a reader the destinations refuse', () => {
+        /*
+         * ⚠️ THIS IS J2c's DEFECT IN ITS OTHER TWO HOMES. `/dashboard` carries no gate, so every role
+         * reaches this page; `/forms` is `can:viewAny,Form` (a Reviewer and a Viewer hold none of its three
+         * keys) and `/members` is `can:tenant.members.invite` (Owner/Admin only) — while the Members TILE
+         * renders for anyone with `dashboard.org.view`, which a Viewer has. Unconditional hrefs would hand
+         * both roles a bare 403.
+         */
+        // ⚠️ `try/finally`, BECAUSE `mocks.pageProps` IS HOISTED AND SHARED. Restoring after the assertion
+        // means a FAILING assertion leaks `manageForms: false` into every later test in this file — one
+        // failure becomes a cascade whose messages point at the wrong cases.
+        mocks.pageProps.auth.can.manageForms = false;
+        mocks.pageProps.auth.can.manageMembers = false;
+
+        try {
+            const wrapper = render();
+            const hrefs = wrapper
+                .findAll('.dash__stats a')
+                .map((a) => a.attributes('href'));
+
+            expect(hrefs).toEqual(['/submissions']);
+            wrapper.unmount();
+        } finally {
+            mocks.pageProps.auth.can.manageForms = true;
+            mocks.pageProps.auth.can.manageMembers = true;
+        }
+    });
+
+    it('never links the Accepting-responses tile, whose number no list can reproduce', () => {
+        // It counts published AND in-window AND under-cap forms; `/forms` has no filter for that set, so a
+        // link would land the reader on a list whose length disagrees with the number they clicked.
+        const wrapper = render();
+        const hrefs = wrapper
+            .findAll('.dash__stats a')
+            .map((a) => a.attributes('href'));
+
+        expect(hrefs).not.toContain('/forms?accepting=1');
+        expect(wrapper.findAll('.dash__stats a')).toHaveLength(3);
         wrapper.unmount();
     });
 });

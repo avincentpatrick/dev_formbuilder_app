@@ -64,7 +64,11 @@ it('renders every prop the page binds to, key by key', function (): void {
         // Resolved server-side: only the server knows whether the target still exists, and half the
         // aliases have no addressable page at all.
         ->where('data.0.target.label', 'Clinic Intake')
-        ->where('data.0.target.url', '/forms')
+        // J2d — the FORM'S OWN HUB, not the forms index. The old value was `/forms`, justified by a comment
+        // saying `/forms/{form}` was the builder; J2b made `/forms/{form}` the hub, gated on `viewOverview`,
+        // which every reader of this ledger (Owner/Admin only) holds. A soft-deleted target keeps its label
+        // and loses its url — `AuditLogPresenter` resolves the two with separate queries for that reason.
+        ->where('data.0.target.url', '/forms/'.$form->id)
         ->where('data.0.changes.0.key', 'title')
         ->where('data.0.changes.0.new', 'Clinic Intake')
         ->where('data.0.changes.0.redacted', false)

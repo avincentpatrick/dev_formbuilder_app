@@ -24,8 +24,9 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ visit: vi.fn(), post: vi.fn() }));
 
 vi.mock('@inertiajs/vue3', () => ({
-    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
-    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    // ⚠️ RETAINED, THOUGH THE CRUMB NO LONGER READS IT. J2d moved the trail server-side and deleted
+    // `formsCrumb()`; this mock stays only because `usePage()` is still resolved elsewhere in the
+    // page's tree, and removing an Inertia mock key is how a fresh, unrelated failure appears.
     usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
@@ -77,6 +78,7 @@ type Props = {
     versions: Array<{ id: string; version_number: number; status: string; published_at: string | null }>;
     recent: Array<{ id: string; status: string; source_label: string; submitted_at: string | null }>;
     tabs: Tab[];
+    crumbs: { label: string; href?: string }[];
     can: { edit: boolean; publish: boolean; encode: boolean; template: boolean };
     share?: Record<string, unknown>;
 };
@@ -135,6 +137,8 @@ function props(overrides: Partial<Props> = {}): Props {
             { id: 'sub-2', status: 'approved', source_label: 'Manual entry', submitted_at: '2026-08-09T10:00:00+00:00' },
         ],
         tabs: OWNER_TABS,
+        // J2d — server-resolved by `CrumbTrail`. The hub's trail is two crumbs: the root and this page.
+        crumbs: [{ label: 'Forms', href: '/forms' }, { label: 'Clinic Intake' }],
         can: { edit: true, publish: true, encode: true, template: true },
         share: SHARE,
         ...overrides,
@@ -149,6 +153,8 @@ function render(overrides: Partial<Props> = {}): VueWrapper {
 function readerProps(overrides: Partial<Props> = {}): Partial<Props> {
     return {
         tabs: VIEWER_TABS,
+        // A Viewer holds no `forms.*` key, so `/forms` 403s for them and the root crumb loses its href.
+        crumbs: [{ label: 'Forms' }, { label: 'Clinic Intake' }],
         can: { edit: false, publish: false, encode: false, template: false },
         share: undefined,
         ...overrides,

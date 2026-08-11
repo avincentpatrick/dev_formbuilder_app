@@ -42,7 +42,6 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 import ShareModal from '@/components/forms/ShareModal.vue';
 import type { ShareProps } from '@/components/forms/types';
 
@@ -90,6 +89,15 @@ const props = defineProps<{
     versions: VersionRow[];
     recent: RecentRow[];
     tabs: TabNavItem[];
+    /**
+     * The breadcrumb trail, resolved SERVER-SIDE (Increment J2d).
+     *
+     * Every crumb's href is decided by `CrumbTrail` against the gate its own route carries, so this page
+     * renders the trail and synthesises nothing. The previous client `computed` hard-coded `/forms/{id}`
+     * on five pages, where no Pest test can reach it — which is how J2c shipped a `/forms` crumb that 403s
+     * for a Reviewer and a Viewer. Do not reintroduce a locally-built crumb here.
+     */
+    crumbs: BreadcrumbItem[];
     can: { edit: boolean; publish: boolean; encode: boolean; template: boolean };
     /**
      * ABSENT, not empty, for a reader without `update` — the presenter omits the key entirely because it
@@ -148,14 +156,6 @@ const versionLabel = computed(() => {
 
     return '—';
 });
-
-// ── Navigation ───────────────────────────────────────────────────────────────────────────────────────────
-const crumbs = computed<BreadcrumbItem[]>(() => [
-    formsCrumb(),
-    // No href: this IS the form's page. `MdsBreadcrumb` would render the last crumb as text regardless, but
-    // passing one would still be a claim that there is somewhere else to go.
-    { label: props.form.title },
-]);
 
 /**
  * The Responses destination, taken from the tab set rather than rebuilt here.

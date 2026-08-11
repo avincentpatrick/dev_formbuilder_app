@@ -83,8 +83,8 @@ function report(overrides: Partial<Report> = {}): Report {
         breakdown: {
             axis: 'form',
             rows: [
-                { key: 'f1', label: 'Community Health Survey', count: 9 },
-                { key: 'f2', label: 'Household Roster', count: 6 },
+                { key: 'f1', label: 'Community Health Survey', count: 9, url: '/forms/f1' },
+                { key: 'f2', label: 'Household Roster', count: 6, url: '/forms/f2' },
             ],
             other: null,
             unassigned: 0,
@@ -107,7 +107,7 @@ function report(overrides: Partial<Report> = {}): Report {
 
 function filters(): FilterOptions {
     return {
-        forms: [{ value: 'f1', label: 'Community Health Survey' }],
+        forms: [{ value: 'f1', label: 'Community Health Survey', url: '/forms/f1' }],
         scope_nodes: [{ value: 'n1', label: 'Luzon', depth: 0, is_active: true }],
         locales: [
             { value: 'en', label: 'en' },
@@ -167,11 +167,49 @@ describe('Analytics — the §D12 data tables (axe cannot see these)', () => {
         wrapper.unmount();
     });
 
-    it('pairs the breakdown chart with a table of every category', () => {
+    it('pairs the breakdown chart with a table of every category on a NON-linkable axis', () => {
+        // A `source` axis names values, not entities, so no bar carries an href and `MdsBarChart` keeps
+        // `role="img"` AND its own sr-only table. This is the half of §D12 that survives J2d unchanged.
+        const wrapper = render({
+            report: report({
+                breakdown: {
+                    axis: 'source',
+                    rows: [
+                        { key: 'guest', label: 'Guest link', count: 9, url: null },
+                        { key: 'manual', label: 'Manual entry', count: 3, url: null },
+                    ],
+                    other: null,
+                    unassigned: 0,
+                    unassigned_label: 'Unassigned',
+                    has_unassigned_bucket: true,
+                },
+            }),
+        });
+
+        expect(wrapper.findAll('.mds-bar__table tbody tr')).toHaveLength(2);
+        expect(wrapper.find('.mds-table').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('drops the chart’s own table on the FORM axis, where the bars become links', () => {
+        /*
+         * ⚠️ THIS ASSERTION WAS INVERTED BY J2d, AND THE INVERSION IS CORRECT RATHER THAN A LOSS.
+         * `role="img"` is a LEAF: every descendant leaves the accessibility tree, so a link inside the plot
+         * would be unreachable, not merely unlabelled. `MdsBarChart` therefore drops `role="img"` the moment
+         * any datum is linked — and with it the sr-only data table, which would otherwise make a screen
+         * reader announce the whole dataset twice (the plot is now traversable).
+         *
+         * §D12's "nothing is hidden" still holds on this page, and that is what the third assertion pins:
+         * the paired `MdsDataTable` is unconditional here and carries every category regardless.
+         */
         const wrapper = render();
 
-        // The chart's own table, plus the page's fuller MdsDataTable.
-        expect(wrapper.findAll('.mds-bar__table tbody tr')).toHaveLength(2);
+        expect(wrapper.findAll('a.mds-bar__label--link').map((a) => a.attributes('href'))).toEqual([
+            '/forms/f1',
+            '/forms/f2',
+        ]);
+        expect(wrapper.find('.mds-bar__table').exists()).toBe(false);
+        expect(wrapper.find('.mds-bar__summary').exists()).toBe(true);
         expect(wrapper.find('.mds-table').exists()).toBe(true);
         wrapper.unmount();
     });
@@ -181,7 +219,7 @@ describe('Analytics — the §D12 data tables (axe cannot see these)', () => {
             report: report({
                 breakdown: {
                     axis: 'form',
-                    rows: [{ key: 'f1', label: 'Community Health Survey', count: 9 }],
+                    rows: [{ key: 'f1', label: 'Community Health Survey', count: 9, url: '/forms/f1' }],
                     other: { count: 3, categories: 2 },
                     unassigned: 0,
                     unassigned_label: 'Unassigned',
@@ -200,7 +238,7 @@ describe('Analytics — the §D12 data tables (axe cannot see these)', () => {
             report: report({
                 breakdown: {
                     axis: 'locale',
-                    rows: [{ key: 'en', label: 'en', count: 9 }],
+                    rows: [{ key: 'en', label: 'en', count: 9, url: null }],
                     other: null,
                     unassigned: 0,
                     unassigned_label: 'Not recorded',

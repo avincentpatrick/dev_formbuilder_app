@@ -12,8 +12,9 @@ import type { FormReport } from '@/components/analytics/types';
  */
 
 vi.mock('@inertiajs/vue3', () => ({
-    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
-    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    // ⚠️ RETAINED, THOUGH THE CRUMB NO LONGER READS IT. J2d moved the trail server-side and deleted
+    // `formsCrumb()`; this mock stays only because `usePage()` is still resolved elsewhere in the
+    // page's tree, and removing an Inertia mock key is how a fresh, unrelated failure appears.
     usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a :href="$attrs.href"><slot /></a>' },
@@ -74,7 +75,12 @@ function render(overrides: Partial<FormReport> = {}): VueWrapper {
             // The form's tab strip (J2b), resolved server-side by `FormTabSet`. A full four-tab set rather
             // than an empty one so the strip actually renders here: `MdsTabNav` renders nothing at all for
             // an empty list, which would make every assertion about it vacuously true.
-            tabs: [
+            crumbs: [
+        { label: 'Forms', href: '/forms' },
+        { label: 'Clinic Intake', href: '/forms/f1' },
+        { label: 'Response statistics' },
+    ],
+    tabs: [
                 { key: 'overview', label: 'Overview', href: '/forms/f1', icon: 'forms' as const },
                 { key: 'submissions', label: 'Responses', href: '/forms/f1/submissions', icon: 'submissions' as const },
                 { key: 'builder', label: 'Builder', href: '/forms/f1/builder', icon: 'edit' as const },

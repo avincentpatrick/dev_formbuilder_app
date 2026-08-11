@@ -16,9 +16,15 @@ use App\Support\Search\SearchTerms;
  *
  * The only arm with no database query at all: its corpus is {@see DestinationCatalog}'s authored rows,
  * matched in PHP. That is why `allowed()` is unconditionally true — every authenticated tenant user can
- * reach Dashboard, Settings and Notifications, so refusing the arm would be a lie. **The ROWS are what get
- * filtered**, and a row the user cannot reach is absent, which satisfies the same disclosure rule the
- * query-backed arms follow.
+ * reach **Dashboard and Settings**, so refusing the arm would be a lie. **The ROWS are what get filtered**,
+ * and a row the user cannot reach is absent, which satisfies the same disclosure rule the query-backed arms
+ * follow.
+ *
+ * ⚠️ THAT SENTENCE USED TO NAME A THIRD PAGE — "Dashboard, Settings and Notifications" — AND IT WAS FALSE.
+ * `/notifications` is a JSON endpoint with no Inertia page at all, so the row backing the claim was itself
+ * the defect J2d removed (see {@see DestinationCatalog}). `allowed(): true` stays correct on the surviving
+ * two, but the justification is corrected rather than left standing on a row that no longer exists: a
+ * docblock arguing from a deleted premise is how the next author reintroduces it.
  *
  * ⚠️ `count()` AND `search()` SHARE `matched()` FOR THE SAME REASON THE OTHER ARMS SHARE A BUILDER. There
  * is no database here, so the count could trivially have been `count(self::ROWS)` — and that would report

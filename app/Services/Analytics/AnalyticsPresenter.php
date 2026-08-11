@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEndpointPresenter;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Forms\FormHubLink;
 use Carbon\CarbonInterface;
 use DateTimeZone;
 use Illuminate\Support\Collection;
@@ -327,7 +328,7 @@ final class AnalyticsPresenter
      * for a reason the user cannot see. A soft-deleted form is legitimately here (its submissions stay
      * countable for a grant-holder) and says so.
      *
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, url: string|null}>
      */
     private function formOptions(User $user): array
     {
@@ -337,9 +338,15 @@ final class AnalyticsPresenter
             ->orderBy('title')
             ->get(['id', 'title', 'deleted_at']);
 
+        // The reachable subset (J2d). `withTrashed()` above is what lets a shared link's archived form keep a
+        // REMOVABLE chip; `pathsFor()` is the separate question of whether that chip can be a LINK, and it
+        // omits every trashed id — so an archived option keeps its "(archived)" label and no destination.
+        $urls = FormHubLink::pathsFor($user, $forms->pluck('id')->map(fn ($id): string => (string) $id)->all());
+
         return array_values($forms->map(fn (Form $form): array => [
             'value' => (string) $form->id,
             'label' => $form->trashed() ? $form->title.' (archived)' : $form->title,
+            'url' => $urls[(string) $form->id] ?? null,
         ])->all());
     }
 

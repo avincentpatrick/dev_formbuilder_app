@@ -16,8 +16,8 @@ import { describe, expect, it, vi } from 'vitest';
  */
 
 vi.mock('@inertiajs/vue3', () => ({
-    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
-    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    // J2d — the trail is a SERVER prop now, so no ability mock decides it. `usePage` stays because other
+    // parts of this page read it.
     usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a><slot /></a>' },
@@ -97,6 +97,12 @@ function mountAt(status: string, canReview = true, canUpdate = true) {
             blocks: [],
             can: { review: canReview, update: canUpdate },
             pdf: null,
+            crumbs: [
+                { label: 'Forms', href: '/forms' },
+                { label: 'Survey', href: '/forms/f1' },
+                { label: 'Responses', href: '/forms/f1/submissions' },
+                { label: 'Response' },
+            ],
         },
         global: {
             stubs: {
@@ -194,25 +200,83 @@ describe('Show.vue — the edit-answers gate (I9c)', () => {
     });
 });
 
-describe('the way back (Increment J2c)', () => {
-    it('leads to the form, and to that form’s own responses, not just to the global inbox', () => {
-        // ⚠️ THE DEAD END THIS PAGE USED TO BE. Its only navigation was `← Back to submissions`, pointing at
-        // the global inbox — so a reviewer who arrived from one form could not return to it, while the h1
-        // above printed that form's TITLE as unlinked text. `FormHubController`'s docblock names this as one
-        // of the three dead ends the hub was built to end.
-        //
-        // Four crumbs because the page genuinely is four deep, and `MdsBreadcrumb` renders the LAST as text
-        // whatever it carries — so ending at "Responses" would print the per-form list's name unreachable,
-        // which is the same defect one level down.
+describe('the way back (Increment J2c; server-resolved in J2d)', () => {
+    it('renders the server’s trail verbatim and synthesises nothing', () => {
+        /*
+         * ⚠️ THE DEAD END THIS PAGE USED TO BE. Its only navigation was `← Back to submissions`, pointing at
+         * the global inbox — so a reviewer who arrived from one form could not return to it.
+         *
+         * ⚠️ AND THIS ASSERTION CHANGED SHAPE IN J2d, DELIBERATELY. It used to spell the four expected
+         * crumbs out, which pinned a trail the CLIENT built. The trail now comes from `CrumbTrail`, and the
+         * only thing worth asserting here is that the page passes it through untouched — because the two
+         * defects J2d fixed (a hub crumb that 403s for a respondent, and one that 404s for a soft-deleted
+         * form) are decidable only on the server, and `CrumbTrailGateTest` is where they are pinned.
+         *
+         * A pass-through assertion is what would catch this page reintroducing a locally-built crumb.
+         */
         const wrapper = mountAt('submitted');
-        const crumbs = wrapper.findComponent({ name: 'Breadcrumb' });
-
-        expect(crumbs.props('items')).toEqual([
+        const items = [
             { label: 'Forms', href: '/forms' },
             { label: 'Survey', href: '/forms/f1' },
             { label: 'Responses', href: '/forms/f1/submissions' },
             { label: 'Response' },
-        ]);
+        ];
+
+        expect(wrapper.findComponent({ name: 'Breadcrumb' }).props('items')).toEqual(items);
+
+        wrapper.unmount();
+    });
+
+    it('renders an href-less middle crumb as text, so a refused destination is not a link', () => {
+        /*
+         * The server's refusal reaching the DOM. `CrumbTrail` omits the `href` key on a crumb the reader
+         * cannot open; `MdsBreadcrumb` renders that as a span. Without this case, a page that quietly
+         * defaulted a missing href back to `/forms/${form_id}` would still pass the pass-through assertion
+         * above, because the prop it received would be unchanged.
+         */
+        const wrapper = mount(Show, {
+            props: {
+                submission: {
+                    id: 's1',
+                    form_id: 'f1',
+                    form_title: '—',
+                    version_number: 1,
+                    status: 'submitted',
+                    status_label: 'submitted',
+                    source: 'guest',
+                    source_label: 'Guest',
+                    respondent: 'Anonymous',
+                    locale: null,
+                    submitted_at: null,
+                    finalized_at: null,
+                    review: { validator: null, validated_at: null, returned_reason: null, remarks: null },
+                },
+                blocks: [],
+                can: { review: true, update: true },
+                pdf: null,
+                crumbs: [
+                    { label: 'Forms', href: '/forms' },
+                    { label: '—' },
+                    { label: 'Responses' },
+                    { label: 'Response' },
+                ],
+            },
+            global: {
+                stubs: {
+                    MdsBadge: true,
+                    MdsCard: { template: '<div><slot name="header" /><slot /></div>' },
+                    MdsFormField: { template: '<div><slot /></div>' },
+                    MdsModal: { template: '<div><slot /></div>' },
+                    MdsTextarea: true,
+                },
+            },
+        });
+
+        const trail = wrapper.findComponent({ name: 'Breadcrumb' });
+
+        // Exactly one link in the trail: the root. The two middle crumbs are text, and the tail always is.
+        expect(trail.findAll('a')).toHaveLength(1);
+        expect(trail.text()).toContain('—');
 
         wrapper.unmount();
     });

@@ -48,8 +48,19 @@ final readonly class DestinationCatalog
         ['key' => 'webhooks', 'label' => 'Webhooks', 'url' => '/webhooks', 'keywords' => 'callbacks http endpoints deliveries zapier', 'ability' => 'manageWebhooks', 'feature' => 'webhooks'],
         ['key' => 'integrations', 'label' => 'Integrations', 'url' => '/integrations', 'keywords' => 'connectors sheets airtable slack google', 'ability' => 'manageIntegrations', 'feature' => 'native_connectors'],
         ['key' => 'domains', 'label' => 'Domains', 'url' => '/domains', 'keywords' => 'dns hostname cname custom url', 'ability' => 'manageDomains', 'feature' => 'custom_domain'],
-        ['key' => 'settings', 'label' => 'Settings', 'url' => '/settings', 'keywords' => 'preferences workspace configuration options', 'ability' => null, 'feature' => null],
-        ['key' => 'notifications', 'label' => 'Notifications', 'url' => '/notifications', 'keywords' => 'alerts bell activity', 'ability' => null, 'feature' => null],
+        // ⚠️ THE NOTIFICATION KEYWORDS RIDE HERE, AND THE `notifications` ROW IS GONE (Increment J2d).
+        // It offered `/notifications`, which is `NotificationController::index(): JsonResponse` — the route
+        // block says so outright ("a BELL, not a page … ALL THREE ROUTES ARE JSON") and there is no
+        // `resources/js/Pages/notifications/` to render. Both consumers hand a catalog url straight to the
+        // Inertia router (`CommandPalette.vue` `router.visit()`, `search/Index.vue` `<Link :href>`), so the
+        // row hard-navigated the user onto raw JSON — a live defect J1c shipped, invisible to the only test
+        // covering this file because that test asserts `toStartWith('/')` and never issues a request.
+        //
+        // The keywords move rather than die: `/settings` genuinely hosts notification preferences
+        // (`PATCH /settings/notifications`), so someone typing "notifications" lands where they can act. The
+        // bell itself is a shell affordance with no URL, and a catalog of URLs cannot honestly offer it.
+        // `DestinationReachabilityTest` now drives every row and would redden if the row came back.
+        ['key' => 'settings', 'label' => 'Settings', 'url' => '/settings', 'keywords' => 'preferences workspace configuration options notifications alerts bell activity', 'ability' => null, 'feature' => null],
     ];
 
     public function __construct(private EntitlementService $entitlements) {}

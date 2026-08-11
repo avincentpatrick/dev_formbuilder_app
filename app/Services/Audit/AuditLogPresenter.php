@@ -14,6 +14,7 @@ use App\Support\Audit\AuditableTypes;
 use App\Support\Audit\AuditDiff;
 use App\Support\Audit\AuditFilterQuery;
 use App\Support\Audit\AuditLogger;
+use App\Support\Forms\FormHubLink;
 use App\Support\Search\ListEmptyReason;
 use App\Support\Search\SearchTerms;
 use Carbon\CarbonInterface;
@@ -73,7 +74,7 @@ final class AuditLogPresenter
         /** @var Collection<int, Audit> $items */
         $items = collect($paginator->items());
 
-        $targets = $this->resolveTargets($items);
+        $targets = $this->resolveTargets($items, $user);
 
         return [
             'data' => $items->map(fn (Audit $a): array => [
@@ -213,10 +214,21 @@ final class AuditLogPresenter
      * deliberate and matches the H24b1 precedent: a soft-deleted form otherwise renders as a bare uuid on
      * the very row recording that it was archived.
      *
+     * ⚠️ TWO QUERIES, AND THE SPLIT IS THE WHOLE POINT (Increment J2d). The `withTrashed()` query above
+     * answers **what is this row's target CALLED**; {@see FormHubLink::pathsFor()} answers **can this reader
+     * open it**, which excludes trashed rows because `/forms/{form}` binds through the default scope.
+     *
+     * ⚠️ THE ROWS THAT PAYOFF NAMES ARE NOT `form.archived`, AND SAYING SO WAS A MISTAKE THIS COMMENT USED
+     * TO MAKE. `FormService::archive()` sets `status` and `archived_at` and never calls `delete()`, while
+     * neither `scopeReadableBy()` nor `viewOverview()` reads status — so an archived form's hub resolves 200
+     * and its ledger row links correctly either way. The split protects SOFT-DELETED targets, which no
+     * product path produces today (there is no delete route for a form): a fail-closed guard for the feature
+     * that adds one, not a live fix. Labelled as such rather than left reading like a shipped bug.
+     *
      * @param  Collection<int, Audit>  $items
      * @return array<string, array{label: string, url: ?string}>
      */
-    private function resolveTargets(Collection $items): array
+    private function resolveTargets(Collection $items, User $reader): array
     {
         $formIds = $items
             ->where('auditable_type', 'form')
@@ -230,13 +242,22 @@ final class AuditLogPresenter
 
         $resolved = [];
 
+        // The reachable subset — absent for a trashed form, so `?? null` below is the whole guard.
+        $urls = FormHubLink::pathsFor($reader, $formIds);
+
         foreach (Form::withTrashed()->whereIn('id', $formIds)->get(['id', 'title']) as $form) {
             $resolved['form:'.$form->getKey()] = [
                 'label' => $form->title,
-                // The forms index, not a detail route: /forms/{form} is the BUILDER, which a viewer of the
-                // ledger may hold no capacity on. Linking somewhere they will bounce off is worse than not
-                // linking.
-                'url' => '/forms',
+                // The FORM'S OWN HUB (J2d), replacing a hard-coded `/forms`.
+                //
+                // ⚠️ THE COMMENT THAT STOOD HERE WAS TRUE WHEN WRITTEN AND FALSE BY THE TIME IT WAS READ. It
+                // said "/forms/{form} is the BUILDER, which a viewer of the ledger may hold no capacity on"
+                // — J2b moved the builder to `/forms/{form}/builder` and made `/forms/{form}` the hub,
+                // gated on `viewOverview`, which every reader of this ledger holds (`/audit-log` is
+                // `audit_log.view` = Owner/Admin, and both hold `dashboard.org.view`). The argument for
+                // `/forms` had quietly stopped applying, which is the whole reason this row was on J2d's
+                // list: a stale rationale reads exactly like a live one.
+                'url' => $urls[$form->getKey()] ?? null,
             ];
         }
 

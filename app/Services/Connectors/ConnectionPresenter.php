@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEndpointPresenter;
+use App\Support\Forms\FormHubLink;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -65,11 +66,15 @@ final class ConnectionPresenter
 
         $rules = $connections->flatMap(fn (Connection $c): Collection => $c->subscriptions);
 
+        // The reachable subset for THIS reader, resolved ONCE for the page (J2d) — see the note on
+        // `ruleRow()` for why this is server-resolved rather than inferred from `form_title` on the client.
+        $formUrls = FormHubLink::pathsFor($user, $rules->pluck('form_id')->filter()->values()->all());
+
         return [
             'providers' => $this->providerCatalog($connections),
             'connections' => $connections->map(fn (Connection $c): array => [
                 ...$this->connectionRow($c, $user),
-                'rules' => $c->subscriptions->map(fn (ConnectionSubscription $s): array => $this->ruleRow($s))->all(),
+                'rules' => $c->subscriptions->map(fn (ConnectionSubscription $s): array => $this->ruleRow($s, $formUrls))->all(),
             ])->all(),
             'summary' => [
                 'rules' => [
@@ -115,7 +120,7 @@ final class ConnectionPresenter
 
         return [
             'connection' => $connection instanceof Connection ? $this->connectionRow($connection, $user) : null,
-            'rule' => $this->ruleDetail($rule),
+            'rule' => $this->ruleDetail($rule, $user),
             'deliveries' => [
                 'data' => $items->map(fn (WebhookDelivery $d): array => $this->deliveryRow($d))->all(),
                 'meta' => [
@@ -218,9 +223,10 @@ final class ConnectionPresenter
      * A list-row projection of a delivery rule. `config` is projected into an explicit destination pair rather
      * than shipped whole, so a later key in that blob cannot leak to the client by default.
      *
+     * @param  array<string, string>  $formUrls  id => hub path, for the ids this reader may open
      * @return array<string, mixed>
      */
-    private function ruleRow(ConnectionSubscription $rule): array
+    private function ruleRow(ConnectionSubscription $rule, array $formUrls = []): array
     {
         $config = $rule->config;
 
@@ -231,6 +237,10 @@ final class ConnectionPresenter
             'event_types' => $rule->event_types,
             'form_id' => $rule->form_id,
             'form_title' => $this->formTitle($rule),
+            // ⚠️ SERVER-RESOLVED, NOT INFERRED FROM `form_title === null` ON THE CLIENT (Increment J2d) —
+            // the twin of the note in `WebhookEndpointPresenter::row()`, and it exists twice because the
+            // tempting shortcut exists twice. An absent key means "no link", never "no form".
+            'form_url' => $rule->form_id === null ? null : ($formUrls[$rule->form_id] ?? null),
             'channel_id' => is_string($config['channel_id'] ?? null) ? $config['channel_id'] : null,
             'channel_name' => is_string($config['channel_name'] ?? null) ? $config['channel_name'] : null,
             'status' => $rule->status->value,
@@ -244,10 +254,10 @@ final class ConnectionPresenter
     /**
      * @return array<string, mixed>
      */
-    private function ruleDetail(ConnectionSubscription $rule): array
+    private function ruleDetail(ConnectionSubscription $rule, User $user): array
     {
         return [
-            ...$this->ruleRow($rule),
+            ...$this->ruleRow($rule, FormHubLink::pathsFor($user, array_filter([$rule->form_id]))),
             'updated_at' => $this->iso($rule->updated_at),
         ];
     }

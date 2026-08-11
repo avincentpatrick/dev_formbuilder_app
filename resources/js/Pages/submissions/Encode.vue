@@ -34,7 +34,6 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
-import { formsCrumb } from '@/composables/useFormsCrumb';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import {
@@ -127,6 +126,28 @@ const props = defineProps<{
     update_url: string | null;
     /** The autosave endpoint. NULL IN EDIT MODE — an edit must never reach the draft channel. */
     draft_url: string | null;
+    /**
+     * The trail back, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * ⚠️ THE THREE-OR-FIVE BRANCH IS GONE, and its absence is the improvement. This page rebuilt the trail
+     * from `isEditing` / `draft === null` — re-deriving on the client a mode each of the three controllers
+     * already knows by construction, with three hard-coded URL expressions that could disagree with the
+     * route that rendered them.
+     */
+    crumbs: BreadcrumbItem[];
+    /**
+     * Where Cancel leaves TO — `CrumbTrail::exitFrom()`, the crumb immediately BEFORE the tail.
+     *
+     * ⚠️ NOT THE TAIL: the tail is where you ARE ("Edit answers", "New response"); Cancel is where you leave
+     * to — the submission in edit mode, the form otherwise. An earlier note here said the tail must agree
+     * with Cancel, which is false in both modes. Deriving it server-side from the same trail is what makes
+     * the agreement structural rather than a docblock asking the next author to remember; the invariant is
+     * asserted in `CrumbTrailReachabilityTest`.
+     *
+     * ⚠️ NULL IS A REAL OUTCOME — a reader refused that destination must not be offered a Cancel that 403s,
+     * so both call sites below are `v-if`-guarded rather than defaulting to a URL.
+     */
+    cancel_url: string | null;
 }>();
 
 /**
@@ -141,29 +162,6 @@ const props = defineProps<{
  */
 const isEditing = computed(() => props.editing != null);
 
-/**
- * The trail back (Increment J2c). Both branches pass through the FORM — `props.form.id` has always been in
- * this payload, so no presenter change was needed — which is the fix: the non-editing crumb used to be a
- * bare `← Forms`, sending a keyer who arrived from one form back to the list of all of them.
- *
- * ⚠️ THE TRAIL AND THE CANCEL ACTION MUST KEEP NAMING THE SAME DESTINATION — AND IT IS NOT THE TAIL. An
- * earlier version of this note said "the tail must agree with Cancel", which is false in both modes and
- * would lead an author following it literally to break the invariant it exists to protect. The tail is where
- * you ARE ("Edit answers", "New response" / "Continue response"); Cancel is where you LEAVE TO, which is the
- * crumb immediately BEFORE the tail: the submission in edit mode, the form otherwise. Cancel appears TWICE
- * in this template — the header and the sticky footer — so three sites move together.
- */
-const crumbs = computed<BreadcrumbItem[]>(() => [
-    formsCrumb(),
-    { label: props.form.title, href: `/forms/${props.form.id}` },
-    ...(isEditing.value
-        ? [
-              { label: 'Responses', href: `/forms/${props.form.id}/submissions` },
-              { label: 'Response', href: `/submissions/${props.editing!.id}` },
-              { label: 'Edit answers' },
-          ]
-        : [{ label: props.draft === null ? 'New response' : 'Continue response' }]),
-]);
 
 const page = usePage();
 
@@ -730,8 +728,11 @@ function submitEdit(): void {
                      has to be observing the node before the text changes — so `v-if` here would silently
                      swallow the first "Draft saved". -->
                 <span class="encode__autosave" role="status" aria-live="polite">{{ autosaveLabel ?? '' }}</span>
-                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
-                <Link v-else :href="`/forms/${form.id}`" class="encode__cancel">Cancel</Link>
+                <!-- ONE destination, derived from the trail (J2d): `cancel_url` is the crumb immediately
+                     before the tail. It was two hard-coded branches here and two more in the sticky footer,
+                     kept in step with the trail by hand. `v-if` rather than a fallback URL — a reader the
+                     destination refuses is offered no Cancel at all, which is the whole point of the sweep. -->
+                <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
             </template>
         </PageHeader>
 
@@ -996,8 +997,8 @@ function submitEdit(): void {
             </template>
 
             <div class="encode__actions">
-                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
-                <Link v-else :href="`/forms/${form.id}`" class="encode__cancel">Cancel</Link>
+                <!-- The sticky footer's Cancel — the same `cancel_url` as the header's, which is the point. -->
+                <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
                     type="button"

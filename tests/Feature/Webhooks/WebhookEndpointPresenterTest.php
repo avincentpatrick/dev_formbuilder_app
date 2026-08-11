@@ -46,7 +46,7 @@ it('shapes the index list, the entitlement summary, and the catalogs', function 
     $props = app(WebhookEndpointPresenter::class)->index($this->admin);
 
     expect($props['data'])->toHaveCount(2)
-        ->and($props['data'][0])->toHaveKeys(['id', 'name', 'url', 'status', 'event_types', 'form_title', 'secret_masked'])
+        ->and($props['data'][0])->toHaveKeys(['id', 'name', 'url', 'status', 'event_types', 'form_title', 'form_url', 'secret_masked'])
         ->and($props['data'][0])->not->toHaveKey('secret')
         // Endpoints is a live gauge → used reflects the two just created; no plan → unlimited (null).
         ->and($props['summary']['endpoints']['used'])->toBe(2)

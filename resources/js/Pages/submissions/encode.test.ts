@@ -25,7 +25,12 @@ import type { RawField, RawSection } from '../../../public-runtime/lib/types';
  */
 
 const mocks = vi.hoisted(() => ({
-    pageProps: { errors: {} as Record<string, string>, flash: {} as Record<string, unknown> },
+    pageProps: {
+        errors: {} as Record<string, string>,
+        flash: {} as Record<string, unknown>,
+        // `formsCrumb()` (J2c) reads this to decide whether the leading crumb links to /forms.
+        auth: { can: { manageForms: true } },
+    },
     post: vi.fn(),
     patch: vi.fn(),
 }));
@@ -37,8 +42,15 @@ vi.mock('@inertiajs/vue3', () => ({
     usePage: () => ({ props: mocks.pageProps }),
 }));
 
+// ⚠️ `#breadcrumbs` RENDERS TOO, AND IT DID NOT UNTIL J2c — the identical omission `submissions/show.test.ts`
+// carried. J2c replaced this page's navigation with a five-crumb conditional trail and repointed two Cancel
+// links, and a mock that drops the slot means not one line of that is covered. Fixing one instance and
+// leaving the other is how a gap survives a review; both are fixed.
 vi.mock('@/components/shell/PageHeader.vue', () => ({
-    default: { name: 'PageHeader', template: '<header><slot name="actions" /></header>' },
+    default: {
+        name: 'PageHeader',
+        template: '<header><slot name="breadcrumbs" /><slot name="actions" /></header>',
+    },
 }));
 
 // Imported AFTER the mocks so the component resolves them.

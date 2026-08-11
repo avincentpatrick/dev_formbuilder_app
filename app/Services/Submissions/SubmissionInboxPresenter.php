@@ -54,18 +54,45 @@ final class SubmissionInboxPresenter
      * inbox it links into from disagreeing about whether a row matches. Read the scope before widening what
      * a submission match means — in particular, answer text is deliberately not in it.
      *
+     * ── $boundForm — THE SAME LIST, SCOPED TO ONE FORM BY THE ROUTE (Increment J2c) ────────────────────
+     * `GET /forms/{form}/submissions` reuses this method wholesale rather than growing a second query, which
+     * is J1e's audit-export finding applied before it could bite: the filter chain here and in
+     * {@see SubmissionExporter::baseQuery()} is ALREADY spelled twice, and a third copy for the per-form page
+     * would be the one that drifts. The parameter is OPTIONAL so every existing caller and every existing
+     * test passes UNEDITED — the same house rule {@see FormPresenter::list()} states for its `$terms`.
+     *
+     * Two things change when it is set, and both are about not lying to the reader:
+     *   - the bound form WINS over `?form_id=`, so the URL cannot narrow the page to a different form than
+     *     the one whose name is in the heading and the breadcrumb;
+     *   - `forms` is OMITTED from the filter catalog — absent, never an empty array (ADR-0011 §D9). The
+     *     dropdown is meaningless on a page that is already one form, and an empty array would read to the
+     *     client as "this reader may select nothing".
+     *
      * @param  array{form_id?: ?string, status?: ?string, source?: ?string, q?: ?SearchTerms}  $filters
      * @return array<string, mixed>
      */
-    public function list(User $user, array $filters): array
+    public function list(User $user, array $filters, ?Form $boundForm = null): array
     {
         $terms = $filters['q'] ?? SearchTerms::parse(null);
+
+        // ⚠️ NORMALISED INTO `$filters` RATHER THAN HELD BESIDE IT, AND THAT IS A CORRECTNESS CHOICE.
+        // The bound form WINS over any `?form_id=`, so the URL cannot narrow the page to a different form
+        // than the one whose name is in the heading. Writing it back into the array is what keeps
+        // `hasAnyFilter()` HONEST: computed into a local instead, its `form_id` skip would read
+        // `$filters['form_id']`, which `forForm()` never sets — so the skip would be dead code that
+        // mutation-testing reports as surviving, and `empty_reason` would depend on a controller continuing
+        // to omit a key rather than on a rule stated here. (Found exactly that way.)
+        if ($boundForm !== null) {
+            $filters['form_id'] = $boundForm->id;
+        }
+
+        $formId = $filters['form_id'] ?? null;
 
         $paginator = Submission::query()
             ->visibleTo($user)
             ->with(['form:id,title', 'respondent:id,name'])
             ->matchingKeyword($terms)
-            ->when($filters['form_id'] ?? null, fn ($q, $v) => $q->where('form_id', $v))
+            ->when($formId, fn ($q, $v) => $q->where('form_id', $v))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             // Hide in-progress drafts (H10) unless the status filter explicitly asks for them. The inbox is a
             // review surface for completed responses; a half-filled guest draft is not something a reviewer
@@ -84,9 +111,36 @@ final class SubmissionInboxPresenter
         /** @var Collection<int, Submission> $items */
         $items = collect($paginator->items());
 
+        // ⚠️ WHICH OF THESE ROWS MAY HAVE THEIR FORM LINKED, RESOLVED ONCE FOR THE PAGE.
+        //
+        // The row set is strictly WIDER than form readability, so "the row is listed" does not imply "its
+        // form opens" — and an unconditional link is a 403 or a 404 dressed as navigation. Two real paths,
+        // both reachable today: (1) `Submission::scopeVisibleTo()` has a **respondent arm**
+        // (`respondent_user_id = me`) that `viewOverview` has no counterpart for, so a keyer whose grant was
+        // revoked still sees rows they encoded and would be offered a link that 403s; (2) a SOFT-DELETED
+        // form makes `formTitle()` render an em dash, and route-model binding excludes trashed rows — so
+        // the inbox would have printed "—" as a live hyperlink to a 404.
+        //
+        // One query for the page rather than a policy call per row: `readableBy` is the same predicate the
+        // route's gate composes, narrowed to the form ids actually on screen (at most PER_PAGE of them).
+        // The alternative — `$user->can('viewOverview', $form)` per row — is the 25-grant-lookup shape the
+        // `can.resume` note below already refuses.
+        $linkableFormIds = $items->isEmpty()
+            ? collect()
+            : Form::query()
+                ->readableBy($user)
+                ->whereIn('forms.id', $items->pluck('form_id')->unique()->all())
+                ->pluck('id')
+                ->flip();
+
         return [
             'data' => $items->map(fn (Submission $s): array => [
                 'id' => $s->id,
+                // ⚠️ THE ID AS WELL AS THE TITLE (J2c), AND IT IS FREE. `form:id,title` is already eager-
+                // loaded above, so this adds no query — and without it the global inbox can print a form's
+                // name on every row while linking none of them, which is the dead end this whole row exists
+                // to remove. `detail()` has carried `form_id` since F7; only the LIST row lacked it.
+                'form_id' => $s->form_id,
                 'form_title' => $this->formTitle($s),
                 'status' => $s->status->value,
                 'source' => $s->source->value,
@@ -108,6 +162,10 @@ final class SubmissionInboxPresenter
                 // pays only on the Draft-filtered view, which is the only place the button can appear.
                 'can' => [
                     'resume' => $s->status === SubmissionStatus::Draft && $user->can('promote', $s),
+                    // Whether THIS viewer may open the row's FORM (J2c). See `$linkableFormIds` above — the
+                    // row being listed does not imply the form opens, so the client keys the link off this
+                    // rather than off the presence of `form_id`.
+                    'open_form' => $linkableFormIds->has($s->form_id),
                 ],
             ])->all(),
             'meta' => [
@@ -117,7 +175,8 @@ final class SubmissionInboxPresenter
                 'per_page' => $paginator->perPage(),
             ],
             'filters' => [
-                'forms' => $this->formOptions($user),
+                // Absent on the per-form page, never an empty array — see the `$boundForm` note above.
+                ...($boundForm === null ? ['forms' => $this->formOptions($user)] : []),
                 'statuses' => array_map(
                     fn (SubmissionStatus $s): array => ['value' => $s->value, 'label' => $s->label()],
                     SubmissionStatus::cases(),
@@ -127,7 +186,7 @@ final class SubmissionInboxPresenter
                     SubmissionSource::cases(),
                 ),
                 'applied' => [
-                    'form_id' => $filters['form_id'] ?? null,
+                    'form_id' => $formId,
                     'status' => $filters['status'] ?? null,
                     'source' => $filters['source'] ?? null,
                     'q' => $terms->raw(),
@@ -139,7 +198,7 @@ final class SubmissionInboxPresenter
             // in-progress drafts unless a status is chosen. So an inbox holding nothing but drafts rendered
             // "Responses appear here as forms are filled out" — telling a reviewer nothing had arrived while
             // the rows sat one dropdown away. That is exactly the failure the I2 rule names.
-            'empty_reason' => ListEmptyReason::for($items->isNotEmpty(), $this->hasAnyFilter($filters, $terms)),
+            'empty_reason' => ListEmptyReason::for($items->isNotEmpty(), $this->hasAnyFilter($filters, $terms, $boundForm)),
             'can' => ['export' => $user->can('submissions.export')],
         ];
     }
@@ -154,11 +213,24 @@ final class SubmissionInboxPresenter
      * for that sentence — an empty state reading "no matching submissions" when they filtered nothing would
      * be a different lie from the one this prop fixes.
      *
+     * ⚠️ AND A ROUTE-BOUND FORM IS NOT A FILTER EITHER (Increment J2c) — SAME RULE, SECOND APPLICATION.
+     * On `/forms/{form}/submissions` the form is the PAGE, not something the reader narrowed to: they chose
+     * nothing and cannot clear it. Counting it would make `empty_reason` permanently `no_matches`, so a
+     * brand-new form — the single most likely form to have no responses — would greet its author with "No
+     * matching submissions · try a different keyword, or clear the filters to see everything" over a list
+     * with no filters to clear. That is the same shape of lie as the client-side inference this prop
+     * replaced, arriving from the opposite direction, and no test would have caught it: every fixture that
+     * seeds a submission passes either way.
+     *
      * @param  array<string, mixed>  $filters
      */
-    private function hasAnyFilter(array $filters, SearchTerms $terms): bool
+    private function hasAnyFilter(array $filters, SearchTerms $terms, ?Form $boundForm = null): bool
     {
         foreach (['form_id', 'status', 'source'] as $key) {
+            if ($key === 'form_id' && $boundForm !== null) {
+                continue;
+            }
+
             if (($filters[$key] ?? null) !== null) {
                 return true;
             }
@@ -381,14 +453,36 @@ final class SubmissionInboxPresenter
         ])->all());
     }
 
-    /** The forms that appear in this user's visible submissions — the useful set for the form filter. */
-    /** @return list<array{value: string, label: string}> */
+    /**
+     * The forms this reader may open — the set the form filter offers.
+     *
+     * ⚠️ IT USED TO BE DERIVED FROM SUBMISSIONS, AND THAT MADE THE FILTER UNABLE TO EXPRESS THE ONE
+     * QUESTION IT IS MOST OFTEN ASKED (Increment J2c). `Submission::visibleTo($user)->distinct()
+     * ->pluck('form_id')` lists only forms that ALREADY HAVE a visible response, so a form with none was
+     * not selectable at all — and "has anything come in yet?" is precisely what an author asks about a form
+     * they just published. The old shape could answer every question except that one.
+     *
+     * It also read as correct, which is why it survived this long: every fixture that exercises the filter
+     * seeds a submission first, so no test could distinguish the two implementations. `FormTabSetReachability
+     * Test` measured the consequence from the outside — the Responses tab had to link to `?form_id=` on a
+     * form the dropdown could not offer — and left the fix to this increment.
+     *
+     * Now {@see Form::scopeReadableBy()}, which is byte-for-byte {@see FormPolicy::viewOverview()}: the
+     * dropdown offers exactly the forms whose hub the reader may already open. ⚠️ NOT
+     * {@see Form::scopeVisibleTo()} — that is the AUTHORING scope and returns nothing for a Reviewer or a
+     * Viewer, the two roles that live in this inbox, so it would empty the dropdown for them while every
+     * Owner-fixtured test stayed green.
+     *
+     * Soft-deleted forms stay out, exactly as before — `readableBy` adds no `withTrashed()`. That is a
+     * deliberate non-change rather than an oversight: it is a separate question from the one this fixes, and
+     * `AnalyticsPresenter::formOptions()` answers it differently for its own stated reason.
+     *
+     * @return list<array{value: string, label: string}>
+     */
     private function formOptions(User $user): array
     {
-        $formIds = Submission::query()->visibleTo($user)->distinct()->pluck('form_id');
-
         return array_values(Form::query()
-            ->whereIn('id', $formIds)
+            ->readableBy($user)
             ->orderBy('title')
             ->get(['id', 'title'])
             ->map(fn (Form $f): array => ['value' => $f->id, 'label' => $f->title])

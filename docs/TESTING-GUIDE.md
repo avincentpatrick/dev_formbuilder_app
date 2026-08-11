@@ -137,7 +137,13 @@ submission printed its form's title as an unlinked heading. This section is that
    responses, drafts in progress, whether it is accepting responses, and when the last one arrived.
 2. Check the tiles against §7's dashboard for the same form. **Expect:** the same totals. They are computed
    through the same visibility scope the inbox uses, so the hub and the list it links to cannot disagree.
-3. Click the **Responses** tile. **Expect:** the submissions inbox, filtered to this form.
+3. Click the **Responses** tile. **Expect:** *(updated in J2c)* the form's **own** responses page at
+   `/forms/{id}/submissions` — not the global inbox filtered by a query string, which is where this pointed
+   until that route existed. The trail reads *Forms / Community Health Survey 2026 / Responses*, the strip
+   is still there with **Responses** now current, and there is **no Form dropdown** in the filter bar (the
+   page is already one form). **Export CSV/XLSX is offered immediately**, where the global inbox hides it
+   until you pick a form. The tile and the tab lead to the same place because the tile reads its link back
+   off the tab set rather than rebuilding the URL.
 4. Click a row in **Latest responses**. **Expect:** that submission's detail page.
 5. Walk the strip: **Responses → Builder → Analytics**, then use the breadcrumb's middle crumb to come back.
    **Expect:** every page of the form is reachable from every other one **without touching the sidebar** —
@@ -155,6 +161,19 @@ submission printed its form's title as an unlinked heading. This section is that
    refused destination is never shown as disabled.
 8. As the **editor**, open the hub for a form you hold no grant on (reach it by editing the URL).
    **Expect:** 403. Grants scope a `.own` role to the forms it names.
+9. *(J2c)* Create a form and publish it, then open its **Responses** tab before anyone answers.
+   **Expect:** *"No responses yet"* — **not** *"No matching submissions · try a different keyword, or clear
+   the filters"*. The form is the page, not a filter you applied, so there is nothing to clear. This is the
+   one claim in this section that no seeded fixture can check: the demo seeder exists to populate forms.
+10. *(J2c)* From that responses page, click a submission, then walk the **breadcrumb** back up.
+   **Expect:** *Forms / {title} / Responses / Response* — four crumbs, each ancestor a live link. Before
+   J2c this page's only exit was *← Back to submissions*, which went to the global inbox, so a reviewer who
+   arrived from a form could not get back to it while its title sat in the heading as unlinked text.
+11. *(J2c)* Open the **global** inbox at `/submissions` and click a form name in the **Form** column.
+   **Expect:** that form's hub. The column has printed form names since F7 and linked none of them.
+12. *(J2c)* Still on `/submissions`, open the **Form** dropdown. **Expect:** the form you created in step 9
+   is listed **even though it has no responses**. Until J2c the dropdown was derived from submissions, so
+   the one form you most want to check on was the one form you could not select.
 
 ---
 
@@ -226,6 +245,10 @@ Do this chapter in a **private/incognito window**, so you are genuinely not sign
    cap** (§3's `max_responses`), and it still **appears in the unfiltered inbox** rather than being hidden —
    a form that screens everyone out should be loud, not silent.
 4. Filter by form, and by date range. **Expect:** both narrow the list; the counts change accordingly.
+   *(J2c)* **Expect the dropdown to list every form you may open, including ones with no responses at all** —
+   it was derived from submissions until then, so a newly published form was not selectable. As
+   **reviewer@demo.test** the same dropdown lists only the three forms they hold grants on, which is the
+   other half: the fix widened what the control can express, not who can see what.
 5. Page through the list. **Expect:** pagination works and the sort order is stable.
 6. Open any submission. **Expect:** the full answer document, who submitted it, when, from which channel, and
    which form version it was captured against.

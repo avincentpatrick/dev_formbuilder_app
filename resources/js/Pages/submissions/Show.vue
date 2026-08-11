@@ -8,8 +8,19 @@
  */
 import { computed, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { MdsBadge, MdsButton, MdsCard, MdsFormField, MdsModal, MdsTextarea, statusVariant } from '@meridian/design-system';
+import {
+    MdsBadge,
+    MdsBreadcrumb,
+    MdsButton,
+    MdsCard,
+    MdsFormField,
+    MdsModal,
+    MdsTextarea,
+    statusVariant,
+    type BreadcrumbItem,
+} from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 
 type FieldRow = { key: string; label: string; value: string };
 /**
@@ -52,6 +63,21 @@ const props = defineProps<{
     can: { review: boolean; update: boolean };
     pdf: PdfArtifact | null;
 }>();
+
+/**
+ * The trail back (Increment J2c). `submission.form_id` has been in this payload since F7 — `detail()`
+ * carried it while the LIST row did not — so no presenter change was needed here, only a reader.
+ *
+ * The middle two crumbs are the point: the form's hub, and that form's own responses list. A reviewer who
+ * arrived from either can return to it, which is what "no dead-end pages" means on the page furthest from
+ * the root.
+ */
+const crumbs = computed<BreadcrumbItem[]>(() => [
+    formsCrumb(),
+    { label: props.submission.form_title, href: `/forms/${props.submission.form_id}` },
+    { label: 'Responses', href: `/forms/${props.submission.form_id}/submissions` },
+    { label: 'Response' },
+]);
 
 /**
  * Queue a PDF (Increment H17).
@@ -165,9 +191,19 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Submission · ${submission.form_title}`" />
 
-        <Link href="/submissions" class="detail__back">← Back to submissions</Link>
-
         <PageHeader :title="submission.form_title" icon="submissions">
+            <!--
+                Increment J2c. This was a hand-rolled `← Back to submissions` link sitting OUTSIDE
+                `PageHeader` — one of the four back-links DSR §3.4 names as owing this migration, and the
+                only navigation off this page. It went to the global inbox, so a reviewer who arrived from a
+                form had no way back to that form: the h1 above prints the form's TITLE, unlinked, which
+                `FormHubController`'s docblock names as one of the three dead ends the hub was built to end.
+                Four crumbs rather than three because this page genuinely is four deep, and the last is never
+                a link — so ending at "Responses" would print the per-form list's name unreachable.
+            -->
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
                 <!-- I9c. Tertiary and FIRST, ahead of the review verbs: correcting a record is a different
                      kind of act from deciding its outcome, and the primary action on this page stays the
@@ -333,17 +369,9 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-4);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-action-primary-fg);
-    text-decoration: none;
-}
-
-.detail__back:hover {
-    text-decoration: underline;
-}
+/* `.detail__back` was deleted with its markup in J2c — the hand-rolled back link became `MdsBreadcrumb`
+   inside `PageHeader`'s slot, which brings its own styling. Left behind it would be dead rules that read as
+   an element still on the page. */
 
 .detail__grid {
     display: grid;

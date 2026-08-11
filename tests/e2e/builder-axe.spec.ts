@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme } from './support/axe';
+import { forceTheme, settlePaint } from './support/axe';
 import { openBuilder } from './support/navigate';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
@@ -76,6 +76,14 @@ async function scan(page: Page, label: string): Promise<void> {
     // standing reputation for contrast flakes at mobile+dark (the `:159` "known flake", I11a's empty-canvas
     // case) is very likely the same artifact, unmeasured until now.
     await page.mouse.move(0, 0);
+
+    // ⚠️ AND WAIT FOR THAT UN-HOVER TO PAINT. Parking the pointer is a style invalidation like any other:
+    // the control it left begins transitioning back to its resting colour, and the recalc lands on a later
+    // frame. J1e added the two-frame wait to `forceTheme` and NOT here, and J2b's CI flaked on exactly the
+    // gap — "share panel, live link (dark)" reported 93 violations with an intermediate FOREGROUND
+    // (`#6f99b5`, in no token file) over the settled dark `bg-surface` (`#123350`), on the very button the
+    // test had just clicked. Shared with `assertClean`, which owed the same wait.
+    await settlePaint(page);
 
     const overflows = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,

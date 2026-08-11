@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme } from './support/axe';
+import { forceTheme, settlePaint } from './support/axe';
 
 /*
  * The scoping hierarchy page (Increment G10b2) — the app's first tree widget, so this spec carries most of
@@ -20,6 +20,11 @@ const themes = ['light', 'dark'] as const;
 
 async function scanPane(page: Page, selector: string, label: string): Promise<void> {
     await page.mouse.move(0, 0);
+
+    // Wait for the un-hover to PAINT — see `support/axe.ts`'s `assertClean`: parking the pointer starts a
+    // transition on the control it left, and a scan issued on the same frame can read an intermediate
+    // foreground against a settled background. J2b's CI flaked on exactly that in `builder-axe`.
+    await settlePaint(page);
     const results = await new AxeBuilder({ page })
         .include(selector)
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

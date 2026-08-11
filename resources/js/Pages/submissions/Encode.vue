@@ -32,8 +32,9 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCard } from '@meridian/design-system';
+import { MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import {
@@ -139,6 +140,30 @@ const props = defineProps<{
  * thing here — "there is no submission being corrected" — and the predicate has to say so.
  */
 const isEditing = computed(() => props.editing != null);
+
+/**
+ * The trail back (Increment J2c). Both branches pass through the FORM — `props.form.id` has always been in
+ * this payload, so no presenter change was needed — which is the fix: the non-editing crumb used to be a
+ * bare `← Forms`, sending a keyer who arrived from one form back to the list of all of them.
+ *
+ * ⚠️ THE TRAIL AND THE CANCEL ACTION MUST KEEP NAMING THE SAME DESTINATION — AND IT IS NOT THE TAIL. An
+ * earlier version of this note said "the tail must agree with Cancel", which is false in both modes and
+ * would lead an author following it literally to break the invariant it exists to protect. The tail is where
+ * you ARE ("Edit answers", "New response" / "Continue response"); Cancel is where you LEAVE TO, which is the
+ * crumb immediately BEFORE the tail: the submission in edit mode, the form otherwise. Cancel appears TWICE
+ * in this template — the header and the sticky footer — so three sites move together.
+ */
+const crumbs = computed<BreadcrumbItem[]>(() => [
+    formsCrumb(),
+    { label: props.form.title, href: `/forms/${props.form.id}` },
+    ...(isEditing.value
+        ? [
+              { label: 'Responses', href: `/forms/${props.form.id}/submissions` },
+              { label: 'Response', href: `/submissions/${props.editing!.id}` },
+              { label: 'Edit answers' },
+          ]
+        : [{ label: props.draft === null ? 'New response' : 'Continue response' }]),
+]);
 
 const page = usePage();
 
@@ -685,12 +710,15 @@ function submitEdit(): void {
             icon="submissions"
         >
             <template #breadcrumbs>
-                <!-- In edit mode the way back is the submission, not the forms list: the editor arrived from
-                     the detail page and that is where Save returns them. -->
-                <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__crumb">
-                    ← Back to submission
-                </Link>
-                <Link v-else href="/forms" class="encode__crumb">← Forms</Link>
+                <!--
+                    Increment J2c — a real trail rather than a single hand-rolled back link, and the
+                    destination changed as well as the markup. It used to be a bare `← Forms`, which threw a
+                    keyer who arrived from ONE form back to the list of all of them; the trail now passes
+                    through that form's hub. In edit mode the tail is the submission, because the editor
+                    arrived from the detail page and that is where Save returns them — the crumb and the
+                    Cancel action below must keep naming the same place.
+                -->
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
             </template>
             <template #actions>
                 <!-- The autosave indicator lives in the header, beside Cancel, because that is where a keyer
@@ -703,7 +731,7 @@ function submitEdit(): void {
                      swallow the first "Draft saved". -->
                 <span class="encode__autosave" role="status" aria-live="polite">{{ autosaveLabel ?? '' }}</span>
                 <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
-                <Link v-else href="/forms" class="encode__cancel">Cancel</Link>
+                <Link v-else :href="`/forms/${form.id}`" class="encode__cancel">Cancel</Link>
             </template>
         </PageHeader>
 
@@ -969,7 +997,7 @@ function submitEdit(): void {
 
             <div class="encode__actions">
                 <Link v-if="isEditing" :href="`/submissions/${editing!.id}`" class="encode__cancel">Cancel</Link>
-                <Link v-else href="/forms" class="encode__cancel">Cancel</Link>
+                <Link v-else :href="`/forms/${form.id}`" class="encode__cancel">Cancel</Link>
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
                     type="button"
@@ -1016,19 +1044,18 @@ function submitEdit(): void {
     max-width: 720px;
 }
 
-.encode__crumb,
+/* `.encode__crumb` went with its markup in J2c — the hand-rolled crumb became `MdsBreadcrumb`, which brings
+   its own styling. `.encode__cancel` keeps these rules: it is a Link styled as text, not a crumb. */
 .encode__cancel {
     color: var(--mds-color-action-primary-fg);
     font-size: var(--mds-type-body-sm-font-size);
     text-decoration: none;
 }
 
-.encode__crumb:hover,
 .encode__cancel:hover {
     text-decoration: underline;
 }
 
-.encode__crumb:focus-visible,
 .encode__cancel:focus-visible {
     outline: 2px solid var(--mds-color-focus-ring);
     outline-offset: 2px;

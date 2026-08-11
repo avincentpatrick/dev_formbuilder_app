@@ -12,6 +12,9 @@ import type { FormReport } from '@/components/analytics/types';
  */
 
 vi.mock('@inertiajs/vue3', () => ({
+    // `formsCrumb()` reads `auth.can.manageForms` to decide whether the leading crumb is a LINK — /forms
+    // 403s for a Reviewer and a Viewer. True here so the link branch is the one under test.
+    usePage: () => ({ props: { auth: { can: { manageForms: true } } } }),
     Head: { name: 'Head', render: () => null },
     Link: { name: 'Link', template: '<a :href="$attrs.href"><slot /></a>' },
 }));
@@ -73,7 +76,7 @@ function render(overrides: Partial<FormReport> = {}): VueWrapper {
             // an empty list, which would make every assertion about it vacuously true.
             tabs: [
                 { key: 'overview', label: 'Overview', href: '/forms/f1', icon: 'forms' as const },
-                { key: 'submissions', label: 'Responses', href: '/submissions?form_id=f1', icon: 'submissions' as const },
+                { key: 'submissions', label: 'Responses', href: '/forms/f1/submissions', icon: 'submissions' as const },
                 { key: 'builder', label: 'Builder', href: '/forms/f1/builder', icon: 'edit' as const },
                 { key: 'analytics', label: 'Analytics', href: '/forms/f1/analytics', icon: 'chart-bar' as const },
             ],

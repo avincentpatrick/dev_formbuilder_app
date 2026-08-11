@@ -173,6 +173,63 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > So `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`. It is unobservable for the same reason: all five roles hold
 > `submissions.view`.
 
+> **Design Note (J2c, 2026-08-11) — `Form::scopeReadableBy()` is the LIST twin of `viewOverview`, and it
+> also coins no key. The catalog stays closed at 29.** J2b added the ability; J2c needed the set. Two
+> surfaces ask "which forms may this reader open" — `GET /forms/{form}/submissions`, and the submissions
+> inbox's form dropdown — and the scope is byte-for-byte the policy's second conjunct:
+> `dashboard.org.view` OR a grant of **any** capacity on the form.
+>
+> ⚠️ **`Form::scopeVisibleTo()` IS NOT INTERCHANGEABLE WITH IT, AND SUBSTITUTING ONE IS SILENT.** That scope
+> is the **authoring** rule — it keys on `forms.edit.any` / `forms.edit.own` and requires **Editor**
+> capacity — so a **Reviewer and a Viewer hold neither** and it returns them the empty set. Building the
+> inbox's dropdown on it blanks the control for exactly the two roles that live in that inbox, while every
+> test written with an Owner stays green. `SubmissionInboxTest` now pins the Reviewer-with-a-grant case
+> specifically so the substitution reddens.
+>
+> ⚠️ **THE ONE HONEST WIDENING, STATED RATHER THAN GLOSSED.** A **Viewer** holds `dashboard.org.view` and is
+> 403'd from `/forms` (that route gates on `viewAny,Form` = the `forms.*` keys), so before J2c they could
+> not enumerate the tenant's forms. The fixed dropdown lists every form they may open, including ones with
+> no responses — so they gain **discoverability of form titles they could not previously enumerate**. They
+> gain no authority: `viewOverview` already let them open any of those hubs, and they already read every
+> submission in the tenant. The trade was accepted deliberately (a dropdown that cannot offer a form with no
+> responses cannot answer "has anything arrived yet?", which is the question it is most often asked). Note
+> the boundary that did **not** move: soft-deleted forms stay out, because `readableBy` adds no
+> `withTrashed()` — unlike `AnalyticsFormSet::visible()`, which answers a different question.
+>
+> **And one NARROWING in the same change, recorded because a widening alone would be a half-truth.**
+> `Submission::scopeVisibleTo()` admits a row on `respondent_user_id = me` — a **respondent arm** that
+> `viewOverview` has no counterpart for. The old submissions-derived dropdown therefore offered a form a
+> reader could reach *only* by having answered it; `readableBy` does not. That reader still sees those rows
+> and can no longer filter to them by form. Accepted: the alternative is a dropdown whose entries do not all
+> correspond to forms the reader may open, which is the defect below.
+>
+> ⚠️ **THE SAME ASYMMETRY IS WHY AN INBOX ROW'S FORM TITLE IS NOT UNCONDITIONALLY A LINK.** The row set is
+> strictly wider than form readability, so *"this row is listed"* does not imply *"its form opens"*. Two live
+> paths: a keyer whose grant was revoked keeps seeing rows they encoded (the respondent arm) while
+> `/forms/{id}` 403s them; and a **soft-deleted** form renders its title as an em dash while binding to
+> nothing, so an unguarded link shipped `—` as a hyperlink to a 404. The row payload carries
+> `can.open_form`, resolved once per page against `readableBy` rather than per row against the policy.
+>
+> ⚠️ **AND `/forms` ITSELF IS NOT REACHABLE BY EVERY ROLE THAT CAN REACH THE PAGES LINKING TO IT** — the
+> defect J2c's adversarial review found in its own new breadcrumbs. That route gates on `viewAny,Form` =
+> `forms.create | forms.edit.any | forms.edit.own`, which a **Reviewer and a Viewer hold none of**, while
+> both can reach the form hub, a form's responses, a submission and the encode screen. A hard `href:
+> '/forms'` hands them a bare 403 with no way back. `formsCrumb()` (`resources/js/composables/`) drops the
+> href — keeping the crumb as text — off `ShellAbilities`' existing `manageForms`, which is computed from
+> the identical ability the route's middleware evaluates. **The tab strip already had this property and the
+> trail did not:** `FormTabSet` resolves each tab's gate server-side and `FormTabSetReachabilityTest` issues
+> a real request per href, so a tab cannot be offered to a reader the route refuses. Breadcrumbs had no
+> equivalent, and nothing structural yet enforces one — J2d should extend the reachability idiom to trails.
+>
+> **The route composes both halves, and neither alone is sufficient.** `can:viewAny,Submission` says nothing
+> about *which* form — with it alone, any member holding `submissions.view` (all five roles) could open any
+> form's responses page and read its **title** above an empty list, because an empty list is not a refusal.
+> `can:viewOverview,form` bounds the binding but says nothing about submissions. `FormSubmissionsGateTest`
+> drives each half out on its own; `FormTabSet` carries the same conjunction so that "the strip offered it"
+> implies "the reader can reach it", which `FormTabSetReachabilityTest` turns from a hope into a theorem.
+> Both conjuncts are **fail-closed structural guards** — no shipped role can observe either, and each is
+> pinned with a synthetic member rather than presented as a live rule.
+
 > **Design Note (ADR-0011 / H1e, 2026-08-03) — advanced analytics coins no permission.** The Phase-3
 > analytics surface (H24a/H24b) authorizes on `dashboard.org.view` and `dashboard.form.view` exactly as
 > shipped: the org-wide-versus-own-forms split those two already encode *is* the visibility split an

@@ -237,4 +237,57 @@ class Form extends Model implements TenantScoped
 
         return $query->whereIn('forms.id', $granted);
     }
+
+    /**
+     * The LIST twin of {@see FormPolicy::viewOverview()} — "whose form may this user OPEN", which is a
+     * different and wider question from {@see scopeVisibleTo()}'s "whose form may this user AUTHOR"
+     * (Increment J2c).
+     *
+     * ⚠️ THE TWO SCOPES ARE NOT INTERCHANGEABLE AND SUBSTITUTING ONE FOR THE OTHER IS SILENT, NOT LOUD.
+     * `scopeVisibleTo()` above keys on `forms.edit.any` / `forms.edit.own`, and a **Reviewer and a Viewer
+     * hold neither** — so using it to build the submissions inbox's form dropdown returns an EMPTY list for
+     * exactly the two roles the inbox exists for, while every test written with an Owner passes. That is why
+     * this exists rather than a second caller of the authoring scope. `SubmissionInboxTest` pins the
+     * Reviewer-with-a-grant case for that reason.
+     *
+     * It is byte-for-byte {@see FormPolicy::viewOverview()} — **both** conjuncts, and the first one is here
+     * because an earlier version of this docblock argued it away with a claim that is false.
+     *
+     * ⚠️ THAT ARGUMENT WAS: "the `dashboard.form.view` conjunct is not repeated here, because a scope answers
+     * 'which rows', the policy answers 'may you at all', and the route carries the policy." **No route on
+     * this scope's only path checks it.** `formOptions()` is reached from
+     * `SubmissionInboxController::index()` on `GET /submissions`, whose sole gate is `can:viewAny,Submission`
+     * = `submissions.view`. Without the conjunct, a principal holding `submissions.view` +
+     * `dashboard.org.view` but NOT `dashboard.form.view` would enumerate every form title in the tenant
+     * while being refused every one of those hubs. No shipped role can reach that state — all five hold the
+     * key — so it is a fail-closed guard exactly like the one inside `viewOverview()` itself, and it is
+     * stated as one rather than delegated to a gate that does not exist. Deleting the sentence was the other
+     * honest option; keeping the guard is the better one.
+     *
+     * ⚠️ `grantedFormIdsQuery($user)` WITH NO CAPACITY, never `ResourceCapacity::Editor`: a Reviewer's grant
+     * is reviewer capacity, so an editor-capacity check would refuse the single role this was widened for —
+     * the same trap `viewOverview()` records for `holdsAny()` versus `holds(Editor)`. It inherits that
+     * method's fail-closed empty set, so a user with no grants matches NOTHING rather than everything.
+     *
+     * ⚠️ NO `withTrashed()`, unlike {@see AnalyticsFormSet::visible()}. Soft-deleted forms stay out, which
+     * is exactly what the inbox's dropdown did before J2c — so this changes no behaviour there, and widening
+     * it would be a separate decision about a separate question. Archive/status filtering is likewise the
+     * CALLER's, for the reason `scopeVisibleTo()` states.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeReadableBy(Builder $query, User $user): Builder
+    {
+        // The policy's FIRST conjunct, fail-closed. See the docblock: no route on this scope's path checks it.
+        if (! $user->can('dashboard.form.view')) {
+            return $query->whereRaw('false');
+        }
+
+        if ($user->can('dashboard.org.view')) {
+            return $query;
+        }
+
+        return $query->whereIn('forms.id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
+    }
 }

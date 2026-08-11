@@ -31,6 +31,7 @@ import {
     type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { formsCrumb } from '@/composables/useFormsCrumb';
 import AnalyticsChartsCard from '@/components/analytics/AnalyticsChartsCard.vue';
 import { conversionTile, medianTile } from '@/components/analytics/draft-metrics';
 import { dateLabel, rangeLabel as formatRange } from '@/components/analytics/bucket-label';
@@ -54,7 +55,7 @@ const props = defineProps<{
  * way to reach it — which is the exact dead end this increment exists to remove.
  */
 const crumbs = computed<BreadcrumbItem[]>(() => [
-    { label: 'Forms', href: '/forms' },
+    formsCrumb(),
     { label: props.form.title, href: `/forms/${props.form.id}` },
     { label: 'Response statistics' },
 ]);

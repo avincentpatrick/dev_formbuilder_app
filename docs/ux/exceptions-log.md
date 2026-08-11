@@ -281,6 +281,16 @@ all" row — into a reusable API from a single consumer would be inventing the A
 §1.3's own consolidation trigger is three-plus undocumented deviations for the same need; this is the
 first, and it is documented.
 
+> **Amendment (J2a).** Two of the primitives named in that list have since been built **in the package**,
+> and neither is `MdsCombobox`, so this entry still stands. `MdsTabNav` and `MdsBreadcrumb` shipped with
+> J2a's form hub. ⚠️ **`MdsTabNav` is NOT the `MdsTabs` named above** — that list means the ARIA-1.2 in-page
+> tablist, which remains J4's; `TabNav`'s items are links that load a page, so it is a navigation landmark
+> with `aria-current` and building it as a tablist would have removed every non-active destination from the
+> tab sequence. DSR §3.4 now carries the split. Both went in `packages/design-system/src/` **because of the
+> coverage note below** rather than for taxonomy reasons: an app-tree component gets no story and no
+> `checkA11y` scan at all, and these two carry contracts (heading-free landmark naming, `aria-current`
+> exactly once) that a page-level e2e scan would never isolate. **No new exceptions entry is owed by J2a.**
+
 **⚠️ Coverage note, recorded because a green gate will otherwise be misread.** Storybook globs
 `packages/design-system/src/**/*.stories.@(ts|tsx)` only, so this app-tree component gets **no story and
 no `checkA11y` scan**. The `design-system-a11y` job passing says nothing whatsoever about this file. Its

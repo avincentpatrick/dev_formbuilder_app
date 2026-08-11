@@ -15,6 +15,24 @@
  *
  * Deliberately NOT built (§D10, so a later increment does not assume otherwise): stacked bars, grouped
  * bars, negative values, and a value axis. A bar's number is printed beside it instead.
+ *
+ * ── ⚠️ A LINKED DATUM CHANGES THE PLOT'S ACCESSIBLE STRUCTURE, AND IT HAS TO (Increment J2a) ────────────
+ * `BarDatum.href` makes a bar's label a link to the object it counts. That cannot simply be dropped into
+ * the markup: the plot carries `role="img"`, and an element with that role is a LEAF — every descendant is
+ * removed from the accessibility tree. The visible labels and values already inside it are not announced
+ * today either (the summary sentence plus the data table below are what a screen reader gets, which is the
+ * existing deliberate design). A link left in there would therefore be not merely unlabelled but
+ * unreachable, which is worse than the dead end J2 set out to remove.
+ *
+ * So when ANY datum carries an href the plot stops being one image: `role="img"` and its label come off,
+ * the summary moves into a visually-hidden paragraph immediately before the plot so the one-sentence
+ * overview is not lost, and each linked row's label becomes a real anchor. The tracks stay `aria-hidden`
+ * either way, so nothing gains "a dozen unlabelled images". With no hrefs the rendered output is
+ * byte-identical to before J2a — which is what `BarChart.test.ts` asserts, in both directions.
+ *
+ * The VALUE is deliberately outside the anchor. The link goes to the category, not to its count, and
+ * "Clinic Intake" is the accessible name a reader needs; "Clinic Intake 128" reads as a single odd label
+ * and makes every link name change whenever the data moves.
  */
 import { computed } from 'vue';
 import { coord } from '../../charts/scale';
@@ -71,17 +89,25 @@ const accessibleSummary = computed(() => {
 });
 
 const isEmpty = computed(() => props.data.length === 0);
+
+/** See the docblock: one linked datum is enough to take the plot out of `role="img"`. */
+const isInteractive = computed(() => props.data.some((d) => d.href !== undefined));
 </script>
 
 <template>
     <figure class="mds-bar">
+        <p v-if="isInteractive && !isEmpty" class="mds-bar__summary">{{ accessibleSummary }}</p>
+
         <div
             class="mds-bar__plot"
-            :role="isEmpty ? undefined : 'img'"
-            :aria-label="isEmpty ? undefined : accessibleSummary"
+            :role="isEmpty || isInteractive ? undefined : 'img'"
+            :aria-label="isEmpty || isInteractive ? undefined : accessibleSummary"
         >
             <div v-for="bar in bars" :key="bar.key" class="mds-bar__row">
-                <span class="mds-bar__label">{{ bar.label }}</span>
+                <a v-if="bar.href" class="mds-bar__label mds-bar__label--link" :href="bar.href">
+                    {{ bar.label }}
+                </a>
+                <span v-else class="mds-bar__label">{{ bar.label }}</span>
                 <svg
                     class="mds-bar__track"
                     viewBox="0 0 100 10"
@@ -128,7 +154,13 @@ const isEmpty = computed(() => props.data.length === 0);
  * are already text, so the group is one image whose alternative is the summary sentence, and the tracks
  * themselves are decorative. Putting the role on each track would announce a dozen unlabelled images.
  */
+/* `position: relative` so the two clipped-but-present children (`.mds-bar__summary` and the sr-only table
+   wrap) resolve their containing block INSIDE this figure. Without a positioned ancestor an absolutely
+   positioned 1px element is clipped by whatever ancestor happens to establish one, and can then extend the
+   DOCUMENT's scrollable width — the G11 defect `MdsDataTable`'s scroll wrapper records at length, which
+   `assertClean`'s horizontal-overflow assertion is what finally caught. */
 .mds-bar {
+    position: relative;
     margin: 0;
 }
 
@@ -149,6 +181,37 @@ const isEmpty = computed(() => props.data.length === 0);
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-body);
     overflow-wrap: anywhere;
+}
+
+/* The summary the plot's `aria-label` carries when the chart is static. Rendered only in the interactive
+   shape, and only to assistive tech — sighted readers have the bars themselves. Same clip idiom as
+   `.mds-bar__table-wrap--sr`; it holds no focusable content, so it mints no invisible tab stop. */
+.mds-bar__summary {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.mds-bar__label--link {
+    color: var(--mds-color-text-body);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.mds-bar__label--link:hover {
+    color: var(--mds-color-text-heading);
+}
+
+.mds-bar__label--link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 
 .mds-bar__track {

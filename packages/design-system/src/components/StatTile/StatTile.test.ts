@@ -130,3 +130,45 @@ describe('MdsStatTile — honest states (ADR-0011 §D5)', () => {
         wrapper.unmount();
     });
 });
+
+/** Increment J2a — every tile on the dashboard named something and led nowhere. */
+describe('MdsStatTile — the optional link', () => {
+    it('stays a plain container when no href is supplied', () => {
+        // Eleven call sites predate this prop. The default must remain a non-interactive element, or the
+        // dashboard gains eleven tab stops that go nowhere.
+        const wrapper = mount(StatTile, { props: { label: 'Forms', value: 3, icon: 'forms' } });
+
+        expect(wrapper.element.tagName).toBe('DIV');
+        expect(wrapper.attributes('href')).toBeUndefined();
+        expect(wrapper.classes()).not.toContain('mds-stat-tile--link');
+        wrapper.unmount();
+    });
+
+    it('becomes a real anchor when one is', () => {
+        // An anchor, not a div with a click handler: the latter has no role, no accessible name, no
+        // keyboard route and no default hover affordance, and would fail the axe job that gates this
+        // package while looking identical in a screenshot.
+        const wrapper = mount(StatTile, {
+            props: { label: 'Forms', value: 3, icon: 'forms', href: '/forms' },
+        });
+
+        expect(wrapper.element.tagName).toBe('A');
+        expect(wrapper.attributes('href')).toBe('/forms');
+        expect(wrapper.classes()).toContain('mds-stat-tile--link');
+        wrapper.unmount();
+    });
+
+    it('takes its accessible name from the value and label, adding no extra ARIA', () => {
+        const wrapper = mount(StatTile, {
+            props: { label: 'Submissions', value: '1,284', icon: 'submissions', href: '/submissions' },
+        });
+
+        const link = wrapper.get('a');
+        expect(link.text()).toContain('Submissions');
+        expect(link.text()).toContain('1,284');
+        // The glyph stays decorative — a linked tile must not start announcing its icon.
+        expect(wrapper.get('.mds-stat-tile__badge').attributes('aria-hidden')).toBe('true');
+        expect(link.attributes('aria-label')).toBeUndefined();
+        wrapper.unmount();
+    });
+});

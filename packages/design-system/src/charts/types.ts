@@ -27,6 +27,17 @@ export interface BarDatum {
      * NEUTRAL and never a recycled hue, so "Other" never reads as a peer category.
      */
     neutral?: boolean;
+    /**
+     * Makes this bar's label a link to the thing it counts (Increment J2a) — the dashboard's "Top forms"
+     * breakdown already carries each form's id and threw it away, so its bars named five forms and led
+     * nowhere. Optional and per-datum, because the aggregated *Other (N)* bucket names no single object
+     * and must stay inert.
+     *
+     * ⚠️ SUPPLYING ONE CHANGES THE CHART'S ACCESSIBLE STRUCTURE — see `BarChart.vue`'s docblock. It has to:
+     * the plot is `role="img"`, and everything inside a `role="img"` is removed from the accessibility
+     * tree, so a link left in there would be unreachable rather than merely unlabelled.
+     */
+    href?: string;
 }
 
 export interface ChartLegendItem {

@@ -22,6 +22,13 @@
  * `danger-300` in dark and fails contrast on `bg-surface` at this size (found in H21d1); the badge's
  * `status-*-fg` on `status-*-bg` is the pairing that is actually verified. The arrow glyph is the
  * redundant channel, so direction never depends on colour alone (WCAG 1.4.1).
+ *
+ * J2a added `href`, and it is a LINK rather than a click emit — the `MdsCard` `interactive`/`as` precedent
+ * one directory over. Every tile on the dashboard names something the reader can go and look at, and until
+ * J2 not one of them was reachable: eleven tiles and charts, all inert markup. A `click` emit on the
+ * existing container would have been the smaller diff and the wrong answer — a div with a handler has no
+ * accessible name, no role, no keyboard route and no hover affordance, and would fail the same axe job that
+ * gates this package. Optional, so all pre-existing call sites keep rendering a plain container.
  */
 import { computed } from 'vue';
 import Badge from '../Badge/Badge.vue';
@@ -42,6 +49,8 @@ const props = withDefaults(
         unavailable?: boolean;
         unavailableNote?: string;
         caption?: string;
+        /** When set the whole tile becomes a link to this destination (J2a). */
+        href?: string;
     }>(),
     {
         value: null,
@@ -50,6 +59,7 @@ const props = withDefaults(
         unavailable: false,
         unavailableNote: undefined,
         caption: undefined,
+        href: undefined,
     },
 );
 
@@ -80,7 +90,12 @@ const deltaText = computed(() => {
 </script>
 
 <template>
-    <div class="mds-stat-tile">
+    <component
+        :is="href ? 'a' : 'div'"
+        class="mds-stat-tile"
+        :class="{ 'mds-stat-tile--link': href }"
+        :href="href"
+    >
         <span class="mds-stat-tile__badge" aria-hidden="true">
             <Icon :name="icon" size="md" />
         </span>
@@ -97,7 +112,7 @@ const deltaText = computed(() => {
 
             <p v-if="caption" class="mds-stat-tile__caption">{{ caption }}</p>
         </div>
-    </div>
+    </component>
 </template>
 
 <style scoped>
@@ -111,6 +126,28 @@ const deltaText = computed(() => {
     border-radius: var(--mds-radius-md);
     box-shadow: var(--mds-shadow-1);
     color: var(--mds-color-text-body);
+}
+
+/* A linked tile keeps the tile's own typography — `color: inherit` and no underline — and gains the
+   raise-on-hover + focus ring `MdsCard--interactive` uses, so the two read as one family. The value and
+   label are the accessible name; nothing extra is needed. */
+.mds-stat-tile--link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition:
+        box-shadow var(--mds-duration-base) var(--mds-ease-standard),
+        border-color var(--mds-duration-base) var(--mds-ease-standard);
+}
+
+.mds-stat-tile--link:hover {
+    box-shadow: var(--mds-shadow-2);
+    border-color: var(--mds-color-border-strong);
+}
+
+.mds-stat-tile--link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
 }
 
 .mds-stat-tile__badge {

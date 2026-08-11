@@ -1335,3 +1335,23 @@ their synthetic case and shipping labelled as fail-closed guards.
 `/members` needs it: `listMembers()` resolves identities on `pgsql_auth`, a separate session that cannot see
 `RefreshDatabase`'s uncommitted rows, and indexes with `$users[$m->user_id]` — so a `User::factory()` member
 500s the page on an undefined array key. It reads exactly like a product bug and is a fixture one.
+
+**CI then found two things no local gate could, and one of them defeats the control the last two increments
+installed.** The first was mine outright: `ConnectorDeepLinkTest` asserted a full absolute URL and passed
+locally, then failed all three dataset rows in CI, because the scheme is config-driven and defaults to
+`https` — `http` only in the dev container. Assert the PATH; a server-generated absolute URL is not a
+literal.
+
+The second is worth more. `analytics-axe.spec.ts` requires every bar chart's sr-only table to tabulate every
+plotted category, and making the form axis linkable **by design** drops that table: one linked datum takes
+the plot out of `role="img"`, which un-prunes every label and value into the accessibility tree and turns the
+table into a duplicate that announces the dataset twice. I ran the J2b/J2c grep over `tests/e2e/` for deleted
+strings and it correctly found nothing — because this is not a locator matching a label, it is a
+**behavioural contract asserted structurally**. The standing lesson needs its complement: grep for the
+strings you delete, and reason about the contracts you change. The Vitest twin of that very assertion was
+predicted and updated in the same increment; only a gate that cannot run locally caught its e2e counterpart.
+
+The fix **branches rather than relaxes**, and the distinction is the whole point: "a table OR some links"
+would have retired a §D12 gate to make a change pass. The interactive path now proves more than the old
+assertion did — links present, sr-only table deliberately absent, `.mds-bar__summary` present, every plotted
+category named in the tree, and the page's unconditional paired `MdsDataTable` still carrying the full list.

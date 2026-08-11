@@ -18,7 +18,7 @@ import { reactive } from 'vue';
 import { describe as group, expect, it, vi } from 'vitest';
 
 import ShareModal from './ShareModal.vue';
-import type { ShareProps } from '@/components/builder/types';
+import type { ShareProps } from '@/components/forms/types';
 
 // `reactive` is load-bearing, not tidiness: Inertia's real useForm returns a reactive object, and a plain
 // one here would leave every computed in the component frozen at its first value — the preview and the

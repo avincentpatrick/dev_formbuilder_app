@@ -104,6 +104,8 @@ a pending row to show. That is intended.
 1. `/forms` · owner. **Expect:** six forms. *Patient Intake*, *Community Health Survey 2026*, *Field Site
    Assessment*, *Referral Router* and *Staff Feedback 2025* are published; *Quarterly Report (draft)* is not.
 2. Open **Quarterly Report (draft)** → **Edit**. This opens the builder on an unpublished form.
+   *(Since J2b the row **title** goes to the form's hub instead — §2.1 — and **Edit** is how you reach the
+   builder directly. The title used to link to the builder, and only for a role that could edit it.)*
 3. Add a section, then add fields to it. **Expect:** the field-type picker offers around thirty types grouped
    by kind; each added field appears on the canvas and is selected, with its settings in the right-hand panel.
 4. Rename a field's label and change its key. **Expect:** the change is saved without a page reload (watch for
@@ -122,6 +124,37 @@ a pending row to show. That is intended.
     configured field.
 11. On a published form, use **Export XLSForm**. **Expect:** an `.xlsx` download. Re-import it into a draft to
     confirm the round trip.
+
+### 2.1 The form hub — PRD §3.7 (Increment J2b)
+
+Before this existed, a GET on `/forms/{form}` answered **405** and *nothing in the product could link to a
+form*: the audit ledger sent form targets to `/forms`, global search sent them to the builder, and a
+submission printed its form's title as an unlinked heading. This section is that page.
+
+1. `/forms` · owner → click the **title** *Community Health Survey 2026* (not a row button). **Expect:** the
+   form's hub at `/forms/{id}` — a breadcrumb reading *Forms / Community Health Survey 2026*, a tab strip
+   (**Overview · Responses · Builder · Analytics**) with Overview marked current, and four tiles: total
+   responses, drafts in progress, whether it is accepting responses, and when the last one arrived.
+2. Check the tiles against §7's dashboard for the same form. **Expect:** the same totals. They are computed
+   through the same visibility scope the inbox uses, so the hub and the list it links to cannot disagree.
+3. Click the **Responses** tile. **Expect:** the submissions inbox, filtered to this form.
+4. Click a row in **Latest responses**. **Expect:** that submission's detail page.
+5. Walk the strip: **Responses → Builder → Analytics**, then use the breadcrumb's middle crumb to come back.
+   **Expect:** every page of the form is reachable from every other one **without touching the sidebar** —
+   that is the whole point of the increment. Note the builder shows the trail but not the strip (its
+   three-pane workspace cannot spare the height; the crumb is its way back).
+6. Look at the **Versions** panel. **Expect:** *v2 draft* above *v1 published* — publishing clones the
+   published structure forward into a fresh draft, so a form published once has two versions. **Print blank**
+   and **Restore** appear on the published row only; a draft has no printable content.
+7. Sign in as **viewer@demo.test**, then as **reviewer@demo.test**, and open the same hub. (The Reviewer
+   only holds grants on three forms, so use one of those.)
+   **Expect:** the page loads for both — this is J2b's authorization widening, and every other per-form page
+   refuses them. **Expect:** the strip is exactly **Overview · Responses** for both — *Builder* and
+   *Analytics* are gone, because both gate on abilities that resolve to "may edit this form". And *New
+   response*, *Publish*, *Share*, *Edit form* and *Print blank* are **absent rather than greyed out**: a
+   refused destination is never shown as disabled.
+8. As the **editor**, open the hub for a form you hold no grant on (reach it by editing the URL).
+   **Expect:** 403. Grants scope a `.own` role to the forms it names.
 
 ---
 

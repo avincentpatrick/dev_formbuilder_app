@@ -10,7 +10,14 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCheckbox, MdsModal, MdsSegmentedControl } from '@meridian/design-system';
+import {
+    MdsBreadcrumb,
+    MdsButton,
+    MdsCheckbox,
+    MdsModal,
+    MdsSegmentedControl,
+    type BreadcrumbItem,
+} from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -28,6 +35,17 @@ import { useEntitlements } from '@/composables/useEntitlements';
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
 const { selection, saving, canUndo, canRedo, conflict, library } = store;
+
+/**
+ * The toolbar's path trail (J2b), replacing the hand-rolled "← Forms" link. The middle crumb is the point:
+ * it reaches the form's HUB, which before this increment had no route at all, so the builder's only way out
+ * was back to the list.
+ */
+const crumbs = computed<BreadcrumbItem[]>(() => [
+    { label: 'Forms', href: '/forms' },
+    { label: props.form.title, href: `/forms/${props.form.id}` },
+    { label: 'Builder' },
+]);
 
 // Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
 // Each is server-gated on its route; this only spares a 402 click.
@@ -181,12 +199,26 @@ function submitImport(): void {
         <Head :title="`Edit · ${form.title}`" />
 
         <header class="builder__toolbar">
+            <!--
+                J2b. The hand-rolled "← Forms" link became a real trail so the builder can reach the form's
+                HUB and not only the list — one of the six pages that hand-rolled the same back link before
+                `MdsBreadcrumb` existed.
+
+                ⚠️ THREE CRUMBS, and the middle one is the load-bearing addition: `MdsBreadcrumb` renders the
+                LAST item as text whatever it carries, so a two-crumb trail ending in the form's title would
+                print the hub's name with no way to click it.
+
+                The builder deliberately does NOT get the tab strip (user decision, J2b), unlike the hub and
+                the analytics page. This is a three-pane workspace on a `height: 100%` grid; a second ~44px
+                header row costs the one screen in the product that cannot spare the vertical space, and the
+                trail already provides the way out. DSR §3.4 records it.
+            -->
             <div class="builder__title-group">
-                <Link href="/forms" class="builder__back" aria-label="Back to forms">
-                    <span aria-hidden="true">←</span> Forms
-                </Link>
-                <h1 class="builder__title">{{ form.title }}</h1>
-                <span v-if="draft" class="builder__version">Draft v{{ draft.version_number }}</span>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+                <div class="builder__title-row">
+                    <h1 class="builder__title">{{ form.title }}</h1>
+                    <span v-if="draft" class="builder__version">Draft v{{ draft.version_number }}</span>
+                </div>
             </div>
             <div class="builder__actions">
                 <span class="builder__save" role="status" aria-live="polite">
@@ -456,27 +488,21 @@ function submitImport(): void {
     background-color: var(--mds-color-bg-surface);
 }
 
+/* A column since J2b: the trail sits above the title rather than inline beside it, which is where a
+   breadcrumb belongs and is also the only arrangement that does not push the title off a narrow toolbar. */
 .builder__title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+.builder__title-row {
     display: flex;
     align-items: center;
     gap: var(--mds-space-3);
     min-width: 0;
-}
-
-.builder__back {
-    color: var(--mds-color-text-secondary);
-    font-size: var(--mds-type-body-sm-font-size);
-    text-decoration: none;
-    white-space: nowrap;
-}
-.builder__back:hover {
-    color: var(--mds-color-text-body);
-    text-decoration: underline;
-}
-.builder__back:focus-visible {
-    outline: 2px solid var(--mds-color-focus-ring);
-    outline-offset: 2px;
-    border-radius: var(--mds-radius-sm);
 }
 
 .builder__title {

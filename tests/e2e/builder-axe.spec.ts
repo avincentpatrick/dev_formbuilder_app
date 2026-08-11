@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { forceTheme } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
 // surface. Unlike the goto-only responsive-axe spec, this DRIVES the builder's real interactive states:
@@ -108,12 +109,6 @@ async function assertBackgroundInert(page: Page): Promise<void> {
         await page.getByRole('dialog').first().evaluate((el) => el.closest('[inert]') === null),
         'the dialog itself must NOT be inert — otherwise the scan below measures nothing',
     ).toBe(true);
-}
-
-async function openBuilder(page: Page, formTitle: string): Promise<void> {
-    await page.goto('/forms', { waitUntil: 'networkidle' });
-    await page.getByRole('link', { name: formTitle }).click();
-    await page.waitForURL('**/builder', { timeout: 30_000 });
 }
 
 for (const theme of themes) {

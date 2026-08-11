@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import { assertClean, forcePersonalization, forceTheme } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 /**
  * Increment G11 — the personalization axes (design-system-reference.md §2.9).
@@ -63,9 +64,7 @@ for (const target of reflowPages) {
 test('Builder at extra_large + dyslexia font + teal — accessible & no horizontal overflow', async ({
     page,
 }) => {
-    await page.goto('/forms', { waitUntil: 'networkidle' });
-    await page.getByRole('link', { name: 'Community Health Survey' }).click();
-    await page.waitForURL('**/builder', { timeout: 30_000 });
+    await openBuilder(page, 'Community Health Survey');
     await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
 
     await forceTheme(page, 'dark');

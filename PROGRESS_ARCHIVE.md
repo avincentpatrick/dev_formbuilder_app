@@ -1063,3 +1063,95 @@ before the paint). **Fixing both took the E2E job from 464 passed / 1 failed / 1
 which retires the `:159` "known flake, do not chase" entry and very likely I11a's empty-canvas one: they were
 this artifact all along. Merged gates: Pest 3336/0 (13,194 assertions), Vitest 90 files/1583, PHPStan 23 delta 0,
 Pint 1135, controller-gate 83, openapi.json byte-identical, e2e 466/0/0.
+
+## 2026-08-11 — J2 begins: the form hub. J2a merged (#127); J2b's server half committed.
+
+J2a (PR #127, `d80730d`, 6/6 with real steps) shipped the primitives: `MdsTabNav`, `MdsBreadcrumb`, and
+optional links on `MdsStatTile` + `BarDatum`. Package-only, so all 17 existing tile call sites and 12 charts
+render byte-identical output. **`MdsTabNav` is deliberately NOT the ARIA tablist** DSR §3.4 also specifies —
+its items are links that load a page, and a roving tabindex would remove every non-active destination from
+the tab sequence; no gate catches that, because a tablist of links is valid ARIA, so `TabNav.test.ts` is the
+only place in the repo asserting the absence of `tablist`/`role=tab`/`aria-selected`/`tabindex`.
+
+Its adversarial review found **a real WCAG 1.4.11 failure no gate we run can see**: the underline shipped as
+`action-primary-bg` — which is what §3.4's `--mds-primary-600` maps to, so it read as following the spec — but
+`-bg` is a FILL and `BRAND_RAMP_PAIRINGS` pairs it solely with `on_primary`, giving **2.12:1 in dark** (1.95:1
+teal) where a non-text component owes 3:1. `-fg` is guaranteed against surface AND canvas in both themes for
+every tenant brand. axe does not check border contrast. Two more: `isInteractive` and its template `v-if`
+tested different predicates, so `href: ''` stripped `role="img"` and its label and rendered zero links; and an
+unguarded `:href` bound `href=""` onto `MdsStatTile`'s div. And **un-pruning the chart's plot made it announce
+the dataset twice** — the sr-only table is the plot's alternative and now comes off when the plot is readable.
+Four claims in J2a's own docs were false and were corrected by counting (the `#breadcrumbs` slot had two
+consumers, not zero; 11 of 17 tables ship row actions, not all; 17 StatTile call sites, not eleven; the
+exceptions-log amendment contradicted itself within two sentences), and one of its tests was vacuous.
+`MdsDataTable` did NOT get `rowHref` — `#cell-<key>` already does the job and 11 tables would nest
+interactive content — recorded in DSR §3.3 as a decision with a real reconsideration trigger.
+
+J2b's server half (`f250519`, on `j2b-form-hub`, not pushed): `GET /forms/{form}` now exists, where a GET
+previously answered **405** — the reason nothing in the product could link to a form. Gated on the new
+`FormPolicy::viewOverview` = `dashboard.form.view AND (dashboard.org.view OR a grant)`, the user's decision
+and byte-for-byte the rule `Submission::scopeVisibleTo()` already applies, so it coins no permission key.
+`FormAnalyticsGateTest` passes unedited as proof the widening did not leak. `FormSharePresenter` was extracted
+from `BuilderPresenter` FIRST, with 40 builder/share cases passing unedited. **Its second mutation SURVIVED**
+— deleting the `dashboard.form.view` conjunct left all twelve cases green while the docblock already claimed
+the file mutated it out; no shipped role can distinguish the two, the conjunct stays because `resource_grants`
+is a capacity store rather than a permission store, and a synthetic member now pins it. Gates: Pest 332 in
+tests/Feature/Forms, Pint clean, controller-gate passed, **PHPStan 20 — DOWN from the 23 baseline**, because
+three `@property` timestamp annotations on `Form` cleared the new phantom plus three pre-existing ones.
+
+## 2026-08-11 — J2b finished: the form hub's Vue half, and the dead link it nearly shipped
+
+`GET /forms/{form}` had a route, a gate and a presenter but **no page** — `FormHubController` rendered
+`forms/Show`, which did not exist on disk. This session built it, gave it inbound links, and paid J2b's doc
+debt (the server half committed zero docs; `viewOverview` appeared nowhere in `docs/`).
+
+**The finding worth keeping: the strip's own second tab was a 404.** `FormHubPresenter::tabs()` emitted
+`/forms/{form}/submissions`, which is **J2c's route and does not exist yet** — so the page opened to remove
+dead ends would have shipped one in its primary navigation. It now points at `/submissions?form_id={id}`,
+verified safe by reading the code rather than hoping: the inbox takes `form_id` as a plain query string with
+no `Rule::in` and composes it as a bare `where`, so a form with zero responses filters to an empty list
+instead of 422-ing against a dropdown derived from forms-that-have-submissions. The durable fix is
+`FormTabSetReachabilityTest` — a dataset issuing a REAL request per tab href, one request per case because
+the tenant GUC is torn down on the way out. Mutating the href back reddens exactly two of its cases.
+
+**`MdsTabNav` and `MdsBreadcrumb` gained `linkComponent` (user decision).** Both rendered bare anchors, so
+every tab and crumb click was a full document load that tore down the persistent `AppLayout`. The package
+imports zero Inertia by design, so the element is injected instead; the default stays `'a'`, and both J2a
+specs plus every story pass **unedited**. Two things only the tests show: the injected component must receive
+`href` as a real prop (a fallthrough attribute renders a working-looking anchor that never becomes a client
+visit), and the call site must `markRaw` it. In a template the prop is `:ariaLabel` — `vue-tsc` treats the
+kebab spelling as an HTML attribute and then reports the required prop as missing.
+
+**Two more user decisions:** the builder takes the breadcrumb ONLY, not the strip (a three-pane workspace on
+a `height:100%` grid cannot spare a second header row), and `forms/Index.vue`'s row title was pulled forward
+from J2d — it linked to the builder and only for a role that could edit, so a non-editor saw inert text and
+the hub would otherwise have had no inbound link at all.
+
+**Three things the page refuses to do, each recorded where someone would add it.** The Last-response tile
+carries no href, because `max(submitted_at)` and `orderByDesc('id')` can name different rows. A recent row
+links only when the Responses tab is present — provable, since `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`,
+and unobservable in production because all five roles hold `submissions.view`, so it is labelled a
+fail-closed guard exactly like the `dashboard.form.view` conjunct. And a form's sub-page always takes THREE
+crumbs: `MdsBreadcrumb` renders the last as text, so a two-crumb trail prints the hub's name with no link on
+it — the dead end intact, with a separator.
+
+**Two type/markup traps paid once.** A `MdsDataTable` row shape must be a `type` alias, never an interface —
+TypeScript grants the implicit index signature only to the former, and as interfaces the failure cascades
+into every `#cell-*` slot binding `Record<string, unknown>`. And the panel headings are unconditional `h2`s:
+`heading-order` fails only when a panel is EMPTY, which for a brand-new form is both at once — a state no
+seeded e2e fixture can reach, so it is pinned in Vitest.
+
+Gates: full Pest 3049/0 (12,260 assertions, 3051 collected so nothing was skipped); Forms + Analytics 453/0
+on their own with `FormAnalyticsGateTest` and `BuilderRoutesTest` **unedited**; Vitest 93 files / 1,645
+tests; PHPStan 20 (delta 0); Pint clean; controller-gate 43, migration-lint 63, job-payload-lint 28; vue-tsc
+clean; build clean; `openapi.json` byte-identical. Four mutations run, each reddening exactly one case.
+
+**And a gate-measurement finding worth more than the numbers: the recorded Pest baselines are not
+reproducible by the command the tracker documents, and the gap is not J2's.** A full local
+`vendor/bin/pest` gives 3,049 of 3,051 collected against J1e's recorded 3,336. Three checks say no test was
+lost: collected equals executed; `tests/Unit` + `tests/Feature` sum exactly to the collected total and no
+`*Test.php` lives outside those two registered suites; and static `it(`/`test(` counts rise monotonically
+across `59971c3` → `d80730d` → `f250519` → HEAD as 2,607 → 2,607 → 2,620 → 2,638, with the +13 landing
+exactly on `FormHubGateTest` and the +18 on this session's two files. CI runs `php artisan test` while the
+tracker documents `vendor/bin/pest`, which is the likeliest divergence. Report the DELTA, not the absolute —
+the PHPStan lesson applied one gate over.

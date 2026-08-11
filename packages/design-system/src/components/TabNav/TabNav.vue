@@ -63,8 +63,27 @@
  * destination, and there are a dozen of them, so `MdsBarChart` keeps the value outside its anchor. The rule
  * the two share: a count belongs in the name when it describes the DESTINATION, and outside it when it is
  * the data being plotted.
+ *
+ * ── `linkComponent` — how the strip does an SPA visit without this package knowing Inertia exists (J2b) ──
+ * Each item renders as a bare anchor by default, which in an Inertia application means a **full document
+ * load** on every tab click: the persistent AppLayout the router goes out of its way to keep mounted is torn
+ * down and rebuilt, the shell flashes, and every long-lived piece of client state (the command palette, the
+ * notification poll, the resolved theme) re-initialises. On the strip that IS a form's primary navigation
+ * that is the difference between an application and a set of documents.
+ *
+ * This package imports nothing from Inertia and must not start — Storybook renders these components with no
+ * router present, and a router import would make every story a mock-setup exercise. So the consumer passes
+ * its own link element instead: `linkComponent` accepts a component (Inertia's Link) or a tag name, and the
+ * item renders through a dynamic component with the same href, class and `aria-current` it always had. A
+ * passed component receives `href` as a prop; the default, the string `'a'`, receives it as an attribute,
+ * and the rendered markup is identical either way.
+ *
+ * ⚠️ THE DEFAULT MUST STAY `'a'`. It is what keeps every existing story, every existing call site and the
+ * whole of `TabNav.test.ts` correct without a single edit — those files passing unedited is the evidence this
+ * prop added a capability rather than changed a behaviour. Anything that makes the Inertia path the default
+ * silently couples this package to an application framework.
  */
-import { computed } from 'vue';
+import { computed, type Component } from 'vue';
 import Badge from '../Badge/Badge.vue';
 import Icon from '../Icon/Icon.vue';
 import type { IconName } from '../Icon/icons';
@@ -82,17 +101,26 @@ export interface TabNavItem {
     badge?: string | number;
 }
 
-const props = defineProps<{
-    items: TabNavItem[];
-    /** The `key` of the item representing the page currently open. */
-    current: string;
-    /**
-     * Names the landmark. Required, and it should name the RESOURCE ("Clinic Intake") rather than say
-     * "Tabs": a page can hold several navigation landmarks, and axe's `landmark-unique` distinguishes them
-     * by accessible name.
-     */
-    ariaLabel: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        items: TabNavItem[];
+        /** The `key` of the item representing the page currently open. */
+        current: string;
+        /**
+         * Names the landmark. Required, and it should name the RESOURCE ("Clinic Intake") rather than say
+         * "Tabs": a page can hold several navigation landmarks, and axe's `landmark-unique` distinguishes them
+         * by accessible name.
+         */
+        ariaLabel: string;
+        /**
+         * What each item renders as. Defaults to a plain anchor; an Inertia application passes its own Link
+         * so a tab switch is a client visit rather than a document load. See the docblock — the default is
+         * load-bearing and must not change.
+         */
+        linkComponent?: Component | string;
+    }>(),
+    { linkComponent: 'a' },
+);
 
 /**
  * The active item resolved ONCE, by index.
@@ -111,7 +139,8 @@ const currentIndex = computed(() => props.items.findIndex((item) => item.key ===
              semantics for — the same fix and the same reason as `NotificationBell.vue`'s panel list. -->
         <ul class="mds-tabnav__list" role="list">
             <li v-for="(item, index) in items" :key="item.key" class="mds-tabnav__item">
-                <a
+                <component
+                    :is="linkComponent"
                     class="mds-tabnav__link"
                     :class="{ 'is-current': index === currentIndex }"
                     :href="item.href"
@@ -124,7 +153,7 @@ const currentIndex = computed(() => props.items.findIndex((item) => item.key ===
                         variant="neutral"
                         :label="String(item.badge)"
                     />
-                </a>
+                </component>
             </li>
         </ul>
     </nav>

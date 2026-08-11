@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\User;
 use App\Services\Analytics\FormAnalyticsPresenter;
+use App\Support\Forms\FormTabSet;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -37,6 +38,13 @@ final class FormAnalyticsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('forms/Analytics', $presenter->show($form, $user));
+        // The form's tab strip (J2b) is composed HERE rather than in the presenter, and this controller's
+        // own docblock above is the argument: WHO MAY SEE WHAT is decided here and in the route, and a tab
+        // set is nothing but that question asked four times. It also keeps the presenter's "nothing is read
+        // from the request, every knob is a literal" property exactly as it stands.
+        return Inertia::render('forms/Analytics', [
+            ...$presenter->show($form, $user),
+            'tabs' => FormTabSet::for($form, $user),
+        ]);
     }
 }

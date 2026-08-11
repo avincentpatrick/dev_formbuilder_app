@@ -36,7 +36,7 @@ import {
     MdsNumberInput,
     MdsTextInput,
 } from '@meridian/design-system';
-import type { ShareProps } from '@/components/builder/types';
+import type { ShareProps } from '@/components/forms/types';
 
 const props = defineProps<{
     open: boolean;

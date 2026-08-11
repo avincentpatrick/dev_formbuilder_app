@@ -133,6 +133,46 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 > after review (`submissions.edit.*`, I9) are different questions with different answers. Mirrored in
 > `Submission::scopeVisibleTo()` so the single-row check and the inbox query still express one rule.
 
+> **Design Note (J2b, 2026-08-11) — `FormPolicy::viewOverview()` composes two rows of this table and coins
+> no key; the catalog stays closed at 29.** The form hub (`GET /forms/{form}`) is the first surface that
+> needed "may this person *read about* a form", as distinct from "may they change it". `FormPolicy::view()`
+> could not answer it: it delegates to `canEdit()`, so `can:view,form` and `can:update,form` admit the
+> identical set and refuse the **Reviewer and the Viewer** — precisely the two roles the hub exists to give a
+> destination to, since they are the ones who meet a form's title in the inbox, the audit ledger and global
+> search with nowhere to click. Widening `view()` would have silently widened the analytics page with it.
+>
+> The new ability is, verbatim:
+>
+> ```php
+> $user->can('dashboard.form.view')
+>     && ($user->can('dashboard.org.view') || $this->grants->holdsAny($user, $form));
+> ```
+>
+> That is byte-for-byte the split `Submission::scopeVisibleTo()` and `AnalyticsFormSet::visible()` already
+> apply, and the one this table has documented against `dashboard.form.view` since Phase 0 — "✓ (own forms)"
+> for Editor and Reviewer is exactly the grant arm. It discloses nothing new either: a Viewer already reads
+> every submission in the tenant and every org-wide KPI on the dashboard. What they gain is a destination,
+> not a fact. `holdsAny()`, never `holds(Editor)` — a Reviewer's grant is reviewer capacity, so an
+> editor-capacity check would refuse the single role the ability was widened for.
+>
+> ⚠️ **THE `dashboard.form.view` CONJUNCT IS A FAIL-CLOSED GUARD AND NO SHIPPED ROLE CAN OBSERVE IT.** Stated
+> precisely because the first draft of the policy's own docblock claimed the test suite "mutates it out and
+> requires that case to redden", and when the mutation was actually run **all twelve cases stayed green**.
+> All five seeded roles hold the key, and the only product path that changes a member's authority
+> (`PATCH /members/{user}/role`) assigns one of those five — so nothing a user can do today distinguishes
+> the two implementations. It stays because `resource_grants` is a **capacity** store and not a permission
+> store: a grant says "editor capacity on this form", never "may read this tenant's forms". Drop it and the
+> day a custom permission set becomes reachable, the hub becomes readable on the strength of a grant alone.
+> `FormHubGateTest` pins it with a synthetic member built on `ResourceGrantServiceTest`'s `actorWith()`
+> idiom, labelled there as unreachable-today rather than presented as a live rule.
+>
+> **The same composition appears once more, on the client.** The hub links a recent response to
+> `/submissions/{id}` only when the reader was offered the Responses tab, and that is provable rather than a
+> proxy: `viewAny` is `submissions.view` alone, `view(row)` is that key AND the disjunction above, and the
+> rows were already filtered through `scopeVisibleTo()` — which is that same disjunction **minus the key**.
+> So `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`. It is unobservable for the same reason: all five roles hold
+> `submissions.view`.
+
 > **Design Note (ADR-0011 / H1e, 2026-08-03) — advanced analytics coins no permission.** The Phase-3
 > analytics surface (H24a/H24b) authorizes on `dashboard.org.view` and `dashboard.form.view` exactly as
 > shipped: the org-wide-versus-own-forms split those two already encode *is* the visibility split an

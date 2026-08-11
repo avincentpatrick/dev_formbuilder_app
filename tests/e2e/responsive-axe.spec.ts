@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 // Composed-page responsive + accessibility gate. Each authenticated tenant page is scanned at the
 // three reference viewports (the config's projects) in light AND dark for zero WCAG 2.2 AA violations,
@@ -129,14 +130,13 @@ for (const p of filteredToZero) {
     }
 }
 
-// The interactive builder (D4a). Reached via the form title link on the list (no id in the URL); the
+// The interactive builder (D4a). Reached by clicking through the list and then the HUB's Builder tab (no id
+// in the URL) — see `support/navigate`, which owns that two-step walk for all six specs that need it; the
 // page auto-selects the first field on load, so the config panel + tabs are mounted for the scan. The
 // full interaction-driven pass (opening dialogs, keyboard reorder + aria-live) is D4b.
 for (const theme of themes) {
     test(`Builder (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Community Health Survey' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Community Health Survey');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Builder');
@@ -165,9 +165,44 @@ for (const theme of themes) {
             .getByRole('button', { name: 'Response statistics' })
             .click();
         await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/analytics$/, { timeout: 30_000 });
-        await page.getByRole('link', { name: '← Forms' }).waitFor({ state: 'visible', timeout: 10_000 });
+        // J2b replaced this page's hand-rolled "← Forms" link with `MdsBreadcrumb` + `MdsTabNav`, so the old
+        // `getByRole('link', { name: '← Forms' })` settle locator no longer matches anything. Waiting on the
+        // STRIP rather than a crumb is the better choice anyway: it is the last thing this page renders and
+        // it only appears once the server's tab set has arrived.
+        await page.getByRole('navigation', { name: 'Community Health Survey' })
+            .waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Form analytics');
+    });
+}
+
+// The form hub (J2b) — `/forms/{form}`, the page every other surface starts linking to in J2d.
+//
+// Reached by CLICKING rather than by a literal path, the house rule for any uuid route: the id is minted by
+// the seeder, so a hard-coded URL would be a fixture guess. The row TITLE is the entry point, which is
+// itself part of what this increment changed — it used to link to the builder and only for a role that
+// could edit.
+//
+// ⚠️ THE SCAN IS WORTH RUNNING BECAUSE OF WHAT "Community Health Survey" HOLDS: nine countable responses
+// across three channels plus a draft, so the recent-responses panel is populated and the four stat tiles
+// carry real values rather than em dashes. The EMPTY case — where both panels render `MdsEmptyState` under
+// their h2, and `heading-order` is at stake — is covered in `show.test.ts`, which can construct a form with
+// no responses at all; no seeded fixture here can, because the seeder exists to populate them.
+for (const theme of themes) {
+    test(`Form hub (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/forms', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'Community Health Survey' })
+            .getByRole('link', { name: 'Community Health Survey' })
+            .click();
+        // No trailing segment: the hub IS `/forms/{uuid}`, so the anchor matters or this matches the
+        // builder and the analytics page too.
+        await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('navigation', { name: 'Community Health Survey' })
+            .waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Form hub');
     });
 }
 
@@ -177,9 +212,7 @@ for (const theme of themes) {
 // `assertClean` horizontal-overflow check is doing real work here rather than being a formality.
 for (const theme of themes) {
     test(`Builder logic view (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Logic Notices Demo');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         // The server-derived notice, so the widest state of the card is on screen when the scan runs.
@@ -197,9 +230,7 @@ for (const theme of themes) {
 // three times (H12b, H14, H15b), and this is the deepest control nesting the builder has.
 for (const theme of themes) {
     test(`Builder condition editor (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page.getByRole('link', { name: 'Logic Notices Demo' }).click();
-        await page.waitForURL('**/builder', { timeout: 30_000 });
+        await openBuilder(page, 'Logic Notices Demo');
         await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();

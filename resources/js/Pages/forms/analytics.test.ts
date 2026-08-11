@@ -68,6 +68,15 @@ function render(overrides: Partial<FormReport> = {}): VueWrapper {
         props: {
             form: { id: 'f1', title: 'Clinic Intake' },
             report: report(overrides),
+            // The form's tab strip (J2b), resolved server-side by `FormTabSet`. A full four-tab set rather
+            // than an empty one so the strip actually renders here: `MdsTabNav` renders nothing at all for
+            // an empty list, which would make every assertion about it vacuously true.
+            tabs: [
+                { key: 'overview', label: 'Overview', href: '/forms/f1', icon: 'forms' as const },
+                { key: 'submissions', label: 'Responses', href: '/submissions?form_id=f1', icon: 'submissions' as const },
+                { key: 'builder', label: 'Builder', href: '/forms/f1/builder', icon: 'edit' as const },
+                { key: 'analytics', label: 'Analytics', href: '/forms/f1/analytics', icon: 'chart-bar' as const },
+            ],
         },
     });
 }
@@ -206,6 +215,38 @@ describe('forms/Analytics — the page contract', () => {
 
         expect(wrapper.find('a[href="/forms"]').text()).toContain('Forms');
         expect(wrapper.text()).toContain('Clinic Intake');
+        wrapper.unmount();
+    });
+
+    /**
+     * J2b. This page was one of the six that could only get back to `/forms` — it printed the form's title
+     * as plain prose and offered no way to reach the form itself, because until this increment there was no
+     * `/forms/{form}` route to reach.
+     *
+     * ⚠️ THE MIDDLE CRUMB IS THE ASSERTION THAT MATTERS. `MdsBreadcrumb` renders the LAST item as text
+     * whatever it carries, so the natural-looking two-crumb trail (Forms → Clinic Intake) would print the
+     * hub's name with no link on it and pass a laxer test — the dead end intact, now with a separator.
+     */
+    it('reaches the form hub through the trail, not just the list', () => {
+        const wrapper = render();
+
+        const crumb = wrapper.find('a[href="/forms/f1"]');
+
+        expect(crumb.exists()).toBe(true);
+        expect(crumb.text()).toBe('Clinic Intake');
+        // The trail's tail is this page, and it is text rather than a self-link.
+        expect(wrapper.get('.mds-breadcrumb [aria-current="page"]').text()).toBe('Response statistics');
+
+        wrapper.unmount();
+    });
+
+    it('carries the form tab strip with Analytics marked current', () => {
+        const wrapper = render();
+        const nav = wrapper.get('.mds-tabnav');
+
+        expect(nav.get('[aria-current="page"]').text()).toContain('Analytics');
+        expect(nav.findAll('a')).toHaveLength(4);
+
         wrapper.unmount();
     });
 

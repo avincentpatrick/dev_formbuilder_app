@@ -1250,3 +1250,17 @@ shows only that the runner ran what it collected, and the companion `Unit + Feat
 self-referential. The correct local check is the FILE COUNT, exactly as for Vitest. Until the root cause is
 closed, a local full-suite Pest absolute *or delta* is not reportable; CI is the authority and an increment's
 own tests are verified by running their files directly.
+
+**J2c closed the same day at PR #129 (`199ba16`), 6/6 with real steps — but its first CI run was red, and
+the defect was a lesson written down twenty lines from where it was broken.** Six deterministic E2E
+failures, every `Submission detail` scan, because the settle locator waited on `← Back to submissions` —
+the hand-rolled link J2c had just replaced with `MdsBreadcrumb`. J2b made the identical substitution on the
+analytics page, updated its locator in the same commit, and left a comment in that very file explaining it.
+The control costs one grep: before deleting a string from a page, grep `tests/e2e/` for it. The replacement
+waits on the trail's LANDMARK rather than a crumb's text, so it survives changes to the trail's depth.
+
+CI reconciles the increment exactly: **Pest 3397/0** (13,656 assertions), **+27** on J2b's 3370, matching the
+additions one for one — 10 gate + 9 page + 6 inbox + 2 reachability. **E2E 478 passed / 0 failed / 2 skipped
+and 0 FLAKY**, the first zero-flaky run since J1e, which is `settlePaint()` working: J2b's run carried one,
+and its cause was measured (an intermediate foreground over a settled background, on the button the test had
+just clicked) rather than shrugged at.

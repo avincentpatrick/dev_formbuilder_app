@@ -64,10 +64,17 @@ it('deep-links a form lifecycle event to the hub, not the builder', function (Do
      * The string assertion, and here it is the PRIMARY one rather than a supplement: there is no reader to
      * navigate as, so "does it resolve for the role that receives it" is not a question this surface can
      * ask. What can be pinned is the exact path — and `/builder` is the specific wrong answer that shipped.
+     *
+     * ⚠️ THE PATH, NOT THE ABSOLUTE URL — AND CI IS WHAT TAUGHT ME THAT. The first version asserted
+     * `'http://acme.meridian.test/forms/'.$id` and passed locally, then failed all three dataset rows in CI:
+     * the scheme is `config('connectors.tenant_url_scheme')`, which defaults to **https** and is `http` only
+     * in the dev container. The host and scheme belong to `ConnectorRedirector` and the environment; what
+     * J2d changed, and therefore the only thing this case should pin, is the PATH.
      */
     $context = $this->resolver->resolve(formEventEnvelope($type, $this->tenant->id, $this->form->id));
 
-    expect($context->deepLink)->toBe('http://acme.meridian.test/forms/'.$this->form->id)
+    expect(parse_url((string) $context->deepLink, PHP_URL_PATH))->toBe('/forms/'.$this->form->id)
+        ->and(parse_url((string) $context->deepLink, PHP_URL_HOST))->toBe('acme.meridian.test')
         ->and($context->deepLink)->not->toContain('/builder')
         ->and($context->formName)->toBe('Clinic Intake');
 })->with([

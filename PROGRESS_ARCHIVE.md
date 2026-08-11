@@ -1141,7 +1141,17 @@ into every `#cell-*` slot binding `Record<string, unknown>`. And the panel headi
 `heading-order` fails only when a panel is EMPTY, which for a brand-new form is both at once — a state no
 seeded e2e fixture can reach, so it is pinned in Vitest.
 
-Gates: Forms + Analytics Pest 453/0 (1,970 assertions) with `FormAnalyticsGateTest` and `BuilderRoutesTest`
-**unedited**; Vitest 93 files; PHPStan 20 (delta 0); Pint clean; controller-gate 43, migration-lint 63,
-job-payload-lint 28; vue-tsc clean; build clean; `openapi.json` byte-identical. Four mutations run, each
-reddening exactly one case.
+Gates: full Pest 3049/0 (12,260 assertions, 3051 collected so nothing was skipped); Forms + Analytics 453/0
+on their own with `FormAnalyticsGateTest` and `BuilderRoutesTest` **unedited**; Vitest 93 files / 1,645
+tests; PHPStan 20 (delta 0); Pint clean; controller-gate 43, migration-lint 63, job-payload-lint 28; vue-tsc
+clean; build clean; `openapi.json` byte-identical. Four mutations run, each reddening exactly one case.
+
+**And a gate-measurement finding worth more than the numbers: the recorded Pest baselines are not
+reproducible by the command the tracker documents, and the gap is not J2's.** A full local
+`vendor/bin/pest` gives 3,049 of 3,051 collected against J1e's recorded 3,336. Three checks say no test was
+lost: collected equals executed; `tests/Unit` + `tests/Feature` sum exactly to the collected total and no
+`*Test.php` lives outside those two registered suites; and static `it(`/`test(` counts rise monotonically
+across `59971c3` → `d80730d` → `f250519` → HEAD as 2,607 → 2,607 → 2,620 → 2,638, with the +13 landing
+exactly on `FormHubGateTest` and the +18 on this session's two files. CI runs `php artisan test` while the
+tracker documents `vendor/bin/pest`, which is the likeliest divergence. Report the DELTA, not the absolute —
+the PHPStan lesson applied one gate over.

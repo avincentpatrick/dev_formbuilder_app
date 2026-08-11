@@ -393,7 +393,6 @@ describe('form hub — every payload key has a reader', () => {
         expect(text).toContain('Northern Region'); // form.scope_node_name
         expect(text).toContain('v3 live'); // form.current_version
         expect(text).toContain('142'); // stats.responses
-        expect(text).toContain('7'); // stats.drafts
         expect(text).toContain('Accepting'); // schedule.acceptance
         expect(text).toContain('Guest link'); // recent[].source_label
         expect(text).toContain('v2'); // versions[]
@@ -401,13 +400,28 @@ describe('form hub — every payload key has a reader', () => {
         expect(text).toContain('Edit form'); // can.edit
         expect(wrapper.findComponent({ name: 'ShareModal' }).exists()).toBe(true); // share
 
-        // `form.updated_at` and `stats.last_response_at` are dates, so they are asserted by presence of a
-        // formatted value rather than by a literal — the runner's locale decides the exact string.
-        expect(wrapper.text()).not.toContain('2026-08-01T09:00:00'); // rendered, not dumped raw
-        const lastTile = wrapper
-            .findAllComponents({ name: 'StatTile' })
-            .find((t) => t.props('label') === 'Last response');
-        expect(lastTile?.props('value')).not.toBeNull();
+        // ⚠️ THE REMAINING THREE ARE ASSERTED ON THE TILE'S `value` PROP, NOT ON PAGE TEXT, and the reason
+        // is that a text assertion here is worthless. `stats.drafts` is `7`, and `toContain('7')` passes
+        // against any page that happens to render a seven anywhere — including one where the drafts tile has
+        // been deleted outright, which is the single thing this case exists to notice. The two dates are the
+        // same problem from the other side: the runner's locale decides their exact string, so the only
+        // stable assertion is that a formatted value reached the tile rather than a raw ISO instant.
+        const valueOf = (label: string) =>
+            wrapper.findAllComponents({ name: 'StatTile' }).find((t) => t.props('label') === label)?.props('value');
+
+        expect(valueOf('Drafts in progress')).toBe('7'); // stats.drafts
+        expect(valueOf('Last response')).toEqual(expect.stringContaining('2026')); // stats.last_response_at
+        expect(valueOf('Last response')).not.toContain('T14:30'); // formatted, never the raw ISO instant
+
+        // `form.updated_at`, scoped to its own definition-list row rather than matched against page text.
+        // A bare `toMatch(/2026/)` over the whole page would pass on the version dates alone, so it would
+        // survive the very deletion this case is here to catch.
+        const lastEdited = wrapper
+            .findAll('.hub__meta-item')
+            .find((item) => item.get('dt').text() === 'Last edited');
+
+        expect(lastEdited?.get('dd').text()).not.toBe('—');
+        expect(lastEdited?.get('dd').text()).toContain('2026');
 
         wrapper.unmount();
     });

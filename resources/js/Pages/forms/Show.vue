@@ -251,8 +251,14 @@ function submitRestore(): void {
         {},
         {
             preserveScroll: true,
+            // ⚠️ The modal closes on SUCCESS, never on finish, and `forms/Index.vue` splits the two the same
+            // way. Restoring can fail — the publish path takes a row lock and a concurrent edit answers 409 —
+            // and clearing the target in `onFinish` would dismiss the dialog on failure too, throwing away
+            // the flash error along with the context that explains it. Only `busy` belongs in `onFinish`.
             onFinish: () => {
                 restoring.busy = false;
+            },
+            onSuccess: () => {
                 restoreTarget.value = null;
             },
         },

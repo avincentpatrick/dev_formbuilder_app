@@ -135,9 +135,20 @@ function isLast(index: number, length: number): boolean {
     min-width: 0;
 }
 
+/*
+ * `overflow-wrap: anywhere` on the LINK too, not only on the current crumb (J2b).
+ *
+ * J2a gave it to `__current` alone, on the reasonable assumption that the long, arbitrary, user-authored
+ * string in a trail is the page you are standing on. J2b is what made that false: a form's sub-pages read
+ * `Forms / {form title} / Builder`, so the tenant-authored text is now a middle crumb — and it is a LINK.
+ * `flex-wrap` breaks the trail between crumbs but cannot break inside one, so a long unspaced title would
+ * push past the viewport and fail `assertClean`'s horizontal-overflow check at 375px on the builder, the
+ * one screen with no room to give.
+ */
 .mds-breadcrumb__link {
     color: var(--mds-color-text-secondary);
     text-decoration: none;
+    overflow-wrap: anywhere;
 }
 
 .mds-breadcrumb__link:hover {

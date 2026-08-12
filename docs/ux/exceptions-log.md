@@ -403,3 +403,47 @@ mix ever changes, re-measure both endpoints against light `#FFFFFF` and dark `#1
 because nothing else will.
 
 ---
+
+## #12 — The data table collapses on its container, not on a tokenized viewport band (`packages/design-system/src/components/DataTable/DataTable.vue`)
+
+**The rule being excepted:** §2.7 names three breakpoint tokens (`mobile-max` 480px, `tablet-max`
+1024px, `desktop-min` 1025px) and §6 says the library implements the bands mobile-first with `min-width`
+media queries. `MdsDataTable`'s card-per-row collapse is now a **`@container (max-width: 56em)`** query
+on a query container the component establishes itself — neither a viewport query, nor one of the three
+tokenized numbers, nor `min-width`-first.
+
+**Why (measured, JR4).** The shell's sidebar is 240px above 1024px and 64px at or below it, so a tenant
+page's content box is **896px at a 1024px viewport and 721px at 1025px** — *narrower on the wider
+screen*. A `max-width` viewport query therefore fires its densest layout in the box with the least room,
+and a `min-width` one does the same thing from the other direction. The cost of the old
+`@media (max-width: 480px)` rule was concrete: across 481–1024px every table with five or more columns
+(`/submissions`, `/members`, `/audit-log`, `/webhooks`, `/feedback`, `/integrations`, `/admin/feedback`)
+was a sideways-scrolling strip — the component's own docblock had already called that "a latent defect
+in this component rather than that page's problem". No viewport number can express the fix, because the
+same viewport gives different tables different room.
+
+**Why 56em rather than a token.** 896px is the widest content box that can exist while the sidebar is
+still a rail (1024 − 64 − 64), so collapsing at exactly that width is what makes the transition
+*continuous* across the sidebar swap: cards at 1024, cards at 1025, table from 1201 up. Anything smaller
+reintroduces the inversion from the other side — a table that turns back into cards as the window
+widens. `em` rather than `px` because §2.9's font-size axis scales the type but not a px literal; the
+threshold resolves to 896 / 1008 / 1120px across the three scales. A `var()` is not available: container
+and media query conditions cannot read custom properties, which is also why the three §2.7 tokens have
+never had a single reference anywhere in the stylesheets.
+
+**Scope of the exception.** One component, one query. The three breakpoint tokens remain the contract
+for every layout that is genuinely keyed on the window — the sidebar's three states, the shell padding,
+the modal's full-screen sheet — and none of those moved. The gate is a column count of three or more,
+so a two-column table inside a ~300px chart card is never dragged in.
+
+**Known cost, stated rather than discovered later:** nothing in this repo can execute a container query.
+happy-dom lays nothing out, the Storybook axe run renders one viewport, and the e2e overflow assertion
+reads a `documentElement.scrollWidth` that `.app-shell { overflow-x: clip }` pins flat. The threshold and
+its reasoning are therefore pinned as **source-text assertions** in `DataTable.test.ts`, the collapsed
+layout gets three Storybook stories at a narrow container so axe sees it at all, and
+`tests/e2e/list-layout.spec.ts` measures the scroll wrapper's own box rather than the document's.
+
+**Disposition:** accepted. If the shell's sidebar widths or the content padding ever change, re-derive
+the threshold from the same two edges rather than adjusting it by eye.
+
+---

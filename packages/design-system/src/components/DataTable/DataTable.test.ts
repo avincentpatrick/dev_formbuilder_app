@@ -67,9 +67,9 @@ describe('MdsDataTable — scrollable region keyboard access', () => {
         wrapper.unmount();
     });
 
-    it('stays inert when content is wider but the box does not scroll (the mobile card layout)', async () => {
-        // At <=480px the component drops `overflow-x` to `visible`, so it is not a scroll container at all
-        // and must not claim a tab stop even though the content is wider than the box.
+    it('stays inert when content is wider but the box does not scroll (the card layout)', async () => {
+        // Below the collapse threshold the component drops `overflow-x` to `visible`, so it is not a
+        // scroll container at all and must not claim a tab stop even though the content is wider.
         const wrapper = mount(DataTable, { props: { columns, rows, caption: 'Delivery rules' } });
         const el = wrapper.find('.mds-table__scroll').element;
 
@@ -109,8 +109,13 @@ describe('MdsDataTable — the sort button must not drop the header’s type tre
         'utf8',
     );
 
-    const sortRule = source.match(/\.mds-table__sort\s*\{([^}]*)\}/);
-    const thRule = source.match(/\.mds-table__th\s*\{([^}]*)\}/);
+    // ⚠️ ANCHORED TO THE START OF A LINE (`/m`), WHICH THE FIRST VERSION OF THIS GUARD WAS NOT. JR4 added
+    // a container block whose selectors are compounds — `.mds-table__frame--stackable .mds-table__th` —
+    // and an unanchored pattern matches the TAIL of one, so a block authored above the base rules would
+    // silently retarget this test at the stacked declarations, where it would either fail for the wrong
+    // reason or pass vacuously. Base rules sit at column 0; everything inside an at-rule is indented.
+    const sortRule = source.match(/^\.mds-table__sort\s*\{([^}]*)\}/m);
+    const thRule = source.match(/^\.mds-table__th\s*\{([^}]*)\}/m);
 
     it('inherits every type property the header sets that a <button> would otherwise reset', () => {
         expect(sortRule, '.mds-table__sort rule not found — was it renamed?').not.toBeNull();
@@ -133,5 +138,112 @@ describe('MdsDataTable — the sort button must not drop the header’s type tre
     it('is not vacuous: the header really does set both properties today', () => {
         expect(thRule![1]).toMatch(/text-transform:\s*uppercase/);
         expect(thRule![1]).toMatch(/letter-spacing:\s*var\(--mds-tracking-wide\)/);
+    });
+});
+
+/**
+ * JR4 — WHICH tables may collapse to cards. This is the half of the collapse that lives in script, and
+ * it is the only half any runtime in this repo can observe: happy-dom lays nothing out, so a container
+ * query is invisible here by construction (the threshold itself is pinned as source text below).
+ *
+ * The gate exists because the two kinds of table overlap in width and cannot be told apart by one: a
+ * chart's paired two-column table sits in a ~300px card at EVERY viewport, and a full-width page on a
+ * phone is a ~343px container. Column count is what separates them.
+ */
+describe('MdsDataTable — which tables are eligible to collapse', () => {
+    const stackable = (wrapper: ReturnType<typeof mount>): boolean =>
+        wrapper.find('.mds-table__frame').classes().includes('mds-table__frame--stackable');
+
+    it('gates a two-column table out — it is already a key/value list', () => {
+        const wrapper = mount(DataTable, { props: { columns, rows, caption: 'Responses by channel' } });
+
+        expect(stackable(wrapper)).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('counts the row-actions cell, so two columns plus actions are in', () => {
+        // Not a technicality: an action cluster is real width, and `columnCount` has always counted it.
+        const wrapper = mount(DataTable, {
+            props: { columns, rows, caption: 'Workspaces' },
+            slots: { 'row-actions': '<button type="button">Suspend</button>' },
+        });
+
+        expect(stackable(wrapper)).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('gates a three-column table in', () => {
+        const wrapper = mount(DataTable, {
+            props: {
+                columns: [...columns, { key: 'source', header: 'Channel' }],
+                rows,
+                caption: 'Recent responses',
+            },
+        });
+
+        expect(stackable(wrapper)).toBe(true);
+
+        wrapper.unmount();
+    });
+
+    it('re-evaluates when the column set changes', async () => {
+        // The submissions inbox builds five or six columns depending on whether it is scoped to one form,
+        // so the gate has to be reactive rather than read once at mount.
+        const wrapper = mount(DataTable, { props: { columns, rows, caption: 'Responses' } });
+
+        expect(stackable(wrapper)).toBe(false);
+
+        await wrapper.setProps({ columns: [...columns, { key: 'source', header: 'Channel' }] });
+
+        expect(stackable(wrapper)).toBe(true);
+
+        wrapper.unmount();
+    });
+});
+
+/**
+ * JR4 — the collapse threshold, asserted as SOURCE TEXT for the same reason the JR2 guard above is:
+ * nothing in this repo can execute a container query. happy-dom computes no layout; Storybook's axe run
+ * renders one viewport; and the e2e horizontal-overflow assertion reads a document width that
+ * `.app-shell { overflow-x: clip }` pins flat. What these cases protect is the REASONING — a later
+ * edit that reaches for a viewport media query, or for `px`, is re-introducing a defect that was
+ * measured once and would be invisible on the way back in.
+ */
+describe('MdsDataTable — the collapse threshold', () => {
+    const source = readFileSync(
+        join(process.cwd(), 'packages/design-system/src/components/DataTable/DataTable.vue'),
+        'utf8',
+    );
+
+    it('collapses on the CONTAINER, never on the viewport', () => {
+        expect(source).toMatch(/@container \(max-width:/);
+        expect(
+            source,
+            'a viewport media query cannot see the sidebar inversion — the content box is 896px at a ' +
+                '1024px viewport and 721px at 1025px, so a max-width media query fires its densest ' +
+                'layout in the narrowest box',
+            // Anchored: the block comment in the component NAMES the rule it replaced, and prose about a
+            // defect is not the defect. An at-rule sits at column 0.
+        ).not.toMatch(/^@media \(max-width: 480px\)/m);
+    });
+
+    it('states the threshold in em, so it is correct at all three type scales', () => {
+        // A px threshold is right at exactly one setting of §2.9's font-size axis; JR3 shipped that and
+        // had to fix it. A container query's em resolves against the container's own font size.
+        expect(source).toMatch(/@container \(max-width:\s*\d+em\)/);
+    });
+
+    it('establishes the query container on the frame, not on the scroll wrapper', () => {
+        // A container query never matches its own container, and the collapse must set `overflow-x` ON
+        // the scroll wrapper — put `container-type` there and that declaration becomes unreachable.
+        expect(source).toMatch(/\.mds-table__frame\s*\{[^}]*container-type:\s*inline-size/);
+    });
+
+    it('keeps the grid track floor guarded, which no runtime gate can check', () => {
+        // A bare `minmax(20em, 1fr)` overruns a 343px container; `.app-shell` is `overflow-x: clip`, so
+        // the overrun is clipped rather than scrolled and the e2e assertion never sees it.
+        expect(source).toMatch(/minmax\(min\(100%, 20em\), 1fr\)/);
     });
 });

@@ -205,7 +205,13 @@ function canChangeRole(row: Member): boolean {
                 <MdsBadge v-bind="statusVariant(String(value))" dot />
             </template>
             <template #row-actions="{ row }">
-                <div class="members__actions">
+                <!-- ⚠️ THE WRAPPER IS CONDITIONAL, AND JR4's VISUAL SWEEP IS WHAT SHOWED WHY. Every
+                     button inside is individually gated, and the Owner's row passes none of them — so on
+                     a table row this rendered as an empty cell nobody noticed, and in the card layout it
+                     became a blank 50px strip at the foot of the Owner's card. Pre-existing (the same
+                     strip was there below 480px), but JR4 brings that layout to every tablet and most
+                     laptops, so it stopped being invisible. -->
+                <div v-if="canChangeRole(row) || canTransfer(row) || canRemove(row)" class="members__actions">
                     <MdsButton
                         v-if="canChangeRole(row)"
                         variant="tertiary"

@@ -17,8 +17,9 @@ import { type Locator, type Page } from '@playwright/test';
  * which form it wants and never which layout it expects.
  *
  * ⚠️ `tr` cannot be `getByRole('row')` here, and that is not an oversight: `MdsDataTable` drops table
- * ARIA for its card-per-row layout at 375px, so the role query finds nothing at the mobile viewport. The
- * tag selector is the thing that survives both of this page's layout switches.
+ * ARIA for its card-per-row layout, so the role query finds nothing wherever that layout is in force —
+ * since JR4 that is any width at which the table's CONTAINER is under 56em, i.e. the 834px project as
+ * well as 375px. The tag selector is the thing that survives every one of this page's layout switches.
  *
  * ⚠️ AND IT FILTERS ON THE TITLE LINK, NOT ON `hasText`, WHICH THE OLD CALL SITES USED. A card renders
  * the form's DESCRIPTION and the table row never did, so a substring text filter would newly match any

@@ -92,8 +92,10 @@ const facets = [
 const render = () => ({
     components: { Badge, Button, Card, IconButton, SegmentedControl },
     setup: () => ({ forms, viewOptions, facets, statusVariant, IDENTITY_VARS }),
+    // JR4: 1600, mirroring `.app-shell__inner--wide` — the forms list is one of the wide pages, and at
+    // that cap its grid gains a fourth column. Fidelity only; the Storybook iframe never reaches it.
     template: `
-        <main style="max-width:1200px;margin:0 auto;padding:var(--mds-space-8)">
+        <main style="max-width:1600px;margin:0 auto;padding:var(--mds-space-8)">
             <header style="display:flex;align-items:center;justify-content:space-between;
                            gap:var(--mds-space-4);margin-bottom:var(--mds-space-6)">
                 <h1 style="margin:0;font-size:var(--mds-type-heading-1-font-size);

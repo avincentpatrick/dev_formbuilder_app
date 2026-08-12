@@ -77,3 +77,27 @@ export const EmptyDark: Story = {
     decorators: [dark],
 };
 export const LoadingDark: Story = { args: { loading: true }, decorators: [dark] };
+
+/* JR4 — the collapsed layout, which until now existed only below a 480px VIEWPORT and was therefore
+   rendered by exactly one Playwright project and no story at all. Keying the collapse on the container
+   is what makes it storyable: the decorator below hands the table a narrow box and the cards appear at
+   whatever width the runner happens to use.
+   46em (736px) is chosen rather than rounded — under the 56em threshold, and over the 2 × 20em + gap the
+   row grid needs for two tracks, so this renders the 834px TABLET shape (2-up) rather than the phone one.
+   These three are also the only machine-checked a11y coverage the stacked layout will ever have: the
+   axe run is per-story, and no app page is in Storybook's glob. */
+const narrow: Decorator = (story) => ({
+    components: { story },
+    template: '<div style="max-width:46em"><story /></div>',
+});
+
+export const Stacked: Story = { decorators: [narrow] };
+export const StackedDark: Story = { decorators: [narrow, dark] };
+
+/* The `colspan` cell is the part of the stacked grid most likely to ship wrong — a colspan means nothing
+   to a grid, so without `grid-column: 1 / -1` the empty state is squeezed into one 20em track. axe
+   cannot see a layout; a person looking at this story is the gate. */
+export const StackedEmpty: Story = {
+    ...Empty,
+    decorators: [narrow],
+};

@@ -191,6 +191,10 @@ function logout(): void {
     flex: 1;
 }
 
+/* Deliberately NOT the tenant shell's 1600px wide class (JR4, `AppLayout.vue`'s `--wide`): the console
+   has no sidebar, so its gutter grows more slowly, and its own ≤900px bar-wrap block is measured against
+   these numbers. If this ever moves, re-derive `DataTable.vue`'s 56em collapse threshold with it — the
+   console at 834px (an 802px content box) is one of the two edges that pinned it. */
 .admin__inner {
     max-width: 1100px;
     margin: 0 auto;

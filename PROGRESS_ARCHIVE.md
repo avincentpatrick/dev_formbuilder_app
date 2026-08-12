@@ -1820,3 +1820,66 @@ closing and reopening it produced no run either; `actions/permissions` reports `
 exact failure `ci.yml`'s header block was written for, and both of its remedies are unavailable because
 `workflow_dispatch` and `schedule` are read from the DEFAULT branch only and `main` has received nothing yet.
 **Neither PR was merged**, because merging on local green is precisely the I5 precedent this tracker keeps.
+
+---
+
+## 2026-08-13 — LANE A: JR4, the list-page width class + the container-keyed tablet band (PR #141, `176fbe4`)
+
+Merged on 6/6 with real steps (11–20 each). CI **Pest 3615/0** (15,384 assertions — delta 0, JR4 touches no
+PHP), **E2E 502 passed / 1 flaky** (up from 488: the 13 new `list-layout` cases), **Storybook axe 223 across
+33 suites** (up from 220: exactly the three stories added). Local: Vitest **99 files / 1775 tests**, vue-tsc
+clean on both projects, `npm run build` clean, controller/migration/job lints **84 / 92 / 28**.
+
+**Two deliverables.** `.app-shell__inner` was 1200px beside a 240px sidebar, so the dead gutter per side ran
+0 @1440 · 80 @1600 · 240 @1920 · 560 @2560 — and Playwright's widest project is 1440, where it is exactly
+zero, which is why no gate ever saw it. Ten list/grid pages now take a 1600px column through a `WIDE_PAGES`
+set mirroring the existing `FLUID_PAGES` mechanism (one persistent layout instance, no props, no page-side
+change). Opt-IN deliberately: forgetting a list page changes nothing, while forgetting to exclude a settings
+form would render 1600px of input fields. `domains`, `search` and `scopes` are excluded and the exclusion is
+measured — they are single-column stacks of full-width cards, so widening them *causes* the defect.
+
+And `MdsDataTable` collapsed to card-per-row only at `@media (max-width: 480px)`, leaving 481–1024px a
+sideways-scrolling strip on six tenant list pages, three log pages and the admin console. It now carries
+`container-type: inline-size` on a new frame element and collapses below **56em of container**.
+
+**The row's framing was half wrong, and the code said so in ten minutes.** "The other eight list pages, still
+bare MdsDataTables" — five of the pages named render no table at all. The real inventory is 22 tag sites in
+17 files. Three increments running, the doc-sourced row has been wrong about its own scope.
+
+**56em is derived.** The sidebar is 240px above 1024px and 64px at or below, so the content box is 896px at a
+1024px viewport and **721px at 1025px** — narrower on the wider screen. 896 is the widest box that can exist
+while the sidebar is still a rail, so collapsing at exactly that width makes the switch *continuous* across
+the swap: cards at 375/834/1024/1025/1200, table from 1201, zero document overflow at all nine viewports.
+Any smaller threshold turns a table back into cards as the window widens. Gated on `columnCount >= 3` because
+the two-column chart tables sit in ~300px cards at every viewport while a full-width phone is ~343px — the
+ranges overlap, so no single width can separate them.
+
+**Three things the collapse needed that the old block never did:** `display: block` on the table (a grid child
+of a `display: table` element gets an anonymous cell), `grid-column: 1 / -1` on the zero-rows row (a colspan
+means nothing to a grid — and `responsive-axe` loads `/members?q=…` at 834px asserting only a heading, so it
+would have passed straight over it), and `thead { display: none }` instead of the visually-hidden clip,
+because thirteen sortable columns put their toggle in that header and a clipped control is still a focus stop
+nobody can see. The toggles are re-rendered as a chip row above the cards.
+
+**Two defects the visual sweep found, and the first was my own fix.** `minmax(12rem, 22rem)` on `MdsFilterBar`
+is wrong: `auto-fit` counts repetitions from the MAX track size when it is definite, so a 706px tablet bar
+packed one control per row where it had packed three — a cosmetic slab turned into a four-row filter rail on
+the exact viewport the increment exists to fix. The cap belongs on the child. Second, the Owner's row on
+`/members` passes none of its action gates, so the card layout gave it a blank 50px strip.
+
+**And the sweep itself nearly lied.** `networkidle` never settles against a Vite dev server under load. Worse,
+the first two runs measured the OLD component: inotify does not cross the Windows Docker bind mount, so the
+dev server never saw a single edit and `.mds-table__frame` was absent from every frame. Restart the node
+container after any SFC edit and confirm what Vite is actually serving before believing a frame.
+
+**Recorded as `exceptions-log.md` #12**, because §6 said the table collapses "at the mobile breakpoint" and
+that the library implements bands mobile-first with `min-width` — a container query is neither. Scope: one
+component, one query; the three breakpoint tokens remain the contract for everything genuinely keyed on the
+window. Cost: nothing in this repo can execute a container query, so the threshold is pinned as source-text
+assertions, the collapsed layout finally has Storybook stories, and `tests/e2e/list-layout.spec.ts` measures
+the scroll wrapper's own box rather than a document width `overflow-x: clip` keeps flat.
+
+**A measurement lesson worth more than the increment:** JR3 recorded Pest 3600 from its own BRANCH, which
+forked before Lane B's connector work landed; 3615 is what `phase1-completion` totals with both lanes merged.
+A branch number and an integration number are different measurements — compare against the same base, or
+against zero delta on an increment that touches no PHP.

@@ -1469,6 +1469,19 @@ engine and merely relabelled it `engine_version: 1`, so the "old" measurements w
 Genuine v1 output no longer exists in the tree, so the test now corrupts the stored ratios to a value the
 engine cannot emit and asserts they come back correct.
 
+Two extrapolations turned out wrong after the PR opened, and neither was visible in a diff of hexes. The
+artifact specifies only the control (12px) and card (20px) radii, so stepping the whole scale up from those
+was an inference — and `radius-sm` at 8px renders the 18px checkbox as a near-circle (a circle there is 9px),
+which is the radio's shape, and §3.2 makes shape the non-colour signifier separating them. And the derived
+dark `neutral-0` landed 0.00016 luminance ABOVE `neutral-50`, inverting the ramp's one structural promise;
+`#0d1322` beside `#0f131c` reads as obviously darker and is not. In dark that token is the input background,
+so every input would have sat a fraction lighter than the canvas rather than sunken into it — a depth cue
+pointing the wrong way, at a magnitude no screenshot review would flag. Both fixed, and the second is now a
+test: `theme-overrides.test.ts` asserts both neutral ramps are monotonic in luminance, in both directions,
+with the steps read from `primitive.json` and an anti-vacuity case. The ramp is the substrate every semantic
+alias resolves through, so an inversion anywhere in it surfaces later as an arbitrary component looking
+subtly wrong — ordering is the cheapest invariant to assert and the most expensive to debug from the symptom.
+
 Deliberately not done: danger and brass (the mockup specifies neither), the per-form chip scale (deferred to
 JR3, where its consumer lives), and the card radius wiring (JR2 — cards sit at 12px in between, by design).
 Success is now a teal a few degrees from the personalization accent, which is the accent/semantic collision

@@ -176,3 +176,52 @@ it('gives every provider in the enum at least one required destination key', fun
         expect($required)->not->toBeEmpty("Provider {$provider->value} would accept a rule with no destination.");
     }
 });
+
+it('refuses a spreadsheet rule subscribed to an event that carries no answers (H16b)', function (): void {
+    // `GoogleSheetsConnector::deliver()` already blocks this with `[unsupported_event]`, and blocking there
+    // is right — an adapter cannot trust that a stored rule came from our own form. But that refusal happens
+    // at DELIVERY time, where `blocked` pauses the rule and emails the owner: a rule that could never have
+    // worked spends its first real event teaching the tenant their integration is broken.
+    $response = $this->actingAs($this->admin)
+        ->from('http://acme.meridian.test/integrations')
+        ->post('http://acme.meridian.test/integrations/connections/'.$this->sheets->id.'/rules', [
+            'name' => 'Publishes to a sheet',
+            'event_types' => [DomainEventType::SubmissionCreated->value, DomainEventType::FormPublished->value],
+            'config' => validSheetsConfig(),
+        ]);
+
+    // Keyed to the OFFENDING INDEX, not to `event_types` as a whole: the form renders a checkbox per event,
+    // and an error on the group cannot point at the box that caused it.
+    $response->assertSessionHasErrors('event_types.1');
+
+    expect(ConnectionSubscription::query()->where('name', 'Publishes to a sheet')->exists())->toBeFalse();
+});
+
+it('leaves Slack free to subscribe to every event in the catalog', function (): void {
+    // The guard is keyed to `isTabular()`, not to "Google" — but it must not narrow a provider whose
+    // destination is a message, which every non-submission event has something to say to.
+    $this->actingAs($this->admin)
+        ->from('http://acme.meridian.test/integrations')
+        ->post('http://acme.meridian.test/integrations/connections/'.$this->slack->id.'/rules', [
+            'name' => 'Everything to ops',
+            'event_types' => DomainEventType::values(),
+            'config' => ['channel_id' => 'C0OPS'],
+        ])
+        ->assertSessionHasNoErrors();
+});
+
+it('narrows the deliverable catalog for a tabular provider and nothing else', function (): void {
+    // Asserted as a PROPERTY over the enum rather than a hardcoded list, so a new DomainEventType case joins
+    // the right side automatically — and a new `submission.*` case is not silently excluded from sheets.
+    $tabular = SubscriptionConfigRules::deliverableEventTypes(ConnectorProviderKey::GoogleSheets);
+
+    expect($tabular)->toBe(array_values(array_filter(
+        DomainEventType::values(),
+        fn (string $v): bool => str_starts_with($v, 'submission.'),
+    )))
+        ->and($tabular)->not->toBeEmpty()
+        ->and(SubscriptionConfigRules::deliverableEventTypes(ConnectorProviderKey::Slack))->toBe(DomainEventType::values())
+        // An unresolved provider must not narrow anything — the request is being rejected on other grounds
+        // anyway, and guessing would reject a Slack rule the resolver simply failed to type.
+        ->and(SubscriptionConfigRules::deliverableEventTypes(null))->toBe(DomainEventType::values());
+});

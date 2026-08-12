@@ -667,16 +667,20 @@ Route::middleware([
     //
     // ⚠️ The create is a POST behind a fetch, which the comment above says this surface does not do. The
     // reason that rule exists — a domain exception on a web route becomes a 302 a fetch client follows into
-    // HTML — cannot arise here, because SheetDestinationDirectory never throws and always answers 200 with a
-    // nullable `error`. See ConnectionController::createSheet() for why an Inertia visit is wrong instead.
+    // HTML — cannot arise here, because TabularDestinationDirectory never throws and always answers 200 with
+    // a nullable `error`. See ConnectionController::createDestination() for why an Inertia visit is wrong.
+    //
+    // H16c renamed these from `/sheets`: Airtable goes through the same pair, and a base picker calling
+    // `/sheets?reference=appXXXX` reads as a bug. Safe to rename — both are internal sidecars with no consumer
+    // outside this app's own client.
     // The mappable-column catalog depends on a choice made INSIDE the open modal (which form the rule is
     // scoped to), so it cannot be an index prop without discarding the half-written rule to learn it.
     Route::get('/integrations/connections/{connection}/columns', [ConnectionController::class, 'mappableColumns'])
         ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.columns');
-    Route::get('/integrations/connections/{connection}/sheets', [ConnectionController::class, 'inspectSheet'])
-        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.sheets.inspect');
-    Route::post('/integrations/connections/{connection}/sheets', [ConnectionController::class, 'createSheet'])
-        ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.connections.sheets.store');
+    Route::get('/integrations/connections/{connection}/destinations', [ConnectionController::class, 'inspectDestination'])
+        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.destinations.inspect');
+    Route::post('/integrations/connections/{connection}/destinations', [ConnectionController::class, 'createDestination'])
+        ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.connections.destinations.store');
     Route::delete('/integrations/connections/{connection}', [ConnectionController::class, 'destroy'])
         ->middleware(['can:delete,connection', 'feature:native_connectors'])->name('integrations.connections.destroy');
 

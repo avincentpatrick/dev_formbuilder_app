@@ -99,8 +99,15 @@ export type MappingColumn = { header: string; field_key: string | null };
 /** The stored `config.mapping`. The fingerprint is the server's; the client never computes one (H16b). */
 export type SheetMapping = { fingerprint: string; columns: MappingColumn[] };
 
-/** A spreadsheet as the editor sees it: what it is called, what tabs it has, and what row 1 actually says. */
-export type SheetDestination = {
+/**
+ * A destination document as the editor sees it: what it is called, what tabs it has, and what row 1 says.
+ *
+ * The key names are Sheets-flavoured and the CONCEPTS are not, matching `TabularDestination` on the server:
+ * `spreadsheet_id` is a Google spreadsheet id OR an Airtable base id, and `tabs`/`sheet_name` are its tabs or
+ * its tables. Renaming the keys would ripple through the stored rule `config` to buy vocabulary; renaming the
+ * TYPE cost nothing, so H16c did that much.
+ */
+export type TabularDestination = {
     spreadsheet_id: string;
     title: string;
     url: string;
@@ -108,10 +115,15 @@ export type SheetDestination = {
     sheet_name: string;
     /** Row 1, VERBATIM and positional — an interior blank is a real column and is preserved. */
     header_row: string[];
+    /**
+     * The chosen tab's STABLE id, when the provider has one (H16c). Airtable does, and delivery keys on it so
+     * a tenant renaming their table is invisible rather than a 404. Null for Google Sheets.
+     */
+    sheet_id: string | null;
 };
 
-/** The always-200 payload from both sheet sidecars: exactly one of the two is non-null. */
-export type SheetDestinationPayload = { destination: SheetDestination | null; error: string | null };
+/** The always-200 payload from both destination sidecars: exactly one of the two is non-null. */
+export type TabularDestinationPayload = { destination: TabularDestination | null; error: string | null };
 
 /** One thing a spreadsheet column can be bound to. `group` is the optgroup the select renders it under. */
 export type MappableColumn = { key: string; label: string; group: string };

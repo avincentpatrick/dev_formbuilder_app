@@ -123,9 +123,12 @@ final class SubscriptionConfigRules
             'config.channel_id' => ['nullable', 'string', 'max:64'],
             'config.channel_name' => ['nullable', 'string', 'max:150'],
 
-            // Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.
+            // The tabular destination (H16a). A Google spreadsheet id, or an Airtable base id.
             'config.spreadsheet_id' => ['nullable', 'string', 'max:255'],
+            // The tab or table inside it. Omitted means the destination's own first one.
             'config.sheet_name' => ['nullable', 'string', 'max:100'],
+            // Airtable (H16c). The table's stable id, so renaming the table cannot break the rule.
+            'config.sheet_id' => ['nullable', 'string', 'max:64'],
             // The spreadsheet's name when the rule was saved, shown as a caption. Optional, and never used to
             // identify the destination — `spreadsheet_id` does that.
             'config.spreadsheet_title' => ['nullable', 'string', 'max:200'],
@@ -140,6 +143,17 @@ final class SubscriptionConfigRules
     /**
      * Only the PRESENCE rules — which of the union's keys this provider cannot do without.
      *
+     * ── H16c MADE THIS A PER-PROVIDER `match` RATHER THAN AN `isTabular()` BRANCH ─────────────────────────
+     * The boolean was right while "tabular" had one member: the two tabular providers share `spreadsheet_id`
+     * and `mapping`, but Airtable additionally cannot deliver without `sheet_id`. Keying that off `isTabular()`
+     * would have made it required for Sheets, which never sends one — and leaving it optional for Airtable
+     * would accept a rule that silently falls back to the table NAME, so a rename turns into a 404 weeks later
+     * with nothing pointing at the cause.
+     *
+     * `default`-less, so a fourth provider has to state its own destination keys instead of inheriting
+     * Google's. `SubscriptionConfigRulesTest`'s "every provider declares a required destination key" case is
+     * the other half of that guard.
+     *
      * @return array<string, array<int, mixed>>
      */
     public static function requiredFor(?ConnectorProviderKey $provider, bool $partial = false): array
@@ -150,16 +164,18 @@ final class SubscriptionConfigRules
 
         $present = $partial ? 'required_with:config' : 'required';
 
-        if (! $provider->isTabular()) {
-            return ['config.channel_id' => [$present, 'string', 'max:64']];
-        }
-
-        return [
+        $mapping = [
             'config.spreadsheet_id' => [$present, 'string', 'max:255'],
             'config.mapping' => [$present, 'array'],
             'config.mapping.fingerprint' => [$present, 'string', 'max:64'],
             'config.mapping.columns' => [$present, 'array', 'min:1'],
         ];
+
+        return match ($provider) {
+            ConnectorProviderKey::Slack => ['config.channel_id' => [$present, 'string', 'max:64']],
+            ConnectorProviderKey::GoogleSheets => $mapping,
+            ConnectorProviderKey::Airtable => [...$mapping, 'config.sheet_id' => [$present, 'string', 'max:64']],
+        };
     }
 
     /**
@@ -226,7 +242,7 @@ final class SubscriptionConfigRules
                 if (is_string($value) && ! in_array($value, $allowed, true)) {
                     $validator->errors()->add(
                         "event_types.{$index}",
-                        'A spreadsheet can only receive submission events — a row is a submission’s answers, and the other events have none.',
+                        "A {$provider->containerNoun()} can only receive submission events — a row is a submission’s answers, and the other events have none.",
                     );
                 }
             }
@@ -240,8 +256,9 @@ final class SubscriptionConfigRules
     {
         if ($provider !== null && $provider->isTabular()) {
             return [
-                'config.spreadsheet_id' => 'spreadsheet',
-                'config.sheet_name' => 'tab',
+                'config.spreadsheet_id' => $provider->containerNoun() ?? 'destination',
+                'config.sheet_name' => $provider->destinationNoun(),
+                'config.sheet_id' => $provider->destinationNoun(),
                 'config.mapping' => 'column mapping',
             ];
         }
@@ -265,9 +282,17 @@ final class SubscriptionConfigRules
         // Laravel's "config.spreadsheet id field is required" — which is the string this method exists to
         // avoid, reappearing on exactly one of the two surfaces.
         if ($provider !== null && $provider->isTabular()) {
+            // ⚠️ THE NOUN IS INTERPOLATED, NOT HARD-CODED (H16c). This block said "spreadsheet" while its only
+            // guard was `isTabular()`, which quietly made the two words synonyms — and Airtable is tabular and
+            // has no spreadsheets, so every string here would have named the wrong product to the tenant.
+            $document = $provider->containerNoun() ?? 'destination';
+            $noun = $provider->destinationNoun();
+
             return [
-                'config.spreadsheet_id.required' => 'Choose a spreadsheet to write into.',
-                'config.spreadsheet_id.required_with' => 'Choose a spreadsheet to write into.',
+                'config.spreadsheet_id.required' => "Choose a {$document} to write into.",
+                'config.spreadsheet_id.required_with' => "Choose a {$document} to write into.",
+                'config.sheet_id.required' => "Choose a {$noun} to write into.",
+                'config.sheet_id.required_with' => "Choose a {$noun} to write into.",
                 'config.mapping.required' => 'Set up which form field goes in which column.',
                 'config.mapping.required_with' => 'Set up which form field goes in which column.',
                 'config.mapping.columns.required' => 'Set up which form field goes in which column.',

@@ -14,7 +14,7 @@
 // would be gone by the time the modal rendered.
 
 import { builderClient, BuilderRequestError } from '@/components/builder/builderClient';
-import type { ChannelsPayload, MappableColumnsPayload, SheetDestinationPayload } from './types';
+import type { ChannelsPayload, MappableColumnsPayload, TabularDestinationPayload } from './types';
 
 /**
  * The destinations this grant can deliver into. Returns null only when the request itself failed (403/404/419
@@ -34,9 +34,9 @@ export async function fetchChannels(connectionId: string): Promise<ChannelsPaylo
 }
 
 // ── H16b: ONE WRITE LIVES HERE NOW, AND THE READ-ONLY RULE ABOVE STILL HOLDS ─────────────────────────────
-// `createSheet` is a POST, which the header appears to forbid. It does not. That rule exists because a domain
+// `createDestination` is a POST, which the header appears to forbid. It does not. That rule exists because a domain
 // exception on a web route renders as `back()->with('toast')` — a 302 this client would follow, see `ok`, and
-// choke parsing as JSON. `SheetDestinationDirectory` never throws and answers 200 with a nullable `error` for
+// choke parsing as JSON. `TabularDestinationDirectory` never throws and answers 200 with a nullable `error` for
 // every outcome, so the failure the rule protects against cannot occur on these two endpoints.
 //
 // An Inertia visit was the alternative and is wrong here on BEHAVIOUR, not taste: this produces a value the
@@ -44,7 +44,7 @@ export async function fetchChannels(connectionId: string): Promise<ChannelsPaylo
 // tenant's half-written rule through the session to survive. Every rule MUTATION is still an Inertia visit.
 
 /**
- * Everything a spreadsheet column can be bound to for the form this rule is scoped to. Null on a request
+ * Everything a destination column can be bound to for the form this rule is scoped to. Null on a request
  * failure — the caller degrades to "we couldn't load your fields", the same shape as {@link fetchChannels}.
  */
 export async function fetchMappableColumns(
@@ -64,12 +64,12 @@ export async function fetchMappableColumns(
     }
 }
 
-/** Read an existing spreadsheet's tabs and header row. */
-export async function inspectSheet(
+/** Read an existing document's tabs and header row — a Google spreadsheet's tabs or an Airtable base's tables. */
+export async function inspectDestination(
     connectionId: string,
     reference: string,
     sheetName?: string | null,
-): Promise<SheetDestinationPayload> {
+): Promise<TabularDestinationPayload> {
     const query = new URLSearchParams({ reference });
 
     if (sheetName) {
@@ -77,8 +77,8 @@ export async function inspectSheet(
     }
 
     try {
-        const result = await builderClient.get<SheetDestinationPayload>(
-            `/integrations/connections/${connectionId}/sheets?${query.toString()}`,
+        const result = await builderClient.get<TabularDestinationPayload>(
+            `/integrations/connections/${connectionId}/destinations?${query.toString()}`,
         );
         return result.conflict ? transportFailure() : result.data;
     } catch (error) {
@@ -87,15 +87,20 @@ export async function inspectSheet(
     }
 }
 
-/** Create a spreadsheet in the tenant's Drive with `headers` in row 1. */
-export async function createSheet(
+/**
+ * Create a document in the tenant's provider account with `headers` in row 1.
+ *
+ * Only offered for a provider that can provision — Airtable deliberately cannot (ADR-0009 §D8), and its editor
+ * renders no create control, so this is never called for one.
+ */
+export async function createDestination(
     connectionId: string,
     title: string,
     headers: string[],
-): Promise<SheetDestinationPayload> {
+): Promise<TabularDestinationPayload> {
     try {
-        const result = await builderClient.post<SheetDestinationPayload>(
-            `/integrations/connections/${connectionId}/sheets`,
+        const result = await builderClient.post<TabularDestinationPayload>(
+            `/integrations/connections/${connectionId}/destinations`,
             { title, headers },
         );
         return result.conflict ? transportFailure() : result.data;
@@ -106,14 +111,14 @@ export async function createSheet(
 }
 
 /**
- * What the two sheet calls return when the REQUEST failed rather than the provider.
+ * What the two destination calls return when the REQUEST failed rather than the provider.
  *
  * {@link fetchChannels} answers null and its caller renders "couldn't load", which is right for an aid the
  * tenant can skip. It is wrong for these two: they gate the destination, so a null would leave the editor
  * unable to distinguish "the call failed" from "we asked and there is nothing". Non-null either way, matching
  * the server's own contract.
  */
-function transportFailure(): SheetDestinationPayload {
+function transportFailure(): TabularDestinationPayload {
     return {
         destination: null,
         error: 'We couldn’t reach Meridian just then. Check your connection and try again.',

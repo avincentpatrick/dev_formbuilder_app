@@ -13,8 +13,12 @@ use App\Policies\SubmissionPolicy;
 use App\Services\Analytics\AnswerValueAggregator;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Search\SearchService;
+use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Search\SearchTerms;
+use App\Support\Submissions\SubmissionReference;
+use App\Support\Submissions\SubmissionReferenceIssuer;
 use Database\Factories\SubmissionFactory;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property SubmissionStatus $status
  * @property SubmissionSource $source
  * @property ?string $client_submission_uuid
+ * @property string $reference
  * @property ?string $locale
  * @property ?string $guest_contact_email
  * @property ?int $completeness_percent
@@ -63,6 +68,50 @@ class Submission extends Model implements TenantScoped
     use HasUuidv7;
     use SoftDeletes;
 
+    /**
+     * Mints the short handle (J2e). Every row needs one — `reference` is `NOT NULL` — and there are seven
+     * Eloquent writers, only two of which are the production services. Putting the mint on the MODEL rather
+     * than in {@see SubmissionPipeline} is what makes it an invariant instead of a
+     * convention the eighth writer forgets: the factory, both seeders and every `Submission::factory()` call
+     * in the suite are covered without touching any of them.
+     *
+     * ⚠️ TRAIT BOOT ORDER IS IRRELEVANT HERE, AND SAYING SO IS THE POINT — `booted()` runs after
+     * `bootTraits()`, so this fires after both `BelongsToTenant`'s and `HasUuids`' own `creating` listeners.
+     * It does not matter, because the reference is RANDOM rather than derived: it reads neither `id` (a
+     * derivation from the uuid is precisely the defect J2e removes — see {@see SubmissionReference}) nor
+     * `tenant_id` (uniqueness is enforced per tenant by `submissions_tenant_id_reference_unique`, not by
+     * anything in PHP). This hook is order-independent by construction. "Put it after the tenant hook" is the
+     * first thing a reader assumes it needs, so it is written down that it does not.
+     *
+     * The `=== null` guard keeps a deliberately `forceFill`ed reference — which is how a test pins a known
+     * code, and how the retry in both writers gets a FRESH one (a re-run builds a new model, whose attribute
+     * is null again).
+     *
+     * ⚠️ Anything that suppresses model events suppresses THIS, and now the failure is a hard 23502 rather
+     * than something subtle. {@see DatabaseSeeder} carries the list.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $submission): void {
+            // ⚠️ `getAttribute()`, NOT `$submission->reference`, and the reason is a real tension rather than
+            // style. The `@property string $reference` annotation above is correct for every reader of a
+            // PERSISTED row — the column is NOT NULL — but it is exactly wrong for this one moment, when the
+            // attribute has not been set yet. Written as `$submission->reference === null` the analyser sees
+            // `string === null`, calls the comparison always-false, and the increment ships a PHPStan error
+            // rather than a guard. Reaching through `getAttribute()` states "unset" without lying about the
+            // column's shape everywhere else.
+            if ($submission->getAttribute('reference') === null) {
+                $submission->reference = app(SubmissionReferenceIssuer::class)->issue();
+            }
+        });
+    }
+
+    /**
+     * ⚠️ `reference` IS DELIBERATELY ABSENT. It is server-issued identity: making it mass-assignable would let
+     * any `update()` reachable from a request payload rewrite the handle a respondent has already written
+     * down. Same call as `forms.public_slug`'s share columns and `scope_nodes`' path columns; pinned by
+     * `SubmissionReferenceIssuanceTest`.
+     */
     protected $fillable = [
         'tenant_id',
         'form_id',
@@ -273,7 +322,12 @@ class Submission extends Model implements TenantScoped
 
     /**
      * THE keyword predicate for a submission (Increment J1e) — reviewer remarks and returned reason (through
-     * the generated `search_vector`), the parent form's title, or a reference prefix.
+     * the generated `search_vector`), the parent form's title, its short `reference`, or its full id.
+     *
+     * ⚠️ THE TWO IDENTITY BRANCHES ARE EXACT MATCHES AS OF J2e, NOT PREFIXES. The `id::text LIKE 'xxxxxxxx%'`
+     * arm that lived here is gone: under uuidv7 those eight characters are a millisecond timestamp's top 32
+     * bits, so it returned every row created in the same ~49-day window. `submissions.reference` is the
+     * replacement handle — see {@see SubmissionReference}.
      *
      * ⚠️ IT IS A SCOPE, AND IT IS SHARED, AND BOTH HALVES ARE THE POINT. It was `SubmissionSearchArm`'s
      * private builder until J1e gave the INBOX a keyword box; leaving it there would have meant two
@@ -323,19 +377,22 @@ class Submission extends Model implements TenantScoped
                     ->whereRaw("forms.search_vector @@ to_tsquery('simple', ?)", [$terms->tsQuery()]);
             });
 
-            $prefix = $terms->uuidPrefix();
-            if ($prefix !== null) {
-                // A scan, and bounded to stay one by RLS plus the caller's visibility scope. Deliberately
-                // NOT indexed — `submissions` has no reference column, and the right fix is a real short
-                // handle (filed for J2), not an index on a cast.
-                //
-                // ⚠️ AN EIGHT-CHARACTER PREFIX IS NOT A UNIQUE LOOKUP, and an earlier version of this
-                // comment claimed a collision was "vanishingly unlikely". Under uuidv7 it is CERTAIN: those
-                // characters are the top 32 bits of a millisecond timestamp and are shared by every row
-                // created in the same ~49-day window. See {@see SearchTerms::MIN_UUID_PREFIX} for the
-                // measurement and for why raising the constant alone would make it worse. A full uuid is
-                // still an exact match, which is the case a support ticket can actually rely on.
-                $match->orWhereRaw('submissions.id::text LIKE ?', [$prefix.'%']);
+            // The short handle (J2e). An EQUALITY on an indexed column, replacing the `id::text LIKE 'xxxx%'`
+            // scan this scope carried until J2e — which matched a ~49-day uuidv7 timestamp window rather than
+            // a row. `submissions_tenant_id_reference_unique` covers `(tenant_id, reference)`, and `text =`
+            // measures leakproof on PG17 (`SearchIndexUsageTest`), so unlike `@@` and `ILIKE` this predicate
+            // is at least ELIGIBLE to become an index qual under FORCE'd RLS.
+            $reference = $terms->referenceCandidate();
+            if ($reference !== null) {
+                $match->orWhere('submissions.reference', $reference);
+            }
+
+            // A full uuid pasted out of a URL or a ticket. Always was an exact lookup; now it is spelled as
+            // one instead of as a LIKE over a cast. ⚠️ Safe ONLY because `submissionId()` refuses anything
+            // that is not strictly canonical — binding a non-uuid here raises 22P02, i.e. a 500 on a GET.
+            $id = $terms->submissionId();
+            if ($id !== null) {
+                $match->orWhere('submissions.id', $id);
             }
         });
     }

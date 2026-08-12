@@ -91,7 +91,17 @@ it('adds exactly one index to submissions, net', function (): void {
     //
     // Pre-H24a baseline was 7 (pkey, the client-uuid unique, three plain composites, draft-expiry,
     // form-finalized); H24a widens one of those in place and adds exactly one, so 8.
+    //
+    // ⚠️ 8 → 9 IN J2e, AND THIS GUARD WORKED EXACTLY AS INTENDED. The ninth is
+    // `submissions_tenant_id_reference_unique` on `(tenant_id, reference)` — a CORRECTNESS constraint (the
+    // short handle must be unique per tenant) rather than an analytics read-path index, so it is outside
+    // ADR-0011 §D7's budget rather than an exception to it. Recorded here because the next author to see
+    // this number move deserves to know which of the two kinds they are looking at.
+    //
+    // Worth noting how this was caught: `tests/Feature/Analytics` is one of the directories the container's
+    // truncating `RecursiveDirectoryIterator` drops, so no local Pest run could collect this file at all —
+    // CI was genuinely the only thing that could see it.
     $count = DB::table('pg_indexes')->where('tablename', 'submissions')->count();
 
-    expect($count)->toBe(8);
+    expect($count)->toBe(9);
 });

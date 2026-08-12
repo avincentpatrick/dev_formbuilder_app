@@ -19,6 +19,7 @@ use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Api\ApiErrorResponse;
 use App\Support\Guest\GuestShareToken;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -86,6 +87,15 @@ final class GuestSubmissionController extends Controller
         return response()->json([
             'data' => [
                 'id' => $result->submission->id,
+                // Increment J2e — the short handle, so the confirmation screen prints the code the TENANT can
+                // actually find rather than one derived client-side that is stored nowhere. Formatted at this
+                // boundary: the client never spells the grouping.
+                //
+                // Discloses nothing new — this same unauthenticated caller already receives the full uuid on
+                // the line above, and a reference is strictly less information. ⚠️ It is a display handle and
+                // never a credential: no route may resolve a submission by reference alone, which
+                // `SubmissionReferenceDisclosureTest` asserts structurally.
+                'reference' => SubmissionReference::format($result->submission->reference),
                 'status' => $result->submission->status->value,
             ],
         ], $result->created ? 201 : 200);

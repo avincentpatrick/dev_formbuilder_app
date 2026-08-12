@@ -98,11 +98,18 @@ test('Public runtime — installable PWA renders offline + guards submit', async
     await expect(page.getByText('My submissions on this device')).toBeVisible();
     await expect(page.getByText(/Saved on this device — will send/i)).toBeVisible();
 
-    // The reference the list shows must be the one the confirmation screen shows. Deriving the list's from
-    // the server id once it arrives would make a code the respondent may have written down CHANGE.
-    const reference = (await page.locator('.outbox__ref').first().innerText()).trim();
-    expect(reference).toMatch(/^MER-[0-9A-Z]{6}$/);
-    await expect(page.getByText(reference).first()).toBeVisible();
+    // ⚠️ REWRITTEN IN J2e, AND THE ASSERTION IT REPLACES WAS THE DOCTRINE, NOT AN ACCIDENT.
+    // This used to read "the reference the list shows must be the one the confirmation screen shows", and
+    // further down asserted the code did NOT change across the sync transition. Both were correct under the
+    // old design, where the only code that existed was derived on the device from the client uuid.
+    //
+    // That code was stored nowhere on the server, so a respondent who wrote it down and quoted it to the
+    // tenant got nothing back. J2e issues a real `submissions.reference` and relabels the local one as a
+    // QUEUE TAG — so the code is now expected to change exactly once, when a provisional label is replaced
+    // by a real handle, and the copy on screen says so rather than promising otherwise.
+    const queueTag = (await page.locator('.outbox__ref').first().innerText()).trim();
+    expect(queueTag).toMatch(/^MER-[0-9A-Z]{6}$/);
+    await expect(page.getByText(queueTag).first()).toBeVisible();
 
     await assertClean(page, 'Public runtime queued confirmation');
 
@@ -146,17 +153,27 @@ test('Public runtime — installable PWA renders offline + guards submit', async
         { timeout: 20_000 },
     );
 
-    // ...and the SAME reference is still on screen, now as a sent receipt. The code did not change across
-    // the transition, which is the property the whole client-uuid derivation exists to give.
+    // ...and the row now shows the SERVER's reference, which is a DIFFERENT string from the queue tag it
+    // showed while pending. That difference is the whole point of J2e: the tag was a device-local label, the
+    // reference is a row the tenant can actually find.
     //
     // Scoped to the row's own paragraph, and the live region asserted separately, because a bare
-    // getByText() matches BOTH: the receipt reads "Sent — reference MER-…" and the polite announcement reads
-    // "Response sent — reference MER-…", which contains it. Two elements is a strict-mode violation, and the
-    // fix is to say which one — asserting both is stronger than picking one with .first() anyway, since it
-    // pins that the visible receipt and the screen-reader announcement quote the same code.
-    await expect(page.locator('.outbox__detail', { hasText: `Sent — reference ${reference}` })).toBeVisible({
-        timeout: 20_000,
-    });
+    // getByText() matches BOTH: the receipt reads "Sent — reference 7K4M-2QXB" and the polite announcement
+    // reads "Response sent — reference 7K4M-2QXB", which contains it. Two elements is a strict-mode
+    // violation, and the fix is to say which one — asserting both is stronger than picking one with
+    // .first() anyway, since it pins that the visible receipt and the screen-reader announcement quote the
+    // same code.
+    const receipt = page.locator('.outbox__detail', { hasText: /^Sent — reference / });
+    await expect(receipt).toBeVisible({ timeout: 20_000 });
+
+    const sentText = (await receipt.innerText()).trim();
+    const reference = sentText.replace('Sent — reference ', '').trim();
+
+    // The shape the server issues: eight Crockford Base32 characters, displayed in two groups of four. The
+    // alphabet excludes I, L, O and U, which is why the class is spelled out rather than written [A-Z0-9].
+    expect(reference).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(reference).not.toBe(queueTag);
+
     await expect(page.locator('.sync-status__sr')).toHaveText(`Response sent — reference ${reference}`);
 });
 

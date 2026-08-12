@@ -21,7 +21,7 @@
  */
 import { computed, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { MdsBadge, MdsButton, MdsEmptyState, MdsFormField, MdsSelect, MdsTextInput } from '@meridian/design-system';
+import { MdsBadge, MdsButton, MdsEmptyState, MdsFilterBar, MdsFormField, MdsSearchField, MdsSelect } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 
 interface SearchItem {
@@ -69,8 +69,6 @@ const entityOptions = computed(() => [
     })),
 ]);
 
-const hasFilters = computed(() => keyword.value !== '' || entity.value !== '');
-
 function visit(): void {
     const params: Record<string, string> = {};
     if (keyword.value !== '') params.q = keyword.value;
@@ -95,38 +93,42 @@ function clearFilters(): void {
         <PageHeader title="Search" icon="search" />
 
         <!--
-            Style B (a labelled section with its own <h2>), matching audit/Index.vue and feedback/Index.vue.
-            The heading is load-bearing rather than decorative: PageHeader renders the <h1> and
-            MdsEmptyState renders an <h3>, so dropping it fails axe's heading-order check ONLY in the empty
-            state — i.e. only on a query that matched nothing. Rendered unconditionally for the same reason.
+            Increment J2e — MdsFilterBar + MdsSearchField, closing DSR §3.2 note 5's list of three pages that
+            still hand-rolled this markup. The section, the <h2> and the grid all live in the component now,
+            along with the reason the heading must stay unconditional.
+
+            ⚠️ THREE THINGS WENT, AND EACH IS A DECISION RATHER THAN A CASUALTY OF THE SWAP.
+
+            · The card chrome (padding / border / bg-surface / radius). /search was the only filter surface in
+              the product wearing one; the other eight are bare. One design system, no exceptions.
+            · The explicit "Search" button. MdsSearchField commits on Enter OR blur, which is the rule on all
+              six J1e lists. It DOES delete the only unconditional re-submit — its `commit()` returns early
+              when the box already matches what the server ran — and that is acceptable here: re-running an
+              identical query returns identical results, and this page has no refresh semantics.
+            · The in-bar "Clear filters". The empty state below already carries a "Clear search" action, and
+              the entity select's own "All results" option auto-visits, so nothing is a dead end.
+
+            ⚠️ The label is NOT "Search this workspace", which is TopNav's accessible name and is rendered on
+            this page too — two searchboxes sharing one accessible name is an a11y smell and would make any
+            future getByRole('searchbox', { name }) here a strict-mode violation.
         -->
-        <section class="search__filters" aria-labelledby="search-filters-heading">
-            <h2 id="search-filters-heading" class="search__filters-heading">Filters</h2>
-            <div class="search__filters-grid">
-                <MdsFormField label="Keywords" input-id="search-q">
-                    <MdsTextInput
-                        id="search-q"
-                        v-model="keyword"
-                        type="search"
-                        name="q"
-                        placeholder="Search this workspace"
-                        @keyup.enter="visit"
-                    />
-                </MdsFormField>
-                <MdsFormField label="Type" input-id="search-entity">
-                    <MdsSelect
-                        id="search-entity"
-                        v-model="entity"
-                        :options="entityOptions"
-                        @update:model-value="visit"
-                    />
-                </MdsFormField>
-            </div>
-            <div class="search__filters-actions">
-                <MdsButton variant="secondary" @click="visit">Search</MdsButton>
-                <MdsButton v-if="hasFilters" variant="tertiary" @click="clearFilters">Clear filters</MdsButton>
-            </div>
-        </section>
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="keyword"
+                :applied="filters.applied.q ?? ''"
+                label="Search everything"
+                placeholder="Search this workspace"
+                @submit="visit"
+            />
+            <MdsFormField label="Type" input-id="search-entity">
+                <MdsSelect
+                    id="search-entity"
+                    v-model="entity"
+                    :options="entityOptions"
+                    @update:model-value="visit"
+                />
+            </MdsFormField>
+        </MdsFilterBar>
 
         <p class="search__scope-note">Only results you have permission to see are shown.</p>
 
@@ -193,36 +195,11 @@ function clearFilters(): void {
 </template>
 
 <style scoped>
-.search__filters {
-    margin-bottom: var(--mds-space-5);
-    padding: var(--mds-space-4);
-    background-color: var(--mds-color-bg-surface);
-    border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
-}
-
-.search__filters-heading {
-    margin: 0 0 var(--mds-space-3);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-body-sm-font-size);
-    font-weight: var(--mds-font-weight-semibold);
-    color: var(--mds-color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.search__filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--mds-space-3);
-}
-
-.search__filters-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mds-space-2);
-    margin-top: var(--mds-space-3);
-}
+/*
+    The `.search__filters*` rules are gone (J2e): three moved into MdsFilterBar, and the fourth — the
+    actions row — had nothing left to lay out once the two buttons went. The card chrome this page used to
+    carry was deliberately NOT carried over; see the template.
+*/
 
 .search__scope-note {
     margin: 0 0 var(--mds-space-4);

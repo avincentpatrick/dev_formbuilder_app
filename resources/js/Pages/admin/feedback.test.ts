@@ -204,4 +204,20 @@ describe('feedback console — navigation', () => {
         expect(empty.text()).toContain('No feedback yet');
         empty.unmount();
     });
+
+    it('keeps the filter heading that axe heading-order depends on, in both states', () => {
+        // ⭐ ADDED IN J2e, AND IT WAS MISSING BEFORE — this page's sibling (admin/AuditLog.vue) has had the
+        // equivalent case since I11a, while this one relied entirely on the /admin/feedback axe scan. That
+        // scan is real coverage, but it runs only in CI and only against a SEEDED database, so the state the
+        // heading actually protects — an empty list under AdminLayout's h1 and MdsEmptyState's h3 — is the
+        // one it is least likely to reach. Migrating the markup into MdsFilterBar was the cheapest possible
+        // moment to close that.
+        const populated = render();
+        expect(populated.find('.mds-filterbar h2').text()).toBe('Filters');
+        populated.unmount();
+
+        const empty = render({ data: [], empty_reason: 'no_rows' });
+        expect(empty.find('.mds-filterbar h2').text()).toBe('Filters');
+        empty.unmount();
+    });
 });

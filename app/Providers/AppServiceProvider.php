@@ -45,6 +45,8 @@ use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\Submissions\RandomSubmissionReferenceIssuer;
+use App\Support\Submissions\SubmissionReferenceIssuer;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\SystemDnsTxtResolver;
 use Dedoc\Scramble\Scramble;
@@ -187,6 +189,14 @@ class AppServiceProvider extends ServiceProvider
         // this seam is the only way the verification sweep is testable. It is also the swap point if the
         // Windows host's DNS_TXT support proves inadequate — see SystemDnsTxtResolver.
         $this->app->singleton(DnsTxtResolver::class, SystemDnsTxtResolver::class);
+
+        // The submission reference generator (J2e). `singleton` for the same reason as the resolver above:
+        // it is stateless, holding no tenant and no counter, so there is nothing to leak across requests.
+        //
+        // An interface at all because a COLLISION IS OTHERWISE UNTESTABLE: at 32^8 codes no test can make two
+        // draws agree by chance, so the transaction-retry path that recovers from one would ship unexercised.
+        // Binding a scripted issuer is what makes it deterministic — see SubmissionReferenceIssuer.
+        $this->app->singleton(SubmissionReferenceIssuer::class, RandomSubmissionReferenceIssuer::class);
     }
 
     /**

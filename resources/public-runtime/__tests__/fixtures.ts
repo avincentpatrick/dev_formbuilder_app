@@ -116,6 +116,7 @@ export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
         last_error: partial.last_error ?? null,
         conflict_code: partial.conflict_code ?? null,
         server_submission_id: partial.server_submission_id ?? null,
+        server_reference: partial.server_reference ?? null,
         synced_at: partial.synced_at ?? null,
         created_at: partial.created_at ?? '2026-08-09T00:00:00.000Z',
         updated_at: partial.updated_at ?? '2026-08-09T00:00:00.000Z',

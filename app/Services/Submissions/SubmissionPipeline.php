@@ -46,6 +46,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class SubmissionPipeline
 {
+    /**
+     * How many times Stage 4 is re-run after a `submissions.reference` collision (J2e).
+     *
+     * Two is arguably enough — the per-insert odds are ~9e-7 even in a million-row tenant — but the retry is
+     * cheap and only ever runs after a real 23505, so the budget is set where a second failure stops being
+     * chance and starts being a symptom.
+     */
+    private const int MAX_REFERENCE_ATTEMPTS = 3;
+
     public function __construct(
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
@@ -106,24 +115,52 @@ final class SubmissionPipeline
         $this->attachmentRefs->validate($version, $fields, $result->effectiveAnswers);
 
         // Stage 4 — transactional persist.
-        try {
-            $submission = DB::transaction(fn (): Submission => $this->persist($payload, $form, $fields, $sections, $result, $contentChecksum));
-        } catch (QueryException $e) {
-            // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
-            // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
-            // but a same-uuid different-content winner is the same conflict Stage 2b guards (Increment G8c).
-            if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
-                $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
-                if ($existing !== null) {
-                    if ($this->contentConflicts($existing, $contentChecksum)) {
-                        throw SubmissionConflictException::contentConflict();
-                    }
+        //
+        // ⚠️ THE LOOP IS THE REFERENCE-COLLISION RECOVERY (J2e), AND IT HAS TO LIVE OUT HERE. `submissions`
+        // carries TWO unique constraints now, and a 23505 from either arrives the same way. A "mint, SELECT,
+        // re-mint if taken" probe inside the model hook cannot fix the second one: the insert happens INSIDE
+        // `DB::transaction`, so by the time the index objects the PostgreSQL transaction is in ERROR state and
+        // every subsequent statement fails 25P02 — re-minting in place is impossible. Retrying the whole
+        // closure is: `persist()` builds a fresh `Submission::create()`, whose `creating` hook mints again.
+        //
+        // The arms are ORDERED rather than told apart by the constraint name, which keeps
+        // `SavedReportViewService`'s rule intact (catch the CODE, never match the driver's message text):
+        // resolve the client-uuid race FIRST — unchanged behaviour — and only a 23505 that arm cannot explain
+        // is treated as a reference collision.
+        $attempt = 0;
 
-                    return new SubmissionResult($existing, created: false);
+        while (true) {
+            $attempt++;
+
+            try {
+                $submission = DB::transaction(fn (): Submission => $this->persist($payload, $form, $fields, $sections, $result, $contentChecksum));
+                break;
+            } catch (QueryException $e) {
+                if ((string) $e->getCode() !== '23505') {
+                    throw $e;
+                }
+
+                // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
+                // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
+                // but a same-uuid different-content winner is the same conflict Stage 2b guards (Increment G8c).
+                if ($payload->clientSubmissionUuid !== null) {
+                    $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+                    if ($existing !== null) {
+                        if ($this->contentConflicts($existing, $contentChecksum)) {
+                            throw SubmissionConflictException::contentConflict();
+                        }
+
+                        return new SubmissionResult($existing, created: false);
+                    }
+                }
+
+                // Nothing to resolve to, so this was the reference index. Retry with a fresh code; give up
+                // loudly rather than silently once the budget is spent, because at 32^8 codes a second
+                // collision on the same insert means something other than chance is wrong.
+                if ($attempt >= self::MAX_REFERENCE_ATTEMPTS) {
+                    throw $e;
                 }
             }
-
-            throw $e;
         }
 
         event(SubmissionCreated::for($submission)); // post-commit only (scalar-payload domain event)

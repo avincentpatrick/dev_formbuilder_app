@@ -184,11 +184,20 @@ describe('admin/AuditLog', () => {
 
     it('keeps the filter heading that axe heading-order depends on, in both states', () => {
         // ⭐ AdminLayout renders the h1 and MdsEmptyState renders an h3, so without this h2 the empty state
-        // skips a level. /admin/* is never axe-scanned, so this assertion is the only guard that exists.
-        expect(render().find('h2#platform-audit-filters-heading').exists()).toBe(true);
-        expect(
-            render({ data: [], empty_reason: 'no_rows' }).find('h2#platform-audit-filters-heading').exists(),
-        ).toBe(true);
+        // skips a level. /admin/audit-log is STILL not axe-scanned (admin-console-axe.spec.ts covers
+        // /admin/settings and /admin/feedback only), so this assertion remains the only guard that exists.
+        //
+        // ⚠️ Located by CLASS AND TEXT since J2e, not by id. The heading moved into MdsFilterBar, whose id
+        // comes from `useId()` — so `h2#platform-audit-filters-heading` matches nothing any more. Asserting
+        // the id would now pin an implementation detail of the component rather than the contract, which is
+        // that a level-2 heading reading "Filters" is present in both states.
+        const populated = render().find('.mds-filterbar h2');
+        expect(populated.exists()).toBe(true);
+        expect(populated.text()).toBe('Filters');
+
+        const empty = render({ data: [], empty_reason: 'no_rows' }).find('.mds-filterbar h2');
+        expect(empty.exists()).toBe(true);
+        expect(empty.text()).toBe('Filters');
     });
 
     it('distinguishes an empty platform ledger from a filter that matched nothing', () => {

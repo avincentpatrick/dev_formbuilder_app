@@ -186,8 +186,8 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             if (!response.ok) {
                 throw toError(response, body);
             }
-            const data = (body as { data: { id: string; status: string } }).data;
-            return { id: data.id, status: data.status, created: response.status === 201 };
+            const data = (body as { data: { id: string; reference: string; status: string } }).data;
+            return { id: data.id, reference: data.reference, status: data.status, created: response.status === 201 };
         },
 
         async saveDraft(payload: SaveDraftPayload): Promise<SaveDraftResult> {

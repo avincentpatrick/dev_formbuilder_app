@@ -24,6 +24,7 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsIconButton,
     MdsModal,
@@ -133,10 +134,19 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
     <AdminLayout title="Feedback" icon="feedback">
         <p v-if="adminError" class="admin-fb__alert" role="alert">{{ adminError }}</p>
 
-        <section class="admin-fb__filters" aria-labelledby="admin-feedback-filters-heading">
-            <h2 id="admin-feedback-filters-heading" class="admin-fb__filters-heading">Filters</h2>
+        <!--
+            Increment J2e — the section, its <h2> and the grid moved into MdsFilterBar, the last of the three
+            pages DSR §3.2 note 5 named as still hand-rolling this markup.
 
-            <div class="admin-fb__filters-grid">
+            Geometry unchanged, and MEASURED: the three rules deleted below were byte-identical to
+            FilterBar's on every property, and its one extra declaration (`font-family` on the heading) is a
+            no-op because app.css already sets that family on `body` with no h1..h6 override anywhere.
+
+            ⚠️ The <h2> was load-bearing here too — AdminLayout renders the <h1> and MdsEmptyState an <h3>, so
+            without it the EMPTY state skips a level — and unlike its sibling this page had NO Vitest case
+            pinning it, only the /admin/feedback axe scan. J2e adds one.
+        -->
+        <MdsFilterBar>
                 <MdsFormField label="Status" input-id="admin-feedback-status">
                     <MdsSelect
                         id="admin-feedback-status"
@@ -155,8 +165,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                         @update:model-value="applyFilters"
                     />
                 </MdsFormField>
-            </div>
-        </section>
+        </MdsFilterBar>
 
         <p class="admin-fb__hint">
             Newest first, across every workspace. Changing a status is recorded in that workspace's own audit
@@ -296,24 +305,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
     font-size: var(--mds-type-body-md-font-size);
 }
 
-.admin-fb__filters {
-    margin-bottom: var(--mds-space-5);
-}
-
-.admin-fb__filters-heading {
-    margin: 0 0 var(--mds-space-3);
-    font-size: var(--mds-type-label-font-size);
-    font-weight: var(--mds-font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--mds-color-text-secondary);
-}
-
-.admin-fb__filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--mds-space-3);
-}
+/* The three `.admin-fb__filters*` rules moved into MdsFilterBar verbatim (J2e) — geometry unchanged. */
 
 .admin-fb__hint {
     margin: 0 0 var(--mds-space-3);

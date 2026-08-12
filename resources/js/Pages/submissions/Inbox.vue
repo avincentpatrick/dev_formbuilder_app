@@ -58,6 +58,9 @@ type Option = { value: string; label: string };
 
 type SubmissionRow = {
     id: string;
+    // Increment J2e — the short handle, already grouped by the server (`7K4M-2QXB`). No page spells the
+    // separator, so a re-grouping is one line in SubmissionReference rather than a sweep.
+    reference: string;
     // Increment J2c — the id as well as the title, so the global inbox can LINK a row to its form. Present
     // in both modes (the per-form page simply has no Form column to put it in).
     form_id: string;
@@ -120,6 +123,11 @@ const baseUrl = computed(() => (props.form ? `/forms/${props.form.id}/submission
  * the page's heading, its breadcrumb and its tab strip's accessible name.
  */
 const columns = computed<DataTableColumn[]>(() => [
+    // Increment J2e — the row's own identity, and it LEADS. It stays on the per-form page (unlike Form it is
+    // not constant per row), and it is the first text link this list has ever had to a submission: before
+    // J2e the only way in was the `View submission` row-action icon, which is the dead-end shape J2 exists
+    // to remove. DSR §3.3 already makes `#cell-<key>` where a row's first cell is linked.
+    { key: 'reference', header: 'Reference' },
     ...(props.form ? [] : [{ key: 'form_title', header: 'Form', sortable: true }]),
     { key: 'status', header: 'Status' },
     { key: 'source_label', header: 'Source' },
@@ -304,6 +312,22 @@ function formatDate(iso: string | null): string {
             :caption="form ? `Responses to ${form.title}` : 'Submissions'"
             row-key="id"
         >
+            <!-- Increment J2e — the row's identity, and its link to itself.
+
+                 ⚠️ UNCONDITIONAL, AND THAT IS PROVABLE RATHER THAN HOPEFUL. Unlike the form link below,
+                 which needs `can.open_form` because the row set is strictly wider than form readability,
+                 this destination is the row itself: the `View submission` row-action beneath already
+                 navigates here with NO `v-if`, so the product has always asserted every listed row is
+                 openable by its reader. An unconditional link is exactly as safe as that button.
+
+                 ⚠️ AND THE BUTTON STAYS. `responsive-axe.spec.ts:362` NAVIGATES by
+                 getByRole('button', { name: 'View submission' }); deleting it as "now redundant" is J2d's
+                 do-not-move-the-row-action lesson one surface over. -->
+            <template #cell-reference="{ row }">
+                <Link :href="`/submissions/${(row as SubmissionRow).id}`" class="inbox__reference">
+                    {{ (row as SubmissionRow).reference }}
+                </Link>
+            </template>
             <!-- Increment J2c — the submission→form link. Before this, the inbox printed a form's name on
                  every row and linked none of them, which `FormHubController`'s docblock names as one of the
                  three dead ends the hub was built to end. Rendered only in global mode, because the per-form
@@ -425,6 +449,27 @@ function formatDate(iso: string | null): string {
 }
 
 .inbox__form-link:hover {
+    text-decoration: underline;
+}
+
+/*
+    Increment J2e. Mirrors `.inbox__form-link` rather than styling a bare anchor: there is NO global `a`
+    reset in this app, so an unstyled link renders browser-default blue — which was the most user-visible
+    defect J2d's review turned up, across four pages at once.
+
+    Tabular figures and the mono stack because a reference is a CODE: a column of them should align digit
+    over digit so a mis-typed character is visible by shape, and `--mds-font-family-mono` is what
+    `webhooks/Show.vue` already uses for the same reason.
+*/
+.inbox__reference {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+    font-family: var(--mds-font-family-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.inbox__reference:hover {
     text-decoration: underline;
 }
 </style>

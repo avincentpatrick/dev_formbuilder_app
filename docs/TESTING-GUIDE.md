@@ -571,14 +571,18 @@ it finds **forms** and **submissions**, and nothing else yet. §18 lists what it
    matched as a prefix, so a partial word still finds things (other forms whose description mentions a
    survey come back too, which is correct). Now search `surveys`. **Expect:** nothing at all. Words are
    matched literally, so a plural finds no singular; §18 explains why that trade was taken deliberately.
-9. Copy a **full submission reference** from a row on `/submissions` (open the row; the detail page shows
-   the whole id) and search it. **Expect:** that one submission. Fewer than 8 characters deliberately does
-   not do a prefix lookup at all. ⚠️ **An 8-character reference is a time window, not a lookup, and that is
-   measured rather than assumed (J1e).** Submission ids are uuidv7, whose first 8 hex characters are the top
-   32 bits of a millisecond timestamp — so they are *identical* for every submission created in the same
-   ~49-day window, and the demo corpus was seeded in one go. Searching the 8 characters the inbox displays
-   returns most of the tenant's submissions. Nothing is disclosed that the viewer could not already see; the
-   short reference simply is not selective. Making it one means a real short handle, which is filed for J2.
+9. Copy a **submission reference** straight off the leading column of `/submissions` — it looks like
+   `7K4M-2QXB` — and search it. **Expect:** that one submission, and only that one. It works in the grouped
+   form shown, without the hyphen, and in lowercase; `I`/`L` read as `1` and `O` as `0`, so a hand-copied
+   code still resolves. Fewer than eight characters is not a reference and matches nothing through the
+   identity branch. A **full uuid** pasted from a URL is still an exact lookup as well.
+   ⚠️ **AN 8-CHARACTER SLICE OF THE ID NOW MATCHES NOTHING, AND THAT IS THE POINT OF J2e.** Submission ids
+   are uuidv7, whose first 8 hex characters are the top 32 bits of a millisecond timestamp — *identical* for
+   every submission created in the same ~49-day window, and the demo corpus was seeded in one go. Until J2e
+   the product printed those characters and accepted them back, so pasting them returned most of the
+   tenant's submissions: a time window, not a lookup. Raising the length alone could not fix it (the product
+   printed exactly what it accepted), so the format changed instead. Try it — an 8-character id fragment now
+   returns an empty list, deliberately.
 10. Sign in as `reviewer@demo.test` and search `health`. **Expect:** a Submissions group and **no Forms
     group at all** — not an empty Forms group showing "0". A reviewer holds no forms permission, and the
     feature's rule is that a section you may not search is *absent*, because a "0" would itself tell you
@@ -678,11 +682,10 @@ expected and is not a defect.
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
-| **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its reference, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |
+| **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its short reference (J2e — a real stored handle, not a slice of its id), its full id, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |
 | **Typo tolerance and word stemming** | **Not built, deliberately.** Searching "submission" will not find "submissions" except through the prefix match, and a misspelling finds nothing. Words are indexed literally, which is what lets a form titled "The A Team" be found by "the" — English stemming would strip that title to almost nothing and make it unfindable by its own name. Fuzzy matching needs a database extension and is a later decision. |
 | ~~**The ⌘K command palette**~~ | ✅ Built in J1d — press ⌘K (Ctrl+K on Windows) anywhere in the app. |
 | **Searching a list by a column the list shows** | Partially deliberate. Three refusals are named in §17.1's table — the webhooks **Scope** column, the feedback **reporter**, and a submission's **respondent**. Each wants its own dropdown rather than a substring match that would make one box mean several things; none is a data-access limitation. |
-| **A short, quotable submission reference** | Not built. The 8-character id fragment the inbox displays is a uuidv7 timestamp prefix and is not selective (§17 step 9) — a real short handle is filed for J2. A full reference works as an exact lookup today. |
 | **Pagination on the forms list** | Not built. `/forms` loads every non-archived form at once and sorts client-side; the keyword filter narrows that array rather than paging it. Fine at demo scale, and the row to watch if a workspace ever holds hundreds of forms. |
 | **Searching audit rows** | **Not built, deliberately** — not deferred, and not scheduled. A keyword search over an audit diff would read exactly the values redaction exists to remove, and the console-side equivalent was refused for the same reason. |
 | **Finding a pending invitation by search** | **Not built, deliberately.** A person who has been invited but has not accepted is not yet visible to the workspace at the database level — the isolation rule that keeps one workspace's people out of another's search is the same rule that hides them. They are listed on `/members`, which is where you cancel or resend. |

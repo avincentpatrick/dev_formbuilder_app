@@ -11,6 +11,7 @@ use App\Models\Submission;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Support\Mapping\ColumnMapping;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
 
 /**
@@ -36,6 +37,20 @@ use Illuminate\Support\Collection;
  */
 final class SubmissionRowProjector
 {
+    /**
+     * The short handle (J2e). Leads the metadata block, because it is the identity a human quotes — the
+     * uuid beside it is the one a system does.
+     */
+    public const META_REFERENCE = '__reference';
+
+    /**
+     * ⚠️ NEVER RENAME THIS KEY, AND J2e IS WHEN THAT STOPPED BEING HYPOTHETICAL. The obvious tidy-up once a
+     * `__reference` column exists is to retire `__submission_id` or re-label it — but this string is
+     * PERSISTED as a `field_key` inside `connection_subscriptions.config` ({@see ColumnMapping::toArray()},
+     * read back by `fromArray()`, resolved by `project()`). `project()` falls back to `''` for a key it does
+     * not recognise rather than raising, so a rename would silently write a column of empty strings into
+     * every tenant spreadsheet that had bound it — forever, with no crash and no error to notice.
+     */
     public const META_SUBMISSION_ID = '__submission_id';
 
     public const META_STATUS = '__status';
@@ -130,11 +145,17 @@ final class SubmissionRowProjector
     /**
      * The fixed metadata values, in the export's column order.
      *
+     * ⚠️ THIS AND {@see metaLabels()} MUST BE EDITED TOGETHER, AND A ONE-SIDED EDIT FAILS SILENTLY.
+     * `SubmissionExporter` builds the header row from the labels and every body row from these values, so a
+     * key present in one and absent from the other shifts every column right by one — a corrupted export
+     * with no exception and nothing for a type check to catch. `SubmissionExportTest` pins their arity.
+     *
      * @return array<string, string>
      */
     public function metaValues(Submission $submission): array
     {
         return [
+            self::META_REFERENCE => SubmissionReference::format($submission->reference),
             self::META_SUBMISSION_ID => (string) $submission->id,
             self::META_STATUS => $submission->status->label(),
             self::META_SOURCE => $submission->source->label(),
@@ -153,6 +174,7 @@ final class SubmissionRowProjector
     public static function metaLabels(): array
     {
         return [
+            self::META_REFERENCE => 'Reference',
             self::META_SUBMISSION_ID => 'Submission ID',
             self::META_STATUS => 'Status',
             self::META_SOURCE => 'Source',

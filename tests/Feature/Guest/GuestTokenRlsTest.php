@@ -7,6 +7,7 @@ use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,6 +65,11 @@ function seedGuestTenant(string $name): array
 /**
  * A raw guest submissions row — source=guest, no respondent, no client uuid.
  *
+ * ⚠️ `reference` IS MINTED HERE BECAUSE NOTHING ELSE WILL. This goes in through
+ * `DB::table('submissions')->insert()`, so `Submission::booted()`'s `creating` hook — which fills the column
+ * everywhere else — never fires, and `submissions.reference` is `NOT NULL` with no database default. Without
+ * this line every case in this file dies on a 23502 that reads like an RLS refusal and is not.
+ *
  * @return array<string, mixed>
  */
 function guestSubmissionRow(string $tenantId, string $formId, string $versionId): array
@@ -75,6 +81,7 @@ function guestSubmissionRow(string $tenantId, string $formId, string $versionId)
         'form_version_id' => $versionId,
         'status' => 'submitted',
         'source' => 'guest',
+        'reference' => SubmissionReference::mint(),
     ];
 }
 

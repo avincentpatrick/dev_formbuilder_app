@@ -12,6 +12,7 @@ use App\Services\Search\SearchArm;
 use App\Services\Search\SearchArmResult;
 use App\Support\Search\KeywordFilter;
 use App\Support\Search\SearchTerms;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 
@@ -60,15 +61,20 @@ final readonly class SubmissionSearchArm implements SearchArm
     {
         $rows = $this->builder($user, $terms)
             ->with(['form:id,title'])
-            ->select(['submissions.id', 'submissions.form_id', 'submissions.status', 'submissions.submitted_at'])
+            ->select(['submissions.id', 'submissions.form_id', 'submissions.reference', 'submissions.status', 'submissions.submitted_at'])
             ->orderByDesc('submissions.id')
             ->limit($limit + 1)
             ->get()
             ->map(fn (Submission $s): array => [
                 'id' => $s->id,
-                // The reference a support ticket quotes. `SearchTerms::uuidPrefix()` accepts the same shape,
-                // so what is displayed is what can be pasted back in.
-                'title' => mb_substr($s->id, 0, 8),
+                // The reference a support ticket quotes, and `SearchTerms::referenceCandidate()` accepts the
+                // same shape — so what is displayed is what can be pasted back in.
+                //
+                // ⚠️ THAT SENTENCE ONLY BECAME TRUE IN J2e. Until then this printed `substr($id, 0, 8)`, and
+                // the claim was false in the way that matters: pasting it back returned every submission
+                // created in the same ~49-day window, because those characters are a uuidv7's timestamp
+                // prefix. The handle is now a real one.
+                'title' => SubmissionReference::format($s->reference),
                 'subtitle' => trim($this->formLabel($s).' · '.$s->status->label()),
                 'url' => '/submissions/'.$s->id,
             ])

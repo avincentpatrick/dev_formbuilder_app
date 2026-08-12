@@ -551,7 +551,7 @@ A third note joins the two above, and it is the one this increment adds:
 | Entity | Arm gate | Row rule | Owner / Admin | Form Editor | Reviewer | Viewer |
 |---|---|---|---|---|---|---|
 | Forms | `viewAny` on `Form` (`forms.create` \| `.edit.any` \| `.edit.own`) | `Form::scopeVisibleTo()`, Editor capacity, non-archived | ✓ every non-archived form | ✓ editor-granted only | ✗ **arm refused** | ✗ **arm refused** |
-| Submissions | `viewAny` on `Submission` | `Submission::scopeVisibleTo()` + `countable()`; matches own vector, the FORM's title, or a ≥8-char reference prefix | ✓ every non-draft | ✓ granted forms | ✓ granted forms | ✓ per `submissions.view` |
+| Submissions | `viewAny` on `Submission` | `Submission::scopeVisibleTo()` + `countable()`; matches own vector, the FORM's title, its 8-char `reference` (exact), or its full id (exact) | ✓ every non-draft | ✓ granted forms | ✓ granted forms | ✓ per `submissions.view` |
 | Members *(J1c)* | `tenant.members.invite` — the key `/members` itself uses | `whereExists` over `tenant_users (tenant_id, status='active')` on the **default** connection; `ILIKE` over name + email | ✓ active roster | ✗ **arm refused** | ✗ **arm refused** | ✗ **arm refused** |
 | Settings & pages *(J1c)* | — (never refused) | a static catalog, filtered per row by `ShellAbilities` + the plan feature — the same pair `Sidebar.vue` reads | ✓ every reachable page | ✓ theirs | ✓ theirs | ✓ theirs |
 | Audit rows | — | — | ✗ **not an entity** | ✗ | ✗ | ✗ |

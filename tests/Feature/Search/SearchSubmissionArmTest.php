@@ -7,8 +7,10 @@ use App\Enums\SearchEntity;
 use App\Enums\SubmissionStatus;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Search\Arms\SubmissionSearchArm;
 use App\Services\Search\SearchPresenter;
 use App\Support\Search\SearchTerms;
+use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -139,17 +141,40 @@ it('matches a submission by its FORM’s title, the only label the inbox shows',
     expect(searchedSubmissionIds($this->reviewer, 'intake'))->toContain($this->matching->id);
 });
 
-it('finds a submission by a reference prefix', function (): void {
-    $prefix = mb_substr($this->matching->id, 0, 8);
+it('finds a submission by its reference, in either the stored or the displayed form', function (): void {
+    // ⚠️ REWRITTEN IN J2e. This case used to paste `substr($id, 0, 8)` and assert it found the row — true,
+    // but so did every other submission created in the same ~49-day window, because those characters are a
+    // uuidv7's timestamp prefix. The handle is now a real one.
+    $reference = $this->matching->reference;
 
-    expect(searchedSubmissionIds($this->owner, $prefix))->toContain($this->matching->id);
+    expect(searchedSubmissionIds($this->owner, $reference))->toContain($this->matching->id)
+        ->and(searchedSubmissionIds($this->owner, SubmissionReference::format($reference)))->toContain($this->matching->id);
 });
 
-it('ignores a reference prefix shorter than eight characters', function (): void {
-    // Below eight the LIKE stops being a lookup and starts matching a meaningful slice of the tenant.
-    $short = mb_substr($this->matching->id, 0, 4);
+it('shows the reference as the result title, so what is displayed can be pasted back in', function (): void {
+    // The arm's stated contract, which was FALSE until J2e — it printed an id fragment that no longer
+    // resolved to one row. Driving the round trip is what makes the claim testable rather than asserted.
+    $arm = app(SubmissionSearchArm::class);
+    $shown = collect($arm->search($this->owner, SearchTerms::parse($this->matching->reference), 10)->rows)
+        ->firstWhere('id', $this->matching->id);
 
-    expect(SearchTerms::parse($short)->uuidPrefix())->toBeNull();
+    expect($shown['title'])->toBe(SubmissionReference::format($this->matching->reference))
+        ->and(searchedSubmissionIds($this->owner, $shown['title']))->toContain($this->matching->id);
+});
+
+it('ignores a fragment shorter than a whole reference', function (): void {
+    // Seven characters is not a reference and not a uuid, so it reaches neither identity branch. It may
+    // still match through the text branches, which is why this asserts the PARSER rather than the results.
+    $short = mb_substr($this->matching->reference, 0, 7);
+
+    expect(SearchTerms::parse($short)->referenceCandidate())->toBeNull()
+        ->and(SearchTerms::parse($short)->submissionId())->toBeNull();
+});
+
+it('still resolves a full uuid exactly', function (): void {
+    // The fallback a support ticket can always rely on, unchanged by J2e apart from being spelled as an
+    // equality instead of a LIKE over a cast.
+    expect(searchedSubmissionIds($this->owner, $this->matching->id))->toContain($this->matching->id);
 });
 
 it('does not surface a draft, matching the inbox default', function (): void {

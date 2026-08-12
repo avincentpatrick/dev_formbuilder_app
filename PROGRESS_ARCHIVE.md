@@ -1359,3 +1359,54 @@ category named in the tree, and the page's unconditional paired `MdsDataTable` s
 **Merged as PR #130 (`30f8778`), 6/6 with real steps (11–20 each, so genuinely executed rather than an
 outage). CI reconciles: Pest 3475 passed / 0 failed (13,973 assertions), +78 on J2c's 3397; E2E 478 passed /
 0 failed / 0 FLAKY, holding the zero-flaky run J2c's `settlePaint()` first achieved.**
+
+---
+
+## 2026-08-12 — J2e: the short submission handle, and the local-gate diagnosis that closes a root cause
+
+`submissions.reference` — eight Crockford Base32 characters (no I/L/O/U), stored uppercase and ungrouped,
+displayed `7K4M-2QXB`, unique per tenant, server-issued at row creation by a `Submission::booted()` hook.
+Built on branch `j2e-submission-reference`; closes the J2 row and hands off to JR1.
+
+**The finding worth more than the feature: `RecursiveDirectoryIterator` silently truncates on the container's
+bind mount.** Same PHP code, same files — `database/migrations` 91 on the host and **64** in the container,
+`app/Http/Controllers` 84 vs **43**, `tests` 347 vs **307**. `find` and `glob` are unaffected. PHPUnit/Pest
+discovers test files through that iterator, so the "collection silently drops ~45 of 330 test FILES" mystery
+J2c filed as OPEN is a Docker-for-Windows `readdir` truncation rather than anything about Pest — and the
+"controller-gate 43, migration-lint 63" counts this tracker has carried for months were recording a scan of
+roughly half the tree. **Run the three lint gates on the HOST.**
+
+**The collision design was wrong on the first pass, and the adversarial review is what caught it.** A
+pre-flight probe (the `FormSlug::suggest()` shape) cannot work here: both writers create INSIDE
+`DB::transaction`, so the probe is a TOCTOU read, and once the index raises 23505 the transaction is in ERROR
+state — re-minting in place is impossible (25P02). Its attempts are probes, not inserts. The recovery moved
+to the transaction boundary, where re-running the closure builds a fresh model and the hook mints again; the
+23505 arms are ORDERED rather than told apart by constraint name, so `SavedReportViewService`'s "catch the
+CODE, never the message" rule survives. The backfill then hit the identical wall in its own effect test —
+correct in production autocommit, broken under any caller holding a transaction — and its chunk UPDATE is now
+wrapped in a nested transaction, i.e. a SAVEPOINT.
+
+**Two ordering decisions that read as details and are not.** The unique index is created BEFORE the backfill
+(Postgres treats NULLs as distinct, so un-backfilled rows coexist under it and the backfill writes THROUGH
+the constraint — the alternative, a PHP `seen` set, is a second authority testable only probabilistically).
+And it carries no `deleted_at IS NULL` arm: a soft-deleted submission keeps its code reserved forever,
+because freeing it would let a written-down code resolve later to a DIFFERENT submission. Verified on the
+real seeded database — 521 pre-existing rows, all backfilled, all distinct, clean `up → down → up`.
+
+**The guest runtime had a live defect nobody had filed.** `deriveReference()` printed `MER-XXXXXX` on the
+confirmation screen and in the offline outbox, derived from a uuid and stored NOWHERE — so a respondent
+quoting it to the tenant got nothing back. One reference now, server-issued; the offline code is relabelled a
+**queue tag** with copy saying a reference is issued once the response is sent. `outbox-status.ts`'s rule
+forbidding a code change was right under its premise, and the premise is gone.
+
+**Four tests went red by design and each had predicted it** — `ListKeywordFilterTest` ("this case goes red
+the day either half changes"), `SearchSubmissionArmTest`, `SearchTermsTest`, and one no grep could have
+found: `public-runtime-offline.spec.ts` asserted the code does NOT change across sync, a behavioural contract
+rather than a label, which is process rule 7b recurring exactly as J2d wrote it. **And the increment's own
+disclosure lint was vacuous on its first run** — it matched `where(` case-sensitively and therefore skipped
+`orWhere(`, the single call site it exists to police. A failing expectation is what exposed it.
+
+**Local gates: Pest 540/0 (Submissions + Connectors), 165/0 (Unit + Feature Search), 436/0 at the model-hook
+checkpoint; PHPStan 20 = delta 0; Pint clean 1,162; vue-tsc clean; `openapi.json` byte-identical (it does not
+move — Scramble types the sync `submission` field as a bare string); controller-gate 84, migration-lint 91,
+job-payload-lint 28 on the host; Playwright compile-check 480 in 14 files.**

@@ -9,6 +9,7 @@ use App\Enums\WebhookEndpointStatus;
 use App\Models\FeedbackReport;
 use App\Models\User;
 use App\Models\WebhookEndpoint;
+use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,32 +133,34 @@ it('narrows the inbox on the parent form’s title', function (): void {
             ->where('empty_reason', null));
 });
 
-it('narrows the inbox on a submission REFERENCE, and records what the 8-character one cannot do', function (): void {
+it('narrows the inbox on a submission REFERENCE, which J2e made an actual lookup', function (): void {
     $clinic = publishedInboxForm($this->tenant, $this->owner, 'Clinic Intake');
     $one = seedInboxSubmission($clinic, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
     $two = seedInboxSubmission($clinic, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Grace']);
 
-    // A FULL reference is an exact lookup, which is the path that actually works.
+    // A full uuid is an exact lookup and always was.
     $this->get(listUrl('/submissions', (string) $one->id))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->has('data', 1)->where('data.0.id', $one->id));
 
-    // ⚠️ AND THE EIGHT-CHARACTER ONE IS NOT A LOOKUP UNDER uuidv7 — MEASURED HERE, NOT ARGUED.
-    // `SearchTerms::MIN_UUID_PREFIX`'s docblock justified 8 on the grounds that anything shorter "would
-    // match a meaningful fraction of any tenant's submissions and stop being a lookup". That reasoning
-    // holds for a RANDOM uuid and fails for a uuidv7: the first 8 hex characters are the top 32 bits of a
-    // 48-bit millisecond timestamp, so they are IDENTICAL for every row created in the same ~49-day
-    // window. Two submissions seeded milliseconds apart share them, which is what this asserts.
-    //
-    // It is not a disclosure — the rows are still bounded by `visibleTo` — it is the reference lookup not
-    // being one. The constant is deliberately NOT raised here: the inbox and the palette both DISPLAY
-    // exactly 8 characters, and `SubmissionSearchArm`'s contract is that what is shown can be pasted back
-    // in, so raising it alone would make the displayed reference unusable. The fix is the real short handle
-    // that scope already files for J2. This case goes red the day either half changes, which is the day
-    // someone should re-read all of it.
+    // The short handle is now one too — in the displayed form, which is the string a respondent quotes.
+    $this->get(listUrl('/submissions', SubmissionReference::format($one->reference)))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('data', 1)->where('data.0.id', $one->id));
+
+    // ⚠️ THE MEASUREMENT THAT MADE J2e NECESSARY IS KEPT, BECAUSE IT IS STILL TRUE AND IS NOW THE REASON
+    // THE PREFIX ARM IS GONE. Under uuidv7 the first 8 hex characters are the top 32 bits of a 48-bit
+    // millisecond timestamp, so they are IDENTICAL for every row created inside the same ~49-day window —
+    // two submissions seeded milliseconds apart share them. That is what made pasting them a time-window
+    // scan rather than a lookup, and raising the old `MIN_UUID_PREFIX` alone could not fix it, because the
+    // product PRINTED exactly those 8 characters. It needed a different reference FORMAT.
     expect(substr((string) $one->id, 0, 8))->toBe(substr((string) $two->id, 0, 8));
 
+    // So an 8-character id fragment now matches NOTHING through the identity branches. Both these rows are
+    // still in the tenant and still visible; the query simply is not a lookup for either of them any more.
     $this->get(listUrl('/submissions', substr((string) $one->id, 0, 8)))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->has('data', 2));
+        ->assertInertia(fn (Assert $page) => $page->has('data', 0)->where('empty_reason', 'no_matches'));
+
+    // And two references never collide the way two id prefixes always did.
+    expect($one->reference)->not->toBe($two->reference);
 });
 
 it('ANDs the keyword with the status filter rather than replacing it', function (): void {

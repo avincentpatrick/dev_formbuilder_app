@@ -22,9 +22,14 @@ import { statusVariant } from '../components/Badge/status-variant';
 //   - real text-on-surface contrast for all SIX identity hues, in BOTH themes, which is the half of
 //     the identity scale that a token unit test measures in the abstract and this measures as painted.
 //
-// The card markup below is a faithful copy of `FormCard.vue`'s, not an approximation: if the two
-// diverge, this story stops testing the thing it is named after. The tint/hue pairing in particular
-// must stay — a solid identity fill with white initials is the version that fails contrast.
+// ⚠️ THE MARKUP BELOW IS A CLOSE COPY OF `FormCard.vue`'s, NOT A FAITHFUL ONE, and the difference is
+// worth naming because an earlier draft of this comment claimed otherwise. Inline styles cannot carry a
+// pseudo-element or an at-rule, so four things are NOT reproduced here and are NOT covered by this run:
+// the `::before` 4px identity edge (so the edge's own contrast is asserted only by the token unit test,
+// never as painted), the `@container` stat reflow, `overflow-wrap: anywhere`, and the two-line
+// description clamp. What IS faithful is the part this story exists for — the glyph's tint/hue pairing,
+// the heading levels, the list semantics and the badge/button composition. A solid identity fill with
+// white initials is the version that fails contrast; that is the thing this must keep catching.
 
 const dark: Decorator = (story) => {
     document.documentElement.setAttribute('data-theme-mode', 'dark');

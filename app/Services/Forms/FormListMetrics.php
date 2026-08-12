@@ -9,6 +9,7 @@ use App\Models\Form;
 use App\Models\Submission;
 use App\Models\User;
 use App\Support\Forms\FormScheduleView;
+use Carbon\CarbonImmutable;
 // Both collections are in play and they are not interchangeable. `Collection` here is the ELOQUENT one,
 // because `modelKeys()` exists only on that and `FormPresenter::list()` hands over the result of
 // `->get()`; `SupportCollection` is what `toBase()->get()` returns, whose rows are `stdClass`, not models.
@@ -114,11 +115,11 @@ final class FormListMetrics
             // pair from re-associating against the surrounding predicate is applied by
             // `Builder::callScope()`, and evaporates the moment the body is hoisted (see its docblock).
             ->visibleTo($user)
-            ->groupBy('form_id')
-            ->selectRaw('form_id')
+            ->groupBy('submissions.form_id')
+            ->selectRaw('submissions.form_id')
             ->selectRaw('count(*) filter (where submissions.status <> ?) as responses', [$draft])
             ->selectRaw('count(*) filter (where submissions.status = ?) as drafts', [$draft])
-            ->selectRaw('max(submitted_at) filter (where submissions.status <> ?) as last_response_at', [$draft])
+            ->selectRaw('max(submissions.submitted_at) filter (where submissions.status <> ?) as last_response_at', [$draft])
             ->toBase()
             ->get();
 
@@ -127,9 +128,14 @@ final class FormListMetrics
             $out[(string) $row->form_id] = [
                 'responses' => (int) $row->responses,
                 'drafts' => (int) $row->drafts,
-                // Left as the driver's own string, exactly as FormHubPresenter::stats() does — the two
-                // have to be comparable for the parity test to mean anything.
-                'last_response_at' => $row->last_response_at !== null ? (string) $row->last_response_at : null,
+                // ISO-8601, matching FormHubPresenter::stats() — the two have to be comparable for the
+                // parity test to mean anything, AND the driver's raw `2026-08-09 14:30:00+00` (a space,
+                // not a `T`) is outside the ES spec's Date Time String Format, so `new Date()` on it is
+                // implementation-defined. V8 accepts it; the table's `formatDate()` would have printed
+                // "Invalid Date" on an engine that does not.
+                'last_response_at' => $row->last_response_at !== null
+                    ? CarbonImmutable::parse((string) $row->last_response_at)->toIso8601String()
+                    : null,
             ];
         }
 
@@ -156,8 +162,8 @@ final class FormListMetrics
             // exclusions as separate `!=` conjuncts on purpose — the partial index proves the
             // implication from those and not from a `whereNotIn`.
             ->consumesCapacity()
-            ->groupBy('form_id')
-            ->selectRaw('form_id, count(*) as consumed')
+            ->groupBy('submissions.form_id')
+            ->selectRaw('submissions.form_id, count(*) as consumed')
             ->toBase()
             ->get();
 

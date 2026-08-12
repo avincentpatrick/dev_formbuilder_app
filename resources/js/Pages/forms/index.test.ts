@@ -19,7 +19,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * cannot see what the server clamped or defaulted; `AuditLogPresenter` records the rule.
  */
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+    get: vi.fn(),
+    visit: vi.fn(),
+    // Mutable so a test can mount the ninth row action. It is gated on the PAGE-level `manageScopes`
+    // rather than a per-row flag, so a fixed `false` here makes that button unmountable in every case.
+    manageScopes: { value: false },
+}));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
@@ -36,7 +42,7 @@ vi.mock('@inertiajs/vue3', () => ({
         patch: vi.fn(),
         delete: vi.fn(),
     }),
-    usePage: () => ({ props: { auth: { can: { manageScopes: false } } } }),
+    usePage: () => ({ props: { auth: { can: { manageScopes: mocks.manageScopes.value } } } }),
 }));
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
@@ -63,6 +69,13 @@ const FACETS = [
     { value: 'draft', label: 'Draft', count: 0 },
     { value: 'closing_soon', label: 'Closing soon', count: 0 },
 ];
+
+/** Mounts with the page-level `scopes.manage` permission, which mounts the ninth row action. */
+function renderWithScopes(overrides: Partial<Props> = {}): VueWrapper {
+    mocks.manageScopes.value = true;
+
+    return render(overrides);
+}
 
 function render(overrides: Partial<Props> = {}): VueWrapper {
     return mount(FormsIndex, {
@@ -109,8 +122,15 @@ const row = (canEdit: boolean) => ({
     can: { edit: canEdit, publish: false, delete: false, analytics: false, encode: false, template: false },
 });
 
+/** The nine row actions, by accessible name — the single list both view-parity tests read. */
+const ACTION_LABELS = [
+    'Open builder', 'Response statistics', 'New submission', 'Version history',
+    'Save as template', 'Rename form', 'Set form scope', 'Publish form', 'Archive form',
+];
+
 beforeEach(() => {
     mocks.get.mockClear();
+    mocks.manageScopes.value = false;
 });
 
 describe('forms list — the empty state no longer lies', () => {
@@ -125,7 +145,7 @@ describe('forms list — the empty state no longer lies', () => {
     it('says the SEARCH matched nothing when it did, and never offers to create a first form', () => {
         // Mutation: drop the `v-if` and this reddens on the second assertion — which is the one that
         // matters, because the first would still pass against the old unconditional slot.
-        const wrapper = render({ empty_reason: 'no_matches', filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ empty_reason: 'no_matches', filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         expect(wrapper.text()).toContain('No matching forms');
         expect(wrapper.text()).not.toContain('Create your first form');
@@ -137,7 +157,7 @@ describe('forms list — the empty state no longer lies', () => {
         // The two disagree here on purpose: a keyword is present and the server nonetheless says the list
         // is genuinely empty (a brand-new tenant that typed something). A client-side
         // `selected.q ? 'no_matches' : 'no_rows'` inference gets this backwards.
-        const wrapper = render({ empty_reason: 'no_rows', filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ empty_reason: 'no_rows', filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         expect(wrapper.text()).toContain('Create your first form');
         expect(wrapper.text()).not.toContain('No matching forms');
@@ -238,17 +258,23 @@ describe('forms list — the card grid (JR3)', () => {
     it('keeps every one of the nine row actions in the card, not behind a menu', () => {
         // `templates-axe.spec.ts` clicks "Save as template" unscoped, and "Rename form" opens the only
         // `PATCH /forms/{form}` call site in the client. Both must be in the tree without a hover.
-        const wrapper = render({
+        //
+        // ⚠️ NINE MEANS NINE, AND THE FIRST DRAFT OF THIS TEST LISTED EIGHT. The missing one was
+        // "Set form scope" — the only mount of `AssignScopeModal` in the entire client, which the
+        // component's own docblock names as load-bearing. It is gated on the page-level `manageScopes`
+        // rather than a `row.can.*`, and the module-level `usePage` mock returns `false`, so it was
+        // absent from every render and silently omitted from the list. A test titled "nine" that asserts
+        // eight is worse than no test: it reports coverage of the one affordance nobody would notice
+        // losing. `withScopes` re-mocks the page so the ninth is actually mounted.
+        const wrapper = renderWithScopes({
             forms: [{ ...row(true), can: { edit: true, publish: true, delete: true, encode: true, template: true, analytics: true } }],
             empty_reason: null,
         });
 
-        for (const label of [
-            'Open builder', 'Response statistics', 'New submission', 'Version history',
-            'Save as template', 'Rename form', 'Publish form', 'Archive form',
-        ]) {
+        for (const label of ACTION_LABELS) {
             expect(wrapper.find(`[aria-label="${label}"]`).exists(), label).toBe(true);
         }
+        expect(ACTION_LABELS).toHaveLength(9);
 
         wrapper.unmount();
     });
@@ -258,14 +284,12 @@ describe('forms list — the card grid (JR3)', () => {
             wrapper.findAll('[aria-label]').map((el) => el.attributes('aria-label')).sort();
 
         const full = { ...row(true), can: { edit: true, publish: true, delete: true, encode: true, template: true, analytics: true } };
-        const cards = render({ forms: [full], empty_reason: null });
-        const table = render({ forms: [full], empty_reason: null, view: 'table' });
+        const cards = renderWithScopes({ forms: [full], empty_reason: null });
+        const table = renderWithScopes({ forms: [full], empty_reason: null, view: 'table' });
 
         // Intersection rather than equality: the two views legitimately differ elsewhere (the table adds
         // sortable column buttons, the card a progressbar). What must not differ is the action set.
-        const actions = ['Open builder', 'Response statistics', 'New submission', 'Version history',
-            'Save as template', 'Rename form', 'Publish form', 'Archive form'];
-        for (const label of actions) {
+        for (const label of ACTION_LABELS) {
             expect(names(cards), `cards: ${label}`).toContain(label);
             expect(names(table), `table: ${label}`).toContain(label);
         }
@@ -346,7 +370,7 @@ describe('forms list — the card grid (JR3)', () => {
 
 describe('forms list — the keyword filter', () => {
     it('renders a search field seeded from what the server applied', () => {
-        const wrapper = render({ filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         const input = wrapper.get('input[type="search"]');
         expect((input.element as HTMLInputElement).value).toBe('clinic');
@@ -373,7 +397,7 @@ describe('forms list — the keyword filter', () => {
     it('sends no q at all when the box is cleared, rather than an empty one', async () => {
         // `?q=` would arrive as null after `ConvertEmptyStringsToNull` and mean the same thing, but it
         // would also leave a `?q=` on every URL the user copies out of the address bar.
-        const wrapper = render({ filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         await wrapper.get('input[type="search"]').setValue('');
         await wrapper.get('input[type="search"]').trigger('keyup.enter');

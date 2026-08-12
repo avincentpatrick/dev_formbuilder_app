@@ -23,8 +23,15 @@ import { openBuilder } from './support/navigate';
  */
 
 // ── Loop A: accent contrast ──────────────────────────────────────────────────────────────────────
-// /forms is the densest colour surface in the app — primary CTA, DataTable, status badges, pagination
-// — so it exercises the accent's action/focus tokens against the most backgrounds per page load.
+// /forms is the densest colour surface in the app, which is why the accent loop lives here: it
+// exercises the accent's action/focus tokens against the most backgrounds per page load.
+//
+// ⚠️ WHAT IS ON THIS PAGE CHANGED IN JR3 AND THIS COMMENT WAS STALE. It used to read "primary CTA,
+// DataTable, status badges, pagination" — `/forms` now renders a CARD GRID by default and has never had
+// pagination at all. The surfaces it actually exercises today are the primary CTA, the segmented view
+// toggle, the counted facet chips, six `MdsCard`s with per-form identity hues, the status badges and the
+// capacity meter. The table is still scanned, but only via the explicit `?view=table` entry in
+// `responsive-axe.spec.ts` — this loop no longer sees one.
 for (const theme of ['light', 'dark'] as const) {
     test(`Teal accent on Forms (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });

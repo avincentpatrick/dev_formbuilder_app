@@ -17,6 +17,7 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { MdsBadge, MdsCard, statusVariant } from '@meridian/design-system';
+import { relativeTime } from '@/components/notifications/relative-time';
 import type { FormRow } from '@/types/forms';
 
 const props = defineProps<{ row: FormRow }>();
@@ -51,38 +52,66 @@ const capacity = computed(() => {
 const scheduleNote = computed(() => {
     const { acceptance, closes_at: closesAt, opens_at: opensAt } = props.row.schedule;
 
+    // ⚠️ PUBLICATION IS CHECKED FIRST, AND THE FIRST DRAFT GOT THIS BACKWARDS. `FormSchedule::acceptance()`
+    // knows nothing about publication, so an UNPUBLISHED draft carrying a `closes_at` reports
+    // `acceptance: 'open'` and fell through to "Closes in 3 days" — while the Live and Closing-soon chips
+    // correctly excluded it, because `FormListFacets::matches()` conjoins `$isPublished`. The card and the
+    // chips above it would have contradicted each other about the same form on the same screen.
+    if (props.row.status !== 'published') return 'Not published';
+
     if (acceptance === 'closed') return 'Closed';
     if (acceptance === 'capacity_reached') return 'Capacity reached';
-    if (acceptance === 'opens_soon') return opensAt ? `Opens ${relative(opensAt)}` : 'Not open yet';
-    if (closesAt) return `Closes ${relative(closesAt)}`;
+    if (acceptance === 'opens_soon') return opensAt ? `Opens ${untilLabel(opensAt)}` : 'Not open yet';
+    if (closesAt) return `Closes ${untilLabel(closesAt)}`;
 
-    return props.row.status === 'published' ? 'Accepting responses' : 'Not published';
+    return 'Accepting responses';
 });
 
 const lastResponse = computed(() => {
     const at = props.row.stats.last_response_at;
+    if (!at) return '—';
 
-    return at ? relative(at) : '—';
+    // The SHARED helper, not a private copy. The first draft hand-rolled this and reproduced, verbatim,
+    // the defect that file's own comment documents: it rounded instead of flooring, so 59m40s printed
+    // "60 minutes ago". It was also unclamped, so a few seconds of clock skew rendered "in 4 seconds" on
+    // a response that had already arrived, and it had no week bucket — so the same instant read
+    // "10 days ago" here and "1 week ago" in the notification bell. `relativeTime` is tested; this was not.
+    return relativeTime(at) || '—';
 });
 
-const updated = computed(() => (props.row.updated_at ? `Updated ${relative(props.row.updated_at)}` : ''));
+const updated = computed(() => {
+    if (!props.row.updated_at) return '';
+    const label = relativeTime(props.row.updated_at);
 
-/** "in 3 days" / "2 hours ago", via the platform formatter so it follows the viewer's locale. */
-function relative(iso: string): string {
+    return label ? `Updated ${label}` : '';
+});
+
+/**
+ * "in 12 days" — the FORWARD-looking counterpart, which is why the shared helper cannot serve this one.
+ * `relativeTime` deliberately CLAMPS to zero (`Math.max(0, …)`) because a notification is always in the
+ * past and clock skew must not print "in 3 seconds"; a schedule window is the opposite case and the whole
+ * point is the future. Same flooring discipline, and it degrades to the empty string rather than to
+ * "Invalid Date" for the same reason the shared helper does.
+ */
+function untilLabel(iso: string): string {
     const then = new Date(iso).getTime();
-    if (Number.isNaN(then)) return '—';
+    if (Number.isNaN(then)) return '';
 
-    const seconds = Math.round((then - Date.now()) / 1000);
+    const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    const seconds = (then - Date.now()) / 1000;
+    const sign = seconds < 0 ? -1 : 1;
+    const magnitude = Math.abs(seconds);
     const units: [Intl.RelativeTimeFormatUnit, number][] = [
-        ['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60],
+        ['year', 31536000], ['month', 2592000], ['week', 604800],
+        ['day', 86400], ['hour', 3600], ['minute', 60],
     ];
-    const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
 
     for (const [unit, size] of units) {
-        if (Math.abs(seconds) >= size) return formatter.format(Math.round(seconds / size), unit);
+        // FLOOR, matching the shared helper: rounding would print "in 24 hours" rather than "tomorrow".
+        if (magnitude >= size) return rtf.format(sign * Math.floor(magnitude / size), unit);
     }
 
-    return formatter.format(0, 'minute');
+    return rtf.format(0, 'minute');
 }
 </script>
 

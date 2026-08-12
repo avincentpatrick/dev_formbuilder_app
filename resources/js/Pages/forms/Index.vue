@@ -169,7 +169,16 @@ function versionLabel(row: FormRow): string {
 
 function formatDate(iso: string | null): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+
+    const at = new Date(iso);
+
+    // Never render "Invalid Date" into a cell — the rule `relative-time.ts` states: an unparseable
+    // timestamp is a server bug, and printing a stack-trace-shaped string at the user is not the
+    // client's job. This cell takes `stats.last_response_at`, which JR3 also normalised to ISO-8601
+    // server-side; the guard is the belt to that braces.
+    if (Number.isNaN(at.getTime())) return '—';
+
+    return at.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // ── Create ──────────────────────────────────────────────────────────────
@@ -405,7 +414,17 @@ function submitRestore(): void {
             there are. (`forms/Templates.vue` predates this and does not carry it — it should, and that is
             a JR4 clean-up rather than a silent inconsistency.)
         -->
-        <ul v-else-if="view === 'grid'" class="forms__grid" role="list" aria-label="Forms">
+        <!-- `aria-busy` + a fade while a filter round-trips. The table gets this free from
+             `MdsDataTable`'s `:loading`, and the grid had NOTHING: clicking a facet chip in the default
+             view produced a server round trip with no visible change at all until the rows swapped. -->
+        <ul
+            v-else-if="view === 'grid'"
+            class="forms__grid"
+            :class="{ 'forms__grid--busy': busy }"
+            :aria-busy="busy"
+            role="list"
+            aria-label="Forms"
+        >
             <li v-for="row in forms" :key="row.id" class="forms__cell" data-form-entry>
                 <FormCard :row="row">
                     <template #actions>
@@ -683,6 +702,14 @@ function submitRestore(): void {
     display: flex;
 }
 
+.forms__grid--busy {
+    opacity: 0.6;
+    /* Not `none`: the cards must stay focusable mid-request or a keyboard user is thrown out of the
+       tab order for the length of the round trip. Pointer events only. */
+    pointer-events: none;
+    transition: opacity var(--mds-duration-fast) var(--mds-ease-standard);
+}
+
 /*
     ⚠️ THE ACTION CLUSTER WRAPS IN A CARD AND MUST NOT IN A ROW, and the running app is what showed why.
     `FormRowActions` sets `flex-wrap: wrap` because nine 28px buttons need ~284px against a card's ~260px
@@ -693,6 +720,14 @@ function submitRestore(): void {
 
     So the table gets one line and, when that does not fit, `MdsDataTable`'s own horizontal scroll — a
     designed, focusable (`tabindex="0"`, `role="group"`) region rather than a defect.
+
+    ⚠️ WITH ONE EXCEPTION, WHICH THE FIRST VERSION OF THIS COMMENT ASSERTED AWAY: at ≤480px there IS no
+    scroll region. `DataTable.vue` sets `overflow-x: visible` there and says outright that the element
+    "is not a scroll container at all even if the content is wider", because each row has become a card.
+    A nine-button cluster on one line inside a 375px card has nothing to fall into. That is pre-existing
+    — the old `.forms__actions` was `nowrap` by default too, so this row neither introduces nor fixes it
+    — but the safety net named above does not extend that far, and saying it did was the kind of claim
+    that reads as verified.
 
     ⚠️ THE COST IS REAL AND MEASURED, SO IT IS STATED RATHER THAN DISCOVERED LATER: with seven columns
     and nine actions the table needs ~1136px, so it scrolls sideways at **1280px and below** where the

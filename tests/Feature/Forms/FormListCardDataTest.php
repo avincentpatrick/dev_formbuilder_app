@@ -7,6 +7,7 @@ use App\Models\Form;
 use App\Models\Submission;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
 use App\Support\Forms\FormListFacets;
@@ -156,6 +157,45 @@ it('excludes soft-deleted submissions from BOTH counts — the toBase() guard', 
     $after = collect(app(FormPresenter::class)->list($this->owner))->firstWhere('id', $form->id);
     expect($after['stats']['responses'])->toBe(2)
         ->and($after['schedule']['remaining'])->toBe(8);
+});
+
+it('composes the grouped query with the GRANT arm of visibleTo, not just the org-wide short-circuit', function (): void {
+    // ⚠️ EVERY OTHER CASE IN THIS FILE RUNS AS AN OWNER, AND AN OWNER NEVER EXERCISES THE INTERESTING
+    // HALF. `Submission::scopeVisibleTo()` short-circuits to an unconstrained query for anyone holding
+    // `dashboard.org.view`, so the composition this class's docblock spends a paragraph defending —
+    // a `whereIn(subquery) orWhere(...)` closure nested inside a `whereIn` + four `selectRaw` bindings —
+    // was compiled by no test at all. That is the one arrangement where a binding-order or
+    // re-association bug would be silent, so it gets a reader who actually needs the predicate.
+    // A form_editor, and the form is created BY them: `FormService::create` grants the creator Editor
+    // capacity, which is what puts the form in their list at all. A reviewer cannot serve here — the
+    // first draft used one and got a null row, because `Form::scopeVisibleTo()` asks for EDITOR capacity,
+    // so a reviewer sees no forms and there is nothing to compute stats for.
+    $editor = User::factory()->create();
+    makeActiveMember($editor, 'form_editor');
+
+    $form = publishedInboxForm($this->tenant, $editor, 'Granted');
+    $version = $form->currentPublishedVersion;
+
+    Submission::factory()->count(2)->forVersion($version)
+        ->create(['status' => SubmissionStatus::Submitted, 'submitted_at' => now()]);
+    Submission::factory()->forVersion($version)->create(['status' => SubmissionStatus::Draft]);
+
+    // The submissions carry no `respondent_user_id`, so the scope's `orWhere` arm cannot match them —
+    // the `whereIn(form_id, grantedFormIdsQuery)` subquery is the only thing that can, which is exactly
+    // the composition being exercised.
+    app(ResourceGrantResolver::class)->forget();
+
+    $row = collect(app(FormPresenter::class)->list($editor))->firstWhere('id', $form->id);
+
+    // The editor resolves the same numbers through the grant arm that an owner gets through the
+    // short-circuit — which is the property, not merely "it did not crash".
+    expect($row)->not->toBeNull()
+        ->and($row['stats']['responses'])->toBe(2)
+        ->and($row['stats']['drafts'])->toBe(1);
+
+    // Anti-vacuity: the reader must NOT be holding the org-wide permission, or this test is just the
+    // short-circuit again under a different role name.
+    expect($editor->can('dashboard.org.view'))->toBeFalse();
 });
 
 it('leaves an uncapped form with no capacity count at all', function (): void {

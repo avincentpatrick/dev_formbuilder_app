@@ -21,6 +21,13 @@ const pages = [
     // eight controls and three checkbox groups are the other half of that risk.
     { name: 'Analytics', path: '/analytics' },
     { name: 'Forms', path: '/forms' },
+    // The forms list's SECOND view (JR3). Without this entry the enriched seven-column table, the
+    // single-line action cluster, the two `align: 'end'` columns and `MdsDataTable`'s own scroll region
+    // are scanned by nothing at all — `/forms` above renders the card grid now, so the table stopped
+    // being covered the moment the default flipped. It is also the half of this page that CAN scroll
+    // sideways (below ~1280px, by design), which makes it the one that most needs the overflow
+    // assertion at three viewports.
+    { name: 'Forms (table view)', path: '/forms?view=table' },
     { name: 'Submissions', path: '/submissions' },
     { name: 'Members', path: '/members' },
     // The scoping hierarchy (G10b2). This is the whole-page scan, so it owns the horizontal-overflow

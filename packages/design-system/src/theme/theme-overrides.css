@@ -60,24 +60,29 @@
 
    Every hue was searched for lightness rather than picked: each clears 4.5:1 against its OWN
    12% tint — which is the ground the glyph initials are actually read on, and a tighter bar
-   than the card surface — in BOTH themes. The 4px card edge is a non-text indicator under
-   WCAG 1.4.11 and takes 3:1; these clear 5:1 against the light canvas and 6:1 against the
-   dark one, so the edge passes with headroom on either ground.
+   than the card surface — in BOTH themes. Measured minima: 4.523 light, 4.507 dark. The 4px
+   card edge is a non-text indicator under WCAG 1.4.11 and takes 3:1; the worst of the four
+   grounds it can sit on is 4.984, so the edge passes with headroom either way.
 
    ⚠️ The binding constraint is SEPARATION FROM THE FOUR STATUS HUES, not from the chart
    series — the status pill is co-located on the same card, and the chart series never appear
-   on this page at all. Minimum measured separation from any status hue is 33deg; minimum
-   mutual separation within the scale is 34deg. The `form-identity scale` describe in
+   on this page at all. Minimum measured separation from any status hue is 32.54deg
+   (identity-4 vs warning); minimum mutual separation within the scale is 33.54deg (dark
+   identity-4 vs identity-6). ⚠️ THE GUARD ASSERTS A 30deg FLOOR, NOT THOSE NUMBERS, and the
+   difference is deliberate: a threshold transcribed from today's hexes tests nothing except
+   that nobody edited them. 30deg is the policy — below it two chips stop reading as different
+   hues — and the measurements above are simply where this palette happens to land. The
+   `form-identity scale` describe in
    `__tests__/theme-overrides.test.ts` asserts both — resolving the status hues through
    semantic.json rather than copying them, so a future re-hue surfaces the collision there —
    plus both contrast bars and that the two dark blocks below carry no literals. */
 :root {
-    --mds-_form-identity-dark-1: #9989ec; /* indigo   vs its own tint on #1a2130  4.54:1 */
-    --mds-_form-identity-dark-2: #15ac4d; /* emerald                             4.59:1 */
-    --mds-_form-identity-dark-3: #e868a4; /* rose                                4.54:1 */
-    --mds-_form-identity-dark-4: #84a30a; /* lime                                4.65:1 */
-    --mds-_form-identity-dark-5: #d26fe2; /* violet                              4.59:1 */
-    --mds-_form-identity-dark-6: #39ac15; /* spring                              4.61:1 */
+    --mds-_form-identity-dark-1: #9989ec; /* indigo   vs its own tint on #1a2130  4.578:1 */
+    --mds-_form-identity-dark-2: #15ac4d; /* emerald                             4.556:1 */
+    --mds-_form-identity-dark-3: #e868a4; /* rose                                4.507:1 */
+    --mds-_form-identity-dark-4: #84a30a; /* lime                                4.630:1 */
+    --mds-_form-identity-dark-5: #d26fe2; /* violet                              4.610:1 */
+    --mds-_form-identity-dark-6: #39ac15; /* spring                              4.573:1 */
 }
 
 /* ── Dark: explicit opt-in ─────────────────────────────────────────────── */

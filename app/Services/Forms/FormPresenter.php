@@ -120,7 +120,13 @@ final class FormPresenter
             // future PDF or digest paints the same form the same colour as this page does. Six because
             // the scale has six hues — see the payload note in `theme-overrides.css` for why six was the
             // ceiling. It carries no meaning: the status pill beside it is what encodes state.
-            'identity' => (crc32((string) $form->id) % 6) + 1,
+            //
+            // ⚠️ `sprintf('%u', …)` IS NOT DECORATION. `crc32()` returns a SIGNED int, and on a 32-bit
+            // build any checksum above 2^31 comes back negative — `-5 % 6 + 1` is `-4`, which emits
+            // `var(--mds-form-identity--4)`, a token that does not exist, so the card loses its edge and
+            // the glyph falls back to body colour. Every environment here is 64-bit today, which is
+            // exactly what makes it the kind of thing nobody would find.
+            'identity' => ((int) sprintf('%u', crc32((string) $form->id)) % 6) + 1,
             'versions' => $versions->map(fn (FormVersion $v): array => [
                 'id' => $v->id,
                 'version_number' => $v->version_number,

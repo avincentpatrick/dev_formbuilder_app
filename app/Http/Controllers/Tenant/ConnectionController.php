@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreConnectionRuleRequest;
 use App\Models\Connection;
+use App\Models\Form;
 use App\Models\User;
 use App\Services\Connectors\ConnectionPresenter;
 use App\Services\Connectors\ConnectionService;
 use App\Services\Connectors\ConnectorChannelDirectory;
+use App\Services\Connectors\MappableColumnCatalog;
 use App\Services\Connectors\SheetDestinationDirectory;
 use App\Support\Connectors\ConnectorConnectOutcome;
 use Illuminate\Http\JsonResponse;
@@ -63,6 +66,32 @@ final class ConnectionController extends Controller
     public function channels(Connection $connection, ConnectorChannelDirectory $directory): JsonResponse
     {
         return response()->json($directory->list($connection));
+    }
+
+    /**
+     * Everything a spreadsheet column can be bound to, for the form the rule is scoped to (H16b).
+     *
+     * A sidecar rather than an index prop because it depends on a choice made INSIDE the open modal — the
+     * tenant picks the form, and re-rendering the page to learn its fields would discard the rule they are
+     * half-way through writing.
+     *
+     * `form_id` is validated with `exists:` on the RLS-scoped table, so another tenant's form is "not found"
+     * rather than forbidden — the {@see StoreConnectionRuleRequest} convention.
+     */
+    public function mappableColumns(Request $request, Connection $connection, MappableColumnCatalog $catalog): JsonResponse
+    {
+        $validated = $request->validate([
+            'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
+        ]);
+
+        // `whereKey()->first()` rather than `find()`: the latter's signature admits an array and so returns
+        // `Form|Collection|null`. That is a real ambiguity here rather than a PHPStan nicety — the id comes
+        // from a request, and `?form_id[]=` is a shape a caller can send.
+        $form = isset($validated['form_id'])
+            ? Form::query()->whereKey($validated['form_id'])->first()
+            : null;
+
+        return response()->json($catalog->for($form));
     }
 
     /**

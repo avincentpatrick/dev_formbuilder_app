@@ -23,6 +23,7 @@ import {
 } from '@meridian/design-system';
 import { fetchChannels } from './integrationsClient';
 import { CHANNEL_PLACEHOLDER, channelWarning, toChannelOptions } from './channel-options';
+import SheetsRuleFields from './SheetsRuleFields.vue';
 import type { Channel, Option, RuleRow } from './types';
 
 const props = defineProps<{
@@ -31,6 +32,8 @@ const props = defineProps<{
     forms: Option[];
     eventTypes: Option[];
     rule?: RuleRow | null;
+    /** The grant's provider key (H16b). Absent behaves as Slack, which is the pre-H16b shape. */
+    provider?: string | null;
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -69,6 +72,38 @@ const channelError = computed<string | undefined>(
     () => (form.errors as Record<string, string | undefined>)['config.channel_id'],
 );
 
+/** H16b — a tabular provider swaps the channel picker for the sheet destination + column map. */
+const isTabular = computed<boolean>(() => props.provider === 'google_sheets');
+
+type SheetsDraft = {
+    spreadsheet_id: string;
+    spreadsheet_title: string;
+    sheet_name: string;
+    columns: { header: string; field_key: string | null }[];
+};
+
+const sheetsDraft = ref<SheetsDraft | null>(null);
+
+/**
+ * ⚠️ THE EVENT LIST IS NARROWED, NOT JUST STYLED — and the server enforces the same rule in `after()`.
+ * Only `submission.*` events carry a submission id, and a spreadsheet row IS a submission's answers, so a
+ * `form.published` rule on a sheet is undeliverable by construction. Offering the checkbox and rejecting the
+ * save would be worse than either: `SubscriptionConfigRules::eventTypeGuard()` exists so a rule that cannot
+ * work never reaches the ledger, and this exists so the tenant never ticks the box in the first place.
+ */
+const availableEvents = computed<Option[]>(() =>
+    isTabular.value ? props.eventTypes.filter((opt) => opt.value.startsWith('submission.')) : props.eventTypes,
+);
+
+const selectedFormTitle = computed<string | null>(
+    () => props.forms.find((f) => f.value === form.form_id)?.label ?? null,
+);
+
+/** Dotted server errors, passed down so the sheet fields can render them against the right control. */
+const dottedErrors = computed<Record<string, string | undefined>>(
+    () => form.errors as Record<string, string | undefined>,
+);
+
 const channelOptions = computed<Option[]>(() => toChannelOptions(channels.value, form.channel_id));
 const warning = computed<string | null>(() => channelWarning(channels.value, form.channel_id));
 /** No usable list — fall back to a raw id field rather than an empty select nobody can satisfy. */
@@ -76,6 +111,10 @@ const manualChannel = computed<boolean>(() => channelsLoaded.value && !channelsL
 
 async function loadChannels(force = false): Promise<void> {
     if (!props.connectionId) return;
+    // A tabular provider has no channel_lister by design (drive.file cannot enumerate), so the sidecar would
+    // answer with the "no destination list" message every time this modal opened. Not calling is both
+    // cheaper and the difference between a picker that degrades and one that reports a failure that is not one.
+    if (isTabular.value) return;
     if (channelsLoaded.value && !force) return;
 
     channelsLoading.value = true;
@@ -134,13 +173,23 @@ function submit(): void {
         name: data.name,
         event_types: data.event_types,
         form_id: data.form_id === '' ? null : data.form_id,
-        config: {
-            channel_id: data.channel_id,
-            // The label the tenant picked, so the list can read "#general" without re-querying the provider.
-            // Null when it was typed by hand — there is no name to know.
-            channel_name:
-                channels.value.find((c) => c.id === data.channel_id)?.label.replace(/^#/, '') ?? null,
-        },
+        config: isTabular.value
+            ? {
+                  spreadsheet_id: sheetsDraft.value?.spreadsheet_id ?? '',
+                  spreadsheet_title: sheetsDraft.value?.spreadsheet_title ?? null,
+                  sheet_name: sheetsDraft.value?.sheet_name ?? null,
+                  // No `fingerprint` — the server derives it from these headers through
+                  // `ColumnMapping::author()`. Sending one from here would be a second implementation of
+                  // `ColumnFingerprint`'s normalisation, kept in step by nothing.
+                  mapping: sheetsDraft.value ? { columns: sheetsDraft.value.columns } : null,
+              }
+            : {
+                  channel_id: data.channel_id,
+                  // The label the tenant picked, so the list can read "#general" without re-querying the
+                  // provider. Null when it was typed by hand — there is no name to know.
+                  channel_name:
+                      channels.value.find((c) => c.id === data.channel_id)?.label.replace(/^#/, '') ?? null,
+              },
     }));
 
     const options = { preserveScroll: true, onSuccess: () => close() };
@@ -169,10 +218,16 @@ function submit(): void {
             <!-- A checkbox GROUP → fieldset/legend (not FormField, which owns a single label→control). -->
             <fieldset class="rule-form__group">
                 <legend class="rule-form__legend">Events</legend>
-                <p class="rule-form__help">Which events get posted to the channel.</p>
+                <p class="rule-form__help">
+                    {{
+                        isTabular
+                            ? 'Which submissions get a row. Only submission events carry answers, so only those can be written to a spreadsheet.'
+                            : 'Which events get posted to the channel.'
+                    }}
+                </p>
                 <div class="rule-form__events">
                     <MdsCheckbox
-                        v-for="opt in eventTypes"
+                        v-for="opt in availableEvents"
                         :key="opt.value"
                         :model-value="form.event_types.includes(opt.value)"
                         :label="opt.label"
@@ -184,7 +239,18 @@ function submit(): void {
                 </p>
             </fieldset>
 
+            <SheetsRuleFields
+                v-if="isTabular"
+                :connection-id="connectionId"
+                :form-id="form.form_id"
+                :form-title="selectedFormTitle"
+                :rule="rule"
+                :errors="dottedErrors"
+                @change="sheetsDraft = $event"
+            />
+
             <MdsFormField
+                v-else
                 v-slot="{ id, describedby, invalid }"
                 label="Channel"
                 :help="manualChannel ? 'Paste the channel id from Slack (Channel details → the ID at the bottom).' : 'Only public channels are listed.'"
@@ -227,7 +293,11 @@ function submit(): void {
                 </div>
             </MdsFormField>
 
-            <p class="rule-form__status" role="status" aria-live="polite">
+            <!-- Not rendered for a tabular provider: SheetsRuleFields owns its own always-present live
+                 region, and two competing `aria-live` regions on one form is worse than one — this one would
+                 be permanently empty, which is exactly the "region with nothing to say" the H15b note warns
+                 about, doubled. -->
+            <p v-if="!isTabular" class="rule-form__status" role="status" aria-live="polite">
                 <template v-if="channelsLoading">
                     <MdsSpinner size="sm" label="Loading channels" />
                     Loading channels…

@@ -1619,3 +1619,58 @@ session does not rediscover it.
 keyed to the project directory, so any session in this repo loads the same index. The argument for
 putting the rule in the tracker is therefore durability, git-visibility and reviewability, not
 cross-agent visibility.
+
+## 2026-08-12 — Lane B (connector lane): a self-sufficient worktree stack, then H16b end to end
+
+Ran in the git worktree `c:\laragon\www\fb-lane-b` under Standing Rule 7, concurrently with Lane A's
+design work and with zero file overlap.
+
+**Task 1 — the second stack.** `docker-compose.override.yml` (untracked, gitignored by name at
+`.gitignore:41`) sets `name: fb-lane-b`, which is almost the whole isolation story: the base compose
+file declares no `container_name`, no `networks:` and one named volume, so Compose derives
+`fb-lane-b-*` containers, an `fb-lane-b_default` network the other stack cannot reach by service name,
+and a separate `fb-lane-b_pgdata`. Host ports remapped to app 8081 / postgres 5433 / redis 6380 / vite
+5174 / mailpit 1026+8026, every one carrying `!override` because **`ports:` merges by APPEND** — without
+it the second stack inherits all six of the first's and collides. Three traps worth keeping: the vite
+port must move INSIDE the container too (`public/hot` is written from the dev server's own port, so a
+host-only remap points the browser at the other lane's Vite); `composer install` exceeds composer's 300s
+process timeout on this bind mount (`-e COMPOSER_PROCESS_TIMEOUT=0`); and `.gitignore:3` is the literal
+`.env`, **not** `.env*`, so `.env.lane-b` and `docker-compose.lane-b.yml` are committable and must not be
+used for this.
+
+**Rule 7(c) amended, and the amendment is structural rather than procedural.** `phpunit.xml` pins
+`DB_DATABASE=meridian_testing` but says nothing about `DB_HOST`, which falls through to `.env`'s SERVICE
+NAME `postgres` — and a service name resolves on the calling container's own network. So each lane's
+`migrate:fresh` can only drop its own schema, by construction. Measured rather than asserted: Lane A's
+dev database read `tenants=2 users=10 forms=7 submissions=518` before and after a full
+`migrate:fresh --seed` in Lane B, and `tests/Feature/Connectors` then ran 153/593 entirely inside
+`fb-lane-b-app-1`. The `ps -eo args` probe survives, scoped to two agents sharing ONE stack.
+
+**Task 2 — H16b in three PRs.** #134 the redirect-URI port (`1660d00`), #135 the tabular destination
+seam (`8198dcd`), #136 the rule UI.
+
+The port bug had **two** victims: `centralHost()` feeds `callbackUrl()` and `tenantHost()`, so besides the
+`redirect_uri_mismatch` the post-consent browser was returned to a portless tenant host nothing serves.
+The fix takes the port from `app.url` **guarded on `app.url`'s host being the central domain** — that
+guard is why the ten asserted redirects in `ConnectorOAuthFlowTest` did not move, where the earlier
+unguarded attempt reddened them. Pinning `APP_URL` in `phpunit.xml` changed exactly one test in the whole
+suite: `GeneratePdfJobTest`'s first case asserted `alpha.localhost:8080` while reading the AMBIENT app.url,
+passing by coincidence because `.env` and `.env.example` agree.
+
+**The client-side Google Picker was dropped as a decision.** ADR-0009 §D8 and the tracker both said it was
+H16b's job — an aside that became a plan of record by repetition, while `config/connectors.php`, written in
+the same increment, had recorded the real alternative ("created by us or named by id"). Only the first half
+works: an id a tenant pastes is unreachable under `drive.file` unless we already hold a per-file grant. The
+Picker needs a browser API key only the user can mint plus the app's first third-party script, the trade
+`FormBotChallenge` already records refusing. `spreadsheets.create` IS permitted under `drive.file`, so
+Meridian creates the sheet and writes its header row. ADR-0009 §D8 amended in place.
+
+**Lessons worth carrying.** Scramble publishes a rule key's PRECEDING COMMENT verbatim as that property's
+`description` — I11a recorded it once and this nearly repeated it; the CI contract gate cannot catch it,
+because it diffs a fresh export against the committed file and both are equally wrong. Only reading the
+regen diff finds it. A test that claimed the column catalog invented four keys was itself blind: the
+tenancy middleware forgets the GUC in `terminate()`, so its own post-request query ran with no context and
+RLS hid every version — an empty expectation matching an empty actual is a bug wearing green. And
+`MdsSegmentedControl` renders its own fieldset and legend, so a wrapper gives the group two; vue-tsc was the
+only gate that could catch it, since happy-dom computes no styles and Storybook globs the design-system
+package only, so an app page never gets an axe scan.

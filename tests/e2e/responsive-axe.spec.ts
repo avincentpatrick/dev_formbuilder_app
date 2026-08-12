@@ -419,6 +419,35 @@ for (const theme of themes) {
     });
 }
 
+// The Sheets rule detail with its DRIFT card (H16b). Its own loop rather than a widened one above, because
+// the markup under scan genuinely differs: a paused Sheets rule mounts a warning-tinted reason panel and a
+// two-button action row the Slack rule never renders, and that panel is the only place on this page where
+// text sits on `status-warning-bg` — in both themes, which is exactly what the theme loop is for.
+//
+// Filtered on "responses sheet", which is unique. "Clinic Intake" alone would ALSO match the seeded Slack
+// rule "Clinic Intake → #clinic" and open whichever row happened to sort first.
+//
+// Deliberately does not open the rule modal, for the reason above and one more specific to this provider:
+// opening it calls the sheet sidecars, which reach Google. e2e has no credentials and no business making
+// that request.
+for (const theme of themes) {
+    test(`Sheets rule detail — drift (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await page.goto('/integrations', { waitUntil: 'networkidle' });
+        await page
+            .locator('tr')
+            .filter({ hasText: 'responses sheet' })
+            .getByRole('button', { name: 'View rule' })
+            .click();
+        await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+        await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
+        // The card this increment exists for. Waiting on it rather than assuming it means a seeder change
+        // that dropped the blocked delivery fails HERE, loudly, instead of quietly scanning a page without it.
+        await page.getByRole('button', { name: 'Review columns' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await forceTheme(page, theme);
+        await assertClean(page, 'Sheets rule detail — drift');
+    });
+}
+
 // The audit change-detail dialog (I2) — this increment's ONLY new structural markup: a before/after
 // <table> with a visually-hidden <caption> and column headers, inside a dialog that becomes a FULL-BLEED
 // SHEET at 375px (Modal's ≤480px rule). That is where it earns a scan of its own: the diff carries a full

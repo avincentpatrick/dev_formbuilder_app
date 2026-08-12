@@ -24,6 +24,7 @@ import {
     MdsCard,
     MdsDataTable,
     MdsEmptyState,
+    MdsIcon,
     MdsModal,
     MdsPagination,
     statusVariant,
@@ -207,6 +208,33 @@ function formatDate(iso: string | null): string {
                 This rule is <strong>{{ rule.status }}</strong> and isn’t delivering. Resume it to start again —
                 that also clears the failure counter.
             </p>
+            <!-- H16b — WHY it stopped, not merely that it did. A paused Sheets rule is almost always a
+                 drifted header row or a destination we can no longer reach, and both are things the tenant
+                 fixes in a minute IF they are told which. `paused_reason` is the `[code] sentence` the
+                 adapter itself wrote, so nothing here is the provider's own unreviewed text. -->
+            <p v-if="rule.paused_reason" class="detail__reason">
+                <MdsIcon name="alert" size="sm" class="detail__reason-icon" aria-hidden="true" />
+                <span>{{ rule.paused_reason }}</span>
+            </p>
+            <div v-if="rule.spreadsheet_id && can.update" class="detail__reason-actions">
+                <!-- Opening the edit modal RE-INSPECTS the sheet, so the tenant sees its CURRENT headings
+                     rather than the ones stored when the rule was written — which, on a drifted rule, is
+                     precisely the difference they need to see. -->
+                <MdsButton variant="secondary" icon-left="edit" @click="editOpen = true">
+                    Review columns
+                </MdsButton>
+                <MdsButton
+                    v-if="rule.spreadsheet_url"
+                    as="a"
+                    variant="tertiary"
+                    icon-left="external-link"
+                    :href="rule.spreadsheet_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Open the spreadsheet
+                </MdsButton>
+            </div>
         </MdsCard>
 
         <section class="detail__log">
@@ -248,6 +276,7 @@ function formatDate(iso: string | null): string {
         <RuleFormModal
             v-model:open="editOpen"
             :connection-id="rule.connection_id"
+            :provider="connection?.provider ?? null"
             :forms="forms"
             :event-types="eventTypes"
             :rule="rule"
@@ -324,6 +353,36 @@ function formatDate(iso: string | null): string {
 
 .detail__notice {
     margin-bottom: var(--mds-space-5);
+}
+
+/* H16b — the adapter's own explanation for a paused rule, on the warning surface. Same recipe as the
+   provider caution on the Integrations page, and the same reason: the icon carries the meaning alongside
+   the colour, and `status-warning-{bg,fg}` is a measured pair. */
+.detail__reason {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    margin: var(--mds-space-3) 0 0;
+    padding: var(--mds-space-3);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-status-warning-bg);
+    color: var(--mds-color-status-warning-fg);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.detail__reason-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Wrap rather than overflow — the standing 375px rule for any row of actions. */
+.detail__reason-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-3);
 }
 
 .detail__prose {

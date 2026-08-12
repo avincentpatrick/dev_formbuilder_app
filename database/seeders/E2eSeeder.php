@@ -777,6 +777,68 @@ class E2eSeeder extends Seeder
             'created_by' => $owner->id,
         ]);
 
+        // ── H16b: a Google Sheets grant, so /integrations' EXISTING axe scan covers the tabular surface —
+        // the destination column, the 7-day caution and a drift-paused rule with its reason card. No new spec
+        // is needed: responsive-axe.spec.ts already visits this page across 3 viewports × 2 themes, and a
+        // surface the seeder never mounts is a surface those six runs cannot see.
+        //
+        // Through the FACTORY, not ConnectionService, for the reason the Slack fixture above records: a real
+        // grant can only come from an OAuth exchange and there is no provider to call in e2e. Nothing here
+        // triggers an outbound request either — the sheet sidecars fire only when a human opens the rule
+        // modal, which no spec does.
+        $sheets = Connection::factory()->googleSheets()->create([
+            'status' => ConnectionStatus::Active,
+            'connected_by' => $owner->id,
+        ]);
+
+        $sheetsMapping = [
+            'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+            'columns' => [
+                ['header' => 'full name', 'field_key' => 'full_name'],
+                ['header' => 'colour', 'field_key' => 'colour'],
+                ['header' => 'submission id', 'field_key' => '__submission_id'],
+            ],
+        ];
+
+        ConnectionSubscription::factory()->forConnection($sheets)->create([
+            'name' => 'Submissions → Q3 Intake sheet',
+            // Only `submission.*` events can reach a spreadsheet — a row IS a submission's answers, which is
+            // why SubscriptionConfigRules::eventTypeGuard() refuses the rest. Seeding the whole catalog here
+            // would seed a rule the product itself now rejects.
+            'event_types' => ['submission.created', 'submission.updated'],
+            'config' => [
+                'spreadsheet_id' => 'E2E_SHEET_0000000000000001',
+                'spreadsheet_title' => 'Q3 Intake',
+                'sheet_name' => 'Responses',
+                'mapping' => $sheetsMapping,
+            ],
+            'created_by' => $owner->id,
+        ]);
+
+        // The drift case — the one a tenant actually meets, and the reason the reason-card exists at all.
+        $drifted = ConnectionSubscription::factory()->forConnection($sheets)->paused()->create([
+            'name' => 'Clinic Intake → responses sheet',
+            'event_types' => ['submission.created'],
+            'config' => [
+                'spreadsheet_id' => 'E2E_SHEET_0000000000000002',
+                'spreadsheet_title' => 'Clinic responses',
+                'sheet_name' => 'Responses',
+                'mapping' => $sheetsMapping,
+            ],
+            'last_failure_at' => now(),
+            'created_by' => $owner->id,
+        ]);
+
+        // `paused_reason` is READ FROM THE LEDGER rather than stored on the rule, so the reason card renders
+        // only when a blocked delivery exists to carry it. A paused rule without one would mount it empty.
+        WebhookDelivery::factory()->forSubscription($drifted)->create([
+            'status' => WebhookDeliveryStatus::DeadLettered,
+            'attempt_count' => 1,
+            'response_status_code' => null,
+            'response_time_ms' => 210,
+            'response_body_excerpt' => '[column_drift] The spreadsheet’s columns changed: added “Reviewer”; moved “colour”. Open the rule to re-map them.',
+        ]);
+
         // A spread across the shared ledger so the rule detail's log + every delivery badge render. The
         // `Result` column is the diagnostic here (Slack fails at HTTP 200), so each row carries a real excerpt.
         $specs = [

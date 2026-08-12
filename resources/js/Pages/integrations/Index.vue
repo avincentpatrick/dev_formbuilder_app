@@ -42,9 +42,12 @@ const props = defineProps<{
     can: { create: boolean };
 }>();
 
+// "Destination" rather than "Channel" (H16b): the column now carries a Slack channel OR a spreadsheet + tab,
+// and the server resolves which — see `destination_label` on the presenter. A per-provider heading would mean
+// a table whose columns differ between the two cards on this very page.
 const columns: DataTableColumn[] = [
     { key: 'name', header: 'Rule' },
-    { key: 'channel_name', header: 'Channel' },
+    { key: 'destination_label', header: 'Destination' },
     { key: 'event_types', header: 'Events' },
     { key: 'form_title', header: 'Scope' },
     { key: 'status', header: 'Status' },
@@ -52,6 +55,7 @@ const columns: DataTableColumn[] = [
 
 const createOpen = ref(false);
 const createConnectionId = ref<string | null>(null);
+const createProvider = ref<string | null>(null);
 const disconnectTarget = ref<ConnectionWithRules | null>(null);
 
 const hasConnections = computed(() => props.connections.length > 0);
@@ -67,6 +71,9 @@ function openRule(id: string): void {
 
 function addRule(connectionId: string): void {
     createConnectionId.value = connectionId;
+    // The modal renders a whole different destination editor per provider (H16b), so it needs the key, not
+    // just the id. Resolved here rather than fetched: the page already carries every connection.
+    createProvider.value = props.connections.find((c) => c.id === connectionId)?.provider ?? null;
     createOpen.value = true;
 }
 
@@ -78,8 +85,21 @@ function confirmDisconnect(): void {
     });
 }
 
-function channelLabel(rule: RuleRow): string {
-    return channelDisplay(rule.channel_name, rule.channel_id);
+/**
+ * The destination cell (H16b).
+ *
+ * `destination_label` is server-resolved so this cell never branches on the provider — the presenter's own
+ * `providerDescription()` is a `default`-less match for the same reason: resolving a provider is the server's
+ * job. `channelDisplay` remains the fallback for a rule stored before that field existed, which is also what
+ * keeps its `##general` normalisation reachable.
+ */
+function destinationLabel(rule: RuleRow): string {
+    return rule.destination_label ?? channelDisplay(rule.channel_name, rule.channel_id);
+}
+
+/** The standing caveat for a connected provider, looked up from the catalog the page already carries. */
+function providerNotice(providerKey: string): string | null {
+    return props.providers.find((p) => p.key === providerKey)?.notice ?? null;
 }
 </script>
 
@@ -112,6 +132,16 @@ function channelLabel(rule: RuleRow): string {
                 <p v-if="!provider.configured" class="provider__notice">
                     {{ provider.label }} isn’t configured on this deployment yet. Ask your administrator to add the
                     app credentials before connecting.
+                </p>
+                <!-- H16b — a standing condition of the DEPLOYMENT, stated up front rather than left for the
+                     weekly "Reconnect needed" badge to imply. Icon AND words carry the meaning (WCAG 1.4.1);
+                     the tinted surface follows DomainCard's `--wait` recipe, whose bg/fg pair is one of the
+                     few in the token set with a measured contrast guarantee. Deliberately not MdsBanner:
+                     that primitive takes a single-line `message` string, and this is three sentences whose
+                     whole job is to name a cause. -->
+                <p v-if="provider.notice" class="provider__caution">
+                    <MdsIcon name="alert" size="sm" class="provider__caution-icon" aria-hidden="true" />
+                    <span>{{ provider.notice }}</span>
                 </p>
                 <div class="provider__actions">
                     <!-- A real anchor, not router.visit: the next hop is Slack's origin, and Inertia would
@@ -184,6 +214,13 @@ function channelLabel(rule: RuleRow): string {
 
                 <p v-if="connection.status !== 'active'" class="connection__notice">
                     This workspace isn’t delivering. Reconnect it above to resume — your rules are kept.
+                    <!-- H16b — the sentence PROGRESS:846 asks for. Repeated here rather than only on the
+                         provider card above because THIS is where the tenant arrives when it happens: the
+                         status badge already says "Reconnect needed", and a red badge with no cause reads as
+                         our bug rather than as Google's published policy. -->
+                    <template v-if="providerNotice(connection.provider)">
+                        {{ providerNotice(connection.provider) }}
+                    </template>
                 </p>
 
                 <!-- Caption names the workspace: a tenant can connect several, and "Delivery rules" three
@@ -194,8 +231,8 @@ function channelLabel(rule: RuleRow): string {
                     :caption="`Delivery rules — ${connection.external_account_label}`"
                     row-key="id"
                 >
-                    <template #cell-channel_name="{ row }">
-                        <span class="connection__channel">{{ channelLabel(row as RuleRow) }}</span>
+                    <template #cell-destination_label="{ row }">
+                        <span class="connection__channel">{{ destinationLabel(row as RuleRow) }}</span>
                     </template>
                     <template #cell-event_types="{ row }">
                         {{ (row as RuleRow).event_types.length }}
@@ -239,6 +276,7 @@ function channelLabel(rule: RuleRow): string {
         <RuleFormModal
             v-model:open="createOpen"
             :connection-id="createConnectionId"
+            :provider="createProvider"
             :forms="forms"
             :event-types="eventTypes"
             :rule="null"
@@ -304,6 +342,30 @@ function channelLabel(rule: RuleRow): string {
 
 .provider__notice {
     color: var(--mds-color-text-body);
+}
+
+/* H16b — the standing 7-day caveat. A surface of its own rather than the same grey as every other hint,
+   for the reason DomainCard's `--wait` note gives: this is the state a tenant is most likely to misread,
+   and the misreading here is "this product's token handling is broken". `status-warning-{bg,fg}` is one of
+   the few pairs in the token set with a measured contrast guarantee, and the icon carries the meaning
+   alongside the colour (WCAG 1.4.1). */
+.provider__caution {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    margin: 0 0 var(--mds-space-3);
+    padding: var(--mds-space-3);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-status-warning-bg);
+    color: var(--mds-color-status-warning-fg);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.provider__caution-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
 }
 
 /* Wrap rather than overflow — the standing 375px rule for any row of actions. */

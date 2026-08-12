@@ -66,7 +66,8 @@ final class SlackConnector implements ConnectorProvider
         return ConnectorProviderKey::Slack;
     }
 
-    public function authorizeUrl(string $state, string $redirectUri): string
+    /** `$codeVerifier` is unused: Slack's OAuth v2 does not offer PKCE for a confidential client. */
+    public function authorizeUrl(string $state, string $redirectUri, string $codeVerifier): string
     {
         return self::AUTHORIZE_URL.'?'.http_build_query([
             'client_id' => (string) config('connectors.providers.slack.client_id'),
@@ -76,7 +77,8 @@ final class SlackConnector implements ConnectorProvider
         ]);
     }
 
-    public function exchangeCode(string $code, string $redirectUri): ConnectorGrant
+    /** `$codeVerifier` is unused — see {@see authorizeUrl()}; nothing was sent, so nothing is proved. */
+    public function exchangeCode(string $code, string $redirectUri, string $codeVerifier): ConnectorGrant
     {
         $body = $this->postForm(self::TOKEN_URL, [
             'client_id' => (string) config('connectors.providers.slack.client_id'),

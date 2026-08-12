@@ -214,6 +214,10 @@ final class ConnectionPresenter
             ConnectorProviderKey::GoogleSheets => config('connectors.providers.google_sheets.publishing_status') === 'testing'
                 ? 'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in Meridian.'
                 : null,
+            // H16c. Airtable has no verification review and no equivalent of Google's 7-day testing expiry, so
+            // there is no standing deployment condition to warn about. Null because there is nothing true to
+            // say, not because nobody looked.
+            ConnectorProviderKey::Airtable => null,
         };
     }
 
@@ -222,6 +226,7 @@ final class ConnectionPresenter
         return match ($key) {
             ConnectorProviderKey::Slack => 'Post new submissions and form status changes straight into a Slack channel.',
             ConnectorProviderKey::GoogleSheets => 'Append every new submission as a row in one of your Google Sheets. We only get access to the spreadsheets you pick.',
+            ConnectorProviderKey::Airtable => 'Add every new submission as a record in one of your Airtable tables. We can read your table names and add records — we can’t change how your bases are built.',
         };
     }
 

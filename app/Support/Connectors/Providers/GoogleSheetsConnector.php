@@ -92,7 +92,8 @@ final class GoogleSheetsConnector implements ConnectorProvider
         return ConnectorProviderKey::GoogleSheets;
     }
 
-    public function authorizeUrl(string $state, string $redirectUri): string
+    /** `$codeVerifier` is unused: Google permits PKCE for a confidential client but does not require it. */
+    public function authorizeUrl(string $state, string $redirectUri, string $codeVerifier): string
     {
         /** @var array<string, string> $extra */
         $extra = (array) config('connectors.providers.google_sheets.auth_params', []);
@@ -106,7 +107,8 @@ final class GoogleSheetsConnector implements ConnectorProvider
         ], $extra));
     }
 
-    public function exchangeCode(string $code, string $redirectUri): ConnectorGrant
+    /** `$codeVerifier` is unused — see {@see authorizeUrl()}; nothing was sent, so nothing is proved. */
+    public function exchangeCode(string $code, string $redirectUri, string $codeVerifier): ConnectorGrant
     {
         $body = $this->postForm(self::TOKEN_URL, [
             'client_id' => (string) config('connectors.providers.google_sheets.client_id'),

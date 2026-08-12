@@ -54,7 +54,13 @@ final class ConnectorAuthController extends Controller
 
         // away(): the destination is the provider's own domain, not a named route in this app.
         return redirect()->away(
-            $adapter->authorizeUrl($state, $this->redirector->callbackUrl($adapter->key()))
+            $adapter->authorizeUrl(
+                $state,
+                $this->redirector->callbackUrl($adapter->key()),
+                // H16c. Derived from the state rather than stashed in the session, because the callback that
+                // needs it again has no session to read — the same reason the state itself is a token.
+                $this->states->codeVerifierFor($state),
+            )
         );
     }
 }

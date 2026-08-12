@@ -67,6 +67,29 @@ class ConnectionFactory extends Factory
         ]);
     }
 
+    /**
+     * An Airtable grant (H16c). Refreshable and expiring like the Google state above, and for the same reason
+     * that docblock gives — but Airtable is the stronger case: it ROTATES the refresh token on every renewal
+     * and invalidates the previous pair, so a state with a null expiry would model a grant that cannot exist
+     * and would skip the one path where getting this wrong kills the connection 60 minutes after connecting.
+     *
+     * `external_account_id` is a real-shaped Airtable user id (`usr…`) rather than the constant the Google
+     * state carries: `whoami` needs no scope, so two Airtable accounts under one tenant are genuinely
+     * distinguishable by `connections_tenant_provider_account_unique`.
+     */
+    public function airtable(int $expiresInSeconds = 3600): static
+    {
+        return $this->state(fn (): array => [
+            'provider' => ConnectorProviderKey::Airtable,
+            'external_account_id' => 'usr'.Str::random(14),
+            'external_account_label' => 'Airtable',
+            'scopes' => ['schema.bases:read', 'data.records:write'],
+            'access_token' => 'oaa'.Str::random(40),
+            'refresh_token' => 'oar'.Str::random(40),
+            'token_expires_at' => Carbon::now()->addSeconds($expiresInSeconds),
+        ]);
+    }
+
     public function revoked(): static
     {
         return $this->state(fn (): array => ['status' => ConnectionStatus::Revoked]);

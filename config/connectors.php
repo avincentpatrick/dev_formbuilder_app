@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Connectors\Providers\AirtableConnector;
 use App\Support\Connectors\Providers\GoogleSheetsConnector;
 use App\Support\Connectors\Providers\GoogleSheetsDirectory;
 use App\Support\Connectors\Providers\SlackChannelLister;
@@ -116,6 +117,42 @@ return [
             | Anything other than `testing` means published; the UI branches on the one value it can act on.
             */
             'publishing_status' => env('GOOGLE_CONNECTOR_PUBLISHING_STATUS', 'testing'),
+        ],
+
+        /*
+        | Airtable (H16c — webhook-integration-design.md §4 row 5). Tabular like Sheets, and the provider that
+        | shows how much of the Sheets design was a workaround for one Google constraint rather than a property
+        | of tabular destinations.
+        |
+        | ⚠️ THE SCOPE SET IS TWO, AND THE ABSENT THIRD IS THE DECISION WORTH READING (ADR-0009 §D8, verified
+        | against Airtable's live scope table 2026-08-13).
+        |
+        |   `schema.bases:read`  — list the tenant's bases, and read a table's field names. Both are needed:
+        |                          the field names ARE the header row that drift detection fingerprints.
+        |   `data.records:write` — create the record. There is no `data.records:read`: the connector appends
+        |                          and never reads back what a tenant has stored.
+        |
+        | `schema.bases:write` is NOT requested, and refusing it is a substantive choice rather than a default.
+        | H16b's Sheets flow CREATES the destination, and the argument for that was specific: `drive.file`
+        | cannot enumerate, so "paste an id" fails for most tenants and creating the file was the only way to
+        | make the destination reachable by construction. Airtable CAN enumerate. The premise is gone, so the
+        | conclusion does not carry, and §D8's narrowest-set rule decides it — a scope that would let us alter
+        | a tenant's base structure buys nothing they cannot do themselves in ten seconds. The user ratified
+        | this on 2026-08-13. Consequence, stated rather than discovered: Airtable registers no
+        | `tabular_directory` provisioning arm, only inspection.
+        |
+        | Airtable requires PKCE, which no previous provider did. There is no `auth_params` entry for it
+        | because the challenge is per-flow rather than per-deployment — see `AirtableConnector::authorizeUrl()`
+        | and `ConnectorOAuthStateService::codeVerifierFor()`.
+        |
+        | And no `publishing_status` twin of Google's: Airtable has no verification review and no 7-day token
+        | expiry, so there is no standing deployment caveat for the UI to explain.
+        */
+        'airtable' => [
+            'adapter' => AirtableConnector::class,
+            'client_id' => env('AIRTABLE_CONNECTOR_CLIENT_ID'),
+            'client_secret' => env('AIRTABLE_CONNECTOR_CLIENT_SECRET'),
+            'scopes' => ['schema.bases:read', 'data.records:write'],
         ],
     ],
 

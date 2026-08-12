@@ -10,6 +10,7 @@ use App\Http\Middleware\EstablishConnectorOauthContext;
 use App\Services\Connectors\ConnectionService;
 use App\Services\Connectors\ConnectorRedirector;
 use App\Support\Connectors\ConnectorOAuthState;
+use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Connectors\ConnectorRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ final class ConnectorCallbackController extends Controller
         private readonly ConnectorRegistry $registry,
         private readonly ConnectionService $connections,
         private readonly ConnectorRedirector $redirector,
+        private readonly ConnectorOAuthStateService $states,
     ) {}
 
     public function __invoke(Request $request, string $provider): RedirectResponse
@@ -57,7 +59,14 @@ final class ConnectorCallbackController extends Controller
         }
 
         try {
-            $grant = $adapter->exchangeCode($code, $this->redirector->callbackUrl($adapter->key()));
+            $grant = $adapter->exchangeCode(
+                $code,
+                $this->redirector->callbackUrl($adapter->key()),
+                // H16c. Re-derived from the state rather than carried: this request has no session, and the
+                // state it is derived from was MAC-verified by the middleware above before any of this ran,
+                // so a forged state cannot reach here to steer the derivation.
+                $this->states->codeVerifierFor((string) $request->query('state')),
+            );
         } catch (ConnectorOAuthException $e) {
             return redirect()->away($this->redirector->failureUrl($state->tenantId, $adapter->key(), $e->errorCode));
         }

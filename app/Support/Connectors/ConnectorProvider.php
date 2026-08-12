@@ -14,6 +14,13 @@ use App\Support\Webhooks\OutboundUrlGuard;
  * One third-party service the native-connector framework can talk to (ADR-0009, H15a). Four responsibilities,
  * deliberately no more: build the consent URL, exchange a code, refresh a grant, and push one event.
  *
+ * H16c (Airtable) is the first provider to press on that: PKCE is mandatory there, and the verifier has to
+ * survive the hop from the authorize half-flow (tenant subdomain, session) to the exchange half-flow (central
+ * domain, no session). The count of responsibilities held; two SIGNATURES gained a `$codeVerifier`, and that
+ * is the honest answer to ADR-0009's "when the second and third providers land" revisit line. A fifth method
+ * was not needed, and neither was a store: the verifier is derived from the state token both halves already
+ * hold ({@see ConnectorOAuthStateService::codeVerifierFor()}).
+ *
  * ADR-0009 rejects an OAuth client library for this: Socialite is built around a same-host, session-backed
  * redirect, whereas this framework's callback is stateless and lands on the central domain, so the library
  * would have to be bent around the design rather than supporting it. An adapter is ~one small class.
@@ -34,15 +41,21 @@ interface ConnectorProvider
     /**
      * The provider's consent screen URL for this flow. `$state` is the signed, provider-bound state token
      * (ADR-0009 §D3) and `$redirectUri` the central-domain callback (§D2) — both are opaque to the adapter.
+     *
+     * `$codeVerifier` is the PKCE verifier for this flow (H16c). An adapter whose provider does not use PKCE
+     * ignores it; one that does publishes `base64url(sha256($codeVerifier))` as `code_challenge` here and
+     * sends the verifier itself at {@see exchangeCode()}.
      */
-    public function authorizeUrl(string $state, string $redirectUri): string;
+    public function authorizeUrl(string $state, string $redirectUri, string $codeVerifier): string;
 
     /**
-     * Trade an authorization code for a grant.
+     * Trade an authorization code for a grant. `$codeVerifier` is the same value this flow's
+     * {@see authorizeUrl()} was given — see that method, and §D3 for why it needs no storage to survive the
+     * hop between the two half-flows.
      *
      * @throws ConnectorOAuthException the provider refused the exchange (expired/reused code, bad client)
      */
-    public function exchangeCode(string $code, string $redirectUri): ConnectorGrant;
+    public function exchangeCode(string $code, string $redirectUri, string $codeVerifier): ConnectorGrant;
 
     /**
      * Trade a refresh token for a fresh grant. A provider that returns no new refresh token leaves

@@ -79,6 +79,12 @@ final class ConnectorConnectOutcome
             'invalid_code', 'bad_verification_code', 'invalid_grant' => 'That authorization link had already been used or had expired. Start the connection again.',
             // Nothing the tenant can fix — this is our app registration, not their workspace.
             'invalid_client_id', 'bad_client_secret', 'invalid_client_secret' => 'This deployment\'s '.$label.' app credentials were rejected. Contact your administrator.',
+            // H16c. Also ours, not theirs: a first exchange that returns no refresh token means the app was
+            // registered without offline access, and the connection would have died within the hour.
+            'missing_refresh_token' => 'This deployment\'s '.$label.' app didn\'t return a renewable sign-in. Contact your administrator.',
+            // H16c. Retryable and genuinely transient — the grant is fine, we just could not read back WHICH
+            // account it belongs to, and storing it without that would let two accounts overwrite each other.
+            'identity_unavailable' => 'We signed in to '.$label.' but couldn\'t confirm which account it was. Please try connecting again.',
             default => $label.' '.self::GENERIC_FAILURE,
         };
     }

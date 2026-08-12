@@ -1410,3 +1410,16 @@ disclosure lint was vacuous on its first run** — it matched `where(` case-sens
 checkpoint; PHPStan 20 = delta 0; Pint clean 1,162; vue-tsc clean; `openapi.json` byte-identical (it does not
 move — Scramble types the sync `submission` field as a bare string); controller-gate 84, migration-lint 91,
 job-payload-lint 28 on the host; Playwright compile-check 480 in 14 files.**
+
+**Merged as PR #131 (`515411d`), 6/6 with real steps. CI reconciles: Pest 3537 passed / 0 failed (15,085
+assertions), +62 on J2d's 3475; Vitest 95 FILES all green; E2E 478 passed; Storybook axe 207; Contract tests
+byte-identical; Static analysis green with all three lint gates at their FULL counts.**
+
+It took three CI runs, and not one of the failures was in shipped code — which is itself the clearest possible
+demonstration of the iterator finding. `AnalyticsIndexShapeTest` (an index-inventory guard doing its job, 8→9)
+lives in a directory the truncating iterator drops, so no local Pest run could collect it; and the new
+`/search` Vitest spec had its first run anywhere in CI, because local Vitest hung at teardown twice on this
+host. The last of its three failures is the one worth keeping: it asserted the refused-scope empty state did
+not contain the word "permission" and failed, because the page carries that word unconditionally in a standing
+scope note. The assertion was testing the copy; it now asserts the two empty states render IDENTICALLY, which
+is the actual disclosure contract.

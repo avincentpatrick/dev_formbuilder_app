@@ -1574,3 +1574,9 @@ is not something a component can know and "is this a status" already has an answ
 Four documentation claims were false and three code comments asserted mechanisms that cannot occur —
 including a guard whose named victim has no reachable call path. All corrected in place, with the
 correction recorded rather than the sentence quietly rewritten.
+
+Merged as PR #133 (`7d56cd8`), 6/6 with real steps: Pest 3551/0 across 15,132 assertions (delta zero
+— JR2 touches no PHP), E2E 477 passed with 1 flaky, and the Storybook axe run 218 across 32 suites,
+up from 207, which is exactly the eleven stories the increment adds. The axe job mattered more than
+usual here: it is the merge-blocking contrast gate, it cannot be run on this host, and a re-skin is
+precisely the kind of change it exists to catch.

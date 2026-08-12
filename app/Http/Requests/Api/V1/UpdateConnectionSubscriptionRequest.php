@@ -9,6 +9,7 @@ use App\Enums\DomainEventType;
 use App\Support\Connectors\SubscriptionConfigRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Partially update a delivery rule (ADR-0009, H15a). Every field is `sometimes`, so a caller may send only
@@ -65,5 +66,18 @@ final class UpdateConnectionSubscriptionRequest extends FormRequest
     public function messages(): array
     {
         return SubscriptionConfigRules::messagesFor(SubscriptionConfigRules::providerFor($this));
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     *
+     * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
+     * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
+     *
+     * @return array<int, \Closure(Validator): void>
+     */
+    public function after(): array
+    {
+        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
     }
 }

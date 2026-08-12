@@ -76,4 +76,26 @@ final class ConnectorRegistry
 
         return $lister instanceof ListsChannels ? $lister : null;
     }
+
+    /**
+     * The provider's OPTIONAL tabular-destination capability (H16b), or null when its destinations are not
+     * documents it can create and read.
+     *
+     * The exact twin of {@see channelListerFor()}, and separate from it because the two are not alternatives:
+     * a provider could have both (enumerate bases AND create one), and Sheets has only this one precisely
+     * because `drive.file` forbids enumeration. Null rather than throwing, for the same reason — a provider
+     * without the capability is not misconfigured, and the CONNECTION is still valid.
+     */
+    public function tabularDirectoryFor(ConnectorProviderKey $provider): ?ProvisionsTabularDestinations
+    {
+        $class = config("connectors.providers.{$provider->value}.tabular_directory");
+
+        if (! is_string($class) || ! is_a($class, ProvisionsTabularDestinations::class, true)) {
+            return null;
+        }
+
+        $directory = $this->container->make($class);
+
+        return $directory instanceof ProvisionsTabularDestinations ? $directory : null;
+    }
 }

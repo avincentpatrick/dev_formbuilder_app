@@ -6318,6 +6318,14 @@
                                 ],
                                 "maxLength": 100
                             },
+                            "spreadsheet_title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "The spreadsheet's name when the rule was saved, shown as a caption. Optional, and never used to\nidentify the destination \u2014 `spreadsheet_id` does that.",
+                                "maxLength": 200
+                            },
                             "mapping": {
                                 "type": [
                                     "object",
@@ -6866,6 +6874,14 @@
                                     "null"
                                 ],
                                 "maxLength": 100
+                            },
+                            "spreadsheet_title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "The spreadsheet's name when the rule was saved, shown as a caption. Optional, and never used to\nidentify the destination \u2014 `spreadsheet_id` does that.",
+                                "maxLength": 200
                             },
                             "mapping": {
                                 "type": [

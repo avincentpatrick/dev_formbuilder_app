@@ -8,6 +8,7 @@ use App\Enums\DomainEventType;
 use App\Support\Connectors\SubscriptionConfigRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Create a delivery rule on a connection (ADR-0009, H15a). `event_types` must be a non-empty subset of the
@@ -72,5 +73,18 @@ final class StoreConnectionSubscriptionRequest extends FormRequest
             'event_types.required' => 'Choose at least one event.',
             'event_types.min' => 'Choose at least one event.',
         ];
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     *
+     * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
+     * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
+     *
+     * @return array<int, \Closure(Validator): void>
+     */
+    public function after(): array
+    {
+        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
     }
 }

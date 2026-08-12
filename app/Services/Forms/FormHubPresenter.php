@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Policies\FormPolicy;
 use App\Support\Forms\FormScheduleView;
 use App\Support\Forms\FormTabSet;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
@@ -114,7 +115,14 @@ final class FormHubPresenter
             // inbox's own list cannot disagree about whether an unfinished draft is a response.
             'responses' => $visible()->countable()->count(),
             'drafts' => $visible()->where('submissions.status', SubmissionStatus::Draft->value)->count(),
-            'last_response_at' => $latest !== null ? (string) $latest : null,
+            // ⚠️ ISO-8601, NOT THE DRIVER'S OWN STRING (JR3). `max()` goes through the query builder, not
+            // the model's casts, so Postgres hands back `2026-08-09 14:30:00+00` — a SPACE, not a `T`,
+            // which is outside the ES spec's Date Time String Format and therefore implementation-defined
+            // in `new Date()`. V8 accepts it, so this looked correct in every browser anyone here has
+            // opened and in CI. Both consumers pass it straight to a `Date`: this page's `formatDateTime`
+            // and, since JR3, the forms list. Every other timestamp on both payloads is already
+            // `toIso8601String()`; this was the one that was not.
+            'last_response_at' => $latest !== null ? CarbonImmutable::parse((string) $latest)->toIso8601String() : null,
         ];
     }
 

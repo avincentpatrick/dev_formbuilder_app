@@ -136,6 +136,29 @@ Shipped as a single `600` step in C1. **G11 extended it to a full ramp**, becaus
 
 Used *only* when a user has selected it; never a system default, never a semantic-status color.
 
+**Form identity — a six-hue MNEMONIC scale (JR3, PRD Feature #3's list surface)**
+
+The Vivid direction leads every row of a list with a per-form colour chip, and JR1 deferred the scale to JR3 because it needed a dark re-point, its own contrast guard and a hue-collision rule. `tokens/identity.json` holds `--mds-form-identity-1` … `-6`; `theme-overrides.css` re-points all six from `--mds-_form-identity-dark-N` private customs, in both dark blocks.
+
+> **This scale is deliberately NOT semantic, and that is what makes it permissible under the separation rule above.** A form's hue is a mnemonic — the thing that lets you find "the purple one" in a grid of twelve — and it encodes nothing. The state is the status pill sitting beside it on the same card, the identity glyph carries the form's initials as a second channel, and the index is derived from the form id (`crc32 % 6`) rather than chosen, so no user ever assigns meaning to it either. Nothing is lost to a viewer who cannot distinguish the hues.
+
+> **⚠️ SIX HUES REQUIRED DOUBLING UP, AND THE ARITHMETIC IS THE INTERESTING PART.** The semantic palette already occupies FOUR of the six perceptual colour families — red (Danger), amber (Warning), teal-green (Success) and blue (Primary/Info) — and the chart scale spends five more. What is genuinely unclaimed is yellow-green, green, indigo, magenta and rose: **five families for six slots**. So the scale doubles up symmetrically, three in the green band and three in the purple band, rather than crowding one side and leaving the other thin. Within-band separation is **34.4°/36.1°** in the green band and **39.7°/42.2°** in the purple one. The index ORDER alternates the two families, so two consecutive indices are never same-family.
+
+> **⚠️ THE BINDING CONSTRAINT IS THE STATUS HUES, NOT THE CHART SERIES.** The status pill is co-located on the card; the chart series never appear on this page at all. Minimum measured separation from any semantic status hue is **32.54°** (identity-4 vs Warning); minimum mutual separation within the scale is **33.54°** (dark identity-4 vs identity-6). **The guard asserts a 30° floor rather than either number** — deliberately, because a threshold transcribed from today's hexes only tests that nobody edited them; 30° is the policy and the measurements are where this palette lands. The status hues are resolved through `semantic.json` rather than copied, so re-hueing Warning in some later row surfaces the collision in the test instead of on the page.
+
+| Token | Light | Dark | Family |
+|---|---|---|---|
+| `--mds-form-identity-1` | `#6850E2` | `#9989ec` | Indigo |
+| `--mds-form-identity-2` | `#0F7B37` | `#15ac4d` | Emerald |
+| `--mds-form-identity-3` | `#C31D6B` | `#e868a4` | Rose |
+| `--mds-form-identity-4` | `#5E7307` | `#84a30a` | Lime |
+| `--mds-form-identity-5` | `#AA27BE` | `#d26fe2` | Violet |
+| `--mds-form-identity-6` | `#287B0F` | `#39ac15` | Spring green |
+
+> **⚠️ THE GLYPH IS A 12% TINT WITH THE HUE AS ITS TEXT, NOT A SOLID FILL WITH WHITE INITIALS — and that choice is what makes the scale affordable at all.** A solid fill carrying white text would force every one of the six to clear **4.5:1 against white**, which confines the palette to hues dark enough that the dark-theme twin goes muddy (the approved mockup draws solid fills, and three of its six chips would not have cleared it). Painting the initials in the hue on a 12% mix of itself makes the measurement hue-on-tint, which every hue clears with room — it is the same device JR2 used for the empty-state medallion. Each hue was **searched for lightness** against that exact ground rather than picked, in both themes.
+
+Two bars apply, and they are different: the glyph initials are small bold TEXT ⇒ 4.5:1 (all six measure **4.507–4.668** on their own tint across both themes); the 4px card edge is a non-text indicator ⇒ 3:1 (WCAG 1.4.11), measured against **all four** grounds a card can sit on — the worst is **4.984** (identity-4 on the light canvas). Per the J2a finding, an edge is an `-fg`-strength value and never a `-bg` fill.
+
 **Primitive scale — Success (Moss → Vivid teal-green, JR1)**
 
 | Token | Hex |
@@ -359,6 +382,8 @@ Governing rule: shadow tokens are **strictly ordered** — a component at elevat
 > ⚠️ **THE THREE TIERS ARE A RULE, NOT A LIST, AND JR2 EXISTS BECAUSE THE LIST WAS NOT ENOUGH.** The row split said "six components"; the measurement said otherwise. Counted on the branch point: **`resources/` held 84 `--mds-radius-md` declarations, and 59 of them sit in the 30 files that also paint `--mds-color-bg-surface`** — page-local surfaces hand-styled to look like a card. (An earlier draft of this paragraph said "84 declarations across 26 files", which reads as one measurement and is two: 84 is *every* `--mds-radius-md` in `resources/`, and the file count is 30, not 26. Corrected here rather than left, because the whole point of the paragraph is that the number is bigger than the row title suggests, and a number that cannot be reproduced by grep argues nothing. After JR2: 81 / 56 / 29.) Move `MdsCard` alone and `/domains` shows a 12px `DomainCard` beside a 20px `MdsCard`, and the sign-in screen — the first surface a new user ever sees — is still speaking the old language. Moving all 30 would be equally wrong: most are inputs, banners and nested panels, which belong at 12px. **Decide by what the surface IS, using the table above**, and when a hand-built surface duplicates `MdsCard`'s fill + border + shadow, the real fix is usually to reach for `MdsCard`.
 >
 > Applied by JR2 beyond the six: `DomainCard.vue`, `AuthLayout.vue`'s `.auth__card` and the guest runtime's `ConfirmationScreen.vue` → `xl`; `Toast.vue` → `lg`. **Deliberately left at `md`:** every builder inner panel, the `AccountMenu`/`NotificationBell` popovers, `.auth-alert`, `.conflict__col`, and every input — all nested or control surfaces. `ConflictDialog` needed nothing at all: it is an `MdsModal` and inherited the panel.
+>
+> **Applied by JR3 (the forms-list card grid):** the form card **is** an `MdsCard`, so it inherits `xl` and needed no decision. Its two inner pieces are where the rule earned its keep: the 38px identity glyph reads **`lg`**, the compact-surface tier, because §2.6 already puts tinted icon fields there alongside the page-header and stat-tile glyphs it shares a screen with — **the approved mockup draws that glyph at 12px, which is the CONTROL tier, and the app's own rule beat the mockup's pixel.** The facet chips are `full`, being true pills.
 
 ### 2.7 Breakpoints
 

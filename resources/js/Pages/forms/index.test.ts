@@ -19,7 +19,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * cannot see what the server clamped or defaulted; `AuditLogPresenter` records the rule.
  */
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), visit: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+    get: vi.fn(),
+    visit: vi.fn(),
+    // Mutable so a test can mount the ninth row action. It is gated on the PAGE-level `manageScopes`
+    // rather than a per-row flag, so a fixed `false` here makes that button unmountable in every case.
+    manageScopes: { value: false },
+}));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
@@ -36,7 +42,7 @@ vi.mock('@inertiajs/vue3', () => ({
         patch: vi.fn(),
         delete: vi.fn(),
     }),
-    usePage: () => ({ props: { auth: { can: { manageScopes: false } } } }),
+    usePage: () => ({ props: { auth: { can: { manageScopes: mocks.manageScopes.value } } } }),
 }));
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
@@ -52,25 +58,79 @@ const FormsIndex = (await import('./Index.vue')).default;
 type Props = {
     forms: unknown[];
     scopes: unknown[];
-    filters: { applied: { q: string | null } };
+    filters: { applied: { q: string | null; state: string | null }; facets: unknown[] };
     empty_reason: 'no_matches' | 'no_rows' | null;
+    view: string;
 };
+
+const FACETS = [
+    { value: null, label: 'All', count: 0 },
+    { value: 'live', label: 'Live', count: 0 },
+    { value: 'draft', label: 'Draft', count: 0 },
+    { value: 'closing_soon', label: 'Closing soon', count: 0 },
+];
+
+/** Mounts with the page-level `scopes.manage` permission, which mounts the ninth row action. */
+function renderWithScopes(overrides: Partial<Props> = {}): VueWrapper {
+    mocks.manageScopes.value = true;
+
+    return render(overrides);
+}
 
 function render(overrides: Partial<Props> = {}): VueWrapper {
     return mount(FormsIndex, {
         props: {
             forms: [],
             scopes: [],
-            filters: { applied: { q: null } },
+            filters: { applied: { q: null, state: null }, facets: FACETS },
             empty_reason: 'no_rows',
+            view: 'grid',
             ...overrides,
         },
         global: { stubs: { teleport: true } },
     });
 }
 
+/**
+ * One row in the shape `FormPresenter::present()` actually emits.
+ *
+ * ⚠️ TWO FIXTURE DEFECTS WERE FIXED HERE RATHER THAN CARRIED FORWARD (JR3). It spelled `can.archive`
+ * where the component reads `can.delete` — so the archive action was never mounted in any Vitest run and
+ * the fixture quietly disagreed with the server — and it omitted `description` entirely, which was
+ * harmless while nothing rendered it and is not any more.
+ */
+const row = (canEdit: boolean) => ({
+    id: 'form-1',
+    title: 'Clinic Intake',
+    description: 'All-scalar manual-encoding demo.',
+    status: 'published',
+    current_version: 2,
+    draft_version: null,
+    updated_at: '2026-08-01T00:00:00+00:00',
+    scope_node_id: null,
+    identity: 3,
+    stats: { responses: 42, drafts: 7, last_response_at: '2026-08-01T00:00:00+00:00' },
+    schedule: {
+        opens_at: null,
+        closes_at: null,
+        timezone: 'UTC',
+        max_responses: 100,
+        acceptance: 'open',
+        remaining: 42,
+    },
+    versions: [],
+    can: { edit: canEdit, publish: false, delete: false, analytics: false, encode: false, template: false },
+});
+
+/** The nine row actions, by accessible name — the single list both view-parity tests read. */
+const ACTION_LABELS = [
+    'Open builder', 'Response statistics', 'New submission', 'Version history',
+    'Save as template', 'Rename form', 'Set form scope', 'Publish form', 'Archive form',
+];
+
 beforeEach(() => {
     mocks.get.mockClear();
+    mocks.manageScopes.value = false;
 });
 
 describe('forms list — the empty state no longer lies', () => {
@@ -85,7 +145,7 @@ describe('forms list — the empty state no longer lies', () => {
     it('says the SEARCH matched nothing when it did, and never offers to create a first form', () => {
         // Mutation: drop the `v-if` and this reddens on the second assertion — which is the one that
         // matters, because the first would still pass against the old unconditional slot.
-        const wrapper = render({ empty_reason: 'no_matches', filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ empty_reason: 'no_matches', filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         expect(wrapper.text()).toContain('No matching forms');
         expect(wrapper.text()).not.toContain('Create your first form');
@@ -97,7 +157,7 @@ describe('forms list — the empty state no longer lies', () => {
         // The two disagree here on purpose: a keyword is present and the server nonetheless says the list
         // is genuinely empty (a brand-new tenant that typed something). A client-side
         // `selected.q ? 'no_matches' : 'no_rows'` inference gets this backwards.
-        const wrapper = render({ empty_reason: 'no_rows', filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ empty_reason: 'no_rows', filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         expect(wrapper.text()).toContain('Create your first form');
         expect(wrapper.text()).not.toContain('No matching forms');
@@ -116,18 +176,6 @@ describe('forms list — the row title reaches the form (J2b)', () => {
      * repointed the href while keeping the `v-if` would satisfy the first case and still leave a Reviewer
      * staring at unclickable text.
      */
-    const row = (canEdit: boolean) => ({
-        id: 'form-1',
-        title: 'Clinic Intake',
-        status: 'published',
-        current_version: 2,
-        draft_version: null,
-        updated_at: '2026-08-01T00:00:00+00:00',
-        scope_node_id: null,
-        versions: [],
-        can: { edit: canEdit, publish: false, analytics: false, encode: false, archive: false },
-    });
-
     it('links the title to the hub, not to the builder', () => {
         const wrapper = render({ forms: [row(true)], empty_reason: null });
 
@@ -143,11 +191,186 @@ describe('forms list — the row title reaches the form (J2b)', () => {
 
         wrapper.unmount();
     });
+
+    it('keeps the link in the TABLE view too, where JR3 left it in this file', () => {
+        // The two cases above now exercise the CARD, because grid is the default — so without this one
+        // the table's own title cell would have no coverage at all after the split.
+        const wrapper = render({ forms: [row(true)], empty_reason: null, view: 'table' });
+
+        expect(wrapper.get('.forms__title-link').attributes('href')).toBe('/forms/form-1');
+
+        wrapper.unmount();
+    });
+});
+
+/**
+ * JR3 — the card grid, the view toggle, and the data the page was already loading.
+ */
+describe('forms list — the card grid (JR3)', () => {
+    it('renders cards by default and the table only when the server says so', () => {
+        const cards = render({ forms: [row(true)], empty_reason: null });
+        expect(cards.find('[data-form-entry]').exists()).toBe(true);
+        expect(cards.find('table').exists()).toBe(false);
+        cards.unmount();
+
+        const table = render({ forms: [row(true)], empty_reason: null, view: 'table' });
+        expect(table.find('table').exists()).toBe(true);
+        expect(table.find('[data-form-entry]').exists()).toBe(false);
+        table.unmount();
+    });
+
+    it('renders the description, which this page has shipped and hidden since D3', () => {
+        // The single largest free win in the row: `description` was already on the wire and rendered by
+        // nothing, so the list made a user open a form to remember what it was for.
+        const wrapper = render({ forms: [row(true)], empty_reason: null });
+
+        expect(wrapper.text()).toContain('All-scalar manual-encoding demo.');
+
+        wrapper.unmount();
+    });
+
+    it('renders the counts and the capacity meter from the server blocks', () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null });
+
+        expect(wrapper.text()).toContain('42'); // responses
+        expect(wrapper.text()).toContain('7'); // drafts
+        expect(wrapper.text()).toContain('58 / 100'); // capacity: cap - remaining
+        expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('58');
+
+        wrapper.unmount();
+    });
+
+    it('shows the shared schedule label instead of a meter when the form is uncapped', () => {
+        // Reads `acceptance` rather than re-deriving from the timestamps, so the list cannot disagree
+        // with the guest runtime or the hub about whether a form is open.
+        const uncapped = {
+            ...row(true),
+            schedule: { ...row(true).schedule, max_responses: null, remaining: null, closes_at: null },
+        };
+        const wrapper = render({ forms: [uncapped], empty_reason: null });
+
+        expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Accepting responses');
+
+        wrapper.unmount();
+    });
+
+    it('keeps every one of the nine row actions in the card, not behind a menu', () => {
+        // `templates-axe.spec.ts` clicks "Save as template" unscoped, and "Rename form" opens the only
+        // `PATCH /forms/{form}` call site in the client. Both must be in the tree without a hover.
+        //
+        // ⚠️ NINE MEANS NINE, AND THE FIRST DRAFT OF THIS TEST LISTED EIGHT. The missing one was
+        // "Set form scope" — the only mount of `AssignScopeModal` in the entire client, which the
+        // component's own docblock names as load-bearing. It is gated on the page-level `manageScopes`
+        // rather than a `row.can.*`, and the module-level `usePage` mock returns `false`, so it was
+        // absent from every render and silently omitted from the list. A test titled "nine" that asserts
+        // eight is worse than no test: it reports coverage of the one affordance nobody would notice
+        // losing. `withScopes` re-mocks the page so the ninth is actually mounted.
+        const wrapper = renderWithScopes({
+            forms: [{ ...row(true), can: { edit: true, publish: true, delete: true, encode: true, template: true, analytics: true } }],
+            empty_reason: null,
+        });
+
+        for (const label of ACTION_LABELS) {
+            expect(wrapper.find(`[aria-label="${label}"]`).exists(), label).toBe(true);
+        }
+        expect(ACTION_LABELS).toHaveLength(9);
+
+        wrapper.unmount();
+    });
+
+    it('renders the same actions in both views, because both render one component', () => {
+        const names = (wrapper: VueWrapper) =>
+            wrapper.findAll('[aria-label]').map((el) => el.attributes('aria-label')).sort();
+
+        const full = { ...row(true), can: { edit: true, publish: true, delete: true, encode: true, template: true, analytics: true } };
+        const cards = renderWithScopes({ forms: [full], empty_reason: null });
+        const table = renderWithScopes({ forms: [full], empty_reason: null, view: 'table' });
+
+        // Intersection rather than equality: the two views legitimately differ elsewhere (the table adds
+        // sortable column buttons, the card a progressbar). What must not differ is the action set.
+        for (const label of ACTION_LABELS) {
+            expect(names(cards), `cards: ${label}`).toContain(label);
+            expect(names(table), `table: ${label}`).toContain(label);
+        }
+
+        cards.unmount();
+        table.unmount();
+    });
+
+    it('renders a counted chip per facet and marks the active one pressed', () => {
+        const wrapper = render({
+            forms: [row(true)],
+            empty_reason: null,
+            filters: {
+                applied: { q: null, state: 'live' },
+                facets: [
+                    { value: null, label: 'All', count: 6 },
+                    { value: 'live', label: 'Live', count: 4 },
+                ],
+            },
+        });
+
+        const chips = wrapper.findAll('.forms__facet');
+        expect(chips).toHaveLength(2);
+        expect(chips[0].text()).toContain('6');
+        expect(chips[0].attributes('aria-pressed')).toBe('false');
+        expect(chips[1].attributes('aria-pressed')).toBe('true');
+
+        wrapper.unmount();
+    });
+
+    it('clears the facet when the active chip is clicked again', async () => {
+        const wrapper = render({
+            forms: [row(true)],
+            empty_reason: null,
+            filters: { applied: { q: null, state: 'live' }, facets: [{ value: 'live', label: 'Live', count: 4 }] },
+        });
+
+        await wrapper.get('.forms__facet').trigger('click');
+
+        // No `state` key at all — "All" is the ABSENCE of the filter, not a value meaning everything.
+        expect(mocks.get.mock.calls[0][1]).toEqual({});
+
+        wrapper.unmount();
+    });
+
+    it('carries the view into the URL only when it is not the default', async () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null, filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
+
+        // Switching to the table adds the key…
+        await wrapper.findAll('input[type="radio"]')[1].setValue(true);
+        expect(mocks.get.mock.calls[0][1]).toEqual({ q: 'clinic', view: 'table' });
+
+        wrapper.unmount();
+    });
+
+    it('drops the view key again when returning to cards, keeping /forms clean', async () => {
+        const wrapper = render({ forms: [row(true)], empty_reason: null, view: 'table' });
+
+        await wrapper.findAll('input[type="radio"]')[0].setValue(true);
+        expect(mocks.get.mock.calls[0][1]).toEqual({});
+
+        wrapper.unmount();
+    });
+
+    it('shows ONE empty state, outside both views, so they cannot disagree', () => {
+        for (const view of ['grid', 'table']) {
+            const wrapper = render({ forms: [], empty_reason: 'no_matches', view });
+
+            expect(wrapper.text(), view).toContain('No matching forms');
+            // Exactly one, not merely "at least one": the failure this guards against is the page and
+            // the table each rendering their own, which reads fine in text and shows two on screen.
+            expect(wrapper.findAll('.mds-empty').length, view).toBe(1);
+
+            wrapper.unmount();
+        }
+    });
 });
 
 describe('forms list — the keyword filter', () => {
     it('renders a search field seeded from what the server applied', () => {
-        const wrapper = render({ filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         const input = wrapper.get('input[type="search"]');
         expect((input.element as HTMLInputElement).value).toBe('clinic');
@@ -174,7 +397,7 @@ describe('forms list — the keyword filter', () => {
     it('sends no q at all when the box is cleared, rather than an empty one', async () => {
         // `?q=` would arrive as null after `ConvertEmptyStringsToNull` and mean the same thing, but it
         // would also leave a `?q=` on every URL the user copies out of the address bar.
-        const wrapper = render({ filters: { applied: { q: 'clinic' } } });
+        const wrapper = render({ filters: { applied: { q: 'clinic', state: null }, facets: FACETS } });
 
         await wrapper.get('input[type="search"]').setValue('');
         await wrapper.get('input[type="search"]').trigger('keyup.enter');

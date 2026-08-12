@@ -1,4 +1,36 @@
-import { type Page } from '@playwright/test';
+import { type Locator, type Page } from '@playwright/test';
+
+/**
+ * One form's entry on `/forms`, in WHATEVER view the page is currently rendering (JR3).
+ *
+ * ── WHY THIS EXISTS, AND WHY IT IS THE SAME LESSON AS `openBuilder` ─────────────────────────────────────
+ * Seven tests in `responsive-axe.spec.ts` reached a form by `page.locator('tr').filter({ hasText })` and
+ * then clicked a row action inside it. JR3 made the CARD GRID the default view, so there are no `tr`
+ * elements on that page unless `?view=table` is asked for — every one of those seven would have matched
+ * zero elements at all three viewports, and none of it is visible on this host because the e2e suite
+ * cannot run here. Exactly the shape of J2b's 81 failures: one deliberate page change, spelled seven
+ * times in a place the person making the change was not looking.
+ *
+ * ⚠️ THE SELECTOR IS DELIBERATELY VIEW-AGNOSTIC IN BOTH DIRECTIONS, not merely switched to the card. It
+ * matches the table row AND the card's `<li data-form-entry>`, so it keeps working if the default flips
+ * back, if a test asks for `?view=table` explicitly, or if a third view is ever added — the caller says
+ * which form it wants and never which layout it expects.
+ *
+ * ⚠️ `tr` cannot be `getByRole('row')` here, and that is not an oversight: `MdsDataTable` drops table
+ * ARIA for its card-per-row layout at 375px, so the role query finds nothing at the mobile viewport. The
+ * tag selector is the thing that survives both of this page's layout switches.
+ *
+ * ⚠️ AND IT FILTERS ON THE TITLE LINK, NOT ON `hasText`, WHICH THE OLD CALL SITES USED. A card renders
+ * the form's DESCRIPTION and the table row never did, so a substring text filter would newly match any
+ * card whose description happens to contain another form's name — resolving to two elements and failing
+ * strict mode, at a viewport nobody can reproduce locally. Matching the exact accessible name of the
+ * title link is precise in both views and cannot be widened by anything the card starts rendering later.
+ */
+export function formEntry(page: Page, formTitle: string): Locator {
+    return page
+        .locator('tr, [data-form-entry]')
+        .filter({ has: page.getByRole('link', { name: formTitle, exact: true }) });
+}
 
 /**
  * Open a form's BUILDER from the forms list (Increment J2b).

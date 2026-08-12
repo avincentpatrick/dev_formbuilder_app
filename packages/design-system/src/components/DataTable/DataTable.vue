@@ -356,11 +356,13 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     transform: rotate(180deg);
 }
 
-/* JR2: 20px of vertical padding rather than 12px, giving a 61px row against the direction's
-   `--m-row-h: 60px`. This is the increment's one real density change and it is the part a user feels:
-   it costs roughly one row per screen on the inbox, and buys the air that makes a list of forms read
-   as a set of objects rather than a spreadsheet. The mobile block below puts it back to 12px — inside
-   a card-per-row each cell is a key/value line, and 20px there makes a very tall card at 375px. */
+/* JR2: 20px of vertical padding rather than 12px — the increment's one real density change, and the
+   part a user feels. ⚠️ It gives a 61px row only when the tallest thing in the row is one line of
+   body text; a status badge is 24px, an `sm` icon button 28px. Measured on the seeded app, `/forms`
+   rows are **68.5px**, so the real range is 61 text-only / 65–73 in practice against the direction's
+   60px. (An earlier version of this comment asserted "61px" flatly, computed from the padding token
+   without measuring what the cells actually contain.) The mobile block below puts it back to 12px —
+   inside a card-per-row each cell is a key/value line, and 20px there makes a very tall card. */
 .mds-table__td {
     padding: var(--mds-space-5) var(--mds-space-4);
     vertical-align: middle;
@@ -374,8 +376,24 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     transition: background-color var(--mds-duration-fast) var(--mds-ease-standard);
 }
 
+/* ⚠️ THE HOVER USED TO BE `bg-canvas`, AND ON MOST OF THIS APP'S TABLES THAT PAINTED NOTHING.
+   Neither `.mds-table` nor `.mds-table__td` sets a background, so a row's ground is whatever is
+   behind the table — and the tables on `/forms`, `/submissions`, `/members`, `/webhooks`,
+   `/integrations` and `/feedback` are mounted bare on the page, whose background IS `bg-canvas`
+   (`app.css` on body, `AppLayout.vue` on `.app-shell__content`). Measured: `#F5F7FC` on `#F5F7FC` is
+   **1.000:1** in light and `#0f131c` on `#0f131c` is **1.000:1** in dark. Not subtle — absent. It
+   only ever worked for the minority of tables sitting inside an `MdsCard`.
+   JR2 found this the embarrassing way: it added a transition to smooth a colour change that does not
+   happen, and wrote a comment asserting the hover worked. The same premise that keeps `bg-surface` on
+   the header — most tables are bare on the canvas — proves the hover was a no-op, and the increment
+   read that premise twice without joining the two.
+   An 8% wash of the accent is ground-independent, which no opaque token in this system can be: there
+   is no colour that differs from BOTH `bg-canvas` and `bg-surface` in BOTH themes. Measured against
+   each of the four possible grounds: 1.110 / 1.117 light, 1.066 / 1.076 dark — in the same band as
+   the in-card hover that already worked (1.072 light). Degradation without `color-mix` is
+   `transparent`, i.e. exactly the no-op it replaces, so nothing regresses on an old engine. */
 .mds-table__row:hover .mds-table__td {
-    background-color: var(--mds-color-bg-canvas);
+    background-color: color-mix(in srgb, var(--mds-color-action-primary-bg) 8%, transparent);
 }
 
 .mds-table__actions {
@@ -411,7 +429,9 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
            at the control tier put 12px corners next to every 20px `MdsCard` on the same screen. It
            does not go all the way to `xl` either: a full-bleed card at 375px with 20px corners is
            heavier than the direction's own phone mock, which draws its panels at 16-18px. This is the
-           compact-surface tier from DSR §2.6 — the same one `MdsToast` and the card skeleton read. */
+           compact-surface tier from DSR §2.6, shared with `MdsToast`. (A draft of this comment also
+           named "the card skeleton" — there is no such variant: `MdsSkeleton` is text/block/circle,
+           and `--block` still reads `md` because it has no consumer that would make it disagree.) */
         border-radius: var(--mds-radius-lg);
         background-color: var(--mds-color-bg-surface);
     }

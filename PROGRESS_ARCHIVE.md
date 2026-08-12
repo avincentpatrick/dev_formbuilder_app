@@ -1515,10 +1515,21 @@ trusting the line references: `Skeleton` has no card variant (its `--block` has 
 `ConflictDialog` is an `MdsModal` that inherited the new panel for free — the radius at the cited
 line is a nested column that correctly stays at 12px.
 
-The real scope was never the six components but the **26 lookalikes**: 84 declarations across the app
-read `--mds-radius-md` while painting a card surface. Answered with a three-tier rule in DSR §2.6
+The real scope was never the six components but the lookalikes: at the branch point `resources/` held
+84 `--mds-radius-md` declarations, 59 of them in the 30 files that also paint a card surface. (The
+survey reported that as "84 across 26 files" and it went into three documents before anyone ran the
+grep — two measurements welded together, and the file count is 30. Corrected everywhere; a number
+that cannot be reproduced by grep argues nothing.) Answered with a three-tier rule in DSR §2.6
 (control 12 / compact surface 16 / page-level card or dialog 20) rather than a list, applied to
 `DomainCard`, the auth card, the guest confirmation card and `Toast`.
+
+The self-review then caught the badge dot shipping inconsistently, which is worse than not shipping
+it at all. The first pass wired it at two call sites and the docs called those "the product's only
+scannable status columns"; a grep for `statusVariant(` found thirteen `#cell-status` templates, so the
+same pill would have been dotted on the forms list and undotted on the form hub two clicks away. The
+fix was not to add eleven more but to find the rule that decides all of them — every `#cell-status`
+badge carries `dot`, nothing else does, 13/13 — because an invariant a grep can check outlives a
+sentence about two columns.
 
 Deliberate divergences, both measured: the table header keeps `bg-surface` rather than the mockup's
 tint, because dark `bg-sunken` IS the dark canvas and the band would vanish on the one list that
@@ -1532,3 +1543,34 @@ The second nearly became a regression — tokenising its literal `600ms` into th
 `--mds-duration-deliberate` would have made it spin at ~1000 rev/sec under reduced motion, because
 the tokens collapse to 1ms. For a functional indicator, reduced motion means slower, not instant;
 `MdsSpinner` already knew this and `MdsButton` now matches it.
+
+**The adversarial review then found a critical defect that all six gates would have passed.** The
+gradient's `@supports` guard tested `background-clip: text` (2016) while the declaration it guards
+needs `color-mix()` (2023). In that seven-year window of engines the guard opens, the
+`background-image` — substituted late because it carries a `var()` — turns out to contain an
+unparseable `color-mix()`, goes invalid at computed-value time and falls back to `none`, while
+`color: transparent` and `-webkit-text-fill-color: transparent` survive as plain values. The
+dashboard's headline figure would have rendered as blank space on Safari ≤16.1, Chrome ≤110,
+Firefox ≤112 and pinned Android WebViews. The reasoning had been done correctly forty lines away for
+the glow tokens, which need no guard because `box-shadow`'s initial value is `none` and `none` is the
+pre-JR2 rendering; same mechanism, opposite consequence, and the confidence was copied instead of the
+reasoning being redone. An `@supports` condition must name every feature its block depends on, not
+the one the technique is named after.
+
+Three more real defects came out of the same pass. `line-height: 1.05` on the stat value was reverted:
+its premise, "a stat value is a single line by construction", is false of the component's own callers,
+which pass prose and formatted dates — and with the gradient painting through the padding box, a
+descender outside a too-short line box now has no ink under it at all. The table row hover turned out
+to be a measured 1.000:1 no-op on the six pages that mount their tables bare on the canvas, because it
+painted `bg-canvas` onto `bg-canvas`; JR2 had added a transition to smooth a colour change that does
+not happen, two rules below a comment stating the very premise that proves it. And the empty-state
+medallion measured 1.00:1 against the canvas — the flourish the user chose was, on the first screen a
+new tenant sees, simply absent.
+
+The badge dot took three attempts. Two call sites, then all thirteen `#cell-status` columns, then the
+rule that actually holds: keyed to `statusVariant()`, 23 of 23, because "is this a scannable column"
+is not something a component can know and "is this a status" already has an answer in the codebase.
+
+Four documentation claims were false and three code comments asserted mechanisms that cannot occur —
+including a guard whose named victim has no reachable call path. All corrected in place, with the
+correction recorded rather than the sentence quietly rewritten.

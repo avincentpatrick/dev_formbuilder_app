@@ -188,10 +188,21 @@ const deltaText = computed(() => {
     margin: 0 0 var(--mds-space-1);
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-1-font-size);
-    /* JR2: 1.05 rather than the role's 46px leading. A stat value is a single line by construction
-       (`displayValue` never wraps a formatted number), so the role's line box only adds 8px of dead
-       space above the figure and pushes the label away from it. */
-    line-height: 1.05;
+    /* ⚠️ THE ROLE'S LEADING STAYS. JR2 first set `line-height: 1.05` here, reasoning that "a stat
+       value is a single line by construction". It is not: `value` is `string | number | null` and
+       real callers pass prose and dates — `"Not open yet"` and `"Capacity reached"`
+       (`forms/Show.vue`), `formatDateTime(...)` → `"Aug 12, 2026, 3:04 PM"`, a tenant-supplied
+       `row.display` (`admin/TenantDetail.vue`), `"3 / 12"` (`integrations/Index.vue`). At 38px in a
+       quarter-width tile those wrap, and a 39.9px line box under ~50px of glyph makes consecutive
+       lines physically overlap. Worse, the gradient below paints through the PADDING BOX, so any
+       descender outside a too-short line box has no ink under it at all — with
+       `-webkit-text-fill-color: transparent` there is no fallback colour to show through, and the
+       tail of a `g` or `p` simply disappears.
+       It is also a policy violation: §2.9 says leading is uniform across the whole scale and never
+       per-component, precisely because `[data-font-size]` re-derives every role's line-height and a
+       hard-coded ratio opts out of that — at extra_large the role gives 58px and 1.05 would give
+       50.4px. `type-scale.test.ts` guards the CSS file and cannot see a component opting out. */
+    line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
     /* JR1 wrote the sentence below and shipped only half of it: the tracking landed, the tabular
        figures did not. Both charts carry `font-variant-numeric` and the one number a user actually
@@ -216,7 +227,20 @@ const deltaText = computed(() => {
        `color: transparent` over a background the mode has already stripped, i.e. an invisible
        number, which is the whole reason this pattern is usually a defect.
    Both gradient endpoints clear 10:1 on their ground in both themes, so the fill costs no legibility. */
-@supports (background-clip: text) or (-webkit-background-clip: text) {
+/* ⚠️ THE CONDITION MUST TEST `color-mix`, NOT JUST `background-clip`, AND THE FIRST VERSION DID NOT.
+   `-webkit-background-clip: text` has shipped since 2016; `color-mix()` since 2023. Guarding a
+   2023 declaration behind a 2016 capability opens the block on every engine in that seven-year
+   window, where the sequence is: @supports passes → `background-image` carries a `var()` so it is a
+   pending-substitution value → at computed-value time the `color-mix()` inside it does not parse →
+   the declaration is invalid at computed-value time → `background-image` falls back to its INITIAL
+   value, `none`. But `color: transparent` and `-webkit-text-fill-color: transparent` are plain
+   values and survive. Net result: no gradient, no ink — the largest number on the dashboard renders
+   INVISIBLE on Safari ≤16.1, Chrome ≤110, Firefox ≤112 and any pinned Android WebView.
+   The shadow tokens next door get away without a guard for the opposite reason: `box-shadow`'s
+   initial value IS `none`, which is exactly the pre-JR2 rendering. A gradient's fallback is not the
+   previous design — it is transparent text. Same mechanism, opposite consequence. */
+@supports ((background-clip: text) or (-webkit-background-clip: text)) and
+    (color: color-mix(in srgb, red 50%, blue)) {
     .mds-stat-tile__value {
         background-image: linear-gradient(
             180deg,

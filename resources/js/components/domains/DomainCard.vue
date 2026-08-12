@@ -60,7 +60,7 @@ function formatStamp(iso: string | null): string {
             <div class="domain-card__ident">
                 <h3 class="domain-card__host">{{ domain.domain }}</h3>
                 <div class="domain-card__tags">
-                    <MdsBadge v-bind="badge" />
+                    <MdsBadge v-bind="badge" dot />
                     <!-- Text, not a colour or an icon alone: which host respondents actually get is the most
                          consequential fact on this page (WCAG 1.4.1). -->
                     <MdsBadge v-if="domain.is_public_host" variant="info" label="Respondent links" />

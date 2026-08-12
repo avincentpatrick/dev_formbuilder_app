@@ -202,7 +202,7 @@ function canChangeRole(row: Member): boolean {
 
         <MdsDataTable :columns="columns" :rows="members" :loading="busy" caption="Workspace members" row-key="user_id">
             <template #cell-status="{ value }">
-                <MdsBadge v-bind="statusVariant(String(value))" />
+                <MdsBadge v-bind="statusVariant(String(value))" dot />
             </template>
             <template #row-actions="{ row }">
                 <div class="members__actions">

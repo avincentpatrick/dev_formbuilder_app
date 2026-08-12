@@ -13,7 +13,7 @@
         },
         "danger": {
             "value": "0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-danger-bg) 55%, transparent)",
-            "comment": "JR2 — the same glow for the destructive fill. Two tokens rather than one parameterised by a local custom property: a `--mds-*` name assigned inside a component's <style> does NOT count as a definition to token-references.test.ts, so the parameterised form fails that gate."
+            "comment": "JR2 — the same glow for the destructive fill. Two tokens rather than one parameterised by a local custom property, because two named tokens say what they are at the point of use and a parameterised one needs the reader to find where the parameter was set. (An earlier note here claimed the parameterised form would fail token-references.test.ts. It would not: that test is scoped to the `--mds-` prefix precisely so component-local properties are ignored, so an unprefixed `--glow-fill` would have been invisible to it. The decision stands; the reason given for it did not.)"
         }
     }
 }

@@ -125,7 +125,14 @@ const emit = defineEmits<{
     gap: var(--mds-space-3);
     padding: var(--mds-space-3);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2 — `lg`, the compact-surface tier (DSR §2.6). This is a row-card, the same species as the
+       table's ≤480px card-per-row, and the survey that swept the app for card lookalikes missed it
+       because it greps `background-color:` and this rule uses the `background` shorthand.
+       ⚠️ It is the one place the mismatch was visible in a single view: THE EMPTY BRANCH OF THIS VERY
+       LIST RENDERS AN `MdsCard` (`.analytics__views-empty` above), so a user creating their first
+       saved report watched the corner radius change under them — 20px while the list was empty, 12px
+       the moment it had one row. */
+    border-radius: var(--mds-radius-lg);
     background: var(--mds-color-bg-surface);
 }
 

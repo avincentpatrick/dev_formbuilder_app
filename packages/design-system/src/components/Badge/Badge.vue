@@ -33,9 +33,15 @@ withDefaults(
 
 <template>
     <span class="mds-badge" :class="`mds-badge--${variant}`">
-        <!-- `&& !icon` is a guard, not tidiness: `MdsStatTile` passes `trend-up`/`trend-down` to its
-             delta badge, and a caller that also set `dot` would put a disc and an arrow side by side.
-             The icon wins because it is the one carrying information. -->
+        <!-- `&& !icon` keeps a disc and a glyph from sitting side by side; the icon wins because it
+             is the one carrying information. ⚠️ It is a FAIL-CLOSED GUARD WITH NO REACHABLE CALLER,
+             and it must be labelled as one rather than sold as a fix. A draft of this comment named
+             `MdsStatTile`'s delta badge as the victim — that cannot happen: StatTile renders
+             `<Badge :variant :icon :label />` with no `dot` prop, no `v-bind="$attrs"` and no
+             fallthrough, and every real `dot` call site spreads `statusVariant()`, which returns
+             only `{variant, label}`. The only thing that exercises this branch today is the
+             `DotWithIcon` story. Keep it — the cost is one boolean and it forecloses a whole class
+             of future call site — but do not cite it as protecting something. -->
         <span v-if="dot && !icon" class="mds-badge__dot" aria-hidden="true" />
         <Icon v-if="icon" :name="icon" size="sm" class="mds-badge__icon" />
         {{ label }}

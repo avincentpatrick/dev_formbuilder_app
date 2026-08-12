@@ -74,7 +74,7 @@ function confirmAction(): void {
                 <Link class="admin-tenants__name" :href="`/admin/tenants/${row.id}`">{{ row.name }}</Link>
             </template>
             <template #cell-status="{ value }">
-                <MdsBadge v-bind="statusVariant(String(value))" />
+                <MdsBadge v-bind="statusVariant(String(value))" dot />
             </template>
             <template #row-actions="{ row }">
                 <MdsButton

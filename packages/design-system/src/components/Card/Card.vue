@@ -59,9 +59,12 @@ withDefaults(
 
 /* JR2: hover picks up the ACCENT edge from the approved direction, not a darker grey. `-fg`, never
    `-bg` — a border is a coloured edge and `-bg` guarantees contrast only against text printed ON it
-   (the J2a WCAG 1.4.11 finding). Measured against the surface behind it: `#1156B2` on `#FFFFFF` is
-   7.01:1 light, `#8FBCFF` on `#1a2130` is 8.29:1 dark, both far past the 3:1 a non-text indicator
-   needs. No transform is added — the mockup shows none, and a hover translate would raise a
+   (the J2a WCAG 1.4.11 finding). Measured on BOTH grounds, because a card edge has two — the card's
+   own fill inside it and the page behind it: `#1156B2` on the card's `#FFFFFF` is 7.01:1 and on the
+   canvas `#F5F7FC` is 6.54:1; dark `#8FBCFF` on `#1a2130` is 8.29:1 and on the dark canvas `#0f131c`
+   is 9.56:1. All four clear the 3:1 a non-text indicator needs. (A draft of this comment quoted the
+   first number while calling `#FFFFFF` "the surface behind it" — that is the card's own fill, not
+   what is behind it.) No transform is added — the mockup shows none, and a hover translate would raise a
    reduced-motion question that a shadow and a border colour do not. */
 .mds-card--interactive:hover {
     box-shadow: var(--mds-shadow-2);

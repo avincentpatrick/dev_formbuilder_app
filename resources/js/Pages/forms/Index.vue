@@ -493,7 +493,7 @@ function submitRestore(): void {
                 <li v-for="v in historyTarget.versions" :key="v.id" class="forms__version">
                     <span class="forms__version-label">
                         <strong>v{{ v.version_number }}</strong>
-                        <MdsBadge v-bind="statusVariant(v.status)" />
+                        <MdsBadge v-bind="statusVariant(v.status)" dot />
                     </span>
                     <span class="forms__version-actions">
                         <!--

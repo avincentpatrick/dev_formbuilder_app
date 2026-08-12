@@ -368,8 +368,22 @@ entry exists rather than a comment.
 **The three guards, all load-bearing:**
 
 1. The plain `color: var(--mds-color-text-heading)` stays the **base** declaration and the gradient
-   lives inside `@supports (background-clip: text) or (-webkit-background-clip: text)`. An engine that
-   cannot clip renders an ordinary heading-ink figure rather than nothing.
+   lives inside a `@supports` block that tests **both** capabilities the block actually uses:
+   `((background-clip: text) or (-webkit-background-clip: text)) and (color: color-mix(in srgb, red 50%, blue))`.
+   An engine missing either renders an ordinary heading-ink figure rather than nothing.
+
+   ⚠️ **The first version of this guard tested only `background-clip` and would have shipped an
+   invisible number.** `-webkit-background-clip: text` has been available since 2016; `color-mix()`
+   since 2023. On every engine in that window the block opened, the `background-image` — which carries
+   a `var()` and is therefore substituted late — turned out to contain an unparseable `color-mix()`,
+   went **invalid at computed-value time**, and fell back to its initial value `none`; while
+   `color: transparent` and `-webkit-text-fill-color: transparent`, being plain values, survived. The
+   largest figure on the dashboard would have rendered as nothing at all on Safari ≤16.1, Chrome ≤110,
+   Firefox ≤112 and pinned Android WebViews. **The lesson is narrow and worth carrying: an `@supports`
+   condition must name every feature the guarded declarations depend on, not the one the technique is
+   named after.** The sibling glow tokens legitimately need no guard, because `box-shadow`'s initial
+   value is `none` and `none` is the pre-JR2 rendering — same failure mechanism, opposite consequence,
+   which is exactly why the reasoning did not transfer and had to be redone rather than copied.
 2. `-webkit-text-fill-color: transparent` is set alongside `color: transparent`. In WebKit that is the
    property the clipped background actually paints through; setting only `color` produces a solid figure
    on Safari and looks like the `@supports` block silently failed.

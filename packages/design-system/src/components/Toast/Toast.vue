@@ -44,10 +44,12 @@ const iconName = computed<IconName>(() => ICONS[props.type]);
     border: 1px solid var(--mds-color-border-default);
     border-left-width: 3px;
     /* JR2: the compact-surface tier (DSR §2.6). A toast is a floating surface — the same species as
-       a card or a modal panel, and the only other component in the package pairing a radius with an
-       elevation — so leaving it at the 12px CONTROL tier made it read as a chip hovering above 20px
-       cards. It does not take `xl` either: at ~56px tall, 20px corners consume most of the height and
-       the strip reads as a lozenge rather than a card. */
+       a card or a modal panel — so leaving it at the 12px CONTROL tier made it read as a chip
+       hovering above 20px cards. It does not take `xl` either: at ~56px tall, 20px corners consume
+       most of the height and the strip reads as a lozenge rather than a card. (A draft of this
+       comment called Toast "the only other component pairing a radius with an elevation", which is
+       simply wrong — `Card`, `Modal` and `StatTile` all do, and three of them moved in this same
+       increment. The argument for `lg` never needed that claim; it rests on the height.) */
     border-radius: var(--mds-radius-lg);
     box-shadow: var(--mds-shadow-5);
     color: var(--mds-color-text-body);

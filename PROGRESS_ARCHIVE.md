@@ -1674,3 +1674,61 @@ RLS hid every version — an empty expectation matching an empty actual is a bug
 `MdsSegmentedControl` renders its own fieldset and legend, so a wrapper gives the group two; vue-tsc was the
 only gate that could catch it, since happy-dom computes no styles and Storybook globs the design-system
 package only, so an app page never gets an axe scan.
+
+## 2026-08-13 — LANE A: JR3, the forms list as a card grid with the table behind a view toggle (PR #137, `b66af9d`)
+
+Merged 6/6 with real steps (11–20 per job): CI Pest **3600/0** (15,338 assertions, +49 on JR2's 3551),
+E2E **488 passed / 2 flaky**, Storybook axe **220 across 33 suites** (up from 218 — the two stories added),
+Contract byte-identical, Static clean.
+
+Cards are the default; the enriched seven-column table is one click away and addressable as `?view=table`.
+Every value on the card already existed in the database. The strongest justification turned out not to be
+the empty gutter that prompted the row but the **tablet band**: `MdsDataTable` collapses to card-per-row
+only at ≤480px, so 481–1024px was a sideways-scrolling strip — measured after, 2-up at 834px with nothing
+to scroll.
+
+**Three defects found by LOOKING at the running app, none visible to any gate in this repo.**
+(1) The container-query threshold was in `px`, so it was correct at exactly one font scale: at
+`extra_large` the label `IN PROGRESS` needs 103px against a 101px column and ellipsed **on the 1600px
+desktop grid**. Now `18em`, which scales with the labels; verified across 3 scales × 7 viewports.
+(2) A single long word in a tenant-supplied title overflowed its track and was eaten by `overflow: hidden`
+— `min-width: 0` lets the box shrink and does nothing about a word. (3) The nine-icon cluster wrapped to
+two lines in every table row, which is what the table view exists to avoid.
+
+**`max-width` in a container query measures the CONTENT box.** The first threshold was 260px, written
+believing it could never fire; it fired on every 300px card — the grid's own track floor — because the
+card carries 40px of padding.
+
+**The fifth must-fix, which the JR block never named:** seven e2e tests reached `/forms` rows by
+`locator('tr')`, which matches nothing once cards are the default, at all three viewports, on a suite that
+cannot run on this host. One view-agnostic `formEntry()` helper, filtering on the title link rather than
+`hasText` because a card renders the description too. `?view=table` is now its own `responsive-axe` entry
+— the default flip had silently un-covered the table entirely.
+
+**The identity scale needed doubling up, and the arithmetic is the finding.** The semantic palette already
+occupies four of the six perceptual colour families and the chart scale spends five more, leaving five
+families for six slots; it splits 3 green / 3 purple, order alternating. Hues were *searched* for lightness
+against their own 12% tint — the ground the initials are actually read on — because a solid fill with white
+initials would force ≥4.5:1 against white and confine the palette to hues whose dark twins go muddy.
+
+**The adversarial review found three shippable defects and seven false numbers.** A card that announced
+"Closes in 3 days" for an unpublished draft while the chips correctly excluded it; `last_response_at` on
+the wire as a non-spec timestamp that `formatDate()` would print as "Invalid Date" on any engine stricter
+than V8 (fixed at both sites — the hub had it too); and a hand-rolled relative-time formatter reproducing
+verbatim the rounding defect the shared helper documents in its own comment. Plus a test titled "nine row
+actions" that asserted eight — the missing one being the only mount of `AssignScopeModal` in the client —
+and a Pest file where every case ran as an owner, so `visibleTo`'s grant subquery was compiled by no test.
+
+**CI caught what local runs did not, on a gate never run:** `token-references.test.ts` scans every
+`var(--mds-…)` and its regex stops at a `$`, so an interpolated token name read as undefined. Spelling the
+six out is what lets the guard cover them at all.
+
+**One reporting error, recorded because it is a method fault:** a cancelled E2E job was read as a pass —
+a `grep -o` over the jobs JSON spanned two objects and picked up a neighbour's `"conclusion":"success"`.
+Parse job status per-job; a cancelled job is not a green one however far it got.
+
+**Known costs, stated rather than discovered later:** the table view scrolls sideways at ≤1280px where the
+four-column version did not, and nothing cheap buys it back (which is why the grid is the default); the
+identity index is a hash, so colour collisions are likely in a small tenant and the glyph initials are the
+disambiguator; and at ≤480px `MdsDataTable` is not a scroll container, so the single-line action cluster
+has no scroll region there.

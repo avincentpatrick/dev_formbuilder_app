@@ -40,7 +40,10 @@ vi.mock('@/components/shell/PageHeader.vue', () => ({
 const SearchIndex = (await import('./Index.vue')).default;
 
 type Props = {
-    data: { entity: string; label: string; rows: { id: string; title: string; subtitle: string; url: string }[]; has_more: boolean }[];
+    // ⚠️ `items`, NOT `rows` — the key the page actually reads. The first draft of this fixture guessed
+    // `rows`, every case that renders a populated group threw on `group.items.length`, and only CI could
+    // see it (local Vitest was hanging at teardown on this host). Read the SFC's own SearchGroup type.
+    data: { entity: string; label: string; items: { id: string; title: string; subtitle: string; url: string }[]; has_more: boolean }[];
     counts: Record<string, number>;
     filters: { entities: { value: string; label: string }[]; applied: { q: string | null; entity: string | null } };
     limits: { per_entity: number; single_entity: number };
@@ -54,7 +57,7 @@ function render(overrides: Partial<Props> = {}): VueWrapper {
                 {
                     entity: 'forms',
                     label: 'Forms',
-                    rows: [{ id: 'f1', title: 'Clinic Intake', subtitle: 'Published', url: '/forms/f1' }],
+                    items: [{ id: 'f1', title: 'Clinic Intake', subtitle: 'Published', url: '/forms/f1' }],
                     has_more: false,
                 },
             ],

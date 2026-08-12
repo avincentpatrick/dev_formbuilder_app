@@ -60,29 +60,62 @@ describe('describeRow', () => {
         expect(elsewhere.detail).toContain('open this form');
     });
 
-    it('reads a delivered row as Sent, quoting its reference', () => {
-        const view = describeRow(outboxRow({ status: 'synced', server_submission_id: 'srv-9' }), false, true);
+    it('reads a delivered row as Sent, quoting the SERVER reference', () => {
+        const view = describeRow(
+            outboxRow({ status: 'synced', server_submission_id: 'srv-9', server_reference: '7K4M-2QXB' }),
+            false,
+            true,
+        );
 
         expect(view.label).toBe('Sent');
         expect(view.variant).toBe('success');
-        expect(view.detail).toContain(view.reference);
+        expect(view.reference).toBe('7K4M-2QXB');
+        expect(view.detail).toBe('Sent — reference 7K4M-2QXB');
     });
 
-    it('derives the reference from the CLIENT uuid for every status, including synced', () => {
-        // Deriving from `server_submission_id` once available would make a code the respondent may already
-        // have written down CHANGE as the row transitions — the worst possible property for a number whose
-        // entire job is to be quotable.
+    it('degrades to a bare Sent when a row predates the server reference', () => {
+        // A row synced by a build older than J2e has no `server_reference`. Falling back to the device-local
+        // tag would be exactly the unfindable code J2e removed, so it says less instead.
+        const view = describeRow(
+            outboxRow({ status: 'synced', server_submission_id: 'srv-9', server_reference: null }),
+            false,
+            true,
+        );
+
+        expect(view.reference).toBeNull();
+        expect(view.detail).toBe('Sent');
+    });
+
+    it('keeps the queue tag device-local and stable, and never calls it a reference', () => {
+        // ⚠️ REWRITTEN IN J2e, AND THE CASE IT REPLACES WAS THE DOCTRINE RATHER THAN AN ACCIDENT. It read
+        // "derives the reference from the CLIENT uuid for every status, including synced", on the grounds
+        // that switching to a server-side value would make a code the respondent may have written down
+        // CHANGE. That was right under its premise — the premise being that the local code was presented AS
+        // their reference. It no longer is: it is a queue tag, labelled as one, with copy saying a reference
+        // is issued once the response is sent.
+        //
+        // So the tag keeps the old invariant (stable across the transition, never derived from anything
+        // server-side) and the REFERENCE is a separate field that is simply absent until there is one.
         const uuid = '0191f0a0-1111-7000-8000-000000000abc';
         const synced = describeRow(
-            outboxRow({ client_submission_uuid: uuid, status: 'synced', server_submission_id: 'srv-9' }),
+            outboxRow({
+                client_submission_uuid: uuid,
+                status: 'synced',
+                server_submission_id: 'srv-9',
+                server_reference: '7K4M-2QXB',
+            }),
             false,
             true,
         );
         const queued = describeRow(outboxRow({ client_submission_uuid: uuid, status: 'pending' }), false, true);
 
-        expect(synced.reference).toBe(deriveReference(uuid));
-        expect(synced.reference).toBe(queued.reference);
-        expect(synced.reference).not.toContain('srv-9');
+        expect(queued.queueTag).toBe(deriveReference(uuid));
+        expect(synced.queueTag).toBe(queued.queueTag);
+        expect(synced.queueTag).not.toContain('srv-9');
+
+        // And a queued row has no reference at all — the whole point of the split.
+        expect(queued.reference).toBeNull();
+        expect(queued.detail).not.toContain('reference');
     });
 
     it('describes EVERY OutboxStatus, so a new case cannot be added silently', () => {

@@ -67,7 +67,12 @@ it('queries submissions.reference in exactly one place in the whole application'
     foreach (appSourceFiles() as $path) {
         $code = referenceSourceWithoutComments($path);
 
-        if (preg_match("/where\(\s*'(submissions\.)?reference'/", $code) === 1) {
+        // ⚠️ CASE-INSENSITIVE, AND THAT IS NOT A DETAIL. The first draft of this lint matched `where(` only,
+        // so it silently skipped `orWhere(` — which is the exact spelling the one legitimate call site uses.
+        // It therefore found nothing and would have passed just as happily against a public controller that
+        // resolved a submission by reference. The failing assertion is what exposed it; a lint that cannot
+        // match the code it is written about is worse than no lint, because it reads like coverage.
+        if (preg_match("/where\(\s*'(submissions\.)?reference'/i", $code) === 1) {
             $offenders[] = str_replace(base_path().DIRECTORY_SEPARATOR, '', $path);
         }
     }

@@ -108,16 +108,21 @@ describe('search results — the filter bar', () => {
         wrapper.unmount();
     });
 
-    it('commits on Enter now that the explicit Search button is gone', () => {
+    it('commits on Enter now that the explicit Search button is gone', async () => {
         // ⭐ THE CASE THE MIGRATION MOST NEEDED. J2e deleted the page's "Search" MdsButton, which was the
         // only unconditional re-submit; if the field's commit path were also broken the page would simply
         // stop searching, and no server test could see it.
+        //
+        // ⚠️ `await` ON setValue IS LOAD-BEARING, NOT STYLE. MdsSearchField's commit() returns early when
+        // `modelValue` still equals what the server last ran — and `modelValue` only reaches it after Vue
+        // flushes. Firing keyup synchronously means the latch sees the OLD value, refuses, and the case
+        // fails as "called 0 times" while the component is behaving perfectly.
         mocks.get.mockClear();
         const wrapper = render();
 
         const input = wrapper.get('input[type="search"]');
-        input.setValue('measles');
-        input.trigger('keyup.enter');
+        await input.setValue('measles');
+        await input.trigger('keyup.enter');
 
         expect(mocks.get).toHaveBeenCalledTimes(1);
         expect(mocks.get).toHaveBeenCalledWith(
@@ -129,15 +134,15 @@ describe('search results — the filter bar', () => {
         wrapper.unmount();
     });
 
-    it('sends no q at all when the box is cleared', () => {
+    it('sends no q at all when the box is cleared', async () => {
         // An empty string must be ABSENT rather than `q=`, or the server reads a present-but-empty key and
         // the "no query" branch stops being reachable from the UI.
         mocks.get.mockClear();
         const wrapper = render();
 
         const input = wrapper.get('input[type="search"]');
-        input.setValue('');
-        input.trigger('keyup.enter');
+        await input.setValue('');
+        await input.trigger('keyup.enter');
 
         expect(mocks.get).toHaveBeenCalledWith('/search', {}, expect.objectContaining({ replace: true }));
 
@@ -158,14 +163,22 @@ describe('search results — the empty states', () => {
         matched.unmount();
     });
 
-    it('says the same thing when a scope is refused as when nothing matched', () => {
+    it('renders a refused scope IDENTICALLY to a query that matched nothing', () => {
         // ⚠️ ONE STATE, ONE STRING — deliberate. Telling a user "there are results you may not see" is a
-        // disclosure; `no_permitted_scopes` and `no_matches` therefore share this block.
+        // disclosure; `no_permitted_scopes` and `no_matches` therefore share one block.
+        //
+        // ⚠️ ASSERTED AS AN EQUALITY, NOT AS THE ABSENCE OF A WORD. The first draft checked that the output
+        // did not contain "permission" and failed — because the page carries an UNCONDITIONAL scope note
+        // ("Only results you have permission to see are shown", Index.vue:133) on every state, which is a
+        // standing disclosure rather than a per-state hint. Probing for a word tested the copy; comparing
+        // the two renders tests the CONTRACT, and cannot be broken by unrelated wording.
         const refused = render({ data: [], counts: {}, empty_reason: 'no_permitted_scopes' });
+        const matched = render({ data: [], counts: {}, empty_reason: 'no_matches' });
 
+        expect(refused.text()).toBe(matched.text());
         expect(refused.text()).toContain('No results for');
-        expect(refused.text()).not.toContain('permission');
 
         refused.unmount();
+        matched.unmount();
     });
 });

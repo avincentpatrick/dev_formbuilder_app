@@ -40,6 +40,46 @@
     --mds-_chart-dark-5: #f0cb6d; /*             10.33:1 */
 }
 
+/* ── The dark-ground FORM-IDENTITY payload, defined ONCE (§2.2, JR3) ────────────────────
+   Same device and the same reason as the chart payload above.
+
+   What this scale is FOR, and why it is not a semantic one: a form's identity colour is a
+   mnemonic, not information. It never encodes state — the state is the status pill sitting
+   beside it — so nothing is lost to a viewer who cannot see the hue, and the glyph carries
+   the form's initials as a second channel regardless. The index is derived server-side from
+   the form id (`crc32 % 6`), so it is stable for the life of the form and identical on every
+   surface that ever renders it.
+
+   ⚠️ WHY SIX HUES MEANT DOUBLING UP, WHICH IS THE REAL FINDING. The semantic palette already
+   occupies FOUR of the six perceptual colour families — red (danger), amber (warning),
+   teal-green (success) and blue (primary/info) — and the chart scale spends five more. What
+   is genuinely left is yellow-green, green, indigo, magenta and rose: five families for six
+   slots. So the scale doubles up symmetrically, three in the green band and three in the
+   purple band, ~34deg apart within each, rather than crowding one side. The ORDER below
+   alternates the two families so two consecutive indices are never in the same one.
+
+   Every hue was searched for lightness rather than picked: each clears 4.5:1 against its OWN
+   12% tint — which is the ground the glyph initials are actually read on, and a tighter bar
+   than the card surface — in BOTH themes. The 4px card edge is a non-text indicator under
+   WCAG 1.4.11 and takes 3:1; these clear 5:1 against the light canvas and 6:1 against the
+   dark one, so the edge passes with headroom on either ground.
+
+   ⚠️ The binding constraint is SEPARATION FROM THE FOUR STATUS HUES, not from the chart
+   series — the status pill is co-located on the same card, and the chart series never appear
+   on this page at all. Minimum measured separation from any status hue is 33deg; minimum
+   mutual separation within the scale is 34deg. The `form-identity scale` describe in
+   `__tests__/theme-overrides.test.ts` asserts both — resolving the status hues through
+   semantic.json rather than copying them, so a future re-hue surfaces the collision there —
+   plus both contrast bars and that the two dark blocks below carry no literals. */
+:root {
+    --mds-_form-identity-dark-1: #9989ec; /* indigo   vs its own tint on #1a2130  4.54:1 */
+    --mds-_form-identity-dark-2: #15ac4d; /* emerald                             4.59:1 */
+    --mds-_form-identity-dark-3: #e868a4; /* rose                                4.54:1 */
+    --mds-_form-identity-dark-4: #84a30a; /* lime                                4.65:1 */
+    --mds-_form-identity-dark-5: #d26fe2; /* violet                              4.59:1 */
+    --mds-_form-identity-dark-6: #39ac15; /* spring                              4.61:1 */
+}
+
 /* ── Dark: explicit opt-in ─────────────────────────────────────────────── */
 :root[data-theme-mode='dark'] {
     /* Neutral ramp → deep cool-ink ground (low steps dark, high steps pale). JR1 re-anchored this
@@ -110,6 +150,14 @@
     --mds-chart-series-3: var(--mds-_chart-dark-3);
     --mds-chart-series-4: var(--mds-_chart-dark-4);
     --mds-chart-series-5: var(--mds-_chart-dark-5);
+
+    /* Form identity (§2.2, JR3): the mandatory dark re-point — see the payload note at the top. */
+    --mds-form-identity-1: var(--mds-_form-identity-dark-1);
+    --mds-form-identity-2: var(--mds-_form-identity-dark-2);
+    --mds-form-identity-3: var(--mds-_form-identity-dark-3);
+    --mds-form-identity-4: var(--mds-_form-identity-dark-4);
+    --mds-form-identity-5: var(--mds-_form-identity-dark-5);
+    --mds-form-identity-6: var(--mds-_form-identity-dark-6);
 }
 
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
@@ -169,6 +217,14 @@
         --mds-chart-series-3: var(--mds-_chart-dark-3);
         --mds-chart-series-4: var(--mds-_chart-dark-4);
         --mds-chart-series-5: var(--mds-_chart-dark-5);
+
+        /* Form identity (§2.2, JR3): the mandatory dark re-point — see the payload note at the top. */
+        --mds-form-identity-1: var(--mds-_form-identity-dark-1);
+        --mds-form-identity-2: var(--mds-_form-identity-dark-2);
+        --mds-form-identity-3: var(--mds-_form-identity-dark-3);
+        --mds-form-identity-4: var(--mds-_form-identity-dark-4);
+        --mds-form-identity-5: var(--mds-_form-identity-dark-5);
+        --mds-form-identity-6: var(--mds-_form-identity-dark-6);
     }
 }
 

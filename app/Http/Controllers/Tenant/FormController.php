@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Scoping\ScopeNodePresenter;
+use App\Support\Forms\FormListFacets;
 use App\Support\Search\ListEmptyReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,7 +39,14 @@ final class FormController extends Controller
         $user = $request->user();
 
         $terms = $this->keyword($request);
-        $forms = $presenter->list($user, $terms);
+        $facet = FormListFacets::parse($request->query('state'));
+        $rows = $presenter->list($user, $terms);
+
+        // Counted BEFORE the facet narrows the set, so every chip keeps showing its own total while one
+        // of them is active — a chip that reported 0 for the thing you are not looking at would make the
+        // bar unusable as a way back.
+        $facets = FormListFacets::counts($rows);
+        $forms = FormListFacets::apply($rows, $facet);
 
         return Inertia::render('forms/Index', [
             'forms' => $forms,
@@ -49,12 +57,22 @@ final class FormController extends Controller
             // ⚠️ THE CLAMPED STRING, NOT THE REQUEST'S. `SearchTerms::raw()` is what the server actually
             // acted on, so a 300-character paste re-renders as the 200 that ran; echoing the input back
             // would put a box on screen disagreeing with the list beneath it (J1e).
-            'filters' => ['applied' => ['q' => $terms->raw()]],
+            'filters' => ['applied' => ['q' => $terms->raw(), 'state' => $facet], 'facets' => $facets],
+            // Presentational, not a filter, so it sits outside `filters` — it changes how the same rows are
+            // drawn and nothing about which rows they are. In the URL rather than in a stored preference
+            // (user decision, JR3): it is SSR-safe with no hydration guard, shareable, and it reuses this
+            // page's own `router.get` round trip instead of introducing the app's first localStorage.
+            'view' => $request->query('view') === 'table' ? 'table' : 'grid',
             // ⚠️ WITHOUT THIS PROP THIS PAGE LIES, AND IT IS THE REASON `empty_reason` REACHED THE THREE
             // FILTER-LESS LISTS AT ALL. `forms/Index.vue`'s `#empty` slot was an unconditional "Create your
             // first form" — so the first `?q` matching nothing would have told a tenant with two hundred
             // forms that it had none, and offered to make one.
-            'empty_reason' => ListEmptyReason::for($forms !== [], ! $terms->isEmpty()),
+            //
+            // ⚠️ AND THE SECOND ARGUMENT MUST NAME EVERY FILTER, WHICH IS WHY THE FACET IS IN IT (JR3). It
+            // was `! $terms->isEmpty()` alone; shipping the facet chips without widening it would have
+            // reproduced that exact defect one filter over — a tenant clicking "Draft" with no drafts
+            // would be told it had never made a form, and offered to make its first.
+            'empty_reason' => ListEmptyReason::for($forms !== [], ! $terms->isEmpty() || $facet !== null),
         ]);
     }
 

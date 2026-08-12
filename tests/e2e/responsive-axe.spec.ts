@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
-import { openBuilder } from './support/navigate';
+import { formEntry, openBuilder } from './support/navigate';
 
 // Composed-page responsive + accessibility gate. Each authenticated tenant page is scanned at the
 // three reference viewports (the config's projects) in light AND dark for zero WCAG 2.2 AA violations,
@@ -157,11 +157,11 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Form analytics (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        // A CSS `tr` locator scoped by row text rather than getByRole('row', …), for the reason the webhook
-        // and encode blocks below record: MdsDataTable drops the table ARIA role for its card layout at 375px.
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Community Health Survey' })
+        // `formEntry` rather than a `tr` locator (JR3): `/forms` renders a CARD GRID by default now, so a
+        // `tr` matches nothing here unless `?view=table` is asked for. The helper matches either view —
+        // and still cannot use getByRole('row'), for the reason the webhook and encode blocks below
+        // record: MdsDataTable drops the table ARIA role for its card layout at 375px.
+        await formEntry(page, 'Community Health Survey')
             .getByRole('button', { name: 'Response statistics' })
             .click();
         await page.waitForURL(/\/forms\/[0-9a-f-]{36}\/analytics$/, { timeout: 30_000 });
@@ -191,9 +191,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Form hub (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Community Health Survey' })
+        await formEntry(page, 'Community Health Survey')
             .getByRole('link', { name: 'Community Health Survey' })
             .click();
         // No trailing segment: the hub IS `/forms/{uuid}`, so the anchor matters or this matches the
@@ -220,9 +218,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Form responses (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Community Health Survey' })
+        await formEntry(page, 'Community Health Survey')
             .getByRole('link', { name: 'Community Health Survey' })
             .click();
         await page.waitForURL(/\/forms\/[0-9a-f-]{36}$/, { timeout: 30_000 });
@@ -284,9 +280,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Encode (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Clinic Intake' })
+        await formEntry(page, 'Clinic Intake')
             .getByRole('button', { name: 'New submission' })
             .click();
         await page.waitForURL('**/submissions/create', { timeout: 30_000 });
@@ -302,9 +296,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Encode repeat group (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Household Roster' })
+        await formEntry(page, 'Household Roster')
             .getByRole('button', { name: 'New submission' })
             .click();
         await page.waitForURL('**/submissions/create', { timeout: 30_000 });
@@ -326,9 +318,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Encode branching — terminal (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Branching Router' })
+        await formEntry(page, 'Branching Router')
             .getByRole('button', { name: 'New submission' })
             .click();
         await page.waitForURL('**/submissions/create', { timeout: 30_000 });
@@ -339,9 +329,7 @@ for (const theme of themes) {
 
     test(`Encode branching — routed (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await page.goto('/forms', { waitUntil: 'networkidle' });
-        await page
-            .locator('tr')
-            .filter({ hasText: 'Branching Router' })
+        await formEntry(page, 'Branching Router')
             .getByRole('button', { name: 'New submission' })
             .click();
         await page.waitForURL('**/submissions/create', { timeout: 30_000 });

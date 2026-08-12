@@ -10,6 +10,7 @@ use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Support\Forms\FormScheduleView;
 use App\Support\Search\KeywordFilter;
 use App\Support\Search\SearchTerms;
 use Illuminate\Database\Eloquent\Builder;
@@ -81,13 +82,17 @@ final class FormPresenter
         // an extra lookup per policy call — five per row — turning the list into an N+1.
         $this->grants->primeNodePaths($forms);
 
-        return array_values($forms->map(fn (Form $form): array => $this->present($form, $user))->all());
+        // The card grid's counts (JR3), for the whole page at once. Same shape of defence as the line
+        // above: gather in a constant number of queries BEFORE the per-row loop, never inside it.
+        $metrics = FormListMetrics::for($forms, $user);
+
+        return array_values($forms->map(fn (Form $form): array => $this->present($form, $user, $metrics))->all());
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function present(Form $form, User $user): array
+    private function present(Form $form, User $user, FormListMetrics $metrics): array
     {
         /** @var Collection<int, FormVersion> $versions */
         $versions = $form->versions;
@@ -103,6 +108,19 @@ final class FormPresenter
             'current_version' => $this->versionNumber($versions, $form->current_published_version_id),
             'draft_version' => $this->versionNumber($versions, $form->draft_version_id),
             'updated_at' => $form->updated_at?->toIso8601String(),
+            // The card's counts and its schedule/capacity block (JR3). Both were already computed for
+            // ONE form on the hub and were never on this page — `description` above is the third of the
+            // same kind, and the only one that was already on the wire with nothing rendering it.
+            'stats' => $metrics->stats((string) $form->id),
+            // Through the SAME shared view the guest runtime, the encode screen and the hub use, so the
+            // list cannot invent a fifth answer to "is this form taking responses right now".
+            'schedule' => FormScheduleView::present($form, $metrics->consumed($form)),
+            // The identity chip's index (JR3). Derived rather than stored: `crc32` of the uuid is stable
+            // for the life of the form, needs no column and no backfill, and being server-side means a
+            // future PDF or digest paints the same form the same colour as this page does. Six because
+            // the scale has six hues — see the payload note in `theme-overrides.css` for why six was the
+            // ceiling. It carries no meaning: the status pill beside it is what encodes state.
+            'identity' => (crc32((string) $form->id) % 6) + 1,
             'versions' => $versions->map(fn (FormVersion $v): array => [
                 'id' => $v->id,
                 'version_number' => $v->version_number,

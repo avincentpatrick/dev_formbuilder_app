@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Search;
 
-use App\Services\Search\Arms\SubmissionSearchArm;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Submissions\SubmissionReference;
 
 /**
  * A parsed, sanitised search query (Increment J1b).
@@ -43,43 +43,34 @@ final readonly class SearchTerms
     public const int MAX_TOKEN_LENGTH = 64;
 
     /**
-     * The shortest hex run treated as a submission reference. Eight is the first canonical uuid group, which
-     * is both what a support ticket quotes and short enough to type.
+     * ⚠️ `MIN_UUID_PREFIX = 8` WAS DELETED IN J2e, AND ITS MEASUREMENT SURVIVES IN
+     * {@see SubmissionReference} AS THE REASON THAT CLASS EXISTS.
      *
-     * ⚠️ THE ORIGINAL JUSTIFICATION FOR 8 WAS WRONG, AND THE CORRECTION IS KEPT BECAUSE IT CHANGES WHAT THIS
-     * FEATURE PROMISES. It read: "Below that the `LIKE` would match a meaningful fraction of any tenant's
-     * submissions and stop being a lookup." That is true of a RANDOM uuid and false of a **uuidv7**, which
-     * is what `submissions.id` is: the first 12 hex characters are a 48-bit millisecond timestamp, so the
-     * first EIGHT are its top 32 bits — identical for every row created inside the same ~49-day window.
-     * Measured in J1e, not reasoned: two submissions seeded milliseconds apart share them.
+     * Short version, because the next reader will wonder why a ≥8-character id fragment stopped working:
+     * `submissions.id` is a uuidv7, whose first 12 hex characters are a 48-bit millisecond timestamp — so
+     * the first EIGHT are its top 32 bits and are IDENTICAL for every row created inside the same ~49-day
+     * window. Pasting eight characters returned a time window, not a row. The constant could not simply be
+     * raised, because the product PRINTED those eight characters and the arm's contract was that what is
+     * shown can be pasted back in; real randomness does not begin until hex position 14. It needed a
+     * different reference FORMAT, which is `submissions.reference`.
      *
-     * So an 8-character reference already narrows to a time window rather than to a row. It is not a
-     * disclosure (every caller is bounded by its own visibility scope), it is the lookup not being one.
+     * What replaced it: {@see referenceCandidate()} (an exact reference) and {@see submissionId()} (an exact,
+     * strictly canonical uuid). A FULL uuid pasted in was always an exact lookup and still is;
+     * `ListKeywordFilterTest` pins both halves.
      *
-     * **Raising this constant alone would make things worse, which is why J1e did not.** The inbox and the
-     * command palette both DISPLAY `substr($id, 0, 8)`, and {@see SubmissionSearchArm}'s
-     * contract is that what is shown can be pasted back in — a longer minimum would refuse the very string
-     * the product prints. Real randomness in a uuidv7 does not begin until hex position 14, so a selective
-     * prefix means displaying ~16 characters, i.e. a different reference format. That is the "real short
-     * handle" the arm already files for J2, and it is one change, not two.
-     *
-     * A FULL uuid pasted in is an exact lookup and always has been; `ListKeywordFilterTest` pins both halves.
-     */
-    public const int MIN_UUID_PREFIX = 8;
-
-    /**
      * @param  list<string>  $tokens  lowercased, alphanumeric-or-underscore only
      */
     private function __construct(
         private ?string $raw,
         private array $tokens,
-        private ?string $uuidPrefix,
+        private ?string $submissionId,
+        private ?string $referenceCandidate,
     ) {}
 
     public static function parse(?string $raw): self
     {
         if ($raw === null) {
-            return new self(null, [], null);
+            return new self(null, [], null, null);
         }
 
         $clamped = mb_substr($raw, 0, self::MAX_RAW_LENGTH);
@@ -87,7 +78,7 @@ final readonly class SearchTerms
         if (trim($clamped) === '') {
             // Whitespace-only is indistinguishable from empty for every purpose here, and collapsing them
             // means the presenter has ONE "no query" branch rather than two that can drift apart.
-            return new self(null, [], null);
+            return new self(null, [], null, null);
         }
 
         $lowered = mb_strtolower($clamped);
@@ -105,25 +96,35 @@ final readonly class SearchTerms
             }
         }
 
-        return new self(trim($clamped), $tokens, self::detectUuidPrefix($lowered));
+        return new self(
+            trim($clamped),
+            $tokens,
+            self::detectSubmissionId($lowered),
+            SubmissionReference::normalize($clamped),
+        );
     }
 
     /**
-     * A canonical-uuid PREFIX, if the whole query looks like one.
+     * A FULL canonical uuid, if the whole query is one.
      *
-     * Deliberately derived from the raw string rather than from `$tokens`: the tokeniser splits on the
-     * hyphens, so `0198a3c1-2b3c` would arrive as two tokens and the hyphen position — which is what makes a
-     * longer prefix match `id::text` at all — would be lost.
+     * ⚠️ THE REGEX IS STRICTLY CANONICAL, AND THAT STRICTNESS IS LOAD-BEARING RATHER THAN TIDY. The consumer
+     * binds this to `submissions.id = ?`, and PostgreSQL raises 22P02 (`invalid input syntax for type uuid`)
+     * on anything that is not one — which arrives as a `QueryException` and therefore as a **500 on an
+     * Inertia GET**, the exact availability failure this class's header exists to prevent. The predecessor
+     * could afford a loose pattern because it compared `id::text LIKE`, where a bad value merely matched
+     * nothing; an equality cannot.
+     *
+     * The version nibble is deliberately NOT constrained: a support ticket may quote any id this system has
+     * ever issued, including a pre-uuidv7 one.
+     *
+     * Derived from the raw string rather than from `$tokens` because the tokeniser splits on the hyphens,
+     * so a uuid would arrive as five separate tokens with its shape destroyed.
      */
-    private static function detectUuidPrefix(string $lowered): ?string
+    private static function detectSubmissionId(string $lowered): ?string
     {
         $candidate = trim($lowered);
 
-        if (! preg_match('/^[0-9a-f]{8}[0-9a-f-]*$/', $candidate)) {
-            return null;
-        }
-
-        if (mb_strlen($candidate) < self::MIN_UUID_PREFIX || mb_strlen($candidate) > 36) {
+        if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $candidate)) {
             return null;
         }
 
@@ -231,9 +232,31 @@ final readonly class SearchTerms
         return true;
     }
 
-    public function uuidPrefix(): ?string
+    /** A full canonical uuid, safe to bind to `submissions.id = ?`. Null for anything else. */
+    public function submissionId(): ?string
     {
-        return $this->uuidPrefix;
+        return $this->submissionId;
+    }
+
+    /**
+     * The query as a stored `submissions.reference`, or null if it is not one.
+     *
+     * ⚠️ THERE IS NO AMBIGUITY WITH {@see submissionId()}, AND THE REASON IS WORTH STATING BECAUSE IT LOOKS
+     * LIKE THERE SHOULD BE. Hex is a strict SUBSET of Crockford Base32 (Crockford omits only I, L, O and U;
+     * A–F and 0–9 are all present), so every 8-character hex string is also a valid reference and no
+     * alphabet-based test could tell them apart. LENGTH does, exactly and totally: a normalized reference is
+     * 8 characters, a canonical uuid is 36, and a de-hyphenated uuid is 32 — never 8. The two accessors are
+     * provably disjoint.
+     *
+     * ⚠️ Derived from the raw string, mirroring its sibling — but unlike its sibling that choice is NOT
+     * observable here, and saying so is better than implying a test pins it. The tokeniser splits
+     * `7K4M-2QXB` into `['7k4m','2qxb']`, and concatenating those yields the same eight characters
+     * {@see SubmissionReference::normalize()} produces from the raw string. It reads from raw for symmetry;
+     * every input I could construct agrees either way.
+     */
+    public function referenceCandidate(): ?string
+    {
+        return $this->referenceCandidate;
     }
 
     /** The clamped, trimmed original — echoed back into `filters.applied` so the box re-renders what ran. */

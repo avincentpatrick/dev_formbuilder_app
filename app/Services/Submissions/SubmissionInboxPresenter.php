@@ -21,6 +21,7 @@ use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Support\Search\ListEmptyReason;
 use App\Support\Search\SearchTerms;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
 
 /**
@@ -136,6 +137,9 @@ final class SubmissionInboxPresenter
         return [
             'data' => $items->map(fn (Submission $s): array => [
                 'id' => $s->id,
+                // The short handle (J2e), FORMATTED here rather than on the client — no page spells the
+                // grouping, so a future re-grouping is one line in SubmissionReference.
+                'reference' => SubmissionReference::format($s->reference),
                 // ⚠️ THE ID AS WELL AS THE TITLE (J2c), AND IT IS FREE. `form:id,title` is already eager-
                 // loaded above, so this adds no query — and without it the global inbox can print a form's
                 // name on every row while linking none of them, which is the dead end this whole row exists
@@ -253,6 +257,8 @@ final class SubmissionInboxPresenter
         return [
             'submission' => [
                 'id' => $submission->id,
+                // The short handle (J2e) — the one string on this page a respondent can quote back.
+                'reference' => SubmissionReference::format($submission->reference),
                 'form_id' => $submission->form_id,
                 'form_title' => $this->formTitle($submission),
                 'version_number' => $version?->version_number,

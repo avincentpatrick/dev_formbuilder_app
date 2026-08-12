@@ -26,8 +26,19 @@ import { deriveReference } from './reference-number';
 export interface OutboxItemView {
     uuid: string;
     slug: string;
-    /** `MER-XXXXXX`, quotable in a support request. */
-    reference: string;
+    /**
+     * The server-issued handle (`7K4M-2QXB`) — Increment J2e. Present only once the row has SETTLED, and
+     * null on any row synced by a build that predates J2e, which every reader must tolerate.
+     */
+    reference: string | null;
+    /**
+     * A device-local label (`MER-XXXXXX`) for telling two queued rows apart — Increment J2e.
+     *
+     * ⚠️ IT IS NOT A REFERENCE AND MUST NEVER BE CALLED ONE IN THE UI. It is derived from the client uuid and
+     * stored NOWHERE on the server, so a respondent who writes it down and quotes it to the tenant gets
+     * nothing back. The copy beside it says so.
+     */
+    queueTag: string;
     variant: BadgeVariant;
     /** The badge word — Queued / Syncing / Retrying / Failed / Needs review / Sent. */
     label: string;
@@ -66,12 +77,19 @@ export function describeRow(row: OutboxRow, syncing: boolean, reviewableHere: bo
     const view: OutboxItemView = {
         uuid: row.client_submission_uuid,
         slug: row.slug,
-        // ⚠️ ALWAYS FROM THE CLIENT UUID, FOR EVERY STATUS. It is the only id that exists for a queued or
-        // failed row, so deriving from `server_submission_id` once available would make a code the respondent
-        // may already have written down CHANGE as the row transitions — the worst possible property for a
-        // number whose entire job is to be quotable. It is a stored server column, so support can still
-        // resolve it.
-        reference: deriveReference(row.client_submission_uuid),
+        // ⚠️ REWRITTEN IN J2e, AND THE OLD RULE WAS RIGHT UNDER ITS OWN PREMISE. It read: always derive from
+        // the client uuid, for every status, because switching to a server-side id would make a code the
+        // respondent may already have written down CHANGE as the row transitions.
+        //
+        // The premise is gone rather than the reasoning being wrong. Nothing now TELLS the respondent the
+        // local code is their reference: it is labelled a queue tag, with copy saying a reference is issued
+        // once the response is sent. So the tag still never changes — it simply stopped making a promise the
+        // server could not keep. The real handle arrives on `server_reference` when the row settles.
+        //
+        // Restoring the old single field would silently reintroduce a code that is unfindable by the tenant
+        // it is quoted to, which is the defect J2e exists to remove.
+        reference: row.server_reference,
+        queueTag: deriveReference(row.client_submission_uuid),
         variant: base.variant,
         label: base.label,
         detail: '',
@@ -120,6 +138,12 @@ export function describeRow(row: OutboxRow, syncing: boolean, reviewableHere: bo
             };
 
         case 'synced':
-            return { ...view, detail: `Sent — reference ${view.reference}` };
+            // The fallback is not defensive padding: a row synced by a build older than J2e has no
+            // `server_reference`, and inventing one from the client uuid is exactly the unfindable code this
+            // increment removed. Saying less is the honest option.
+            return {
+                ...view,
+                detail: view.reference === null ? 'Sent' : `Sent — reference ${view.reference}`,
+            };
     }
 }

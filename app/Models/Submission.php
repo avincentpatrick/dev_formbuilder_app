@@ -322,7 +322,12 @@ class Submission extends Model implements TenantScoped
 
     /**
      * THE keyword predicate for a submission (Increment J1e) — reviewer remarks and returned reason (through
-     * the generated `search_vector`), the parent form's title, or a reference prefix.
+     * the generated `search_vector`), the parent form's title, its short `reference`, or its full id.
+     *
+     * ⚠️ THE TWO IDENTITY BRANCHES ARE EXACT MATCHES AS OF J2e, NOT PREFIXES. The `id::text LIKE 'xxxxxxxx%'`
+     * arm that lived here is gone: under uuidv7 those eight characters are a millisecond timestamp's top 32
+     * bits, so it returned every row created in the same ~49-day window. `submissions.reference` is the
+     * replacement handle — see {@see SubmissionReference}.
      *
      * ⚠️ IT IS A SCOPE, AND IT IS SHARED, AND BOTH HALVES ARE THE POINT. It was `SubmissionSearchArm`'s
      * private builder until J1e gave the INBOX a keyword box; leaving it there would have meant two
@@ -372,19 +377,22 @@ class Submission extends Model implements TenantScoped
                     ->whereRaw("forms.search_vector @@ to_tsquery('simple', ?)", [$terms->tsQuery()]);
             });
 
-            $prefix = $terms->uuidPrefix();
-            if ($prefix !== null) {
-                // A scan, and bounded to stay one by RLS plus the caller's visibility scope. Deliberately
-                // NOT indexed — `submissions` has no reference column, and the right fix is a real short
-                // handle (filed for J2), not an index on a cast.
-                //
-                // ⚠️ AN EIGHT-CHARACTER PREFIX IS NOT A UNIQUE LOOKUP, and an earlier version of this
-                // comment claimed a collision was "vanishingly unlikely". Under uuidv7 it is CERTAIN: those
-                // characters are the top 32 bits of a millisecond timestamp and are shared by every row
-                // created in the same ~49-day window. See {@see SearchTerms::MIN_UUID_PREFIX} for the
-                // measurement and for why raising the constant alone would make it worse. A full uuid is
-                // still an exact match, which is the case a support ticket can actually rely on.
-                $match->orWhereRaw('submissions.id::text LIKE ?', [$prefix.'%']);
+            // The short handle (J2e). An EQUALITY on an indexed column, replacing the `id::text LIKE 'xxxx%'`
+            // scan this scope carried until J2e — which matched a ~49-day uuidv7 timestamp window rather than
+            // a row. `submissions_tenant_id_reference_unique` covers `(tenant_id, reference)`, and `text =`
+            // measures leakproof on PG17 (`SearchIndexUsageTest`), so unlike `@@` and `ILIKE` this predicate
+            // is at least ELIGIBLE to become an index qual under FORCE'd RLS.
+            $reference = $terms->referenceCandidate();
+            if ($reference !== null) {
+                $match->orWhere('submissions.reference', $reference);
+            }
+
+            // A full uuid pasted out of a URL or a ticket. Always was an exact lookup; now it is spelled as
+            // one instead of as a LIKE over a cast. ⚠️ Safe ONLY because `submissionId()` refuses anything
+            // that is not strictly canonical — binding a non-uuid here raises 22P02, i.e. a 500 on a GET.
+            $id = $terms->submissionId();
+            if ($id !== null) {
+                $match->orWhere('submissions.id', $id);
             }
         });
     }

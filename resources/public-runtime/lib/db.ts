@@ -63,6 +63,11 @@ export interface OutboxRow {
      *  Not indexed → no `db.version()` bump. */
     conflict_code: string | null;
     server_submission_id: string | null;
+    /** Increment J2e — the server-issued short handle, recorded when the row settles so the outbox can stop
+     *  showing its provisional queue tag and start showing the code the tenant can actually find. Un-indexed
+     *  → no `db.version()` bump, the same reasoning as `conflict_code` above. Null until `synced` (and on any
+     *  row synced by a build that predates J2e, which is why every reader tolerates null). */
+    server_reference: string | null;
     /** Increment I10d — when the server accepted this row. Un-indexed → no `db.version()` bump, the same
      *  reasoning as `conflict_code` above. Null for every status except `synced`. */
     synced_at: string | null;

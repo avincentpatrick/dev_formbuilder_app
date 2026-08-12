@@ -34,6 +34,8 @@ type PdfArtifact = { id: string; generated_at: string | null; size_bytes: number
 
 type Submission = {
     id: string;
+    // Increment J2e — the short handle, already grouped by the server (`7K4M-2QXB`).
+    reference: string;
     form_id: string;
     form_title: string;
     version_number: number | null;
@@ -240,6 +242,13 @@ function formatDate(iso: string | null): string {
         <div class="detail__grid">
             <MdsCard>
                 <dl class="detail__meta">
+                    <!-- Increment J2e — FIRST, because it is what this page is ABOUT. Until now the detail
+                         view showed no identifier at all: a respondent quoting a code had nothing on screen
+                         to match it against. Not a link (this IS that page) and not truncated. -->
+                    <div class="detail__meta-row">
+                        <dt>Reference</dt>
+                        <dd class="detail__reference">{{ submission.reference }}</dd>
+                    </div>
                     <div class="detail__meta-row">
                         <dt>Status</dt>
                         <dd><MdsBadge v-bind="statusVariant(submission.status)" /></dd>

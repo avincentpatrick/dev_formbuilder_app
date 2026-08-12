@@ -49,7 +49,10 @@ const schema = shallowRef<SchemaResponse | null>(null);
 const errorMessage = ref('');
 // Increment H12b — the full-screen "unavailable" copy (opens-soon / closed / full) when phase === 'unavailable'.
 const unavailableCopy = ref<ScheduleStateCopy | null>(null);
-const reference = ref('');
+// Increment J2e — exactly one of these is ever set. `reference` is the server-issued handle (the response
+// reached the server); `queueTag` is a device-local label for one that has not. See ConfirmationScreen.
+const reference = ref<string | null>(null);
+const queueTag = ref<string | null>(null);
 const confirmationMessage = ref(CONFIRM_MESSAGE);
 const sessionKey = ref(0);
 const retainedAnswers = shallowRef<AnswerMap | undefined>(undefined);
@@ -235,14 +238,17 @@ async function loadResume(resumeToken: string): Promise<void> {
     phase.value = 'ready';
 }
 
-function onSubmitted(id: string, authored: string | null = null): void {
+function onSubmitted(id: string, submittedReference: string, authored: string | null = null): void {
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
     const resolved = resolvingUuid.value !== null;
     if (resolved) {
         void syncOutbox.discardSubmission(resolvingUuid.value as string);
         clearResolveState();
     }
-    reference.value = deriveReference(id);
+    // The SERVER's handle, passed straight through. Deriving one from the id is exactly what J2e removed:
+    // those characters are a uuidv7 timestamp prefix, so the code was not a lookup for anybody.
+    reference.value = submittedReference;
+    queueTag.value = null;
     // Increment H6b — the author's message (already locale-resolved and hole-filled by RuntimeSession,
     // which still had the store when it emitted) replaces the hardcoded copy on BOTH terminal success
     // states. Null — no message, or one whose every hole was unanswered — keeps the default.
@@ -251,7 +257,8 @@ function onSubmitted(id: string, authored: string | null = null): void {
 }
 
 // Increment G8b — an offline (or dropped-mid-submit) finalize: the answers are safely queued, so show a
-// "saved on this device" confirmation with a local reference derived from the client submission id.
+// "saved on this device" confirmation with a local QUEUE TAG derived from the client submission id — not a
+// reference, because no server row exists yet and a code the tenant cannot find is worse than none (J2e).
 function onQueued(clientUuid: string): void {
     // Increment G8c — a resolve that went offline: the reviewed answers are safely re-queued under the new
     // uuid, so the old parked conflict row can be dropped.
@@ -259,7 +266,8 @@ function onQueued(clientUuid: string): void {
         void syncOutbox.discardSubmission(resolvingUuid.value);
         clearResolveState();
     }
-    reference.value = deriveReference(clientUuid);
+    queueTag.value = deriveReference(clientUuid);
+    reference.value = null;
     // Increment H6b deliberately does NOT let an author message replace this one. It is not a thank-you —
     // it is the only thing telling the respondent their answers have not been delivered yet, and swapping
     // it for "Thanks, Maria — your response has been recorded." would be a factual lie about delivery
@@ -391,6 +399,7 @@ function onRestart(): void {
         <ConfirmationScreen
             v-else-if="phase === 'confirmation'"
             :reference="reference"
+            :queue-tag="queueTag"
             :message="confirmationMessage"
             @restart="onRestart"
         />

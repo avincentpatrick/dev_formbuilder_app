@@ -110,7 +110,18 @@ function onKeydown(event: KeyboardEvent): void {
                     <span v-if="item.isSyncing" aria-hidden="true" class="outbox__spinner">
                         <MdsSpinner size="sm" />
                     </span>
-                    <span class="outbox__ref">{{ item.reference }}</span>
+                    <!-- Increment J2e — the real handle once the row has settled, the device-local queue tag
+                         until then. The `title` is what stops the two being confused: a queue tag looks
+                         exactly like a reference, so the only thing distinguishing them is that one of them
+                         says it is not one. Keeps the `.outbox__ref` class, which the e2e spec locates. -->
+                    <span
+                        class="outbox__ref"
+                        :title="
+                            item.reference === null
+                                ? 'A temporary label for this device. A reference is issued once this is sent.'
+                                : 'Your reference'
+                        "
+                    >{{ item.reference ?? item.queueTag }}</span>
                 </div>
 
                 <p class="outbox__detail">{{ item.detail }}</p>

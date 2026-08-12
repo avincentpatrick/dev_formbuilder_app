@@ -71,7 +71,9 @@ const emit = defineEmits<{
     // this session the instant it flips to the confirmation phase (they are mutually exclusive branches),
     // so the store — and with it the locale, the source map and the submitted answers — does not outlive
     // the emit. See {@link authoredConfirmation}.
-    submitted: [id: string, confirmation: string | null];
+    // Increment J2e — the SERVER-issued reference rides along, so App.vue prints the code the tenant can
+    // find rather than one derived on the device from the id.
+    submitted: [id: string, reference: string, confirmation: string | null];
     queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
     discard: [];
@@ -267,7 +269,7 @@ async function submit(): Promise<SubmitOutcome> {
         await discardRow(db, uuid);
         void sync?.refresh();
         await autosave.clear();
-        emit('submitted', result.id, authoredConfirmation());
+        emit('submitted', result.id, result.reference, authoredConfirmation());
         return 'success';
     } catch (error) {
         return await handleSubmitError(error, uuid);

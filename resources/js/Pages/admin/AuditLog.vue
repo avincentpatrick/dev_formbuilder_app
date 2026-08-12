@@ -31,6 +31,7 @@ import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsFormField,
     MdsIconButton,
     MdsPagination,
@@ -130,15 +131,19 @@ function summarize(row: AuditRow): string {
         <p v-if="adminError" class="admin-audit__alert" role="alert">{{ adminError }}</p>
 
         <!--
-            ⚠️ This <h2> is load-bearing. AdminLayout renders the <h1> and MdsEmptyState renders an <h3>, so
-            removing it fails axe's heading-order — but ONLY in the empty state, which is exactly the state a
-            fresh install ships in. /admin/* is excluded from the Playwright axe sweep (superadmin.mfa needs a
-            TOTP in CI), so the Vitest case asserting this element is its only automated guard.
-        -->
-        <section class="admin-audit__filters" aria-labelledby="platform-audit-filters-heading">
-            <h2 id="platform-audit-filters-heading" class="admin-audit__filters-heading">Filters</h2>
+            Increment J2e — the section, its <h2> and the grid all moved into MdsFilterBar, which carries the
+            reason the heading must stay unconditional. Same markup, one definition; this was one of the three
+            pages DSR §3.2 note 5 named as still hand-rolling it.
 
-            <div class="admin-audit__filters-grid">
+            The geometry is unchanged, and that is MEASURED rather than assumed: the three rules deleted below
+            were byte-identical to FilterBar's on every property. Its one extra declaration —
+            `font-family: var(--mds-font-family-body)` on the heading — is a no-op here, because app.css
+            already sets that family on `body` and nothing overrides it for h1..h6.
+
+            ⚠️ /admin/audit-log is still NOT axe-scanned (admin-console-axe.spec.ts covers /admin/settings and
+            /admin/feedback only), so the Vitest case asserting this heading remains its only automated guard.
+        -->
+        <MdsFilterBar>
                 <MdsFormField label="Operator" input-id="platform-audit-actor">
                     <MdsSelect
                         id="platform-audit-actor"
@@ -166,8 +171,7 @@ function summarize(row: AuditRow): string {
                         @change="applyFilters"
                     />
                 </MdsFormField>
-            </div>
-        </section>
+        </MdsFilterBar>
 
         <!--
             Load-bearing copy, not decoration. Without it an operator looks here for the workspace they
@@ -291,24 +295,7 @@ function summarize(row: AuditRow): string {
     font-size: var(--mds-type-body-md-font-size);
 }
 
-.admin-audit__filters {
-    margin-bottom: var(--mds-space-5);
-}
-
-.admin-audit__filters-heading {
-    margin: 0 0 var(--mds-space-3);
-    font-size: var(--mds-type-label-font-size);
-    font-weight: var(--mds-font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--mds-color-text-secondary);
-}
-
-.admin-audit__filters-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--mds-space-3);
-}
+/* The three `.admin-audit__filters*` rules moved into MdsFilterBar verbatim (J2e) — geometry unchanged. */
 
 .admin-audit__hint {
     margin: 0 0 var(--mds-space-3);

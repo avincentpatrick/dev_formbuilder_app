@@ -40,6 +40,7 @@ export async function enqueue(db: MeridianDb, input: EnqueueInput): Promise<Outb
         last_error: null,
         conflict_code: null,
         server_submission_id: null,
+        server_reference: null,
         synced_at: null,
         created_at: now,
         updated_at: now,
@@ -60,7 +61,12 @@ export function listPending(db: MeridianDb): Promise<OutboxRow[]> {
  * Both halves happen in one `rw` transaction, so there is no window in which the row reads as delivered
  * while the answers are still on disk.
  */
-export async function markSynced(db: MeridianDb, uuid: string, serverSubmissionId: string | null = null): Promise<void> {
+export async function markSynced(
+    db: MeridianDb,
+    uuid: string,
+    serverSubmissionId: string | null = null,
+    serverReference: string | null = null,
+): Promise<void> {
     const now = new Date().toISOString();
 
     await db.transaction('rw', db.outbox, db.media_queue, async () => {
@@ -68,6 +74,9 @@ export async function markSynced(db: MeridianDb, uuid: string, serverSubmissionI
         await db.outbox.update(uuid, {
             status: 'synced',
             server_submission_id: serverSubmissionId,
+            // Increment J2e — written in the SAME transaction as the status, so there is no window in which
+            // a row reads as delivered while still advertising its provisional queue tag.
+            server_reference: serverReference,
             synced_at: now,
             // The scrub. `last_error` goes too: a row that eventually succeeded should not still be
             // carrying the message from the attempt that did not.

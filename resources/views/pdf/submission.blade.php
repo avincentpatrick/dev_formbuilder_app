@@ -59,8 +59,10 @@
                 <td class="meta__v">{{ $model['submission']['source_label'] }}</td>
             </tr>
             <tr>
+                {{-- J2e: the row was already LABELLED "Reference" and had been printing a 36-character uuid
+                     under it since H17. It now prints the short handle a respondent was actually shown. --}}
                 <td class="meta__k">Reference</td>
-                <td class="meta__v">{{ $model['submission']['id'] }}</td>
+                <td class="meta__v">{{ $model['submission']['reference'] }}</td>
                 <td class="meta__k">Version</td>
                 <td class="meta__v">{{ $model['version_number'] ?? '—' }}</td>
             </tr>

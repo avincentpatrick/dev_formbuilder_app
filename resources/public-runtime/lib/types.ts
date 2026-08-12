@@ -342,6 +342,13 @@ export interface DraftBlob {
 
 export interface SubmitResult {
     id: string;
+    /**
+     * The server-issued short handle, already grouped (`7K4M-2QXB`) — Increment J2e.
+     *
+     * The confirmation screen prints THIS rather than a code derived on the device, because a derived one is
+     * stored nowhere and so is unfindable by the tenant the respondent would quote it to.
+     */
+    reference: string;
     status: string;
     created: boolean;
 }

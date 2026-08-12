@@ -15,7 +15,6 @@ import { onScopeDispose, ref, type Ref } from 'vue';
 import type { MeridianDb, OutboxRow } from '../lib/db';
 import { counts, discardRow, listConflicts, listSubmissions, pruneSynced, retryAll, retryRow } from '../lib/outbox';
 import { replayOne, replayOutbox, type ReplayHooks } from '../lib/replay';
-import { deriveReference } from '../lib/reference-number';
 
 /** Background Sync's `SyncManager` is not in the standard TS lib typings. */
 type SyncCapableRegistration = ServiceWorkerRegistration & {
@@ -115,13 +114,18 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
             setSyncing(next);
             lastAnnouncement.value = 'Sending 1 response';
         },
-        onRowSettled(uuid, outcome) {
+        onRowSettled(uuid, outcome, reference) {
             const next = new Set(syncingUuids.value);
             next.delete(uuid);
             setSyncing(next);
 
             if (outcome === 'synced') {
-                lastAnnouncement.value = `Response sent — reference ${deriveReference(uuid)}`;
+                // Increment J2e — the SERVER's handle, handed in by the replay rather than derived from the
+                // client uuid. The derived code was stored nowhere, so a screen reader was announcing a
+                // number the tenant could not look up. Null only on the pre-J2e path, where saying less is
+                // better than saying something unfindable.
+                lastAnnouncement.value =
+                    reference == null ? 'Response sent' : `Response sent — reference ${reference}`;
             } else if (outcome === 'needsAttention') {
                 lastAnnouncement.value = 'A response couldn’t be sent and needs your attention';
             }

@@ -18,9 +18,12 @@ import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { MdsBadge, MdsCard, statusVariant } from '@meridian/design-system';
 import { relativeTime } from '@/components/notifications/relative-time';
-import type { FormRow } from '@/types/forms';
+import { formIdentityVar, type FormRow } from '@/types/forms';
 
 const props = defineProps<{ row: FormRow }>();
+
+/** Spelled out rather than interpolated — see `FORM_IDENTITY_VARS` for why the token guard needs that. */
+const identityVar = computed(() => formIdentityVar(props.row.identity));
 
 /**
  * Up to two initials from the title. Decorative — the glyph is `aria-hidden` and the full title sits
@@ -116,7 +119,7 @@ function untilLabel(iso: string): string {
 </script>
 
 <template>
-    <MdsCard class="form-card" :style="{ '--form-card-identity': `var(--mds-form-identity-${row.identity})` }">
+    <MdsCard class="form-card" :style="{ '--form-card-identity': identityVar }">
         <template #header>
             <div class="form-card__head">
                 <!-- Decorative twice over: `aria-hidden` because the title follows immediately, and the

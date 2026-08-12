@@ -69,6 +69,14 @@ const forms = [
     },
 ];
 
+// Spelled out in full, not assembled: `token-references.test.ts` extracts `var(--mds-…)` names with a
+// regex that stops at a `$`, so an interpolated reference reads as the undefined `--mds-form-identity-`.
+// This story lives inside the package the guard scans, so it has to obey it too.
+const IDENTITY_VARS = [
+    'var(--mds-form-identity-1)', 'var(--mds-form-identity-2)', 'var(--mds-form-identity-3)',
+    'var(--mds-form-identity-4)', 'var(--mds-form-identity-5)', 'var(--mds-form-identity-6)',
+];
+
 const viewOptions = [
     { value: 'grid', label: 'Cards', icon: 'layout' as const },
     { value: 'table', label: 'Table', icon: 'list' as const },
@@ -83,7 +91,7 @@ const facets = [
 
 const render = () => ({
     components: { Badge, Button, Card, IconButton, SegmentedControl },
-    setup: () => ({ forms, viewOptions, facets, statusVariant }),
+    setup: () => ({ forms, viewOptions, facets, statusVariant, IDENTITY_VARS }),
     template: `
         <main style="max-width:1200px;margin:0 auto;padding:var(--mds-space-8)">
             <header style="display:flex;align-items:center;justify-content:space-between;
@@ -128,7 +136,7 @@ const render = () => ({
                        gap:var(--mds-space-4);margin:0;padding:0;list-style:none">
                 <li v-for="form in forms" :key="form.id" style="display:flex">
                     <Card :style="{
-                        '--form-card-identity': 'var(--mds-form-identity-' + form.identity + ')',
+                        '--form-card-identity': IDENTITY_VARS[form.identity - 1],
                         position: 'relative', overflow: 'hidden', display: 'flex',
                         flexDirection: 'column', width: '100%', height: '100%',
                         containerType: 'inline-size',

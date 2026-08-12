@@ -1580,3 +1580,42 @@ Merged as PR #133 (`7d56cd8`), 6/6 with real steps: Pest 3551/0 across 15,132 as
 up from 207, which is exactly the eleven stories the increment adds. The axe job mattered more than
 usual here: it is the merge-blocking contrast gate, it cannot be run on this host, and a re-skin is
 precisely the kind of change it exists to catch.
+
+## 2026-08-12 — Alignment session: a held row is out of scope, not pending (no code)
+
+No code, no increment. A second agent held the working tree for JR2 throughout, so this session made
+**zero edits to the tree** and landed its one change through a detached worktree — see the mechanic
+recorded in Rule 5.
+
+**What prompted it.** A routine status report was asked for, then a percentage breakdown, then a
+per-phase breakdown. All three led with what the user is holding: Phase 3 was reported as "~86%, and it
+cannot be finished without you," which is true, useless, and buries the two rows (H16b/H16c) that
+**can** be finished. The user's correction: *"i told you that we will skip all tasks that needs my
+interaction… as long as the task doesnt require the tasks that i told you to put on hold."*
+
+**The diagnosis is that Rule 5 was only half-applied.** Since 2026-08-06 held rows had not been *built* —
+that half was working. They were still being **reported**: as "blocked on you", as denominators in every
+percentage, and as the reason a phase looked open. That hands the user back a decision they already made,
+every session. Rule 5 now closes it: a held row is **out of scope, not pending** — never reported,
+counted, scheduled or asked about — with the held list stated as closed (OCR chain · all
+uploading/import · payments · Track B · GDPR/legal/pricing).
+
+**A second decision of record came out of it.** Asked whether Phase 4 should begin if Phase 3 runs out of
+non-held work and no signal has arrived: *"it should be."* So a held row never stalls the queue and never
+keeps a phase open. Recorded with the caveat that **Phase 4 is not wholly buildable either** — payments
+was cut *into* it and is held, and GDPR tooling splits from the GDPR/legal call — so entry is on
+SSO/SAML, dedicated-DB tenancy, data residency and CRDT sync. Also recorded: this changes no queue
+order, because JR3–JR5, J3, J4, J5 and the final integration PR are all non-held work still ahead of
+Phase 4.
+
+**Two process findings, both from being corrected mid-session.** An `AskUserQuestion` asking which of two
+buildable lanes to take was rejected — with a second agent running, the answer is to take the lane with
+no file overlap and proceed, and asking is itself the defect. And a tracker edit was rejected because
+both sessions share **one checkout**: a write lands on whatever branch the other agent has checked out,
+and switching branches yanks the tree from under them. The worktree recipe is now in Rule 5 so the next
+session does not rediscover it.
+
+**One claim corrected in-session:** "the other agent cannot see my memory" was wrong — `MEMORY.md` is
+keyed to the project directory, so any session in this repo loads the same index. The argument for
+putting the rule in the tracker is therefore durability, git-visibility and reviewability, not
+cross-agent visibility.

@@ -197,7 +197,7 @@ Renamed from the previous draft's "Slate" — same structural role (canvas, surf
 
 | Token | Light hex | Dark hex | Typical use |
 |---|---|---|---|
-| `--mds-neutral-0` | `#FFFFFF` | `#0D1322` | Canvas / surface base |
+| `--mds-neutral-0` | `#FFFFFF` | `#060911` | Canvas / surface base — in dark this is the INPUT fill, so it must sit below the canvas |
 | `--mds-neutral-50` | `#F5F7FC` (Paper) | `#0F131C` | App-shell canvas background — **an engine ground** |
 | `--mds-neutral-100` | `#EEF3FE` (Paper Sunken) | `#1A2130` | Card/table hover background, disabled fill; **the dark surface, an engine ground** |
 | `--mds-neutral-200` | `#E3E8F3` (Rule Soft) | `#2C374C` | Subtle dividers, chart gridlines |

@@ -2,7 +2,7 @@
  * Theme + personalization layer (docs/ux/design-system-reference.md §2.1, §2.2, §2.9).
  *
  * Dark mode is an AUTHENTIC second state of the same instrument — pale linework on a deep
- * drafting-blue ground — not an algorithmic inversion. It is delivered by flipping the neutral
+ * cool-ink ground (drafting-blue until JR1) — not an algorithmic inversion. It is delivered by flipping the neutral
  * *primitive* custom properties to their dark-column hexes (§2.2 Paper/Ink table); the semantic
  * aliases, emitted as `var(--mds-neutral-*)` (outputReferences), follow automatically. A handful
  * of semantic aliases that use a *different* step (or a fixed value) in dark are re-pointed below.
@@ -44,7 +44,7 @@
 :root[data-theme-mode='dark'] {
     /* Neutral ramp → deep cool-ink ground (low steps dark, high steps pale). JR1 re-anchored this
        from the drafting-blue column to the Vivid family; the STRUCTURE is unchanged. */
-    --mds-neutral-0: #0d1322;
+    --mds-neutral-0: #060911;
     --mds-neutral-50: #0f131c;
     --mds-neutral-100: #1a2130;
     --mds-neutral-200: #2c374c;
@@ -91,7 +91,7 @@
     --mds-color-overlay-scrim: rgba(8, 13, 20, 0.6);
 
     /* Status badges (§3.8): the color primitives don't flip in dark, so re-point each status to a
-       deep tint + pale text (pale-on-dark), keeping ≥4.5:1 within the badge on the drafting ground. */
+       deep tint + pale text (pale-on-dark), keeping ≥4.5:1 within the badge on the dark ground. */
     --mds-color-status-success-bg: var(--mds-success-800);
     --mds-color-status-success-fg: var(--mds-success-200);
     --mds-color-status-warning-bg: var(--mds-warning-800);
@@ -115,7 +115,7 @@
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme-mode='light']):not([data-theme-mode='dark']) {
-        --mds-neutral-0: #0d1322;
+        --mds-neutral-0: #060911;
         --mds-neutral-50: #0f131c;
         --mds-neutral-100: #1a2130;
         --mds-neutral-200: #2c374c;

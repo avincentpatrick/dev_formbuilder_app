@@ -445,8 +445,12 @@ rewriting its answers are different powers.
 4. Submit a guest response (§4). **Expect:** a delivery appears in the log with its status code and timing.
 5. Redeliver a past delivery. **Expect:** a new attempt is recorded.
 6. **Rotate the signing secret.** **Expect:** the new secret is shown once and never again.
-7. `/integrations` · owner. **Expect:** a provider catalogue. Slack is connectable; Google Sheets and Airtable
-   are backend-only for now (see §18).
+7. `/integrations` · owner. **Expect:** a provider catalogue with THREE cards — Slack, Google Sheets and
+   Airtable — each with its own rule editor. A card whose credentials this deployment does not hold shows a
+   disabled Connect button and says so, which is the expected state until the operator adds them (see
+   `.env.example`). Connecting needs a real account at the provider; the rule editors differ on purpose:
+   Slack picks a channel, Google Sheets creates a spreadsheet for you, and Airtable lists the bases your
+   connected account can see and asks you to pick a table in one — it never alters your base structure.
 8. `/domains` · owner. **Expect:** the custom-domain surface. Claim a domain. **Expect:** a DNS TXT record to
    add and a **Verify** button. Verification will not succeed unless you actually control the domain — that is
    correct. **Do not expect to activate one**: activation is an operator command run after a certificate is
@@ -678,7 +682,6 @@ expected and is not a defect.
 | **OCR upload, linelist/batch (Feature #2)** | Not built, same blocker. |
 | **Payments and self-serve billing** | Cut to Phase 4 by decision. Plans are assigned by the super-admin console instead. |
 | **Real-time notification push** | The bell polls on an interval rather than pushing over a socket. Deliberate; the socket layer is deployment-track work. |
-| **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |
 | **Searching answer text** | **Not built, deliberately** — not deferred. Search matches a submission's reviewer *remarks*, its *return reason*, its short reference (J2e — a real stored handle, not a slice of its id), its full id, and its form's title, but never what respondents typed. Answers are the one place PII is guaranteed to live, and there is no erasure path yet (`pii_erased_at` has no writer), so a second searchable copy of that data would be the store that survives a deletion request. |

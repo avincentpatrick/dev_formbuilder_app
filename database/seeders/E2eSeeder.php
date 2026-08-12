@@ -836,7 +836,44 @@ class E2eSeeder extends Seeder
             'attempt_count' => 1,
             'response_status_code' => null,
             'response_time_ms' => 210,
-            'response_body_excerpt' => '[column_drift] The spreadsheet’s columns changed: added “Reviewer”; moved “colour”. Open the rule to re-map them.',
+            // ⚠️ THE WORDING IS `MappingDrift::summary()`'s, NOT AN APPROXIMATION OF IT. This line used to
+            // read "The spreadsheet's columns changed…", which the engine has never produced — and it carried
+            // the `[column_drift]` prefix the ADAPTERS did not add until H16c, so the e2e was certifying a
+            // reason card that could not render in production. A seeded string that only resembles the real
+            // one is a test asserting its own fixture.
+            'response_body_excerpt' => '[column_drift] The columns changed: added “reviewer”; moved “colour”.',
+        ]);
+
+        // ── Airtable (H16c) ─────────────────────────────────────────────────────────────────────────────
+        // A third provider card and a third destination shape on the same page, so the responsive/axe sweep
+        // sees a rules table carrying all three at once. Deliberately NOT given a drifted twin: the reason
+        // card it would render is byte-identical to the Sheets one above, and a second scan of the same
+        // markup buys nothing — the H16b note on `responsive-axe.spec.ts` makes that argument already.
+        $airtable = Connection::factory()->airtable()->create([
+            'external_account_label' => 'Airtable',
+            'connected_by' => $owner->id,
+        ]);
+
+        ConnectionSubscription::factory()->forConnection($airtable)->create([
+            'name' => 'Submissions → Applicant tracker',
+            'event_types' => ['submission.created'],
+            'config' => [
+                // The base id, the table id, and the table name as a caption — the id is the identity, so a
+                // rename in Airtable cannot break this rule.
+                'spreadsheet_id' => 'appE2E00000000001',
+                'spreadsheet_title' => 'Applicant tracker',
+                'sheet_id' => 'tblE2E00000000001',
+                'sheet_name' => 'Applicants',
+                'mapping' => [
+                    'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+                    'columns' => [
+                        ['header' => 'full name', 'field_key' => 'full_name'],
+                        ['header' => 'colour', 'field_key' => 'colour'],
+                        ['header' => 'submission id', 'field_key' => '__submission_id'],
+                    ],
+                ],
+            ],
+            'created_by' => $owner->id,
         ]);
 
         // A spread across the shared ledger so the rule detail's log + every delivery badge render. The

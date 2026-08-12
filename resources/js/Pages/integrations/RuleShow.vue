@@ -151,8 +151,13 @@ function formatDate(iso: string | null): string {
                         <dd>{{ connection?.external_account_label ?? 'Removed' }}</dd>
                     </div>
                     <div class="detail__meta-row">
-                        <dt>Channel</dt>
-                        <dd class="detail__mono">{{ channelLabel }}</dd>
+                        <!-- "Destination", not "Channel" (H16c). This row read `Channel` and rendered
+                             `channelLabel`, so EVERY tabular rule showed an em dash under a heading naming a
+                             concept its provider does not have — a Sheets defect H16b shipped and Airtable
+                             would have doubled. `destination_label` is server-resolved for all three
+                             providers; the channel pair stays the fallback for a rule stored before it. -->
+                        <dt>Destination</dt>
+                        <dd class="detail__mono">{{ rule.destination_label ?? channelLabel }}</dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Events</dt>
@@ -217,9 +222,12 @@ function formatDate(iso: string | null): string {
                 <span>{{ rule.paused_reason }}</span>
             </p>
             <div v-if="rule.spreadsheet_id && can.update" class="detail__reason-actions">
-                <!-- Opening the edit modal RE-INSPECTS the sheet, so the tenant sees its CURRENT headings
-                     rather than the ones stored when the rule was written — which, on a drifted rule, is
-                     precisely the difference they need to see. -->
+                <!-- `spreadsheet_id` is the tabular destination's document id for BOTH providers — a Google
+                     spreadsheet id or an Airtable base id — so this condition needed no widening; only the
+                     button's copy did. -->
+                <!-- Opening the edit modal RE-INSPECTS the destination, so the tenant sees its CURRENT
+                     headings rather than the ones stored when the rule was written — which, on a drifted
+                     rule, is precisely the difference they need to see. -->
                 <MdsButton variant="secondary" icon-left="edit" @click="editOpen = true">
                     Review columns
                 </MdsButton>
@@ -232,7 +240,7 @@ function formatDate(iso: string | null): string {
                     target="_blank"
                     rel="noopener noreferrer"
                 >
-                    Open the spreadsheet
+                    Open in {{ connection?.provider_label ?? 'the provider' }}
                 </MdsButton>
             </div>
         </MdsCard>
@@ -277,6 +285,7 @@ function formatDate(iso: string | null): string {
             v-model:open="editOpen"
             :connection-id="rule.connection_id"
             :provider="connection?.provider ?? null"
+            :destination-kind="connection?.destination_kind ?? null"
             :forms="forms"
             :event-types="eventTypes"
             :rule="rule"

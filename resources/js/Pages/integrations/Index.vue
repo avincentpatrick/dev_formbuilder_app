@@ -29,7 +29,13 @@ import {
 import PageHeader from '@/components/shell/PageHeader.vue';
 import RuleFormModal from '@/components/integrations/RuleFormModal.vue';
 import { channelDisplay } from '@/components/integrations/channel-options';
-import type { ConnectionWithRules, Option, ProviderCard, RuleRow } from '@/components/integrations/types';
+import type {
+    ConnectionWithRules,
+    DestinationKind,
+    Option,
+    ProviderCard,
+    RuleRow,
+} from '@/components/integrations/types';
 
 type Quota = { used: number; limit: number | null };
 
@@ -56,6 +62,7 @@ const columns: DataTableColumn[] = [
 const createOpen = ref(false);
 const createConnectionId = ref<string | null>(null);
 const createProvider = ref<string | null>(null);
+const createDestinationKind = ref<DestinationKind | null>(null);
 const disconnectTarget = ref<ConnectionWithRules | null>(null);
 
 const hasConnections = computed(() => props.connections.length > 0);
@@ -73,7 +80,11 @@ function addRule(connectionId: string): void {
     createConnectionId.value = connectionId;
     // The modal renders a whole different destination editor per provider (H16b), so it needs the key, not
     // just the id. Resolved here rather than fetched: the page already carries every connection.
-    createProvider.value = props.connections.find((c) => c.id === connectionId)?.provider ?? null;
+    const connection = props.connections.find((c) => c.id === connectionId);
+    createProvider.value = connection?.provider ?? null;
+    // H16c — the KIND decides which behaviours the modal enables; the provider only decides which of the two
+    // tabular editors it mounts. Both come from the connection the page already carries.
+    createDestinationKind.value = connection?.destination_kind ?? null;
     createOpen.value = true;
 }
 
@@ -277,6 +288,7 @@ function providerNotice(providerKey: string): string | null {
             v-model:open="createOpen"
             :connection-id="createConnectionId"
             :provider="createProvider"
+            :destination-kind="createDestinationKind"
             :forms="forms"
             :event-types="eventTypes"
             :rule="null"

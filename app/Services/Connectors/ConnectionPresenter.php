@@ -258,6 +258,17 @@ final class ConnectionPresenter
                 'update' => $user->can('update', $connection),
                 'delete' => $user->can('delete', $connection),
             ],
+            // ── H16c: THE SHAPE OF THIS GRANT'S DESTINATION, RESOLVED HERE RATHER THAN RE-DERIVED CLIENT-SIDE.
+            // `RuleFormModal` gated three behaviours on `props.provider === 'google_sheets'` — the ONLY
+            // provider literal in the whole front end — which would have given an Airtable grant Slack's
+            // channel picker, Slack's event list and Slack's `config` shape. Every other provider fact on this
+            // surface is already server-resolved (`destination_label`, `providerDescription()`), for the reason
+            // this file's own docblocks give: resolving a provider is the server's job.
+            //
+            // ONE key, not a capability bag. A first draft also shipped `enumerable`, `creatable` and the two
+            // nouns; nothing on the client read them, and an unread prop is the `--block`-with-no-consumer
+            // smell this repo has been bitten by before. They arrive when something needs them.
+            'destination_kind' => $connection->provider->isTabular() ? 'tabular' : 'channel',
         ];
     }
 

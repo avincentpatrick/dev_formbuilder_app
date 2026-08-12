@@ -68,6 +68,9 @@ it('projects a connection and its rules with a fixed key set and no credentials'
         'id', 'provider', 'provider_label', 'external_account_id', 'external_account_label', 'scopes',
         'status', 'disconnected', 'token_expires_at', 'last_refreshed_at', 'last_error', 'last_error_at',
         'connected_by_name', 'created_at', 'can', 'rules',
+        // H16c. `channel` or `tabular` — what the rule editor's behaviour keys on, so the client no longer
+        // carries a provider literal to decide it.
+        'destination_kind',
     ])
         ->and($row['provider_label'])->toBe('Slack')
         ->and($row['connected_by_name'])->toBe($this->admin->name)

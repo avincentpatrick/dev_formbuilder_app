@@ -661,6 +661,18 @@ Route::middleware([
     // on a web route redirects rather than returning JSON.
     Route::get('/integrations/connections/{connection}/channels', [ConnectionController::class, 'channels'])
         ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.channels');
+    // H16b — the tabular-destination sidecars, the Sheets counterpart to the channel picker above. The read
+    // is `can:view` like `channels`; the CREATE is `can:update,connection` because it writes a document into
+    // the tenant's Drive using their grant, which is not something a reader may do with it.
+    //
+    // ⚠️ The create is a POST behind a fetch, which the comment above says this surface does not do. The
+    // reason that rule exists — a domain exception on a web route becomes a 302 a fetch client follows into
+    // HTML — cannot arise here, because SheetDestinationDirectory never throws and always answers 200 with a
+    // nullable `error`. See ConnectionController::createSheet() for why an Inertia visit is wrong instead.
+    Route::get('/integrations/connections/{connection}/sheets', [ConnectionController::class, 'inspectSheet'])
+        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.sheets.inspect');
+    Route::post('/integrations/connections/{connection}/sheets', [ConnectionController::class, 'createSheet'])
+        ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.connections.sheets.store');
     Route::delete('/integrations/connections/{connection}', [ConnectionController::class, 'destroy'])
         ->middleware(['can:delete,connection', 'feature:native_connectors'])->name('integrations.connections.destroy');
 

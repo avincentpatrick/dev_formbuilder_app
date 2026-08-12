@@ -70,11 +70,16 @@ final class ConnectionPresenter
         // `ruleRow()` for why this is server-resolved rather than inferred from `form_title` on the client.
         $formUrls = FormHubLink::pathsFor($user, $rules->pluck('form_id')->filter()->values()->all());
 
+        // ONE grouped query for the whole page, never one per row. `ruleRow()` is called N times and a
+        // per-row lookup would make a page that issues a handful of queries today issue N more — the same 3N
+        // trap the JR3 review caught on the forms list.
+        $pausedReasons = $this->pausedReasons($rules);
+
         return [
             'providers' => $this->providerCatalog($connections),
             'connections' => $connections->map(fn (Connection $c): array => [
                 ...$this->connectionRow($c, $user),
-                'rules' => $c->subscriptions->map(fn (ConnectionSubscription $s): array => $this->ruleRow($s, $formUrls))->all(),
+                'rules' => $c->subscriptions->map(fn (ConnectionSubscription $s): array => $this->ruleRow($s, $formUrls, $pausedReasons, $c->provider))->all(),
             ])->all(),
             'summary' => [
                 'rules' => [
@@ -120,7 +125,9 @@ final class ConnectionPresenter
 
         return [
             'connection' => $connection instanceof Connection ? $this->connectionRow($connection, $user) : null,
-            'rule' => $this->ruleDetail($rule, $user),
+            // The provider comes from the withTrashed() lookup above, so a rule whose grant was disconnected
+            // still renders its destination rather than losing it exactly when the tenant went looking.
+            'rule' => $this->ruleDetail($rule, $user, $connection instanceof Connection ? $connection->provider : null),
             'deliveries' => [
                 'data' => $items->map(fn (WebhookDelivery $d): array => $this->deliveryRow($d))->all(),
                 'meta' => [
@@ -224,9 +231,11 @@ final class ConnectionPresenter
      * than shipped whole, so a later key in that blob cannot leak to the client by default.
      *
      * @param  array<string, string>  $formUrls  id => hub path, for the ids this reader may open
+     * @param  array<string, string>  $pausedReasons  rule id => the reason its last delivery was blocked
+     * @param  ?ConnectorProviderKey  $provider  the owning grant's provider, passed in — see destinationLabel()
      * @return array<string, mixed>
      */
-    private function ruleRow(ConnectionSubscription $rule, array $formUrls = []): array
+    private function ruleRow(ConnectionSubscription $rule, array $formUrls = [], array $pausedReasons = [], ?ConnectorProviderKey $provider = null): array
     {
         $config = $rule->config;
 
@@ -243,7 +252,24 @@ final class ConnectionPresenter
             'form_url' => $rule->form_id === null ? null : ($formUrls[$rule->form_id] ?? null),
             'channel_id' => is_string($config['channel_id'] ?? null) ? $config['channel_id'] : null,
             'channel_name' => is_string($config['channel_name'] ?? null) ? $config['channel_name'] : null,
+            // ── H16b: the tabular destination, projected key by key like the Slack pair above ─────────────
+            // Same rule, same reason: `config` is never shipped whole, so a key added to that blob later
+            // cannot reach the client by default.
+            'spreadsheet_id' => is_string($config['spreadsheet_id'] ?? null) ? $config['spreadsheet_id'] : null,
+            'sheet_name' => is_string($config['sheet_name'] ?? null) ? $config['sheet_name'] : null,
+            // Composed here rather than in the client. The id is opaque and the canonical URL form is a
+            // deployment fact, not a rendering choice — the same argument `form_url` above records.
+            'spreadsheet_url' => $this->spreadsheetUrl($config),
+            'mapping' => $this->mappingProjection($config),
+            // ONE string the row can render whatever the provider is, so the destination column does not need
+            // a `provider === 'x'` branch per cell. `ConnectionPresenter` already learned this lesson from
+            // `providerDescription()`'s default-less match: the place to resolve a provider is the server.
+            'destination_label' => $this->destinationLabel($rule, $provider),
             'status' => $rule->status->value,
+            // Why a paused rule is paused. Without it the UI can only say "Paused", which for the two causes
+            // that actually occur — a drifted header row, and a destination we can no longer reach — is the
+            // whole of the information the tenant needs and none of what they get.
+            'paused_reason' => $pausedReasons[(string) $rule->getKey()] ?? null,
             'consecutive_failure_count' => $rule->consecutive_failure_count,
             'last_success_at' => $this->iso($rule->last_success_at),
             'last_failure_at' => $this->iso($rule->last_failure_at),
@@ -254,12 +280,157 @@ final class ConnectionPresenter
     /**
      * @return array<string, mixed>
      */
-    private function ruleDetail(ConnectionSubscription $rule, User $user): array
+    private function ruleDetail(ConnectionSubscription $rule, User $user, ?ConnectorProviderKey $provider): array
     {
         return [
-            ...$this->ruleRow($rule, FormHubLink::pathsFor($user, array_filter([$rule->form_id]))),
+            ...$this->ruleRow(
+                $rule,
+                FormHubLink::pathsFor($user, array_filter([$rule->form_id])),
+                $this->pausedReasons(collect([$rule])),
+                $provider,
+            ),
             'updated_at' => $this->iso($rule->updated_at),
         ];
+    }
+
+    /**
+     * Rule id => why its most recent blocked delivery was blocked, for the rules given.
+     *
+     * ── ONE QUERY FOR THE WHOLE PAGE ───────────────────────────────────────────────────────────────────────
+     * `DISTINCT ON` is Postgres's answer to "latest row per group" and this schema is Postgres-only by
+     * decision (ADR-0001), so there is no portability cost to pay. The alternative shapes were both worse: a
+     * lookup inside `ruleRow()` is N queries on a page that renders every rule of every connection, and a
+     * window-function subquery buys nothing here because only one column is wanted.
+     *
+     * ⚠️ READS THE LEDGER RATHER THAN A NEW COLUMN, DELIBERATELY. The obvious alternative is
+     * `connection_subscriptions.paused_reason`, written by `finishBlocked()`. It was rejected because it
+     * duplicates state that already exists and can therefore disagree with it: the delivery row is what the
+     * detail page's log renders, and a second copy would need clearing on resume, on re-map, on manual pause,
+     * and on every future path that changes status — four chances to leave a stale sentence under a healthy
+     * rule.
+     *
+     * The scan is bounded by the ledger's own retention and keyed by `connection_subscription_id`, which is
+     * indexed as the ledger's owner column.
+     *
+     * @param  Collection<int, ConnectionSubscription>  $rules
+     * @return array<string, string>
+     */
+    private function pausedReasons(Collection $rules): array
+    {
+        $ids = $rules
+            ->filter(fn (ConnectionSubscription $r): bool => $r->status !== ConnectorSubscriptionStatus::Active)
+            ->map(fn (ConnectionSubscription $r): string => (string) $r->getKey())
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return WebhookDelivery::query()
+            ->select(['connection_subscription_id', 'response_body_excerpt'])
+            ->whereIn('connection_subscription_id', $ids)
+            ->whereNotNull('response_body_excerpt')
+            // Only a `blocked` outcome carries an explanation a human can act on. An ordinary transport
+            // failure's excerpt is the provider's own response body, which is exactly the unreviewed
+            // third-party text `ConnectorChannelDirectory::message()` refuses to put on a page.
+            ->where('response_body_excerpt', 'like', '[%]%')
+            ->orderBy('connection_subscription_id')
+            ->orderByDesc('created_at')
+            ->distinct('connection_subscription_id')
+            ->get()
+            ->mapWithKeys(fn (WebhookDelivery $d): array => [
+                (string) $d->connection_subscription_id => (string) $d->response_body_excerpt,
+            ])
+            ->all();
+    }
+
+    /**
+     * The tenant-facing name of wherever this rule delivers, provider-agnostic.
+     *
+     * Null rather than a placeholder when a rule has no destination configured: `MdsDataTable`'s cell renders
+     * an em dash for an absent value, and inventing "Not set" here would put a second vocabulary for the same
+     * state beside the one the design system already has.
+     */
+    private function destinationLabel(ConnectionSubscription $rule, ?ConnectorProviderKey $provider): ?string
+    {
+        $config = $rule->config;
+
+        // ⚠️ THE PROVIDER IS PASSED IN, NEVER READ AS `$rule->grant?->provider`. Both callers already hold the
+        // Connection — `index()` is inside its own map over it, `ruleShow()` resolved it withTrashed() at the
+        // top — and the relation is NOT eager-loaded on the index query, so touching it here would lazy-load
+        // one parent per rule: N queries added to the page this presenter's grouped `pausedReasons()` exists
+        // to keep at one. It would also resolve to null on this page's most interesting case, because the
+        // SoftDeletes global scope hides a disconnected grant.
+        if ($provider?->isTabular() === true) {
+            $title = is_string($config['spreadsheet_title'] ?? null) ? $config['spreadsheet_title'] : null;
+            $sheet = is_string($config['sheet_name'] ?? null) && $config['sheet_name'] !== '' ? $config['sheet_name'] : null;
+
+            // The title is stored at authoring time as a convenience label, so a renamed spreadsheet shows a
+            // stale name rather than costing a Google round trip on every page render. The id is the identity;
+            // this is only ever the caption.
+            $name = $title ?? (is_string($config['spreadsheet_id'] ?? null) && $config['spreadsheet_id'] !== '' ? 'Spreadsheet' : null);
+
+            if ($name === null) {
+                return null;
+            }
+
+            return $sheet === null ? $name : $name.' · '.$sheet;
+        }
+
+        $channelName = is_string($config['channel_name'] ?? null) && $config['channel_name'] !== '' ? $config['channel_name'] : null;
+        $channelId = is_string($config['channel_id'] ?? null) && $config['channel_id'] !== '' ? $config['channel_id'] : null;
+
+        return $channelName !== null ? '#'.$channelName : $channelId;
+    }
+
+    /**
+     * The stored mapping, shaped for the editor.
+     *
+     * Returned as-stored rather than re-derived: the fingerprint is what {@see MappingDriftDetector} compares
+     * against, so anything that reshapes it here would make the client's idea of the mapping and the
+     * delivery path's idea of it two different things.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{fingerprint: string, columns: list<array{header: string, field_key: ?string}>}|null
+     */
+    private function mappingProjection(array $config): ?array
+    {
+        $mapping = $config['mapping'] ?? null;
+
+        if (! is_array($mapping) || ! is_array($mapping['columns'] ?? null)) {
+            return null;
+        }
+
+        $columns = [];
+
+        foreach ($mapping['columns'] as $column) {
+            if (! is_array($column)) {
+                continue;
+            }
+
+            $columns[] = [
+                'header' => is_scalar($column['header'] ?? null) ? (string) $column['header'] : '',
+                'field_key' => is_string($column['field_key'] ?? null) && $column['field_key'] !== '' ? $column['field_key'] : null,
+            ];
+        }
+
+        return [
+            'fingerprint' => is_string($mapping['fingerprint'] ?? null) ? $mapping['fingerprint'] : '',
+            'columns' => $columns,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function spreadsheetUrl(array $config): ?string
+    {
+        $id = $config['spreadsheet_id'] ?? null;
+
+        return is_string($id) && $id !== ''
+            ? 'https://docs.google.com/spreadsheets/d/'.rawurlencode($id).'/edit'
+            : null;
     }
 
     /**

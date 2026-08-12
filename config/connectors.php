@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Support\Connectors\Providers\GoogleSheetsConnector;
+use App\Support\Connectors\Providers\GoogleSheetsDirectory;
 use App\Support\Connectors\Providers\SlackChannelLister;
 use App\Support\Connectors\Providers\SlackConnector;
 
@@ -79,10 +80,42 @@ return [
         */
         'google_sheets' => [
             'adapter' => GoogleSheetsConnector::class,
+
+            /*
+            | H16b — the answer to the `channel_lister` paragraph above. There is still no lister, because
+            | `drive.file` still cannot enumerate; what changed is that "created by us" stopped being a
+            | sentence in a comment and became a capability. `spreadsheets.create` IS permitted under
+            | `drive.file` — the scope covers "specific Drive files you use with this app", and a file this
+            | app created is one of them permanently — so the rule editor makes the spreadsheet, writes its
+            | header row, and the destination is reachable BY CONSTRUCTION rather than by hoping the tenant
+            | pastes an id we happen to already hold a per-file grant on.
+            */
+            'tabular_directory' => GoogleSheetsDirectory::class,
+
             'client_id' => env('GOOGLE_CONNECTOR_CLIENT_ID'),
             'client_secret' => env('GOOGLE_CONNECTOR_CLIENT_SECRET'),
             'scopes' => ['https://www.googleapis.com/auth/drive.file'],
             'auth_params' => ['access_type' => 'offline', 'prompt' => 'consent'],
+
+            /*
+            | ⚠️ THE OAUTH APP'S PUBLISHING STATUS, AND IT IS A UI FACT BEFORE IT IS A CONFIG ONE.
+            |
+            | While the Google Cloud project is in `testing`, Google expires every refresh token it issues
+            | after SEVEN DAYS. `access_type=offline` does not prevent that and neither does the hourly
+            | `RefreshConnectorTokensJob`: a token Google has already expired cannot be refreshed, so a
+            | Sheets connection dies weekly until the app is published. Left unexplained, the tenant sees
+            | `statusVariant('refresh_failed')`'s bare "Reconnect needed" every week and reasonably concludes
+            | our token handling is broken.
+            |
+            | It lives here rather than hard-coded in a template because publishing changes exactly one
+            | thing: this value. The notice disappears by flipping an env var, with no code edit and nothing
+            | left behind to go stale. Publishing should itself be uneventful — `drive.file` is Google's
+            | Non-sensitive tier and needs no verification review, which is precisely why H16a chose it over
+            | `spreadsheets`.
+            |
+            | Anything other than `testing` means published; the UI branches on the one value it can act on.
+            */
+            'publishing_status' => env('GOOGLE_CONNECTOR_PUBLISHING_STATUS', 'testing'),
         ],
     ],
 

@@ -104,6 +104,19 @@ function condemnEverything(): void
 
 it('renders, stores and emails a download link', function (): void {
     Notification::fake();
+
+    // ⚠️ THE ASSERTION BELOW NAMES A HOST AND A PORT, SO IT MUST NAME THE app.url THEY COME FROM (H16b).
+    // It read the AMBIENT value until now and passed by coincidence: `.env` says localhost:8080 on a
+    // developer's machine, and CI does `cp .env.example .env`, which says the same. Pinning APP_URL in
+    // phpunit.xml — so the suite stops contradicting its own CENTRAL_DOMAIN — moved the composed host to
+    // alpha.meridian.test and reddened exactly this one case out of the whole suite.
+    //
+    // Set explicitly rather than restated, for two reasons. The two cases below already do it this way,
+    // so this one was the odd one out. And localhost:8080 is the PORT-CARRYING shape: `TenantUrl` prefixing
+    // a subdomain label onto an origin that has a port is the composition worth pinning here, and a
+    // portless meridian.test would quietly stop exercising it.
+    config(['app.url' => 'http://localhost:8080']);
+
     $form = pdfJobForm($this->tenant, $this->owner);
     $submission = seedInboxSubmission($form, $this->owner, SubmissionStatus::Submitted, ['applicant' => 'Ana', 'notes' => 'hello']);
 

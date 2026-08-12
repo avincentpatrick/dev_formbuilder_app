@@ -67,7 +67,7 @@ Design/Frontend Engineering jointly owns this document and the component library
 
 Tokens are authored in a **two-layer architecture**, generated from a single source-of-truth (a token definition tool such as Style Dictionary — flagged below as a judgment call) into both CSS custom properties (consumed directly by Vue SFCs in either frontend, framework-agnostic) and a generated TypeScript `tokens.ts` module (for cases needing token values in script, e.g., chart color scales — see the note below, which corrects what "values" means here — or canvas-based signature capture rendering):
 
-1. **Primitive tokens** — the raw scale, e.g. `--mds-primary-600: #1C4B72`. Primitives never change meaning; they are simply "the color/space/size at this step of this scale." Components and pages **never** reference primitives directly.
+1. **Primitive tokens** — the raw scale, e.g. `--mds-primary-600: #0E6FE8`. Primitives never change meaning; they are simply "the color/space/size at this step of this scale." Components and pages **never** reference primitives directly.
 2. **Semantic tokens** — purpose-named aliases that map onto primitives, e.g. `--mds-color-action-primary-bg: var(--mds-primary-600)`, `--mds-color-text-body: var(--mds-neutral-800)`. Components and pages reference **only** semantic tokens.
 
 This indirection is also why dark mode ships **from day one**, not as a deferred phase: because every component consumes semantic tokens rather than primitives, a full dark theme is just a second re-pointing of the semantic layer onto different primitive steps (e.g., `--mds-color-bg-canvas` maps to `--mds-neutral-50` in light mode, `--mds-neutral-900` in dark mode) with **zero component-level changes**. Both mappings are specified below — light is not a placeholder awaiting a future dark pass. The product's chosen visual concept (§2.2) makes this an easy, non-arbitrary commitment rather than a naive color inversion: the light theme reads as **paper and ink** (a technical-drawing/field-notebook surface), and the dark theme reads as an actual **blueprint print** (pale linework on a deep drafting-blue ground) — the two are two authentic states of the same instrument, not one theme and its algorithmic negative.
@@ -83,24 +83,30 @@ This indirection is also why dark mode ships **from day one**, not as a deferred
 
 ### 2.2 Color
 
-**Visual concept: "field instrument / blueprint desk."** Rather than a generic modern-SaaS palette, the approved direction (ratified against a visual prototype, not chosen from swatches alone) casts the product as sitting between a surveyor's field notebook and a technical drafting desk — fitting a tool that lives between rigorous survey instruments (Kobo/ODK heritage) and everyday business forms. Colors are semantic-token scales: **primary** (Blueprint), **accent** (Brass, used narrowly), **success** (Moss), **warning** (Amber), **danger** (Redline), and **neutral** (Paper/Ink), each a 10-step scale (50 lightest → 900 darkest, or fewer steps for the narrow-use Brass accent) plus a small set of fixed aliases (white/black/overlay). Both a light ("paper and ink") and a dark ("blueprint print" — pale lines on a deep drafting-blue ground) mapping are specified below; dark is an authentic second state of the same instrument, not an algorithmic inversion of light (§2.1).
+**Visual concept: "field instrument / blueprint desk."** Rather than a generic modern-SaaS palette, the approved direction (ratified against a visual prototype, not chosen from swatches alone) casts the product as sitting between a surveyor's field notebook and a technical drafting desk — fitting a tool that lives between rigorous survey instruments (Kobo/ODK heritage) and everyday business forms. Colors are semantic-token scales: **primary** (Blueprint), **accent** (Brass, used narrowly), **success** (Moss), **warning** (Amber), **danger** (Redline), and **neutral** (Paper/Ink), each a 10-step scale (50 lightest → 900 darkest, or fewer steps for the narrow-use Brass accent) plus a small set of fixed aliases (white/black/overlay). Both a light ("paper and ink") and a dark (pale lines on a deep cool-ink ground) mapping are specified below; dark is an authentic second state of the same instrument, not an algorithmic inversion of light (§2.1).
+
+> **Amended 2026-08-12 by JR1 (the approved Vivid Product re-skin).** The *structure* above is untouched — same scales, same step counts, same semantic layer. What moved is the palette's temperature: the primary is re-saturated toward `#0E6FE8`, the neutral ramp goes from warm paper/drafting-blue to a cool blue-tinted family, success is re-hued from Moss to `#0B7F76`, and warning to `#8A5A00`. **Danger (Redline) and Brass are deliberately untouched** — the approved direction specifies neither, so changing them would have been invention rather than execution; both were re-measured against the new grounds and still pass. The direction was chosen by the user from four fully-rendered alternatives, which makes it a ratified product decision in exactly the sense the note below describes.
 
 > **Decision (ratified):** the exact hex values below implement the approved visual-prototype direction (a "Meridian — Design System Recommendations" artifact, reviewed and selected over a generic Inter/Indigo alternative). Unlike most decisions in this document, the **palette concept itself is a ratified product/brand decision**, not an open placeholder pending future branding work — the token names, scale structure, *and* the specific hues below are all durable. Only fine-grained interpolation steps between the named anchor points (e.g., exact intermediate 50/100/200 values) remain ordinary judgment calls in the usual sense.
 
-**Primitive scale — Primary (Blueprint)**
+**Primitive scale — Primary (Blueprint → Vivid)**
+
+*(Re-saturated 2026-08-12 by **JR1**, the approved Vivid Product re-skin — the app's own navy turned up rather than a rebrand, so the H23a tenant ramp is unaffected in shape. The 10-step structure and every role below are unchanged; only the hues moved.)*
 
 | Token | Hex | Typical use |
 |---|---|---|
-| `--mds-primary-50` | `#EAF1F6` | Subtle tinted backgrounds (selected row, info panel) — also the dark-theme's `ink` text color, a deliberate light/dark echo |
-| `--mds-primary-100` | `#D2E2EC` | Hover background for tinted surfaces |
-| `--mds-primary-200` | `#A9C7DA` | Border on tinted surfaces |
-| `--mds-primary-300` | `#7DA9C4` | Disabled-primary fill, decorative accents |
-| `--mds-primary-400` | `#4E86A8` | Large-text/icon accents only (not body text) |
-| `--mds-primary-500` | `#2E6789` | Links on white, secondary accents |
-| `--mds-primary-600` | `#1C4B72` | **Default primary action fill** (buttons, active nav item, primary focus accents) — verified 9.14:1 white-text contrast, §4.1 |
-| `--mds-primary-700` | `#123350` | Primary hover/pressed state — verified 13.0:1, §4.1 |
-| `--mds-primary-800` | `#0D2740` | Primary active/pressed-darkest state |
-| `--mds-primary-900` | `#081B2C` | Dark-mode canvas anchor (see dark-mode table below) |
+| `--mds-primary-50` | `#F2F7FF` | Subtle tinted backgrounds (selected row, info panel), `action-primary-tint` |
+| `--mds-primary-100` | `#E0ECFF` | Hover background for tinted surfaces |
+| `--mds-primary-200` | `#C0D9FF` | Border on tinted surfaces; dark-mode `status-info` text (6.83:1 on `primary-800`) |
+| `--mds-primary-300` | `#8FBCFF` | **Dark-mode `action-primary-fg` + focus ring** — 8.29:1 on the dark surface, §4.1 |
+| `--mds-primary-400` | `#589BFD` | Decorative accents; the rgb behind the dark `action-primary-tint` |
+| `--mds-primary-500` | `#3783F0` | Decorative only — **3.71:1 on white, so never text and never a fill under white text** |
+| `--mds-primary-600` | `#0E6FE8` | **Default primary action fill** (buttons, active nav item) — 4.71:1 white-text contrast, §4.1. **The tightest number in the system**; see the note below |
+| `--mds-primary-700` | `#1156B2` | Primary hover fill, **`action-primary-fg`** (brand-coloured TEXT) and the focus ring — 7.01:1 on surface, 6.54:1 on canvas |
+| `--mds-primary-800` | `#09418B` | Primary active/pressed state — 9.81:1 |
+| `--mds-primary-900` | `#032B61` | Deepest anchor |
+
+> ⚠️ **`action-primary-fg` is `primary-700`, NOT `primary-600` — and the two were the same token until JR1.** `#0E6FE8` measures 4.71:1 on the white surface (passing) but only **4.27:1 on the canvas** (`neutral-50`), which is a real WCAG 1.4.3 failure for brand-coloured body text on any page background. The fill is the ratified colour and stays; the *text* role takes the darker step. This is the single most likely "simplification" a future reader will attempt, because collapsing `fg` back onto `bg` looks like tidying and is a regression on every canvas-backed surface.
 
 **Accent scale — Brass (used narrowly, not a button-variant hue)**
 
@@ -130,35 +136,39 @@ Shipped as a single `600` step in C1. **G11 extended it to a full ramp**, becaus
 
 Used *only* when a user has selected it; never a system default, never a semantic-status color.
 
-**Primitive scale — Success (Moss)**
+**Primitive scale — Success (Moss → Vivid teal-green, JR1)**
 
 | Token | Hex |
 |---|---|
-| `--mds-success-50` | `#EAF3EE` |
-| `--mds-success-100` | `#D3E7DA` |
-| `--mds-success-200` | `#A8D0B7` |
-| `--mds-success-300` | `#7CB794` |
-| `--mds-success-400` | `#579C74` |
-| `--mds-success-500` | `#3C7A5C` — verified 5.09:1 as white-text-on-fill (badge/button use, modest but passing margin) |
-| `--mds-success-600` | `#2F6249` — default success **text/icon** color on white/paper (darker than 500 for a safer margin on small text) |
-| `--mds-success-700` | `#24492F` | Hover/pressed |
-| `--mds-success-800` | `#1B3823` |
-| `--mds-success-900` | `#122619` |
+| `--mds-success-50` | `#DFF4F2` |
+| `--mds-success-100` | `#CBEAE5` |
+| `--mds-success-200` | `#99CEC7` — dark-mode badge text (5.50:1 on `success-800`) |
+| `--mds-success-300` | `#60AEA5` |
+| `--mds-success-400` | `#34988E` |
+| `--mds-success-500` | `#15837A` — verified 4.61:1 as white-text-on-fill (badge/button use, modest but passing margin) |
+| `--mds-success-600` | `#0B7F76` — default success **text/icon** color on white/paper, 4.87:1 |
+| `--mds-success-700` | `#006B63` | Hover/pressed; badge text on the `success-50` tint (5.59:1) |
+| `--mds-success-800` | `#004E48` |
+| `--mds-success-900` | `#003834` |
+
+> ⚠️ **This hue collides with the Teal personalization accent, and the collision is recorded rather than resolved.** `success-600` (`#0B7F76`) and `accent-teal-600` (`#1B5E5E`) are near-neighbours in hue, so a user who selects the Teal accent now sees primary buttons in the same family as success pills — which is the confusion the accent/semantic separation rule above exists to prevent, arriving from the opposite direction (the rule anticipated an accent borrowing a semantic hue, not a semantic hue moving onto an accent). The approved direction specifies this success colour, so JR1 ships it; re-hueing a *personalization* accent is a user-facing change and does not belong inside a token diff. Logged as **exceptions-log #10**.
 
 **Primitive scale — Warning (Amber)**
 
 | Token | Hex |
 |---|---|
-| `--mds-warning-50` | `#FBF1E0` |
-| `--mds-warning-100` | `#F6E2C0` |
-| `--mds-warning-200` | `#ECC885` |
-| `--mds-warning-300` | `#DFAD54` |
-| `--mds-warning-400` | `#C68F30` |
-| `--mds-warning-500` | `#A9711F` — default warning **fill**, paired with `--mds-neutral-900`/ink text (**not** white — no amber dark enough to hit 4.5:1 with white text still reads as amber; same resolution the previous draft used, kept intentionally) |
-| `--mds-warning-600` | `#8C5E19` | Hover/pressed fill |
-| `--mds-warning-700` | `#7A4F15` — default warning **text/icon** color on white/paper — verified 7.11:1, §4.1 |
-| `--mds-warning-800` | `#5C3B10` |
-| `--mds-warning-900` | `#3E280B` |
+| `--mds-warning-50` | `#FDF0D8` |
+| `--mds-warning-100` | `#F0DBC0` |
+| `--mds-warning-200` | `#DEB989` — dark-mode badge text (4.87:1 on `warning-800`) |
+| `--mds-warning-300` | `#CE9F61` |
+| `--mds-warning-400` | `#C18E47` |
+| `--mds-warning-500` | `#AD7B33` — default warning **fill**, paired with `--mds-neutral-900`/ink text (**not** white — no amber dark enough to hit 4.5:1 with white text still reads as amber; same resolution the previous draft used, kept intentionally). Ink on it: **4.69:1** |
+| `--mds-warning-600` | `#966617` | Hover/pressed fill |
+| `--mds-warning-700` | `#8A5A00` — default warning **text/icon** color on white/paper — verified 5.93:1, §4.1 |
+| `--mds-warning-800` | `#664200` |
+| `--mds-warning-900` | `#4A2E00` |
+
+> ⚠️ **`warning-500` is the one step in the whole system that is NOT derived by its white-text contrast**, and deriving it that way is how JR1 first got it wrong. Every other `500` targets a ratio against white; this one carries **ink**, so its target is a ratio against ink — and a value picked the usual way landed at 4.25:1 ink-on-fill, a quiet failure of the one pairing that matters for it. It is deliberately the lightest amber whose ink contrast still clears 4.5.
 
 **Primitive scale — Danger (Redline)**
 
@@ -183,18 +193,22 @@ Renamed from the previous draft's "Slate" — same structural role (canvas, surf
 
 | Token | Light hex | Dark hex | Typical use |
 |---|---|---|---|
-| `--mds-neutral-0` | `#FFFFFF` | `#081A29` | Canvas / surface base |
-| `--mds-neutral-50` | `#F3F4F1` (Paper) | `#0C2337` | App-shell canvas background |
-| `--mds-neutral-100` | `#E8EAE4` (Paper Sunken) | `#123350` | Card/table hover background, disabled fill |
-| `--mds-neutral-200` | `#DDE1DA` (Rule Soft) | `#1D3F57` | Subtle dividers |
-| `--mds-neutral-300` | `#CBD3CE` (Rule) | `#2C5570` | Default borders, input borders |
-| `--mds-neutral-400` | `#7C8B93` (Ink Faint) | `#7591A4` | Placeholder text, disabled text/icons (intentionally below AA — verified ~3.52:1, §4.1) |
-| `--mds-neutral-500` | `#5E6E77` | `#8CA5B5` | Icon default color |
-| `--mds-neutral-600` | `#4A5A66` (Ink Soft) | `#A9C1D1` | Secondary body text (verified 7.13:1, §4.1) |
-| `--mds-neutral-700` | `#2E3B44` | `#C4D5E0` | High-emphasis secondary text |
-| `--mds-neutral-800` | `#16212B` (Ink) | `#DCE7EE` | **Default body text** (verified 16.3:1, §4.1) |
-| `--mds-neutral-900` | `#0E1620` | `#EAF1F6` | Headings, highest-emphasis text |
-| `--mds-neutral-950` | `#080D14` | `#F5F9FB` | Reserved, highest-emphasis dark-mode text |
+*(Re-anchored 2026-08-12 by JR1 from the warm paper / drafting-blue columns to a cool blue-tinted family. Every step keeps the contrast ROLE it held — `400` is still deliberately sub-AA, `500` still clears 3:1 as the chart "Other" bucket, `600` still clears 4.5:1 as the axis/tick colour. **This is the change that forced `BrandRampGenerator::VERSION` to 2**: four of its six measurement grounds are the values in this table.)*
+
+| Token | Light hex | Dark hex | Typical use |
+|---|---|---|---|
+| `--mds-neutral-0` | `#FFFFFF` | `#060911` | Canvas / surface base — in dark this is the INPUT fill, so it must sit below the canvas |
+| `--mds-neutral-50` | `#F5F7FC` (Paper) | `#0F131C` | App-shell canvas background — **an engine ground** |
+| `--mds-neutral-100` | `#EEF3FE` (Paper Sunken) | `#1A2130` | Card/table hover background, disabled fill; **the dark surface, an engine ground** |
+| `--mds-neutral-200` | `#E3E8F3` (Rule Soft) | `#2C374C` | Subtle dividers, chart gridlines |
+| `--mds-neutral-300` | `#CFD8EA` (Rule) | `#3A475F` | Default borders, input borders |
+| `--mds-neutral-400` | `#7F899F` (Ink Faint) | `#6D7588` | Placeholder text, disabled text/icons (intentionally below AA — verified 3.51:1, §4.1) |
+| `--mds-neutral-500` | `#687387` | `#838DA0` | Icon default color, chart "Other" |
+| `--mds-neutral-600` | `#5A6478` (Ink Soft) | `#9AA5BD` | Secondary body text (verified 5.95:1, §4.1) |
+| `--mds-neutral-700` | `#333C4F` | `#C0C7D8` | High-emphasis secondary text |
+| `--mds-neutral-800` | `#1A2233` (Ink) | `#E8ECF5` | **Default body text** (verified 15.90:1, §4.1) |
+| `--mds-neutral-900` | `#121A2A` | `#EFF4FD` | Headings, highest-emphasis text — **the `ink` engine ground in both themes** |
+| `--mds-neutral-950` | `#080E1E` | `#F7FAFF` | Reserved, highest-emphasis dark-mode text |
 
 **Semantic aliases (the layer components actually consume) — light / dark**
 
@@ -212,14 +226,17 @@ Renamed from the previous draft's "Slate" — same structural role (canvas, surf
 | `--mds-color-text-disabled` | `--mds-neutral-400` | `--mds-neutral-400` (dark) | Disabled text (exempt from AA — §4.1) |
 | `--mds-color-text-on-primary` | `--mds-neutral-0` | `--mds-neutral-0` (dark) | Text/icons on primary/danger/success fills |
 | `--mds-color-text-on-warning` | `--mds-neutral-900` | `--mds-neutral-900` (dark) | Text/icons on warning fills (amber needs dark text, both themes) |
-| `--mds-color-action-primary-bg` | `--mds-primary-600` | `--mds-primary-400` (dark — lightened so it still reads against a dark ground) | Primary button fill |
-| `--mds-color-action-primary-bg-hover` | `--mds-primary-700` | `--mds-primary-300` (dark) | Primary button hover |
-| `--mds-color-action-primary-bg-active` | `--mds-primary-800` | `--mds-primary-200` (dark) | Primary button pressed |
-| `--mds-color-action-danger-bg` | `--mds-danger-600` | `--mds-danger-400` (dark) | Destructive button fill |
-| `--mds-color-focus-ring` | `--mds-primary-600` @ 55% opacity outer glow + `--mds-primary-700` solid ring | `--mds-primary-400` equivalents (dark) | Focus-visible indicator, all components (§4.2) |
-| `--mds-color-overlay-scrim` | `--mds-neutral-900` @ 50% opacity | `--mds-neutral-950` @ 60% opacity (dark) | Modal/drawer backdrop |
+| `--mds-color-action-primary-bg` | `--mds-primary-600` | `--mds-primary-600` | Primary button fill |
+| `--mds-color-action-primary-bg-hover` | `--mds-primary-700` | `--mds-primary-700` | Primary button hover |
+| `--mds-color-action-primary-bg-active` | `--mds-primary-800` | `--mds-primary-800` | Primary button pressed |
+| `--mds-color-action-primary-fg` | `--mds-primary-700` | `--mds-primary-300` | Brand-coloured **text/icons on a surface** — never a fill. See the §2.2 primary-table warning |
+| `--mds-color-action-danger-bg` | `--mds-danger-600` | `--mds-danger-500` (dark) | Destructive button fill |
+| `--mds-color-focus-ring` | `--mds-primary-700` | `--mds-primary-300` (dark) | Focus-visible indicator, all components (§4.2) |
+| `--mds-color-overlay-scrim` | `rgba(14, 22, 32, 0.5)` | `rgba(8, 13, 20, 0.6)` (dark) | Modal/drawer backdrop |
 
-> **Decision (not pinned by the plan):** the dark-mode primary accent is lightened (primary-400 rather than primary-600) rather than reusing the light-mode fill color verbatim — a design judgment applying the general principle "an accent must keep working on both grounds, shifted rather than replaced" (not itself dictated by the plan, but a direct consequence of committing to a real dark theme in §2.1).
+> **⚠️ Correction (JR1, 2026-08-12): the dark column of the four `action-primary-*` rows above was WRONG, and had been since H21d1.** It read `primary-400 / 300 / 200` — an accent *lightened* on a dark ground, which is the intuitive rule and which H21d1 had already found to be a real WCAG 1.4.3 failure and fixed **in the CSS only**. The document was never updated, so for four increments the reference described a palette the product did not ship and specifically described the bug as the design. Nothing failed, because no test reads this table. Recorded rather than quietly overwritten: a stale doc row is the same class of defect as a stale second copy of a hex, and this section is where a reader would have gone to check.
+>
+> **The rule, correctly stated:** every primary fill carries `--mds-color-text-on-primary`, which is `#FFFFFF` in *both* themes — so a fill that lightens on hover destroys the contrast the fill exists to carry. Dark therefore uses the **same** fill/hover/active triple as light and moves *deeper* on interaction, not lighter. Only `-fg` and the focus ring — which are text and a boundary on the ground rather than fills under text — take a pale step in dark.
 
 ### 2.3 Spacing
 
@@ -258,8 +275,8 @@ Type scale (named tokens; size/line-height/weight), roughly a 1.2× modular scal
 
 | Token | Size | Line-height | Weight | Use |
 |---|---|---|---|---|
-| `--mds-type-display` | 36px | 44px | 700 | Onboarding/marketing hero text only — never inside the authenticated app shell |
-| `--mds-type-heading-1` | 30px | 38px | 700 | Page title (e.g., "Submissions," a form's builder title) |
+| `--mds-type-display` | 44px | 54px | 750 | Onboarding/marketing hero text only — never inside the authenticated app shell. Tracking `-0.028em` |
+| `--mds-type-heading-1` | 38px | 46px | 750 | Page title (e.g., "Submissions," a form's builder title). Tracking `-0.028em` |
 | `--mds-type-heading-2` | 24px | 32px | 600 | Major section heading within a page |
 | `--mds-type-heading-3` | 20px | 28px | 600 | Card/subsection heading |
 | `--mds-type-heading-4` | 16px | 24px | 600 | Small heading, table group header |
@@ -270,7 +287,11 @@ Type scale (named tokens; size/line-height/weight), roughly a 1.2× modular scal
 | `--mds-type-caption` | 12px | 16px | 400 | Help text, timestamps, field-level hints |
 | `--mds-type-code` | 13px | 20px | 400 (monospace) | Expression editor, field `key` display, JSON/payload previews |
 
-Weight tokens used across the scale above: `--mds-font-weight-regular: 400`, `--mds-font-weight-medium: 500`, `--mds-font-weight-semibold: 600`, `--mds-font-weight-bold: 700`.
+Weight tokens used across the scale above: `--mds-font-weight-regular: 400`, `--mds-font-weight-medium: 500`, `--mds-font-weight-semibold: 600`, `--mds-font-weight-bold: 700`, `--mds-font-weight-heavy: 750`.
+
+**Tracking tokens (added by JR1):** `--mds-tracking-base: -0.004em`, applied **once** on `body` (and again on the guest runtime's own `body`, which does not import `app.css`) so it inherits everywhere rather than being repeated per role; and `--mds-tracking-display: -0.028em`, carried by the two display roles as `--mds-type-{display,heading-1}-letter-spacing`. These replaced three hand-written magic numbers (`-0.01em` in `PageHeader.vue` and `AdminLayout.vue`, `-0.015em` in `Welcome.vue`) that had drifted apart from each other — tracking is a property of the type *role*, so it now lives beside the size it belongs to.
+
+> **JR1 enlarged only the two display roles** (display 36→44, heading-1 30→38, both to weight 750). Heading-2/3/4, every body role and `code` are unchanged: the approved direction's density comes from the page title carrying real weight, not from inflating the whole scale. Note the knock-on — `MdsStatTile` renders its value at `heading-1`, so stat figures grew with the page titles, which is intended and matches the mockup.
 
 **Font-role mapping**: `display`, `heading-1`, `heading-2`, `heading-3`, and `heading-4` render in the **Display** stack (**normal case**, a slight negative `letter-spacing` ≈ `-0.01em` on the largest sizes) — a clean humanist sans carrying the page's visual personality (the original drafting-desk concept set these uppercase; the 2026-07-06 refresh dropped the uppercase for a softer, more modern read). `body-lg`, `body-md`, `body-sm`, `label`, and `caption` render in the **Body** stack — plain, maximally legible, no letter-spacing tricks. `code` renders in the **Utility/mono** stack with `font-variant-numeric: tabular-nums`. A component never mixes stacks within a single text node (e.g., a heading is never partially body-face) — the three-role split is a per-token-not-per-character decision, kept simple deliberately.
 
@@ -278,18 +299,20 @@ Governing rule: heading levels are **visual tokens, not semantic HTML levels** �
 
 ### 2.5 Elevation / shadow
 
-A 5-step elevation scale, used to communicate stacking order (what sits "above" the canvas) independent of color. *(Softened 2026-07-06 to more diffuse, lower-opacity shadows as part of the modern/icony refresh; the ink-cast color rule below is unchanged.)*
+A 5-step elevation scale, used to communicate stacking order (what sits "above" the canvas) independent of color. *(Softened 2026-07-06 as part of the modern/icony refresh; **lifted and brand-tinted 2026-08-12 by JR1** — the 5%-alpha ink shadows were a measured contributor to the app reading flat.)*
 
 | Token | Value | Use |
 |---|---|---|
 | `--mds-shadow-0` | `none` | Flat surfaces at canvas level (default card at rest, in some contexts) |
-| `--mds-shadow-1` | `0 1px 3px 0 rgba(22, 33, 43, 0.05), 0 1px 2px -1px rgba(22, 33, 43, 0.04)` | Resting card, table row group |
-| `--mds-shadow-2` | `0 8px 22px -8px rgba(22, 33, 43, 0.12), 0 2px 6px -3px rgba(22, 33, 43, 0.06)` | Hover-raised card, dropdown trigger button |
-| `--mds-shadow-3` | `0 14px 30px -10px rgba(22, 33, 43, 0.14), 0 4px 10px -5px rgba(22, 33, 43, 0.08)` | Popovers, dropdown/select menus, tooltips |
-| `--mds-shadow-4` | `0 22px 44px -14px rgba(22, 33, 43, 0.18), 0 8px 16px -8px rgba(22, 33, 43, 0.10)` | Modals/dialogs, date-picker panels |
-| `--mds-shadow-5` | `0 30px 60px -18px rgba(22, 33, 43, 0.22), 0 12px 24px -10px rgba(22, 33, 43, 0.12)` | Toasts (must read as "above" a modal that might be open concurrently) |
+| `--mds-shadow-1` | `0 2px 4px 0 rgba(14, 111, 232, 0.06), 0 10px 26px -12px rgba(14, 111, 232, 0.22)` | Resting card, table row group |
+| `--mds-shadow-2` | `0 10px 20px -6px rgba(14, 111, 232, 0.20), 0 24px 48px -20px rgba(14, 111, 232, 0.26)` | Hover-raised card, dropdown trigger button |
+| `--mds-shadow-3` | `0 14px 30px -10px rgba(14, 111, 232, 0.24), 0 4px 10px -5px rgba(14, 111, 232, 0.14)` | Popovers, dropdown/select menus, tooltips |
+| `--mds-shadow-4` | `0 22px 44px -14px rgba(14, 111, 232, 0.28), 0 8px 16px -8px rgba(14, 111, 232, 0.18)` | Modals/dialogs, date-picker panels |
+| `--mds-shadow-5` | `0 30px 60px -18px rgba(14, 111, 232, 0.32), 0 12px 24px -10px rgba(14, 111, 232, 0.20)` | Toasts (must read as "above" a modal that might be open concurrently) |
 
-> **Decision (not pinned by the plan):** shadow color is based on the `--mds-neutral-800`/"Ink" value (`rgb(22, 33, 43)`) rather than a generic near-black, so elevation shadows carry the same faint blue-ink cast as the rest of the palette rather than a neutral grey shadow that would look slightly mismatched against the paper/blueprint ground.
+> **Decision:** shadow colour is the **brand hue** (`rgb(14, 111, 232)` — `--mds-primary-600`) rather than ink or a generic near-black, so elevation carries the palette's own cast. This supersedes the 2026-07-06 rule that based it on `--mds-neutral-800`; the *principle* (a shadow tinted with the palette, never neutral grey) is unchanged and is what JR1 applied to the new palette.
+>
+> **Dark mode re-points `shadow-1` and `shadow-2` only**, in `theme-overrides.css`, to `0 2px 6px rgba(0,0,0,.5), 0 14px 32px -16px rgba(127,178,255,.28)` and a heavier twin. A blue shadow on a near-black ground is invisible — what reads as "raised" there is a true black drop plus an accent **glow**, which is a different device for the same job. Steps 3–5 are overlay surfaces that already sit above a scrim, so their light values degrade acceptably and are left alone. Both re-points are duplicated into the `prefers-color-scheme` twin block and a test asserts the two blocks stay byte-identical.
 
 Governing rule: shadow tokens are **strictly ordered** — a component at elevation *N* never sits visually beneath a component at elevation *N-1* it is meant to overlay (e.g., a toast, `shadow-5`, must never appear to sit under an open modal, `shadow-4`, which is why toasts render in their own top-level portal — see §3.7).
 
@@ -297,13 +320,20 @@ Governing rule: shadow tokens are **strictly ordered** — a component at elevat
 
 > **Decision (revised 2026-07-06):** the original drafting-desk concept used a near-flat **2–5px** radius scale for a precise, mostly-square-edged character. At the user's request the app was refreshed to feel *more modern and less "edgy" while staying compact*, so the scale was softened to **6 / 8 / 12px** — still well short of the generic 16px+ "round everything" SaaS look, and spacing/type density were left untouched so the app stays compact. Full-round (`--mds-radius-full`) remains reserved for shapes that are *supposed* to be circular/pill-shaped (avatars, toggle tracks, status pills), never as a general softening device. `--mds-radius-lg` (12px) is now also used for the tinted icon badges introduced in the same refresh (page-header + stat-tile glyphs).
 
+> **Decision (revised again 2026-08-12 by JR1):** the approved Vivid direction sets **controls at 12px and cards at 20px**, so the scale steps up one notch across the board and gains a fifth step. Cards were the flattest thing in the product at 8px; 20px is what makes a card read as an object rather than a ruled box. Controls stay visibly tighter than cards, which is the proportion the direction depends on — a 20px button next to a 20px card reads as a blob.
+
 | Token | Value | Use |
 |---|---|---|
 | `--mds-radius-none` | 0px | Table cells, full-bleed images, the app-shell/canvas edges |
-| `--mds-radius-sm` | 6px | Checkboxes, small chips |
-| `--mds-radius-md` | 8px | **Default**: buttons, form inputs, cards, modals, popovers — one radius for nearly everything |
-| `--mds-radius-lg` | 12px | Larger containers + the tinted icon badges (page-header, stat tiles) introduced in the 2026-07-06 refresh |
+| `--mds-radius-sm` | 6px | Checkboxes, small chips — **deliberately NOT stepped up with the rest of the scale** |
+| `--mds-radius-md` | 12px | **Default**: buttons, form inputs, selects, toasts — one radius for nearly every control |
+| `--mds-radius-lg` | 16px | Larger containers + the tinted icon badges (page-header, stat tiles) |
+| `--mds-radius-xl` | 20px | **Cards** — added by JR1; wired to `Card`, `StatTile` and `Modal` by **JR2** |
 | `--mds-radius-full` | 9999px | Pills/badges, avatars, toggle-switch track/thumb — true circles/pills only, never a "rounded rectangle" softening |
+
+> ⚠️ **`sm` stays at 6px on purpose, and the reason is §3.2.** The rest of the scale stepped up one notch; `sm` did not, because the checkbox box is **18px** and a circle at that size is a 9px radius — an 8px `sm` would render a checkbox as a near-circle, which is the **radio's** shape. §3.2 makes shape the non-colour signifier separating the two controls, so stepping `sm` up would have quietly traded a checked-state affordance for visual consistency. The approved direction specifies only the control (12px) and card (20px) values; `sm` was an extrapolation, and this is where the extrapolation was wrong.
+>
+> ⚠️ **Between JR1 and JR2, cards sit at 12px, not 20px, and that is the intended intermediate state.** `Card`/`StatTile`/`Modal` read `--mds-radius-md`, which JR1 moved 8→12; pointing them at `xl` is a component edit and belongs to JR2 by the row split. A reader landing here mid-sequence should not "fix" it by redefining `md`.
 
 ### 2.7 Breakpoints
 
@@ -455,8 +485,8 @@ of "it worked" would be a worse button.
 **Contrast is inherited from the stored measurements, not re-asserted here.** Each branded declaration
 maps onto a §4.1 pairing the engine already measured: white on the fill is `bg`/on_primary verbatim; the
 brand as ink on white paper is that same measurement read backwards (contrast is symmetric); the PDF's
-prose panel is `tint`/ink, which is why it names `#0E1620` explicitly rather than inheriting the body's
-`#1a1a1a` — `#0E1620` *is* the light ink ground the ratio was taken against. Button text is `#FFFFFF`
+prose panel is `tint`/ink, which is why it names `#121A2A` explicitly rather than inheriting the body's
+`#1a1a1a` — `#121A2A` *is* the light ink ground the ratio was taken against. Button text is `#FFFFFF`
 (the generator's `ON_PRIMARY`) and never `$brand['fg']`, because in the light ramp `fg` **is** `bg`.
 
 **Two things are deliberately not built, and both are decisions rather than gaps.**
@@ -686,7 +716,9 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 
 > **⚠️ SHARE IS NOT A TAB, AND AN EARLIER VERSION OF THIS LINE SAID IT WAS (corrected in J2b).** The J2 plan's tab table listed Share as a fifth item "opening `ShareModal` on the hub", which is precisely the `TabNav`-versus-`Tabs` confusion the notes below exist to prevent: **every item in this strip is a URL with its own route and its own gate**, and a modal-opener is neither. Dressing one as a tab would put an `aria-current`-capable link in the strip whose activation navigates nowhere, and would make the one item that is not a destination indistinguishable from the four that are. Share ships as a **`PageHeader` action button** on the hub, beside Publish and Edit, gated on the presence of the `share` payload key. The builder keeps its own toolbar button — J2b widened Share's reach, it did not move it.
 
-> ⚠️ **THE UNDERLINE IS `--mds-color-action-primary-fg`, AND `-bg` — WHICH IS WHAT THIS SECTION'S ORIGINAL `--mds-primary-600` MAPS TO — IS A REAL 1.4.11 FAILURE.** `MdsTabNav` shipped with `-bg` first and the J2a adversarial review measured it. `-bg` is a **fill**, and the only contrast the system guarantees for it is against the text printed *on* it: `BRAND_RAMP_PAIRINGS` pairs `bg` solely with `on_primary`. Against the surface *behind* it nothing is guaranteed, and in dark it fails — `primary-500` `#2E6789` on `bg-surface` `#123350` = **2.12:1**, and **1.95:1** under the teal accent. An underline is a non-text UI component and owes 3:1.
+> ⚠️ **THE UNDERLINE IS `--mds-color-action-primary-fg`, AND `-bg` — WHICH IS WHAT THIS SECTION'S ORIGINAL `--mds-primary-600` MAPS TO — IS A REAL 1.4.11 FAILURE.** `MdsTabNav` shipped with `-bg` first and the J2a adversarial review measured it. `-bg` is a **fill**, and the only contrast the system guarantees for it is against the text printed *on* it: `BRAND_RAMP_PAIRINGS` pairs `bg` solely with `on_primary`. Against the surface *behind* it nothing is guaranteed. An underline is a non-text UI component and owes 3:1.
+>
+> ⚠️ **JR1 moved the evidence without moving the conclusion.** The measurement that produced this rule was `primary-500` `#2E6789` on `bg-surface` `#123350` = **2.12:1**, an outright failure. Under the Vivid ramp the same pairing is `primary-600` `#0E6FE8` on `#1A2130` = **3.42:1**, which passes — the default accent no longer demonstrates the bug, though teal still does (**2.41:1**). The argument never rested on either number: a fill that happens to clear 3:1 against today's surface for today's palette is a coincidence the next re-skin can revoke, in either direction. Do not fold this back to `-bg` on the strength of the 3.42.
 >
 > `action-primary-fg` carries exactly the guarantee needed, and for **every tenant brand** rather than the two shipped accents: the ramp pairs `fg` against both `surface` and `canvas`, in both themes, at `TEXT_MIN` (4.5:1). Measured anyway — 9.14:1 light, 5.17:1 dark, 7.48:1 light-teal, 5.16:1 dark-teal. `ConfigPanel.vue` already used this token for the same job. **axe does not check border contrast, so no gate we run would have caught it** — which makes this the class of defect that only a measurement finds. When specifying a coloured rule, edge, or indicator anywhere in this document, reach for `-fg`, never `-bg`.
 
@@ -859,16 +891,32 @@ WCAG 2.2 AA is the baseline for the entire product, not only the guest-facing ru
 - **Data-visualization specifics** (added 2026-08-03; contract pinned by ADR-0011 §D11–§D12, **emitted by H24b1** — the measured table is at the end of this section). The 1.4.11 rule above applies to **data marks** — a line, a bar, a legend swatch — and to any boundary whose *identification* carries meaning. It does **not** apply to gridlines, which are decorative scaffolding and should deliberately sit *below* 3:1 so they do not compete with the data; axis tick labels are text and take the 4.5:1 rule. Where two fills touch (any stacked or adjacent mark), 3:1 is required **between the neighbours**, not merely against the background — the standard mitigation is a 1px surface-coloured separator stroke so each segment is judged against the surface, and the difficulty of getting this right is why stacked bars are deliberately not in the first primitive set. Three further constraints: **the categorical series scale is capped at five**, because satisfying 3:1 against *both* the light and dark surfaces with one token set confines a mark to a narrow luminance band that leaves too little room for marks to remain distinguishable from one another — which also makes the dark re-point of the series tokens mandatory, not optional; **series tokens are immune to `data-accent`** and alias none of the primary/success/warning/danger/accent scales, for the same reason Moss and Brass are excluded from the accent whitelist (a data series encodes meaning, and two people looking at one screenshot must see the same series in the same colour); and **colour is never the only channel** — a single-series chart uses no categorical colour at all, and multi-series charts add a dash pattern or a shared `--mds-chart-pattern-*` fill. Finally, a limit of the tooling worth stating here rather than discovering: **axe cannot detect a missing text alternative for an SVG that carries a plausible `aria-label`**, so the merge-blocking gate will pass a chart that is an unreadable picture. Every chart primitive therefore ships a real data table alongside `role="img"`, guarded by a unit assertion rather than by axe.
 - **Verified reference ratios** (computed via the WCAG relative-luminance formula, cited here as concrete evidence rather than an unverified assertion — the full token-pair contrast matrix lives as generated metadata in the Storybook a11y addon per §1.2, not reproduced cell-by-cell here):
 
+*(Every row below recomputed 2026-08-12 for the JR1 palette.)*
+
 | Pairing | Ratio | Verdict |
 |---|---|---|
-| `--mds-primary-600` (`#1C4B72`) fill / white text (default button) | 9.14:1 | Passes, wide margin — a notably wider margin than the retired Indigo-based draft's 6.19:1, since Blueprint is a deeper hue |
-| `--mds-primary-700` (`#123350`) fill / white text (hover/pressed) | 13.0:1 | Passes, very wide margin |
-| `--mds-neutral-800`/"Ink" (`#16212B`) text / white-surface background (default body text) | 16.3:1 | Passes, very high margin |
-| `--mds-neutral-600`/"Ink Soft" (`#4A5A66`) text / white-surface background (secondary text) | 7.13:1 | Passes |
-| `--mds-neutral-400`/"Ink Faint" (`#7C8B93`) text / white-surface background (disabled text) | ~3.52:1 | Below AA's 4.5:1 — **intentional**, disabled content is exempt from WCAG contrast requirements; this token is never used for enabled/interactive text |
-| `--mds-warning-700` (`#7A4F15`) text / white-surface background (warning text/icon) | 7.11:1 | Passes, comfortable margin |
-| `--mds-success-600` (`#2F6249`) text / white-surface background (success text/icon) | ~7.4:1 (darker step than the 500 fill below, chosen specifically for small-text safety margin) | Passes |
-| `--mds-danger-600` (`#A83A2A`) fill / white text (destructive button) | 6.36:1 | Passes, wider margin than the retired draft's 4.56:1 |
+| `--mds-primary-600` (`#0E6FE8`) fill / white text (default button) | **4.71:1** | Passes AA — and it is the **tightest margin in the entire system**. The direction's signature colour; anything smaller than normal body text must not sit on it, and any future darkening of `text-on-primary` breaks it |
+| `--mds-primary-700` (`#1156B2`) fill / white text (hover/pressed) | 7.01:1 | Passes |
+| `--mds-primary-700` (`#1156B2`) **text** / white surface (`action-primary-fg`) | 7.01:1 | Passes — and 6.54:1 on the canvas, which is why `fg` is 700 and not 600 (`#0E6FE8` on canvas is **4.27:1**, a fail) |
+| `--mds-primary-800` (`#09418B`) fill / white text (active) | 9.81:1 | Passes |
+| `--mds-neutral-800`/"Ink" (`#1A2233`) text / white-surface background (default body text) | 15.90:1 | Passes, very high margin |
+| `--mds-neutral-600`/"Ink Soft" (`#5A6478`) text / white-surface background (secondary text) | 5.95:1 | Passes |
+| `--mds-neutral-400`/"Ink Faint" (`#7F899F`) text / white-surface background (disabled text) | 3.51:1 | Below AA's 4.5:1 — **intentional**, disabled content is exempt from WCAG contrast requirements; this token is never used for enabled/interactive text |
+| `--mds-warning-700` (`#8A5A00`) text / white-surface background (warning text/icon) | 5.93:1 | Passes |
+| `--mds-success-600` (`#0B7F76`) text / white-surface background (success text/icon) | 4.87:1 | Passes |
+| `--mds-danger-600` (`#A83A2A`) fill / white text (destructive button) | 6.36:1 | Passes — unchanged by JR1, which specifies no destructive hue |
+| `--mds-neutral-900` ink on `--mds-warning-500` (`#AD7B33`) fill | 4.69:1 | Passes — the exception below, and the one step derived by its **ink** contrast rather than its white contrast |
+
+**Dark theme, the rows a light-only check cannot see** (surface `--mds-neutral-100` `#1A2130`, canvas `#0F131C`):
+
+| Pairing | Ratio | Min | |
+|---|---|---|---|
+| `--mds-neutral-800` (`#E8ECF5`) body text on the dark surface | 13.61:1 | 4.5 | ✅ |
+| `--mds-neutral-600` (`#9AA5BD`) secondary text on the dark surface | 6.51:1 | 4.5 | ✅ |
+| `--mds-primary-300` (`#8FBCFF`) `action-primary-fg` + focus ring on the dark surface | 8.29:1 | 4.5 | ✅ |
+| white text on the dark `action-primary-bg` (`primary-600`) | 4.71:1 | 4.5 | ✅ |
+| white text on the dark hover (`primary-700`) / active (`primary-800`) | 7.01 / 9.81 | 4.5 | ✅ |
+| pale ink on the dark tint `rgba(88,155,253,.18)` composited over `#1A2130` | 10.11:1 | 4.5 | ✅ |
 
 **Teal accent — full verification (Increment G11).** The §2.9 personalization accent is the one hue a *user* can switch the entire primary-action surface to, so every pairing it produces is verified here rather than left to the Storybook matrix. All 17 computed with the WCAG relative-luminance formula against the real surface tokens in each theme.
 
@@ -879,57 +927,59 @@ WCAG 2.2 AA is the baseline for the entire product, not only the guest-facing ru
 | 2 | white text on `teal-700` fill (hover) | 9.40:1 | 4.5 | ✅ |
 | 3 | white text on `teal-800` fill (active) | 12.10:1 | 4.5 | ✅ |
 | 4 | `teal-600` text on `bg-surface` (`#FFFFFF`) | 7.48:1 | 4.5 | ✅ |
-| 5 | `teal-600` text on `bg-canvas` (`#F3F4F1`) | 6.77:1 | 4.5 | ✅ |
-| 6 | `teal-600` UI boundary vs canvas | 6.77:1 | 3.0 | ✅ |
+| 5 | `teal-600` text on `bg-canvas` (`#F5F7FC`) | 6.97:1 | 4.5 | ✅ |
+| 6 | `teal-600` UI boundary vs canvas | 6.97:1 | 3.0 | ✅ |
 | 7 | `teal-700` focus ring vs surface | 9.40:1 | 3.0 | ✅ |
-| 8 | `teal-700` focus ring vs canvas | 8.51:1 | 3.0 | ✅ |
+| 8 | `teal-700` focus ring vs canvas | 8.77:1 | 3.0 | ✅ |
 | 9 | `neutral-900` ink on `teal-50` tint | 15.90:1 | 4.5 | ✅ |
 | **Dark** | | | | |
 | 10 | white text on `teal-500` fill | 6.68:1 | 4.5 | ✅ |
 | 11 | white text on `teal-400` fill (hover) | 4.82:1 | 4.5 | ✅ |
 | 12 | white text on `teal-700` fill (active) | 9.40:1 | 4.5 | ✅ |
-| 13 | `teal-300` text on `bg-surface` (`#123350`) | 5.16:1 | 4.5 | ✅ |
-| 14 | `teal-300` text on `bg-canvas` (`#0C2337`) | 6.36:1 | 4.5 | ✅ |
-| 15 | `teal-300` focus ring vs dark surface | 5.16:1 | 3.0 | ✅ |
-| 16 | `teal-300` focus ring vs dark canvas | 6.36:1 | 3.0 | ✅ |
-| 17 | pale ink on the dark tint `rgba(36,126,126,.18)` composited over `#123350` | 9.54:1 | 4.5 | ✅ |
+| 13 | `teal-300` text on `bg-surface` (`#1A2130`) | 6.39:1 | 4.5 | ✅ |
+| 14 | `teal-300` text on `bg-canvas` (`#0F131C`) | 7.37:1 | 4.5 | ✅ |
+| 15 | `teal-300` focus ring vs dark surface | 6.39:1 | 3.0 | ✅ |
+| 16 | `teal-300` focus ring vs dark canvas | 7.37:1 | 3.0 | ✅ |
+| 17 | pale ink on the dark tint `rgba(36,126,126,.18)` composited over `#1A2130` | 11.27:1 | 4.5 | ✅ |
 
-Teal is never worse than Blueprint at the equivalent role, and in dark mode it is measurably better (dark fill 6.68 vs 6.14; dark hover 4.82 vs 3.96).
+*(Rows 5–8 and 13–17 recomputed 2026-08-12: the teal ramp itself is UNCHANGED by JR1 — its light rows are measured against `#FFFFFF`, which cannot move — but every row measured against a canvas or a dark ground moved with the neutral ramp. All improved.)*
+
+Teal is no longer uniformly better than the primary in dark: the Vivid fill carries white at 4.71:1 against teal's 6.68:1, because JR1 traded fill contrast for saturation deliberately and teal did not move. Both clear AA.
 
 > **This table is now an executable specification, not only a record (Increment H23a1, [ADR-0014](../adr/0014-tenant-brand-ramp-generation.md)).** Its seventeen rows are encoded, hue-removed, as `BrandRampGenerator::pairings()` and `BRAND_RAMP_PAIRINGS`, and every generated **tenant** brand ramp is measured against all seventeen before it is stored. Two details of the encoding are worth knowing before editing this table:
 >
 > - **Light row 6 duplicates row 5's colour pair at a lower floor** (3.0 rather than 4.5, because a UI boundary is not text). It is kept in both the table and the code rather than folded into row 5 — dropping it would make the list sixteen and quietly break the correspondence, which a unit test asserts by count and by per-theme split (9 light, 8 dark).
-> - **The engine's targets are the MIDPOINT of this table's Teal column and Blueprint's equivalent**, so a tenant ramp lands in the same visual register as the product's own rather than scraping the 4.5 floor. The evidence that this reproduces the system's own judgment: fed Teal's hue, the engine re-derives `teal-600` and `teal-50` byte-identically and returns rows 1–3 as 7.48 / 9.40 / 12.10.
+> - **The engine's targets are the MIDPOINT of this table's Teal column and Blueprint's equivalent**, so a tenant ramp lands in the same visual register as the product's own rather than scraping the 4.5 floor. The evidence that this reproduces the system's own judgment: fed Teal's hue, the engine re-derives `teal-600` byte-identically and returns rows 1–3 as 7.48 / 9.40 / 12.10. **JR1 halved that claim, instructively.** It used to cover `teal-50` as well; the tint is searched against the light `ink` ground, which JR1 moved, so the engine now derives `#EBF7F7` where G11's human hand-picked `#E6F2F2`. `--mds-accent-teal-50` was deliberately NOT updated to match — doing so would leave the test comparing the engine against a number copied *from* the engine, destroying exactly the independence the claim asserts. Only the half anchored to `#FFFFFF`, a ground that cannot move, was ever robust.
 >
 > **Adding a row here means adding a pairing there**, and the count assertion is what will tell you.
 
-**Chart scale — full verification (Increment H24b1).** ADR-0011 §D11 states the constraints and deliberately prints no ratios, assigning the measured table here; these are the numbers, computed with the same WCAG relative-luminance formula against the real surface token in each theme. The surface is `--mds-color-bg-surface`: `#FFFFFF` in light, `#123350` in dark (the dark block re-points it to `neutral-100`). A data mark is a *meaningful graphical object* and takes **3:1** (WCAG 1.4.11); axis tick labels are **text** and take 4.5:1; gridlines are decorative scaffolding, **exempt**, and deliberately sit below 3:1.
+**Chart scale — full verification (Increment H24b1).** ADR-0011 §D11 states the constraints and deliberately prints no ratios, assigning the measured table here; these are the numbers, computed with the same WCAG relative-luminance formula against the real surface token in each theme. The surface is `--mds-color-bg-surface`: `#FFFFFF` in light, `#1A2130` in dark (the dark block re-points it to `neutral-100`). *(Dark column recomputed 2026-08-12 — the ten series hexes are UNCHANGED by JR1 and every one gained headroom against the deeper ground.)* A data mark is a *meaningful graphical object* and takes **3:1** (WCAG 1.4.11); axis tick labels are **text** and take 4.5:1; gridlines are decorative scaffolding, **exempt**, and deliberately sit below 3:1.
 
-| # | Token | Light hex | vs `#FFFFFF` | Dark hex | vs `#123350` | Min | |
+| # | Token | Light hex | vs `#FFFFFF` | Dark hex | vs `#1A2130` | Min | |
 |---|---|---|---|---|---|---|---|
-| 1 | `--mds-chart-series-1` (blue) | `#0072B2` | 5.19:1 | `#7CC9F1` | 7.11:1 | 3.0 | ✅ |
-| 2 | `--mds-chart-series-2` (vermilion) | `#E15A14` | 3.70:1 | `#E4813F` | 4.65:1 | 3.0 | ✅ |
-| 3 | `--mds-chart-series-3` (green) | `#00654A` | 7.09:1 | `#37B98C` | 5.25:1 | 3.0 | ✅ |
-| 4 | `--mds-chart-series-4` (purple) | `#7A3468` | 8.34:1 | `#C077AD` | 4.01:1 | 3.0 | ✅ |
-| 5 | `--mds-chart-series-5` (ochre) | `#96700A` | 4.55:1 | `#F0CB6D` | 8.34:1 | 3.0 | ✅ |
-| 6 | `--mds-chart-other` (`{neutral.500}`) | `#5E6E77` | 5.29:1 | `#8CA5B5` | 5.06:1 | 3.0 | ✅ |
-| 7 | `--mds-chart-axis` (`{neutral.600}`, tick labels) | `#4A5A66` | 7.13:1 | `#A9C1D1` | 6.96:1 | 4.5 | ✅ |
-| 8 | `--mds-chart-grid` (`{neutral.200}`) | `#DDE1DA` | 1.32:1 | `#1D3F57` | 1.18:1 | — | ✅ *intentionally low* |
+| 1 | `--mds-chart-series-1` (blue) | `#0072B2` | 5.19:1 | `#7CC9F1` | 8.80:1 | 3.0 | ✅ |
+| 2 | `--mds-chart-series-2` (vermilion) | `#E15A14` | 3.70:1 | `#E4813F` | 5.76:1 | 3.0 | ✅ |
+| 3 | `--mds-chart-series-3` (green) | `#00654A` | 7.09:1 | `#37B98C` | 6.50:1 | 3.0 | ✅ |
+| 4 | `--mds-chart-series-4` (purple) | `#7A3468` | 8.34:1 | `#C077AD` | 4.97:1 | 3.0 | ✅ |
+| 5 | `--mds-chart-series-5` (ochre) | `#96700A` | 4.55:1 | `#F0CB6D` | 10.33:1 | 3.0 | ✅ |
+| 6 | `--mds-chart-other` (`{neutral.500}`) | `#687387` | 4.78:1 | `#838DA0` | 4.82:1 | 3.0 | ✅ |
+| 7 | `--mds-chart-axis` (`{neutral.600}`, tick labels) | `#5A6478` | 5.95:1 | `#9AA5BD` | 6.51:1 | 4.5 | ✅ |
+| 8 | `--mds-chart-grid` (`{neutral.200}`) | `#E3E8F3` | 1.23:1 | `#2C374C` | 1.35:1 | — | ✅ *intentionally low* |
 
-> **Why the dark re-point is mandatory rather than a nicety — measured, not asserted.** Take the light column above and put it, unchanged, on the dark ground: **four of the five fail 1.4.11 outright** — series-1 2.51:1, series-3 1.83:1, series-4 **1.56:1**, series-5 2.86:1; only series-2 survives, at 3.51:1. The reverse is the same story from the other end: the raw Okabe-Ito anchors these hues derive from do not survive a white ground either (`#E69F00` computes **2.25:1**, a real failure, and `#009E73` clears the bar only at 3.42:1 with no margin left), which is why the light column is darkened from them in the first place. A single token set would have to satisfy both columns at once, and the band where that is possible is too narrow to hold five mutually distinguishable marks — which is exactly §D11's claim that **five is derived, not chosen**. Two sets is not duplication; it is the only way one palette clears both grounds.
+> **Why the dark re-point is mandatory rather than a nicety — measured, not asserted.** Take the light column above and put it, unchanged, on the dark ground: series-1 3.11:1, series-2 4.35:1, series-3 **2.27:1**, series-4 **1.93:1**, series-5 3.54:1 — **two fail 1.4.11 outright and the three that pass do so with almost nothing to spare.** *(Recomputed for JR1's deeper dark ground; on the previous `#123350` ground FOUR of the five failed. The evidence weakened and the conclusion did not — a scale where two marks are illegal and three clear the bar by 0.1 is not a scale, and a re-skin that moves the ground again could push any of them back under.)* The reverse is the same story from the other end: the raw Okabe-Ito anchors these hues derive from do not survive a white ground either (`#E69F00` computes **2.25:1**, a real failure, and `#009E73` clears the bar only at 3.42:1 with no margin left), which is why the light column is darkened from them in the first place. A single token set would have to satisfy both columns at once, and the band where that is possible is too narrow to hold five mutually distinguishable marks — which is exactly §D11's claim that **five is derived, not chosen**. Two sets is not duplication; it is the only way one palette clears both grounds.
 
 > **Hue is the primary channel, luminance the secondary, and the dash pattern is the guarantee.** The five hues are Okabe-Ito-derived and therefore separable under the common colour-vision deficiencies. Their luminances are additionally spread across the usable band (light: 3.70 · 4.55 · 5.19 · 7.09 · 8.34) so a greyscale print or an achromatopsic reader still has *something* — but the spread cannot be made large, which is the same fact that caps the scale at five. That is why §D12 requires a redundant non-colour channel outright: `--mds-chart-pattern-1…5` is applied per series index, series 1 is solid, and the legend swatch draws its own pattern rather than a plain colour chip. Colour is never load-bearing alone.
 
 > **Two properties enforced by test, not by this table.** `theme-overrides.test.ts` recomputes every row above from `tokens/chart.json` and the CSS on each run, so a future edit that darkens a series past its floor fails the suite rather than the eye. The same file asserts that **no `[data-accent]` rule touches a `--mds-chart-*` token** — the pre-existing accent-scope guard tested only the five `--mds-color-*` families and would have let a recoloured data series through. A data series encodes meaning: two colleagues reading one screenshot must see the same series in the same colour, which is the Moss-and-Brass argument one layer further out.
 
-> **The bug this table exists to prevent.** Until G11 the accent shipped as a four-declaration stub with no dark variant. Because `[data-accent]` carries the same specificity as `[data-theme-mode='dark']` and appeared *later* in source order, teal won in dark mode and painted the light `#1B5E5E` on the `#123350` ground: **1.74:1** for both `action-primary-fg` and the focus ring — failing 1.4.3 and 1.4.11 by a wide margin. It went unnoticed for two increments because nothing in the product could set `data-accent` and no test had ever set it either. The Playwright `personalization-axe` spec and the `TealDark` Storybook story now both exercise it.
+> **The bug this table exists to prevent.** Until G11 the accent shipped as a four-declaration stub with no dark variant. Because `[data-accent]` carries the same specificity as `[data-theme-mode='dark']` and appeared *later* in source order, teal won in dark mode and painted the light `#1B5E5E` on the then-`#123350` ground: **1.74:1** for both `action-primary-fg` and the focus ring — failing 1.4.3 and 1.4.11 by a wide margin. It went unnoticed for two increments because nothing in the product could set `data-accent` and no test had ever set it either. The Playwright `personalization-axe` spec and the `TealDark` Storybook story now both exercise it.
 
-> **Two observed, deliberately out-of-scope findings.** (a) Blueprint's *dark* `action-primary-bg-active` (`primary-300`, `#7DA9C4`) yields only **2.52:1** with white text. It is pre-existing, unrelated to G11, and invisible to axe because `assertClean` parks the pointer and axe never measures `:active`. Recorded rather than fixed, to keep G11's diff to its own subject. (b) For teal specifically, "lighter on press" is mathematically unreachable — the lightest teal step still clearing 4.5:1 against white *is* the hover step — so dark-mode teal inverts direction and darkens on press (`teal-700`, 9.40:1). That divergence from Blueprint's ramp is exceptions-log #6.
+> **Two observed findings, one now CLOSED.** (a) Blueprint's *dark* `action-primary-bg-active` (`primary-300`, `#7DA9C4`) yielded only **2.52:1** with white text — pre-existing, unrelated to G11, and invisible to axe because `assertClean` parks the pointer and axe never measures `:active`. It was recorded rather than fixed to keep G11's diff to its own subject; **H21d1 fixed the CSS and JR1's re-point settles it at `primary-800`, 9.81:1.** Kept here because the finding outlived two increments purely on the strength of "axe never measures `:active`", which is still true of every other pressed state in the system. (b) For teal specifically, "lighter on press" is mathematically unreachable — the lightest teal step still clearing 4.5:1 against white *is* the hover step — so dark-mode teal inverts direction and darkens on press (`teal-700`, 9.40:1). That divergence from Blueprint's ramp is exceptions-log #6.
 
-> **Note (correction):** the rows above are labeled "white-surface background" because that is what they are actually computed against — `--mds-color-bg-surface` (`--mds-neutral-0`, pure white), the background body text most commonly sits on (cards, panels, table rows, per the §2.2 semantic alias table). An earlier version of this table mislabeled them "paper background," which is a *different*, distinctly-valued token (`--mds-color-bg-canvas` / `--mds-neutral-50` / `#F3F4F1`) used for the page canvas behind those surfaces. For the record, text directly on the Paper canvas (rather than a white surface) is very slightly lower-contrast but still comfortably passes — e.g. Ink on Paper computes to ≈14.8:1, not 16.3:1 — so no pairing in this document is actually at risk; only the label was wrong.
+> **Note (correction):** the rows above are labeled "white-surface background" because that is what they are actually computed against — `--mds-color-bg-surface` (`--mds-neutral-0`, pure white), the background body text most commonly sits on (cards, panels, table rows, per the §2.2 semantic alias table). An earlier version of this table mislabeled them "paper background," which is a *different*, distinctly-valued token (`--mds-color-bg-canvas` / `--mds-neutral-50` / `#F5F7FC`) used for the page canvas behind those surfaces. For the record, text directly on the Paper canvas (rather than a white surface) is very slightly lower-contrast but still comfortably passes — Ink on Paper computes to **14.84:1**, not 15.90:1 — so no pairing in this document is actually at risk; only the label was wrong. **The one place the distinction is load-bearing rather than pedantic is `action-primary-fg`**, where the surface/canvas gap is what separates a pass from a fail (see §2.2).
 
 - **Warning/amber is a deliberate exception to "text-on-fill is always white."** `--mds-warning-500` fill pairs with `--mds-neutral-900`/Ink text (not white), because no amber saturation dark enough to hit 4.5:1 with white text remains recognizably "amber" rather than reading as brown/orange — pairing light amber with dark text is the correct, common resolution and is applied consistently at every warning-fill use site (buttons, badges, banners). The same logic produced a slightly darker dedicated `warning-700` step specifically for small warning *text* (as opposed to a warning *fill*), since the 500 fill color itself falls short of 4.5:1 against a white/light surface.
-- **Success at the 500 step is a comfortable but not maximal margin** (~5.09:1 white-on-fill) — acceptable and passing, but callers needing small-text success messaging should prefer the darker `success-600` text token above rather than setting text color to `success-500` directly.
+- **Success at the 500 step is a modest but passing margin** (4.61:1 white-on-fill after JR1) — callers needing small-text success messaging should prefer the `success-600` text token above rather than setting text color to `success-500` directly.
 - **Any new semantic-token pairing proposed for text-on-background or icon-on-background use must be contrast-checked before merge** (the Storybook a11y addon, backed by `axe-core`, flags failures automatically — §4.6) — this is a mechanical gate, not a design-review-only expectation.
 
 ### 4.2 Focus-visible ring specification

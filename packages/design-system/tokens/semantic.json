@@ -23,7 +23,7 @@
                 "bg": { "value": "{primary.600}" },
                 "bg-hover": { "value": "{primary.700}" },
                 "bg-active": { "value": "{primary.800}" },
-                "fg": { "value": "{primary.600}" },
+                "fg": { "value": "{primary.700}" },
                 "tint": { "value": "{primary.50}" }
             },
             "danger": {

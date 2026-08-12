@@ -27,6 +27,11 @@ body {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-lg-font-size);
     line-height: var(--mds-type-body-lg-line-height);
+    /* JR1: the Vivid direction's global tracking. Set ONCE here rather than per type role — it is a
+       property of the setting, not of a role — and inherited, so any element that does not override it
+       gets it. The two display roles DO override, with their own tighter
+       --mds-type-{display,heading-1}-letter-spacing. */
+    letter-spacing: var(--mds-tracking-base);
     color: var(--mds-color-text-body);
     background-color: var(--mds-color-bg-canvas);
 }

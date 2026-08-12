@@ -33,7 +33,7 @@ test('Public runtime — installable PWA renders offline + guards submit', async
         'href',
         '/f/clinic-intake/manifest.webmanifest?b=none',
     );
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#1C4B72');
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0E6FE8');
 
     // If the service worker is available (secure context), prime its caches under control and prove the form
     // still RENDERS offline. `navigator.serviceWorker` is only defined in a secure context.

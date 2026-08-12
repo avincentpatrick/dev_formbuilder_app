@@ -1423,3 +1423,67 @@ host. The last of its three failures is the one worth keeping: it asserted the r
 not contain the word "permission" and failed, because the page carries that word unconditionally in a standing
 scope note. The assertion was testing the copy; it now asserts the two empty states render IDENTICALLY, which
 is the actual disclosure contract.
+
+## 2026-08-12 — JR1: the Vivid token diff, and the grounds nobody had pinned
+
+Built the first row of the approved Vivid Product re-skin on `jr1-vivid-tokens`. The user confirmed the
+FULL palette rather than the accent alone, and reading the published artifact before planning is what made
+that scope visible: `.mk--vivid` is a complete token contract — cool neutrals, a re-hued success and
+warning, 20px cards, brand-tinted shadows, a 38px/750 page title — not a saturated primary. Every number
+was computed rather than asserted: 50+ pairings across both themes, all passing.
+
+Three findings outrank the feature. **First, `#0E6FE8` cannot be `action-primary-fg`** — 4.71:1 on the
+white surface but 4.27:1 on the canvas, and until now `fg` and `bg` were the same token. The fill is the
+direction's signature and stays; the text role took `primary-700`. **Second, the neutral ramp dragged the
+tenant-branding engine with it.** Four of `BrandRampGenerator`'s six measurement grounds are copies of
+neutral primitives, and nothing tied the copy to the source — so a re-skin would have left every branded
+tenant with a stored `measurements` array certifying contrast against a canvas the product no longer
+paints, with no test failing and no screenshot looking wrong. That is `BrandPalette::PRODUCT`'s failure
+shape, found a second time in the same stack, which is the argument for guarding the class rather than the
+instance: `BrandRampGroundParityTest` now pins all six literals, `VERSION` went to 2, and a migration
+re-derives every stored ramp from the tenant's saved input colour — the input being the only thing that
+survives a version bump, since the tokens are the output of a lightness search with no v1→v2 mapping.
+
+**Third, ADR-0014's anchor claim was halved and the reason is the more useful artefact.** "Fed Teal's hue
+the engine re-derives `teal-600` and `teal-50` byte-identically" survived only for `teal-600`, because
+`bg` is measured against `#FFFFFF` — a ground that cannot move — while `tint` is measured against light
+ink, which moved. `--mds-accent-teal-50` was deliberately NOT updated to match the engine: doing so would
+leave the assertion comparing the engine against a number copied from the engine, destroying exactly the
+independence the claim asserts. A circular assertion that reads like corroboration is worse than an honest
+divergence. Only the half anchored to an immovable ground was ever robust.
+
+Two pre-existing doc defects surfaced. DSR §2.2's semantic table gave the dark `action-primary-*` column as
+`primary-400/300/200` — the lightened-accent shape H21d1 had already found to be a real WCAG failure and
+fixed in the CSS alone, so the reference described the bug as the design for four increments and nothing
+failed, because no test reads that table. And JR1 moved the evidence under TabNav's `-bg`-is-a-failure rule
+without moving its conclusion: the same pairing went from 2.12:1 to 3.42:1 and now passes for the default
+accent while teal still fails at 2.41 — recorded explicitly, because a fill that happens to clear 3:1 today
+is a coincidence the next re-skin can revoke in either direction.
+
+Four of my own tests went red. The fixture regeneration read the raw `measurements` property instead of
+`toArray()`, which rounds to the two decimals §4.1 prints — failing all twelve TypeScript parity vectors
+while every token still matched, which reads as total disagreement between engines that in fact agree
+completely. Two more were jsonb round-trip artefacts (Postgres does not preserve key order; `json_encode`
+turns the float floor 3.0 into an int). The fourth **could not fail**: it stored a ramp built by the current
+engine and merely relabelled it `engine_version: 1`, so the "old" measurements were already the new ones.
+Genuine v1 output no longer exists in the tree, so the test now corrupts the stored ratios to a value the
+engine cannot emit and asserts they come back correct.
+
+Two extrapolations turned out wrong after the PR opened, and neither was visible in a diff of hexes. The
+artifact specifies only the control (12px) and card (20px) radii, so stepping the whole scale up from those
+was an inference — and `radius-sm` at 8px renders the 18px checkbox as a near-circle (a circle there is 9px),
+which is the radio's shape, and §3.2 makes shape the non-colour signifier separating them. And the derived
+dark `neutral-0` landed 0.00016 luminance ABOVE `neutral-50`, inverting the ramp's one structural promise;
+`#0d1322` beside `#0f131c` reads as obviously darker and is not. In dark that token is the input background,
+so every input would have sat a fraction lighter than the canvas rather than sunken into it — a depth cue
+pointing the wrong way, at a magnitude no screenshot review would flag. Both fixed, and the second is now a
+test: `theme-overrides.test.ts` asserts both neutral ramps are monotonic in luminance, in both directions,
+with the steps read from `primitive.json` and an anti-vacuity case. The ramp is the substrate every semantic
+alias resolves through, so an inversion anywhere in it surfaces later as an arbitrary component looking
+subtly wrong — ordering is the cheapest invariant to assert and the most expensive to debug from the symptom.
+
+Deliberately not done: danger and brass (the mockup specifies neither), the per-form chip scale (deferred to
+JR3, where its consumer lives), and the card radius wiring (JR2 — cards sit at 12px in between, by design).
+Success is now a teal a few degrees from the personalization accent, which is the accent/semantic collision
+§2.2 forbids arriving from the direction the rule did not anticipate; shipped as approved and logged as
+exceptions-log #10 rather than resolved inside a token diff.

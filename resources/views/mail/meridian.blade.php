@@ -37,7 +37,7 @@ body *:not(html):not(style):not(br):not(tr):not(code) {
 body {
     -webkit-text-size-adjust: none;
     background-color: #FFFFFF;
-    color: #16212B;
+    color: #1A2233;
     height: 100%;
     line-height: 1.4;
     margin: 0;
@@ -64,7 +64,7 @@ a img {
 /* Typography */
 
 h1 {
-    color: #0E1620;
+    color: #121A2A;
     font-family: 'Segoe UI Variable Display', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 18px;
     font-weight: bold;
@@ -73,7 +73,7 @@ h1 {
 }
 
 h2 {
-    color: #0E1620;
+    color: #121A2A;
     font-size: 16px;
     font-weight: bold;
     margin-top: 0;
@@ -81,7 +81,7 @@ h2 {
 }
 
 h3 {
-    color: #0E1620;
+    color: #121A2A;
     font-size: 14px;
     font-weight: bold;
     margin-top: 0;
@@ -109,7 +109,7 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #F3F4F1;
+    background-color: #F5F7FC;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -159,9 +159,9 @@ img {
     -premailer-cellpadding: 0;
     -premailer-cellspacing: 0;
     -premailer-width: 100%;
-    background-color: #F3F4F1;
-    border-bottom: 1px solid #F3F4F1;
-    border-top: 1px solid #F3F4F1;
+    background-color: #F5F7FC;
+    border-bottom: 1px solid #F5F7FC;
+    border-top: 1px solid #F5F7FC;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -237,7 +237,7 @@ img {
 }
 
 .table td {
-    color: #16212B;
+    color: #1A2233;
     font-size: 15px;
     line-height: 18px;
     margin: 0;
@@ -311,17 +311,17 @@ img {
     margin: 21px 0;
 }
 
-/* `tint` against ink is one of the seventeen pairings the engine measures (>= 4.5:1), and #0E1620 IS the
-   light ink ground it measured against — so naming it here rather than inheriting the body's #16212B is
+/* `tint` against ink is one of the seventeen pairings the engine measures (>= 4.5:1), and #121A2A IS the
+   light ink ground it measured against — so naming it here rather than inheriting the body's #1A2233 is
    what makes the stored measurement true of this element. */
 .panel-content {
     background-color: {{ $brand['tint'] }};
-    color: #0E1620;
+    color: #121A2A;
     padding: 16px;
 }
 
 .panel-content p {
-    color: #0E1620;
+    color: #121A2A;
 }
 
 .panel-item {

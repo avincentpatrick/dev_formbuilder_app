@@ -94,9 +94,11 @@ describe('brand-ramp accessibility floor', () => {
     it.each(vectors.map((v) => [v.name, v] as const))('satisfies every §4.1 pairing for %s', (_name, vector) => {
         // Re-measured in TypeScript from the STORED hexes rather than trusting the stored ratios: this is
         // the assertion that would catch a fixture hand-edited to make a red build green.
+        // A deliberate third copy of the grounds — the point is to re-measure WITHOUT reading the
+        // module under test. JR1 moved all four non-white values with the neutral ramp.
         const grounds = {
-            light: { surface: '#FFFFFF', canvas: '#F3F4F1', ink: '#0E1620' },
-            dark: { surface: '#123350', canvas: '#0C2337', ink: '#EAF1F6' },
+            light: { surface: '#FFFFFF', canvas: '#F5F7FC', ink: '#121A2A' },
+            dark: { surface: '#1A2130', canvas: '#0F131C', ink: '#EFF4FD' },
         } as const;
 
         for (const pairing of BRAND_RAMP_PAIRINGS) {
@@ -113,13 +115,17 @@ describe('brand-ramp accessibility floor', () => {
 });
 
 describe('brand-ramp engine behaviour', () => {
-    it('reproduces the ratified Teal accent token-for-token', () => {
-        // The same anchor claim the PHP suite makes, asserted independently here: fed Teal's hue the
-        // engine re-derives the two tokens G11 hand-picked and hand-verified.
+    it('reproduces the ratified Teal accent FILL token-for-token', () => {
+        // The same anchor claim the PHP suite makes, asserted independently here.
+        //
+        // The TINT half is asserted separately below because it no longer matches G11's hand-picked
+        // #E6F2F2, and the PHP twin carries the full reasoning: `bg` measures against #FFFFFF, a ground
+        // that cannot move, while `tint` measures against the light ink JR1 moved. Only the half anchored
+        // to an immovable ground was ever robust.
         const teal = generateBrandRamp('#1B5E5E');
 
         expect(teal.tokens.light.bg).toBe('#1B5E5E'); // --mds-accent-teal-600
-        expect(teal.tokens.light.tint).toBe('#E6F2F2'); // --mds-accent-teal-50
+        expect(teal.tokens.light.tint).toBe('#EBF7F7'); // diverged from --mds-accent-teal-50 in JR1
     });
 
     it('gives every achromatic input the same ramp', () => {

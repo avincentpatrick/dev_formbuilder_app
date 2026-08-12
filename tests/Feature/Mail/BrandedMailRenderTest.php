@@ -92,7 +92,7 @@ it('inlines the tenant fill onto the action button', function (): void {
     // INLINE style. Asserting the class alone would pass even if the theme never resolved.
     expect($html)->toContain('background-color: #7A2E6B')
         ->and($html)->toContain('Do the thing')
-        ->and($html)->not->toContain('#1C4B72');
+        ->and($html)->not->toContain('#0E6FE8');
 });
 
 it('keeps white on the brand fill rather than reaching for the fg role', function (): void {
@@ -111,7 +111,7 @@ it('inlines the tenant tint onto a panel and leaves neutrals alone', function ()
 
     // ADR-0014 §D7 carried into mail: the brand paints actions, never the page. The canvas and the card
     // stay Meridian neutrals no matter what the tenant picked.
-    expect($html)->toContain('#F3F4F1')   // --mds-neutral-50, the wrapper canvas
+    expect($html)->toContain('#F5F7FC')   // --mds-neutral-50, the wrapper canvas
         ->and($html)->toContain('#DDE1DA'); // --mds-color-border-default
 });
 

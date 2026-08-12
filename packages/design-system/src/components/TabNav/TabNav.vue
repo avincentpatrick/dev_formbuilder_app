@@ -47,15 +47,25 @@
  * FAILURE. This component shipped with `-bg` first — DSR §3.4 specifies "`--mds-primary-600` 2px", and `-bg`
  * is that token's semantic name in light. But `-bg` is a FILL, and the only contrast the system guarantees
  * for it is against the text printed ON it: {@see BRAND_RAMP_PAIRINGS} pairs `bg` solely with `on_primary`.
- * Against the surface behind it there is no guarantee at all, and in dark there is a failure — `-bg` is
- * `primary-500` `#2E6789` on `bg-surface` `#123350` = **2.12:1**, and `1.95:1` under the teal accent. The
- * underline is a non-text UI component and owes 3:1.
+ * Against the surface behind it there is no guarantee at all. The underline is a non-text UI component and
+ * owes 3:1.
+ *
+ * ⚠️ **JR1 MOVED THE EVIDENCE UNDER THIS NOTE WITHOUT MOVING THE CONCLUSION, AND THE DIFFERENCE MATTERS.**
+ * The original measurement was `-bg` = `primary-500` `#2E6789` on `bg-surface` `#123350` = **2.12:1**, an
+ * outright failure. Under the Vivid ramp the same pairing is `primary-600` `#0E6FE8` on `#1a2130` =
+ * **3.42:1**, which passes — so the default accent no longer demonstrates the bug. The teal accent still
+ * does (`accent-teal-500` on `#1a2130` = **2.41:1**), and more importantly the ARGUMENT never depended on
+ * either number: `bg` is a fill, {@see BRAND_RAMP_PAIRINGS} pairs it solely with `on_primary`, and a token
+ * that happens to clear 3:1 against today's surface for today's palette is a coincidence a re-skin can
+ * revoke — as this one nearly did, in the other direction. Do not "simplify" this back to `-bg` on the
+ * strength of the 3.42.
  *
  * `action-primary-fg` is the token that carries exactly the guarantee needed, for every tenant brand rather
  * than just the two shipped accents: the ramp pairs `fg` against BOTH `surface` and `canvas`, in BOTH
  * themes, at `TEXT_MIN` (4.5:1) — comfortably over 3:1, by construction and not by spot measurement.
- * Measured anyway: 9.14:1 light, 5.17:1 dark, 7.48:1 light-teal, 5.16:1 dark-teal. `ConfigPanel.vue` already
- * uses this token for the same job. **axe never checks border contrast, so no gate would have caught this.**
+ * Measured anyway (JR1 values): 7.01:1 light, 8.29:1 dark, 7.48:1 light-teal, 6.39:1 dark-teal.
+ * `ConfigPanel.vue` already uses this token for the same job.
+ * **axe never checks border contrast, so no gate would have caught this.**
  *
  * ── The badge IS part of the link's accessible name, deliberately, and MdsBarChart does the opposite ────
  * "Submissions 128" is what this link is: a navigation item whose count tells the reader how much is behind

@@ -27,8 +27,8 @@
       - `bg` on white paper is `bg`/on_primary read backwards. Contrast is symmetric, so the >= 4.5:1
         the generator proved for white text on the fill is exactly the ratio brand-coloured ink has
         against the page.
-      - `tint` under ink is the `tint`/ink pairing verbatim — which is why .prose names #0E1620 rather
-        than inheriting the body's #1a1a1a: #0E1620 IS the light ink ground that measurement was taken
+      - `tint` under ink is the `tint`/ink pairing verbatim — which is why .prose names #121A2A rather
+        than inheriting the body's #1a1a1a: #121A2A IS the light ink ground that measurement was taken
         against, so naming it is what makes the stored ratio true of this element rather than approximately
         true.
 
@@ -63,7 +63,7 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.45; color: #1a1a
 
 .prose {
     margin: 4pt 0 6pt 0; padding: 5pt 7pt; font-size: 9.5pt;
-    background-color: {{ $brand['tint'] }}; color: #0E1620;
+    background-color: {{ $brand['tint'] }}; color: #121A2A;
 }
 .notice { margin: 2pt 0; color: #6a6a6a; font-style: italic; }
 

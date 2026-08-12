@@ -186,6 +186,9 @@ const deltaText = computed(() => {
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
+    /* JR1: the role now carries tracking, and a stat value is the one place a heading-1 is nearly
+       always digits — tabular-nums plus tight tracking is what makes a column of them line up. */
+    letter-spacing: var(--mds-type-heading-1-letter-spacing);
     color: var(--mds-color-text-heading);
 }
 

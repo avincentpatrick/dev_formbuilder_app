@@ -294,6 +294,75 @@ describe('primary-action fills carry their own text', () => {
     });
 });
 
+/**
+ * JR1 — the neutral ramp must be MONOTONIC in luminance, in both themes.
+ *
+ * This is the guard that would have caught what a hand-check could not. JR1's derived dark `neutral-0`
+ * landed **0.00016 luminance above `neutral-50`** — invisible to the eye, invisible in a diff of hexes
+ * (`#0d1322` next to `#0f131c` looks obviously darker; it is not), and a real inversion of the ramp's
+ * one structural promise: low steps dark, high steps pale.
+ *
+ * It is not cosmetic. In dark, `--mds-color-input-bg` is `neutral-0`, so an input would have rendered a
+ * fraction LIGHTER than the canvas behind it rather than sunken into it — a depth cue pointing the wrong
+ * way, at a magnitude no screenshot review would ever flag.
+ *
+ * The ramp is the substrate every semantic alias resolves through, so an inversion anywhere in it can
+ * surface as an arbitrary component looking subtly wrong three increments later. Ordering is the
+ * cheapest possible invariant to assert and the most expensive to debug from the symptom.
+ */
+describe('neutral ramp ordering', () => {
+    function luminance(hex: string): number {
+        const channel = (v: number): number => {
+            const c = v / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        };
+        const n = hex.replace('#', '');
+        const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    }
+
+    /** Every step the ramp defines, in scale order — read from the source rather than hard-coded. */
+    const STEPS = Object.keys(primitives['neutral']).map(Number).sort((a, b) => a - b);
+
+    function darkNeutral(step: number): string {
+        const declaration = block(`:root\\[data-theme-mode='dark'\\]`).find((d) =>
+            d.startsWith(`--mds-neutral-${step}:`),
+        );
+        expect(declaration, `--mds-neutral-${step} is not re-pointed in the dark block`).toBeDefined();
+
+        return declaration!.split(':')[1].trim();
+    }
+
+    it('covers every step in both columns (anti-vacuity)', () => {
+        // A renamed or dropped step would otherwise make the two assertions below iterate over less
+        // than the ramp and still pass.
+        expect(STEPS.length).toBeGreaterThanOrEqual(12);
+        for (const step of STEPS) expect(darkNeutral(step)).toMatch(/^#[0-9a-fA-F]{6}$/);
+    });
+
+    it('gets strictly DARKER as the step rises, in light', () => {
+        const luminances = STEPS.map((s) => luminance(primitives['neutral'][String(s)].value));
+
+        for (let i = 1; i < luminances.length; i++) {
+            expect(
+                luminances[i],
+                `light neutral-${STEPS[i]} is not darker than neutral-${STEPS[i - 1]}`,
+            ).toBeLessThan(luminances[i - 1]);
+        }
+    });
+
+    it('gets strictly PALER as the step rises, in dark', () => {
+        const luminances = STEPS.map((s) => luminance(darkNeutral(s)));
+
+        for (let i = 1; i < luminances.length; i++) {
+            expect(
+                luminances[i],
+                `dark neutral-${STEPS[i]} is not paler than neutral-${STEPS[i - 1]}`,
+            ).toBeGreaterThan(luminances[i - 1]);
+        }
+    });
+});
+
 describe('dyslexia font', () => {
     it('re-points only the body family alias, never display or mono', () => {
         const rule = block(`:root\\[data-dyslexia-font='true'\\]`);

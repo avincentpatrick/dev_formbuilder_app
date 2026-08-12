@@ -55,7 +55,7 @@ afterEach(function (): void {
 const GUEST_BRAND_HEX = '#C0392B';
 
 /** `--mds-primary-600` — the light `--mds-color-action-primary-bg` an UNBRANDED guest runtime paints. */
-const UNBRANDED_THEME_COLOR = '#1C4B72';
+const UNBRANDED_THEME_COLOR = '#0E6FE8';
 
 /**
  * A guest-reachable published form on a tenant that is branded unless `$brand` is null.

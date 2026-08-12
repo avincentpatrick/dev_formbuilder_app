@@ -30,7 +30,9 @@ export async function assertClean(page: Page, label: string): Promise<void> {
     // Moving the pointer off a control starts a transition on the control it left, exactly as flipping the
     // theme starts one on everything; "collapsing the window is not closing it" applies identically. J2b's
     // CI run flaked on `builder-axe.spec.ts` "share panel, live link (dark)" with 93 violations reporting
-    // `#6f99b5` on `#123350` — the background settled to the real dark `bg-surface` token while the
+    // `#6f99b5` on `#123350` (the dark `bg-surface` OF THE DAY — JR1 moved it to `#1a2130`; the hexes in
+    // this file are preserved as the incident recorded them, not updated to the current palette)
+    // — the background settled to the real dark `bg-surface` token while the
     // FOREGROUND was still an intermediate that appears in no token file, over
     // `.share__row--actions > .mds-button--secondary`: the button the test had just clicked. A `transparent`
     // secondary button whose only opaque state is `:hover` is precisely the shape that produces this.

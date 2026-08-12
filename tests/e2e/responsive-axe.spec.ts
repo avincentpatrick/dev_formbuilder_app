@@ -24,9 +24,10 @@ const pages = [
     // The forms list's SECOND view (JR3). Without this entry the enriched seven-column table, the
     // single-line action cluster, the two `align: 'end'` columns and `MdsDataTable`'s own scroll region
     // are scanned by nothing at all — `/forms` above renders the card grid now, so the table stopped
-    // being covered the moment the default flipped. It is also the half of this page that CAN scroll
-    // sideways (below ~1280px, by design), which makes it the one that most needs the overflow
-    // assertion at three viewports.
+    // being covered the moment the default flipped. ⚠️ JR4 CHANGED WHAT THIS ENTRY SEES AT TWO OF THE
+    // THREE VIEWPORTS: the collapse is keyed on the container now, so this table renders as CARDS below
+    // 56em of container (375 and 834) and as the dense seven-column table only at 1440. The mode that can
+    // still scroll sideways is therefore the desktop one, between ~896px and the ~1136px it needs.
     { name: 'Forms (table view)', path: '/forms?view=table' },
     { name: 'Submissions', path: '/submissions' },
     { name: 'Members', path: '/members' },
@@ -167,7 +168,8 @@ for (const theme of themes) {
         // `formEntry` rather than a `tr` locator (JR3): `/forms` renders a CARD GRID by default now, so a
         // `tr` matches nothing here unless `?view=table` is asked for. The helper matches either view —
         // and still cannot use getByRole('row'), for the reason the webhook and encode blocks below
-        // record: MdsDataTable drops the table ARIA role for its card layout at 375px.
+        // record: MdsDataTable drops the table ARIA role for its card layout, which since JR4 appears at any
+        // width where the table's container is under 56em — the 834px project as well as 375px.
         await formEntry(page, 'Community Health Survey')
             .getByRole('button', { name: 'Response statistics' })
             .click();
@@ -282,7 +284,8 @@ for (const theme of themes) {
 
 // The manual-encoding page (F4b). Reached via the "New submission" row action of the all-scalar published
 // "Clinic Intake" form (no id in the URL). A CSS `tr` locator scoped by row text is used rather than
-// getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.
+// getByRole('row', …) because the DataTable's card layout drops the table ARIA role — and since JR4 that
+// layout appears wherever the table's CONTAINER is under 56em, not only at 375px.
 // The scan covers every Phase-1 encode control (text/number/select/multi-select/yes-no/date/long-text).
 for (const theme of themes) {
     test(`Encode (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
@@ -376,7 +379,8 @@ for (const theme of themes) {
 
 // The webhook endpoint detail + delivery log (H14). Reached from the /webhooks list by opening the seeded
 // "Zapier" endpoint's "View endpoint" action (no id in the URL). A CSS `tr` locator scoped by row text is used
-// rather than getByRole('row', …) because the DataTable's mobile (375px) card layout drops the table ARIA role.
+// rather than getByRole('row', …) because the DataTable's card layout drops the table ARIA role, at any
+// width where the table's container is under 56em (JR4) rather than only at 375px.
 // The seeded endpoint carries a spread of deliveries so the action bar, detail cards, and delivery-log rows
 // (every status Badge) are all mounted for the scan.
 for (const theme of themes) {
@@ -450,7 +454,8 @@ for (const theme of themes) {
 // rather than inherited from MdsDataTable, so nothing else in this suite covers it.
 //
 // A CSS `tr` locator scoped by row text rather than getByRole('row', …), for the same reason the webhook
-// detail above uses one: the DataTable's mobile card layout drops the table ARIA role. `forceTheme` runs
+// detail above uses one: the DataTable's card layout drops the table ARIA role, at every width where its
+// container is under 56em rather than only at 375px (JR4). `forceTheme` runs
 // AFTER the click, matching that test.
 for (const theme of themes) {
     test(`Audit change detail (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {

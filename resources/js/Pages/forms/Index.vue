@@ -8,9 +8,11 @@
  *
  * ⚠️ THE TWO VIEWS ARE NOT TWO FEATURES. Cards suit the tenant with four forms; the table suits the one
  * with sixty sorted by response count. The card grid is the default because it is also the fix for a
- * measured defect: `MdsDataTable` only collapses to card-per-row at ≤480px, so across 481–1024px — every
+ * measured defect: `MdsDataTable` collapsed to card-per-row only at ≤480px, so across 481–1024px — every
  * tablet, every small laptop — this page was a sideways-scrolling strip. A grid reflows 1/2/3/4-up and
- * therefore cannot have that problem, or the empty-gutter problem above 1440px, at any width.
+ * therefore cannot have that problem, or the empty-gutter problem above 1440px, at any width. JR4 then
+ * fixed the underlying defect in the component itself, for the other eight tables that could not be
+ * rewritten as a card grid — so the toggle is now a choice about DENSITY rather than a rescue.
  */
 import { computed, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
@@ -411,8 +413,8 @@ function submitRestore(): void {
         <!--
             `role="list"` is NOT redundant and must not be tidied away: `list-style: none` removes list
             semantics in WebKit, so without it VoiceOver announces six cards with no sense of how many
-            there are. (`forms/Templates.vue` predates this and does not carry it — it should, and that is
-            a JR4 clean-up rather than a silent inconsistency.)
+            there are. (`forms/Templates.vue` predated this and did not carry it; JR4 gave it the same
+            attribute, so the two lists now agree.)
         -->
         <!-- `aria-busy` + a fade while a filter round-trips. The table gets this free from
              `MdsDataTable`'s `:loading`, and the grid had NOTHING: clicking a facet chip in the default
@@ -682,12 +684,12 @@ function submitRestore(): void {
     `[data-font-size="extra_large"]` scales the content ~25%), and the grid overruns. `.app-shell` is
     `overflow-x: clip`, so the overrun is CLIPPED rather than scrolled — and the e2e assertion measures
     `documentElement.scrollWidth`, which the clip keeps at zero. The failure is structurally invisible to
-    every gate; the guard is the only thing preventing it. (`forms/Templates.vue:108` is the one grid in
-    the app without it.)
+    every gate; the guard is the only thing preventing it. (JR4 gave `forms/Templates.vue` the same
+    guard — it was the one grid in the app without one.)
 
     `auto-fill`, not `auto-fit`: with `auto-fit` the empty tracks collapse, so a tenant with ONE form
-    gets a single card stretched across 1200px. `auto-fill` keeps it card-sized, which is also what the
-    approved direction draws.
+    gets a single card stretched across the whole column — 1600px on this page since JR4 made it a wide
+    one. `auto-fill` keeps it card-sized, which is also what the approved direction draws.
 */
 .forms__grid {
     display: grid;
@@ -721,21 +723,24 @@ function submitRestore(): void {
     So the table gets one line and, when that does not fit, `MdsDataTable`'s own horizontal scroll — a
     designed, focusable (`tabindex="0"`, `role="group"`) region rather than a defect.
 
-    ⚠️ WITH ONE EXCEPTION, WHICH THE FIRST VERSION OF THIS COMMENT ASSERTED AWAY: at ≤480px there IS no
-    scroll region. `DataTable.vue` sets `overflow-x: visible` there and says outright that the element
-    "is not a scroll container at all even if the content is wider", because each row has become a card.
-    A nine-button cluster on one line inside a 375px card has nothing to fall into. That is pre-existing
-    — the old `.forms__actions` was `nowrap` by default too, so this row neither introduces nor fixes it
-    — but the safety net named above does not extend that far, and saying it did was the kind of claim
-    that reads as verified.
+    ⚠️ WITH ONE EXCEPTION, WHICH THE FIRST VERSION OF THIS COMMENT ASSERTED AWAY: below the collapse
+    threshold there IS no scroll region. `DataTable.vue` sets `overflow-x: visible` there and says
+    outright that the element "is not a scroll container at all even if the content is wider", because
+    each row has become a card. A nine-button cluster on one line inside a 375px card has nothing to fall
+    into. That is pre-existing — the old `.forms__actions` was `nowrap` by default too, so this row
+    neither introduces nor fixes it — but the safety net named above does not extend that far, and saying
+    it did was the kind of claim that reads as verified.
 
-    ⚠️ THE COST IS REAL AND MEASURED, SO IT IS STATED RATHER THAN DISCOVERED LATER: with seven columns
-    and nine actions the table needs ~1136px, so it scrolls sideways at **1280px and below** where the
-    four-column version did not, and stops at 1440px (uniform 81px rows, no scroll). Nothing cheap buys
-    that back — dropping `Version` saves ~90px against the ~160px needed at 1280, and dropping `Updated`
-    as well would take the list's own sort key. It is also exactly why the CARD grid is the default and
-    why this row exists: the grid reflows and cannot scroll at any width, and a tenant who deliberately
-    chooses a dense table at 1024px is choosing a table.
+    ⚠️ THE COST IS REAL AND MEASURED, SO IT IS STATED RATHER THAN DISCOVERED LATER: with seven columns and
+    nine actions the table needs ~1136px. JR3 measured that as "scrolls at 1280px and below"; JR4 moved
+    the bottom of that range rather than the top, because the collapse is keyed on the container now —
+    under 56em (896px of container) this view renders as CARDS, so the sideways-scrolling band is what is
+    left in between, roughly 896–1136px of content box. Nothing cheap buys that back: dropping `Version`
+    saves ~90px against the ~160px needed, and dropping `Updated` as well would take the list's own sort
+    key. It is also exactly why the CARD grid is the default and why this row exists — the grid reflows
+    and cannot scroll at any width, and a tenant who deliberately chooses a dense table is choosing one.
+    The sort control survives the collapse: `MdsDataTable` renders its sortable columns as a chip row
+    above the cards, which is the affordance this view exists for.
 */
 :deep(.mds-table .form-actions) {
     flex-wrap: nowrap;

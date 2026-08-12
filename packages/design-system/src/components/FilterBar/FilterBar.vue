@@ -72,4 +72,20 @@ const headingId = useId();
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
     gap: var(--mds-space-3);
 }
+
+/* ⚠️ JR4 — THE CAP IS ON THE CHILD, NOT ON THE TRACK, AND THE FIRST ATTEMPT PROVED WHY. A `1fr` track
+   absorbs every spare pixel, and three of the six pages (forms, members, webhooks) pass exactly ONE
+   control — so the keyword field was already a 1136px slab at 1440px and would have become a 1536px one
+   inside JR4's 1600px column. A search input is a control, not a banner.
+
+   The obvious fix, `minmax(12rem, 22rem)`, is WRONG and was measured wrong on the running app: when a
+   track's max sizing function is DEFINITE, `auto-fit` computes its repetition count from the MAX rather
+   than the min, so a 706px tablet bar packed ONE 22rem track per row instead of three — it turned a
+   cosmetic slab into a four-row filter rail on exactly the viewport this increment exists to fix.
+
+   Capping the child leaves the track algorithm untouched: the same number of columns at every width as
+   before, with a lone control sized like a control and aligned to the start of its track. */
+.mds-filterbar__grid > * {
+    max-width: 22rem;
+}
 </style>

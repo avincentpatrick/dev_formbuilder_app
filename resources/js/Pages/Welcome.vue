@@ -141,7 +141,7 @@ const capabilities = [
     font-size: var(--mds-type-display-font-size);
     line-height: var(--mds-type-display-line-height);
     font-weight: var(--mds-type-display-font-weight);
-    letter-spacing: -0.015em;
+    letter-spacing: var(--mds-type-display-letter-spacing); /* JR1: was -0.015em */
 }
 
 .landing__lede {

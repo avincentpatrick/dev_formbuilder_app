@@ -43,7 +43,7 @@ export type BrandRampTheme = 'light' | 'dark';
 export type BrandRampTokens = Record<BrandRampTheme, Record<BrandRampRole, string>>;
 
 /** Must equal `BrandRampGenerator::VERSION`; asserted by the parity suite. */
-export const BRAND_RAMP_ENGINE_VERSION = 1;
+export const BRAND_RAMP_ENGINE_VERSION = 2;
 
 const ON_PRIMARY = '#FFFFFF';
 const MAX_CHROMA = 0.11;
@@ -52,8 +52,8 @@ const TEXT_MIN = 4.5;
 const NON_TEXT_MIN = 3.0;
 
 const GROUNDS: Record<BrandRampTheme, { surface: string; canvas: string; ink: string }> = {
-    light: { surface: '#FFFFFF', canvas: '#F3F4F1', ink: '#0E1620' },
-    dark: { surface: '#123350', canvas: '#0C2337', ink: '#EAF1F6' },
+    light: { surface: '#FFFFFF', canvas: '#F5F7FC', ink: '#121A2A' },
+    dark: { surface: '#1A2130', canvas: '#0F131C', ink: '#EFF4FD' },
 };
 
 const TARGETS = {

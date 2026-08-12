@@ -81,7 +81,8 @@ async function scan(page: Page, label: string): Promise<void> {
     // the control it left begins transitioning back to its resting colour, and the recalc lands on a later
     // frame. J1e added the two-frame wait to `forceTheme` and NOT here, and J2b's CI flaked on exactly the
     // gap — "share panel, live link (dark)" reported 93 violations with an intermediate FOREGROUND
-    // (`#6f99b5`, in no token file) over the settled dark `bg-surface` (`#123350`), on the very button the
+    // (`#6f99b5`, in no token file) over the settled dark `bg-surface` (`#123350` as it then was; JR1 moved
+    // that token to `#1a2130` and the incident hexes are left as recorded), on the very button the
     // test had just clicked. Shared with `assertClean`, which owed the same wait.
     await settlePaint(page);
 

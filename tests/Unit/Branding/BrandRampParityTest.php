@@ -50,14 +50,37 @@ it('re-derives every fixture vector byte-identically', function (array $vector):
     array_map(static fn (array $v): array => [$v], brandRampVectors()),
 ));
 
-it('reproduces the ratified Teal accent token-for-token', function (): void {
+it('reproduces the ratified Teal accent FILL token-for-token', function (): void {
     // The anchor claim of ADR-0014 §D4: the targets encode the design system's own judgment, not an
-    // author's taste. Fed Teal's hue, the engine independently arrives at the two Teal tokens a human
-    // hand-picked and hand-verified in G11 — the fill and the tint, byte-identically.
+    // author's taste. Fed Teal's hue, the engine independently arrives at the fill a human hand-picked
+    // and hand-verified in G11, byte-identically.
     $ramp = (new BrandRampGenerator)->generate('#1B5E5E');
 
-    expect($ramp->token('light', 'bg'))->toBe('#1B5E5E')   // --mds-accent-teal-600
-        ->and($ramp->token('light', 'tint'))->toBe('#E6F2F2'); // --mds-accent-teal-50
+    expect($ramp->token('light', 'bg'))->toBe('#1B5E5E'); // --mds-accent-teal-600
+});
+
+it('no longer reproduces the ratified Teal TINT — and that is a property of the grounds, not a regression', function (): void {
+    // ⚠️ THE TINT HALF OF §D4's BYTE-IDENTITY CLAIM DIED IN JR1, AND THE REASON IS WORTH MORE THAN THE
+    // CLAIM WAS. The two halves were never equally robust:
+    //
+    //   · `bg` is searched against ON_PRIMARY, which is #FFFFFF — a ground that CANNOT move. That half
+    //     still holds byte-for-byte and always will.
+    //   · `tint` is searched against the light `ink` ground, which is `neutral-900`. JR1 moved the neutral
+    //     ramp (#0E1620 -> #121A2A), so the lightness satisfying "15.9:1 against ink" moved with it, and
+    //     the engine now derives #EBF7F7 where G11's human hand-picked #E6F2F2.
+    //
+    // `--mds-accent-teal-50` is deliberately NOT updated to #EBF7F7 to make this test green again. Doing
+    // that would leave the assertion comparing the engine against a number copied FROM the engine, which
+    // is precisely the evidential value §D4 was claiming — an independent human choice and a machine
+    // agreeing. A circular assertion that reads like corroboration is worse than an honest divergence.
+    //
+    // The two are 5 units per channel apart and both clear ink-on-tint comfortably; the divergence is
+    // recorded, not papered over.
+    $ramp = (new BrandRampGenerator)->generate('#1B5E5E');
+
+    expect($ramp->token('light', 'tint'))->toBe('#EBF7F7')
+        ->and(round(ColorSpace::contrast('#121A2A', $ramp->token('light', 'tint')), 2))
+        ->toBeGreaterThanOrEqual(4.5);
 });
 
 it('reproduces §4.1 rows 1-3 for Teal to two decimals', function (): void {

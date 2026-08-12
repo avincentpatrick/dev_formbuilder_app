@@ -17,7 +17,7 @@
    selectors below would otherwise repeat five literals each and could drift apart.
 
    Why a dark re-point at all — this is derived, not stylistic. Charts sit on
-   --mds-color-bg-surface, which is #FFFFFF in light and #123350 in dark. A data mark is a
+   --mds-color-bg-surface, which is #FFFFFF in light and #1a2130 in dark. A data mark is a
    "meaningful graphical object" under WCAG 1.4.11 and takes 3:1 against its ground. One token
    set satisfying 3:1 against BOTH grounds is confined to a narrow luminance band with no room
    left for five marks to stay distinguishable from each other, so the scale is re-pointed per
@@ -25,53 +25,63 @@
 
    Hue identity is preserved per index across the flip (1 blue, 2 vermilion, 3 green, 4 purple,
    5 ochre) — the anchors are the Okabe-Ito colour-vision-deficiency-safe set, darkened for the
-   white ground and lightened for the drafting-blue one. Ratios below are measured against
-   #123350; the full table (both themes) is DSR §4.1. NOTE these alias no primary/success/
-   warning/danger/accent scale and NO [data-accent] rule may touch them: a data series encodes
+   white ground and lightened for the dark one. The five hexes are UNCHANGED by JR1 and were
+   re-measured against the new, deeper ground rather than assumed: every series gained headroom.
+   Ratios below are measured against #1a2130; the full table (both themes) is DSR §4.1. NOTE
+   these alias no primary/success/warning/danger/accent scale and NO [data-accent] rule may
+   touch them: a data series encodes
    meaning, and two colleagues reading one screenshot must see the same series in the same
    colour. That rule is enforced by a test, not by this comment. */
 :root {
-    --mds-_chart-dark-1: #7cc9f1; /* vs #123350   7.11:1 */
-    --mds-_chart-dark-2: #e4813f; /*              4.65:1 */
-    --mds-_chart-dark-3: #37b98c; /*              5.25:1 */
-    --mds-_chart-dark-4: #c077ad; /*              4.01:1 */
-    --mds-_chart-dark-5: #f0cb6d; /*              8.34:1 */
+    --mds-_chart-dark-1: #7cc9f1; /* vs #1a2130   8.80:1 */
+    --mds-_chart-dark-2: #e4813f; /*              5.76:1 */
+    --mds-_chart-dark-3: #37b98c; /*              6.50:1 */
+    --mds-_chart-dark-4: #c077ad; /*              4.97:1 */
+    --mds-_chart-dark-5: #f0cb6d; /*             10.33:1 */
 }
 
 /* ── Dark: explicit opt-in ─────────────────────────────────────────────── */
 :root[data-theme-mode='dark'] {
-    /* Neutral ramp → deep drafting-blue ground (low steps dark, high steps pale) */
-    --mds-neutral-0: #081a29;
-    --mds-neutral-50: #0c2337;
-    --mds-neutral-100: #123350;
-    --mds-neutral-200: #1d3f57;
-    --mds-neutral-300: #2c5570;
-    --mds-neutral-400: #7591a4;
-    --mds-neutral-500: #8ca5b5;
-    --mds-neutral-600: #a9c1d1;
-    --mds-neutral-700: #c4d5e0;
-    --mds-neutral-800: #dce7ee;
-    --mds-neutral-900: #eaf1f6;
-    --mds-neutral-950: #f5f9fb;
+    /* Neutral ramp → deep cool-ink ground (low steps dark, high steps pale). JR1 re-anchored this
+       from the drafting-blue column to the Vivid family; the STRUCTURE is unchanged. */
+    --mds-neutral-0: #0d1322;
+    --mds-neutral-50: #0f131c;
+    --mds-neutral-100: #1a2130;
+    --mds-neutral-200: #2c374c;
+    --mds-neutral-300: #3a475f;
+    --mds-neutral-400: #6d7588;
+    --mds-neutral-500: #838da0;
+    --mds-neutral-600: #9aa5bd;
+    --mds-neutral-700: #c0c7d8;
+    --mds-neutral-800: #e8ecf5;
+    --mds-neutral-900: #eff4fd;
+    --mds-neutral-950: #f7faff;
+
+    /* Elevation on a dark ground: a brand-tinted shadow is invisible against near-black, so the
+       resting steps become a true black drop plus an accent GLOW, which is what reads as raised
+       here (JR1). Only 1 and 2 are re-pointed — 3/4/5 are overlay surfaces that already carry a
+       scrim, and their light values degrade to an acceptable dark drop. */
+    --mds-shadow-1: 0 2px 6px rgba(0, 0, 0, 0.5), 0 14px 32px -16px rgba(127, 178, 255, 0.28);
+    --mds-shadow-2: 0 4px 10px rgba(0, 0, 0, 0.55), 0 14px 34px -12px rgba(127, 178, 255, 0.34);
 
     /* Semantic aliases that shift step (or take a fixed value) on the dark ground */
     --mds-color-bg-surface: var(--mds-neutral-100);
     --mds-color-bg-surface-raised: var(--mds-neutral-100);
     --mds-color-bg-sunken: var(--mds-neutral-50);
     --mds-color-text-on-primary: #ffffff;
-    --mds-color-text-on-warning: #16212b;
-    /* White-on-fill, verified (H21d1). The dark hover/active DARKEN rather than lighten, which is the
-       opposite of a light-mode instinct and the reason this was wrong: --mds-color-text-on-primary is
-       #ffffff here, so a lighter fill destroys the very contrast the fill exists to carry. primary-400 is
-       3.96:1 and primary-300 is 2.52:1 against white — both real WCAG 1.4.3 failures in the hover and
-       active states of every primary button in dark mode. There is no ramp step between 400 and 500 that
-       clears 4.5:1, so the affordance moves the other way rather than inventing a colour. The teal accent
-       already carried per-token verification (see below); the default accent never did. */
-    --mds-color-action-primary-bg: var(--mds-primary-500); /* white on it     6.14:1 */
-    --mds-color-action-primary-bg-hover: var(--mds-primary-600); /*           9.14:1 */
-    --mds-color-action-primary-bg-active: var(--mds-primary-700); /*         13.00:1 */
-    --mds-color-action-primary-fg: var(--mds-primary-300);
-    --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
+    --mds-color-text-on-warning: #121a2a;
+    /* White-on-fill, verified (H21d1, re-verified and RE-POINTED in JR1). The dark hover/active DARKEN
+       rather than lighten: --mds-color-text-on-primary is #ffffff here, so a lighter fill destroys the
+       very contrast the fill exists to carry. That reasoning is unchanged — what changed is which steps
+       satisfy it. The Vivid ramp is far more saturated, so primary-500 is now 3.71:1 against white
+       (it was 6.14:1 as the old #2E6789) and primary-400 is 2.79:1 — the same WCAG 1.4.3 failure H21d1
+       found, arriving from the palette rather than from the direction of the ramp. Every fill therefore
+       shifts one step deeper, and the fills below are the light ramp's own fill/hover/active triple. */
+    --mds-color-action-primary-bg: var(--mds-primary-600); /* white on it     4.71:1 */
+    --mds-color-action-primary-bg-hover: var(--mds-primary-700); /*           7.01:1 */
+    --mds-color-action-primary-bg-active: var(--mds-primary-800); /*          9.81:1 */
+    --mds-color-action-primary-fg: var(--mds-primary-300); /* on #1a2130      8.29:1 */
+    --mds-color-action-primary-tint: rgba(88, 155, 253, 0.18);
     --mds-color-action-danger-bg: var(--mds-danger-500);
     --mds-color-action-danger-bg-hover: var(--mds-danger-400);
     --mds-color-danger-text: var(--mds-danger-300);
@@ -105,30 +115,34 @@
 /* ── Dark: system default (absence of an explicit light/dark choice) ───── */
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme-mode='light']):not([data-theme-mode='dark']) {
-        --mds-neutral-0: #081a29;
-        --mds-neutral-50: #0c2337;
-        --mds-neutral-100: #123350;
-        --mds-neutral-200: #1d3f57;
-        --mds-neutral-300: #2c5570;
-        --mds-neutral-400: #7591a4;
-        --mds-neutral-500: #8ca5b5;
-        --mds-neutral-600: #a9c1d1;
-        --mds-neutral-700: #c4d5e0;
-        --mds-neutral-800: #dce7ee;
-        --mds-neutral-900: #eaf1f6;
-        --mds-neutral-950: #f5f9fb;
+        --mds-neutral-0: #0d1322;
+        --mds-neutral-50: #0f131c;
+        --mds-neutral-100: #1a2130;
+        --mds-neutral-200: #2c374c;
+        --mds-neutral-300: #3a475f;
+        --mds-neutral-400: #6d7588;
+        --mds-neutral-500: #838da0;
+        --mds-neutral-600: #9aa5bd;
+        --mds-neutral-700: #c0c7d8;
+        --mds-neutral-800: #e8ecf5;
+        --mds-neutral-900: #eff4fd;
+        --mds-neutral-950: #f7faff;
+
+        /* Must not drift from the explicit dark block above — see the JR1 note there. */
+        --mds-shadow-1: 0 2px 6px rgba(0, 0, 0, 0.5), 0 14px 32px -16px rgba(127, 178, 255, 0.28);
+        --mds-shadow-2: 0 4px 10px rgba(0, 0, 0, 0.55), 0 14px 34px -12px rgba(127, 178, 255, 0.34);
 
         --mds-color-bg-surface: var(--mds-neutral-100);
         --mds-color-bg-surface-raised: var(--mds-neutral-100);
         --mds-color-bg-sunken: var(--mds-neutral-50);
         --mds-color-text-on-primary: #ffffff;
-        --mds-color-text-on-warning: #16212b;
+        --mds-color-text-on-warning: #121a2a;
         /* Must not drift from the explicit dark block above — see H21d1's note there. */
-        --mds-color-action-primary-bg: var(--mds-primary-500); /* white on it     6.14:1 */
-        --mds-color-action-primary-bg-hover: var(--mds-primary-600); /*           9.14:1 */
-        --mds-color-action-primary-bg-active: var(--mds-primary-700); /*         13.00:1 */
-        --mds-color-action-primary-fg: var(--mds-primary-300);
-        --mds-color-action-primary-tint: rgba(78, 134, 168, 0.18);
+        --mds-color-action-primary-bg: var(--mds-primary-600); /* white on it     4.71:1 */
+        --mds-color-action-primary-bg-hover: var(--mds-primary-700); /*           7.01:1 */
+        --mds-color-action-primary-bg-active: var(--mds-primary-800); /*          9.81:1 */
+        --mds-color-action-primary-fg: var(--mds-primary-300); /* on #1a2130      8.29:1 */
+        --mds-color-action-primary-tint: rgba(88, 155, 253, 0.18);
         --mds-color-action-danger-bg: var(--mds-danger-500);
         --mds-color-action-danger-bg-hover: var(--mds-danger-400);
         --mds-color-danger-text: var(--mds-danger-300);
@@ -170,9 +184,17 @@
      · -bg-active and -tint were never overridden, so they stayed blue;
      · there was no dark variant at all — and since [data-accent] had the SAME specificity
        as [data-theme-mode='dark'] and appeared LATER in source order, teal won in dark and
-       painted light #1B5E5E on the #123350 dark ground: 1.74:1 for BOTH
+       painted light #1B5E5E on the then-#123350 dark ground: 1.74:1 for BOTH
        action-primary-fg and focus-ring, failing WCAG 1.4.3 (4.5:1) and 1.4.11 (3:1).
-   Every pairing below is measured; the full table is DSR §4.1. */
+   Every pairing below is measured; the full table is DSR §4.1.
+
+   ⚠️ JR1 note — THE TEAL RAMP IS UNCHANGED AND ITS LIGHT RATIOS ARE UNCHANGED (the ground is
+   still #FFFFFF), but its DARK ratios were re-measured against the new #1a2130 surface rather
+   than carried over. All improved. Separately: JR1 moved SUCCESS to #0B7F76, which is a teal of
+   very nearly this hue, so a user on this accent now sees primary fills in the same family as
+   success pills. That is a real collision with §2.2's accent/semantic separation and is recorded
+   as exceptions-log #10 — deliberately NOT resolved here, because re-hueing a personalization
+   accent is a user-facing change and does not belong inside a token diff. */
 
 /* Light (and the light half of "system"). */
 :root[data-accent='teal'] {
@@ -200,9 +222,9 @@
     --mds-_accent-teal-dark-bg: var(--mds-accent-teal-500); /* white on it     6.68:1 */
     --mds-_accent-teal-dark-bg-hover: var(--mds-accent-teal-400); /*           4.82:1 */
     --mds-_accent-teal-dark-bg-active: var(--mds-accent-teal-700); /*          9.40:1 */
-    --mds-_accent-teal-dark-fg: var(--mds-accent-teal-300); /* on #123350      5.16:1 */
-    --mds-_accent-teal-dark-tint: rgba(36, 126, 126, 0.18); /* pale ink on it  9.54:1 */
-    --mds-_accent-teal-dark-ring: var(--mds-accent-teal-300); /* vs #123350    5.16:1 */
+    --mds-_accent-teal-dark-fg: var(--mds-accent-teal-300); /* on #1a2130      6.39:1 */
+    --mds-_accent-teal-dark-tint: rgba(36, 126, 126, 0.18); /* pale ink on it 11.27:1 */
+    --mds-_accent-teal-dark-ring: var(--mds-accent-teal-300); /* vs #1a2130    6.39:1 */
 }
 
 /* Dark + teal, explicit opt-in. (0,3,0) beats both the light teal rule (0,2,0) and the
@@ -254,10 +276,10 @@
    swap is for letterform disambiguation in prose, where OpenDyslexic's weighted bottoms help
    — in column-aligned data they hurt. */
 :root[data-font-size='large'] {
-    --mds-type-display-font-size: 41px;
-    --mds-type-display-line-height: 50px;
-    --mds-type-heading-1-font-size: 34px;
-    --mds-type-heading-1-line-height: 43px;
+    --mds-type-display-font-size: 50px;
+    --mds-type-display-line-height: 61px;
+    --mds-type-heading-1-font-size: 43px;
+    --mds-type-heading-1-line-height: 52px;
     --mds-type-heading-2-font-size: 27px;
     --mds-type-heading-2-line-height: 36px;
     --mds-type-heading-3-font-size: 23px;
@@ -279,10 +301,10 @@
 }
 
 :root[data-font-size='extra_large'] {
-    --mds-type-display-font-size: 45px;
-    --mds-type-display-line-height: 55px;
-    --mds-type-heading-1-font-size: 38px;
-    --mds-type-heading-1-line-height: 48px;
+    --mds-type-display-font-size: 55px;
+    --mds-type-display-line-height: 68px;
+    --mds-type-heading-1-font-size: 48px;
+    --mds-type-heading-1-line-height: 58px;
     --mds-type-heading-2-font-size: 30px;
     --mds-type-heading-2-line-height: 40px;
     --mds-type-heading-3-font-size: 25px;

@@ -354,11 +354,13 @@ function summarize(row: AuditRow): string {
 /*
  * ⚠️ A LINK WITHOUT A COLOUR TOKEN IS NOT AN UNSTYLED LINK — IT IS A DARK-MODE CONTRAST FAILURE.
  * Omitting this rule leaves the anchor at the user agent's default `#0000EE`, which is fine on the light
- * surface and measures 1.38:1 against the dark table row (`--mds-primary-700`, #123350) — axe reported
- * exactly that, and the CI E2E gate failed on it at all three viewports in dark while passing in light.
+ * surface and measured 1.38:1 against the dark table row — axe reported exactly that, and the CI E2E gate
+ * failed on it at all three viewports in dark while passing in light. (JR1 moved the dark surface from
+ * #123350 to `--mds-neutral-100` #1a2130 and the same default link is now 1.71:1 — still a failure, and
+ * still one no light-theme check can see.)
  * `--mds-color-action-primary-fg` is the theme-aware token for primary-coloured text ON a surface (the
  * same one `webhooks/Show.vue`'s back link uses): it re-points to `--mds-primary-300` in dark, giving
- * 5.17:1, and the design system documents 7.48:1 for its light value.
+ * 8.29:1, against 7.01:1 for its light value.
  *
  * The lesson generalises past this rule: the light theme cannot catch this class of defect, so any new
  * anchor outside a design-system component needs a token, not a default.

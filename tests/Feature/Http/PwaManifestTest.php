@@ -77,8 +77,8 @@ it('serves a per-form web manifest pinned to the form URL', function (): void {
         // H23b: --mds-primary-600, the light --mds-color-action-primary-bg an unbranded guest runtime
         // actually paints. It was --mds-accent-teal-600 (#1B5E5E) from G8a until now — a colour this
         // surface has never rendered, because the guest shell emits no data-accent.
-        ->assertJsonPath('theme_color', '#1C4B72')
-        ->assertJsonPath('background_color', '#F3F4F1')
+        ->assertJsonPath('theme_color', '#0E6FE8')
+        ->assertJsonPath('background_color', '#F5F7FC')
         ->assertJsonPath('icons.0.src', '/icons/icon-192.png')
         ->assertJsonPath('icons.2.purpose', 'maskable');
 
@@ -100,7 +100,7 @@ it('serves the tenant brand as theme_color, and leaves background_color a neutra
     $this->get('http://acme.meridian.test/f/intake/manifest.webmanifest')
         ->assertOk()
         ->assertJsonPath('theme_color', $ramp->token('light', 'bg'))
-        ->assertJsonPath('background_color', '#F3F4F1');
+        ->assertJsonPath('background_color', '#F5F7FC');
 });
 
 it('404s an unknown slug', function (): void {

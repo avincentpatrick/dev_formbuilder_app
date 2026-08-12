@@ -60,7 +60,7 @@ const props = defineProps<{
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
-const colorForm = useForm({ primary_color: props.branding.input_color ?? '#1C4B72' });
+const colorForm = useForm({ primary_color: props.branding.input_color ?? '#0E6FE8' });
 const logoInput = ref<HTMLInputElement | null>(null);
 
 /**
@@ -92,7 +92,7 @@ const previewMeasurements = computed(() =>
 watch(
     () => props.branding.input_color,
     (value) => {
-        colorForm.primary_color = value ?? '#1C4B72';
+        colorForm.primary_color = value ?? '#0E6FE8';
     },
 );
 
@@ -456,13 +456,13 @@ function removeLogo(): void {
    values are the real --mds-color-bg-surface in each theme (design-system-reference.md §2.2). */
 .branding__theme--light {
     background: #ffffff;
-    color: #0e1620;
+    color: #121a2a;
     border: 1px solid var(--mds-color-border-default);
 }
 
 .branding__theme--dark {
-    background: #123350;
-    color: #eaf1f6;
+    background: #1a2130;
+    color: #eff4fd;
 }
 
 .branding__theme-label {

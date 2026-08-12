@@ -62,21 +62,26 @@ final class BrandPalette
      * @var array<string, string>
      */
     public const array PRODUCT = [
-        'bg' => '#1C4B72',        // color.action.primary.bg        → primary.600
-        'bg_hover' => '#123350',  // color.action.primary.bg-hover  → primary.700
-        'bg_active' => '#0D2740', // color.action.primary.bg-active → primary.800
-        'fg' => '#1C4B72',        // color.action.primary.fg        → primary.600
-        'tint' => '#EAF1F6',      // color.action.primary.tint      → primary.50
-        'ring' => '#123350',      // color.focus.ring               → primary.700
+        'bg' => '#0E6FE8',        // color.action.primary.bg        → primary.600
+        'bg_hover' => '#1156B2',  // color.action.primary.bg-hover  → primary.700
+        'bg_active' => '#09418B', // color.action.primary.bg-active → primary.800
+        'fg' => '#1156B2',        // color.action.primary.fg        → primary.700  ← NOT bg; see below
+        'tint' => '#F2F7FF',      // color.action.primary.tint      → primary.50
+        'ring' => '#1156B2',      // color.focus.ring               → primary.700
     ];
 
     /**
      * White on a brand fill — {@see BrandRampGenerator::ON_PRIMARY}, the ground every `bg`/`bg_hover`/
      * `bg_active` pairing was measured against at ≥4.5:1.
      *
-     * Exposed as a constant so no template is tempted to reach for `fg` for button text: in the light
-     * ramp `fg` IS `bg` (the generator aliases them), so using it there would put the fill colour on the
-     * fill — a contrast inversion the engine never measured.
+     * Exposed as a constant so no template is tempted to reach for `fg` for button text. The reason has
+     * TWO forms now, and both end at "not `fg`":
+     *   · for a TENANT ramp, the generator still aliases light `fg` to `bg`, so using it would put the
+     *     fill colour on the fill — a contrast inversion the engine never measured;
+     *   · for the PRODUCT default since JR1 it is worse than redundant, because `fg` and `bg` finally
+     *     differ: `fg` is `primary.700`, a deliberately darker step chosen so brand-coloured TEXT clears
+     *     4.5:1 on the canvas. Painting it as a fill under white text is a colour picked for the
+     *     opposite job.
      */
     public const string ON_BRAND = '#FFFFFF';
 

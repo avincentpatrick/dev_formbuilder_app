@@ -153,6 +153,17 @@ available for the active state that keeps its label readable, so "lighter on pre
 unreachable for this hue. Darkening instead yields 9.40:1 and reads as a pressed-in surface, which is
 the conventional pressed metaphor anyway.
 
+⚠️ **JR1 (2026-08-12) made this entry's PREMISE obsolete while leaving its content correct.** The
+first sentence above contrasts teal with "every other ramp in the system", citing Blueprint's dark
+`bg-active` as a *paler* step. That is no longer true of anything: the Vivid re-skin's dark fills are
+`primary-600 / 700 / 800`, the same triple light uses, and they move **deeper** on interaction —
+because `--mds-color-text-on-primary` is `#FFFFFF` in both themes, so a lighter fill destroys the
+contrast the fill exists to carry. Teal's darken-on-press is therefore no longer a deviation at all;
+it is now what the default does. The entry is kept rather than deleted because the *reasoning* — that
+for this hue "lighter on press" is mathematically unreachable — is still the reason teal's ramp looks
+the way it does, and because deleting an exception whose subject became the rule loses the record of
+how the rule was arrived at.
+
 **Related observation, deliberately not fixed here:** ~~Blueprint's own dark `bg-active` (`primary-300`)
 measures **2.52:1** with white text — a pre-existing latent failure, invisible to CI because
 `assertClean` parks the pointer and axe never evaluates `:active`. It predates G11 and is unrelated to
@@ -307,3 +318,33 @@ directly in `CommandPalette.test.ts`.
 
 **Retire when:** the primitives increment lands `MdsCombobox`. At that point this component should become
 a consumer of it, and this entry should be deleted rather than amended.
+
+## #10 — Success and the Teal personalization accent now share a hue (`packages/design-system/tokens/primitive.json`)
+
+**Introduced:** Phase 3 · Increment JR1 (the approved Vivid Product re-skin).
+
+**What deviates:** §2.2's accent/semantic separation rule says a personalization accent must never
+borrow a semantic hue — the stated example being that reusing Moss would let a user recolour every
+primary button the same green as "success". JR1 re-hues **success** from Moss `#2F6249` to
+`#0B7F76`, which sits within a few degrees of `--mds-accent-teal-600` `#1B5E5E`. A user who selects
+the Teal accent now sees primary fills in the same family as success pills.
+
+**Why it ships anyway:** the collision arrives from the direction the rule did not anticipate. The
+rule governs what an *accent* may borrow; here a *semantic* hue moved onto an accent that was already
+there. `#0B7F76` is part of the visual direction the user chose from four fully-rendered
+alternatives, so it is a ratified product decision in the same sense the palette itself is — and the
+alternative was to silently substitute a different success colour than the one they approved.
+
+**Why it is not resolved in JR1:** the fix is to re-hue the Teal accent, and that is a user-facing
+personalization change — `data-accent='teal'` is a stored preference on real accounts and the accent
+is named for its colour. Making that call inside a token diff would be exactly the kind of scope
+creep the JR row split exists to prevent. It also affects nobody today: no shipped surface sets
+`data-accent`, so the collision is currently reachable only through the personalization settings page.
+
+**Disposition:** accepted for now, with a named owner in the sequence. Both hues remain independently
+contrast-verified in DSR §4.1 (success 4.87:1 on white; the full 17-row teal table). Revisit when the
+personalization accent set is next opened — the honest options are re-hueing teal toward violet or
+retiring the second accent in favour of the tenant brand ramp, which did not exist when teal was
+introduced.
+
+---

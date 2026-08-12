@@ -19,6 +19,9 @@ body {
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-body-lg-font-size);
     line-height: var(--mds-type-body-lg-line-height);
+    /* JR1: the guest SPA does NOT import app.css, so the global tracking has to be repeated here or
+       the runtime silently keeps the old default while the admin app moves. */
+    letter-spacing: var(--mds-tracking-base);
     color: var(--mds-color-text-body);
     background-color: var(--mds-color-bg-canvas);
 }

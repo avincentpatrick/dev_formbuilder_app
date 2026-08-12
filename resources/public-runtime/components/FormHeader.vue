@@ -43,6 +43,7 @@ defineProps<{ title: string; description: string | null; saving: boolean; savedA
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
+    letter-spacing: var(--mds-type-heading-1-letter-spacing);
     color: var(--mds-color-text-heading);
 }
 

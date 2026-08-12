@@ -251,7 +251,7 @@ function formatDate(iso: string | null): string {
                     </div>
                     <div class="detail__meta-row">
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(submission.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(submission.status)" dot /></dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Version</dt>

@@ -239,7 +239,11 @@ function clearFilters(): void {
     padding: var(--mds-space-3);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2 — `lg`, the compact-surface tier (DSR §2.6). One card per result, mounted bare on the
+       canvas: structurally the same object as the table's ≤480px card-per-row, which this increment
+       promoted for the same reason. Global search is PRD §3.7's non-negotiable surface, so it is the
+       last list that should be left speaking the old radius. */
+    border-radius: var(--mds-radius-lg);
 }
 
 .search__row-title {

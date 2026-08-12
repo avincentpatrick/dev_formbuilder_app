@@ -349,7 +349,9 @@ function formatDate(iso: string | null): string {
             </template>
             <template #cell-status="{ row }">
                 <div class="inbox__status">
-                    <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" />
+                    <!-- `dot` (JR2): the inbox status column, the second of the two scannable status
+                         columns in the product. See forms/Index.vue for the reasoning. -->
+                    <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" dot />
                     <span
                         v-if="(row as SubmissionRow).status === 'draft' && (row as SubmissionRow).completeness_percent !== null"
                         class="inbox__progress"

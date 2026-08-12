@@ -222,7 +222,7 @@ function formatDay(iso: string | null): string {
                 <dl class="admin-td__meta">
                     <div>
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(tenant.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(tenant.status)" dot /></dd>
                     </div>
                     <div>
                         <dt>Slug</dt>
@@ -408,7 +408,7 @@ function formatDay(iso: string | null): string {
                     />
                 </template>
                 <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as ConsoleDomainRow).status)" />
+                    <MdsBadge v-bind="statusVariant((row as ConsoleDomainRow).status)" dot />
                 </template>
                 <template #cell-last_checked_at="{ row }">
                     {{ formatDate((row as ConsoleDomainRow).last_checked_at) }}

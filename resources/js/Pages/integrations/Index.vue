@@ -144,7 +144,7 @@ function channelLabel(rule: RuleRow): string {
                     <div class="connection__head">
                         <div class="connection__identity">
                             <h2 class="connection__title">{{ connection.external_account_label }}</h2>
-                            <MdsBadge v-bind="statusVariant(connection.status)" />
+                            <MdsBadge v-bind="statusVariant(connection.status)" dot />
                         </div>
                         <div class="connection__actions">
                             <MdsButton
@@ -209,7 +209,7 @@ function channelLabel(rule: RuleRow): string {
                         <template v-else>{{ (row as RuleRow).form_title ?? 'All forms' }}</template>
                     </template>
                     <template #cell-status="{ row }">
-                        <MdsBadge v-bind="statusVariant((row as RuleRow).status)" />
+                        <MdsBadge v-bind="statusVariant((row as RuleRow).status)" dot />
                     </template>
                     <template #row-actions="{ row }">
                         <MdsIconButton

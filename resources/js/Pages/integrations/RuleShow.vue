@@ -143,7 +143,7 @@ function formatDate(iso: string | null): string {
                 <dl class="detail__meta">
                     <div class="detail__meta-row">
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(rule.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(rule.status)" dot /></dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Workspace</dt>
@@ -216,7 +216,7 @@ function formatDate(iso: string | null): string {
                     <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
                 </template>
                 <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" />
+                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
                 </template>
                 <template #cell-attempt_count="{ row }">
                     {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}

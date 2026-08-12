@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { mount } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import DataTable from './DataTable.vue';
@@ -82,5 +84,54 @@ describe('MdsDataTable — scrollable region keyboard access', () => {
         expect(wrapper.find('.mds-table__scroll').attributes('tabindex')).toBeUndefined();
 
         wrapper.unmount();
+    });
+});
+
+/**
+ * JR2 — a source-level guard for a defect that shipped in this very increment and that NO runtime
+ * gate in this repo could have caught.
+ *
+ * When the column header became uppercase and tracked, `Status` and `Version` obeyed and `Form` and
+ * `Updated` did not: those two are the SORTABLE columns, and their text lives inside
+ * `.mds-table__sort`, a `<button>`. `font: inherit` resets only the `font-*` longhands; the UA
+ * stylesheet separately sets `text-transform: none` and `letter-spacing: normal` on form controls,
+ * and those beat inheritance. One header row rendered in two type treatments.
+ *
+ * It is asserted as SOURCE TEXT on purpose. happy-dom computes no styles, so a `getComputedStyle`
+ * assertion would pass whatever the CSS said; axe does not check letter case; and there is no
+ * visual-regression baseline anywhere in the repo. The only thing that noticed was a person looking
+ * at a screenshot, and a person is not a gate. `token-references.test.ts` already reads `.vue` files
+ * as text for the same reason.
+ */
+describe('MdsDataTable — the sort button must not drop the header’s type treatment', () => {
+    const source = readFileSync(
+        join(process.cwd(), 'packages/design-system/src/components/DataTable/DataTable.vue'),
+        'utf8',
+    );
+
+    const sortRule = source.match(/\.mds-table__sort\s*\{([^}]*)\}/);
+    const thRule = source.match(/\.mds-table__th\s*\{([^}]*)\}/);
+
+    it('inherits every type property the header sets that a <button> would otherwise reset', () => {
+        expect(sortRule, '.mds-table__sort rule not found — was it renamed?').not.toBeNull();
+        expect(thRule, '.mds-table__th rule not found — was it renamed?').not.toBeNull();
+
+        // Exactly the two properties the UA sheet resets on form controls and `font:` does not cover.
+        for (const property of ['text-transform', 'letter-spacing'] as const) {
+            if (!thRule![1].includes(`${property}:`)) {
+                continue; // the header no longer sets it, so the button has nothing to inherit
+            }
+
+            expect(
+                sortRule![1],
+                `.mds-table__th sets ${property} but .mds-table__sort does not inherit it — the ` +
+                    'sortable columns will render differently from the rest of the header row',
+            ).toContain(`${property}: inherit`);
+        }
+    });
+
+    it('is not vacuous: the header really does set both properties today', () => {
+        expect(thRule![1]).toMatch(/text-transform:\s*uppercase/);
+        expect(thRule![1]).toMatch(/letter-spacing:\s*var\(--mds-tracking-wide\)/);
     });
 });

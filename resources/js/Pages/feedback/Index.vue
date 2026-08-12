@@ -159,7 +159,7 @@ function excerpt(text: string): string {
             </template>
 
             <template #cell-status="{ row }">
-                <MdsBadge v-bind="statusVariant((row as FeedbackRow).status)" />
+                <MdsBadge v-bind="statusVariant((row as FeedbackRow).status)" dot />
             </template>
 
             <template #row-actions="{ row }">
@@ -211,7 +211,7 @@ function excerpt(text: string): string {
                     </div>
                     <div>
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(detailRow.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(detailRow.status)" dot /></dd>
                     </div>
                 </dl>
 

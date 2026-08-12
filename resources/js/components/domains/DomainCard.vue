@@ -60,7 +60,7 @@ function formatStamp(iso: string | null): string {
             <div class="domain-card__ident">
                 <h3 class="domain-card__host">{{ domain.domain }}</h3>
                 <div class="domain-card__tags">
-                    <MdsBadge v-bind="badge" />
+                    <MdsBadge v-bind="badge" dot />
                     <!-- Text, not a colour or an icon alone: which host respondents actually get is the most
                          consequential fact on this page (WCAG 1.4.1). -->
                     <MdsBadge v-if="domain.is_public_host" variant="info" label="Respondent links" />
@@ -122,11 +122,15 @@ function formatStamp(iso: string | null): string {
 </template>
 
 <style scoped>
+/* This is a hand-built `MdsCard` — same fill, same border, same shadow — and it predates the
+   component. JR2 moves it onto the page-level card tier with the real one (DSR §2.6), because
+   /domains renders these beside `MdsCard`s and a 12px card next to a 20px card is the kind of
+   half-migrated look nobody can name but everybody sees. */
 .domain-card {
     padding: var(--mds-space-5);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-1);
 }
 

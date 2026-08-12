@@ -143,7 +143,7 @@ function openEndpoint(id: string): void {
                 <span class="webhooks__url">{{ (row as EndpointRow).url }}</span>
             </template>
             <template #cell-status="{ row }">
-                <MdsBadge v-bind="statusVariant((row as EndpointRow).status)" />
+                <MdsBadge v-bind="statusVariant((row as EndpointRow).status)" dot />
             </template>
             <template #cell-event_types="{ row }">
                 {{ (row as EndpointRow).event_types.length }}

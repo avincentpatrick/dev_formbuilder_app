@@ -193,7 +193,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
             </template>
 
             <template #cell-status="{ row }">
-                <MdsBadge v-bind="statusVariant((row as ConsoleFeedbackRow).status)" />
+                <MdsBadge v-bind="statusVariant((row as ConsoleFeedbackRow).status)" dot />
             </template>
 
             <template #row-actions="{ row }">
@@ -254,7 +254,7 @@ function browserPairs(row: ConsoleFeedbackRow): Array<[string, string]> {
                     </div>
                     <div>
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(detailRow.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(detailRow.status)" dot /></dd>
                     </div>
                     <div v-if="detailRow.resolved_at">
                         <dt>Closed</dt>

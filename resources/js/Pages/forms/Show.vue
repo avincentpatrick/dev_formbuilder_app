@@ -338,7 +338,7 @@ function isPrintable(version: VersionRow): boolean {
             <dl class="hub__meta">
                 <div class="hub__meta-item">
                     <dt>Status</dt>
-                    <dd><MdsBadge v-bind="statusVariant(form.status)" /></dd>
+                    <dd><MdsBadge v-bind="statusVariant(form.status)" dot /></dd>
                 </div>
                 <div class="hub__meta-item">
                     <dt>Version</dt>
@@ -406,7 +406,7 @@ function isPrintable(version: VersionRow): boolean {
                     <span v-else>{{ formatDateTime(row.submitted_at) }}</span>
                 </template>
                 <template #cell-status="{ value }">
-                    <MdsBadge v-bind="statusVariant(String(value))" />
+                    <MdsBadge v-bind="statusVariant(String(value))" dot />
                 </template>
                 <template #empty>
                     <MdsEmptyState
@@ -425,7 +425,7 @@ function isPrintable(version: VersionRow): boolean {
             <MdsDataTable :columns="versionColumns" :rows="versions" caption="This form's versions" row-key="id">
                 <template #cell-version_number="{ value }">v{{ value }}</template>
                 <template #cell-status="{ value }">
-                    <MdsBadge v-bind="statusVariant(String(value))" />
+                    <MdsBadge v-bind="statusVariant(String(value))" dot />
                 </template>
                 <template #cell-published_at="{ row }">{{ formatDate(row.published_at) }}</template>
                 <template #row-actions="{ row }">

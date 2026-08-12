@@ -47,3 +47,10 @@ export const WithHeaderFooter: Story = {
 };
 export const StaticDark: Story = { decorators: [dark] };
 export const InteractiveDark: Story = { args: { interactive: true, as: 'button' }, decorators: [dark] };
+
+/* JR2: the header/footer variant is the only one with rules dividing the card, and at 20px corners
+   the header's own text now sits closer to a rounder edge than it did at 12px. It had no dark twin. */
+export const WithHeaderFooterDark: Story = {
+    ...WithHeaderFooter,
+    decorators: [dark],
+};

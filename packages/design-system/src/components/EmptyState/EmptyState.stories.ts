@@ -70,3 +70,17 @@ export const FilteredZero: Story = {
 };
 
 export const FirstRunDark: Story = { decorators: [dark] };
+
+/* JR2 added a tinted medallion behind the illustration, and its fill is the one accent token that is
+   REDECLARED for dark (`action-primary-tint` → `rgba(88,155,253,0.18)`) rather than riding the primary
+   ramp. A light-only story cannot see that, and the merge-blocking axe runner only scans what has a
+   story — so both remaining illustrations get a dark twin. */
+export const PermissionRestrictedDark: Story = {
+    ...PermissionRestricted,
+    decorators: [dark],
+};
+
+export const FilteredZeroDark: Story = {
+    ...FilteredZero,
+    decorators: [dark],
+};

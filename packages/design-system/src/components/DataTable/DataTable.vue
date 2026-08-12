@@ -299,18 +299,39 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     text-align: start;
     vertical-align: middle;
     border-bottom: 1px solid var(--mds-color-border-default);
+    /* ⚠️ JR2 KEPT `bg-surface` HERE, DIVERGING FROM THE MOCKUP, AND THE REASON IS MEASURED.
+       The direction paints its header band `--m-surface-2` `#EEF3FE`, which is byte-identical to our
+       `--mds-color-bg-sunken` in light — so the swap looks free. It is not: in dark, `bg-sunken`
+       re-points to `neutral-50` `#0f131c`, which IS the dark canvas. The mockup can assume that,
+       because every table it draws sits inside a card; this app's busiest list does not
+       (`forms/Index.vue:265` mounts the table bare on the canvas), so a sunken header there would be
+       the same colour as the page behind it and the whole band would vanish in dark.
+       The Vivid header therefore reads through TYPE rather than fill: caps, tracked, bold, small. */
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    font-weight: var(--mds-font-weight-bold);
+    letter-spacing: var(--mds-tracking-wide);
+    text-transform: uppercase;
     background-color: var(--mds-color-bg-surface);
-    font-size: var(--mds-type-label-font-size);
-    line-height: var(--mds-type-label-line-height);
-    font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-secondary);
     white-space: nowrap;
 }
 
+/* An end-aligned column is a numeric column in practice — that is what right alignment is FOR in a
+   table — so it gets the lining figures the charts and the stat tiles already use. Without them the
+   digits in a right-aligned count column do not share a column position and the edge fringes. */
 .mds-table__cell--end {
     text-align: end;
+    font-variant-numeric: tabular-nums;
 }
 
+/* ⚠️ `text-transform` and `letter-spacing` are inherited EXPLICITLY, and `font: inherit` does not
+   cover them. The `font` shorthand resets the font-* longhands only; the UA stylesheet for <button>
+   separately sets `text-transform: none` and `letter-spacing: normal`, and those beat inheritance.
+   Found by looking at the real page after JR2 made the header uppercase and tracked: `Status` and
+   `Version` obeyed while `Form` and `Updated` — the two SORTABLE columns, whose text lives inside this
+   button — did not, so one header row carried two different type treatments. Nothing could have caught
+   it but a browser: happy-dom computes no styles, and axe does not care about case. */
 .mds-table__sort {
     display: inline-flex;
     align-items: center;
@@ -319,6 +340,8 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     border: 0;
     background: transparent;
     font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
     color: inherit;
     cursor: pointer;
 }
@@ -333,16 +356,44 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     transform: rotate(180deg);
 }
 
+/* JR2: 20px of vertical padding rather than 12px — the increment's one real density change, and the
+   part a user feels. ⚠️ It gives a 61px row only when the tallest thing in the row is one line of
+   body text; a status badge is 24px, an `sm` icon button 28px. Measured on the seeded app, `/forms`
+   rows are **68.5px**, so the real range is 61 text-only / 65–73 in practice against the direction's
+   60px. (An earlier version of this comment asserted "61px" flatly, computed from the padding token
+   without measuring what the cells actually contain.) The mobile block below puts it back to 12px —
+   inside a card-per-row each cell is a key/value line, and 20px there makes a very tall card. */
 .mds-table__td {
-    padding: var(--mds-space-3) var(--mds-space-4);
+    padding: var(--mds-space-5) var(--mds-space-4);
     vertical-align: middle;
     border-bottom: 1px solid var(--mds-color-border-default);
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
+    /* The hover COLOUR is unchanged; only the instant swap is. At 61px a row is a big enough object
+       that an untransitioned repaint reads as a flicker when the pointer crosses the table.
+       Declared on the cell, not on the `:hover` rule — a transition that lives only in the hover
+       state animates the way in and snaps the way out. */
+    transition: background-color var(--mds-duration-fast) var(--mds-ease-standard);
 }
 
+/* ⚠️ THE HOVER USED TO BE `bg-canvas`, AND ON MOST OF THIS APP'S TABLES THAT PAINTED NOTHING.
+   Neither `.mds-table` nor `.mds-table__td` sets a background, so a row's ground is whatever is
+   behind the table — and the tables on `/forms`, `/submissions`, `/members`, `/webhooks`,
+   `/integrations` and `/feedback` are mounted bare on the page, whose background IS `bg-canvas`
+   (`app.css` on body, `AppLayout.vue` on `.app-shell__content`). Measured: `#F5F7FC` on `#F5F7FC` is
+   **1.000:1** in light and `#0f131c` on `#0f131c` is **1.000:1** in dark. Not subtle — absent. It
+   only ever worked for the minority of tables sitting inside an `MdsCard`.
+   JR2 found this the embarrassing way: it added a transition to smooth a colour change that does not
+   happen, and wrote a comment asserting the hover worked. The same premise that keeps `bg-surface` on
+   the header — most tables are bare on the canvas — proves the hover was a no-op, and the increment
+   read that premise twice without joining the two.
+   An 8% wash of the accent is ground-independent, which no opaque token in this system can be: there
+   is no colour that differs from BOTH `bg-canvas` and `bg-surface` in BOTH themes. Measured against
+   each of the four possible grounds: 1.110 / 1.117 light, 1.066 / 1.076 dark — in the same band as
+   the in-card hover that already worked (1.072 light). Degradation without `color-mix` is
+   `transparent`, i.e. exactly the no-op it replaces, so nothing regresses on an old engine. */
 .mds-table__row:hover .mds-table__td {
-    background-color: var(--mds-color-bg-canvas);
+    background-color: color-mix(in srgb, var(--mds-color-action-primary-bg) 8%, transparent);
 }
 
 .mds-table__actions {
@@ -374,7 +425,14 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
         display: block;
         margin-bottom: var(--mds-space-3);
         border: 1px solid var(--mds-color-border-default);
-        border-radius: var(--mds-radius-md);
+        /* JR2: `lg`, not `xl`, and not the `md` it was. Below 480px each row IS a card, so leaving it
+           at the control tier put 12px corners next to every 20px `MdsCard` on the same screen. It
+           does not go all the way to `xl` either: a full-bleed card at 375px with 20px corners is
+           heavier than the direction's own phone mock, which draws its panels at 16-18px. This is the
+           compact-surface tier from DSR §2.6, shared with `MdsToast`. (A draft of this comment also
+           named "the card skeleton" — there is no such variant: `MdsSkeleton` is text/block/circle,
+           and `--block` still reads `md` because it has no consumer that would make it disagree.) */
+        border-radius: var(--mds-radius-lg);
         background-color: var(--mds-color-bg-surface);
     }
     .mds-table__td {
@@ -382,6 +440,9 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
         align-items: center;
         justify-content: space-between;
         gap: var(--mds-space-4);
+        /* Back to 12px from the 20px the desktop row now carries: here a cell is one key/value line
+           inside a card, not a table row, and 20px stacks into a very tall card at 375px. */
+        padding: var(--mds-space-3) var(--mds-space-4);
         text-align: end;
         border-bottom: 1px solid var(--mds-color-border-default);
     }

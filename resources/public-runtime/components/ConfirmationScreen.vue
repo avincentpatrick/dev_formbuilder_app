@@ -87,7 +87,12 @@ onMounted(() => heading.value?.focus());
     padding: var(--mds-space-8);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-lg, var(--mds-radius-md));
+    /* JR2: the page-level card tier (DSR §2.6). The guest runtime is a separate SPA, but it reads the
+       same token sheet, and this card IS the respondent's whole confirmation screen — the one surface
+       a person outside the tenant ever sees. The declared fallback chain is kept: it is the guest
+       bundle's habit of never assuming a token version, so it degrades to the previous tier rather
+       than to a square corner. */
+    border-radius: var(--mds-radius-xl, var(--mds-radius-lg));
     box-shadow: var(--mds-shadow-1);
 }
 

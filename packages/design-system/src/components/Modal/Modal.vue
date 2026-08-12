@@ -292,7 +292,11 @@ onBeforeUnmount(closePage);
     max-height: calc(100dvh - var(--mds-space-8));
     background-color: var(--mds-color-bg-surface-raised);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2: the page-level card/dialog tier (DSR §2.6), in step with `MdsCard`. The close button
+       below stays at `md` — it is a control, and controls hold the 12px tier. The `border-radius: 0`
+       in the ≤480px block is the full-screen sheet and must stay: it is the one radius in this
+       package that is a literal rather than a token, and the one that has to be kept in step by hand. */
+    border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-4);
     color: var(--mds-color-text-body);
 }

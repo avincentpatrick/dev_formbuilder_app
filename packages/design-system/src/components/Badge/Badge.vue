@@ -17,13 +17,32 @@ withDefaults(
         variant?: BadgeVariant;
         label: string;
         icon?: IconName;
+        /**
+         * JR2 — a 6px `currentColor` disc before the label, the approved direction's treatment for a
+         * LIST status pill. Off by default: most badges in the app are inline annotations rather than
+         * a scannable status column, and a dot on all fifty-odd of them is noise.
+         *
+         * It is decoration, never a signifier — the label still carries the meaning, so WCAG 1.4.1
+         * is satisfied by the word exactly as it was before, and the disc is `aria-hidden`.
+         */
+        dot?: boolean;
     }>(),
-    { variant: 'neutral' },
+    { variant: 'neutral', dot: false },
 );
 </script>
 
 <template>
     <span class="mds-badge" :class="`mds-badge--${variant}`">
+        <!-- `&& !icon` keeps a disc and a glyph from sitting side by side; the icon wins because it
+             is the one carrying information. ⚠️ It is a FAIL-CLOSED GUARD WITH NO REACHABLE CALLER,
+             and it must be labelled as one rather than sold as a fix. A draft of this comment named
+             `MdsStatTile`'s delta badge as the victim — that cannot happen: StatTile renders
+             `<Badge :variant :icon :label />` with no `dot` prop, no `v-bind="$attrs"` and no
+             fallthrough, and every real `dot` call site spreads `statusVariant()`, which returns
+             only `{variant, label}`. The only thing that exercises this branch today is the
+             `DotWithIcon` story. Keep it — the cost is one boolean and it forecloses a whole class
+             of future call site — but do not cite it as protecting something. -->
+        <span v-if="dot && !icon" class="mds-badge__dot" aria-hidden="true" />
         <Icon v-if="icon" :name="icon" size="sm" class="mds-badge__icon" />
         {{ label }}
     </span>
@@ -34,18 +53,33 @@ withDefaults(
     display: inline-flex;
     align-items: center;
     gap: var(--mds-space-1);
-    padding: var(--mds-space-0-5) var(--mds-space-2);
+    /* JR2: 4px of vertical padding rather than 2px, and semibold rather than medium — the direction's
+       pill is a slightly taller, slightly firmer object. Radius stays `full`, and the badge keeps
+       having no border and no shadow: it is a tinted fill with text on it, and every variant below
+       is a sanctioned `-bg`/`-fg` pair, so the contrast is guaranteed by construction. */
+    padding: var(--mds-space-1) var(--mds-space-2);
     border-radius: var(--mds-radius-full);
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-caption-font-size);
     line-height: var(--mds-type-caption-line-height);
-    font-weight: var(--mds-font-weight-medium);
+    font-weight: var(--mds-font-weight-semibold);
     white-space: nowrap;
 }
 
 .mds-badge__icon {
     width: 12px;
     height: 12px;
+}
+
+/* `currentColor` rather than a status token: the disc then tracks whichever `-fg` the variant set,
+   so it can never drift out of step with the label beside it, and a variant added later needs no
+   rule here. */
+.mds-badge__dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: var(--mds-radius-full);
+    background-color: currentColor;
 }
 
 .mds-badge--success {

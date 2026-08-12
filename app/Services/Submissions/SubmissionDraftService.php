@@ -49,6 +49,13 @@ final class SubmissionDraftService
      * and passes it as {@see SubmissionPayload::$ttlDays}, and this constant is the fallback when none is set. */
     public const DRAFT_TTL_DAYS = 30;
 
+    /**
+     * How many times {@see createDraft()} is re-run after a `submissions.reference` collision (J2e). The twin
+     * of {@see SubmissionPipeline::MAX_REFERENCE_ATTEMPTS}, kept separate because the two services share no
+     * base class and a shared constant would be the only thing coupling them.
+     */
+    private const int MAX_REFERENCE_ATTEMPTS = 3;
+
     public function __construct(
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
@@ -259,52 +266,75 @@ final class SubmissionDraftService
     {
         $version = $payload->version;
 
-        try {
-            return DB::transaction(function () use ($payload, $version, $normalized, $checksum, $completeness): SubmissionResult {
-                $submission = Submission::create([
-                    'form_id' => $version->form_id,
-                    'form_version_id' => $version->id,
-                    'respondent_user_id' => $payload->respondentUserId,
-                    'status' => SubmissionStatus::Draft,
-                    'source' => $payload->source,
-                    'client_submission_uuid' => $payload->clientSubmissionUuid,
-                    'guest_token' => $payload->guestToken,
-                    'guest_ip' => $payload->guestIp,
-                    'guest_user_agent' => $payload->guestUserAgent,
-                    'guest_contact_email' => $payload->guestContactEmail,
-                    'device_id' => $payload->deviceId,
-                    'app_version' => $payload->appVersion,
-                    'locale' => $payload->locale,
-                    'completeness_percent' => $completeness,
-                    'last_saved_at' => now(),
-                    // Stamp-once: the tenant-configured TTL (H10) resolved by the caller, falling back to the
-                    // 30-day default. A later save never restamps this — see updateDraft().
-                    'draft_expires_at' => now()->addDays($payload->ttlDays ?? self::DRAFT_TTL_DAYS),
-                    'draft_current_step' => $payload->draftCurrentStep,
-                ]);
+        // ⚠️ THE LOOP IS THE REFERENCE-COLLISION RECOVERY (J2e) — the twin of the one in
+        // {@see SubmissionPipeline::submit()}, and it exists for the same reason: `submissions` now carries
+        // TWO unique constraints, the insert happens INSIDE `DB::transaction`, and a 23505 leaves that
+        // transaction in ERROR state, so re-minting in place is impossible (25P02). Re-running the closure
+        // builds a fresh `Submission::create()` whose `creating` hook mints a new code.
+        //
+        // The arms are ORDERED rather than told apart by the constraint name, so this keeps catching the
+        // error CODE and never matches the driver's message text: resolve the client-uuid race first —
+        // unchanged behaviour — and treat only an unexplained 23505 as a reference collision.
+        $attempt = 0;
 
-                SubmissionAnswer::create([
-                    'submission_id' => $submission->id,
-                    'form_version_id' => $version->id,
-                    'answers' => $normalized,
-                    'answers_schema_checksum' => $version->checksum,
-                    'answers_content_checksum' => $checksum,
-                    'last_saved_at' => now(),
-                ]);
+        while (true) {
+            $attempt++;
 
-                return new SubmissionResult($submission, created: true);
-            });
-        } catch (QueryException $e) {
-            // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
-            // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
-            if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
-                $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
-                if ($existing !== null) {
-                    return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+            try {
+                return DB::transaction(function () use ($payload, $version, $normalized, $checksum, $completeness): SubmissionResult {
+                    $submission = Submission::create([
+                        'form_id' => $version->form_id,
+                        'form_version_id' => $version->id,
+                        'respondent_user_id' => $payload->respondentUserId,
+                        'status' => SubmissionStatus::Draft,
+                        'source' => $payload->source,
+                        'client_submission_uuid' => $payload->clientSubmissionUuid,
+                        'guest_token' => $payload->guestToken,
+                        'guest_ip' => $payload->guestIp,
+                        'guest_user_agent' => $payload->guestUserAgent,
+                        'guest_contact_email' => $payload->guestContactEmail,
+                        'device_id' => $payload->deviceId,
+                        'app_version' => $payload->appVersion,
+                        'locale' => $payload->locale,
+                        'completeness_percent' => $completeness,
+                        'last_saved_at' => now(),
+                        // Stamp-once: the tenant-configured TTL (H10) resolved by the caller, falling back to the
+                        // 30-day default. A later save never restamps this — see updateDraft().
+                        'draft_expires_at' => now()->addDays($payload->ttlDays ?? self::DRAFT_TTL_DAYS),
+                        'draft_current_step' => $payload->draftCurrentStep,
+                    ]);
+
+                    SubmissionAnswer::create([
+                        'submission_id' => $submission->id,
+                        'form_version_id' => $version->id,
+                        'answers' => $normalized,
+                        'answers_schema_checksum' => $version->checksum,
+                        'answers_content_checksum' => $checksum,
+                        'last_saved_at' => now(),
+                    ]);
+
+                    return new SubmissionResult($submission, created: true);
+                });
+            } catch (QueryException $e) {
+                if ((string) $e->getCode() !== '23505') {
+                    throw $e;
+                }
+
+                // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
+                // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
+                if ($payload->clientSubmissionUuid !== null) {
+                    $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
+                    if ($existing !== null) {
+                        return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+                    }
+                }
+
+                // Nothing to fold into, so this was the reference index. Retry with a fresh code, then give up
+                // loudly — at 32^8 codes a second collision on one insert is a symptom, not chance.
+                if ($attempt >= self::MAX_REFERENCE_ATTEMPTS) {
+                    throw $e;
                 }
             }
-
-            throw $e;
         }
     }
 

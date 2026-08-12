@@ -13,8 +13,12 @@ use App\Policies\SubmissionPolicy;
 use App\Services\Analytics\AnswerValueAggregator;
 use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Search\SearchService;
+use App\Services\Submissions\SubmissionPipeline;
 use App\Support\Search\SearchTerms;
+use App\Support\Submissions\SubmissionReference;
+use App\Support\Submissions\SubmissionReferenceIssuer;
 use Database\Factories\SubmissionFactory;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property SubmissionStatus $status
  * @property SubmissionSource $source
  * @property ?string $client_submission_uuid
+ * @property string $reference
  * @property ?string $locale
  * @property ?string $guest_contact_email
  * @property ?int $completeness_percent
@@ -63,6 +68,50 @@ class Submission extends Model implements TenantScoped
     use HasUuidv7;
     use SoftDeletes;
 
+    /**
+     * Mints the short handle (J2e). Every row needs one — `reference` is `NOT NULL` — and there are seven
+     * Eloquent writers, only two of which are the production services. Putting the mint on the MODEL rather
+     * than in {@see SubmissionPipeline} is what makes it an invariant instead of a
+     * convention the eighth writer forgets: the factory, both seeders and every `Submission::factory()` call
+     * in the suite are covered without touching any of them.
+     *
+     * ⚠️ TRAIT BOOT ORDER IS IRRELEVANT HERE, AND SAYING SO IS THE POINT — `booted()` runs after
+     * `bootTraits()`, so this fires after both `BelongsToTenant`'s and `HasUuids`' own `creating` listeners.
+     * It does not matter, because the reference is RANDOM rather than derived: it reads neither `id` (a
+     * derivation from the uuid is precisely the defect J2e removes — see {@see SubmissionReference}) nor
+     * `tenant_id` (uniqueness is enforced per tenant by `submissions_tenant_id_reference_unique`, not by
+     * anything in PHP). This hook is order-independent by construction. "Put it after the tenant hook" is the
+     * first thing a reader assumes it needs, so it is written down that it does not.
+     *
+     * The `=== null` guard keeps a deliberately `forceFill`ed reference — which is how a test pins a known
+     * code, and how the retry in both writers gets a FRESH one (a re-run builds a new model, whose attribute
+     * is null again).
+     *
+     * ⚠️ Anything that suppresses model events suppresses THIS, and now the failure is a hard 23502 rather
+     * than something subtle. {@see DatabaseSeeder} carries the list.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $submission): void {
+            // ⚠️ `getAttribute()`, NOT `$submission->reference`, and the reason is a real tension rather than
+            // style. The `@property string $reference` annotation above is correct for every reader of a
+            // PERSISTED row — the column is NOT NULL — but it is exactly wrong for this one moment, when the
+            // attribute has not been set yet. Written as `$submission->reference === null` the analyser sees
+            // `string === null`, calls the comparison always-false, and the increment ships a PHPStan error
+            // rather than a guard. Reaching through `getAttribute()` states "unset" without lying about the
+            // column's shape everywhere else.
+            if ($submission->getAttribute('reference') === null) {
+                $submission->reference = app(SubmissionReferenceIssuer::class)->issue();
+            }
+        });
+    }
+
+    /**
+     * ⚠️ `reference` IS DELIBERATELY ABSENT. It is server-issued identity: making it mass-assignable would let
+     * any `update()` reachable from a request payload rewrite the handle a respondent has already written
+     * down. Same call as `forms.public_slug`'s share columns and `scope_nodes`' path columns; pinned by
+     * `SubmissionReferenceIssuanceTest`.
+     */
     protected $fillable = [
         'tenant_id',
         'form_id',

@@ -348,3 +348,44 @@ retiring the second accent in favour of the tenant brand ramp, which did not exi
 introduced.
 
 ---
+
+## #11 — The stat value's colour comes from a gradient, not a text token (`packages/design-system/src/components/StatTile/StatTile.vue`)
+
+**Introduced:** Phase 3 · Increment JR2 (the Vivid component pass).
+
+**What deviates:** §2.2 requires a component to take its text colour from a semantic text token.
+`.mds-stat-tile__value` sets `color: transparent` and paints the figure with a `background-clip: text`
+gradient running from `--mds-color-text-heading` into `color-mix(… 78%, --mds-color-action-primary-bg)`.
+The declared colour of the largest number in the product is therefore *no colour at all*, and the
+visible one is a background.
+
+**Why it ships anyway:** it is the approved direction's signature treatment for the stat value, and
+the user selected it explicitly from the four flourishes JR2 offered. Both gradient endpoints are
+themselves token-derived and both clear **10:1** against their ground in both themes, so nothing about
+legibility is being traded — what is being traded is the *auditability* of the rule, which is why this
+entry exists rather than a comment.
+
+**The three guards, all load-bearing:**
+
+1. The plain `color: var(--mds-color-text-heading)` stays the **base** declaration and the gradient
+   lives inside `@supports (background-clip: text) or (-webkit-background-clip: text)`. An engine that
+   cannot clip renders an ordinary heading-ink figure rather than nothing.
+2. `-webkit-text-fill-color: transparent` is set alongside `color: transparent`. In WebKit that is the
+   property the clipped background actually paints through; setting only `color` produces a solid figure
+   on Safari and looks like the `@supports` block silently failed.
+3. `@media (forced-colors: active)` restores `background-image: none` and `CanvasText`. Without it a
+   Windows High Contrast user gets transparent text over a background the mode has already stripped —
+   an invisible number. **This is the guard that turns the pattern from a defect into an exception.**
+
+**Known cost, stated rather than discovered later:** axe's `color-contrast` rule cannot evaluate text
+over a gradient and returns **incomplete** for this element. An incomplete does not fail
+`checkA11y`, so the merge-blocking Storybook job stays green — but it also means this one figure is no
+longer *automatically* contrast-checked anywhere. The endpoints are pinned by tokens the theme tests
+already guard, which is the mitigation; it is not the same thing as a scan.
+
+**Disposition:** accepted, scoped to this one element. **Do not spread the pattern** — a second
+gradient-filled text node doubles the un-scannable surface for no additional signature. If the accent
+mix ever changes, re-measure both endpoints against light `#FFFFFF` and dark `#1a2130` by hand,
+because nothing else will.
+
+---

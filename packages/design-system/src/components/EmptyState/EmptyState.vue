@@ -57,10 +57,30 @@ withDefaults(
     padding: var(--mds-space-10) var(--mds-space-6);
 }
 
+/* JR2 — the line art moves into a tinted medallion. Neither approved mockup shows an empty state, so
+   this is a derivation rather than a transcription; what it derives from is the direction's own rule
+   that a tinted field plus an accent glyph is how a non-text element carries the brand (the same
+   construction as `MdsStatTile`'s icon chip and the sidebar's active item).
+   The measured reason it is worth doing: the diagnosis behind this whole re-skin names "empty states
+   are plain text, no illustration" as one of the thirty compounding causes, and a grey stroke on a
+   white ground is the plainest thing on any page that has one.
+
+   `action-primary-tint` is the load-bearing token choice. It is the ONE accent fill that is
+   re-declared for dark as `rgba(88,155,253,0.18)` (theme-overrides.css:84,145) rather than riding the
+   primary ramp — reach for `primary-50` instead and dark mode gets a near-white slab.
+
+   CSS-only, deliberately: no wrapper element, so `.mds-empty__desc` and the rest of the markup stay
+   exactly where every consumer and `dashboard.test.ts:467` expect them. Padding on an inline <svg>
+   insets the viewBox, so `box-sizing: border-box` + 96px − 2×16px keeps the glyph at its original
+   64px and grows only the field around it. */
 .mds-empty__art {
-    width: 64px;
-    height: 64px;
-    color: var(--mds-color-border-strong);
+    box-sizing: border-box;
+    width: 96px;
+    height: 96px;
+    padding: var(--mds-space-4);
+    border-radius: var(--mds-radius-xl);
+    background-color: var(--mds-color-action-primary-tint);
+    color: var(--mds-color-action-primary-fg);
     margin-bottom: var(--mds-space-1);
 }
 

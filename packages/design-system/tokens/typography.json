@@ -13,7 +13,11 @@
     },
     "tracking": {
         "base": { "value": "-0.004em" },
-        "display": { "value": "-0.028em" }
+        "display": { "value": "-0.028em" },
+        "wide": {
+            "value": "0.06em",
+            "comment": "JR2 — positive tracking for an UPPERCASED micro-label (stat-tile labels, table headers, filter-bar eyebrows). Uppercase closes the gaps a lowercase word opens, so a caps label needs letting where a sentence-case one does not. Lives under `tracking`, not `type`: type-scale.test.ts hard-pins eleven type roles and a twelfth reddens it."
+        }
     },
     "type": {
         "display": {

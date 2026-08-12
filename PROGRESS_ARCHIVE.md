@@ -1487,3 +1487,48 @@ JR3, where its consumer lives), and the card radius wiring (JR2 — cards sit at
 Success is now a teal a few degrees from the personalization accent, which is the accent/semantic collision
 §2.2 forbids arriving from the direction the rule did not anticipate; shipped as approved and logged as
 exceptions-log #10 rather than resolved inside a token diff.
+
+## 2026-08-12 — JR2: the six components, and the increment CI cannot see
+
+Second row of the approved Vivid re-skin. `Card`, `StatTile` and the `Modal` panel take
+`--mds-radius-xl` — the token JR1 shipped with zero consumers so this would be a component edit
+rather than a redefinition of `md`, which every control also reads. `Button` gained the accent glow
+it never had (it read no shadow token at any state and was the flattest thing in the six), `Badge`
+gained an opt-in status dot wired at the product's only two scannable status columns, `EmptyState`
+gained a tinted medallion, and `DataTable` gained an uppercase tracked header, 61px rows and tabular
+end-cells. Three tokens added: `--mds-tracking-wide`, `--mds-shadow-accent`, `--mds-shadow-danger`.
+
+The finding that shaped the whole increment is that **no gate can see it**. Nothing in the repo
+asserts a radius, a shadow, a padding or a row height, and there is no visual-regression harness at
+all — so the six jobs stay green whatever the corners do, and the only automated signal is an axe
+contrast failure on a job that cannot run on this host. Verification was screenshots of the running
+seeded app, light and dark, at 1440 and 375.
+
+Which is how the one real defect surfaced: with the header uppercased, `Status` and `Version`
+obeyed and `Form` and `Updated` did not, because those two are the sortable columns and their text
+lives inside a `<button>`. `font: inherit` resets the `font-*` longhands only; the UA stylesheet
+separately sets `text-transform: none` and `letter-spacing: normal` on form controls. One header row,
+two type treatments — invisible to happy-dom, to axe, and to a diff.
+
+Two claims in the pre-flight survey were wrong and were caught by opening the files rather than
+trusting the line references: `Skeleton` has no card variant (its `--block` has zero consumers), and
+`ConflictDialog` is an `MdsModal` that inherited the new panel for free — the radius at the cited
+line is a nested column that correctly stays at 12px.
+
+The real scope was never the six components but the **26 lookalikes**: 84 declarations across the app
+read `--mds-radius-md` while painting a card surface. Answered with a three-tier rule in DSR §2.6
+(control 12 / compact surface 16 / page-level card or dialog 20) rather than a list, applied to
+`DomainCard`, the auth card, the guest confirmation card and `Toast`.
+
+Deliberate divergences, both measured: the table header keeps `bg-surface` rather than the mockup's
+tint, because dark `bg-sunken` IS the dark canvas and the band would vanish on the one list that
+mounts its table bare; and card padding stays at `space-5`, because the two artifacts disagree and
+padding is the one value with 52 call sites and no visual net. Card and StatTile arrangement
+unchanged by user decision.
+
+Two things this increment fixed that predate it: a JR1 comment claiming tabular figures on the stat
+value while the declaration did not exist, and `MdsButton`'s spinner having no reduced-motion arm.
+The second nearly became a regression — tokenising its literal `600ms` into the identically-valued
+`--mds-duration-deliberate` would have made it spin at ~1000 rev/sec under reduced motion, because
+the tokens collapse to 1ms. For a functional indicator, reduced motion means slower, not instant;
+`MdsSpinner` already knew this and `MdsButton` now matches it.

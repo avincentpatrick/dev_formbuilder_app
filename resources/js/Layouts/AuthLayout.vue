@@ -40,7 +40,10 @@ defineProps<{ title: string }>();
     padding: var(--mds-space-6);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2: the page-level card tier (DSR §2.6). This card is the entire visual weight of the sign-in
+       screen and it is the FIRST surface a new user sees, so it is the last one that should still be
+       speaking the old language. `.auth-alert` below stays at `md` — it sits inside this card. */
+    border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-2);
 }
 

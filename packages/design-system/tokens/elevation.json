@@ -5,6 +5,15 @@
         "2": { "value": "0 10px 20px -6px rgba(14, 111, 232, 0.20), 0 24px 48px -20px rgba(14, 111, 232, 0.26)" },
         "3": { "value": "0 14px 30px -10px rgba(14, 111, 232, 0.24), 0 4px 10px -5px rgba(14, 111, 232, 0.14)" },
         "4": { "value": "0 22px 44px -14px rgba(14, 111, 232, 0.28), 0 8px 16px -8px rgba(14, 111, 232, 0.18)" },
-        "5": { "value": "0 30px 60px -18px rgba(14, 111, 232, 0.32), 0 12px 24px -10px rgba(14, 111, 232, 0.20)" }
+        "5": { "value": "0 30px 60px -18px rgba(14, 111, 232, 0.32), 0 12px 24px -10px rgba(14, 111, 232, 0.20)" },
+
+        "accent": {
+            "value": "0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-primary-bg) 55%, transparent)",
+            "comment": "JR2 — the glow under a FILLED button. NOT a rung of the 0-5 ladder (DSR §2.5's strict ordering describes distance from the page; this describes a fill bleeding into its surroundings), so never substitute one for the other. Mixed off the live fill rather than a literal so a brand-themed tenant's button glows in THEIR accent, not a hard-coded blue. An engine without color-mix invalidates the whole declaration and the button renders flat — i.e. exactly as it did before JR2 — which is why no @supports guard is needed."
+        },
+        "danger": {
+            "value": "0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-danger-bg) 55%, transparent)",
+            "comment": "JR2 — the same glow for the destructive fill. Two tokens rather than one parameterised by a local custom property: a `--mds-*` name assigned inside a component's <style> does NOT count as a definition to token-references.test.ts, so the parameterised form fails that gate."
+        }
     }
 }

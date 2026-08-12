@@ -52,3 +52,14 @@ export const DestructiveDark: Story = {
     args: { variant: 'destructive', label: 'Delete form' },
     decorators: [dark],
 };
+
+/* JR2 gave the two FILLED variants a glow and takes it away again for disabled and loading, so those
+   two states now differ from their base by more than a colour. They had no dark story at all, which
+   meant the disabled fill — the one pairing in the system deliberately exempt from AA (§4.1) and
+   therefore the one most worth watching — was never scanned on a dark ground. */
+export const LoadingDark: Story = { args: { loading: true, label: 'Saving' }, decorators: [dark] };
+export const DisabledDark: Story = { args: { disabled: true }, decorators: [dark] };
+export const DestructiveDisabledDark: Story = {
+    args: { variant: 'destructive', label: 'Delete form', disabled: true },
+    decorators: [dark],
+};

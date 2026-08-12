@@ -67,3 +67,13 @@ export const Empty: Story = {
         `,
     }),
 };
+
+/* JR2: both of these gained something dark-specific and neither had a dark story. `Empty` now renders
+   an `EmptyState` whose new medallion uses the one accent fill that is redeclared for dark, and it is
+   the composition — a tinted field inside a table inside the page — that decides whether the two
+   surfaces separate. `Loading` renders skeletons under the retyped uppercase header. */
+export const EmptyDark: Story = {
+    ...Empty,
+    decorators: [dark],
+};
+export const LoadingDark: Story = { args: { loading: true }, decorators: [dark] };

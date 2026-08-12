@@ -280,8 +280,11 @@ function submitRestore(): void {
             <template #cell-title="{ row }">
                 <Link :href="`/forms/${row.id}`" class="forms__title-link">{{ row.title }}</Link>
             </template>
+            <!-- `dot` (JR2): this is a scannable status COLUMN, which is the case the disc was added
+                 for — the eye finds a row by its dot and reads the word to confirm. Inline badges
+                 elsewhere in the app deliberately do not set it. -->
             <template #cell-status="{ value }">
-                <MdsBadge v-bind="statusVariant(String(value))" />
+                <MdsBadge v-bind="statusVariant(String(value))" dot />
             </template>
             <template #cell-version="{ row }">
                 {{ versionLabel(row) }}

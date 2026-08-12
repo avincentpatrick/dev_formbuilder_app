@@ -55,7 +55,10 @@ const headingId = useId();
     font-size: var(--mds-type-label-font-size);
     font-weight: var(--mds-font-weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    /* JR2: was a literal `0.04em` — the one hard-coded typographic value in the package, and exactly
+       the orphan `tracking.wide` was added for. Now the same letting as the stat-tile label and the
+       table header, so the three uppercased micro-labels in the product finally agree. */
+    letter-spacing: var(--mds-tracking-wide);
     color: var(--mds-color-text-secondary);
 }
 

@@ -35,7 +35,12 @@ withDefaults(
     padding: var(--mds-space-5);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2: the page-level card tier (DSR §2.6). `xl` shipped unconsumed in JR1 precisely so this
+       wiring would be one component edit rather than a redefinition of `md`, which every control in
+       the app also reads. Padding deliberately stays at `space-5`: the two approved mockups disagree
+       (24px on a panel, 18px on a grid card), 20px sits between them, and padding is the one value
+       here with 52 call sites and no visual-regression net behind it. */
+    border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-1);
     color: var(--mds-color-text-body);
 }
@@ -52,9 +57,15 @@ withDefaults(
         border-color var(--mds-duration-base) var(--mds-ease-standard);
 }
 
+/* JR2: hover picks up the ACCENT edge from the approved direction, not a darker grey. `-fg`, never
+   `-bg` — a border is a coloured edge and `-bg` guarantees contrast only against text printed ON it
+   (the J2a WCAG 1.4.11 finding). Measured against the surface behind it: `#1156B2` on `#FFFFFF` is
+   7.01:1 light, `#8FBCFF` on `#1a2130` is 8.29:1 dark, both far past the 3:1 a non-text indicator
+   needs. No transform is added — the mockup shows none, and a hover translate would raise a
+   reduced-motion question that a shadow and a border colour do not. */
 .mds-card--interactive:hover {
     box-shadow: var(--mds-shadow-2);
-    border-color: var(--mds-color-border-strong);
+    border-color: var(--mds-color-action-primary-fg);
 }
 
 .mds-card--interactive:focus-visible {

@@ -129,7 +129,9 @@ const deltaText = computed(() => {
     padding: var(--mds-space-5);
     background-color: var(--mds-color-bg-surface);
     border: 1px solid var(--mds-color-border-default);
-    border-radius: var(--mds-radius-md);
+    /* JR2: the page-level card tier, in step with `MdsCard` (DSR §2.6). The icon chip below stays at
+       `lg`, so the nesting reads 20 outside / 16 inside rather than the flat 12/16 it was. */
+    border-radius: var(--mds-radius-xl);
     box-shadow: var(--mds-shadow-1);
     color: var(--mds-color-text-body);
 }
@@ -154,9 +156,11 @@ const deltaText = computed(() => {
         border-color var(--mds-duration-base) var(--mds-ease-standard);
 }
 
+/* JR2: the accent hover edge, identical to `MdsCard--interactive` so the two keep reading as one
+   family. See that rule for the measured ratios and for why `-fg` rather than `-bg`. */
 .mds-stat-tile--link:hover {
     box-shadow: var(--mds-shadow-2);
-    border-color: var(--mds-color-border-strong);
+    border-color: var(--mds-color-action-primary-fg);
 }
 
 .mds-stat-tile--link:focus-visible {
@@ -184,17 +188,66 @@ const deltaText = computed(() => {
     margin: 0 0 var(--mds-space-1);
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-1-font-size);
-    line-height: var(--mds-type-heading-1-line-height);
+    /* JR2: 1.05 rather than the role's 46px leading. A stat value is a single line by construction
+       (`displayValue` never wraps a formatted number), so the role's line box only adds 8px of dead
+       space above the figure and pushes the label away from it. */
+    line-height: 1.05;
     font-weight: var(--mds-type-heading-1-font-weight);
-    /* JR1: the role now carries tracking, and a stat value is the one place a heading-1 is nearly
-       always digits — tabular-nums plus tight tracking is what makes a column of them line up. */
+    /* JR1 wrote the sentence below and shipped only half of it: the tracking landed, the tabular
+       figures did not. Both charts carry `font-variant-numeric` and the one number a user actually
+       reads did not, so a column of tiles jittered by a fraction per digit. JR2 adds the missing
+       declaration — a stat value is the one place a heading-1 is nearly always digits, and
+       tabular-nums plus tight tracking is what makes a column of them line up. */
     letter-spacing: var(--mds-type-heading-1-letter-spacing);
+    font-variant-numeric: tabular-nums;
     color: var(--mds-color-text-heading);
 }
 
+/* JR2 — the approved direction's signature, and the one place in the system a text colour does not
+   come from a text token (exceptions-log #11). The figure is filled with a top-to-bottom gradient
+   from the heading ink into 22% of the accent, which is what gives the dashboard its lift.
+
+   Three guards, each load-bearing:
+     · the plain `color` above stays the BASE declaration, so any engine that does not take
+       `background-clip: text` renders an ordinary heading-ink number rather than nothing;
+     · `-webkit-text-fill-color` is set alongside `color`, because in WebKit that property — not
+       `color` — is what the clipped background actually paints through;
+     · forced-colors is restored explicitly. Without it a Windows High Contrast user gets
+       `color: transparent` over a background the mode has already stripped, i.e. an invisible
+       number, which is the whole reason this pattern is usually a defect.
+   Both gradient endpoints clear 10:1 on their ground in both themes, so the fill costs no legibility. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+    .mds-stat-tile__value {
+        background-image: linear-gradient(
+            180deg,
+            var(--mds-color-text-heading),
+            color-mix(in srgb, var(--mds-color-text-heading) 78%, var(--mds-color-action-primary-bg))
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+@media (forced-colors: active) {
+    .mds-stat-tile__value {
+        background-image: none;
+        color: CanvasText;
+        -webkit-text-fill-color: CanvasText;
+    }
+}
+
+/* JR2: an uppercased micro-label under the figure, the direction's treatment for a stat caption.
+   `text-transform` does not touch `textContent`, so the tile's accessible name — asserted verbatim
+   in StatTile.test.ts — reads exactly as it did before. */
 .mds-stat-tile__label {
     margin: 0;
-    font-size: var(--mds-type-body-md-font-size);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    font-weight: var(--mds-font-weight-semibold);
+    letter-spacing: var(--mds-tracking-wide);
+    text-transform: uppercase;
     color: var(--mds-color-text-secondary);
 }
 

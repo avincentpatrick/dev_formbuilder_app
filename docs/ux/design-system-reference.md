@@ -291,6 +291,10 @@ Weight tokens used across the scale above: `--mds-font-weight-regular: 400`, `--
 
 **Tracking tokens (added by JR1):** `--mds-tracking-base: -0.004em`, applied **once** on `body` (and again on the guest runtime's own `body`, which does not import `app.css`) so it inherits everywhere rather than being repeated per role; and `--mds-tracking-display: -0.028em`, carried by the two display roles as `--mds-type-{display,heading-1}-letter-spacing`. These replaced three hand-written magic numbers (`-0.01em` in `PageHeader.vue` and `AdminLayout.vue`, `-0.015em` in `Welcome.vue`) that had drifted apart from each other — tracking is a property of the type *role*, so it now lives beside the size it belongs to.
 
+**`--mds-tracking-wide: 0.06em` (added by JR2)** — positive letting for an **uppercased micro-label**. Uppercase closes the gaps a lowercase word opens, so a caps label needs letting where a sentence-case one does not; this is the one place in the system tracking goes positive. Three consumers, and they are the whole set: `MdsStatTile`'s label, `MdsDataTable`'s column headers, and `MdsFilterBar`'s heading — which until JR2 carried a literal `0.04em`, **the only hard-coded typographic value in the package**. It lives under `tracking`, deliberately not as a twelfth `type` role: `type-scale.test.ts` re-derives every `[data-font-size]` declaration from the eleven roles and hard-pins that count.
+
+> ⚠️ **`--mds-type-*-letter-spacing` exists for `display` and `heading-1` ONLY.** Every other role emits no letter-spacing property, so a component wanting tracking on `caption` or `label` reaches for `--mds-tracking-wide`/`-base` directly. Referencing `--mds-type-caption-letter-spacing` compiles, resolves to nothing, and **invalidates the whole declaration at computed-value time** — the H21d1 failure mode. `token-references.test.ts` catches it.
+
 > **JR1 enlarged only the two display roles** (display 36→44, heading-1 30→38, both to weight 750). Heading-2/3/4, every body role and `code` are unchanged: the approved direction's density comes from the page title carrying real weight, not from inflating the whole scale. Note the knock-on — `MdsStatTile` renders its value at `heading-1`, so stat figures grew with the page titles, which is intended and matches the mockup.
 
 **Font-role mapping**: `display`, `heading-1`, `heading-2`, `heading-3`, and `heading-4` render in the **Display** stack (**normal case**, a slight negative `letter-spacing` ≈ `-0.01em` on the largest sizes) — a clean humanist sans carrying the page's visual personality (the original drafting-desk concept set these uppercase; the 2026-07-06 refresh dropped the uppercase for a softer, more modern read). `body-lg`, `body-md`, `body-sm`, `label`, and `caption` render in the **Body** stack — plain, maximally legible, no letter-spacing tricks. `code` renders in the **Utility/mono** stack with `font-variant-numeric: tabular-nums`. A component never mixes stacks within a single text node (e.g., a heading is never partially body-face) — the three-role split is a per-token-not-per-character decision, kept simple deliberately.
@@ -316,6 +320,23 @@ A 5-step elevation scale, used to communicate stacking order (what sits "above" 
 
 Governing rule: shadow tokens are **strictly ordered** — a component at elevation *N* never sits visually beneath a component at elevation *N-1* it is meant to overlay (e.g., a toast, `shadow-5`, must never appear to sit under an open modal, `shadow-4`, which is why toasts render in their own top-level portal — see §3.7).
 
+#### The two glow steps (added by JR2) — a second axis, NOT rungs of the ladder
+
+| Token | Value | Use |
+|---|---|---|
+| `--mds-shadow-accent` | `0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-primary-bg) 55%, transparent)` | The resting glow under a **filled primary** button |
+| `--mds-shadow-danger` | the same geometry, mixed off `--mds-color-action-danger-bg` | The resting glow under a **filled destructive** button |
+
+> **These are outside the strict ordering above and must never be substituted for a numbered step.** `shadow-0..5` describe *distance from the page* — a stacking claim, which is why the ordering rule can be stated at all. A glow describes *a fill bleeding into its surroundings*; a glowing button is not "above" a card, it is coloured. Two different questions, two different token families.
+>
+> **Why `color-mix` off the live token rather than a literal rgba** — and this is the whole reason there are two tokens: `--mds-color-action-primary-bg` is **re-pointed per tenant by the brand ramp** and again by `[data-accent='teal']`. A literal blue halo would sit under a teal-branded tenant's button and under every destructive button in the product. Mixing off the fill means the glow follows whatever that fill currently is, including a colour no one has chosen yet.
+>
+> **No `@supports` guard, deliberately.** An engine without `color-mix` treats the whole declaration as invalid and drops it, so the button renders flat — exactly as it did before JR2. The failure mode is the previous design.
+>
+> **No dark re-point.** One value works on both grounds, which also keeps JR2 out of the two duplicated dark blocks that `theme-overrides.test.ts` asserts are byte-identical. The glow is a property of the fill, and the fill is already theme-correct.
+>
+> ⚠️ **Only filled variants carry it, and they drop it on `:active`, `:disabled` and `--loading`.** A lifted thing that stays lifted while you press it is the one motion cue users read as broken; dropping the shadow is what makes the darker active fill read as *settling*. A disabled button whose grey face still casts a coloured halo reads as enabled-but-broken.
+
 ### 2.6 Border radius
 
 > **Decision (revised 2026-07-06):** the original drafting-desk concept used a near-flat **2–5px** radius scale for a precise, mostly-square-edged character. At the user's request the app was refreshed to feel *more modern and less "edgy" while staying compact*, so the scale was softened to **6 / 8 / 12px** — still well short of the generic 16px+ "round everything" SaaS look, and spacing/type density were left untouched so the app stays compact. Full-round (`--mds-radius-full`) remains reserved for shapes that are *supposed* to be circular/pill-shaped (avatars, toggle tracks, status pills), never as a general softening device. `--mds-radius-lg` (12px) is now also used for the tinted icon badges introduced in the same refresh (page-header + stat-tile glyphs).
@@ -326,14 +347,18 @@ Governing rule: shadow tokens are **strictly ordered** — a component at elevat
 |---|---|---|
 | `--mds-radius-none` | 0px | Table cells, full-bleed images, the app-shell/canvas edges |
 | `--mds-radius-sm` | 6px | Checkboxes, small chips — **deliberately NOT stepped up with the rest of the scale** |
-| `--mds-radius-md` | 12px | **Default**: buttons, form inputs, selects, toasts — one radius for nearly every control |
-| `--mds-radius-lg` | 16px | Larger containers + the tinted icon badges (page-header, stat tiles) |
-| `--mds-radius-xl` | 20px | **Cards** — added by JR1; wired to `Card`, `StatTile` and `Modal` by **JR2** |
+| `--mds-radius-md` | 12px | **The control tier.** Buttons, form inputs, selects, chips, menu items, popovers, the modal close button, and any panel nested *inside* another surface |
+| `--mds-radius-lg` | 16px | **The compact-surface tier.** Toasts, the ≤480px card-per-row, the tinted icon badges (page-header, stat tiles) |
+| `--mds-radius-xl` | 20px | **The page-level card/dialog tier.** `MdsCard`, `MdsStatTile`, the `MdsModal` panel, and standalone page-local cards — wired by **JR2** |
 | `--mds-radius-full` | 9999px | Pills/badges, avatars, toggle-switch track/thumb — true circles/pills only, never a "rounded rectangle" softening |
 
 > ⚠️ **`sm` stays at 6px on purpose, and the reason is §3.2.** The rest of the scale stepped up one notch; `sm` did not, because the checkbox box is **18px** and a circle at that size is a 9px radius — an 8px `sm` would render a checkbox as a near-circle, which is the **radio's** shape. §3.2 makes shape the non-colour signifier separating the two controls, so stepping `sm` up would have quietly traded a checked-state affordance for visual consistency. The approved direction specifies only the control (12px) and card (20px) values; `sm` was an extrapolation, and this is where the extrapolation was wrong.
 >
-> ⚠️ **Between JR1 and JR2, cards sit at 12px, not 20px, and that is the intended intermediate state.** `Card`/`StatTile`/`Modal` read `--mds-radius-md`, which JR1 moved 8→12; pointing them at `xl` is a component edit and belongs to JR2 by the row split. A reader landing here mid-sequence should not "fix" it by redefining `md`.
+> ✅ **The JR1→JR2 interim is over (2026-08-12).** `Card`, `StatTile` and the `Modal` panel now read `xl`; the warning that used to sit here — "cards sit at 12px and that is the intended intermediate state" — is discharged and has been removed rather than left to mislead.
+>
+> ⚠️ **THE THREE TIERS ARE A RULE, NOT A LIST, AND JR2 EXISTS BECAUSE THE LIST WAS NOT ENOUGH.** The row split said "six components"; the measurement said otherwise. **84 declarations across 26 app files read `--mds-radius-md` while also painting `--mds-color-bg-surface`** — page-local surfaces hand-styled to look like a card. Move `MdsCard` alone and `/domains` shows a 12px `DomainCard` beside a 20px `MdsCard`, and the sign-in screen — the first surface a new user ever sees — is still speaking the old language. Moving all 26 would be equally wrong: most are inputs, menus and nested panels, which belong at 12px. **Decide by what the surface IS, using the table above**, and when a hand-built surface duplicates `MdsCard`'s fill + border + shadow, the real fix is usually to reach for `MdsCard`.
+>
+> Applied by JR2 beyond the six: `DomainCard.vue`, `AuthLayout.vue`'s `.auth__card` and the guest runtime's `ConfirmationScreen.vue` → `xl`; `Toast.vue` → `lg`. **Deliberately left at `md`:** every builder inner panel, the `AccountMenu`/`NotificationBell` popovers, `.auth-alert`, `.conflict__col`, and every input — all nested or control surfaces. `ConflictDialog` needed nothing at all: it is an `MdsModal` and inherited the panel.
 
 ### 2.7 Breakpoints
 
@@ -543,6 +568,11 @@ The sections below inventory the components that live inside these shells.
 | Active/pressed | `--mds-primary-800` fill | `--mds-primary-100` fill | `--mds-primary-100` fill | `--mds-danger-800` fill |
 | Disabled | `--mds-neutral-200` fill, `--mds-neutral-400` text, no hover/focus response | Same pattern, border removed | `--mds-neutral-400` text only | Same pattern as primary disabled |
 | Loading | Fill/border unchanged; label replaced by an inline spinner (§3.9) + optional retained label at reduced opacity; button is programmatically disabled (`aria-disabled="true"`, not removed from tab order — see §4.3) during the load | (same treatment) | (same treatment) | (same treatment) |
+| **Elevation (JR2)** | `--mds-shadow-accent` at rest; **`none`** on active, disabled and loading | none | none | `--mds-shadow-danger` at rest; **`none`** on active, disabled and loading |
+
+> **JR2 — why the filled variants gained a glow.** Before JR2 `MdsButton` read **no shadow token at any state**: it was the flattest component in the design system, and since a button is the thing on a page a user is most looking for, that flatness was a disproportionate share of why the product read plain. The glow is a coloured spill, not a stacking claim — see §2.5's note on why it is a separate token axis and why it is mixed off the live fill rather than written as a literal.
+>
+> ⚠️ **The `mds-button-spin` duration is a literal `600ms` ON PURPOSE and must not be "tidied" into `--mds-duration-deliberate`,** which holds the same number and therefore looks like a free improvement. Reduced motion collapses every duration token to 1ms centrally (§2.8), so a tokenised spinner would run at roughly a thousand revolutions a second — a strobing disc, and strictly worse for the very user the setting protects. `MdsSpinner` reached this conclusion first and states the principle: a loading spinner is a **functional** indicator, so under reduced motion it keeps moving, just slower. JR2 gave `MdsButton`'s spinner the same 1500ms reduced-motion arm, which it had been missing entirely.
 
 Icon-only buttons always carry an `aria-label` (never rely on a visual tooltip alone for their accessible name — §4.5) and use the same size/state matrix as labeled buttons, sized to a perfect square matching the size token's height.
 
@@ -631,6 +661,12 @@ The data table is the single most-used composite component (submissions inbox, f
 - **Row-level states**: hover (`--mds-neutral-50` background), selected (checkbox-driven row selection tinted `--mds-primary-50`), and an inline error/warning row indicator (e.g., a submission flagged for review) using a left-edge color bar plus a status pill (§3.8) — never row-background color alone as the only signifier.
 
 **Governing layout rule**: column headers, cell padding, row height, and the filter-bar/pagination placement are **fixed by the table component itself** — a page configures *which* columns/filters/actions appear, never *how* the table lays them out. A "denser" or "wider" one-off table for a specific page is exactly the kind of change that requires a documented exception (§1.3) or, more likely, a new density variant added to the shared component (§7.2).
+
+**Table typography and density (set by JR2).** Column headers are `caption` size, **bold**, **uppercase**, tracked at `--mds-tracking-wide`; cells carry 20px of vertical padding for a **61px row** against the approved direction's 60px. That row height is the increment's one deliberate density change and it is felt: it costs roughly one row per screen on the inbox, and buys the air that makes a list read as a set of objects rather than a spreadsheet. Below 480px the cell padding returns to 12px — there a cell is one key/value line inside a card, not a table row. End-aligned columns carry `font-variant-numeric: tabular-nums`, because right alignment in a table means "these are numbers and I want to compare them", and proportional digits fringe the very edge being aligned.
+
+> ⚠️ **The header keeps `--mds-color-bg-surface`, diverging from the approved mockup, and the reason is measured rather than aesthetic.** The direction paints its header band `--m-surface-2` `#EEF3FE`, which is byte-identical to `--mds-color-bg-sunken` in light — so the swap looks free. It is not. In dark, `bg-sunken` re-points to `neutral-50` `#0f131c`, which **is the dark canvas**. The mockup can assume a tinted band because every table it draws sits inside a card; this app's busiest list does not (`forms/Index.vue` mounts the table bare on the canvas), so a sunken header there would be the same colour as the page behind it and the band would disappear entirely in dark. **The Vivid header therefore reads through type, not fill.** Should a future increment put every table inside a card, this is re-openable — but re-check the dark ground first, because that is the half that fails.
+>
+> ⚠️ **Below 480px the card-per-row reads `--mds-radius-lg`, not `xl`** (§2.6's compact-surface tier). At that width a row *is* a card, so leaving it on the control tier put 12px corners beside every 20px `MdsCard` on the same screen; but a full-bleed card at 375px with 20px corners is heavier than the direction's own phone mock, which draws its panels at 16–18px.
 
 > ⚠️ **`MdsDataTable` did NOT gain a row-link prop in J2a, and that is a decision rather than an omission.** The J2 plan carried an opt-in `rowHref` so a row could link to its object. It was refused on two grounds. **(1) `#cell-<key>` already links a row's first cell**, in `forms/Index.vue` and elsewhere, and has since before J2 — a second mechanism for one job is how a component comes to disagree with itself. **(2) 11 of the 17 tables in the app ship `#row-actions` containing buttons**, so for those a row-wrapping anchor would put interactive content inside interactive content (axe's `nested-interactive`), which means the only universally safe shape *is* "link the first cell" — i.e. the mechanism that already exists.
 >
@@ -774,21 +810,31 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 
 ### 3.5 Cards
 
-The default content container for the dashboard, forms list (grid view), and settings panels. Default state: `--mds-color-bg-surface` fill, `--mds-radius-md` corners, `--mds-shadow-1` (or `--mds-shadow-0` flat when inside an already-elevated context like a modal), `--mds-space-5` internal padding, `--mds-color-border-default` 1px border (used **together with** the shadow, not instead of it, so cards remain legible in contexts/zoom levels where shadows render faintly). Interactive cards (e.g., a clickable form-summary card) add a hover state (`--mds-shadow-2`) and a focus-visible ring when reached via keyboard, and must be a real `<button>`/`<a>`, never a `<div>` with a click handler (§4.5).
+The default content container for the dashboard, forms list (grid view), and settings panels. Default state: `--mds-color-bg-surface` fill, **`--mds-radius-xl` corners** (the page-level card tier, §2.6 — wired by JR2), `--mds-shadow-1` (or `--mds-shadow-0` flat when inside an already-elevated context like a modal), `--mds-space-5` internal padding, `--mds-color-border-default` 1px border (used **together with** the shadow, not instead of it, so cards remain legible in contexts/zoom levels where shadows render faintly). Interactive cards (e.g., a clickable form-summary card) add a hover state (`--mds-shadow-2` **plus an accent edge, `--mds-color-action-primary-fg`**) and a focus-visible ring when reached via keyboard, and must be a real `<button>`/`<a>`, never a `<div>` with a click handler (§4.5).
+
+> **The hover edge is `-fg`, never `-bg`, and this is the recurrence the J2a finding predicted.** A border is a coloured edge, and `-bg` guarantees contrast only against text printed *on* it — nothing against the surface behind it (§2.2). Measured for this pairing: `#1156B2` on `#FFFFFF` is **7.01:1** light, `#8FBCFF` on `#1a2130` is **8.29:1** dark, both far past the 3:1 a non-text indicator needs. **No hover transform** was added: the approved mockup shows none, and a translate would raise a reduced-motion question that a shadow and a border colour do not.
+>
+> **Padding stayed at `--mds-space-5` when the radius moved, deliberately.** The two approved artifacts disagree about card padding (24px on a panel, 18px on a grid card) and 20px sits between them; padding is also the one value here with 52 call sites and no visual-regression net behind it. Radius, elevation, type and table row height already carry the direction's density. `MdsStatTile` holds the same 20px for the same reason.
+>
+> ⚠️ **Three consumers set `padding: 0` on a Card to seat an `MdsEmptyState` flush** — `Dashboard.vue`, `analytics/Index.vue`, `SavedViewList.vue`. With the padding gone, the EmptyState's own 40/24px is the only thing keeping content off a corner that is now 8px rounder. It clears comfortably, but these three are where a future padding change would show first.
 
 **Governing layout rule**: a card's internal content always follows the same internal structure — optional media/icon, heading (`--mds-type-heading-3` or `heading-4`), optional metadata row, body content, optional action row — so a user scanning a grid of cards (forms list, template gallery) can predict where to look for the same kind of information across every card, regardless of which feature built that particular grid.
 
 ### 3.6 Modals / Dialogs
 
-Used for focused, blocking tasks (confirm-destructive-action, quick-create flows) — never for primary navigation or as a substitute for a full page. States: entering (slide/fade in over `--mds-duration-slow`, `--mds-ease-decelerate`), open (`--mds-shadow-4`, `--mds-color-overlay-scrim` backdrop), exiting (reverse transition), and a **destructive-confirmation variant** that always requires the destructive action itself to be styled as the `destructive` button variant (§3.1) — never styled as `primary`, so "the button that does the dangerous thing" is never visually indistinguishable from "the button that does the normal thing" across the whole product.
+Used for focused, blocking tasks (confirm-destructive-action, quick-create flows) — never for primary navigation or as a substitute for a full page. The panel takes **`--mds-radius-xl`** (the page-level card/dialog tier, §2.6 — wired by JR2); its close button stays at `--mds-radius-md`, because that is a control. States: entering (slide/fade in over `--mds-duration-slow`, `--mds-ease-decelerate`), open (`--mds-shadow-4`, `--mds-color-overlay-scrim` backdrop), exiting (reverse transition), and a **destructive-confirmation variant** that always requires the destructive action itself to be styled as the `destructive` button variant (§3.1) — never styled as `primary`, so "the button that does the dangerous thing" is never visually indistinguishable from "the button that does the normal thing" across the whole product.
 
 **Governing layout rule**: every modal has exactly one primary action (bottom-right, per the one-primary-button rule in §3.1), one cancel/secondary action (bottom-left or immediately left of primary), a close affordance (top-right icon button, always also closable via `Escape`), and a focus trap (§4.5) — no modal ships without all four, and no page builds a "modal-like" floating panel that skips the focus-trap requirement by not technically being the shared Modal component.
+
+> ⚠️ **The `border-radius: 0` in `Modal.vue`'s ≤480px block is the full-screen sheet and must be kept in step by hand.** It is the only literal radius left in the entire package — every other corner in every component resolves through a token — so it is also the only one a token change cannot reach. It was correct before JR2 and is correct after; the point is that nothing will tell you if it ever stops being.
 
 ### 3.7 Toasts / Notifications
 
 Ephemeral, non-blocking feedback (e.g., "Form published," "Submission deleted," a webhook-delivery-failure alert). Rendered in a dedicated top-level portal (outside any modal's DOM subtree, so a toast is never visually trapped beneath an open modal's overlay — see the elevation ordering rule in §2.5), stacked in a fixed corner (top-right on desktop, full-width top-anchored on mobile per §6).
 
 States: entering (`--mds-duration-base`, slide+fade), visible (auto-dismiss after a type-dependent duration — success/info: 5s; warning: 8s; error: **no auto-dismiss**, requires explicit manual dismissal, since an error a user didn't get to read defeats its own purpose), hover (pauses the auto-dismiss timer), and exiting. Each toast carries a semantic icon + color bar matching its type (success/warning/danger/info, using the corresponding token scale) plus text — never an icon-less color swatch alone.
+
+**JR2 moved the toast to `--mds-radius-lg`** (§2.6's compact-surface tier). A toast is a *floating surface* — the same species as a card or a modal panel, and the only other component in the package that pairs a radius with an elevation — so leaving it on the 12px control tier made it read as a chip hovering above 20px cards. It does not take `xl` either: at roughly 56px tall, 20px corners consume most of the height and the strip reads as a lozenge.
 
 **Governing layout rule**: toasts communicate the *outcome* of an action the user just took (or an async event relevant right now); they never carry a primary call-to-action requiring navigation away from the current context (that's a banner or the dashboard's own notification center) — this keeps toasts genuinely ephemeral and prevents them from becoming a dumping ground for anything that "needs to tell the user something."
 
@@ -797,6 +843,14 @@ States: entering (`--mds-duration-base`, slide+fade), visible (auto-dismiss afte
 Small, `--mds-radius-full`, single-line labels communicating a discrete state — submission status (`draft`/`submitted`/`screened_out`/`under_review`/`approved`/`returned`/`archived`, matching the `SubmissionStatus` enum in the Data Dictionary; `screened_out` was added in I9a and is **neutral**, not danger — a settled non-failure, the same rule `wont_fix`/`disabled`/`revoked` follow), form status (`draft`/`published`/`archived`), webhook delivery status, subscription-tier badges, etc. Each status maps to exactly one semantic color pairing (background tint + matching-hue text, e.g., `approved` → `--mds-success-50` background / `--mds-success-700` text; `returned` → `--mds-warning-50` / `--mds-warning-700`\*(text darkened beyond the default warning text token specifically for the small-pill-text-size case — see the contrast note in §4.1); `archived` → `--mds-neutral-100` / `--mds-neutral-600`), and — consistent with the "never color alone" rule threaded through this document — every pill's **text label is the status name itself**, never a bare colored dot.
 
 **Governing layout rule**: the mapping from enum value → badge color/label is defined **once**, centrally in the component library (a single `statusVariant` lookup consumed by every screen that renders that enum), not re-decided per screen — so `approved` is the same green everywhere it appears, from the submissions inbox to the dashboard to an audit-log entry.
+
+**The `dot` prop (added by JR2)** puts a 6px `currentColor` disc before the label, for the direction's list-status pill. Three things about it are deliberate:
+
+- **It is off by default and opted into at exactly two call sites** — the forms-list and submissions-inbox Status columns. Those are the product's only *scannable status columns*, where the eye finds a row by its dot and reads the word to confirm. The other ~50 badges are inline annotations, and a disc on all of them is noise.
+- **It never replaces the label.** Read the paragraph above literally: the pill's text is the status name, "never a bare colored dot". The disc is `aria-hidden` decoration sitting *beside* the word, so WCAG 1.4.1 is satisfied exactly as it was before — this prop cannot be used to build the thing that rule forbids.
+- **It paints `currentColor`, and it is suppressed when an `icon` is also passed.** `currentColor` means the disc tracks whichever `-fg` the variant set, so it cannot drift out of step with its own label and a variant added later needs no new rule. The suppression is a guard with a named victim: `MdsStatTile` passes `trend-up`/`trend-down` to its delta badge, and a caller who set both would otherwise get a disc *and* an arrow.
+
+JR2 also moved the pill to `--mds-font-weight-semibold` with 4px of vertical padding (from medium/2px) — a slightly taller, firmer object, matching the direction. It still has no border and no shadow.
 
 ### 3.9 Progress Indicators
 
@@ -812,7 +866,13 @@ Three distinct patterns, used for three distinct situations — they are not int
 
 ### 3.10 Empty States
 
-The shared pattern for "this list/page has nothing in it yet," used across forms list, submissions inbox, webhook delivery log, template gallery, and the dashboard's own KPI tiles when a tenant is brand-new. Structure: a simple line-art illustration (token-consistent stroke color, `--mds-neutral-300`), a `--mds-type-heading-3` headline, one line of `--mds-type-body-md`/`--mds-color-text-secondary` explanatory copy, and **exactly one primary-button call-to-action** driving the single next best action (e.g., "Create your first form").
+The shared pattern for "this list/page has nothing in it yet," used across forms list, submissions inbox, webhook delivery log, template gallery, and the dashboard's own KPI tiles when a tenant is brand-new. Structure: a simple line-art illustration **inside a tinted medallion** (JR2 — 96px square at `--mds-radius-xl`, `--mds-color-action-primary-tint` field, `--mds-color-action-primary-fg` stroke; it was a bare 64px glyph stroked `--mds-color-border-strong`), a `--mds-type-heading-3` headline, one line of `--mds-type-body-md`/`--mds-color-text-secondary` explanatory copy, and **exactly one primary-button call-to-action** driving the single next best action (e.g., "Create your first form").
+
+> **The medallion is a derivation, not a transcription — neither approved artifact draws an empty state.** What it derives from is the direction's own construction for carrying brand in a non-text element: a tinted field with an accent glyph, the same shape as `MdsStatTile`'s icon chip and the sidebar's active item. It is worth doing because the measured diagnosis behind the whole re-skin names *"empty states are plain text, no illustration"* as one of the thirty compounding causes, and a grey stroke on a white ground is the plainest thing on any page that has one.
+>
+> ⚠️ **`--mds-color-action-primary-tint` is the load-bearing token choice here, and `primary-50` is the trap.** `tint` is the one accent fill that is *redeclared* for dark — `rgba(88,155,253,0.18)` in both dark blocks — rather than riding the primary ramp, which is not theme-flipped. Reach for `primary-50` because it is "the light accent" and dark mode gets a near-white slab where the medallion should be.
+>
+> The change is CSS-only: padding on an inline `<svg>` insets its viewBox, so `box-sizing: border-box` with 96px − 2×16px keeps the glyph at its original 64px and grows only the field around it. No wrapper element was added, which is why every consumer and `dashboard.test.ts`'s `.mds-empty__desc` assertions are untouched.
 
 **Governing layout rule (extended 2026-08-03)**: an empty state never presents more than one primary CTA and never presents zero CTAs when a next action genuinely exists — a list that is empty because of an upstream permission restriction (rather than "nothing created yet") uses a distinct copy variant explaining *why*, rather than the generic "get started" copy, so the empty state always tells the truth about the situation it's describing.
 
@@ -848,6 +908,32 @@ Contrast, colour-channel and text-alternative obligations are in §4.1.
 > ⚠️ **One predicate, not two.** `isInteractive` and the per-row `v-if` must test the same thing. The first version tested `href !== undefined` in the script and truthiness in the template, so `href: ''` — the obvious shape of a `cond ? url : ''` call site — stripped `role="img"` *and* its label *and* rendered zero links. **The value stays outside the anchor**: the link goes to the category, not to its count. `MdsTabNav` deliberately does the opposite with its badge, and the shared rule is that a count belongs **inside** the accessible name when it describes the destination ("Submissions 128" — how much is behind this link) and outside it when it is the data being plotted.
 >
 > **`MdsStatTile` gained `href` in the same increment**, as a link and never a click emit — the `MdsCard` `interactive`/`as` precedent, and §3.5's standing rule that an interactive card is a real `<button>`/`<a>`. Optional, so the **17** pre-existing tiles keep rendering a plain container rather than gaining 17 tab stops; `href: ''` is treated as absent for the same call-site reason as the chart. ⚠️ **A linked tile's accessible name is its WHOLE text** — the delta badge, its comparison label and the caption all join it, because an anchor's name is its contents. That is correct for a card-shaped link, and it is why no `aria-label` is added: one would replace that name and hide the delta from screen-reader users while sighted readers keep seeing it. `StatTile.test.ts` asserts the exact string, after the review found that the case named for this contract asserted only `toContain` and could not have failed it.
+
+> **`MdsStatTile` under JR2 — four changes, and the arrangement is deliberately NOT one of them.**
+> The approved mockup draws its tile label-on-top with a 13px inline accent icon; this component keeps
+> its 44px tinted medallion on the left with the value first. That is a decision of record (user, 2026-08-12):
+> the medallion is a Vivid-compatible element the mockup happens not to have, and it puts more accent
+> colour on the dashboard than an inline glyph would. Keeping it also means no markup moves, so the
+> exact-accessible-name assertion above and the three page-level `tile()` helpers stay valid.
+>
+> What did change: the container took `--mds-radius-xl` (the chip stays `lg`, so the nesting now reads
+> 20 outside / 16 inside); the hover edge became the accent, matching `MdsCard--interactive`; the label
+> became an uppercased `caption` at `--mds-tracking-wide`; and the value gained **`font-variant-numeric: tabular-nums`**
+> plus a `1.05` line-height.
+>
+> ⚠️ **The tabular figures were a JR1 comment that shipped without its declaration.** The code carried
+> the sentence *"tabular-nums plus tight tracking is what makes a column of them line up"* while only the
+> tracking existed — both charts had `font-variant-numeric` and the one number a user actually reads did
+> not, so a column of tiles jittered by a fraction of a digit width. A comment is not a guard; this is the
+> second time that lesson has been paid for in this file.
+>
+> **The value is gradient-filled** (`exceptions-log #11`) — heading ink at the top, ink mixed with 22%
+> accent at the bottom, via `background-clip: text`. Three guards make that safe and all three are
+> load-bearing: the plain `color` stays the base declaration so an engine without `background-clip: text`
+> renders an ordinary number; `-webkit-text-fill-color` is set alongside `color`, because in WebKit *that*
+> is the property the clipped background paints through; and `@media (forced-colors: active)` restores
+> `CanvasText`, without which a Windows High Contrast user gets transparent text over a background the
+> mode has already stripped — an invisible number, which is the usual reason this pattern is a defect.
 
 > **As-built (H24b2) — the first page assembled from these primitives.** `/analytics` is the Business-gated
 > cross-form surface (ADR-0011), and five shapes it settled are page-level rather than primitive-level, so

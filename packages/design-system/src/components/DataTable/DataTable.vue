@@ -299,18 +299,39 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     text-align: start;
     vertical-align: middle;
     border-bottom: 1px solid var(--mds-color-border-default);
+    /* ⚠️ JR2 KEPT `bg-surface` HERE, DIVERGING FROM THE MOCKUP, AND THE REASON IS MEASURED.
+       The direction paints its header band `--m-surface-2` `#EEF3FE`, which is byte-identical to our
+       `--mds-color-bg-sunken` in light — so the swap looks free. It is not: in dark, `bg-sunken`
+       re-points to `neutral-50` `#0f131c`, which IS the dark canvas. The mockup can assume that,
+       because every table it draws sits inside a card; this app's busiest list does not
+       (`forms/Index.vue:265` mounts the table bare on the canvas), so a sunken header there would be
+       the same colour as the page behind it and the whole band would vanish in dark.
+       The Vivid header therefore reads through TYPE rather than fill: caps, tracked, bold, small. */
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    font-weight: var(--mds-font-weight-bold);
+    letter-spacing: var(--mds-tracking-wide);
+    text-transform: uppercase;
     background-color: var(--mds-color-bg-surface);
-    font-size: var(--mds-type-label-font-size);
-    line-height: var(--mds-type-label-line-height);
-    font-weight: var(--mds-font-weight-semibold);
     color: var(--mds-color-text-secondary);
     white-space: nowrap;
 }
 
+/* An end-aligned column is a numeric column in practice — that is what right alignment is FOR in a
+   table — so it gets the lining figures the charts and the stat tiles already use. Without them the
+   digits in a right-aligned count column do not share a column position and the edge fringes. */
 .mds-table__cell--end {
     text-align: end;
+    font-variant-numeric: tabular-nums;
 }
 
+/* ⚠️ `text-transform` and `letter-spacing` are inherited EXPLICITLY, and `font: inherit` does not
+   cover them. The `font` shorthand resets the font-* longhands only; the UA stylesheet for <button>
+   separately sets `text-transform: none` and `letter-spacing: normal`, and those beat inheritance.
+   Found by looking at the real page after JR2 made the header uppercase and tracked: `Status` and
+   `Version` obeyed while `Form` and `Updated` — the two SORTABLE columns, whose text lives inside this
+   button — did not, so one header row carried two different type treatments. Nothing could have caught
+   it but a browser: happy-dom computes no styles, and axe does not care about case. */
 .mds-table__sort {
     display: inline-flex;
     align-items: center;
@@ -319,6 +340,8 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     border: 0;
     background: transparent;
     font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
     color: inherit;
     cursor: pointer;
 }
@@ -333,12 +356,22 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
     transform: rotate(180deg);
 }
 
+/* JR2: 20px of vertical padding rather than 12px, giving a 61px row against the direction's
+   `--m-row-h: 60px`. This is the increment's one real density change and it is the part a user feels:
+   it costs roughly one row per screen on the inbox, and buys the air that makes a list of forms read
+   as a set of objects rather than a spreadsheet. The mobile block below puts it back to 12px — inside
+   a card-per-row each cell is a key/value line, and 20px there makes a very tall card at 375px. */
 .mds-table__td {
-    padding: var(--mds-space-3) var(--mds-space-4);
+    padding: var(--mds-space-5) var(--mds-space-4);
     vertical-align: middle;
     border-bottom: 1px solid var(--mds-color-border-default);
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
+    /* The hover COLOUR is unchanged; only the instant swap is. At 61px a row is a big enough object
+       that an untransitioned repaint reads as a flicker when the pointer crosses the table.
+       Declared on the cell, not on the `:hover` rule — a transition that lives only in the hover
+       state animates the way in and snaps the way out. */
+    transition: background-color var(--mds-duration-fast) var(--mds-ease-standard);
 }
 
 .mds-table__row:hover .mds-table__td {
@@ -374,7 +407,12 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
         display: block;
         margin-bottom: var(--mds-space-3);
         border: 1px solid var(--mds-color-border-default);
-        border-radius: var(--mds-radius-md);
+        /* JR2: `lg`, not `xl`, and not the `md` it was. Below 480px each row IS a card, so leaving it
+           at the control tier put 12px corners next to every 20px `MdsCard` on the same screen. It
+           does not go all the way to `xl` either: a full-bleed card at 375px with 20px corners is
+           heavier than the direction's own phone mock, which draws its panels at 16-18px. This is the
+           compact-surface tier from DSR §2.6 — the same one `MdsToast` and the card skeleton read. */
+        border-radius: var(--mds-radius-lg);
         background-color: var(--mds-color-bg-surface);
     }
     .mds-table__td {
@@ -382,6 +420,9 @@ watch(() => [props.rows, props.columns, props.loading], () => queueMicrotask(mea
         align-items: center;
         justify-content: space-between;
         gap: var(--mds-space-4);
+        /* Back to 12px from the 20px the desktop row now carries: here a cell is one key/value line
+           inside a card, not a table row, and 20px stacks into a very tall card at 375px. */
+        padding: var(--mds-space-3) var(--mds-space-4);
         text-align: end;
         border-bottom: 1px solid var(--mds-color-border-default);
     }

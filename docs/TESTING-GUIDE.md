@@ -678,7 +678,6 @@ expected and is not a defect.
 | **OCR upload, linelist/batch (Feature #2)** | Not built, same blocker. |
 | **Payments and self-serve billing** | Cut to Phase 4 by decision. Plans are assigned by the super-admin console instead. |
 | **Real-time notification push** | The bell polls on an interval rather than pushing over a socket. Deliberate; the socket layer is deployment-track work. |
-| **Google Sheets connector UI** | The backend and the shared column-mapping engine are built; the connect-and-map screens are increment H16b. |
 | **Airtable connector** | Increment H16c. |
 | **Cross-tenant audit search from the console** | **Not built, deliberately** — not deferred. `/admin/audit-log` shows platform-wide actions only. A super-admin action against a workspace is recorded in *that workspace's* log, where the people it affected can read it; letting the console read every tenant's history was a one-line change and was rejected. |
 | **Domain actions from the workspace detail page** | Not built, deliberately. Verifying, activating or removing a hostname from the console would record no audit entry, so those stay in the workspace's own settings. |

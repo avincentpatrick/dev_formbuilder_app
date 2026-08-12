@@ -178,6 +178,9 @@ final class ConnectionPresenter
                 'configured' => is_string($clientId) && $clientId !== '',
                 'connect_url' => '/integrations/'.$key->value.'/connect',
                 'connected' => in_array($key->value, $live, true),
+                // H16b — a standing condition of the DEPLOYMENT, not of this request, so the page states it
+                // rather than waiting for the weekly failure to imply it. Null once the app is published.
+                'notice' => $this->providerNotice($key),
             ];
         }, ConnectorProviderKey::cases());
     }
@@ -187,6 +190,33 @@ final class ConnectionPresenter
      * here is an `UnhandledMatchError` the first time anyone opens Integrations, which is a loud failure at
      * the moment the case is added rather than a silent blank card discovered by a tenant later.
      */
+    /**
+     * A standing caveat about the provider's own configuration, or null when there is nothing to say.
+     *
+     * ── WHY THIS SENTENCE EXISTS AT ALL (H16b) ─────────────────────────────────────────────────────────────
+     * While the Google Cloud project is in `testing`, Google expires every refresh token after SEVEN DAYS.
+     * `access_type=offline` does not prevent it and the hourly `RefreshConnectorTokensJob` cannot save it —
+     * a token Google has already expired cannot be refreshed. So the connection dies weekly, and the tenant
+     * sees `statusVariant('refresh_failed')`'s bare **"Reconnect needed"**: a red badge, every week, with no
+     * cause given. The reasonable conclusion from that is that our token handling is broken.
+     *
+     * The fix is not a better badge, it is naming the cause. This is the difference between a product that
+     * looks unreliable and one that is being honest about a deployment state its user cannot see.
+     *
+     * Read from config so publishing the app removes it by flipping one env var, with no template edit and
+     * nothing left behind to go stale. `default`-less on the enum for the H8 forcing-device reason the
+     * method below records.
+     */
+    private function providerNotice(ConnectorProviderKey $key): ?string
+    {
+        return match ($key) {
+            ConnectorProviderKey::Slack => null,
+            ConnectorProviderKey::GoogleSheets => config('connectors.providers.google_sheets.publishing_status') === 'testing'
+                ? 'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in Meridian.'
+                : null,
+        };
+    }
+
     private function providerDescription(ConnectorProviderKey $key): string
     {
         return match ($key) {

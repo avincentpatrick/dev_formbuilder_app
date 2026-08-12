@@ -1732,3 +1732,91 @@ four-column version did not, and nothing cheap buys it back (which is why the gr
 identity index is a hash, so colour collisions are likely in a small tenant and the glyph initials are the
 disambiguator; and at ≤480px `MdsDataTable` is not a scroll container, so the single-line action cluster
 has no scroll region there.
+
+
+## 2026-08-13 — Lane B (connector lane): H16c, the Airtable connector
+
+Three PRs. **#138 MERGED 6/6** (`1a6b976`) — the provider and the PKCE seam. **#139** (enumeration,
+inspection, delivery) and **#140** (the rule editor) are OPEN, locally green on every gate, and
+**have no CI run at all** — see the outstanding-verification note at the end.
+
+**The organising fact: Airtable can enumerate, which is the one thing `drive.file` could not.** Most of
+this increment is that propagating. H16b creates the Sheets destination because "paste an id" fails for a
+scope that shows us only files we created — "reachable by construction" was an answer to a Google
+constraint, not a property of tabular destinations. Airtable's `schema.bases:read` lists bases properly, so
+the tenant picks a base and a table that already exist, and **`schema.bases:write` was refused** (ADR-0009
+§D8, user-ratified). Consequently H16b's `ProvisionsTabularDestinations` was split:
+`InspectsTabularDestinations` is the reading half Airtable claims, provisioning extends it, and
+`GoogleSheetsDirectory` needed no edit. Bundling the two had looked like cohesion and was really a
+workaround for one scope limitation wearing the shape of a design.
+
+**PKCE, and the framework had nowhere to put a verifier.** Airtable requires `code_challenge`/`S256`, and
+the two half-flows run on different hosts in different requests — which is §D2/§D3's whole
+design, and exactly what makes "stash it in the session" unavailable. It is DERIVED from the signed `state`
+both halves already hold: `base64url(HMAC-SHA256('connector-pkce.v1.'+state, stateKey))`, 43 chars, RFC
+7636's minimum. No session, no cache entry, no `oauth_states` table — so §D3's rejection of a
+server-side nonce store stands unweakened, which it would not have if PKCE had forced one. The objection
+worth pre-answering: an attacker who intercepts the redirect sees `code` AND `state`, so this looks like
+deriving a secret from a public value; it is not, because the derivation is an HMAC under a key they do not
+hold. The four-method `ConnectorProvider` contract survived in COUNT but not in SIGNATURE —
+`authorizeUrl()` and `exchangeCode()` each gained a `$codeVerifier` — and that is the honest answer to
+the ADR's "when the second and third providers land" revisit line, which is now closed in the ADR itself.
+
+**A real H16b defect, found by a new test, live since #136.** `ConnectionPresenter::pausedReasons()` selects
+paused rules' excerpts with `LIKE '[%]%'`, and `MappingDrift::summary()` carries no code — so every
+drift-paused rule stored a reason the presenter then dropped, and the tenant saw a paused rule with **no
+explanation**, on the one failure the drift card exists to explain. It survived because the e2e seeder
+fabricates a correctly-prefixed excerpt the code never produced: a test certifying a behaviour that did not
+exist. Both adapters now prefix `[column_drift]`, and the seeder's string was rewritten to `summary()`'s
+actual wording. The engine cannot add the prefix itself — `App\Support\Mapping` is forbidden from
+importing connector code, and a source-parsing test enforces that.
+
+**Three more, two of them mine.** (1) `destinationNoun()` first returned `spreadsheet` for Sheets, which
+quietly made "tabular" and "spreadsheet" synonyms and re-pointed copy that had always meant the TAB —
+"that tab isn't in the spreadsheet any more" became "that spreadsheet isn't there any more", advice for a
+different problem. A tabular provider has TWO nouns; `containerNoun()` now carries the outer one, and the
+existing Sheets tests caught it. (2) Making the reference parser provider-keyed moved a Slack connection's
+failure from "this integration has no tabular destination" to "your link looks wrong" — **ask "can this
+provider do this?" before "is this input valid?"**. (3) `token-references.test.ts` red-lit three `--mds-*`
+names invented from memory rather than copied from the sibling component; **grep the sibling's tokens, never
+recall them.** A fourth, cheap: `Http::fake()` APPENDS stubs rather than replacing them, so a per-iteration
+fake left the first `whoami` answering both connects and a correct multi-account test failed against correct
+code.
+
+**Airtable's four real differences from Sheets, each pinned by a test.** A record is a KEYED OBJECT, so the
+positional mapping is zipped back onto the destination's VERBATIM field names — `ColumnFingerprint`
+casefolds, and writing to `full name` when the field is `Full Name` makes Airtable refuse the whole record.
+An empty value is OMITTED rather than written, the opposite of the positional rule where a blank holds a
+column open. Delivery keys on the TABLE ID (`config.sheet_id`), so a rename is invisible instead of a 404,
+leaving genuine field changes as the only thing drift ever reports. And `typecast: true` is sent, because a
+form answer is always text and a mapped field often is not — its one disclosed cost, that typecast can
+ADD a single-select option (a schema side effect Airtable permits on the data scope alone), is recorded in
+ADR-0009 and in the GDPR §7 sub-processor bullet rather than left to be discovered.
+
+**Two renames, both deliberate deviations from the approved plan.** `SheetDestinationDirectory` →
+`TabularDestinationDirectory` and `/sheets` → `/destinations`: the plan said reuse `/sheets` because it
+is cheaper, and on reading it in place an Airtable base picker calling `/sheets?reference=appXXXX` reads as a
+bug to whoever finds it next. Mechanical, no behaviour change, and PR 3 rewrote most of the affected client
+files anyway.
+
+**And the front end's last provider literal is gone.** `RuleFormModal` gated three behaviours on
+`provider === 'google_sheets'` — the channel fetch, the `submission.*` event narrowing and the `config`
+submit shape — all three of which would have been wrong for Airtable at once. They now read a
+server-resolved `destination_kind`. What capabilities honestly CANNOT decide is WHICH tabular editor mounts,
+so that stays one provider-keyed map in one place; a first draft also shipped `enumerable`/`creatable` and
+two nouns that nothing read, and an unread prop is the `--block`-with-no-consumer smell this repo has been
+bitten by before.
+
+**Gates (local, Lane B's own stack).** Pest `tests/Feature/Connectors` + `Unit/Mapping` + `Unit/Connectors`
+270/0 across #138+#139 and 225/0 on #140's tree; PHPStan delta 0 (local baseline 20, all pre-existing
+model-property phantoms); Pint clean; vue-tsc clean; Vitest 98 files / 1752 tests; `npm run build` clean;
+host lint gates 84/93/28; `openapi.json` regenerated for #139 with the diff READ (two new descriptions, both
+publishable) and byte-identical for #140; migration up→down→up; the E2eSeeder run end to end against
+Lane B's database (1 Airtable, 1 Sheets, 2 Slack connections).
+
+**⚠️ OUTSTANDING VERIFICATION.** From ~18:50 GitHub Actions stopped creating runs for this
+repository — nothing after #138's post-merge run, on any branch or event. Opening #139 produced no run;
+closing and reopening it produced no run either; `actions/permissions` reports `enabled: true`. This is the
+exact failure `ci.yml`'s header block was written for, and both of its remedies are unavailable because
+`workflow_dispatch` and `schedule` are read from the DEFAULT branch only and `main` has received nothing yet.
+**Neither PR was merged**, because merging on local green is precisely the I5 precedent this tracker keeps.

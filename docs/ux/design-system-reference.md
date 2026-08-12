@@ -325,12 +325,14 @@ Governing rule: shadow tokens are **strictly ordered** — a component at elevat
 | Token | Value | Use |
 |---|---|---|
 | `--mds-radius-none` | 0px | Table cells, full-bleed images, the app-shell/canvas edges |
-| `--mds-radius-sm` | 8px | Checkboxes, small chips |
+| `--mds-radius-sm` | 6px | Checkboxes, small chips — **deliberately NOT stepped up with the rest of the scale** |
 | `--mds-radius-md` | 12px | **Default**: buttons, form inputs, selects, toasts — one radius for nearly every control |
 | `--mds-radius-lg` | 16px | Larger containers + the tinted icon badges (page-header, stat tiles) |
 | `--mds-radius-xl` | 20px | **Cards** — added by JR1; wired to `Card`, `StatTile` and `Modal` by **JR2** |
 | `--mds-radius-full` | 9999px | Pills/badges, avatars, toggle-switch track/thumb — true circles/pills only, never a "rounded rectangle" softening |
 
+> ⚠️ **`sm` stays at 6px on purpose, and the reason is §3.2.** The rest of the scale stepped up one notch; `sm` did not, because the checkbox box is **18px** and a circle at that size is a 9px radius — an 8px `sm` would render a checkbox as a near-circle, which is the **radio's** shape. §3.2 makes shape the non-colour signifier separating the two controls, so stepping `sm` up would have quietly traded a checked-state affordance for visual consistency. The approved direction specifies only the control (12px) and card (20px) values; `sm` was an extrapolation, and this is where the extrapolation was wrong.
+>
 > ⚠️ **Between JR1 and JR2, cards sit at 12px, not 20px, and that is the intended intermediate state.** `Card`/`StatTile`/`Modal` read `--mds-radius-md`, which JR1 moved 8→12; pointing them at `xl` is a component edit and belongs to JR2 by the row split. A reader landing here mid-sequence should not "fix" it by redefining `md`.
 
 ### 2.7 Breakpoints

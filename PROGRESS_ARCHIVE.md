@@ -2552,3 +2552,48 @@ lockout went unrecorded there.
 
 **Environment:** Docker Desktop's engine wedged mid-session (500 on every API route) and needed a full
 restart plus `wsl --shutdown`; both lanes' stacks were brought back up afterwards.
+
+## 2026-08-14 — LANE A · J3c2 (Google sign-in) begun: dependency, ADRs, seam, schema, state (branch `j3c2-google-signin`, no PR yet)
+
+**Six commits, pushed, nothing half-edited.** The increment was split so the riskiest and most
+irreversible parts landed first, and each was verified against the running stack rather than reasoned
+about.
+
+**THE PLAN'S #1 RISK IS CLEARED.** `laravel/socialite v5.29.0` resolves cleanly against
+`laravel/framework ^13.8`, so the hand-rolled `HttpGoogleIdentityProvider` held in reserve is not needed.
+Stated cost rather than glossed: it pulls four transitive packages, three of which
+(`league/oauth1-client`, `phpseclib`, `random_compat`) exist for OAuth**1** providers this product will
+never use.
+
+**ADR-0009 COULD NOT SIMPLY BE OVERRIDDEN, so it was amended in four places.** §D2 extended (the
+one-central-callback rule carries over, but this callback takes `web` because its central arm signs in
+there, and declares no `Route::domain()` because that would 404 on `localhost` and make the fake
+unexercisable locally). §D3 amended — **its own revisit trigger fired**, and the interesting part is that
+it fired against **one of two legs**: the outbound `state` stays a stateless HMAC bounded by Google's
+single-use code, while the handoff that creates the session is a row. §D4's trigger answered with a
+sibling middleware rather than a reuse. And the **Socialite rejection carved out** by answering its three
+reasons one at a time — `->stateless()` is Socialite's own mode for this topology, Google's driver is
+first-party rather than the third-party package the clause objected to, and the adapter it said Socialite
+would replace **is written anyway**, so reverting is one binding line.
+
+**ADR-0017 written**, twelve sub-decisions. §D11 is the one to read: a user's own second factor still
+applies, **deliberately diverging from ADR-0016 §D22's opposite answer for SAML**, because SAML is an
+enterprise trust anchor an administrator configured while Google is a consumer credential the end user
+chose. Recorded as a divergence with its argument, so it is not later "fixed" in either direction.
+
+**MEASURED, NOT ASSERTED.** The schema's three CHECK constraints were exercised live: an UPDATE stamping
+`completed_at` with no `handoff_hash` raises 23514, and `fill()` cannot reach `completed_at` — the
+non-fillable guard that stops a well-meaning `fill()` reintroducing the read-then-write race. The state
+service was exercised live too: the token carries no `/` (so it survives a query-string round trip), both
+the tenant and central arms round-trip, tamper/garbage/wrong-version/expired are each refused, and — the
+one worth keeping — **a CONNECTOR state token presented to this verifier is refused**, which is what makes
+the derived-key domain separation a genuine replacement for the connector state's `prov` claim rather than
+a claim about one.
+
+**14 unit cases on the seam**, seven of them on `email_verified` failing closed — that claim is this
+flow's analogue of SAML's signature check, it arrives inside a raw JSON array, and `(bool) "false"` is
+`true`.
+
+**Remaining** (listed precisely in the Lane A block and the next-prompt line): the request service, the
+middleware, the provisioner, three controllers and routes, the UI, ~24 feature cases, and the docs.
+

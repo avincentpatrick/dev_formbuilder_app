@@ -210,12 +210,13 @@ final class TenantMembershipService
      * CHECK-constrained to the seeded catalog MINUS `owner` (see `AssignableRoles`), because RBAC §5
      * establishes Owner only by ownership transfer and an IdP attribute must never be a path to it.
      *
-     * ⚠️ AND THE CALLER MUST HAVE ALREADY REFUSED A SUSPENDED MEMBERSHIP. This method reactivates any
-     * non-Active row, which is correct for both doors' "not currently a member" states — but `Suspended` is
-     * an explicit administrative sanction and reactivating it would let SSO launder a decision an admin
-     * made. `App\Services\Sso\SsoUserProvisioner` checks that before calling here — named in prose rather
-     * than through `{@see}` on purpose, so this generic tenancy service imports nothing from the SSO seam
-     * and the dependency keeps pointing one way.
+     * ⚠️ THE CALLER STILL REFUSES A SUSPENDED MEMBERSHIP FIRST, AND `attachMember()` NOW REFUSES ONE TOO.
+     * P1b relied on the caller alone: `App\Services\Sso\SsoUserProvisioner` checks the status before calling
+     * here — named in prose rather than through `{@see}` on purpose, so this generic tenancy service imports
+     * nothing from the SSO seam and the dependency keeps pointing one way. P1c added the same refusal to the
+     * shared path, which is where it protects the OTHER door as well. The duplication is deliberate: the
+     * provisioner's check is what produces the distinct `membership_suspended` reason an admin sees in the
+     * failures panel, and this one is what makes the guarantee true for every future caller.
      */
     public function joinViaSso(Tenant $tenant, User $user, string $roleName): ?TenantUser
     {
@@ -258,6 +259,28 @@ final class TenantMembershipService
                 // the emission above this line.
                 if ($existing !== null && $existing->status === TenantUserStatus::Active) {
                     return $existing;
+                }
+
+                // ⚠️ SILENT STATE 3 OF 3, AND THE ONLY ONE THAT IS A REFUSAL RATHER THAN A NO-OP (P1c).
+                // Everything below this line REACTIVATES the row it finds, which is right for `Declined` and
+                // `Removed` — both mean "not currently a member", which is what both doors are for. It is
+                // wrong for `Suspended`, which is an administrative sanction: a workspace door that quietly
+                // reversed one would make the sanction unenforceable in exactly the workspaces most likely
+                // to rely on it.
+                //
+                // NULL, not an exception, because null already means "no membership was created" to both
+                // callers — `JoinTenantOnRegistration` ignores it, and `SsoUserProvisioner` never reaches
+                // here for a suspended member because it refuses first, with its own distinct reason.
+                //
+                // ⚠️ HONESTLY LATENT RATHER THAN LIVE, and the difference is worth writing down because the
+                // row that scheduled this fix called it a live bug. NOTHING in the application writes
+                // `Suspended` today — the enum case has no producer — and `CreateNewUser` validates
+                // `Rule::unique('pgsql_auth.users','email')` with no trashed carve-out, so a suspended member
+                // cannot re-register under their own address to reach this path anyway. It is a guard for the
+                // day a suspend surface ships, placed now because P1b made this method the SSO door too and
+                // the reasoning is already written down two files away.
+                if ($existing !== null && $existing->status === TenantUserStatus::Suspended) {
+                    return null;
                 }
 
                 try {

@@ -267,7 +267,15 @@ it('shows the panel to an admin, with a label and something to do about it', fun
         ->get(FAILURE_LOG_HOST.'/settings/sso')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('Settings/Sso')
+            // ⚠️ `false` IS THE SECOND ARGUMENT ON EVERY `component()` CALL IN THIS REPO, AND IT IS NOT
+            // BOILERPLATE — IT IS A LINUX-ONLY FAILURE WAITING FOR WHOEVER OMITS IT. It disables Inertia's
+            // "does this page file exist on disk?" check, which cannot succeed here: the package's default
+            // page path is `resource_path('js/pages')` (LOWERCASE) while this repo's directory is
+            // `resources/js/Pages`. Windows and macOS resolve that case-insensitively, so the check passes
+            // locally and fails on CI — green here, red there, with an error ("page component file does not
+            // exist") that reads as a missing file rather than a config mismatch. Nine existing call sites
+            // pass `false`; none of them says why, which is how this cost an extra CI run.
+            ->component('Settings/Sso', false)
             ->has('failures', 1)
             ->where('failures.0.reason', SsoFailureReason::AssertionOutsideConditions->value)
             ->where('failures.0.reason_label', SsoFailureReason::AssertionOutsideConditions->label())

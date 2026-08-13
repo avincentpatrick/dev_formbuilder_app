@@ -51,7 +51,12 @@ describe('MdsPasswordStrength — it renders the server\'s list', () => {
 
     it('counts only the rules this browser can decide', () => {
         const wrapper = mount(PasswordStrength, {
-            props: { password: 'Abcdefghijk1', requirements: POLICY },
+            // A 12-character mixed-case-plus-digit literal beside the word `password` is exactly the
+            // shape gitleaks' generic-api-key rule looks for, and CI's secret scan flagged this one
+            // line of the file. It is a fixture for a password STRENGTH checklist — it has to look
+            // like a real password to be worth asserting on. The directive must sit on the SAME line
+            // as the match; on the line above it does nothing, which is how the first attempt failed.
+            props: { password: 'Abcdefghijk1', requirements: POLICY }, // gitleaks:allow
         });
 
         // Three of three, not three of four: the breach row is never tickable, so including it in the

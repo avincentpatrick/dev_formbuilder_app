@@ -199,6 +199,35 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   </details>
 
+- ⚠️ **THE TWO-FACTOR CHALLENGE PAGE IS UNREACHABLE, SO ANYONE WHO ACTUALLY ENROLS IN 2FA IS LOCKED OUT
+  AT THEIR NEXT SIGN-IN.** Found in J3b while building an accessibility scan for that page; measured on
+  the running app, not inferred:
+
+  ```
+  POST /login                → 302 → /two-factor-challenge   (correct: credentials pass, challenge issued)
+  GET  /two-factor-challenge → 302 → /login                  (the bug)
+  ```
+
+  Fortify's `TwoFactorLoginRequest::hasChallengedUser()` resolves the pending user with
+  `$model::find($this->session()->get('login.id'))` — on the **default** connection. At that moment the
+  user is authenticated for no guard, so `EstablishTenantDatabaseContext` has set `app.current_user_id`
+  to NULL, `users_users_visibility` matches nothing, `find()` returns null, and the controller concludes
+  there is no challenged user. **It is the same RLS shape J3b's first PR fixed on the WRITE side**
+  (`docs/feature-backlog.md`'s closed entry above), arriving on the read side — and `RlsAwareUserProvider`
+  exists precisely because pre-auth reads need `pgsql_auth`; this path was never routed through it.
+
+  **Why nothing caught it before:** no seeded identity has ever had a real TOTP secret. The E2E
+  super-admin carries `two_factor_confirmed_at` with a NULL `two_factor_secret` **on purpose**, so
+  Fortify does not consider 2FA enabled and never issues a challenge. `TwoFactorEnrollmentTest` covers
+  enrolment, which is a different route group. The path had no coverage at all until J3b seeded
+  `twofactor@meridian.test` — which is kept, unused, because it is what the fix will need.
+
+  **The fix is a decision, not a patch**, and it is deliberately NOT folded into J3b for the same reason
+  J3a did not fold in the write-side one: the natural fix is to give the mid-login request a user context
+  from `session('login.id')`, which is a security-relevant widening of when `app.current_user_id` is set
+  and deserves its own increment and its own tests. Note the blast radius is wider than the one page —
+  `two-factor.login.store` and the recovery-code path resolve the same way.
+
 - **Seven components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
   nothing themselves**, so that node's containing block is established outside the component and no scroll
   container in between can clip it. This is the defect G11 fixed on `MdsDataTable`, JR5 fixed on

@@ -92,6 +92,11 @@ final class EnsureVerifiedEmail
             return $next($request);
         }
 
+        // ⚠️ THE ONLY THING GUARDING THIS BRANCH IS ONE PEST CASE, AND THAT IS WORTH KNOWING BEFORE ANYONE
+        // "SIMPLIFIES" IT. `impersonation.spec.ts` cannot catch a regression here: `E2eSeeder` stamps every
+        // identity it creates as verified, so an impersonated member passes the check above and never
+        // reaches this line. A first draft of J3a's commit message claimed the e2e spec would redden — it
+        // would not. `EmailVerificationGateTest`'s "exempts an impersonated session" case is the guard.
         if (ImpersonationContext::operatorId() !== null) {
             return $next($request);
         }

@@ -8,6 +8,7 @@ use App\Enums\UsageMetric;
 use App\Models\Notification;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Settings\PlatformSettings;
@@ -180,9 +181,16 @@ it('says nothing for a CENTRAL-host registration, which joins no workspace at al
     expect(joinedRows())->toHaveCount(0);
 });
 
-it('rolls the notification back with the membership if the transaction fails', function (): void {
-    // What raising the event INSIDE the transaction buys: no phantom bell row for a membership that was
+it('rolls the notification back TOGETHER WITH the membership when the transaction fails', function (): void {
+    // What raising the event inside the transaction buys: no phantom bell row for a membership that was
     // never written. Driven by making the audit write — the statement immediately before the event — throw.
+    //
+    // ⚠️ BOTH HALVES ARE ASSERTED, AND A FIRST DRAFT ASSERTED ONLY THE FIRST. "No notification after an
+    // exception" is true however the event is placed — if it were post-commit it would never fire at all —
+    // so on its own it proved nothing about atomicity and nothing about placement. Asserting that the
+    // MEMBERSHIP is equally absent is what makes this a rollback test rather than a restatement of "the
+    // call threw". Placement itself is carried by the two cases above, which need the borrowed GUC to be
+    // live for their rows to exist at all.
     $newcomer = User::factory()->create();
 
     TenantContext::flush();
@@ -201,5 +209,6 @@ it('rolls the notification back with the membership if the transaction fails', f
 
     enterTenant($this->tenant->id, $this->owner->id);
 
-    expect(joinedRows())->toHaveCount(0);
+    expect(joinedRows())->toHaveCount(0)
+        ->and(TenantUser::query()->where('user_id', $newcomer->id)->exists())->toBeFalse();
 });

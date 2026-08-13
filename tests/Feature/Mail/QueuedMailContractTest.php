@@ -6,6 +6,7 @@ use App\Enums\QueueName;
 use App\Mail\TenantMail;
 use App\Notifications\Auth\QueuedResetPassword;
 use App\Notifications\Auth\QueuedVerifyEmail;
+use App\Notifications\Auth\WelcomeNotification;
 use App\Notifications\Concerns\CarriesTenantBrand;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Notifications\Entitlements\QuotaOverageNotification;
@@ -45,6 +46,9 @@ $queuedMailNotifications = [
     ConnectionRevokedNotification::class,
     SubmissionPdfReadyNotification::class,
     EventNotification::class,
+    // J3a — the tenth. See scripts/job-payload-lint.php's EXEMPT_JOBS for its twin registration; adding a
+    // queued mail notification means adding it in BOTH places or two separate gates fail.
+    WelcomeNotification::class,
 ];
 
 it('implements ShouldQueue on every queued mail notification', function (string $class): void {

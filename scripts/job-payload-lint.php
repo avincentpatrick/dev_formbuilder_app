@@ -108,6 +108,10 @@ const EXEMPT_JOBS = [
     // than one per case, so the copy lives in a pure support class and this carries only scalars plus the
     // backed enum R3 admits. Same on-demand-notifiable, resolved-in-request shape as every sibling above.
     'App\Notifications\EventNotification',
+    // J3a. The one email in this application that asks for nothing — sent on `Verified`, not `Registered`,
+    // so it does not land beside the verification link it is the reward for. Three builtin scalars, product
+    // palette (the QueuedVerifyEmail argument verbatim), on-demand notifiable. Same shape as every sibling.
+    'App\Notifications\Auth\WelcomeNotification',
 ];
 
 $root = dirname(__DIR__);

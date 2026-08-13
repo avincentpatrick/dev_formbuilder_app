@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\PlanTier;
+use App\Enums\SettingKey;
 use App\Enums\TenantUserStatus;
 use App\Models\Audit;
 use App\Models\Plan;
@@ -13,6 +14,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -560,6 +562,31 @@ it('accepts the POST without a CSRF token, because there is none to send', funct
 
     $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
         ->assertRedirect('/dashboard');
+});
+
+it('does not exempt an SSO arrival from a workspace’s own 2FA enforcement', function (): void {
+    // ⚠️ A DOCUMENTED DECISION, NOT AN OVERSIGHT (ADR-0016 consequences). "Require 2FA for all tenant
+    // members" is a policy an admin switched on; inferring an exemption from the presence of SSO would
+    // silently drop it. A workspace whose IdP already performs MFA turns the setting off — their call.
+    //
+    // The ACS itself still succeeds: it is outside the authenticated group, so the gate applies to the
+    // NEXT request, exactly as it does after a password login. Asserting both halves is what makes this a
+    // statement about the policy rather than about where the middleware happens to be mounted.
+    enterTenant($this->tenant->id, $this->admin->id);
+    app(TenantSettingRegistry::class)->put(
+        $this->tenant,
+        [SettingKey::SecurityRequireTwoFactor->value => true],
+    );
+    app(TenantSettingRegistry::class)->forget();
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
+        ->assertRedirect('/dashboard');
+
+    $this->withoutVite()
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertRedirect(route('two-factor.required'));
 });
 
 /*

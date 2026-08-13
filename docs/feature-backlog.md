@@ -199,6 +199,26 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   </details>
 
+- **Seven components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
+  nothing themselves**, so that node's containing block is established outside the component and no scroll
+  container in between can clip it. This is the defect G11 fixed on `MdsDataTable`, JR5 fixed on
+  `MdsSegmentedControl`, and J3b fixed on `MdsSpinner` and `MdsTimeSeriesChart` — found the fourth time by
+  scanning for the shape rather than by tripping over it. The remaining seven are all in the app trees and
+  all sr-only live regions: `Pages/scopes/Index.vue`, `components/builder/BuilderCanvas.vue`,
+  `components/shell/CommandPalette.vue`, `components/shell/FeedbackButton.vue`,
+  `components/submissions/GeoInput.vue`, `public-runtime/components/RuntimeShell.vue`,
+  `public-runtime/components/SyncStatus.vue`.
+
+  **Not fixed here because the fix is one line and the VERIFICATION is not**: `position: relative` also
+  makes the container the containing block for any other absolutely positioned descendant and establishes
+  a stacking context, so each needs a look at the running app. **Whether each is a LIVE bug also depends on
+  whether an ancestor scroll container exists**, which source text cannot answer — the design-system cases
+  were latent for four increments precisely because they only bite where something finally tries to clip.
+
+  They are pinned meanwhile: `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`
+  asserts the design system has **zero** instances and that the app-tree list is **exactly** these seven,
+  so an eighth fails at the moment it is written. ⚠️ The list may only ever shrink — do not add to it.
+
 ## Notes
 
 - Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here.

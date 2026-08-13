@@ -1,7 +1,13 @@
 <script setup lang="ts">
 // Design-system-styled sign-in page (Increment C1). Posts to Fortify's session-auth route.
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
+import {
+  MdsButton,
+  MdsCheckbox,
+  MdsFormField,
+  MdsTextInput,
+  MdsPasswordInput,
+} from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 // I5 — whether /register is reachable from HERE, on THIS host. The server answers it from the same
@@ -17,7 +23,7 @@ function submit(): void {
 </script>
 
 <template>
-  <AuthLayout title="Sign in">
+  <AuthLayout title="Sign in" variant="split">
     <form class="auth-form" @submit.prevent="submit">
       <MdsFormField
         label="Email"
@@ -48,10 +54,11 @@ function submit(): void {
         />
       </MdsFormField>
 
-      <label class="auth-remember">
-        <input v-model="form.remember" type="checkbox" />
-        <span>Remember me</span>
-      </label>
+      <!-- J3b: the shared control, not a raw checkbox under a page-owned class. `MdsCheckbox`
+           carries the 44px touch target (§4.4) and the check GLYPH as the state signifier, which
+           the 16px `accent-color` version had neither of. The accessible name is unchanged, which
+           matters less here than for the two fields either side of it but is still the rule. -->
+      <MdsCheckbox v-model="form.remember" label="Remember me" />
 
       <MdsButton type="submit" :loading="form.processing">Sign in</MdsButton>
     </form>

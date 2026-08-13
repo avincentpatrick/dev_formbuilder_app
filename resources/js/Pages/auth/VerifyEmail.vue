@@ -2,7 +2,7 @@
 // Design-system-styled email-verification page (Increment C1; the correction form is J3a).
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
+import { MdsBanner, MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 const props = defineProps<{
@@ -54,9 +54,11 @@ function correct(): void {
       <template v-else>you</template>.
     </p>
 
-    <p v-if="props.status === 'verification-link-sent'" class="auth-alert">
-      A new verification link has been sent to your email address.
-    </p>
+    <MdsBanner
+      v-if="props.status === 'verification-link-sent'"
+      icon="mail"
+      message="A new verification link has been sent to your email address."
+    />
 
     <form class="auth-form" @submit.prevent="resend">
       <MdsButton type="submit" :loading="resendForm.processing">Resend verification email</MdsButton>

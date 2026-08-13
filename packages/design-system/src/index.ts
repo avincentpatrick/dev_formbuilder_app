@@ -6,6 +6,18 @@ export { default as MdsTextarea } from './components/Textarea/Textarea.vue';
 export { default as MdsSelect } from './components/Select/Select.vue';
 export { default as MdsNumberInput } from './components/NumberInput/NumberInput.vue';
 export { default as MdsPasswordInput } from './components/PasswordInput/PasswordInput.vue';
+// The live password-requirement checklist (J3b). In the PACKAGE for the same coverage reason as
+// FilterBar and TabNav below: Storybook globs `packages/design-system/src/**` only, so an app-tree
+// component gets no story and no `checkA11y` scan at all (exceptions-log #9). A component whose entire
+// job is announcing state changes to somebody who cannot see them is the last one that should sit
+// outside the accessibility gate. It renders the SERVER's list — see its docblock, and note that the
+// `uncompromised` row's null pattern is deliberate and must never be given one.
+export { default as MdsPasswordStrength } from './components/PasswordStrength/PasswordStrength.vue';
+export type { PasswordRequirement } from './components/PasswordStrength/PasswordStrength.vue';
+export {
+    describedByWithStrength,
+    passwordStrengthId,
+} from './components/PasswordStrength/describedby';
 export { default as MdsIcon } from './components/Icon/Icon.vue';
 export { default as MdsCard } from './components/Card/Card.vue';
 export { default as MdsStatTile } from './components/StatTile/StatTile.vue';

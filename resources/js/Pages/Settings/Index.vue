@@ -19,6 +19,9 @@ import {
     MdsIcon,
     MdsNumberInput,
     MdsPasswordInput,
+    MdsPasswordStrength,
+    describedByWithStrength,
+    type PasswordRequirement,
     MdsSegmentedControl,
     MdsSwitch,
     MdsTextInput,
@@ -41,6 +44,7 @@ const props = defineProps<{
     // `needs_password_confirmation` is what stops the enrolment panel rendering a blank QR when the
     // session's password confirmation has lapsed — see TwoFactorSetup.vue's docblock (I8a).
     twoFactor: { enabled: boolean; confirmed: boolean; needs_password_confirmation: boolean };
+    passwordPolicy: PasswordRequirement[];
     // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
     // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
     draftSettings: { draft_ttl_days: number; is_default: boolean; can_manage: boolean };
@@ -400,8 +404,13 @@ function savePassword(): void {
                             v-model="password.password"
                             name="password"
                             autocomplete="new-password"
-                            :describedby="describedby"
+                            :describedby="describedByWithStrength(id, describedby)"
                             :invalid="invalid"
+                        />
+                        <MdsPasswordStrength
+                            :input-id="id"
+                            :password="password.password"
+                            :requirements="props.passwordPolicy"
                         />
                     </MdsFormField>
                     <MdsFormField label="Confirm new password" required v-slot="{ id, describedby, invalid }">

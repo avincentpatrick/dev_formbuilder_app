@@ -2003,3 +2003,16 @@ border subtraction). The 60em derivation is `260 + 340 + 360`. Two prose overcla
 "nothing reads scrollHeight" (FieldPalette reads its own; no *gate* asserts on the document's) and
 "MdsSegmentedControl had no test at all" (no *unit* test — six Storybook stories already ran under the axe
 gate).
+
+**Merged as PR #142 (`e02a8ce`), 6/6 with real steps.** CI Pest **3637/0** (15,468 assertions), E2E **506
+passed / 10 skipped / 0 failed**, Storybook axe **223 across 33 suites — unchanged, which was the predicted
+signal since JR5 adds no stories on purpose**, Vitest **101 files**. The Pest delta of +22 on JR4's 3615 is
+Lane B's H16c merging in between, not this increment, which touches no PHP.
+
+**One process finding worth carrying: PR #142 showed NO CI checks at all for four hours and it looked exactly
+like the `pull_request`-event outage the tracker had recorded.** It was not. `gh pr view --json mergeable`
+reported `CONFLICTING`/`DIRTY`, and GitHub does not run pull_request checks on a PR whose merge commit cannot
+be created — `phase1-completion` had moved under the branch. **Check `mergeable` before diagnosing a missing
+run as an outage.** Lane B reached the same conclusion independently and has already deleted the tracker's
+"pull_request events are not producing runs" claim, which was measured from a window that was already stale
+when it was written.

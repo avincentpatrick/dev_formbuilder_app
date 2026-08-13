@@ -1,6 +1,6 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { assertClean, forcePersonalization, forceTheme } from './support/axe';
-import { openBuilder } from './support/navigate';
+import { openBuilder, showBuilderPane } from './support/navigate';
 
 /**
  * Increment G11 — the personalization axes (design-system-reference.md §2.9).
@@ -66,15 +66,44 @@ for (const target of reflowPages) {
     });
 }
 
-// The builder is the densest layout in the app (three panes, a canvas, a tabbed config panel), so it is
-// the most likely place for a 25% text growth to collide. Scanned once, at maximum stress.
+// The builder is the densest layout in the app (three panes above 60em of its own container, one pane and a
+// switcher below it), so it is the most likely place for a 25% text growth to collide. Scanned at maximum
+// stress, and since JR5 across all three panes rather than only the one the whole-page scan happens to see.
+//
+// ⚠️ THIS TEST IS THE ONE THAT MAKES THE `em` THRESHOLD OBSERVABLE, AND IT IS THE LEAST OBVIOUS CONSEQUENCE
+// OF CHOOSING `em` OVER `px`. A container query's font-relative units resolve against the container's own
+// font size, so 60em is 960 / 1080 / 1200px across §2.9's three scales — which means that the moment
+// `forcePersonalization` sets `extra_large`, THE BUILDER GOES COMPACT AT THE 1440 DESKTOP PROJECT TOO. That
+// is the design working (the 260/340 pane columns are px literals that do not grow with the type), and it
+// is why `showBuilderPane` asks the page what is on screen instead of reading `info.project.name`.
+//
+// ⚠️ AND THE PANE SWEEP MUST COME *AFTER* `forcePersonalization`. Before it, at the desktop project, the
+// switcher is not on screen, the helper returns false, and the sweep silently does nothing at exactly the
+// combination it exists to stress.
 test('Builder at extra_large + dyslexia font + teal — accessible & no horizontal overflow', async ({
     page,
 }) => {
     await openBuilder(page, 'Community Health Survey');
-    await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await showBuilderPane(page, 'settings');
 
     await forceTheme(page, 'dark');
     await forcePersonalization(page, { accent: 'teal', fontSize: 'extra_large', dyslexia: true });
     await assertClean(page, 'Builder (max personalization)');
+
+    // The `overflow-x: clip` blind spot, third instance (after MdsDataTable and the notification panel).
+    // `MdsSegmentedControl` is `inline-flex` with `white-space: nowrap` and no wrap and no overflow
+    // handling, so a switcher that does not fit spills OUT of its bar while the document width never
+    // moves — invisible to `assertClean` by construction. 375px × extra_large × OpenDyslexic is the exact
+    // combination the width arithmetic in Builder.vue is about, so it is measured here rather than assumed.
+    const strip = page.locator('.builder__pane-switch');
+    if (await strip.isVisible()) {
+        const spill = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+        expect(spill, 'the pane switcher overflows its bar under maximum personalization').toBeLessThanOrEqual(1);
+    }
+
+    if (await showBuilderPane(page, 'fields')) {
+        await assertClean(page, 'Builder (max personalization) — Add');
+        await showBuilderPane(page, 'canvas');
+        await assertClean(page, 'Builder (max personalization) — Form');
+    }
 });

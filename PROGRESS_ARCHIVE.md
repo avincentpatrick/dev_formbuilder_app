@@ -1883,3 +1883,48 @@ the scroll wrapper's own box rather than a document width `overflow-x: clip` kee
 forked before Lane B's connector work landed; 3615 is what `phase1-completion` totals with both lanes merged.
 A branch number and an integration number are different measurements — compare against the same base, or
 against zero delta on an increment that touches no PHP.
+
+## 2026-08-13 — LANE A · JR5: the builder's responsive layout (the last JR row)
+
+Branch `jr5-builder-tabs`, zero PHP. The session opened on a prompt two rows stale (it asked for JR3, merged
+at #137; JR4 was merged at #141), and the row itself was wrong in three of its five words — **four-for-four
+now on verifying a doc-sourced row against the code before planning against it.**
+
+`Builder.vue`'s single `@media (max-width: 1024px)` rule **already linearized all three panes**, so nothing
+was hidden, off-screen or sideways-scrolling at 375px; the cost was ergonomic (scroll past ~31 palette
+buttons to reach the canvas). The defect the row never named is arithmetic: the builder is the app's only
+fluid page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
+below — **785px at a 1025px viewport against 960px at a 1024px one**. The three-column grid stayed on above
+1024, so across **1025–1200 the canvas track was 183px**, a state no Playwright project (375/834/1440) has
+ever rendered.
+
+One `@container (max-width: 60em)` on a container `.builder` establishes itself replaces the media query and
+fixes all three bands. **60em = 960px answers two independent questions that agree**: `260 + 340 + 2 + 358`,
+and `1024 − 64` (the widest box that can exist while the sidebar is still a rail) — the second is what makes
+the switch continuous across the sidebar swap. The inclusivity of `max-width` is load-bearing; at
+`59.9375em` the inversion returns from the other side. `em` not `px`, pinned by a `font-size` declaration on
+the container, so the threshold is 960 / 1080 / 1200px across the three type scales.
+
+The switcher is `MdsSegmentedControl` — a **radiogroup, deliberately not a tablist**: thirteen `[role="tab"]`
+locators across three specs, four of them loops that click every match, would have been joined by a second
+tablist. `MdsTabs` remains J4's, and DSR §3.4 now says not to retrofit it here. This does **not** reopen the
+J2b "no tab strip on the builder" decision: that refused a *navigation* row of links with routes and gates,
+and this carries no href, no `aria-current`, no landmark, and is `display: none` above the threshold.
+
+**Measured, 36 cases, zero failures**, plus a toolbar win that was measured rather than estimated: **375px
+369px → 225px (−144px)**, 834px 225px → 177px.
+
+**Two live defects fixed en route.** `.builder`'s `grid-template-rows: auto 1fr` assumed two children, so a
+warnings banner took the panes' flexible row. And **`MdsSegmentedControl` had no `position` on its fieldset**
+while its `<legend>` and `<input>`s are absolutely-positioned visually-hidden nodes — at 375px with the
+config pane selected the 1px legend sat 73px below the workspace and **the page gained 73px of real vertical
+scroll**. G11 found the identical bug horizontally on `MdsDataTable`, whose own comment already called it "a
+latent bug in this component". Same one-line fix; the component had **no test at all** until now.
+
+**Two environment findings that cost real time and belong in the next hand-off.** (1) The local Vitest forks
+pool now fails **green**: a full run took 88 minutes and reported "50 passed (50)" with 50
+`Failed to start forks worker` errors and **exit code 0** — half the suite silently never ran, and the file
+count itself lied. `--pool=threads` starts workers reliably but OOMs on the full set; chunking by directory
+works. File count is now **101**. (2) **`tsconfig.json` excludes `resources/js/**/*.test.ts` and does not
+cover `tests/e2e/`**, so `npm run type-check` never sees either and Playwright is transpile-only — the six
+edited specs and both new test files were type-checked separately under `--strict`.

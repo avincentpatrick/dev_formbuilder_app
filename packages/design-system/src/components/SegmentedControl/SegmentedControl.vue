@@ -54,7 +54,25 @@ const groupName = props.name ?? useId();
 </template>
 
 <style scoped>
+/* ⚠️ `position: relative` IS LOAD-BEARING, NOT DECORATIVE — the same defect `DataTable.vue` documents,
+   on the other axis. Both `.mds-segmented__legend` and `.mds-segmented__input` below are the
+   `position: absolute` + `clip: rect(0 0 0 0)` visually-hidden pattern. Without a positioned ancestor
+   HERE their containing block resolves outside the fieldset, so no scroll container between this control
+   and the document can clip them: a 1px hidden node then sits at document coordinates and extends the
+   DOCUMENT's scrollable box, even though the control itself is correctly contained.
+
+   Measured in JR5 by the builder sweep: at a 375px viewport with the config pane selected, the group's
+   hidden `<legend>` landed 73px past the bottom of a workspace that is `height: 100%` all the way up,
+   and the whole page gained 73px of real VERTICAL scroll behind a screen that owns its own scrolling.
+   G11 found the identical thing horizontally on `MdsDataTable`; the fix there was this one line and the
+   note that it is "a latent bug in this component". It was latent in this one too — every consumer had
+   it, and it only became visible where an ancestor finally tried to clip.
+
+   ⚠️ NO GATE IN THIS REPO CAN SEE IT. The e2e overflow assertion reads `documentElement.scrollWidth`,
+   which `.app-shell { overflow-x: clip }` pins flat, and nothing measures scrollHeight at all; happy-dom
+   lays nothing out; axe has no rule for it. Hence the source-text assertion in SegmentedControl.test.ts. */
 .mds-segmented {
+    position: relative;
     display: inline-flex;
     min-width: 0;
     gap: var(--mds-space-0-5);

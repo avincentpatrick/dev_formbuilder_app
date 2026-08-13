@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { forceTheme, settlePaint } from './support/axe';
-import { openBuilder } from './support/navigate';
+import { openBuilder, showBuilderPane } from './support/navigate';
 
 // Interaction-driven accessibility gate for the form builder (Increment D4b) — the single highest-risk
 // surface. Unlike the goto-only responsive-axe spec, this DRIVES the builder's real interactive states:
@@ -123,6 +123,10 @@ async function assertBackgroundInert(page: Page): Promise<void> {
 for (const theme of themes) {
     test(`Builder — populated & interactive (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Community Health Survey');
+        // JR5 — every `[role="tab"]` on this page belongs to ConfigPanel, which is on screen below 60em of
+        // the builder's container ONLY when the Settings pane is selected. This also replaces the bare
+        // `[role="tab"]` settle as the hydration wait; a no-op at the desktop project.
+        await showBuilderPane(page, 'settings');
         // Auto-selected field → config panel + tabs mounted.
         await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
@@ -135,8 +139,22 @@ for (const theme of themes) {
             await scan(page, `field tab ${i}`);
         }
 
+        // JR5 — THE COVERAGE THIS INCREMENT WOULD OTHERWISE HAVE COST. Before it, a whole-page scan at
+        // 375/834 saw all three panes at once because they were stacked; now it sees one. Walk the other
+        // two so the mobile and tablet projects keep scanning the palette and the canvas at all. Skipped
+        // entirely at any width where all three are already up, where it would only duplicate the scans
+        // above.
+        if (await showBuilderPane(page, 'fields')) {
+            await scan(page, 'compact pane — Add');
+            await showBuilderPane(page, 'canvas');
+            await scan(page, 'compact pane — Form');
+            await showBuilderPane(page, 'settings');
+        }
+
         // Select the repeatable section → its Advanced tab mounts the min/max MdsNumberInputs.
+        await showBuilderPane(page, 'canvas');
         await page.getByRole('button', { name: /^New section/ }).first().click();
+        await showBuilderPane(page, 'settings');
         const sectionTabs = page.locator('[role="tab"]');
         for (let i = 0; i < (await sectionTabs.count()); i++) {
             await sectionTabs.nth(i).click();
@@ -144,6 +162,7 @@ for (const theme of themes) {
         }
 
         // Full keyboard reorder via the grip's grab-mode, asserting the aria-live announcements.
+        await showBuilderPane(page, 'canvas');
         const status = page.locator('.canvas__sr');
         await page.getByRole('button', { name: /^Reorder Short text/ }).focus();
         await page.keyboard.press('Enter'); // grab
@@ -199,6 +218,7 @@ for (const theme of themes) {
     // (rows/columns/cells lists). Walk the tabs (scanning the grid editor) with no palette interaction.
     test(`Builder — grid config editor (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Grid Builder Demo');
+        await showBuilderPane(page, 'settings');
         await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
 
@@ -220,6 +240,7 @@ for (const theme of themes) {
     // with no palette interaction.
     test(`Builder — geo config editor (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Geo Builder Demo');
+        await showBuilderPane(page, 'settings');
         await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
         await forceTheme(page, theme);
 
@@ -243,7 +264,10 @@ for (const theme of themes) {
     // `scan()` helper's own horizontal-overflow assertion at all three viewports.
     test(`Builder — logic view (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Logic Notices Demo');
-        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        // JR5 — the Logic rail lives in the CENTRE pane, so `.builder__centre-tabs` is only on screen when
+        // the Form pane is selected. This doubles as the hydration settle the `[role="tab"]` locator used
+        // to provide, which would now wait on a pane this test never selects.
+        await showBuilderPane(page, 'canvas');
         await forceTheme(page, theme);
 
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
@@ -270,7 +294,9 @@ for (const theme of themes) {
         await expect(page.locator('button.rail__head').first()).toHaveAttribute('aria-pressed', 'true');
         await scan(page, 'logic view after selection');
 
-        // …and back, with the structure canvas intact.
+        // …and back, with the structure canvas intact. (Selecting a rail node drives the config panel, which
+        // below the threshold means the Form pane is still the one on screen — the centre control has not
+        // moved.)
         await page.locator('.builder__centre-tabs').getByText('Structure').click();
         await expect(page.locator('.canvas').first()).toBeVisible();
         await scan(page, 'back to structure');
@@ -283,7 +309,7 @@ for (const theme of themes) {
     // one — and a scan of only the first would miss half the surface.
     test(`Builder — condition editor (${theme})`, async ({ page }) => {
         await openBuilder(page, 'Logic Notices Demo');
-        await expect(page.locator('[role="tab"]').first()).toBeVisible({ timeout: 10_000 });
+        await showBuilderPane(page, 'canvas');
         await forceTheme(page, theme);
 
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
@@ -291,6 +317,10 @@ for (const theme of themes) {
         // The nested-group node: `(${age} > 18 or ${age} < 5) and selected(${colours}, 'red')` — the only
         // seeded shape that draws the recursive group control and a "Condition 1.2 …" ordinal.
         await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();
+        // ⚠️ JR5 — MANDATORY, NOT COSMETIC. The next line is a CSS locator, so with the config pane
+        // `display: none`-d it still MATCHES (strict mode is satisfied) and `.click()` then waits the full
+        // timeout for a visibility that never comes. Selecting the pane is what makes it clickable.
+        await showBuilderPane(page, 'settings');
         await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
 
         await expect(page.getByRole('group', { name: 'Show this section only when…' })).toBeVisible();
@@ -306,8 +336,10 @@ for (const theme of themes) {
         await expect(page.getByLabel('Condition 1.1 operator')).toBeFocused();
 
         // The OPAQUE arm: arithmetic, which the editor renders as raw text alone and never rewrites.
+        await showBuilderPane(page, 'canvas');
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         await page.locator('button.rail__head', { hasText: 'Arithmetic gate' }).click();
+        await showBuilderPane(page, 'settings');
         await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
 
         await expect(page.getByLabel('Condition expression')).toHaveValue('${age} + 1 > 18');

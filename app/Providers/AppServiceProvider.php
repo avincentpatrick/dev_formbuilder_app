@@ -42,6 +42,7 @@ use App\Services\Search\SearchPresenter;
 use App\Services\Search\SearchService;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Auth\GoogleAuthStateService;
 use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Auth\SocialiteGoogleIdentityProvider;
 use App\Support\Connectors\ConnectorOAuthStateService;
@@ -127,6 +128,25 @@ class AppServiceProvider extends ServiceProvider
                 : hash_hmac('sha256', 'connector-oauth-state.v1', (string) config('app.key'));
 
             return new ConnectorOAuthStateService($key, (int) config('connectors.state.ttl', 600));
+        });
+
+        // The Google sign-in `state` signer (J3c2 / ADR-0017 §D6) — the FOURTH token family. Same wire
+        // format and the same reason as the connector state above: the session cookie is host-only, so a
+        // tenant session is unreadable at the central callback.
+        //
+        // ⚠️ THE DOMAIN SEPARATOR IS WHAT KEEPS THE TWO FAMILIES APART, AND IT REPLACES A CLAIM. The
+        // connector state carries a `prov` claim so a token minted for one provider cannot be replayed at
+        // another's callback; this one has a single provider, and a connector token presented here simply
+        // fails the MAC check because the key differs. That is a stronger guarantee than a comparison and
+        // needs no code to enforce — but it means changing this separator invalidates every in-flight
+        // consent, exactly as it would for the three above.
+        $this->app->singleton(GoogleAuthStateService::class, function (): GoogleAuthStateService {
+            $configuredKey = config('google-auth.state.key');
+            $key = is_string($configuredKey) && $configuredKey !== ''
+                ? $configuredKey
+                : hash_hmac('sha256', 'google-signin-state.v1', (string) config('app.key'));
+
+            return new GoogleAuthStateService($key, (int) config('google-auth.state.ttl_seconds', 600));
         });
 
         // The per-instance authorization resolver (Increment G10a). `scoped`, NOT `singleton`: it memoizes

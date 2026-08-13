@@ -2264,3 +2264,113 @@ decision, recorded at the emission site rather than left as an accident of the m
 answers "who is in this workspace and when did they arrive", equally true of an IdP arrival, and `$via`
 distinguishes them in the audit ledger where the distinction belongs. The one merge conflict was that
 closure's `use` list (mine needed `$tenant`, theirs `$via`); resolved as the union, not by taking a side.
+
+---
+
+## 2026-08-14 — LANE B: SSO/SAML P1c, protocol-aware step-up (PR #146)
+
+**Built:** the step-up round trip an SSO member can actually complete; the tenant-scoped sign-in failures
+panel ADR-0016 §D19 recorded as owed; and the suspended-membership guard in the shared `attachMember()`
+path. Four commits, one PR into `phase1-completion`. CI: **Pest 3845 passed / 16,466 assertions**, **E2E 504 passed / 2 flaky / 10 skipped / 0 failed**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,808 tests**; Static, Contract and Frontend green. Pest 7m57s, E2E 17m57s.
+
+**THE FINDING THAT CHANGED THE DESIGN, AND THE PROMPT DID NOT ANTICIPATE IT.** The row required the stamp to
+check "a `user_id` matching the currently authenticated user" at the ACS. It cannot be checked there.
+`config/session.php:202` sets `same_site` to `lax`, so the identity provider's cross-site top-level POST
+carries no session cookie — a fact `SsoAcsController` had stated in prose since P1b, while explaining its
+CSRF exemption, with nobody drawing the consequence. `Auth::id()` at the ACS is null even for a member
+signed in two tabs away.
+
+The tempting fix is to `Auth::login()` there and stamp the fresh session. It works, and it is wrong four
+times over: it replaces the session the step-up is being performed *for*, discards what that session held,
+leaves the old one live server-side, and quietly turns the subject check from a statement about the SESSION
+into a statement about the ASSERTION — which is the property that made the check worth having. So the flow
+gained one same-site hop (`verified_at` at the ACS → `completed_at` at a GET on our own host, which Lax
+*does* send cookies on). **Two columns, never a reuse of `consumed_at`**, because "an assertion arrived" and
+"the browser came back and the clock was stamped" are different events and the table's own retention policy
+already rejects collapsing distinct events into one column.
+
+**THE STEP-UP ARM DOES THREE THINGS LESS THAN THE LOGIN ARM.** No `Auth::login()`; no provisioning (an
+unknown subject is a mismatch, never a new joiner — the absence of a create is what guards that, not
+`jit_provisioning_enabled`); and no `last_login_at`, because that column answers "is sign-in working" for an
+admin and a healthy step-up keeping it fresh would let a broken login path look fine for weeks.
+
+**`return_to` STORES A PATH AND NOTHING COMPARES HOSTS.** A host comparison is the check that keeps being
+got wrong; a path resolves against the origin the browser is already on, so same-origin is a property rather
+than an assertion. The consequence is stated rather than discovered: a foreign absolute URL contributes only
+its path, on our host — harmless, and reachable only via a foreign `Referer` on a request that already
+passed CSRF.
+
+**THE FAILURES PANEL IS MOSTLY A STORE.** §D19's revisit trigger had already named the obstacle — the
+obvious table is append-only and an anonymous endpoint must not be able to fill it — so the work was the
+bound, not the card. `sso_auth_failures` trims on every insert to a per-tenant row cap **and** a retention
+window. ⚠️ **Not a scheduled prune, measured rather than preferred**: `routes/console.php:40` records that
+nothing runs the scheduler on the production box yet, so a nightly job would be a bound that exists in the
+repository and not on the machine. ⚠️ **The cap is "not among the newest N", never "older than the Nth"** —
+a grinder writes dozens of rows inside one second and a timestamp comparison keeps every tied row, failing
+at exactly the volume it exists for.
+
+⚠️ **AND THE `request_id` COLUMN WOULD HAVE BEEN A SUPPRESSION PRIMITIVE.** It comes from an unvalidated
+document into a `char(33)`: an over-long value makes the INSERT throw, the recorder swallow it (correctly —
+a failure to record a failure must not turn a 404 into a 500) and the panel stay empty for as long as
+somebody keeps sending them. `SsoAuthRequest::isMintedShape()` keeps it out of the column instead, so the
+row is still written with a null. `subject_email` follows the same posture from the other side: NULL for
+every pre-validation refusal, because before a signature verifies there is no address anyone should be
+shown.
+
+⚠️ **THE STATUS CARD HAD BEEN LYING SINCE P1b MERGED, AND A GREEN TEST WAS DEFENDING THE LIE.** The active
+banner still said signing in with SSO *"isn't switched on yet"* — exact in P1a, false the day the round trip
+landed — and `cards.test.ts` asserted that sentence. **A test pins copy; nothing pins truth.** A statement
+about what a NEIGHBOURING increment has not built yet has an expiry date and no gate will notice it pass.
+Corrected in both files with the lesson recorded in each, because the shape will recur every time one
+increment ships a caveat about another.
+
+⚠️ **FIVE-FOR-FIVE ON VERIFYING A DOC-SOURCED ROW AGAINST THE CODE.** The prompt called the
+`joinOpenTenant()` suspended-membership reactivation "a live bug on this branch". It is latent: nothing in
+the application writes `TenantUserStatus::Suspended` — the enum case has no producer, only two tests set it
+by raw `update()` — and `CreateNewUser` validates `Rule::unique('pgsql_auth.users','email')` with no trashed
+carve-out, so a suspended member cannot re-register under their own address to reach the path. Both halves
+must be false before it is reachable. Fixed anyway (three lines, and P1b had made that method the SSO door
+too), but reported as a guard rather than as a closed hole — "we closed a live one" and "we closed a latent
+one" are different claims and only one was true.
+
+⚠️ **CI CAUGHT TWO REAL PHPSTAN ERRORS, AND THE LOCAL BASELINE IS 0 ON THIS TREE RATHER THAN 20.** The Lane
+B prompt warns of ~20 phantom `property.notFound` errors CI does not report; this run returned exactly the
+two genuine ones and nothing else, so the delta WAS the whole list. Measuring the delta was still the right
+instruction — it simply happened to equal the count here. Both errors were mine and both were real: a
+route-supplied `string|int` window reaching `shouldConfirmPassword()` (which the parent had never needed to
+narrow, because it only ever passed the value straight through), and `map()->all()` over an Eloquent
+collection **preserving keys** where a `list` was declared — not a typing quibble, since a prop reaching
+Inertia as an object with numeric keys renders nothing while every server-side assertion still passes.
+
+⚠️ **I CONTAMINATED MY OWN LOCAL FULL-SUITE PEST RUN, AND KILLED IT RATHER THAN REPORT ITS NUMBER.**
+Standing Rule 7(c)'s `migrate:fresh` hazard applies WITHIN a lane, not only across lanes: the ~34-minute
+background run was still going when I ran two targeted suites against the same container. **Run the
+`ps -eo args | grep '[p]est'` probe before every Pest invocation, including against your own.** CI is the
+authority for the totals and always was.
+
+**OWED TO ANOTHER LANE, NAMED IN THE ADR RATHER THAN LEFT IMPLICIT.** An admin whose SSO breaks cannot step
+up through SSO. The escape hatch works — `/user/confirm-password` is routed on the tenant subdomain, a
+member with no usable password reaches it by password reset, the fork falls back to the password prompt
+whenever SSO cannot serve, and `GET /settings/sso` is ungated so the failures panel still says what broke —
+but the LINK belongs on `resources/js/Pages/auth/ConfirmPassword.vue`, which is Lane A's J3b.
+
+**Docs:** ADR-0016 §D22–§D26, two new accepted costs, two new revisit triggers, §D19 half-closed and the
+P1c trigger discharged; `docs/data-dictionary.md` §28's two columns plus a new §29. ⚠️
+`docs/security-threat-model.md` still carries **no SSO rows at all** — inherited from P1a/P1b, not created
+here, and worth one before Phase 4 closes.
+
+⚠️ **THE ONE CI PEST FAILURE WAS AN ASSERTION THAT CAN ONLY PASS ON WINDOWS, AND IT COST A RUN.**
+`assertInertia(...->component('Settings/Sso'))` reported "page component file does not exist" for a file
+that does. Inertia's default page path is `resource_path('js/pages')` — LOWERCASE — against this repo's
+`resources/js/Pages`, with no `config/inertia.php` to correct it: case-insensitive locally, fatal on Linux.
+**Nine pre-existing `component()` call sites pass `false` to disable the check and not one says why.** The
+tenth is documented. The general shape is worth more than the fix: **a local green proves nothing about an
+assertion whose outcome depends on the filesystem**, and the error message names a missing file rather than
+a config mismatch, so it reads as a real defect.
+
+**THE PEST DELTA IS RECORDED AS UNRECONCILED RATHER THAN EXPLAINED AWAY.** 3845 against the 3816 of the run
+immediately before it on this integration branch (Lane A's #147, which merged while P1c was in flight) is
++29, while the three new/extended test files run 34 cases on their own. Different merge commits, and the
+arithmetic does not close. Both new files are confirmed present in the CI log, so nothing was dropped.
+**Fourth time: compare a branch number only against a run of the same base** — Lane A's 3767, which the P1c
+prompt would have had me compare against, was two merges stale before this row finished.

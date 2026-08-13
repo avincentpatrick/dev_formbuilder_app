@@ -212,3 +212,60 @@ it('keeps invitations isolated to their own tenant', function (): void {
     enterTenant($tenantA->id, $user->id);
     expect(TenantUser::where('invite_token', hash('sha256', 'shared-token'))->first()->id)->toBe($invite->id);
 });
+
+/*
+|--------------------------------------------------------------------------
+| The shared attach path (P1c) — reactivation is right for three statuses and wrong for one
+|--------------------------------------------------------------------------
+|
+| `joinOpenTenant()` and `joinViaSso()` share `attachMember()` entirely, and that body REACTIVATES whatever
+| non-Active row it finds. Correct for `Declined` and `Removed`, which both mean "not currently a member" —
+| exactly what both doors are for. Wrong for `Suspended`, which is an administrative sanction: a door that
+| quietly reversed one would make the sanction unenforceable in the workspaces most likely to rely on it.
+|
+| ⚠️ THIS IS A LATENT HOLE, NOT A LIVE ONE, AND THE DISTINCTION IS ASSERTED RATHER THAN ASSUMED. Nothing in
+| the application writes `Suspended` today — the enum case has no producer — and `CreateNewUser` validates
+| `Rule::unique('pgsql_auth.users','email')`, so a suspended member cannot re-register under their own
+| address to reach the open-registration door anyway. The service is driven directly here for that reason:
+| there is no HTTP path that can reach this state, which is precisely why the guard needs a test rather
+| than a comment.
+*/
+
+it('refuses to reactivate a suspended membership through the open-registration door', function (): void {
+    $tenant = Tenant::create(['name' => 'Sanctioned', 'slug' => 'sanctioned']);
+    $user = User::factory()->create();
+
+    enterTenant($tenant->id, $user->id);
+    $membership = TenantUser::create([
+        'user_id' => $user->id,
+        'status' => TenantUserStatus::Suspended,
+        'invited_role_id' => catalogRole('viewer'),
+        'joined_at' => now()->subMonth(),
+    ]);
+
+    // Null is the same answer a full workspace gives, and `JoinTenantOnRegistration` already handles it:
+    // the person keeps their account and gains no workspace.
+    expect(app(TenantMembershipService::class)->joinOpenTenant($tenant, $user))->toBeNull();
+
+    enterTenant($tenant->id, $user->id);
+    expect($membership->fresh()->status)->toBe(TenantUserStatus::Suspended);
+    // And no role was materialized on the way past — the half that would survive a status rollback.
+    expect(DB::table('model_has_roles')->where('model_id', $user->id)->count())->toBe(0);
+});
+
+it('still reactivates a declined or removed membership, which is what the door is for', function (string $status): void {
+    $tenant = Tenant::create(['name' => 'Reopened', 'slug' => 'reopened'.substr($status, 0, 3)]);
+    $user = User::factory()->create();
+
+    enterTenant($tenant->id, $user->id);
+    TenantUser::create([
+        'user_id' => $user->id,
+        'status' => TenantUserStatus::from($status),
+        'invited_role_id' => catalogRole('viewer'),
+    ]);
+
+    expect(app(TenantMembershipService::class)->joinOpenTenant($tenant, $user))->not->toBeNull();
+
+    enterTenant($tenant->id, $user->id);
+    expect(TenantUser::query()->where('user_id', $user->id)->value('status'))->toBe(TenantUserStatus::Active);
+})->with(['declined', 'removed']);

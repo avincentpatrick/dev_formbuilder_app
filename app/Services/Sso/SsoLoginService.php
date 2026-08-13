@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Sso;
 
+use App\Enums\SsoAuthIntent;
 use App\Http\Controllers\Tenant\Sso\SsoAcsController;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
-use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -25,7 +25,13 @@ use Illuminate\Support\Facades\Cache;
  *     attribute back to the validator would be checking a string against itself.
  *  4. CONSUME the row — the atomic conditional UPDATE whose affected-row count is the check.
  *  5. Record the assertion's own `@ID` in the replay ledger.
- *  6. Resolve the identity, then provision.
+ *  6. Resolve the identity, then FORK ON THE ROW'S INTENT — provision (login) or match (step-up).
+ *
+ * ── ⚠️ THE FORK IS AFTER THE CONSUME, DELIBERATELY (P1c) ────────────────────────────────────────────
+ * A step-up that fails its subject check has still had a real, signed, single-use assertion presented
+ * against it. Burning the request first means that assertion cannot be re-presented against a second guess,
+ * and it means the failure is recorded in the same place every other one is. Refusing before the consume
+ * would leave the row live and turn a mismatch into a retry primitive.
  *
  * ── ⚠️ STEPS 4 AND 5 ARE TWO MECHANISMS AND NEITHER SUBSUMES THE OTHER (§D8) ─────────────────────────
  * `consumed_at` makes the REQUEST single-use: one AuthnRequest, one session. The cache ledger makes the
@@ -48,12 +54,13 @@ final class SsoLoginService
         private readonly SsoAuthRequestService $requests,
         private readonly SsoIdentityResolver $identities,
         private readonly SsoUserProvisioner $provisioner,
+        private readonly SsoStepUpService $stepUps,
     ) {}
 
     /**
      * @throws SsoAuthenticationException
      */
-    public function consumeAssertion(Tenant $tenant, SsoConnection $connection, string $samlResponse): User
+    public function consumeAssertion(Tenant $tenant, SsoConnection $connection, string $samlResponse): SsoAuthOutcome
     {
         $inResponseTo = $this->validator->inResponseTo($samlResponse);
         $authRequest = $this->requests->findLive($inResponseTo);
@@ -72,11 +79,13 @@ final class SsoLoginService
 
         $this->rememberAssertion($tenant, $assertion);
 
-        return $this->provisioner->provision(
-            $tenant,
-            $connection,
-            $this->identities->resolve($connection, $assertion),
-        );
+        $identity = $this->identities->resolve($connection, $assertion);
+
+        $user = $authRequest->intent === SsoAuthIntent::StepUp
+            ? $this->stepUps->matchSubject($authRequest, $identity)
+            : $this->provisioner->provision($tenant, $connection, $identity);
+
+        return new SsoAuthOutcome($authRequest->intent, $user, $authRequest);
     }
 
     /**

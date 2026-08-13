@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Sso;
 
 use App\Http\Middleware\RequireFeature;
+use App\Http\Middleware\RequireRecentPassword;
 use App\Models\SsoConnection;
 use App\Services\Entitlements\EntitlementService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -43,17 +44,37 @@ final class SsoGate
      */
     public function activeConnectionOrAbort(): SsoConnection
     {
-        $connection = SsoConnection::query()->first();
+        $connection = $this->activeConnection();
 
-        if ($connection === null || ! $connection->servesProtocol()) {
-            throw new NotFoundHttpException;
-        }
-
-        if (! $this->entitlements->feature('sso_saml')) {
+        if ($connection === null) {
             throw new NotFoundHttpException;
         }
 
         return $connection;
+    }
+
+    /**
+     * The same question, asked by a caller that has something else to do with "no" (P1c).
+     *
+     * ⚠️ THE POINT OF SEPARATING THESE IS THAT `null` IS NOT ALWAYS A REFUSAL. {@see RequireRecentPassword}
+     * asks whether an SSO step-up is POSSIBLE, and a "no" there means fall back to the password prompt —
+     * which is the documented escape hatch for a tenant that has disabled SSO or downgraded off Enterprise.
+     * An exception would have made that ordinary answer into a 404 on somebody's role-change page.
+     *
+     * Identical conditions to the abort form, in the same order and for the same reasons: connection first
+     * (so an off-tenant caller is told "no connection" rather than the misleading "not entitled"), then the
+     * entitlement, which fails CLOSED on a null plan because this is the protocol question, not the settings
+     * screen's. {@see isEntitled()} is the one that must not.
+     */
+    public function activeConnection(): ?SsoConnection
+    {
+        $connection = SsoConnection::query()->first();
+
+        if ($connection === null || ! $connection->servesProtocol()) {
+            return null;
+        }
+
+        return $this->entitlements->feature('sso_saml') ? $connection : null;
     }
 
     /**

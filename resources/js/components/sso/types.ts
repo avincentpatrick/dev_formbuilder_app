@@ -77,9 +77,38 @@ export interface SsoOption {
     label: string;
 }
 
+/**
+ * One refused sign-in, as the workspace's own admin sees it (P1c — ADR-0016 §D26).
+ *
+ * ⚠️ `reason_label` AND `hint` ARE COMPOSED SERVER-SIDE, from `App\Enums\SsoFailureReason`. There is
+ * deliberately no map from `reason` to prose in this package: the database CHECK, the log token and the
+ * sentence an admin reads all come from one enum, and a second copy here is how the two come to disagree
+ * about a case somebody added to only one of them.
+ */
+export interface SsoFailureRow {
+    id: string;
+    /** The stable machine token — for grouping and for correlating with a log line, never for display. */
+    reason: string;
+    reason_label: string;
+    /** An instruction, not a restatement: what the admin should go and do about it. */
+    hint: string;
+    /** Null unless a verified signature vouched for the address. Never taken from an unvalidated document. */
+    subject_email: string | null;
+    /** The `InResponseTo` the response claimed, when it was shaped like an id this service provider mints. */
+    request_id: string | null;
+    ip_address: string | null;
+    occurred_at: string;
+}
+
 export interface SsoPageProps {
     data: SsoConnectionRow | null;
     sp: SsoServiceProvider;
+    /**
+     * The twenty most recent refusals. Empty when nothing is configured, and empty is the ordinary state —
+     * the panel is a diagnostic, not a feed. The store behind it is trimmed on every write, so this is a
+     * page rather than an archive.
+     */
+    failures: SsoFailureRow[];
     roles: SsoOption[];
     nameIdFormats: SsoOption[];
     attributeKeys: string[];

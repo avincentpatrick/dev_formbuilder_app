@@ -377,6 +377,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('saml-acs', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($samlKey('samlacs', $request)));
 
+        // Step-up (P1c) — the third SAML bucket, and the only one KEYED ON THE USER rather than on IP+host.
+        // It can be, because unlike the two above this route is inside the authenticated group, and it
+        // should be: a shared NAT egress is precisely the enterprise shape the comment above worries about,
+        // and per-user is the tightest key that cannot punish a colleague. 20/minute is far above anyone
+        // clicking through a role change and far below a script minting `sso_auth_requests` rows in bulk —
+        // which is the actual cost of this endpoint, one INSERT per hit.
+        RateLimiter::for('saml-step-up', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by('samlstepup:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum
         // personal-access-token auth used by the /api/v1 surface (api-specification.md §2.6 / §3).

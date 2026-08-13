@@ -40,6 +40,9 @@ final class FeatureGateException extends RuntimeException
             // ADR-0011 §D9 assigns this arm to H24a by name: without it a 402 body renders the raw
             // snake_case key in user-facing copy.
             'advanced_analytics' => 'advanced cross-form analytics',
+            // P1a / ADR-0016. Lowercase sentence fragment, not the console's title-case 'SSO (SAML)'
+            // (TenantDetailPresenter:351) — this one has to read inside "Your plan doesn't include …".
+            'sso_saml' => 'single sign-on (SAML)',
             default => $key,
         };
 

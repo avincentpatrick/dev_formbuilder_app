@@ -1026,6 +1026,69 @@ A user's saved cross-form analytics report (H24a; ADR-0011 §D8; `docs/PRD.md:20
 
 ---
 
+## 27. `sso_connections`
+
+The tenant's federated-identity trust anchor (P1a; ADR-0016). **Exactly one row per tenant** — the schema enforces it, and multi-IdP is deferred because it is a login-surface question (which provider does the login page offer?), not a schema one.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. Not addressable by any route — the resource is a singleton at `/settings/sso`. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `protocol` | `varchar(20)` — PHP enum: `SsoProtocol` | No | `'saml2'` | No | One case today. The discriminator exists *before* the second protocol so OIDC is a new case plus a driver, never a table rename (ADR-0016 §D1). CHECK generated from the enum. |
+| `status` | `varchar(20)` — PHP enum: `SsoConnectionStatus` | No | `'draft'` | No | `draft` (a trust anchor exists but the tenant has not finished setup — the protocol endpoints 404) / `active` / `disabled` (retained rather than deleted, so the anchor and its audit history survive a suspension). CHECK from the enum. Only `active` may serve. |
+| `idp_entity_id` | `varchar(1024)` | No | — | No | The identity provider's entityID, from its metadata. 1024 is the SAML 2.0 metadata bound; a non-conforming document is refused at validation rather than by the column. |
+| `idp_sso_url` | `varchar(1024)` | No | — | No | The IdP's HTTP-Redirect `SingleSignOnService` Location. `https` is required outside local development. |
+| `idp_certificates` | `text` | No | — | No (**a trust anchor**) | The IdP's signing certificates as bare base64 DER, no PEM armour. **Encrypted at rest** (`encrypted:array`) — and the claim is **integrity, not confidentiality**: a signing certificate is public by construction, but anything that can silently rewrite this column can make the application trust assertions minted by a key of the attacker's choosing, which is a total authentication bypass for that tenant. Laravel's cast is authenticated, so tampering fails loudly. `text` because the cast base64s a JSON envelope around a multi-KB list. `$hidden` on the model, in `AuditRedactor`'s unconditional list, and emitted by **no** presenter in any form. A *list* rather than one value because an IdP legitimately publishes a successor alongside its current key during a rollover. |
+| `idp_certificates_fingerprint` | `char(64)` | No | — | No | SHA-256 over the **sorted** certificate set — order-independent, so re-importing the same keys in a different order is correctly not a change. Plaintext beside an encrypted column on purpose: it is what the settings screen displays, what the audit ledger records instead of the key, and what answers "did the trust anchor actually change?" without decrypting. Always exactly 64 lowercase hex. |
+| `idp_metadata_sha256` | `char(64)` | Yes | `NULL` | No | SHA-256 of the imported document itself — distinguishes "the tenant re-pasted the same metadata" from "the IdP changed something". |
+| `idp_metadata_imported_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the service, not the parser. |
+| `name_id_format` | `varchar(120)` | No | the emailAddress urn | No | Overridable per connection, but **this application's identity key IS the email address**, so any other format will not resolve to a user — which the settings screen states plainly rather than letting it present as an intermittent login failure. ⚠️ The DB default is materialised from `config('saml.default_name_id_format')` at migration time, so changing the config later does not move it. |
+| `attribute_map` | `jsonb` | No | `'{}'` | No | Optional overrides mapping this IdP's assertion attribute names onto `email` / `name` / `first_name` / `last_name`. Empty = use the conventional names. |
+| `jit_provisioning_enabled` | `boolean` | No | `true` | No | Whether an unknown-but-authenticated subject is provisioned on first login (user decision, 2026-08-13: default ON). |
+| `default_role_name` | `varchar(30)` | No | `'viewer'` | No | The role a JIT-provisioned member receives. CHECK generated from `RolePermissionSeeder::ROLES` **minus `owner`** — RBAC §5 establishes Owner only by ownership transfer, and an IdP attribute must never be a path to it. |
+| `last_login_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the ACS (P1b). Deliberately **not** `$fillable` — it is machine-written, never part of a settings save. |
+| `created_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL`. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Uniqueness**: `tenant_id` alone (the singleton), and `(tenant_id, id)` as the composite-FK target §28 points back at. Index on `(tenant_id, status)`.
+
+> **Design Notes**
+> - **RLS**: strict (`withTenantIsolation('sso_connections')`), and it does real work here rather than being belt-and-braces: the protocol endpoints run **without `auth`** (the caller is an identity provider, or a browser being bounced through one), so tenant context established from the host is the only thing confining the row. No super-admin bypass is attached to either SSO table — the platform operator cannot read a tenant's trust anchor.
+> - **No soft delete.** Removing SSO is a real removal; the audit trail is the record that it existed. This is also the ADR-0012 §D9 escape hatch — the delete and the status toggle are ungated by the plan feature so a downgraded tenant can always undo what a paid tier let them create.
+> - **Audited under the `sso_connection` alias, keyed on `tenants.id`** (audit-compliance-logging-spec §1) — the singleton/re-create argument, not the `domain` row's uuid-vs-integer one.
+
+---
+
+## 28. `sso_auth_requests`
+
+One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 §D8). The replay ledger: an assertion is only accepted against a row here that is still live, and consuming it is a one-way transition.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `sso_connection_id` | `uuid` | No | — | No | Composite FK `(tenant_id, sso_connection_id) → sso_connections (tenant_id, id)`, `ON DELETE CASCADE`. **No single-column FK**, deliberately (ADR-0002 §D5): PostgreSQL runs referential actions bypassing RLS, so carrying the tenant in the key is what keeps the cascade tenant-confined. |
+| `request_id` | `char(33)` | No | — | No | The `AuthnRequest` `@ID` echoed back as `InResponseTo`. `_` + 32 hex — the leading underscore is required, not cosmetic: `xs:ID` derives from `xs:NCName`, which may not begin with a digit, and some IdPs reject or mangle a bare hex string. **Globally unique, not per-tenant**: it is matched from an unauthenticated request body before any tenant scoping can be trusted, so a cross-tenant collision would be a second row a cross-tenant read could match. |
+| `intent` | `varchar(20)` — PHP enum: `SsoAuthIntent` | No | — | No | `login` (an unauthenticated visitor establishing a session) or `step_up` (an already-authenticated user re-proving identity for a high-blast-radius mutation). Load-bearing, not descriptive: it is what authorises the ACS to stamp `auth.password_confirmed_at`, and without it any successful assertion would silently refresh the step-up clock. CHECK from the enum. |
+| `user_id` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE CASCADE`. The subject a `step_up` is about. A CHECK pins **both** directions — `step_up` requires it, `login` forbids it — because a login request carrying one would let a consumed login assertion masquerade as a step-up. |
+| `return_to` | `varchar(500)` | Yes | `NULL` | No | Where to land after a successful round trip. Chosen by the SP at mint time and **never** populated from SAML `RelayState`, which is attacker-controlled. |
+| `force_authn` | `boolean` | No | `false` | No | Whether the IdP was told not to answer from an existing session. One of the three conditions a step-up stamp requires. |
+| `issued_at` | `timestamptz` | No | — | No | — |
+| `expires_at` | `timestamptz` | No | — | No | `config('saml.authn_request_ttl_seconds')` after issue. Evaluated **without** clock skew: skew exists for disagreement over timestamps the *IdP* wrote, and this is a value this host wrote and reads back. |
+| `consumed_at` | `timestamptz` | Yes | `NULL` | No | NULL = never used. ⚠️ **Consumed as an atomic conditional UPDATE whose affected-row count is the check** — never read-then-write, which leaves two concurrent replays both seeing NULL. |
+| `ip_address` | `varchar(45)` | Yes | `NULL` | Yes (conditional) | The requesting client's address (45 = `INET6_ADDRSTRLEN`). |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Uniqueness**: `request_id` (globally). Index on `(tenant_id, expires_at)` for the liveness lookup and the prune scan.
+
+> **Design Notes**
+> - **RLS**: strict, same reasoning as §27 — the ACS is unauthenticated and tenant context comes from the host.
+> - **Expired rows are not deleted on read.** `consumed_at` and `expires_at` are both retained so the ACS can distinguish *expired* from *already used* from *never existed* — three different security events, only one of which is an attack.
+> - **This ledger exists because ADR-0009 §D3's stateless HMAC nonce does not transfer here**, and ADR-0009 says so itself: it declares the stateless `state` insufficient once a callback gains a side effect beyond writing the connection it names, and a SAML ACS establishes a session. An HMAC proves we minted a token; it cannot prove single use.
+> - A second, independent mechanism (a cache ledger keyed on the assertion's own `@ID`) covers an IdP that mints two assertions for one request. Both are required; neither subsumes the other.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1137,6 +1200,14 @@ notification_preferences.user_id       -> users.id           (external)
 
 saved_report_views.tenant_id           -> tenants.id
 saved_report_views.user_id             -> users.id           (external)
+
+sso_connections.tenant_id              -> tenants.id
+sso_connections.created_by             -> users.id           (external, nullable, SET NULL)
+
+sso_auth_requests.tenant_id            -> tenants.id
+sso_auth_requests.(tenant_id,
+                   sso_connection_id)  -> sso_connections (tenant_id, id)   (composite, CASCADE)
+sso_auth_requests.user_id              -> users.id           (external, nullable, CASCADE)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

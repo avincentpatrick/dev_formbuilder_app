@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Authorization\AssignableRoles;
 use App\Support\Search\ListEmptyReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,14 +26,6 @@ final class MemberController extends Controller
 {
     use ReadsKeywordFilter;
     use ResolvesTenant;
-
-    /** Roles an Admin may assign (Owner is established only via ownership transfer, §5). */
-    private const ASSIGNABLE_ROLES = [
-        ['value' => 'admin', 'label' => 'Admin'],
-        ['value' => 'form_editor', 'label' => 'Form Editor'],
-        ['value' => 'reviewer', 'label' => 'Reviewer'],
-        ['value' => 'viewer', 'label' => 'Viewer'],
-    ];
 
     public function __construct(private readonly TenantMembershipService $memberships) {}
 
@@ -51,7 +44,7 @@ final class MemberController extends Controller
 
         return Inertia::render('members/Index', [
             'members' => $members,
-            'assignableRoles' => self::ASSIGNABLE_ROLES,
+            'assignableRoles' => AssignableRoles::options(),
             'filters' => ['applied' => ['q' => $terms->raw()]],
             'empty_reason' => ListEmptyReason::for($members !== [], ! $terms->isEmpty()),
         ]);
@@ -62,7 +55,7 @@ final class MemberController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
             // Owner is deliberately not invitable — it is established only by ownership transfer (§5).
-            'role' => ['required', 'string', Rule::in(['admin', 'form_editor', 'reviewer', 'viewer'])],
+            'role' => ['required', 'string', Rule::in(AssignableRoles::values())],
         ]);
 
         /** @var User $actor */
@@ -79,14 +72,16 @@ final class MemberController extends Controller
      * seeded to Owner/Admin since Phase 0 with no code behind it until now — plus `step-up`, so a live
      * session alone is not enough.
      *
-     * The allowed values are ASSIGNABLE_ROLES, the same list the invite form offers, which is what keeps
-     * `owner` off both surfaces. The four domain refusals (Owner's role, self, no-op, non-member) live in
-     * {@see TenantMembershipService::changeRole()} — a request cannot know any of them.
+     * The allowed values are {@see AssignableRoles}, the same list the invite form and the SSO default-role
+     * picker offer, which is what keeps `owner` off all three surfaces — and, since P1a, the same expression
+     * the `sso_connections_default_role_check` CHECK is compiled from. The four domain refusals (Owner's
+     * role, self, no-op, non-member) live in {@see TenantMembershipService::changeRole()} — a request cannot
+     * know any of them.
      */
     public function changeRole(Request $request, User $user): RedirectResponse
     {
         $validated = $request->validate([
-            'role' => ['required', 'string', Rule::in(array_column(self::ASSIGNABLE_ROLES, 'value'))],
+            'role' => ['required', 'string', Rule::in(AssignableRoles::values())],
         ]);
 
         /** @var User $actor */

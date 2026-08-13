@@ -1065,6 +1065,8 @@ One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 
 
 **Writer and consumer (P1b):** `SsoAuthRequestService::mint()` from `GET /sso/saml/login`, `::findLive()` then `::consume()` from `POST /sso/saml/acs`. The look-up and the consume are deliberately two calls — see ADR-0016 §D18 — so a garbage POST carrying a guessed `InResponseTo` cannot invalidate somebody's pending sign-in, while single use still binds at the moment a session is created. `consumed_at` is **not** in the model's `$fillable`, so the only way to write it is the conditional UPDATE.
 
+**Second writer (P1c):** `SsoStepUpService::start()` from `GET /sso/saml/step-up`, which mints the same row with `intent = step_up`, a `user_id` and `force_authn = true`. Its assertion is answered by `::matchSubject()` at the ACS (`verified_at`) and finally by `::redeem()` at `GET /sso/saml/step-up/complete/{requestId}` (`completed_at`). ⚠️ **The step-up finishes on a SECOND request, and that is a cookie policy rather than a design preference** — `session.same_site` is `lax`, so the identity provider's cross-site POST to the ACS carries no session cookie and `Auth::id()` there is null even for a signed-in member. The completion hop is a same-site GET, which Lax *does* send cookies on, and is the only place `user_id` can be compared against the actually-authenticated session. See ADR-0016 §D23.
+
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
@@ -1073,11 +1075,13 @@ One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 
 | `request_id` | `char(33)` | No | — | No | The `AuthnRequest` `@ID` echoed back as `InResponseTo`. `_` + 32 hex — the leading underscore is required, not cosmetic: `xs:ID` derives from `xs:NCName`, which may not begin with a digit, and some IdPs reject or mangle a bare hex string. **Globally unique, not per-tenant**: it is matched from an unauthenticated request body before any tenant scoping can be trusted, so a cross-tenant collision would be a second row a cross-tenant read could match. |
 | `intent` | `varchar(20)` — PHP enum: `SsoAuthIntent` | No | — | No | `login` (an unauthenticated visitor establishing a session) or `step_up` (an already-authenticated user re-proving identity for a high-blast-radius mutation). Load-bearing, not descriptive: it is what authorises the ACS to stamp `auth.password_confirmed_at`, and without it any successful assertion would silently refresh the step-up clock. CHECK from the enum. |
 | `user_id` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE CASCADE`. The subject a `step_up` is about. A CHECK pins **both** directions — `step_up` requires it, `login` forbids it — because a login request carrying one would let a consumed login assertion masquerade as a step-up. |
-| `return_to` | `varchar(500)` | Yes | `NULL` | No | Where to land after a successful round trip. Chosen by the SP at mint time and **never** populated from SAML `RelayState`, which is attacker-controlled. **Always NULL as of P1b** (ADR-0016 §D21): nothing yet bounces an unauthenticated deep link through SSO, so there is no server-side origin to record, and taking one from the query string would be an open redirect. P1c's step-up is its first writer; the ACS lands on `/dashboard` unconditionally until then. |
+| `return_to` | `varchar(500)` | Yes | `NULL` | No | Where to land after a successful round trip. Chosen by the SP at mint time and **never** populated from SAML `RelayState`, which is attacker-controlled. Null for every `login` row; **written by the step-up since P1c** from the server's own `url.intended`. ⚠️ **It stores a PATH, not a URL** — one leading `/`, no scheme and no authority (`App\Support\Sso\SsoReturnTo`), so a browser resolves it against the origin it is already on and no host comparison exists to get wrong (ADR-0016 §D25). A foreign absolute URL therefore contributes only its path. |
 | `force_authn` | `boolean` | No | `false` | No | Whether the IdP was told not to answer from an existing session. One of the three conditions a step-up stamp requires. |
 | `issued_at` | `timestamptz` | No | — | No | — |
 | `expires_at` | `timestamptz` | No | — | No | `config('saml.authn_request_ttl_seconds')` after issue. Evaluated **without** clock skew: skew exists for disagreement over timestamps the *IdP* wrote, and this is a value this host wrote and reads back. |
 | `consumed_at` | `timestamptz` | Yes | `NULL` | No | NULL = never used. ⚠️ **Consumed as an atomic conditional UPDATE whose affected-row count is the check** — never read-then-write, which leaves two concurrent replays both seeing NULL. |
+| `verified_at` | `timestamptz` | Yes | `NULL` | No | **P1c, step-up only.** The ACS's mark: a signed assertion answering this request validated AND its subject resolved to the user the row names. It is the only evidence a signed assertion was ever presented, which is why a redemption may not precede it. Not `$fillable`. |
+| `completed_at` | `timestamptz` | Yes | `NULL` | No | **P1c, step-up only.** The completion hop's mark: the browser came back on the original session, `Auth::id()` matched `user_id`, and `auth.password_confirmed_at` was stamped. Redeemed by the same conditional-UPDATE shape as `consumed_at`, so it is single-use. A CHECK pins `completed_at IS NULL OR verified_at IS NOT NULL`. ⚠️ **Deliberately not a reuse of `consumed_at`**: “an assertion arrived” and “the browser came back and the clock was stamped” are different events, and collapsing them is the mistake this table's retention policy already rejects. |
 | `ip_address` | `varchar(45)` | Yes | `NULL` | Yes (conditional) | The requesting client's address (45 = `INET6_ADDRSTRLEN`). |
 | `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
 
@@ -1088,6 +1092,37 @@ One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 
 > - **Expired rows are not deleted on read.** `consumed_at` and `expires_at` are both retained so the ACS can distinguish *expired* from *already used* from *never existed* — three different security events, only one of which is an attack.
 > - **This ledger exists because ADR-0009 §D3's stateless HMAC nonce does not transfer here**, and ADR-0009 says so itself: it declares the stateless `state` insufficient once a callback gains a side effect beyond writing the connection it names, and a SAML ACS establishes a session. An HMAC proves we minted a token; it cannot prove single use.
 > - A second, independent mechanism (a cache ledger keyed on the assertion's own `@ID`, TTL `config('saml.assertion_replay_ttl_seconds')`, written with an atomic `Cache::add()`) covers an IdP that mints two assertions for one request — a case this table structurally cannot see, because both assertions legitimately answer distinct live rows. Both are required; neither subsumes the other, and **this one runs first**, because it is the mechanism a cache eviction cannot silently turn into a no-op.
+> - **A step-up row is never found by being the newest** (P1c). Two begun inside one second are a tie and PostgreSQL breaks ties by physical order, so the completion hop takes the `request_id` as a path segment. That id in a URL stamps nothing on its own: redemption also requires `verified_at` inside `config('saml.step_up_completion_ttl_seconds')` (90s) and a session belonging to the user the row names.
+
+---
+
+## 29. `sso_auth_failures`
+
+One refused SAML sign-in, kept so a tenant's own admin can see why (P1c; ADR-0016 §D26). It discharges the cost §D19 accepted in writing: an employee whose identity provider's clock has drifted sees a bare 404, and before this their admin had no in-app view of the reason.
+
+**Writer:** `SsoAuthFailureRecorder::record()`, called from `SsoAcsController`'s catch block beside the existing `Log::warning`. **Reader:** `SsoConnectionPresenter::page()` (twenty newest) → the settings screen's failures card.
+
+⚠️ **THIS IS A DIAGNOSTIC, NOT A LEDGER, AND THE DIFFERENCE IS WHY IT IS NOT `audits`.** `audits` is append-only by RLS and never pruned, while the ACS is unauthenticated — so an audit row per rejection would be an amplification primitive. This table exists *because* it may be deleted from: every insert is followed by a trim to a per-tenant row cap (`saml.failure_log_max_rows`, 200) **and** a retention window (`saml.failure_retention_days`, 30). Nothing may be built on the assumption that a row survives.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `sso_connection_id` | `uuid` | No | — | No | Composite FK `(tenant_id, sso_connection_id) → sso_connections (tenant_id, id)`, `ON DELETE CASCADE` — same ADR-0002 §D5 reasoning as §28. |
+| `reason` | `varchar(40)` — PHP enum: `SsoFailureReason` | No | — | No | The stable machine token the log line also prints. CHECK generated from `SsoFailureReason::values()`, so the vocabulary the panel groups by cannot drift from the one the code throws. `label()` and `hint()` compose the admin-facing prose server-side. |
+| `subject_email` | `varchar(255)` | Yes | `NULL` | **Yes** | ⚠️ **NULL for every PRE-validation refusal, and that is the rule rather than an omission.** An address only exists once a signature over the assertion carrying it has verified; recording one from a document that failed validation would let anyone on the internet write chosen text into a tenant's database and onto an admin's screen. Populated only by `jit_disabled`, `membership_suspended`, `seat_quota_exhausted`, `step_up_unknown_subject` and `step_up_subject_mismatch`. |
+| `request_id` | `char(33)` | Yes | `NULL` | No | The `InResponseTo` the document claimed, for correlating a panel row with a log line. **Not a foreign key** — the commonest reason to be here is that no row matched it. ⚠️ Stored only when it passes `SsoAuthRequest::isMintedShape()`: it comes from an unvalidated document, and an over-long value would make the INSERT throw, the recorder swallow it, and the panel go silent — a suppression primitive. |
+| `ip_address` | `varchar(45)` | Yes | `NULL` | **Yes (conditional)** | The requesting client's address (45 = `INET6_ADDRSTRLEN`). Half the reason the retention window is data minimisation and not merely housekeeping. |
+| `occurred_at` | `timestamptz` | No | — | No | When the refusal happened. Both readers order on it. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Uniqueness**: none. Index on `(tenant_id, occurred_at)`, serving both the panel's “twenty most recent” and the trim.
+
+> **Design Notes**
+> - **RLS**: strict, same reasoning as §27 and §28 — the writer is unauthenticated and tenant context comes from the host, so there is no `app.current_user_id` at insert time.
+> - **The bound is on the WRITE path, not on a scheduled job**, and that is measured rather than preferred: `routes/console.php` records that nothing runs the scheduler on the production box yet, so a nightly prune would be a bound that exists in the repository and not on the machine.
+> - **The cap is “not among the newest N”, never “older than the Nth”.** A grinder writes dozens of rows inside one second; a timestamp comparison keeps every tied row and fails at exactly the volume the cap exists for.
+> - **Reading this is not a softening of §D19's uniform 404.** That posture is about the *unauthenticated wire*; this surface is behind `auth` plus `can:tenant.settings.manage` on the reader's own workspace.
 
 ---
 
@@ -1210,6 +1245,10 @@ sso_auth_requests.tenant_id            -> tenants.id
 sso_auth_requests.(tenant_id,
                    sso_connection_id)  -> sso_connections (tenant_id, id)   (composite, CASCADE)
 sso_auth_requests.user_id              -> users.id           (external, nullable, CASCADE)
+
+sso_auth_failures.tenant_id            -> tenants.id
+sso_auth_failures.(tenant_id,
+                   sso_connection_id)  -> sso_connections (tenant_id, id)   (composite, CASCADE)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

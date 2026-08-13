@@ -1301,12 +1301,26 @@ class DemoSeeder extends Seeder
             return $this->resolvedUsers[$email] = $existing;
         }
 
-        return $this->resolvedUsers[$email] = User::create([
+        $user = User::create([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($password),
-            'email_verified_at' => now(),
         ]);
+
+        // ⚠️ THIS USED TO BE A FOURTH KEY IN `create()` ABOVE, AND IT WORKED EXACTLY HALF THE TIME.
+        // `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+        // mass-assignable. `artisan db:seed` wraps the whole run in `Model::unguarded()`
+        // (`SeedCommand::handle()`), which is why every demo account in a normally-seeded database really is
+        // verified and nobody ever noticed. Construct the seeder and call `run()` directly — which
+        // `DemoSeederIdempotencyTest` does — and there is no ambient unguard, the attribute is silently
+        // dropped, and the demo tenant quietly fills with unverified accounts.
+        //
+        // Harmless until J3a, which mounts `verified` on the authenticated tenant group: from here an
+        // unverified demo account cannot reach `/dashboard` at all. `forceFill` does not depend on an ambient
+        // state the caller happens to establish.
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $this->resolvedUsers[$email] = $user;
     }
 
     /**

@@ -101,6 +101,22 @@ final class NotificationCopy
                     .' to investigate an issue. Everything they do is recorded in your audit log, marked as'
                     .' taken by a platform operator.',
             ],
+            // J3a — the twin of `member_invited` above, and deliberately shaped like it: names the person,
+            // names the tenant (an email is read weeks later in an inbox that knows neither), and points at
+            // the members page where the reader can actually act.
+            //
+            // ⚠️ NO EMAIL ADDRESS, unlike `member_invited`. There the Admin TYPED the address, so repeating
+            // it back is repeating their own input; here it belongs to a stranger who walked in the front
+            // door, and putting it in an email to two other people discloses something nobody asked to
+            // share. The members page has it, behind the tenant's own authorization.
+            NotificationType::MemberJoined => [
+                'headline' => (self::string($data, 'name') ?? 'Someone').' joined your workspace.',
+                'body' => (self::string($data, 'name') ?? 'Someone').' created an account on '.$tenantName
+                    .(self::string($data, 'role') === null
+                        ? ''
+                        : ' and joined as '.str_replace('_', ' ', (string) self::string($data, 'role')))
+                    .'. Open the members page to change what they can do, or to remove them.',
+            ],
         };
     }
 
@@ -164,7 +180,27 @@ final class NotificationCopy
             NotificationType::ImpersonationStarted => 'Platform support signed in as '
                 .(self::string($data, 'target_name') ?? 'one of your members')
                 .' to investigate an issue.',
+            // J3a — no tenant name (this row is read inside the workspace) and no email address, for the
+            // reason the email arm gives.
+            NotificationType::MemberJoined => self::joinedDescription($data),
         };
+    }
+
+    /**
+     * Deliberately shaped like {@see self::inviteDescription()} one method down: the same person usually
+     * produces both rows, minutes apart, in the same popover, so they should read as one sequence rather
+     * than as two unrelated sentences about the same stranger.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function joinedDescription(array $data): string
+    {
+        $name = self::string($data, 'name') ?? 'Someone';
+        $role = self::string($data, 'role');
+
+        return $role === null
+            ? "{$name} joined your workspace."
+            : $name.' joined as '.str_replace('_', ' ', $role).'.';
     }
 
     /** @param  array<string, mixed>  $data */

@@ -74,6 +74,16 @@ Route::prefix('api/v1')
         PreventAccessFromCentralDomains::class,
         EstablishTenantDatabaseContext::class,
         'auth',
+        // verified (J3a) — the ONLY place a bearer token's verification status can ever be established.
+        // Group B below authenticates by TOKEN, so `$request->user()` there is resolved from the token and
+        // there is no session, no browser, and nowhere to send someone to verify: a gate on that group could
+        // only 403 a key that already works. Gating the MINT instead makes every token issued from here
+        // transitively the property of a verified account, which is the durable version of the same rule.
+        //
+        // The JSON arm matters here and nowhere else: this group is `web`-session-authenticated but its
+        // clients send `Accept: application/json`, so EnsureVerifiedEmail answers with the documented
+        // `forbidden` envelope rather than a 302 to an HTML notice page an API client cannot follow.
+        'verified',
     ])
     ->group(function (): void {
         // A key is minted scoped to the issuer's own RBAC (requested abilities are intersected against

@@ -218,7 +218,12 @@ final class NotificationPresenter
             NotificationType::SubmissionApproved,
             NotificationType::ReviewRequested,
             NotificationType::ExportReady => $this->allows($user, 'view', $submissions[$this->payloadId($notification, 'submission_id')] ?? null),
-            NotificationType::MemberInvited => $canSeeMembers,
+            // J3a folds `member_joined` in here rather than giving it its own arm: same destination, same
+            // question, and `$canSeeMembers` is already hoisted out of the loop above, so the pair costs one
+            // permission check for both. Splitting them would invite the two to drift on a gate that is, by
+            // construction, one gate.
+            NotificationType::MemberInvited,
+            NotificationType::MemberJoined => $canSeeMembers,
             NotificationType::WebhookFailed => $hasWebhooks
                 && $this->allows($user, 'view', $endpoints[$this->payloadId($notification, 'webhook_endpoint_id')] ?? null),
             // I11b — the row links to the tenant's own ledger, so the question is exactly the one

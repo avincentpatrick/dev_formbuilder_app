@@ -8,6 +8,7 @@ use App\Enums\AuditEvent;
 use App\Enums\TenantUserStatus;
 use App\Enums\UsageMetric;
 use App\Events\MemberInvited;
+use App\Events\MemberJoined;
 use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Models\Role;
@@ -205,7 +206,7 @@ final class TenantMembershipService
         $savedUser = TenantContext::currentUserId();
         $savedTeam = app(PermissionRegistrar::class)->getPermissionsTeamId();
 
-        return DB::transaction(function () use ($user, $role, $tenantId, $userId, $savedTenant, $savedUser, $savedTeam): ?TenantUser {
+        return DB::transaction(function () use ($tenant, $user, $role, $tenantId, $userId, $savedTenant, $savedUser, $savedTeam): ?TenantUser {
             TenantContext::applyLocal($tenantId, $userId);
             app(PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
 
@@ -214,6 +215,10 @@ final class TenantMembershipService
                 // person who declined an invitation last month may legitimately walk in the front door now.
                 $existing = TenantUser::query()->where('user_id', $userId)->first();
 
+                // ⚠️ SILENT STATE 1 OF 2 — NOTHING HAPPENED, SO NOTHING IS ANNOUNCED. This person is already
+                // a member; they just registered a second time. `MemberJoined` is raised BELOW this return,
+                // so the Owner is not told that someone "joined" who has been here for months. Do not hoist
+                // the emission above this line.
                 if ($existing !== null && $existing->status === TenantUserStatus::Active) {
                     return $existing;
                 }
@@ -221,6 +226,10 @@ final class TenantMembershipService
                 try {
                     $this->quota->assertCanCreate(UsageMetric::ActiveSeats);
                 } catch (QuotaExceededException) {
+                    // ⚠️ SILENT STATE 2 OF 2 — the workspace is full, so no membership was created and there
+                    // is nothing to announce. Same rule as above: `MemberJoined` is raised below this return.
+                    // Telling an Owner that a member joined a workspace that refused them would be worse than
+                    // silence, which is the outcome the docblock above already calls correct.
                     return null;
                 }
 
@@ -256,6 +265,15 @@ final class TenantMembershipService
                     ],
                     actorId: $userId,
                 );
+
+                // ⚠️ INSIDE THE TRANSACTION, WHICH IS THE OPPOSITE OF DomainEvent'S POST-COMMIT RULE — and
+                // required rather than merely tolerated. `TenantContext::applyLocal()` is `SET LOCAL`, so the
+                // RLS GUC dies with this transaction; `notifications` is strict-RLS, so the listener's INSERT
+                // would be REFUSED (not mis-scoped) if this were raised after commit. Spatie's team id is
+                // restored in the same `finally`, and the recipient resolver needs it to answer who holds
+                // owner/admin here. `MemberJoined` is deliberately NOT a DomainEvent — see its docblock for
+                // what that costs. The queued email is still post-commit: `after_commit` is on globally.
+                event(MemberJoined::for($tenant, $user, $role->name));
 
                 return $membership;
             } finally {

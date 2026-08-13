@@ -136,7 +136,13 @@ class E2eSeeder extends Seeder
         $this->seedSuperAdmin();
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
-        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
+        // ⚠️ THE ONE IDENTITY THAT MUST STAY UNVERIFIED, AND IT IS NOT AN OVERSIGHT.
+        // `InvitationController::show()` reads `email_verified_at === null` as `needsRegistration`, so
+        // stamping this placeholder turns the invitation page from "set a name and a password" into "sign in
+        // as the invited account" — silently breaking the invite fixture, and with it the invitation
+        // accessibility scan J3b adds. It is also the only unverified user in the fixture, which makes it the
+        // natural subject for the `verified` gate's own e2e coverage.
+        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48), verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
@@ -1463,7 +1469,23 @@ class E2eSeeder extends Seeder
         }
     }
 
-    private function resolveOrCreateUser(string $email, string $name, string $password): User
+    /**
+     * ⚠️ `$verified` IS LOAD-BEARING FROM J3a, AND THE DEFAULT IS THE ONE THAT KEEPS THE E2E SUITE ALIVE.
+     * `routes/tenant.php`'s authenticated group now carries `verified`, so an unverified identity is bounced
+     * to `/email/verify` — including at `tests/e2e/global-setup.ts`'s very first navigation, which waits on a
+     * dashboard URL. Before J3a this seeder set no verification timestamp at all, so every e2e identity was
+     * unverified and mounting the gate would have failed all 506 specs before one of them ran.
+     *
+     * ⚠️ AND IT IS `forceFill`, NOT A FOURTH KEY IN `create()`, FOR A REASON THAT IS NOT THE OBVIOUS ONE.
+     * `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+     * mass-assignable — but `artisan db:seed` wraps the whole run in `Model::unguarded()`
+     * (`SeedCommand::handle()`), so a fourth key WOULD work there and looks perfectly fine. It stops working
+     * the moment the seeder is constructed and run directly, which is exactly what
+     * `E2eSeederIdempotencyTest` and `DemoSeederIdempotencyTest` do: no ambient unguard, attribute silently
+     * dropped, and the only symptom is a user who is quietly unverified. `forceFill` does not depend on an
+     * ambient state that the caller happens to establish.
+     */
+    private function resolveOrCreateUser(string $email, string $name, string $password, bool $verified = true): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();
         if ($existing !== null) {
@@ -1472,7 +1494,13 @@ class E2eSeeder extends Seeder
             return $existing;
         }
 
-        return User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password)]);
+        $user = User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password)]);
+
+        if ($verified) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        return $user;
     }
 
     private function roleId(string $name): string

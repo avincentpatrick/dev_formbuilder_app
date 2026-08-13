@@ -5,8 +5,20 @@
 // shape fails type-check instead of passing a test against a payload the server never sends.
 
 /**
- * The seven `App\Enums\NotificationType` cases. Used to TYPE THE VISUAL MAP's keys and the test
- * fixtures — deliberately NOT the wire type of `NotificationRow.type`; see below.
+ * Every `App\Enums\NotificationType` case, in the enum's own order. Used to TYPE THE VISUAL MAP's keys and
+ * the test fixtures — deliberately NOT the wire type of `NotificationRow.type`; see below.
+ *
+ * ⚠️ THIS LIST DRIFTED ONCE AND NOTHING NOTICED FOR TWO INCREMENTS. I11b added `impersonation_started` to
+ * the PHP enum and never touched this file, so every such notification rendered with the generic bell
+ * fallback — correct behaviour by design (see `NotificationRow.type` below), and therefore completely
+ * silent. J3a added `member_joined` and would have made it two.
+ *
+ * There are now two guards, and they close different halves:
+ *   · `NOTIFICATION_VISUAL` is typed `Record<NotificationTypeKey, …>`, so a case added HERE and forgotten
+ *     THERE is a `npm run type-check` failure rather than a quiet fallback.
+ *   · `NotificationTypeParityTest` (Pest) reads this union off disk and asserts it equals
+ *     `NotificationType::values()`, which is the half TypeScript cannot see — nothing in the JS toolchain
+ *     can read a PHP enum, so the drift that actually happened needs a test on the PHP side.
  */
 export type NotificationTypeKey =
     | 'submission_received'
@@ -15,7 +27,9 @@ export type NotificationTypeKey =
     | 'review_requested'
     | 'export_ready'
     | 'member_invited'
-    | 'webhook_failed';
+    | 'webhook_failed'
+    | 'impersonation_started'
+    | 'member_joined';
 
 /** One row of `GET /notifications`. Every string here is SERVER-authored — see NotificationPresenter. */
 export type NotificationRow = {

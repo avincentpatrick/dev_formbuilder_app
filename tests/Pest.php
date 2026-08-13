@@ -140,6 +140,11 @@ function committedTenantIdentity(string $name = 'Committed Member'): User
         'name' => $name,
         'email' => Str::lower(Str::random(12)).'@identity.test',
         'password' => Hash::make('secret-password-123'),
+        // J3a — `routes/tenant.php`'s authenticated group carries `verified`, so an identity handed to
+        // `actingAs()` without this is bounced to `/email/verify` and every assertion about the page under
+        // test reads as a product failure. `UserFactory` already defaults it; the hand-rolled committed
+        // identities did not, because before J3a nothing consumed the column.
+        'email_verified_at' => now(),
     ]);
     $user->setConnection((string) config('database.default'));
 

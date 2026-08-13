@@ -16,7 +16,7 @@ use App\Services\Notifications\NotificationRecipientResolver;
  * The human-facing notification vocabulary (data-dictionary §22/§23 and its enum catalog row, PRD Feature
  * #13). Backs `notifications.type` and `notification_preferences.notification_type`, and is pinned at the
  * database by CHECKs generated from {@see self::values()} on both columns, so the enum and the constraints
- * cannot drift. **The case ORDER is therefore load-bearing** — `tests/Unit/NotificationEnumsTest.php` pins
+ * cannot drift. **The case ORDER is therefore load-bearing** — `tests/Unit/Notifications/NotificationTypeTest.php` pins
  * it, and a reorder silently changes the generated constraint on the next `migrate:fresh`.
  *
  * ── A THIRD vocabulary, orthogonal to the other two ─────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ enum NotificationType: string
      * A platform operator began impersonating one of this workspace's members (I11b).
      *
      * ⚠️ APPENDED LAST, and that is not stylistic — the case ORDER is load-bearing (see the class docblock)
-     * and `tests/Unit/NotificationEnumsTest.php` pins it. Inserting this beside a thematically similar case
+     * and `tests/Unit/Notifications/NotificationTypeTest.php` pins it. Inserting this beside a thematically similar case
      * would reorder the ones after it.
      *
      * This is the only type in the catalog raised by an actor who is NOT a member of the tenant. That is
@@ -64,6 +64,30 @@ enum NotificationType: string
      * only. The bell is what turns "it is in your log" into "you were told".
      */
     case ImpersonationStarted = 'impersonation_started';
+
+    /**
+     * Someone self-registered on this workspace's subdomain and became a member (J3a).
+     *
+     * ⚠️ APPENDED LAST, for the same reason {@see self::ImpersonationStarted} was: the case ORDER is
+     * load-bearing (see the class docblock) and `tests/Unit/Notifications/NotificationTypeTest.php` pins it.
+     * Inserting this next to {@see self::MemberInvited}, where it thematically belongs, would reorder every
+     * case after it and silently change the generated CHECK constraints on the next `migrate:fresh`.
+     *
+     * ── WHY THIS IS NOT ALSO A `DomainEventType`, AND WHAT THAT COSTS ──────────────────────────────────
+     * A deliberate scope decision, not an omission. {@see DomainEventType} doubles as the webhook and
+     * connector SUBSCRIPTION vocabulary and feeds `openapi.json`, so a case there is a four-file act with a
+     * published contract attached. The cost, stated plainly rather than discovered: **a tenant cannot make
+     * their own systems react to a self-registration** — no webhook delivery, no Slack or Sheets fan-out.
+     * Recorded in `docs/feature-backlog.md` as the row to open if anyone asks for it.
+     *
+     * ── THE TWIN OF `member_invited`, AND SCOPED LIKE IT ───────────────────────────────────────────────
+     * Same page, same question ("who is in this workspace"), same recipients. The two are the two doors into
+     * a tenant: `member_invited` fires when a seat is OFFERED, this when one is TAKEN through the open-
+     * registration door instead. An Admin told about the first and not the second has half a ledger, which is
+     * why this does not follow `ImpersonationStarted`'s narrower owner-only scoping — that case is narrow
+     * because it discloses PROCESSOR access to the party accountable for the workspace, a different question.
+     */
+    case MemberJoined = 'member_joined';
 
     /**
      * Human label for the notification center, the preferences card, and any email subject built from the
@@ -83,6 +107,7 @@ enum NotificationType: string
             // The tenant's words, not the operator's — matching AuditEvent::ImpersonationStarted's label,
             // because the bell row and the ledger row describe the same event to the same reader.
             self::ImpersonationStarted => 'Platform access',
+            self::MemberJoined => 'Member joined',
         };
     }
 
@@ -146,6 +171,8 @@ enum NotificationType: string
             // Owner is that party (`tenants.owner_user_id` is a real column; "Admin" is a delegated role).
             // Widening it later is additive; narrowing it after people have relied on it is not.
             self::ImpersonationStarted => ['owner'],
+            // The twin of `member_invited` above, and scoped identically on purpose — see the case's docblock.
+            self::MemberJoined => ['owner', 'admin'],
             self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed => [],
         };
     }
@@ -197,6 +224,9 @@ enum NotificationType: string
             // (`routes/tenant.php`:667), which is where §9 says the access is visible, and there is no
             // per-row page to deep-link to — `/audit-log` has no `{audit}` detail route by design.
             self::ImpersonationStarted => 'audit-log',
+            // Unconditional, and the same destination `member_invited` points at: the members page is where a
+            // new arrival is acted on (promote, or remove).
+            self::MemberJoined => 'members',
         };
     }
 
@@ -212,6 +242,7 @@ enum NotificationType: string
             self::MemberInvited => 'View members',
             self::WebhookFailed => 'View webhook',
             self::ImpersonationStarted => 'View audit log',
+            self::MemberJoined => 'View members',
         };
     }
 

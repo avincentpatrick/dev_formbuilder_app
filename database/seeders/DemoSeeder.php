@@ -86,7 +86,14 @@ class DemoSeeder extends Seeder
 {
     use DeterministicIds;
 
-    /** One password for every seeded demo account — low-entropy on purpose, `gitleaks` scans this repo. */
+    /**
+     * One password for every seeded demo account — low-entropy on purpose, `gitleaks` scans this repo.
+     *
+     * ⚠️ EXEMPT FROM J3a'S FOUR CHARACTER CLASSES, AND DELIBERATELY SO. It is written through `Hash::make()`
+     * and read by `Hash::check()` on the login path; `Password::defaults()` governs a password being CHOSEN,
+     * never one being verified. Nothing re-registers or resets with it. See E2eSeeder::OWNER_PASSWORD's
+     * docblock for the full argument.
+     */
     public const PASSWORD = 'meridian-demo-2026';
 
     public const DEMO_SLUG = 'demo';

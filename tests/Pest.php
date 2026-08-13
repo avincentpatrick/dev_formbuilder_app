@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
 use App\Enums\IndexedDataType;
@@ -43,10 +44,12 @@ use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PlanSeeder;
+use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
@@ -430,6 +433,50 @@ function fakeDns(array $records = []): FakeDnsTxtResolver
     app()->instance(DnsTxtResolver::class, $fake);
 
     return $fake;
+}
+
+/**
+ * Stub Have I Been Pwned's k-anonymity range endpoint.
+ *
+ * ⚠️ ANY TEST THAT VALIDATES A NEW PASSWORD REACHES THE PUBLIC INTERNET WITHOUT THIS, AND STAYS GREEN WHILE
+ * IT DOES — WHICH IS WHY IT WENT UNNOTICED FOR TWO INCREMENTS. `Password::uncompromised()` is a shipped
+ * default (`FortifyServiceProvider::boot()`) and `NotPwnedVerifier` performs the lookup through the `Http`
+ * facade, so a merge-blocking gate silently depended on api.pwnedpasswords.com being reachable from the
+ * runner. It never announced itself because the verifier CATCHES the failure, `report()`s it and returns an
+ * empty collection — i.e. it FAILS OPEN to "uncompromised". The suite therefore passes with or without
+ * egress, and the only difference is whether CI is quietly making an outbound HTTPS request per registration
+ * test.
+ *
+ * I8a fixed this in `AuthenticationTest` alone, as a file-local function. J3a found two more files doing it
+ * (`Feature/Settings/OpenTenantRegistrationTest`, `Feature/Tenancy/MembershipRoutesTest`) and promoted the
+ * helper HERE — which is also the only place it can live, because Pest loads every test file into one
+ * process and a second top-level `fakeHibp` would be a fatal.
+ *
+ * The stub answers with a real `SUFFIX:COUNT` line for each nominated password whose hash prefix matches the
+ * request, and an EMPTY body otherwise, which the verifier reads as "no match", i.e. uncompromised. Suffixes
+ * are DERIVED with `sha1()` rather than pasted as constants, so the fixture cannot drift from what the
+ * validator actually asks for. Note the array form: only this one host is stubbed, so an unrelated stray
+ * request stays visible rather than being absorbed by a catch-all.
+ *
+ * @param  list<string>  $breachedPasswords
+ */
+function fakeHibp(array $breachedPasswords = []): void
+{
+    Http::fake([
+        'api.pwnedpasswords.com/range/*' => function (HttpClientRequest $request) use ($breachedPasswords) {
+            $lines = [];
+
+            foreach ($breachedPasswords as $candidate) {
+                $hash = strtoupper(sha1($candidate));
+
+                if (str_ends_with($request->url(), substr($hash, 0, 5))) {
+                    $lines[] = substr($hash, 5).':9659365';
+                }
+            }
+
+            return Http::response(implode("\r\n", $lines));
+        },
+    ]);
 }
 
 function customDomain(Tenant $tenant, string $host, bool $verified = true, bool $activated = true): Domain

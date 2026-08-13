@@ -80,6 +80,18 @@ class E2eSeeder extends Seeder
 
     private const OWNER_EMAIL = 'demo@meridian.test';
 
+    /**
+     * ⚠️ DO NOT "FIX" THIS TO SATISFY J3a'S FOUR CHARACTER CLASSES. IT IS EXEMPT BY CONSTRUCTION.
+     *
+     * Every seeded password is written through `Hash::make()` and read back by `Hash::check()` on the LOGIN
+     * path, which has no opinion whatever about character classes — `Password::defaults()` governs a password
+     * being CHOSEN, not one being verified. Nothing in the suite re-registers or resets with these strings:
+     * their only consumers are `POST /login` here and in `tests/e2e/global-setup.ts`.
+     *
+     * Changing them would churn this file, {@see DemoSeeder}, `tests/e2e/global-setup.ts`,
+     * `tests/e2e/support/console.ts`, `docs/TESTING-GUIDE.md` and the tracker's next-prompt — for zero
+     * behavioural gain, while breaking every credential the user has memorised.
+     */
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
 
     /** The central-domain console operator (Increment I10e) — see seedSuperAdmin(). */

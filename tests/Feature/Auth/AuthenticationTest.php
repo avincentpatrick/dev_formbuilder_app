@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Actions\Fortify\PasswordValidationRules;
 use App\Models\User;
-use App\Providers\FortifyServiceProvider;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\NotPwnedVerifier;
 use Illuminate\Validation\Rules\Password;
 
 uses(RefreshDatabase::class);
@@ -65,39 +65,25 @@ it('rejects a wrong password', function (): void {
 });
 
 /**
- * Stub Have I Been Pwned's k-anonymity range endpoint.
+ * Assert that `$password` satisfies EVERY rule in the policy except `uncompromised()`.
  *
- * ⚠️ WITHOUT THIS, THIS FILE REACHED THE PUBLIC INTERNET ON EVERY CI RUN. `Password::uncompromised()` is
- * a shipped default ({@see FortifyServiceProvider}), and
- * {@see NotPwnedVerifier} performs the lookup through the `Http` facade — so a
- * merge-blocking gate was silently depending on api.pwnedpasswords.com being reachable from the runner.
- * Faked in I8a.
+ * ⚠️ THIS IS WHAT KEEPS THE TWO BREACH TESTS BELOW HONEST, AND J3a IS WHY IT NOW HAS TO EXIST.
+ * `Rules\Password::passes()` runs the length check and all four character-class checks inside ONE inner
+ * validator, and reaches the HIBP verifier **only if that validator passes** — structurally, regardless of
+ * the order the builder chain was written in. So a fixture that fails any class is rejected before a single
+ * request is made, and a test asserting "this was rejected by the breach check" would pass **for the wrong
+ * reason, with zero requests sent**.
  *
- * The stub answers with a real `SUFFIX:COUNT` line for each nominated password whose hash prefix matches
- * the request, and an EMPTY body otherwise — which the verifier reads as "no match", i.e. uncompromised.
- * Suffixes are DERIVED with `sha1()` rather than pasted as constants, so the fixture cannot drift from
- * what the validator actually asks for. Note the array form: only this one host is stubbed, so an
- * unrelated stray request in this file stays visible rather than being absorbed by a catch-all.
- *
- * @param  list<string>  $breachedPasswords
+ * That was a real risk here rather than a theoretical one: before J3a all four fixtures in this file were
+ * lowercase-only passphrases, and adding `->mixedCase()` to the defaults would have silently converted both
+ * breach tests into length-and-class tests wearing a breach test's name.
  */
-function fakeHibp(array $breachedPasswords): void
+function expectSatisfiesEveryRuleButBreach(string $password): void
 {
-    Http::fake([
-        'api.pwnedpasswords.com/range/*' => function (ClientRequest $request) use ($breachedPasswords) {
-            $lines = [];
+    $withoutBreachCheck = Password::min(PasswordPolicy::MIN_LENGTH)->letters()->mixedCase()->numbers()->symbols();
 
-            foreach ($breachedPasswords as $candidate) {
-                $hash = strtoupper(sha1($candidate));
-
-                if (str_ends_with($request->url(), substr($hash, 0, 5))) {
-                    $lines[] = substr($hash, 5).':9659365';
-                }
-            }
-
-            return Http::response(implode("\r\n", $lines));
-        },
-    ]);
+    expect(validator(['password' => $password], ['password' => $withoutBreachCheck])->fails())
+        ->toBeFalse('fixture must satisfy every rule but uncompromised(), or the breach check is never reached');
 }
 
 it('registers a new user and rejects a too-short password', function (): void {
@@ -116,11 +102,14 @@ it('registers a new user and rejects a too-short password', function (): void {
 
     // A strong, un-breached password registers and logs in (user created on meridian_app via the
     // permissive INSERT policy, inside the transaction — rolled back after the test).
+    $strong = 'Correct-Horse-Battery-9';
+    expectSatisfiesEveryRuleButBreach($strong);
+
     $this->post('/register', [
         'name' => 'New Person',
         'email' => 'reg@authtest.local',
-        'password' => 'correct-horse-battery-staple',
-        'password_confirmation' => 'correct-horse-battery-staple',
+        'password' => $strong,
+        'password_confirmation' => $strong,
     ]);
 
     $this->assertAuthenticated();
@@ -130,10 +119,34 @@ it('registers a new user and rejects a too-short password', function (): void {
     Http::assertSentCount(1);
 });
 
+it('rejects a new password that satisfies the length but not the four character classes', function (): void {
+    fakeHibp([]);
+
+    // J3a. Long, memorable, un-breached — and lowercase-only, so it fails `mixedCase()` and `numbers()`.
+    // This is the exact shape of every password fixture in the suite before J3a, which is why it is worth
+    // its own case rather than being folded into the length test above.
+    $noClasses = 'correct-horse-battery-staple';
+
+    $this->from('/register')->post('/register', [
+        'name' => 'New Person',
+        'email' => 'classes@authtest.local',
+        'password' => $noClasses,
+        'password_confirmation' => $noClasses,
+    ])->assertSessionHasErrors('password');
+
+    $this->assertGuest();
+
+    // ⚠️ ZERO, not one. The class failure short-circuits the inner validator, so the breach lookup is never
+    // made — which is the property `expectSatisfiesEveryRuleButBreach()` exists to defend in the two tests
+    // below, stated here as a positive assertion so the mechanism is pinned rather than assumed.
+    Http::assertSentCount(0);
+});
+
 it('rejects a long but breached password on registration', function (): void {
-    // Long enough to clear min:12, so the ONLY rule left to reject it is uncompromised() — which is the
-    // point: this is the test that proves the breached-password check is wired, not merely configured.
-    $breached = 'trustno1-trustno1';
+    // Satisfies min-12 AND all four classes, so the ONLY rule left to reject it is uncompromised() — which
+    // is the point: this is the test that proves the breached-password check is wired, not merely configured.
+    $breached = 'Trustno1-Trustno1!';
+    expectSatisfiesEveryRuleButBreach($breached);
 
     fakeHibp([$breached]);
 
@@ -150,17 +163,56 @@ it('rejects a long but breached password on registration', function (): void {
         $request->url(),
         'https://api.pwnedpasswords.com/range/'.substr(strtoupper(sha1($breached)), 0, 5),
     ));
+
+    // ⚠️ `assertSent` alone is satisfied by ANY matching request and says nothing about how many were made;
+    // it is the COUNT that proves the class gate let this through to the verifier exactly once.
+    Http::assertSentCount(1);
 });
 
 it('rejects a breached password when accepting an invitation', function (): void {
-    // The invitation-accept form declares its own rules rather than using PasswordValidationRules
-    // (InvitationController), so it is the one password surface that could silently diverge. Pinned here.
-    $breached = 'letmein-letmein-letmein';
+    // The invitation-accept form is single-field, so it cannot inherit `'confirmed'` — historically it
+    // declared its own rules inline, making it the one password surface that could silently diverge. J3a
+    // moved that divergence onto a NAMED METHOD of the shared trait; the case below pins that the two
+    // methods differ by exactly `'confirmed'` and nothing else, so a future rule cannot reach three
+    // surfaces and miss the fourth.
+    $breached = 'Letmein-Letmein-42!';
+    $unused = 'A-Genuinely-Unused-Passphrase-9143';
+
+    expectSatisfiesEveryRuleButBreach($breached);
+    expectSatisfiesEveryRuleButBreach($unused);
 
     fakeHibp([$breached]);
 
-    $rules = ['password' => ['required', 'string', Password::default()]];
+    $surface = new class
+    {
+        use PasswordValidationRules;
+
+        /** @return array<int, mixed> */
+        public function confirmed(): array
+        {
+            return $this->passwordRules();
+        }
+
+        /** @return array<int, mixed> */
+        public function unconfirmed(): array
+        {
+            return $this->passwordRulesUnconfirmed();
+        }
+    };
+
+    // Compared by SHAPE, not by identity: `Password::default()` builds a fresh instance per call, so two
+    // structurally identical rule sets are never the same object and `toBe()` would fail on a difference
+    // that does not exist. Mapping each rule to its class name (or its own string) pins what actually
+    // matters — the same rules, in the same order, differing by exactly the trailing `'confirmed'`.
+    $shape = fn (array $rules): array => array_map(
+        fn (mixed $rule): string => is_object($rule) ? $rule::class : (string) $rule,
+        $rules,
+    );
+
+    expect($shape($surface->confirmed()))->toBe([...$shape($surface->unconfirmed()), 'confirmed']);
+
+    $rules = ['password' => $surface->unconfirmed()];
 
     expect(validator(['password' => $breached], $rules)->fails())->toBeTrue();
-    expect(validator(['password' => 'a-genuinely-unused-passphrase-9143'], $rules)->fails())->toBeFalse();
+    expect(validator(['password' => $unused], $rules)->fails())->toBeFalse();
 });

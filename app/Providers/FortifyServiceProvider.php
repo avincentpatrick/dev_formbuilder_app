@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
 use App\Services\Settings\RegistrationGate;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,9 +38,27 @@ class FortifyServiceProvider extends ServiceProvider
             $config['model'],
         ));
 
-        // Breached-password check (OWASP ASVS L1) + a 12-char minimum, inherited by registration,
-        // password reset, and password update via Password::defaults() in PasswordValidationRules.
-        Password::defaults(fn () => Password::min(12)->uncompromised());
+        // Breached-password check (OWASP ASVS L1) + a 12-char minimum + the four character classes
+        // (user decision of record 2026-08-09), inherited by registration, password reset, password
+        // update AND invitation-accept via Password::defaults() in PasswordValidationRules.
+        //
+        // ⚠️ THE CHAIN ORDER IS COSMETIC AND MUST NOT BE READ AS PRECEDENCE. `Rules\Password::passes()`
+        // runs the length and all four class checks inside ONE inner validator, and reaches
+        // `uncompromised()` only if that validator passes — structurally, whatever order they are
+        // written in. So every class failure short-circuits the HIBP lookup, which is why a fixture that
+        // fails a class makes a breach test pass with ZERO requests sent. `AuthenticationTest` guards
+        // both breach cases against exactly that.
+        //
+        // `letters()` is implied by `mixedCase()` at runtime and is named anyway: four classes is the
+        // decision, and a reader of this line should not have to know that one call subsumes another.
+        // The minimum lives on PasswordPolicy so the number the strength checklist renders and the
+        // number the validator enforces cannot be two numbers.
+        Password::defaults(fn () => Password::min(PasswordPolicy::MIN_LENGTH)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols()
+            ->uncompromised());
 
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);

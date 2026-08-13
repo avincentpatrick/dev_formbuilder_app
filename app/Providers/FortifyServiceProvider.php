@@ -9,6 +9,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
+use App\Http\Requests\Auth\RlsAwareTwoFactorLoginRequest;
 use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\PasswordPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,12 +22,27 @@ use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Requests\TwoFactorLoginRequest;
 
 class FortifyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Make the two-factor challenge reachable (Increment J3c1). Fortify resolves the pending user with
+        // a STATIC `$model::find()` on the default connection, which bypasses RlsAwareUserProvider and is
+        // hidden by the join-shape `users` RLS policy mid-login — so the page 302'd to /login forever and
+        // anyone who enrolled in 2FA was locked out. The full argument is in the subclass's docblock.
         //
+        // ⚠️ THIS BINDING IS THE ONLY SEAM FORTIFY OFFERS. None of its contracts covers the form request,
+        // and `Fortify::ignoreRoutes()` is a single boolean that would disable its ~25 routes rather than
+        // these two. Both of Fortify's call sites are method-injected type-hints on
+        // TwoFactorAuthenticatedSessionController, and route dependencies resolve through the container
+        // (`ResolvesRouteDependencies` calls `make()`), so binding the parent to the subclass is enough.
+        //
+        // In register(), not boot(): the framework's FormRequest lifecycle is attached by container
+        // `resolving()`/`afterResolving()` callbacks whose type matching is `instanceof`-based, so they
+        // still fire for the subclass and validation/redirector wiring is unchanged.
+        $this->app->bind(TwoFactorLoginRequest::class, RlsAwareTwoFactorLoginRequest::class);
     }
 
     public function boot(): void

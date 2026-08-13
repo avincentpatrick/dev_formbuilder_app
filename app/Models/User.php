@@ -55,7 +55,67 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasUuidv7;
     use Notifiable;
     use SoftDeletes;
-    use TwoFactorAuthenticatable;
+
+    // Aliased, not plain, so replaceRecoveryCode() below can wrap it — see that method for why.
+    use TwoFactorAuthenticatable {
+        replaceRecoveryCode as private replaceRecoveryCodeOnCurrentConnection;
+    }
+
+    /**
+     * Rotate a used recovery code on the connection that can actually see this row (Increment J3c1).
+     *
+     * ⚠️ THIS IS A PRE-AUTH WRITE, AND WITHOUT THE SWITCH IT SILENTLY DID NOTHING. Its only caller is
+     * Fortify's TwoFactorAuthenticatedSessionController::store(), which rotates the code the person just
+     * spent — BEFORE `Auth::login()`, so `app.current_user_id` is still unset. The trait's body is
+     * `forceFill([...])->save()` on the default connection, and while `users_app_update` is permissive,
+     * PostgreSQL applies the SELECT policy to an UPDATE whose WHERE reads a column: `users_users_visibility`
+     * matches nothing, the statement affects ZERO ROWS, throws nothing, `save()` returns true, and
+     * `RecoveryCodeReplaced` fires as if it had worked.
+     *
+     * The consequence is not cosmetic. Recovery codes are single-use by construction, so a rotation that
+     * never lands leaves the spent code VALID FOREVER — turning a lockout defect into a credential-reuse
+     * one. It is the same zero-row shape PR #147 fixed on six other Fortify endpoints, arriving on the one
+     * write that middleware cannot reach, because this write happens inside the login request itself.
+     *
+     * `pgsql_auth` can do it: `users_auth_select USING (true) TO meridian_auth` makes the row visible, the
+     * permissive `users_app_update` policy permits the write, and the apply_users_rls migration GRANTs
+     * SELECT + UPDATE on `users` to that role. This is the same asymmetry
+     * {@see RlsAwareUserProvider} already documents for the password-reset save.
+     *
+     * Switch-call-restore rather than a GUC change, mirroring
+     * {@see \App\Auth\RlsAwareUserProvider::updateRememberToken()}: the object this is called on becomes
+     * `Auth::user()` moments later, and `meridian_auth` holds grants on `users` alone, so leaving it
+     * elevated would fail on the first relation the request touched. `finally`, so a throw cannot strand it.
+     * The restore is asserted by `TwoFactorChallengeTest`'s recovery-code case, which is the only path that
+     * reaches this method at all.
+     *
+     * ⚠️ THE WHOLE TRAIT BODY RUNS INSIDE THE ELEVATED WINDOW, NOT JUST THE `save()`, AND THAT IS A
+     * CONSTRAINT ON FUTURE CODE RATHER THAN A BUG TODAY. The aliased method dispatches
+     * `RecoveryCodeReplaced` and fires the model's own saving/saved events before returning, so all of them
+     * see `$this` bound to `meridian_auth`. There are no listeners on that event and no `User` observer
+     * today — verified — but **a listener added later must not touch a relation or any table other than
+     * `users`**, or it will fail with a permission error on a path that only runs during a recovery-code
+     * sign-in. Narrowing the window would mean re-implementing the vendor's body, which is worse.
+     *
+     * ⚠️ The connection name is the literal rather than {@see \App\Auth\RlsAwareUserProvider}'s constant:
+     * five other call sites in `app/` spell it out (`CreateNewUser`, `UpdateUserProfileInformation`,
+     * `InvitationController`, `ImpersonationService`, `TenantMembershipService`), and a model reaching into
+     * the auth provider that is configured WITH it points the dependency the wrong way.
+     *
+     * @param  string  $code
+     */
+    public function replaceRecoveryCode($code): void
+    {
+        $original = $this->getConnectionName();
+
+        $this->setConnection('pgsql_auth');
+
+        try {
+            $this->replaceRecoveryCodeOnCurrentConnection($code);
+        } finally {
+            $this->setConnection($original ?? (string) Config::get('database.default'));
+        }
+    }
 
     /**
      * Pin Spatie's guard for this model to the RBAC catalog's guard (`web`, per RolePermissionSeeder),

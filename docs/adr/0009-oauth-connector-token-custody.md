@@ -89,11 +89,57 @@ The H-map sequences this ADR **immediately before** H15a and after the whole web
 
 - **D2 — The callback lands on the central domain, outside `web`.** One registered redirect URI per provider, `https://{central}/oauth/{provider}/callback`, with the host read from `config('tenancy.central_domain')` (not `env()` — the `routes/admin.php:24` precedent exists because a raw `env()` call does not survive `route:cache`). Per-tenant redirect URIs are unshippable: Slack and Google require exact, pre-registered URIs and reject wildcard hosts. The route group carries **no `web` middleware** — a third-party GET arriving from an external redirect has no session and no CSRF token, and demanding either would break the flow, not secure it; CSRF protection for this hop is `state` (§D3), which is what the OAuth spec assigns it to. It also carries no `PreventAccessFromCentralDomains`, mirroring API Group C. **Revisit trigger:** a provider that supports per-tenant or wildcard redirect registration, or the platform moving to per-tenant custom domains for the app itself (Business-tier `custom_domain` covers public forms, not the admin app).
 
+  > **⚠ EXTENDED BY J3c2 (2026-08-14) — §D2 NOW BINDS A FLOW THAT IS NOT A CONNECTOR.** First-party Google
+  > sign-in takes the same topology for the same reason: Google rejects wildcard redirect URIs for an
+  > identity client exactly as it does for a Sheets client, so there is one registered callback on the
+  > central domain. **What it does NOT take is `web`-less-ness.** A connector callback only writes a row;
+  > a sign-in callback must be able to *establish a session* on the central host (the central arm of the
+  > flow signs in there directly), so `/auth/google/callback` carries `web`. That is a divergence, not an
+  > oversight: the CSRF argument §D2 makes still holds — the hop is protected by `state`, and a top-level
+  > GET carries no CSRF token to check — but the response needs a session cookie the connector flow never
+  > wanted. ⚠️ And it deliberately declares **no `Route::domain()`**, unlike `routes/connectors.php`:
+  > `routes/web.php:12-17` records that `config('tenancy.central_domain')` does not match `localhost`
+  > locally, and J3c2 must be exercisable against its fake on a dev box. `RequirePlatformHost` is what
+  > keeps a tenant custom domain from serving it, and Fortify's own `'domain' => null` is the precedent.
+
 - **D3 — `state` is a signed, domain-separated, provider-bound HMAC token, not a session nonce.** It reuses the `GuestShareTokenService` wire format (`v1.<base64url(payload)>.<base64url(mac)>`, constant-time compare, decode-after-verify) with a **third** independently-rotatable key derived as `hash_hmac('sha256', 'connector-oauth-state.v1', APP_KEY)` and overridable by config, exactly as the share and resume keys are (`app/Providers/AppServiceProvider.php:51-70`). Claims: `{tid, uid, prov, nonce, exp}` — the tenant it may write into, the user who started the flow (recorded as `connected_by` and used for the audit actor), the provider it is valid for, a random nonce for uniqueness, and a **~10-minute expiry** (an interactive consent screen, not a 24-hour share link). `prov` is load-bearing: it prevents a state minted for one provider's flow being replayed against another provider's callback. **Accepted narrowing: `state` is stateless, so it is replayable within its TTL.** Replay is bounded by the provider's authorization `code` being single-use — a replayed callback fails at the token exchange — and the consequence of a successful replay would be re-writing the same tenant's own connection. A server-side single-use nonce store was rejected as a table plus a reaper on a path that must work before any tenant context exists. **Revisit trigger:** a provider with non-single-use codes, or a flow where the callback has a side effect beyond writing the connection it names.
 
   > **⚠ EXTENDED BY H16c (2026-08-13): the state token now has a SECOND job — it is also the seed for the PKCE `code_verifier`.** Airtable requires PKCE, and this ADR's two-hosts-two-requests topology leaves nowhere to remember a verifier between the halves; `ConnectorOAuthStateService::codeVerifierFor()` derives one under the same key, domain-separated by prefix. **Consequence to keep in mind before changing anything here:** the state token is now load-bearing for a provider's token exchange, not only for tenant identity, so altering its wire format, its TTL or its key derivation breaks in-flight Airtable consents as well as in-flight identity claims. The full argument, including why deriving from a value the attacker can see is still sound, is in §When to Revisit.
 
+  > **⚠ AMENDED BY J3c2 (2026-08-14) — §D3's OWN REVISIT TRIGGER HAS FIRED, AND IT FIRED AGAINST ONE OF
+  > TWO LEGS RATHER THAN THE WHOLE FLOW.** The trigger reads "a flow where the callback has a side effect
+  > beyond writing the connection it names". **A sign-in establishes a session — the largest side effect in
+  > the application** — so the stateless-`state` reasoning cannot carry it unchanged. ADR-0016 already made
+  > this argument once, at
+  > `database/migrations/2026_08_14_000002_create_sso_auth_requests_table.php:15-26`: *an HMAC proves WE
+  > MINTED a token; it cannot prove the token has not been presented before. Single-use IS replay
+  > protection, single-use requires remembering, and remembering requires a store.*
+  >
+  > **But the split is finer than "so J3c2 needs a store".** The Google flow has two hops that could be
+  > replayed, and only one of them creates the session. The **`state`** on the outbound leg stays a
+  > stateless HMAC of exactly this shape — replaying it only re-opens a consent screen, and the
+  > authorization `code` behind it is single-use at Google, which is §D3's existing bound. The **handoff**
+  > from the central callback back to the tenant host is what carries the flow into a session, and *that*
+  > is a database row with a hashed, 60-second, single-use token redeemed by a conditional UPDATE whose
+  > affected-row count is the check. So §D3 is not overturned; it is **scoped to the leg it was always
+  > describing**, and the nonce store it named as the eventual fix exists as the handoff row.
+  >
+  > ⚠️ **The central-host arm of J3c2 has no handoff at all and therefore no row**, and that is a
+  > consequence of RLS rather than a shortcut: `TenantIsolation::nullableGlobalSql()` widens SELECT only —
+  > *"every write stays strict: a tenant connection cannot create/alter a global row"* — so a tenant-less
+  > row is unwritable on the app connection. It needs no hop because callback and session share a host,
+  > and its replay bound is Google's single-use `code` plus the state's own expiry, which is precisely
+  > §D3's original bargain.
+
 - **D4 — Tenant context is adopted from the verified `state`, before RLS, and forgotten on terminate.** A dedicated middleware — the `EstablishGuestDraftContext` shape (`app/Http/Middleware/EstablishGuestDraftContext.php:37-52`) — verifies `state`, then calls `TenantContext::apply(tenantId, userId)`, stashes the decoded claims on the request, and pairs the session-scoped apply with `TenantContext::forget()` in `terminate()` so context can never survive onto a pooled connection (ADR-0002 §D2). The tenant is **never** inferred from the request host (there isn't one — it is the central domain, §Context 4) and **never** read from an unverified parameter. A tampered, expired, or provider-mismatched state throws before any GUC is set; the rendered outcome is a redirect to `config('app.url')` with no indication of whether the named tenant exists (the `superadmin` non-disclosure posture). Because the user id is carried too, the callback's audit entry names a real actor rather than a system write. **Revisit trigger:** any second central-domain route that writes tenant data — it must reuse this middleware, not re-derive context.
+
+  > **⚠ THE §D4 TRIGGER FIRED TOO (J3c2, 2026-08-14), AND THE ANSWER IS A SIBLING RATHER THAN A REUSE.**
+  > `/auth/google/callback` is exactly the "second central-domain route that writes tenant data" this
+  > trigger names, and it does adopt context from a verified `state` with a `terminate()` that forgets —
+  > the shape is copied deliberately. It is a **separate class** because strip
+  > `ConnectorProviderKey` resolution and `ConnectorOAuthStateService` out of
+  > `EstablishConnectorOauthContext` and nothing provider-agnostic is left: the two share a pattern, not a
+  > body. Recorded here so the divergence reads as a decision rather than as drift.
 
 - **D5 — The return host comes from the `domains` table; the outcome is a query parameter.** After the exchange the callback redirects to `https://{tenant host}/integrations?connected={provider}` (or `?connect_error={code}`), with the host read from the tenant's `domains` row — the `GuestDraftController::resumeUrl` precedent (`:117-124`) — and **never** echoed from the request or from a `ret`-style claim in the state payload. That is what closes the open-redirect: even a validly-signed state cannot steer the browser anywhere but the tenant's own host. The outcome rides a **query parameter rather than a session flash** because the central host cannot write the tenant host's session cookie (§Context 3); the receiving page reads the parameter and renders the toast (H15b). **Revisit trigger:** if a tenant may hold multiple domains, the choice of which to return to becomes a real decision rather than "the one row."
 
@@ -165,6 +211,39 @@ The H-map sequences this ADR **immediately before** H15a and after the whole web
 - **Widening `SESSION_DOMAIN` to span subdomains** so the central callback can read the tenant session — rejected per §Context 3 / §D3: it makes every tenant's session cookie a cross-host artifact on every request, permanently, to solve a problem that arises twice per connection.
 - **A server-side `oauth_states` table with single-use nonces** — rejected for now per §D3: a table plus a reaper on a path that must run before any tenant context exists, buying protection against a replay whose only effect is rewriting the tenant's own connection. Named as the fix if provider codes ever stop being single-use.
 - **`laravel/socialite` (+ a community Slack provider)** — rejected: Socialite is built around a same-host, session-backed redirect and would have to be bent around the stateless central-domain callback; the Slack driver is a third-party package; and the adapter it replaces is roughly one small class per provider. Recorded so the choice is not re-argued as an oversight.
+
+  > **⚠ CARVED OUT BY J3c2 (2026-08-14) — THE REJECTION STANDS FOR CONNECTORS AND DOES NOT REACH
+  > FIRST-PARTY SIGN-IN.** J3c2 adds `laravel/socialite` for Google sign-in only. Taking this bullet's
+  > three reasons one at a time, because a carve-out that does not answer them is just a reversal:
+  >
+  > 1. *"Built around a same-host, session-backed redirect… would have to be bent."* Socialite's
+  >    `->stateless()` is its own supported mode for exactly this topology: it emits no `state` and reads
+  >    none back, so ADR-0009's signed token is passed in with `->with([...])` and remains the sole trust
+  >    anchor. Nothing is bent — the library is used as an HTTP/wire-format client and is never asked to
+  >    carry identity across the hop.
+  > 2. *"The Slack driver is a third-party package."* Google's driver is **first-party and in the box**.
+  >    No `socialiteproviders/*` package is taken. That clause was about supply chain, and it does not
+  >    apply.
+  > 3. *"The adapter it replaces is roughly one small class per provider."* True — and **J3c2 writes that
+  >    class anyway**, as `App\Support\Auth\GoogleIdentityProvider` with `SocialiteGoogleIdentityProvider`
+  >    behind it. So the cost of being wrong is one binding line, and the seam is what makes the flow
+  >    testable against a fake with no live credentials.
+  >
+  > **What Socialite buys that `GoogleSheetsConnector` (which already speaks Google OAuth) does not:** the
+  > `sub` + `email_verified` mapping off `oauth2/v3/userinfo`. That mapping is the security-load-bearing
+  > half of a sign-in — `sub` is the identity key and `email_verified` is this flow's analogue of a
+  > signature check — and it is the part worth not hand-rolling.
+  >
+  > ⚠️ **STATED COST, because it is not free:** Socialite pulls four transitive packages, of which
+  > `league/oauth1-client`, `phpseclib/phpseclib` and `paragonie/random_compat` exist for OAuth**1**
+  > providers this product will never use. `firebase/php-jwt` is the only one on our path. That is real
+  > dependency surface accepted for one driver, and it is the strongest remaining argument for the
+  > hand-rolled adapter if this is ever revisited.
+  >
+  > ⚠️ **`ConnectorProvider` DOES NOT ADOPT SOCIALITE AND MUST NOT.** The connector lane holds a *durable
+  > third-party credential that lets the platform act as the tenant inside the tenant's own workspace*;
+  > this flow reads an identity once and discards the token. Different custody problem, different answer,
+  > and `app/Support/Connectors/ConnectorProvider.php:23-25` still says so correctly.
 - **An external secret manager (Vault/KMS) for token custody** — rejected for this phase: ADR-0005's self-hosted single-box deployment has no such service, and nothing in CI could exercise it. The `encrypted` cast is the same protection the platform already relies on for webhook secrets.
 - **Plaintext tokens protected only by RLS** — rejected per §D1: RLS protects a query, not a backup, a support tool, or a mis-scoped export.
 - **Reveal-once / masked-suffix token display, mirroring the webhook secret** — rejected per §D1: the affordance exists for webhooks because the tenant must paste the secret into their receiver; a connector token has no user-facing consumer, so displaying it is pure downside.

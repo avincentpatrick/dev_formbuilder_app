@@ -12,6 +12,8 @@ use Database\Seeders\E2eSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Fortify\Fortify;
+use PragmaRX\Google2FA\Google2FA;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -131,32 +133,75 @@ it('lands the seeded placeholder on the verification notice, which is where the 
 });
 
 /*
-| ⚠️ THE TWO-FACTOR PREMISE IS NOT ASSERTED HERE, AND THE REASON IS A TRAP WORTH THE PARAGRAPH.
+| ⚠️ THE TWO-FACTOR PREMISE STILL CANNOT BE ASSERTED BY DRIVING `POST /login` HERE, AND THE TRAP IS WORTH
+| KEEPING even though the case below now asserts the premise a different way.
 |
 | `auth-axe.spec.ts` signs in as `twofactor@meridian.test` and expects to be diverted to
 | `/two-factor-challenge`. The obvious mirror — POST /login and assert the redirect — CANNOT WORK under
 | `RefreshDatabase`, and it fails in a way that reads like an application bug rather than a test-harness
 | limit: the login throws `ValidationException::withMessages()` from deep inside Fortify, which surfaces
-| as "Call to a member function all() on array" pointing at the assertion line.
-|
-| The cause is the one PROGRESS.md already records for SSO provisioning, arriving from a new direction:
+| as "Call to a member function all() on array" pointing at the assertion line. The cause is that
 | `RlsAwareUserProvider::retrieveByCredentials()` resolves on `pgsql_auth`, a SEPARATE SESSION which
-| cannot see RefreshDatabase's open transaction. The seeded identity therefore does not exist as far as
-| the credential lookup is concerned, authentication legitimately fails, and the case would be measuring
-| the failure path forever.
+| cannot see RefreshDatabase's open transaction, so the seeded identity does not exist as far as the
+| credential lookup is concerned.
 |
 | ⚠️ NOTE THE ASYMMETRY THAT MAKES THIS EASY TO GET WRONG: the case above it, which drives the same
 | seeder's PENDING user, passes — because `actingAs()` sets the user on the guard directly and never goes
 | near `retrieveByCredentials()`. A mirror is available for one and not the other, and the difference is
 | invisible from the test's shape.
 |
-| VERIFIED OUT-OF-TRANSACTION INSTEAD, and recorded rather than left implicit: a probe without
-| `RefreshDatabase` (so the seeder's writes commit and `pgsql_auth` can see them) answered
-| `302 → http://acme.meridian.test/two-factor-challenge`. That confirms both halves the spec depends on —
-| that the secret was written by the seeder's single INSERT, and that no workspace membership is needed to
-| reach the challenge. The probe is not kept as a test: it would commit fixture rows outside a
-| transaction and leak them into every suite that ran afterwards.
+| ⚠️ AND A SECOND LIMIT, FOUND IN J3c1 AND NOT PREVIOUSLY RECORDED: this identity's row cannot even be
+| SELECTED here by the idiom the three cases above use. They reach their user through `tenant_users`,
+| but `twofactor@meridian.test` is deliberately a member of NO workspace — so `users_users_visibility`
+| can only admit it via `app.current_user_id = id`, and you cannot set that GUC without first knowing the
+| id you are trying to read. `pgsql_auth` and `pgsql_privileged` cannot help: separate sessions, and the
+| seeder's writes are inside this transaction. The way in is the model event below, which captures the key
+| as the seeder assigns it.
+|
+| THE MIRROR THAT DOES DRIVE THE FLOW lives in `tests/Feature/Auth/TwoFactorChallengeTest.php`, against a
+| COMMITTED identity of its own. What is asserted here is only what the SEEDER promises the spec.
 */
+
+it('seeds a two-factor identity the accessibility spec can actually be diverted as', function (): void {
+    // ⚠️ THE SPEC CANNOT PROVE ITS OWN PREMISE AND THIS CAN. If any of the three below drifts, the spec
+    // fails as "Timeout 30000ms exceeded" on a `waitForURL`, with no indication of which link in the chain
+    // broke — the password, the enrolment state, or the secret's decodability.
+    //
+    // Capturing the key from the `created` event is what makes the row readable at all; see the block
+    // above. `HasUuidv7` assigns the key BEFORE the insert, so the event carries it, and model listeners
+    // live on the per-test container so nothing leaks into another file.
+    $ids = [];
+    User::created(function (User $user) use (&$ids): void {
+        $ids[$user->email] = (string) $user->getKey();
+    });
+
+    (new E2eSeeder)->run();
+
+    expect($ids)->toHaveKey('twofactor@meridian.test');
+
+    $row = DB::transaction(function () use ($ids): ?User {
+        TenantContext::applyLocal(null, $ids['twofactor@meridian.test']);
+
+        return User::query()->whereKey($ids['twofactor@meridian.test'])->first();
+    });
+
+    expect($row)->not->toBeNull();
+
+    // 1. The password literal the spec types.
+    expect(Hash::check('meridian-e2e-2026', (string) $row->password))->toBeTrue();
+
+    // 2. The EXACT predicate Fortify's RedirectIfTwoFactorAuthenticatable branches on. With
+    //    `confirm => true` in config/fortify.php it requires BOTH a secret and a confirmation stamp, so
+    //    asserting the two columns separately would not assert the same thing.
+    expect($row->hasEnabledTwoFactorAuthentication())->toBeTrue();
+
+    // 3. The seeder's constant claims to be "a syntactically valid base32 TOTP secret". Checked rather
+    //    than restated: a secret that cannot derive a code would make the scan reachable but the flow
+    //    untestable, and J3c1's own tests depend on this being true of a real enrolment.
+    $secret = Fortify::currentEncrypter()->decrypt((string) $row->two_factor_secret);
+
+    expect(app(Google2FA::class)->getCurrentOtp($secret))->toMatch('/^\d{6}$/');
+});
 
 it('publishes the password policy to every page that renders the checklist', function (): void {
     // ⚠️ ASSERTED PER PAGE, NOT ONCE. `PasswordPolicy::requirements()` is pure and cannot fail; what CAN

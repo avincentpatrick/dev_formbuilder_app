@@ -8,7 +8,7 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     MdsBreadcrumb,
@@ -33,7 +33,7 @@ import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { selection, saving, canUndo, canRedo, conflict, library } = store;
+const { selection, saving, canUndo, canRedo, conflict, library, saveError } = store;
 
 
 // Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
@@ -77,6 +77,30 @@ const paneOptions = [
 function onPaneChange(value: string): void {
     if (value === 'fields' || value === 'canvas' || value === 'settings') pane.value = value;
 }
+
+// ⚠️ THE ONE THING ALLOWED TO OVERRIDE THE AUTHOR'S PANE CHOICE, AND IT IS A CORRECTNESS FIX RATHER THAN
+// A CONVENIENCE. `saveError` is rendered in exactly ONE place in the entire client — ConfigPanel's
+// `<p v-if="saveError" role="alert">` — which lives inside the CONFIG pane. Without this watcher, a write
+// that fails while the author is on Add or Form mounts that alert inside a `display: none` subtree, where
+// it is neither painted nor placed in the accessibility tree, so it is never announced and never seen. The
+// rule this increment replaced only linearized the panes, so the alert was reachable at every width before
+// it: the silence would be new, and it would be new on exactly the paths most likely to fail — deleting or
+// duplicating a field, adding a section, inserting from the library, and undo/redo from the toolbar.
+// (WCAG 3.3.1 Error Identification, 4.1.3 Status Messages.)
+//
+// ⚠️ WHY THIS WATCHER IS ACCEPTABLE WHERE A `watch(selection, …)` WAS NOT. That one was rejected because
+// `onMounted` below auto-selects the first field, so it would fire on load and override the default pane.
+// `saveError` starts null and only becomes truthy on a real failure, so nothing fires on mount. And above
+// the threshold all three panes are on screen and `pane` is inert, so this is a no-op on desktop rather
+// than a layout surprise.
+//
+// Not fixed here, because it is NOT this increment's and predates it: `.builder__save` is driven by
+// `pending.count`, which returns to zero on the failure path too, so the toolbar's polite live region
+// still announces "All changes saved" after a failed write — at every width, including 1440px today.
+// Filed to docs/feature-backlog.md.
+watch(saveError, (message) => {
+    if (message) pane.value = 'settings';
+});
 
 const readOnly = computed(() => props.draft === null);
 
@@ -822,11 +846,11 @@ function submitImport(): void {
    page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
    below it — so the box is 785px at a 1025px VIEWPORT and 960px at a 1024px one, NARROWER ON THE WIDER
    SCREEN. The three-column grid therefore stayed on through 1025–1200 with a canvas track of
-   785 − 260 − 340 − 2 = 183px, and Playwright's projects are 375/834/1440, so no gate in this repo has
+   785 − 260 − 340 = 185px, and Playwright's projects are 375/834/1440, so no gate in this repo has
    ever rendered that state.
 
    60em = 960px, and it is the answer to two independent questions that agree: 260 (palette) + 340 (config)
-   + 2 (the pane rules) + 358 (the smallest canvas worth having); and 1024 − 64, the widest box that can
+   + 360 (the smallest canvas worth having); and 1024 − 64, the widest box that can
    exist while the sidebar is still a rail. The second is what makes the transition CONTINUOUS across the
    sidebar swap — compact at 1024, compact at 1025, three panes from 1201 up.
 

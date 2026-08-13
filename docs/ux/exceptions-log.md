@@ -465,11 +465,11 @@ the whole canvas. **Arithmetically**, 1024 is not a width this page ever has. Th
 fluid page (`AppLayout.vue`'s `FLUID_PAGES`), so its box is `viewport − sidebar`, and the sidebar is 240px
 above 1024px and a 64px rail at or below it — the box is therefore **785px at a 1025px viewport and 960px
 at a 1024px one**, the same inversion #12 documents, arriving on the builder. The three-column grid stayed
-on above 1024, so across **1025–1200 the canvas track was `785 − 260 − 340 − 2 = 183px`**. Playwright's
+on above 1024, so across **1025–1200 the canvas track was `785 − 260 − 340 = 185px`**. Playwright's
 projects are 375 / 834 / 1440, so **no gate in this repo has ever rendered that state**.
 
 **Why 60em rather than a token.** 960px is the answer to two independent questions and they agree. It is
-`260 (palette) + 340 (config) + 2 (the two 1px pane rules) + 358 (the smallest canvas worth having)`. It is
+`260 (palette) + 340 (config) + 360 (the smallest canvas worth having)`. It is
 also `1024 − 64`: the widest box that can exist while the sidebar is still a rail — so, exactly as #12's 896
 does, it makes the transition **continuous across the sidebar swap**: compact at 1024, compact at 1025,
 three panes from 1201 up. **The inclusivity of `max-width` is load-bearing.** At `59.9375em` the 1024px
@@ -509,9 +509,9 @@ offset `auto`, and all six dialogs on the page are `MdsModal`, which `<Teleport 
    horizontally on `MdsDataTable`, whose `position: relative` carries a comment saying it is "a latent bug
    in this component". It was latent in `MdsSegmentedControl` too, in every consumer, and only became
    visible once an ancestor finally tried to clip. Fixed in the component with the same one line, and
-   pinned by a new `SegmentedControl.test.ts` — the component had no test at all until now. **No gate here
+   pinned by a new `SegmentedControl.test.ts` — the component had no unit test until now (six Storybook stories already ran under the merge-blocking axe gate). **No gate here
    can execute the check**: the e2e overflow assertion reads `documentElement.scrollWidth`, which
-   `.app-shell { overflow-x: clip }` pins flat, nothing reads `scrollHeight`, happy-dom lays nothing out,
+   `.app-shell { overflow-x: clip }` pins flat, no GATE asserts on document `scrollHeight`, happy-dom lays nothing out,
    and axe has no rule for a hidden node extending the page.
 
 **Scope of the exception.** One page, one query, one toolbar. §2.7's three tokens remain the contract for
@@ -537,6 +537,24 @@ full-screen sheet — and none of those moved.
    `docs/feature-backlog.md`; it is not here because the page auto-selects a field on mount, so the watcher
    would fire on load and override the default pane, and because pane state driven by store events reorders
    what eight e2e sequences see in a suite that cannot run on the development host.
+
+   ⚠️ **THE ONE EXCEPTION TO THAT, AND AN ADVERSARIAL PASS IS WHAT FOUND IT.** `saveError` is rendered in
+   exactly **one** place in the entire client — `ConfigPanel.vue`'s `<p v-if="saveError" role="alert">` —
+   which lives inside the config pane. So a write that failed while the author was on *Add* or *Form* would
+   have mounted that alert inside a `display: none` subtree: not painted, not in the accessibility tree,
+   never announced. The replaced rule only linearized, so the alert was reachable at every width before this
+   increment — **the silence would have been new**, and new on exactly the paths most likely to fail
+   (deleting or duplicating a field, adding a section, inserting from the library, undo/redo). A
+   `watch(saveError, …)` that pulls the config pane on screen is therefore shipped, and it is acceptable
+   where the `selection` watcher was not for two reasons: `saveError` starts null so nothing fires on
+   mount, and above the threshold all three panes are shown so it is a no-op. **WCAG 3.3.1 / 4.1.3.**
+
+   **What is *not* fixed here, because it is genuinely older than this increment:** `.builder__save`
+   (`role="status" aria-live="polite"`) is driven by `saving = pending.count > 0`, and `guard()` catches
+   the throw, so the count returns to zero on the failure path and the page politely announces *"All
+   changes saved"* at the moment the write failed — at every width, on `phase1-completion` today. Filed to
+   `docs/feature-backlog.md` rather than folded in, because inferring success from "nothing in flight" is a
+   store defect, not a layout one.
 4. **At `extra_large` the threshold is 1200px of container, so a 1440px desktop is compact.** That is the
    `em` choice working as designed — the 260/340 pane columns are px literals that do not grow with the type
    — but it means any test helper keyed on `info.project.name` rather than on what is actually on screen

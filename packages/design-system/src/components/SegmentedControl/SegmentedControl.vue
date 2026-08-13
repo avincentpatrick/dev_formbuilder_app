@@ -69,8 +69,10 @@ const groupName = props.name ?? useId();
    it, and it only became visible where an ancestor finally tried to clip.
 
    ⚠️ NO GATE IN THIS REPO CAN SEE IT. The e2e overflow assertion reads `documentElement.scrollWidth`,
-   which `.app-shell { overflow-x: clip }` pins flat, and nothing measures scrollHeight at all; happy-dom
-   lays nothing out; axe has no rule for it. Hence the source-text assertion in SegmentedControl.test.ts. */
+   which `.app-shell { overflow-x: clip }` pins flat, and no gate asserts on the document's scrollHeight
+   at all (`FieldPalette.vue` reads its OWN, to decide an overflow tabindex — that is not a gate);
+   happy-dom lays nothing out; axe has no rule for it. Hence the source-text assertion in
+   SegmentedControl.test.ts. */
 .mds-segmented {
     position: relative;
     display: inline-flex;

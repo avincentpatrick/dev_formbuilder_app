@@ -21,8 +21,10 @@ import { join } from 'node:path';
  *
  * ⚠️ NOTHING IN THIS REPO CAN EXECUTE THE CHECK. happy-dom computes no layout, so a mounted assertion
  * would pass whatever the CSS said; the e2e overflow assertion reads `documentElement.scrollWidth`, which
- * `.app-shell { overflow-x: clip }` pins flat, and no gate reads scrollHeight; axe has no rule for a
- * hidden node extending the page. Source text is therefore the only place this can be held.
+ * `.app-shell { overflow-x: clip }` pins flat, and no gate asserts on the document's scrollHeight at all;
+ * axe has no rule for a hidden node extending the page. Source text is therefore the only place this can
+ * be held. (The component's six Storybook stories DO run under the merge-blocking axe gate — they simply
+ * cannot see this, which is why "it had no test" would have been the wrong thing to conclude.)
  */
 describe('MdsSegmentedControl — the visually-hidden nodes stay inside the control', () => {
     const source = readFileSync(

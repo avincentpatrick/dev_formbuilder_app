@@ -25,13 +25,18 @@ describe('forms/Builder — the compact-layout threshold', () => {
     const source = readFileSync(join(process.cwd(), 'resources/js/Pages/forms/Builder.vue'), 'utf8');
 
     it('collapses on the CONTAINER, never on the viewport', () => {
-        expect(source).toMatch(/@container \(max-width:/);
+        // ⚠️ ANCHORED TO COLUMN 0, and that is not fussiness: this file's own script comment SPELLS the
+        // string "@container (max-width: 60em)" while explaining the ref, so an unanchored positive
+        // assertion is satisfied by prose and would stay green through a revert to a viewport media
+        // query. An at-rule sits at column 0; a comment about one does not. Same reasoning as the
+        // negative assertion below, which `DataTable.test.ts` already applies to `^@media`.
+        expect(source).toMatch(/^@container \(max-width:/m);
         expect(
             source,
             'a viewport media query cannot see the sidebar inversion — the builder is fluid, so its box ' +
                 'is `viewport − sidebar`: 960px at a 1024px viewport and 785px at 1025px. The old ' +
                 '`@media (max-width: 1024px)` rule therefore kept the three-column grid in the NARROWEST ' +
-                'box, giving the canvas a 183px track across 1025–1200 — a band no Playwright project ' +
+                'box, giving the canvas a 185px track across 1025–1200 — a band no Playwright project ' +
                 'renders.',
             // Anchored: the block comment in the page NAMES the rule it replaced, and prose about a
             // defect is not the defect. An at-rule sits at column 0.
@@ -40,8 +45,8 @@ describe('forms/Builder — the compact-layout threshold', () => {
 
     it('states the threshold in em, so it is correct at all three type scales', () => {
         // A px threshold is right at exactly one setting of §2.9's font-size axis; JR3 shipped that and
-        // had to fix it. 60em resolves to 960 / 1080 / 1200px.
-        expect(source).toMatch(/@container \(max-width:\s*60em\)/);
+        // had to fix it. 60em resolves to 960 / 1080 / 1200px. Anchored for the reason above.
+        expect(source).toMatch(/^@container \(max-width:\s*60em\)\s*\{/m);
     });
 
     it('establishes the query container on .builder, not on .builder__panes', () => {
@@ -81,10 +86,26 @@ describe('forms/Builder — the compact-layout threshold', () => {
         // at all three viewports, and nine `[role="tab"]` locators need ConfigPanel mounted. None of them
         // needs the pane painted.
         expect(source).toMatch(/\.builder__pane\s*\{\s*display:\s*none/);
-        expect(source).not.toMatch(/builder__pane--(?:left|canvas|config)"[^>]*v-if/);
+
+        // ⚠️ THE WHOLE OPENING TAG, NOT A SUFFIX MATCH. The first version of this asserted
+        // `not.toMatch(/builder__pane--(left|canvas|config)"[^>]*v-if/)`, which required `v-if` to be
+        // written AFTER the class attribute — and Vue templates in this repo put structural directives
+        // FIRST, so the assertion could not fail on the change it exists to catch. Pull each pane's
+        // opening tag out and check the tag itself.
+        for (const modifier of ['left', 'canvas', 'config']) {
+            const tag = source.match(new RegExp(`<div[^>]*builder__pane--${modifier}[^>]*>`))?.[0];
+            expect(tag, `the ${modifier} pane must exist`).toBeDefined();
+            expect(tag, `${modifier} pane: display:none, never v-if — three e2e gates need it attached`)
+                .not.toMatch(/\sv-(?:if|else|else-if)\b/);
+        }
+
         for (const p of ['fields', 'canvas', 'settings']) {
             expect(source, `the --show-${p} rule is what makes that pane reachable`).toContain(
                 `.builder__panes--show-${p}`,
+            );
+            // The CSS half is useless without the template half that emits the class.
+            expect(source, `nothing emits builder__panes--show-${p}`).toMatch(
+                /:class="`builder__panes--show-\$\{pane\}`"/,
             );
         }
     });
@@ -118,6 +139,23 @@ describe('forms/Builder — the compact-layout threshold', () => {
             expect(label, button.slice(0, 90)).toBe(text);
             expect(button, button.slice(0, 90)).toContain(`title="${label}"`);
         }
+    });
+
+    it('brings the config pane on screen when a save fails', () => {
+        // `saveError` is rendered in exactly ONE place in the client — ConfigPanel's
+        // `<p v-if="saveError" role="alert">` — which lives inside the config pane. Without this watcher a
+        // failed write raised while the author is on Add or Form mounts that alert inside a `display:none`
+        // subtree: not painted, not in the accessibility tree, never announced. The rule this increment
+        // replaced only linearized the panes, so the silence would be NEW (WCAG 3.3.1 / 4.1.3).
+        //
+        // Deliberately asserted here rather than in a mount test: the defect is the interaction between a
+        // container query and a Vue watcher, and happy-dom lays out neither.
+        expect(source, 'the store’s saveError must be destructured to be watchable').toMatch(
+            /const \{[^}]*\bsaveError\b[^}]*\} = store;/,
+        );
+        expect(source, 'a failed save must pull the pane that owns the alert on screen').toMatch(
+            /watch\(\s*saveError\s*,[\s\S]{0,160}?pane\.value = 'settings'/,
+        );
     });
 
     it('keeps Publish carrying its word at every width', () => {

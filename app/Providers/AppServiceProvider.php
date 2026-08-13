@@ -347,6 +347,22 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('connector-oauth', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('coauth:'.$request->ip()));
 
+        // SAML protocol endpoints (P1b / ADR-0016). Both are unauthenticated by necessity — the caller is a
+        // browser with no session yet, or an identity provider — so a per-IP ceiling is the only key
+        // available: there is no token, no tenant claim worth trusting and no user.
+        //
+        // ⚠️ SEPARATE BUCKETS, NOT ONE SHARED "saml". A completed sign-in costs exactly one hit of each, so
+        // sharing a bucket would halve whichever ceiling an operator thought they were setting — the
+        // `guest-challenge` lesson, on a surface where the two halves also cost very different things: the
+        // login path writes a row, the ACS runs XML signature validation over an attacker-supplied
+        // document. The ACS is the more expensive and the more attractive to grind, and it is where the
+        // tighter number belongs.
+        RateLimiter::for('saml-login', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by('samllogin:'.$request->ip()));
+
+        RateLimiter::for('saml-acs', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by('samlacs:'.$request->ip()));
+
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum
         // personal-access-token auth used by the /api/v1 surface (api-specification.md §2.6 / §3).

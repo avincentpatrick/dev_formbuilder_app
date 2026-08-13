@@ -2465,8 +2465,13 @@ for a **seeder-created** identity fails under `RefreshDatabase` — `retrieveByC
 function all() on array` from inside Fortify, which reads like an application bug. A case driving the SAME
 seeded user via `actingAs()` passes, because that never touches `retrieveByCredentials()`.
 
-**TWO CI FAILURES ON THE FIRST #148 RUN.** gitleaks flagged the fixture `password: 'Abcdefghijk1'` — and a
+**TWO CI FAILURES ON THE FIRST #148 RUN.** gitleaks flagged the fixture `password: 'Abcdefghijk1'` — and a <!-- gitleaks:allow -->
 `gitleaks:allow` directive **must sit on the same line as the match**; on the line above it does nothing.
+⚠️ **AND THIS VERY SENTENCE THEN FAILED CI ON `phase1-completion` FOR THE SAME REASON — QUOTING THE MATCH
+IS THE MATCH.** The line above needed its own directive, which is why it now carries one. The run that
+merged this entry (`c94ba81`) is red, and every branch cut from it inherited the failure; J3c1 found it
+because its own PR went red on a rule it had not tripped. **A lesson written down about a secret-scanner
+match must carry the directive it is describing.**
 And the two-factor scan, which is the finding above. ⚠️ **A cancelled run is not a green one**: my own push
 cancelled the first run and a `gh run watch` on it still exited 0. Parse `conclusion` per job.
 

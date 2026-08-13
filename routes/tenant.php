@@ -39,6 +39,8 @@ use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SearchController;
+use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
+use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionEditController;
@@ -218,6 +220,49 @@ Route::middleware([
         ->middleware(['can:tenant.settings.manage', 'feature:branding'])->name('settings.branding.logo.store');
     Route::delete('/settings/branding/logo', [BrandingController::class, 'destroyLogo'])
         ->middleware('can:tenant.settings.manage')->name('settings.branding.logo.destroy');
+
+    // Single sign-on — the TENANT CONFIGURATION surface (Phase 4, P1a, ADR-0016). The protocol surface is a
+    // different route group entirely, mounted without `auth` further down this file; these four are ordinary
+    // authenticated settings routes and share nothing with it but a feature name.
+    //
+    // NO `{connection}` SEGMENT, AND NOT BY OMISSION: `sso_connections` is UNIQUE on `tenant_id` (§D2), so
+    // the resource is a singleton and the row is reached by RLS rather than by an id. A future multi-IdP
+    // row would change the LOGIN surface (which provider does the login page offer?), not just this path.
+    //
+    // ⚠️ THE GATING ASYMMETRY IS DELIBERATE AND MUST NOT BE "TIDIED UP" INTO CONSISTENCY — the third
+    // instance of ADR-0012 §D9 in this file, after /domains below and branding above. Only the two writes
+    // that can CREATE or WIDEN carry `feature:sso_saml`; the read, the on/off switch and the removal do not,
+    // because a tenant downgraded off Enterprise still has an identity provider pointed at this SP and must
+    // retain a path to undo what a paid tier let them create.
+    //
+    // ⚠️ THE STATUS TOGGLE IS ON THE UNGATED SIDE, AND THE FIRST DRAFT OF THIS BLOCK HAD IT ON THE OTHER —
+    // which left a downgraded tenant able to DELETE the trust anchor but not DISABLE it. "Destroy or
+    // nothing" is the inverse of an escape hatch, and against SsoConnectionStatus::Disabled's own contract
+    // (retained so the anchor and its audit history survive a suspension). Enabling is still gated, in
+    // SsoConnectionService::changeStatus() rather than here, because one route serves both directions:
+    // a tenant may always undo, never redo.
+    //
+    // ⚠️ `step-up` GUARDS THE IMPORT AND ONLY THE IMPORT. Rewriting idp_certificates is a complete
+    // authentication takeover for the tenant — a larger blast radius than members.role or members.remove,
+    // both of which already carry it (I8a, PRD #14). It is NOT on the read (a password prompt to look at a
+    // page devalues the prompt where it means something), nor on the status toggle or the delete, which must
+    // stay reachable per the asymmetry above. Safe here because the import is a plain Inertia visit, which
+    // gets RequirePassword's redirect — never mount `step-up` on a JSON sidecar, which gets a bare 423.
+    //
+    // ⚠️ THE IMPORT IS A `PUT` BECAUSE ITS PAYLOAD IS A STRING. @inertiajs/core does NOT method-spoof, and
+    // PHP populates $_FILES only for a multipart POST — so a PUT carrying an upload arrives EMPTY. The page
+    // reads any chosen file client-side into the same textarea to keep the wire JSON. If a real file input
+    // is ever added, this becomes a POST (the /settings/branding/logo precedent).
+    Route::get('/settings/sso', [SsoSettingsController::class, 'show'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso');
+    Route::put('/settings/sso/idp-metadata', [SsoSettingsController::class, 'importMetadata'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml', 'step-up'])->name('settings.sso.metadata');
+    Route::patch('/settings/sso', [SsoSettingsController::class, 'update'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml'])->name('settings.sso.update');
+    Route::patch('/settings/sso/status', [SsoSettingsController::class, 'updateStatus'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.status');
+    Route::delete('/settings/sso', [SsoSettingsController::class, 'destroy'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.destroy');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
@@ -882,6 +927,36 @@ Route::middleware([
     // TenantBrandingService::isActive(), because an unentitled tenant must answer 404 (an image that is
     // not there) and not the middleware's 403 (an image that exists and is being withheld).
     Route::get('/branding/logo', BrandingLogoController::class)->name('branding.logo');
+});
+
+/*
+| SAML 2.0 Service Provider — the PROTOCOL surface (Phase 4, P1a, ADR-0016). Same subdomain pipeline as the
+| invitation group and WITHOUT `auth`, for the same structural reason one step further out: the caller is an
+| identity provider, or a browser being bounced through one, and on the login path there is by definition no
+| session yet — requiring auth would be circular. Tenant context is still established BEFORE any query, which
+| is what makes the strict-RLS `sso_connections` row visible and confines it to its own tenant.
+|
+| ⚠️ THE TENANT COMES FROM THE HOST, NEVER FROM THE REQUEST BODY. An attacker choosing which tenant to
+| address chooses only which public subdomain to visit; the assertion's audience is then checked against THAT
+| tenant's SP entity id, so a response minted for another tenant dies on the audience check.
+|
+| ⚠️ NOT `feature:sso_saml` — the gate is inside the controller, via SsoGate. RequireFeature answers a web
+| request with back() plus a toast, which is meaningless for a cross-origin POST from an IdP, and any answer
+| other than 404 discloses another organisation's plan to an unauthenticated caller. Unentitled, unconfigured,
+| draft and disabled must all be indistinguishable — the BrandingLogoController posture above, on a surface
+| where the disclosure matters more.
+|
+| AppSecurityHeaders is mandatory here rather than incidental: `frame-ancestors 'none'` on a request that
+| mints a session is what stops the whole flow being driven inside an attacker's iframe.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/sso/saml/metadata', SsoMetadataController::class)->name('sso.metadata');
 });
 
 /*

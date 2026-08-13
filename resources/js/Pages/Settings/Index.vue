@@ -33,6 +33,7 @@ import MaintenanceCard from '@/components/settings/MaintenanceCard.vue';
 import ModulesCard from '@/components/settings/ModulesCard.vue';
 import AboutCard from '@/components/settings/AboutCard.vue';
 import type { NotificationPreferenceRow } from '@/components/notifications/types';
+import type { SsoSettingsCard } from '@/components/sso/types';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
@@ -67,6 +68,12 @@ const props = defineProps<{
         modules: InstanceType<typeof ModulesCard>['$props']['modules'];
         about: InstanceType<typeof AboutCard>['$props']['about'];
     };
+    // P1a (ADR-0016) — a LINK to /settings/sso, and note the condition is NOT `configured` alone the way
+    // customDomains above is `count > 0`. SSO has no sidebar entry at all (§D6: `sso_saml` is Enterprise-only
+    // and Enterprise is seeded is_active:false, so a feature-gated nav row would be invisible in every
+    // environment), which makes this card the ONLY way in — so it must also render for an entitled tenant
+    // that has configured nothing yet. The server folds both halves into `visible`.
+    sso: SsoSettingsCard;
 }>();
 
 const page = usePage();
@@ -324,6 +331,33 @@ function savePassword(): void {
                 </div>
                 <MdsButton variant="secondary" icon-left="globe" @click="router.visit('/domains')">
                     Manage domains
+                </MdsButton>
+            </div>
+        </MdsCard>
+
+        <!-- Single sign-on (P1a) — a signpost, not a control, exactly like custom domains above. The
+             condition is deliberately WIDER than that card's: `visible` is entitled OR configured, because
+             SSO has no sidebar entry to cover the entitled-but-empty case (ADR-0016 §D6). It still never
+             advertises an unbuyable plan, since an unentitled tenant with nothing configured sees nothing. -->
+        <MdsCard v-if="sso.visible" class="settings-card">
+            <template #header>
+                <div class="settings-card__head">
+                    <MdsIcon name="shield" size="sm" aria-hidden="true" />
+                    <h2 class="settings-card__title">Single sign-on</h2>
+                </div>
+            </template>
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">
+                        {{ sso.configured ? `SAML 2.0 · ${sso.status_label}` : 'Not set up' }}
+                    </p>
+                    <p class="settings-row__hint">
+                        Let members sign in with your organisation’s own identity provider instead of an email
+                        address and password.
+                    </p>
+                </div>
+                <MdsButton variant="secondary" icon-left="shield" @click="router.visit('/settings/sso')">
+                    {{ sso.configured ? 'Manage single sign-on' : 'Set up single sign-on' }}
                 </MdsButton>
             </div>
         </MdsCard>

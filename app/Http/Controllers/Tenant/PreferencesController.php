@@ -14,6 +14,7 @@ use App\Services\Branding\BrandingPresenter;
 use App\Services\Notifications\NotificationPreferenceResolver;
 use App\Services\Notifications\NotificationPresenter;
 use App\Services\Settings\AppSettingsPresenter;
+use App\Services\Sso\SsoConnectionPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
 use App\Support\Auth\PasswordConfirmation;
@@ -49,6 +50,7 @@ final class PreferencesController extends Controller
         private readonly NotificationPresenter $notifications,
         private readonly NotificationPreferenceResolver $notificationPreferences,
         private readonly AppSettingsPresenter $appSettings,
+        private readonly SsoConnectionPresenter $sso,
     ) {}
 
     public function show(Request $request): Response
@@ -104,6 +106,16 @@ final class PreferencesController extends Controller
             // ONE presenter, rather than four more assembled here. Every value is RESOLVED (the `settings`
             // table is sparse), and `can_manage` gates the first three cards; About renders for everyone.
             'appSettings' => $this->appSettings->forSettings($tenant, $user),
+            // Single sign-on (P1a, ADR-0016) — a LINK, like customDomains above and for a related reason,
+            // but with a WIDER condition and the difference matters. That card can wait for `count > 0`
+            // because /domains also has a sidebar entry covering the entitled-but-empty case; SSO has no nav
+            // entry at all (§D6, an Enterprise-gated row would be invisible everywhere), so this card is the
+            // ONLY way in and must render for an entitled tenant that has configured nothing yet. The
+            // `configured` half is then the same downgrade escape hatch the domains card provides.
+            //
+            // One query, on this page only, and skipped entirely for a non-manager — the presenter returns
+            // early rather than reading `sso_connections` for someone who could not act on it anyway.
+            'sso' => $this->sso->settingsCard($user, $tenant),
         ]);
     }
 

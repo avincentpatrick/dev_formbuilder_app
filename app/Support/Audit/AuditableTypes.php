@@ -45,6 +45,7 @@ final class AuditableTypes
         'webhook_endpoint' => 'Webhook endpoint',
         'connection' => 'Integration',
         'connection_subscription' => 'Integration rule',
+        'sso_connection' => 'Single sign-on',
         'subscription' => 'Subscription',
         'tenant_users' => 'Membership',
         'resource_grants' => 'Access grant',

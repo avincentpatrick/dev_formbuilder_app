@@ -6308,7 +6308,7 @@
                                     "string",
                                     "null"
                                 ],
-                                "description": "Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.",
+                                "description": "The tabular destination (H16a). A Google spreadsheet id, or an Airtable base id.",
                                 "maxLength": 255
                             },
                             "sheet_name": {
@@ -6316,7 +6316,16 @@
                                     "string",
                                     "null"
                                 ],
+                                "description": "The tab or table inside it. Omitted means the destination's own first one.",
                                 "maxLength": 100
+                            },
+                            "sheet_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Airtable (H16c). The table's stable id, so renaming the table cannot break the rule.",
+                                "maxLength": 64
                             },
                             "spreadsheet_title": {
                                 "type": [
@@ -6865,7 +6874,7 @@
                                     "string",
                                     "null"
                                 ],
-                                "description": "Google Sheets (H16a). `sheet_name` omitted means Google's own default first tab.",
+                                "description": "The tabular destination (H16a). A Google spreadsheet id, or an Airtable base id.",
                                 "maxLength": 255
                             },
                             "sheet_name": {
@@ -6873,7 +6882,16 @@
                                     "string",
                                     "null"
                                 ],
+                                "description": "The tab or table inside it. Omitted means the destination's own first one.",
                                 "maxLength": 100
+                            },
+                            "sheet_id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Airtable (H16c). The table's stable id, so renaming the table cannot break the rule.",
+                                "maxLength": 64
                             },
                             "spreadsheet_title": {
                                 "type": [

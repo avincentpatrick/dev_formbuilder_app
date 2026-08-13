@@ -28,7 +28,7 @@ import {
     MdsSpinner,
     MdsTextInput,
 } from '@meridian/design-system';
-import { createSheet, fetchMappableColumns, inspectSheet } from './integrationsClient';
+import { createDestination, fetchMappableColumns, inspectDestination } from './integrationsClient';
 import {
     buildRows,
     columnLabel,
@@ -40,7 +40,7 @@ import {
     UNBOUND_LABEL,
     type MappingRow,
 } from './mapping-model';
-import type { MappableColumn, Option, RuleRow, SheetDestination } from './types';
+import type { MappableColumn, Option, RuleRow, TabularDestination } from './types';
 
 const props = defineProps<{
     connectionId: string | null;
@@ -61,7 +61,7 @@ type Mode = 'create' | 'existing';
 const mode = ref<Mode>('create');
 const reference = ref('');
 const title = ref('');
-const destination = ref<SheetDestination | null>(null);
+const destination = ref<TabularDestination | null>(null);
 const rows = ref<MappingRow[]>([]);
 const catalog = ref<MappableColumn[]>([]);
 const scoped = ref(false);
@@ -136,7 +136,7 @@ async function connectExisting(): Promise<void> {
     busy.value = true;
     problem.value = null;
 
-    const payload = await inspectSheet(props.connectionId, reference.value);
+    const payload = await inspectDestination(props.connectionId, reference.value);
 
     destination.value = payload.destination;
     problem.value = payload.error;
@@ -153,7 +153,7 @@ async function changeTab(tab: string): Promise<void> {
 
     // Re-inspected rather than assumed: a different tab has a different header row, and reusing the previous
     // one would bind every column to a heading that is not there.
-    const payload = await inspectSheet(props.connectionId, destination.value.spreadsheet_id, tab);
+    const payload = await inspectDestination(props.connectionId, destination.value.spreadsheet_id, tab);
 
     if (payload.destination) {
         destination.value = payload.destination;
@@ -174,7 +174,7 @@ async function create(): Promise<void> {
     // The header row IS the catalog, in order, so a created sheet arrives fully mapped and the tenant can
     // unbind what they do not want rather than bind fourteen things by hand.
     const headers = catalog.value.map((column) => column.label);
-    const payload = await createSheet(props.connectionId, title.value.trim() || suggestedTitle(props.formTitle), headers);
+    const payload = await createDestination(props.connectionId, title.value.trim() || suggestedTitle(props.formTitle), headers);
 
     destination.value = payload.destination;
     problem.value = payload.error;

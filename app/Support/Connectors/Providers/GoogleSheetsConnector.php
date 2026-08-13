@@ -174,7 +174,18 @@ final class GoogleSheetsConnector implements ConnectorProvider
         $verdict = $this->drift->compare($mapping, $headers);
 
         if ($verdict->hasDrifted) {
-            return ConnectorDeliveryResult::blocked(null, $verdict->summary());
+            // ⚠️ THE `[column_drift]` PREFIX IS LOAD-BEARING AND WAS MISSING UNTIL H16c FOUND IT.
+            // `ConnectionPresenter::pausedReasons()` selects paused rules' excerpts with `LIKE '[%]%'`, because
+            // only a `blocked` outcome carries copy we wrote — an ordinary failure's excerpt is the provider's
+            // raw response body. `MappingDrift::summary()` is our copy but carries no code, so every drifted
+            // rule in production stored a reason the presenter then dropped: the tenant saw a paused rule with
+            // NO explanation, and the drift card H16b exists to render never appeared.
+            //
+            // It went unnoticed because the e2e seeder fabricates a correctly-prefixed excerpt that this line
+            // never produced — a test certifying a behaviour the code did not have. The engine cannot add the
+            // prefix itself: `App\Support\Mapping` is forbidden from knowing about connectors, and
+            // `MappingNamespaceBoundaryTest` enforces that by parsing the source.
+            return ConnectorDeliveryResult::blocked(null, '[column_drift] '.$verdict->summary());
         }
 
         $row = $this->rowFor($submissionId, $mapping);

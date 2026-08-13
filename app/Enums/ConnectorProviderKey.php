@@ -92,13 +92,35 @@ enum ConnectorProviderKey: string
      *
      * Deliberately not a label for the DESTINATION KIND ("channel or table") but for the provider's own word,
      * because the string is read by someone looking at that provider's own UI beside it.
+     *
+     * ⚠️ THIS IS THE INNER THING — the tab, the table, the channel — AND ITS FIRST DRAFT WAS WRONG. It
+     * returned `spreadsheet` for Sheets, which quietly re-pointed copy that had always meant the TAB: "that
+     * tab isn't in the spreadsheet any more" became "that spreadsheet isn't there any more", advice for a
+     * different problem. A tabular provider has TWO nouns and one method cannot carry both — see
+     * {@see containerNoun()}.
      */
     public function destinationNoun(): string
     {
         return match ($this) {
             self::Slack => 'channel',
-            self::GoogleSheets => 'spreadsheet',
+            self::GoogleSheets => 'tab',
             self::Airtable => 'table',
+        };
+    }
+
+    /**
+     * The DOCUMENT a {@see destinationNoun()} lives inside, or null for a provider whose destination has no
+     * container (H16c).
+     *
+     * Slack's channel is not "inside" anything a tenant picks, so null is the truthful answer rather than a
+     * stretched word — and every caller of this pairs it with a provider that has a tabular destination.
+     */
+    public function containerNoun(): ?string
+    {
+        return match ($this) {
+            self::Slack => null,
+            self::GoogleSheets => 'spreadsheet',
+            self::Airtable => 'base',
         };
     }
 }

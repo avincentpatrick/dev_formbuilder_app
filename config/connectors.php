@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Support\Connectors\Providers\AirtableBaseLister;
 use App\Support\Connectors\Providers\AirtableConnector;
+use App\Support\Connectors\Providers\AirtableDirectory;
 use App\Support\Connectors\Providers\GoogleSheetsConnector;
 use App\Support\Connectors\Providers\GoogleSheetsDirectory;
 use App\Support\Connectors\Providers\SlackChannelLister;
@@ -150,6 +152,18 @@ return [
         */
         'airtable' => [
             'adapter' => AirtableConnector::class,
+
+            /*
+            | ⚠️ THE FIRST PROVIDER TO REGISTER BOTH, WHICH `ConnectorRegistry::tabularDirectoryFor()` PREDICTED
+            | ("a provider could have both — enumerate bases AND create one") AND THEN GOT SLIGHTLY WRONG.
+            | Airtable enumerates and does NOT create. The lister answers "which base?" through the H15b picker
+            | sidecar, so H16c adds no route; the directory answers "what fields does that table have?" and
+            | implements the READING half only (`InspectsTabularDestinations`), because `schema.bases:write`
+            | was refused above.
+            */
+            'channel_lister' => AirtableBaseLister::class,
+            'tabular_directory' => AirtableDirectory::class,
+
             'client_id' => env('AIRTABLE_CONNECTOR_CLIENT_ID'),
             'client_secret' => env('AIRTABLE_CONNECTOR_CLIENT_SECRET'),
             'scopes' => ['schema.bases:read', 'data.records:write'],

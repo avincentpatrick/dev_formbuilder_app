@@ -84,7 +84,9 @@ it('projects a connection and its rules with a fixed key set and no credentials'
         // H16b — the tabular destination, projected key by key like the Slack pair, plus the provider-neutral
         // caption and the reason a paused rule is paused. Present on EVERY row including Slack's, because a
         // shape that varies by provider is one the client has to branch on before it can read it.
-        'spreadsheet_id', 'sheet_name', 'spreadsheet_url', 'mapping', 'destination_label', 'paused_reason',
+        // `sheet_id` is H16c's addition: Airtable's stable table id, so a renamed table cannot break a rule.
+        // Null for Slack and Sheets, and present on their rows anyway, for the reason above.
+        'spreadsheet_id', 'sheet_name', 'sheet_id', 'spreadsheet_url', 'mapping', 'destination_label', 'paused_reason',
     ]);
 });
 

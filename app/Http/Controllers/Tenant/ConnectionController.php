@@ -13,7 +13,7 @@ use App\Services\Connectors\ConnectionPresenter;
 use App\Services\Connectors\ConnectionService;
 use App\Services\Connectors\ConnectorChannelDirectory;
 use App\Services\Connectors\MappableColumnCatalog;
-use App\Services\Connectors\SheetDestinationDirectory;
+use App\Services\Connectors\TabularDestinationDirectory;
 use App\Support\Connectors\ConnectorConnectOutcome;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -95,13 +95,16 @@ final class ConnectionController extends Controller
     }
 
     /**
-     * Read an existing spreadsheet's tabs and header row so a mapping can be authored against it (H16b).
+     * Read an existing document's tabs and header row so a mapping can be authored against it (H16b).
+     *
+     * Provider-neutral since H16c: a Google spreadsheet's tabs or an Airtable base's tables, resolved by
+     * {@see TabularDestinationDirectory} from the connection's own provider.
      *
      * Same always-200 contract as {@see channels()} and for the same reason, plus one specific to this
      * surface: the tenant is mid-way through a rule form, and a 4xx here would lose everything they had
      * already typed into it.
      */
-    public function inspectSheet(Request $request, Connection $connection, SheetDestinationDirectory $directory): JsonResponse
+    public function inspectDestination(Request $request, Connection $connection, TabularDestinationDirectory $directory): JsonResponse
     {
         $validated = $request->validate([
             'reference' => ['required', 'string', 'max:2048'],
@@ -116,21 +119,24 @@ final class ConnectionController extends Controller
     }
 
     /**
-     * Create a spreadsheet for this grant, with the given headers in row 1 (H16b).
+     * Create a document for this grant, with the given headers in row 1 (H16b).
+     *
+     * Only providers that CAN provision reach the capability — Airtable deliberately cannot, and answers with
+     * an explaining `error` rather than a 500 (ADR-0009 §D8; H16c).
      *
      * ⚠️ A WRITE BEHIND A JSON SIDECAR, WHICH THE H15b DOCBLOCK ABOVE SAYS THIS SURFACE DOES NOT DO — so the
      * exception is argued rather than assumed. That rule exists because a domain exception on a tenant-web
      * route renders as a 302 (`bootstrap/app.php` keys its JSON branch on the `api/v1/*` PATH), which a fetch
-     * client follows into HTML. {@see SheetDestinationDirectory} never throws, so the hazard cannot arise.
+     * client follows into HTML. {@see TabularDestinationDirectory} never throws, so the hazard cannot arise.
      *
      * The alternative — an Inertia visit — was rejected on behaviour, not taste: this produces a value the
      * OPEN FORM needs (the new id, its tab, its header row) and the rule is not saved yet, so a redirect
      * would have to round-trip the tenant's half-finished input through the session to survive.
      *
-     * The write it performs is in the tenant's own Drive, never in our database: nothing here persists, and
+     * The write it performs is in the tenant's own provider account, never in our database: nothing here persists, and
      * the id only reaches `connection_subscriptions.config` when the tenant submits the rule.
      */
-    public function createSheet(Request $request, Connection $connection, SheetDestinationDirectory $directory): JsonResponse
+    public function createDestination(Request $request, Connection $connection, TabularDestinationDirectory $directory): JsonResponse
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:200'],

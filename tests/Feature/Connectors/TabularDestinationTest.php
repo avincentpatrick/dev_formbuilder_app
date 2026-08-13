@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
+use App\Enums\ConnectorProviderKey;
 use App\Enums\PlanTier;
 use App\Models\Connection;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Services\Connectors\SheetDestinationDirectory;
+use App\Services\Connectors\TabularDestinationDirectory;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,8 +21,8 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| The tabular-destination sidecars (H16b) — GET/POST /integrations/connections/{connection}/sheets, backed by
-| GoogleSheetsDirectory + SheetDestinationDirectory.
+| The tabular-destination sidecars (H16b) — GET/POST /integrations/connections/{connection}/destinations, backed by
+| GoogleSheetsDirectory + TabularDestinationDirectory.
 |
 | THE POINT OF THE INCREMENT, and therefore of this file: under `drive.file` the platform can only reach files
 | it created or the tenant handed it, so before this existed a destination could only be checked at DELIVERY
@@ -59,7 +60,7 @@ afterEach(function (): void {
 
 function sheetsUrl(Connection $connection): string
 {
-    return 'http://acme.meridian.test/integrations/connections/'.$connection->id.'/sheets';
+    return 'http://acme.meridian.test/integrations/connections/'.$connection->id.'/destinations';
 }
 
 it('creates a spreadsheet with our header row, in ONE call', function (): void {
@@ -245,7 +246,7 @@ it('says so plainly when the provider has no tabular destinations at all', funct
 
     $this->actingAs($this->admin)->getJson(sheetsUrl($slack).'?'.http_build_query([
         'reference' => 'SHEET_ID_0000000000000010',
-    ]))->assertOk()->assertJsonPath('error', 'This integration doesn’t deliver into spreadsheets.');
+    ]))->assertOk()->assertJsonPath('error', 'This integration doesn’t deliver into a spreadsheet or a table.');
 });
 
 it('rejects a reference that is not a sheets link before any request is made', function (): void {
@@ -259,14 +260,14 @@ it('rejects a reference that is not a sheets link before any request is made', f
 it('parses the id out of every shape a tenant can supply, and nothing else', function (): void {
     $id = 'SHEET_ID_0000000000000011';
 
-    expect(SheetDestinationDirectory::spreadsheetIdFrom("https://docs.google.com/spreadsheets/d/{$id}/edit#gid=0"))->toBe($id)
-        ->and(SheetDestinationDirectory::spreadsheetIdFrom("https://docs.google.com/spreadsheets/d/{$id}"))->toBe($id)
-        ->and(SheetDestinationDirectory::spreadsheetIdFrom("  {$id}  "))->toBe($id)
+    expect(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, "https://docs.google.com/spreadsheets/d/{$id}/edit#gid=0"))->toBe($id)
+        ->and(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, "https://docs.google.com/spreadsheets/d/{$id}"))->toBe($id)
+        ->and(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, "  {$id}  "))->toBe($id)
         // ⚠️ The URL arm is anchored on the `/spreadsheets/d/` path segment rather than "a long token
         // somewhere in the string". A greedy match would happily return `docs`, `google` or the gid.
-        ->and(SheetDestinationDirectory::spreadsheetIdFrom('https://docs.google.com/document/d/'.$id.'/edit'))->toBeNull()
-        ->and(SheetDestinationDirectory::spreadsheetIdFrom('short'))->toBeNull()
-        ->and(SheetDestinationDirectory::spreadsheetIdFrom(''))->toBeNull();
+        ->and(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, 'https://docs.google.com/document/d/'.$id.'/edit'))->toBeNull()
+        ->and(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, 'short'))->toBeNull()
+        ->and(TabularDestinationDirectory::documentIdFrom(ConnectorProviderKey::GoogleSheets, ''))->toBeNull();
 });
 
 it('lets a reader inspect but not create — the create writes into the tenant\'s Drive', function (): void {

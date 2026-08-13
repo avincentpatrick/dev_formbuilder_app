@@ -2493,3 +2493,62 @@ exactly one `<h1>` everywhere, exactly one "Sign in" button on login, no extra d
 375 × `extra_large` × OpenDyslexic. ⚠️ It measured **geometry, not appearance**: no screenshots were
 reviewed, and contrast rests on the axe gates instead. ⚠️ A standalone sweep script must live in the **repo
 root** to resolve `playwright`; a scratchpad copy cannot.
+
+## 2026-08-14 — LANE A · J3c1: the two-factor challenge becomes reachable (PR #149, `09defc0`)
+
+**6/6, every job parsed individually.** Pest **3863 / 16,563**, E2E **536 passed / 0 failed**, Static ·
+Contract · Frontend · Storybook-axe green. Against J3b's #148 run on the same base (3856 / 16,516) the
+delta is **+7 tests / +47 assertions** — six `TwoFactorChallengeTest` cases plus the premise case that
+replaced a paragraph. E2E 530 → 536, exactly +2 declarations × 3 projects.
+
+**J3c was split in two.** J3c1 is this; J3c2 is Google sign-in, whose plan is already written and approved.
+The split was not optional: the user's decision that personal 2FA still applies to a Google sign-in routes
+that flow **through** the page this increment repaired.
+
+**THE DEFECT.** `POST /login` → 302 → `/two-factor-challenge`, then that page → 302 → `/login`, forever,
+for everyone, with no self-service escape (`two-factor.disable` is behind `auth` + `password.confirm`,
+both past the challenge). `EloquentUserProvider::getModel()` returns a **class-string**, so Fortify's
+`$model::find(session('login.id'))` is a STATIC call that structurally bypasses
+`RlsAwareUserProvider::createModel()` — the provider was configured correctly and unreachable from that
+line. ⚠️ **`84459b4` armed it**: before #147 the 2FA writes affected zero rows, so nobody could acquire a
+real secret through the UI and the divert never fired.
+
+**THE PREDICTED FIX WAS REFUSED.** The backlog called for widening `app.current_user_id` from
+`session('login.id')`. That redefines what the GUC MEANS — every RLS policy is written against "the
+authenticated user", `login.id` names someone who passed factor ONE — and Fortify has no per-route
+middleware hook, so it would land on four other routes. `EstablishTenantDatabaseContext` is untouched.
+
+**THE BLAST RADIUS WAS ONE ITEM WIDER THAN THE ENTRY KNEW, AND IT FAILED OPEN.** The recovery path also
+WRITES: `replaceRecoveryCode()` rotates the spent code before `Auth::login()`, with no user GUC — the
+zero-row shape again. **A used recovery code was never rotated and stayed valid forever.** Measured live
+with the fix disabled: the sign-in still succeeded and the spent code survived.
+
+**FOUR LESSONS WORTH THE ARCHIVE.**
+
+1. **The adversarial pass paid for itself twice running.** Run after 5 of 6 CI jobs were green, it found
+   five real defects — including a threat-model row I had just written that was **factually wrong**: the
+   login limiter does not increment "only on failure". `limiters.login` being set means Fortify's own
+   `LoginRateLimiter` is never consulted, and the live `ThrottleRequests` bucket counts successes and is
+   never cleared. Also: a case that could pass vacuously, an invariant asserted on the one path that
+   cannot break it, and an assertion (`$model->exists`) that could not fail.
+2. **Verify the harness that measures the mutation.** Two full mutation runs reported "nothing reddened"
+   for every mutation while the runs were genuinely red — the attribution regex captured `classname=`
+   instead of `name=`. Believing it would have meant rewriting working tests.
+3. **CI on `phase1-completion` had been red since `c94ba81` and nobody noticed**, because the previous
+   session's own archive entry **quoted** the literal it was warning about, on a line with no directive.
+   Every branch cut from it inherited the failure. Quoting a secret-scanner match IS a match.
+4. **Container-side file discovery silently under-counts on this host.** Inside
+   `dev_formbuilder_app-app-1`, `RecursiveDirectoryIterator` — and therefore PHPUnit's file iterator —
+   misses whole directories on the Windows bind mount (`tests/` 327 of 367, controllers 44 of 90,
+   migrations 71 of 98), deterministically and with exit 0. Run the lint gates on the host and Pest per
+   leaf directory. Symfony Finder is unaffected, so PHPStan in the container is sound — and PHPStan
+   *cannot* run on the host, which dies on a Windows fiber/paging error.
+
+**Also recorded:** a seeded identity with no membership cannot be SELECTed at all inside `RefreshDatabase`
+(neither arm of `users_users_visibility` can admit it, and you cannot set the self GUC without already
+knowing the id) — the way in is a `User::created` listener registered before the seeder. And
+`docs/security-threat-model.md` gained its first authentication rows; it had none, which is how a live
+lockout went unrecorded there.
+
+**Environment:** Docker Desktop's engine wedged mid-session (500 on every API route) and needed a full
+restart plus `wsl --shutdown`; both lanes' stacks were brought back up afterwards.

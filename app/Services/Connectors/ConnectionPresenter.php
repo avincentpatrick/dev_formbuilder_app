@@ -258,6 +258,17 @@ final class ConnectionPresenter
                 'update' => $user->can('update', $connection),
                 'delete' => $user->can('delete', $connection),
             ],
+            // ── H16c: THE SHAPE OF THIS GRANT'S DESTINATION, RESOLVED HERE RATHER THAN RE-DERIVED CLIENT-SIDE.
+            // `RuleFormModal` gated three behaviours on `props.provider === 'google_sheets'` — the ONLY
+            // provider literal in the whole front end — which would have given an Airtable grant Slack's
+            // channel picker, Slack's event list and Slack's `config` shape. Every other provider fact on this
+            // surface is already server-resolved (`destination_label`, `providerDescription()`), for the reason
+            // this file's own docblocks give: resolving a provider is the server's job.
+            //
+            // ONE key, not a capability bag. A first draft also shipped `enumerable`, `creatable` and the two
+            // nouns; nothing on the client read them, and an unread prop is the `--block`-with-no-consumer
+            // smell this repo has been bitten by before. They arrive when something needs them.
+            'destination_kind' => $connection->provider->isTabular() ? 'tabular' : 'channel',
         ];
     }
 
@@ -292,9 +303,11 @@ final class ConnectionPresenter
             // cannot reach the client by default.
             'spreadsheet_id' => is_string($config['spreadsheet_id'] ?? null) ? $config['spreadsheet_id'] : null,
             'sheet_name' => is_string($config['sheet_name'] ?? null) ? $config['sheet_name'] : null,
+            // H16c. Airtable's stable table id; null for Sheets, which has no equivalent the editor uses.
+            'sheet_id' => is_string($config['sheet_id'] ?? null) ? $config['sheet_id'] : null,
             // Composed here rather than in the client. The id is opaque and the canonical URL form is a
             // deployment fact, not a rendering choice — the same argument `form_url` above records.
-            'spreadsheet_url' => $this->spreadsheetUrl($config),
+            'spreadsheet_url' => $this->destinationUrl($provider, $config),
             'mapping' => $this->mappingProjection($config),
             // ONE string the row can render whatever the provider is, so the destination column does not need
             // a `provider === 'x'` branch per cell. `ConnectionPresenter` already learned this lesson from
@@ -401,10 +414,11 @@ final class ConnectionPresenter
             $title = is_string($config['spreadsheet_title'] ?? null) ? $config['spreadsheet_title'] : null;
             $sheet = is_string($config['sheet_name'] ?? null) && $config['sheet_name'] !== '' ? $config['sheet_name'] : null;
 
-            // The title is stored at authoring time as a convenience label, so a renamed spreadsheet shows a
-            // stale name rather than costing a Google round trip on every page render. The id is the identity;
+            // The title is stored at authoring time as a convenience label, so a renamed document shows a stale
+            // name rather than costing a provider round trip on every page render. The id is the identity;
             // this is only ever the caption.
-            $name = $title ?? (is_string($config['spreadsheet_id'] ?? null) && $config['spreadsheet_id'] !== '' ? 'Spreadsheet' : null);
+            $fallback = $provider === ConnectorProviderKey::Airtable ? 'Base' : 'Spreadsheet';
+            $name = $title ?? (is_string($config['spreadsheet_id'] ?? null) && $config['spreadsheet_id'] !== '' ? $fallback : null);
 
             if ($name === null) {
                 return null;
@@ -457,15 +471,34 @@ final class ConnectionPresenter
     }
 
     /**
+     * A deep link to the rule's destination, composed rather than stored.
+     *
+     * ⚠️ THIS HARD-CODED THE GOOGLE DOCS URL UNTIL H16c, so an Airtable rule would have offered its owner an
+     * "open the spreadsheet" link into `docs.google.com/spreadsheets/d/appXXXX` — a 404 on the wrong product.
+     * Composed rather than read from a stored `destination_url` on purpose: a URL saved at authoring time is a
+     * third thing that can go stale beside the title, and both providers' URL shapes are stable and public.
+     *
+     * `default`-less on the enum, the forcing device the rest of this surface uses.
+     *
      * @param  array<string, mixed>  $config
      */
-    private function spreadsheetUrl(array $config): ?string
+    private function destinationUrl(?ConnectorProviderKey $provider, array $config): ?string
     {
         $id = $config['spreadsheet_id'] ?? null;
 
-        return is_string($id) && $id !== ''
-            ? 'https://docs.google.com/spreadsheets/d/'.rawurlencode($id).'/edit'
-            : null;
+        if ($provider === null || ! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return match ($provider) {
+            ConnectorProviderKey::Slack => null,
+            ConnectorProviderKey::GoogleSheets => 'https://docs.google.com/spreadsheets/d/'.rawurlencode($id).'/edit',
+            // Table-scoped when the id is known: Airtable resolves a base-only URL to whichever table the
+            // viewer last had open, which is not necessarily the one this rule writes into.
+            ConnectorProviderKey::Airtable => is_string($config['sheet_id'] ?? null) && $config['sheet_id'] !== ''
+                ? 'https://airtable.com/'.rawurlencode($id).'/'.rawurlencode($config['sheet_id'])
+                : 'https://airtable.com/'.rawurlencode($id),
+        };
     }
 
     /**

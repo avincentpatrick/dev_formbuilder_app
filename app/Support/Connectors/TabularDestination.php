@@ -32,6 +32,7 @@ final readonly class TabularDestination
     /**
      * @param  list<string>  $tabs  every tab in the document, in document order
      * @param  list<string>  $headerRow  row 1 of `$sheetName`, verbatim and positional
+     * @param  ?string  $sheetId  the chosen tab's STABLE id, when the provider has one (H16c)
      */
     public function __construct(
         public string $spreadsheetId,
@@ -40,10 +41,11 @@ final readonly class TabularDestination
         public array $tabs,
         public string $sheetName,
         public array $headerRow,
+        public ?string $sheetId = null,
     ) {}
 
     /**
-     * @return array{spreadsheet_id: string, title: string, url: string, tabs: list<string>, sheet_name: string, header_row: list<string>}
+     * @return array{spreadsheet_id: string, title: string, url: string, tabs: list<string>, sheet_name: string, header_row: list<string>, sheet_id: ?string}
      */
     public function toArray(): array
     {
@@ -54,6 +56,7 @@ final readonly class TabularDestination
             'tabs' => $this->tabs,
             'sheet_name' => $this->sheetName,
             'header_row' => $this->headerRow,
+            'sheet_id' => $this->sheetId,
         ];
     }
 }

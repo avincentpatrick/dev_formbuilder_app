@@ -948,7 +948,7 @@ The platform's OAuth grant on a tenant's third-party workspace (H15a; ADR-0009; 
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
-| `provider` | `varchar(30)` — PHP enum: `ConnectorProviderKey` | No | — | No | `slack` in H15a; Sheets/Airtable are H16. CHECK generated from the enum. |
+| `provider` | `varchar(30)` — PHP enum: `ConnectorProviderKey` | No | — | No | `slack` (H15a), `google_sheets` (H16a), `airtable` (H16c). CHECK generated from the enum. |
 | `external_account_id` | `varchar(255)` | No | — | No | The provider's own handle for the workspace (a Slack team id). |
 | `external_account_label` | `varchar(255)` | No | — | No | Display name of the workspace, for the UI. |
 | `scopes` | `jsonb` | No | `'[]'` | No | The scopes actually granted — stored for display and re-consent detection (ADR-0009 §D8). |
@@ -997,7 +997,7 @@ One "send these events to this destination" rule on a connection (H15a; ADR-0009
 > **Design Notes**
 > - **RLS**: strict. A rule delivers only while BOTH it and its grant are active; a dead grant pauses its rules rather than deleting them, so routing survives a re-connect.
 > - **No per-tier cap.** Unlike `webhook_endpoints` (`UsageMetric::WebhookEndpointsCount`) there is no subscription-count gauge: the pricing matrix has no such row, and the real cost — actual sends — is already bounded by the shared monthly `webhook_deliveries` quota. A deliberate H15a narrowing, not an omission.
-> - `config` is jsonb rather than provider-specific columns because H16's Sheets/Airtable destinations are shaped nothing like a channel id. Each adapter validates its own shape at the request layer.
+> - `config` is jsonb rather than provider-specific columns because H16's Sheets/Airtable destinations are shaped nothing like a channel id. Each adapter validates its own shape at the request layer. As built: Slack stores `channel_id`/`channel_name`; both tabular providers store `spreadsheet_id` (a Google spreadsheet id OR an Airtable base id), `spreadsheet_title`, `sheet_name` and `mapping`, and Airtable adds `sheet_id` — its table's stable id, so a rename cannot break the rule (H16c).
 
 ---
 

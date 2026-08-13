@@ -72,6 +72,13 @@ final class ConnectorChannelDirectory
      * — harmless while Slack was the only provider with a lister, and wrong the moment a second one has one.
      * The error CODES stay Slack's because Slack is the only implementor today; a second lister brings its own
      * arm rather than being forced through this vocabulary.
+     *
+     * ✅ H16c: THE SECOND LISTER ARRIVED AND DID THE OPPOSITE, WHICH IS THE BETTER OUTCOME. `AirtableBaseLister`
+     * maps its HTTP statuses ONTO this vocabulary (401 → `invalid_auth`, 403 → `missing_scope`, 429 →
+     * `ratelimited`) rather than bringing Airtable's own `error.type` strings here. The codes were never
+     * really Slack's — they name what a tenant has to DO, and "reconnect" / "re-grant" / "wait" is the whole
+     * space. Translating at the edge is also what keeps third-party text out of this file, which the paragraph
+     * above already required for a different reason. Only `provider_unavailable` was genuinely new.
      */
     private function message(ConnectorProviderKey $provider, string $errorCode): string
     {
@@ -81,7 +88,7 @@ final class ConnectorChannelDirectory
             'invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'not_authed' => "{$label} rejected our credentials. Reconnect this account, then try again.",
             'missing_scope' => "The {$label} app is missing the permission needed to list destinations. Reconnect this account to grant it.",
             'ratelimited' => "{$label} is rate-limiting us. Wait a moment and refresh the list.",
-            'transport_error' => "We couldn’t reach {$label}. Check your connection and refresh the list.",
+            'transport_error', 'provider_unavailable' => "We couldn’t reach {$label}. Check your connection and refresh the list.",
             default => "We couldn’t load destinations from {$label}. Refresh to try again, or enter a destination id.",
         };
     }

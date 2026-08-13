@@ -39,7 +39,7 @@ vi.mock('@/components/shell/PageHeader.vue', () => ({
 
 // The rule modal opens a provider round trip on mount; this page's tests have nothing to say about it.
 vi.mock('@/components/integrations/RuleFormModal.vue', () => ({
-    default: { name: 'RuleFormModal', props: ['open', 'connectionId', 'provider', 'forms', 'eventTypes', 'rule'], template: '<div />' },
+    default: { name: 'RuleFormModal', props: ['open', 'connectionId', 'provider', 'destinationKind', 'forms', 'eventTypes', 'rule'], template: '<div />' },
 }));
 
 const Index = (await import('./Index.vue')).default;
@@ -74,6 +74,7 @@ function rule(overrides: Partial<RuleRow> = {}): RuleRow {
         channel_name: null,
         spreadsheet_id: 'SHEET_ID_0000000000000001',
         sheet_name: 'Responses',
+        sheet_id: null,
         spreadsheet_url: 'https://docs.google.com/spreadsheets/d/SHEET_ID_0000000000000001/edit',
         mapping: { fingerprint: 'abc', columns: [{ header: 'full name', field_key: 'full_name' }] },
         destination_label: 'Q3 Intake · Responses',
@@ -104,6 +105,7 @@ function connection(overrides: Partial<ConnectionWithRules> = {}): ConnectionWit
         connected_by_name: 'Demo Owner',
         created_at: '2026-08-01T09:00:00+00:00',
         can: { update: true, delete: true },
+        destination_kind: 'tabular',
         rules: [rule()],
         ...overrides,
     };
@@ -212,15 +214,57 @@ describe('the destination column', () => {
 });
 
 describe('opening the rule modal', () => {
-    it('hands the modal the PROVIDER, not just the connection id', async () => {
-        // The modal renders an entirely different destination editor per provider. Passing only the id would
-        // give a Google connection Slack's channel picker — which would call a sidecar that cannot enumerate.
-        const wrapper = render();
+    async function openRuleModal(overrides: Record<string, unknown> = {}) {
+        const wrapper = render(overrides);
         const button = wrapper.findAll('button').find((b) => b.text().includes('Add rule'));
 
         await button?.trigger('click');
 
+        return wrapper;
+    }
+
+    it('hands the modal the PROVIDER, not just the connection id', async () => {
+        // The modal renders an entirely different destination editor per provider. Passing only the id would
+        // give a Google connection Slack's channel picker — which would call a sidecar that cannot enumerate.
+        const wrapper = await openRuleModal();
+
         expect(wrapper.findComponent({ name: 'RuleFormModal' }).props('provider')).toBe('google_sheets');
+        wrapper.unmount();
+    });
+
+    it('hands the modal the DESTINATION KIND, which is what its behaviour keys on (H16c)', async () => {
+        // Three behaviours read this and not the provider: whether the channel picker fetches, whether the
+        // event list narrows to `submission.*`, and which `config` shape is submitted. Before H16c they read
+        // `provider === 'google_sheets'`, so an Airtable grant would have got all three wrong at once.
+        const wrapper = await openRuleModal();
+
+        expect(wrapper.findComponent({ name: 'RuleFormModal' }).props('destinationKind')).toBe('tabular');
+        wrapper.unmount();
+    });
+
+    it('hands a Slack grant the channel kind', async () => {
+        const wrapper = await openRuleModal({
+            connections: [connection({ provider: 'slack', provider_label: 'Slack', destination_kind: 'channel' })],
+        });
+
+        expect(wrapper.findComponent({ name: 'RuleFormModal' }).props('destinationKind')).toBe('channel');
+        wrapper.unmount();
+    });
+
+    it('hands an Airtable grant the tabular kind and its own provider', async () => {
+        // The pair is the point: `kind` turns on the tabular behaviours, and `provider` picks WHICH tabular
+        // editor mounts — the one thing a capability cannot answer, because two destination shapes need two
+        // components and only the provider identifies which.
+        const wrapper = await openRuleModal({
+            connections: [
+                connection({ provider: 'airtable', provider_label: 'Airtable', destination_kind: 'tabular' }),
+            ],
+        });
+
+        const modal = wrapper.findComponent({ name: 'RuleFormModal' });
+
+        expect(modal.props('provider')).toBe('airtable');
+        expect(modal.props('destinationKind')).toBe('tabular');
         wrapper.unmount();
     });
 });

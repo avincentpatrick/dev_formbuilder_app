@@ -68,6 +68,9 @@ it('projects a connection and its rules with a fixed key set and no credentials'
         'id', 'provider', 'provider_label', 'external_account_id', 'external_account_label', 'scopes',
         'status', 'disconnected', 'token_expires_at', 'last_refreshed_at', 'last_error', 'last_error_at',
         'connected_by_name', 'created_at', 'can', 'rules',
+        // H16c. `channel` or `tabular` — what the rule editor's behaviour keys on, so the client no longer
+        // carries a provider literal to decide it.
+        'destination_kind',
     ])
         ->and($row['provider_label'])->toBe('Slack')
         ->and($row['connected_by_name'])->toBe($this->admin->name)
@@ -84,7 +87,9 @@ it('projects a connection and its rules with a fixed key set and no credentials'
         // H16b — the tabular destination, projected key by key like the Slack pair, plus the provider-neutral
         // caption and the reason a paused rule is paused. Present on EVERY row including Slack's, because a
         // shape that varies by provider is one the client has to branch on before it can read it.
-        'spreadsheet_id', 'sheet_name', 'spreadsheet_url', 'mapping', 'destination_label', 'paused_reason',
+        // `sheet_id` is H16c's addition: Airtable's stable table id, so a renamed table cannot break a rule.
+        // Null for Slack and Sheets, and present on their rows anyway, for the reason above.
+        'spreadsheet_id', 'sheet_name', 'sheet_id', 'spreadsheet_url', 'mapping', 'destination_label', 'paused_reason',
     ]);
 });
 

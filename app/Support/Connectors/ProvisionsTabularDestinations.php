@@ -34,11 +34,18 @@ use App\Support\Webhooks\OutboundUrlGuard;
  * A provider without this capability has no `tabular_directory` entry and
  * {@see ConnectorRegistry::tabularDirectoryFor()} returns null.
  *
+ * ── H16c SPLIT THIS IN TWO, AND LEFT THIS HALF WHERE IT WAS ──────────────────────────────────────────────
+ * Reading now lives in {@see InspectsTabularDestinations}, which this extends. The reason is in that file:
+ * bundling reading with creating looked like cohesion but was a workaround for `drive.file` in the shape of a
+ * design, and Airtable — which can read a tenant's tables and deliberately may not alter them — needs exactly
+ * the half that was underneath. Nothing about Sheets changed; `GoogleSheetsDirectory` still implements this
+ * interface and required no edit.
+ *
  * Implementations inherit the adapter rules unchanged: never persist anything, guard every outbound host
  * through {@see OutboundUrlGuard} first, never follow redirects, bound every request with the webhook
  * timeouts, and reduce the wire response to {@see TabularDestination} so no provider field name escapes.
  */
-interface ProvisionsTabularDestinations
+interface ProvisionsTabularDestinations extends InspectsTabularDestinations
 {
     /**
      * Create a document this grant owns, with `$headers` written into row 1 of its first tab.
@@ -52,11 +59,4 @@ interface ProvisionsTabularDestinations
      * @throws ConnectorDestinationException the provider refused or was unreachable
      */
     public function create(Connection $connection, string $title, array $headers): TabularDestination;
-
-    /**
-     * Read an existing document's tabs and the header row of `$sheetName` (or its first tab when null).
-     *
-     * @throws ConnectorDestinationException the provider refused, was unreachable, or cannot see the document
-     */
-    public function inspect(Connection $connection, string $spreadsheetId, ?string $sheetName = null): TabularDestination;
 }

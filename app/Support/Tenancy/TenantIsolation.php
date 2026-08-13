@@ -343,10 +343,17 @@ final class TenantIsolation
     /**
      * Companion write policies for the `users` visibility shape (RBAC §6: user writes are app-layer
      * authorized, not tenant-scoped — but FORCE RLS still needs *some* write policy or all writes are
-     * denied). INSERT permissive (registration/invite-placeholder run with no user context); UPDATE
-     * and DELETE own-row (a user modifies only their own account). When $authRole is given, add
-     * `TO <authRole>` permissive SELECT/UPDATE so the pre-auth login/reset path (which runs with no
-     * context) can resolve and write a user — scoped to that role only, never the app role.
+     * denied). All three are PERMISSIVE. When $authRole is given, add `TO <authRole>` permissive SELECT
+     * so the pre-auth login/reset path (which runs with no context) can resolve a user — scoped to that
+     * role only, never the app role.
+     *
+     * ⚠️ THIS DOCBLOCK USED TO SAY "UPDATE and DELETE own-row (a user modifies only their own account)",
+     * WHICH DESCRIBES A POLICY THAT HAS NEVER EXISTED HERE — both are emitted `USING (true)`, as
+     * `TenantIsolationSqlTest` has always asserted verbatim. The restriction is real but it lives in the
+     * SELECT policy, and the difference is not academic: it is why a write with no user context fails
+     * SILENTLY rather than being refused, and anyone debugging it by looking for an own-row UPDATE
+     * policy finds nothing wrong. Corrected in J3b, after the claim below had propagated the same wrong
+     * diagnosis into a second lane's notes.
      *
      * @return list<string>
      */
@@ -357,9 +364,22 @@ final class TenantIsolation
         // Writes on the global `users` identity table are governed by APPLICATION-LAYER authorization,
         // not tenant RLS (RBAC §6: user writes are "a user's own account", not a tenant operation).
         // FORCE RLS still needs a policy per command, so these are permissive — the SELECT visibility
-        // policy is what enforces read isolation. Permissive writes also let central account-management
-        // (Fortify profile/password/2FA, which run with no tenant context) update the user's own row,
-        // and let the password-reset save succeed on the pre-auth connection.
+        // policy is what enforces read isolation.
+        //
+        // ⚠️ THE SENTENCE THAT USED TO FOLLOW WAS THE FALSE PREMISE THE J3b DEFECT RESTED ON, AND IT
+        // SURVIVED HERE FOR THE WHOLE OF PHASE 0. It read: "Permissive writes also let central
+        // account-management (Fortify profile/password/2FA, which run with no tenant context) update the
+        // user's own row." They do not, and could not: **PostgreSQL applies SELECT policies to an UPDATE
+        // whose WHERE reads a column**, so `users_users_visibility` runs first and, with no
+        // `app.current_user_id` and no active co-tenant, matches nothing. A permissive UPDATE policy is
+        // never reached, because there is no row to reach it with — the write affects ZERO rows and
+        // throws nothing. Six Fortify endpoints wrote nothing at all until `config/fortify.php` was given
+        // `EstablishTenantDatabaseContext`; `tests/Feature/Auth/FortifyRouteContextTest.php` pins them.
+        //
+        // The other half of the old sentence IS true and is the reason these stay permissive: the
+        // password-reset save runs on the pre-auth connection, whose `users_auth_select` policy is
+        // `USING (true)`, so the row IS visible to that session and the permissive UPDATE then applies.
+        // That asymmetry is exactly why `/reset-password` worked while `/user/password` did not.
         $statements = [
             self::policy($table, 'app_insert', 'INSERT', check: 'true'),
             self::policy($table, 'app_update', 'UPDATE', using: 'true', check: 'true'),

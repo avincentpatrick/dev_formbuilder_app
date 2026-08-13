@@ -168,14 +168,14 @@ it('gives a member behind the gate the values needed to correct their own addres
     // load-bearing — Fortify's action validates and rewrites the pair together, so a form that submitted a
     // blank name would be rejected, and one that guessed the address would show the wrong one.
     //
-    // ⚠️ WHAT IT DELIBERATELY DOES NOT ASSERT, AND WHY: that the correction ROUND TRIP completes. It does
-    // not, and the cause is a pre-existing defect J3a discovered rather than caused — see
-    // `docs/feature-backlog.md`. `PUT /user/profile-information` is a Fortify route carrying no tenancy
-    // middleware, so `app.current_user_id` is unset; `users_users_visibility` is a SELECT policy, and
-    // PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — so the write matches no
-    // row, affects ZERO rows and throws nothing. Measured directly: an update with the GUC cleared reports
-    // 0 affected. Asserting a passing round trip here would encode that defect as the contract, which is
-    // exactly the mistake this file already made once with the impersonation exemption.
+    // ⚠️ THE ROUND TRIP IS ASSERTED HERE NOW, AND UNTIL J3b IT COULD NOT BE. When this case was written
+    // the write silently did nothing: `PUT /user/profile-information` is a Fortify route, that group
+    // carried no tenancy middleware, so `app.current_user_id` was unset — and PostgreSQL applies SELECT
+    // policies to an UPDATE whose WHERE reads a column, so `users_users_visibility` hid the row from its
+    // own update and the write affected ZERO rows without throwing. The case deliberately stopped at the
+    // render rather than encode that defect as the contract. J3b gave the group
+    // `EstablishTenantDatabaseContext`; `tests/Feature/Auth/FortifyRouteContextTest.php` is where that
+    // fix is pinned endpoint by endpoint, and this is the half that proves the ESCAPE HATCH works.
     $this->withoutVite();
     $user = memberOfTenant($this->tenant, verified: false);
 
@@ -187,6 +187,22 @@ it('gives a member behind the gate the values needed to correct their own addres
         ->assertInertia(fn ($page) => $page->component('auth/VerifyEmail', false)
             ->where('email', $user->email)
             ->where('name', $user->name));
+
+    // ⚠️ NO `withoutUserContext()` EQUIVALENT IS NEEDED AND THAT IS NOT LUCK. The two requests above went
+    // through the tenant group, whose EstablishTenantDatabaseContext::terminate() calls
+    // TenantContext::forget() — a SESSION-scoped set_config, which overrides the SET LOCAL `enterTenant()`
+    // issued. So by this line the GUC is already clear, which is exactly the state a real browser arrives
+    // in. (Verified by reverting the config/fortify.php line: this case goes red.)
+    $this->actingAs($user)
+        ->put('http://acme.meridian.test/user/profile-information', [
+            'name' => $user->name,
+            'email' => 'typo-corrected@meridian.test',
+        ])
+        ->assertSessionHasNoErrors();
+
+    TenantContext::applyLocal($this->tenant->id, $user->id);
+
+    expect(User::query()->whereKey($user->id)->value('email'))->toBe('typo-corrected@meridian.test');
 });
 
 it('stops bouncing a member the moment they verify', function (): void {

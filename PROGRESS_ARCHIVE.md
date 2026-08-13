@@ -2113,11 +2113,11 @@ spec in a file Lane A was mid-edit on.
 
 ---
 
-## 2026-08-13 — LANE B: SSO/SAML `P1b` — the login round trip and JIT provisioning (PR #144, 6/6)
+## 2026-08-13 — LANE B: SSO/SAML `P1b` — the login round trip and JIT provisioning (PR #144, `0b445d4`, 6/6)
 
 **A tenant can now actually sign in with SAML**, which is the first time that sentence has been true. P1a shipped the trust anchor and published an ACS location nothing could reach; ADR-0016 §D14 recorded the gap deliberately and left a canary asserting `/sso/saml/login` and `/sso/saml/acs` both 404'd while a connection was Active. **That canary was rewritten by hand into the round trip it stood for** — activate → `GET /sso/saml/login` → post a signed assertion → authenticated on `/dashboard`, `last_login_at` stamped.
 
-CI: **Pest 3755 passed / 16,074 assertions** (P1a's 3712 **+43**, which is exactly the 11 login and 32 ACS cases — the canary was rewritten, not added), **E2E 505 of 516**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,803 tests**. E2E 18m18s, Pest 6m52s. Two commits behind one PR, for P1a's reason: `(1/2)` alone redirects to an IdP whose answer nothing can consume.
+CI: **Pest 3756 passed / 16,081 assertions** (P1a's 3712 **+44**, which is exactly the 11 login, 32 ACS and 1 org-2FA cases — the canary was rewritten, not added), **E2E 505 of 516**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,803 tests**. E2E 18m18s, Pest 6m52s. Two commits behind one PR, for P1a's reason: `(1/2)` alone redirects to an IdP whose answer nothing can consume.
 
 **WHAT SHIPPED.** `(1/2)` `SsoAuthnRequestBuilder`, `SsoAuthRequestService`, `SsoLoginController`, `/sso/saml/login`, two per-IP limiters, `SsoAuthRequestFactory`. `(2/2)` `SsoSamlSettings`, `SsoAssertionValidator`, `SsoAssertion`, `SsoIdentityResolver`, `SsoIdentity`, `SsoUserProvisioner`, `SsoLoginService`, `SsoAuthenticationException`, `SsoAcsController`, `/sso/saml/acs`, the CSRF exemption, `sp.login_url` through the presenter and the SP card, and `tests/Support/Sso/FakeIdp.php`. ADR-0016 gained **§D15–§D21**, its consequences and four revisit triggers; `docs/data-dictionary.md` §27/§28 gained the writer, the consumer and the `last_login_at` hazard. No migration — no new table, no new column; `last_login_at` already existed.
 

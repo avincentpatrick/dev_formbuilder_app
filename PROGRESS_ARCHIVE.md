@@ -2016,3 +2016,97 @@ be created — `phase1-completion` had moved under the branch. **Check `mergeabl
 run as an outage.** Lane B reached the same conclusion independently and has already deleted the tracker's
 "pull_request events are not producing runs" claim, which was measured from a window that was already stale
 when it was written.
+
+---
+
+## 2026-08-13 — LANE B: SSO/SAML `P1a` — the SAML SP, end to end (PR #143, `f29ed08`, 6/6)
+
+Phase 4's first row, merged as one PR over two commits. CI **Pest 3712 / 15,818 assertions**, **E2E 502**,
+**Storybook axe 223 across 33 suites**, Contract/Frontend/Static green; E2E 18m20s, Pest 6m52s. Plan
+`read-progress-md-including-standing-fluffy-valiant.md`, approved. ⚠️ **The 3712 is not comparable to Lane
+A's 3637 from JR5 (#142)** — different bases, both merged the same afternoon; the integration branch now
+carries both and the next Lane B run is the first honest baseline. E2E and axe unchanged on purpose: no e2e
+spec (Lane A held six of those files) and no Storybook story.
+
+**Held as ONE PR because `(1/2)` alone ships a dead endpoint.** The SP metadata route existed with no writer,
+so `/sso/saml/metadata` 404'd for every tenant — the `--block`-with-no-consumer smell. `(2/2)` is the write
+path that makes it reachable, and **`Active` had to be reachable in this slice** or the PR would still have
+shipped the dead endpoint it was being held for.
+
+**THE PLAN WAS WRONG IN TWO PLACES AND THE CODE SAID SO — both found by an adversarial pass run against the
+approved plan, not against the finished work.** That ordering is the transferable part: the pass cost one
+agent and caught two defects that would otherwise have merged green.
+
+**(1) `getOriginal()` DECRYPTS.** It rebuilds the model with `setRawAttributes()` and maps every attribute
+through `transformModelValue()`, applying the cast — so on `idp_certificates` (`encrypted:array`) it returns
+the plaintext key list. `$hidden` is consulted only by `attributesToArray()` and does nothing here; the
+siblings fail the other way, `getDirty()`/`getChanges()` yielding multi-KB ciphertext. The repo's own
+snapshot idiom (`Arr::only($model->getOriginal(), array_keys($columns))`, `TenantSettingsService.php:102`)
+would therefore have written IdP signing keys in plaintext into `audits` — **append-only by RLS policy, no
+DELETE policy for any role, never pruned.** Verified in the framework source before acting on it. The service
+hand-builds its payload with the column structurally absent; `AuditRedactor::SECRETS` registers it as a
+backstop. **Both are tested because they catch different regressions** — the redactor test stays green if
+someone "simplifies" the payload back to `getOriginal()`, so only the raw-body `not->toContain($cert)`
+assertion would catch that, and only the redactor test would catch a future writer that snapshots the model.
+
+**(2) THE GATING ASYMMETRY WAS INVERTED, AND THE INVERSION READ LIKE THE RULE.** The approved plan put
+`status` on the `feature:`-gated policy write, mirroring `/domains`. But `/domains` has no on/off switch, so
+the mirror was wrong in a way the precedent could not show: a tenant downgraded off Enterprise could
+**delete** the trust anchor and not **disable** it. "Destroy or nothing" is the opposite of ADR-0012 §D9's
+escape hatch, and against `SsoConnectionStatus::Disabled`'s own contract. `status` moved to its own route
+gated `can:tenant.settings.manage` alone, with the service refusing only the enable direction. **The rule
+generalises: a downgraded tenant may always UNDO, never REDO** — copying an asymmetry is not the same as
+reproducing its reasoning.
+
+**A THIRD, SUBTLER ONE: TWO GATES THAT DISAGREED.** `RequireFeature` blocks only when `currentPlan() !== null`
+(a deliberate "dev/test has no plans" pass-through), while `SsoGate::isEntitled()` called `feature()` bare and
+fails to `false`. On a tenant with no resolved plan the write ROUTE admitted the request while the PAGE said
+"not entitled" — and worse, **a test that skipped `assignPlanTier()` would have asserted a gate that was doing
+nothing, in the direction that makes it look present.** Both now share the pass-through, pinned by a test,
+because "make them consistent" is a plausible-looking change in either direction.
+
+**FOUR MORE, EACH A 500 OR WORSE.** The parser returns `?string` for `name_id_format` into a NOT NULL column
+(`<md:NameIDFormat>` is `minOccurs="0"`; ADFS omits it) — and a column DEFAULT does not save you, because an
+explicit null is still explicit and on the UPDATE path a default is irrelevant entirely. **No size bound on
+the metadata document existed at all**: measured at ~38 MB of DOM for 16 MB of XML, which against a 128 MB
+`memory_limit` is a fatal — no toast, no 422 — now bounded twice, in the request for a field error and in
+`parseHardened()` before `loadXML` because that one cannot be bypassed, both on BYTES since Laravel's `max:`
+counts characters. The singleton race through `updateOrCreate`'s check-then-insert surfaced as an unhandled
+`QueryException` (there is no such arm in `bootstrap/app.php`), fixed with `lockForUpdate()`. And `step-up`
+was absent from the one route that can take over authentication for an entire tenant — a larger blast radius
+than `members.role`, which has carried it since I8a.
+
+**FOUR DERIVATIONS OF THE SAME FOUR ROLES, COLLAPSED TO ONE.** `MemberController` held a private const, a
+`Rule::in()` literal in `invite()` and a third spelling in `changeRole()`; the `sso_connections` migration
+derived the set from `RolePermissionSeeder::ROLES` minus `owner`. **Only the migration's was derived, and it
+is the one the DATABASE enforces** — so a drifted picker fails as `SQLSTATE 23514`, not as validation, and no
+static gate catches it. `AssignableRoles` is that one expression, and a test compares it against
+`pg_get_constraintdef('sso_connections_default_role_check')` so the two are checked against each other rather
+than merely written to match.
+
+**A GAP IN THIS REPO'S GATES, FOUND BY ASKING WHAT NOTHING COVERS.** Pest asserts the Inertia PROPS;
+`vue-tsc` type-checks templates without executing them; the Vite build compiles an SFC without ever mounting
+it. **So a component that throws on mount ships as a blank page with all six jobs green.** Added
+`resources/js/components/sso/cards.test.ts`, mounting every card in every state the presenter can produce —
+including `unreadable`/`not_yet_valid` certificates and the downgraded tenant, three branches the happy path
+never reaches. Worth copying to the next Inertia surface.
+
+**THE P1a/P1b BOUNDARY, STATED IN THREE PLACES RATHER THAN DISCOVERED.** An Active connection publishes an
+ACS location that does not exist until P1b. The gap is **inert, not merely small**: `allow_unsolicited` is
+`false` permanently (an unsolicited assertion has no `InResponseTo` to bind; accepting one is a login-CSRF
+primitive) and `/sso/saml/login` is unrouted, so no button, link or redirect can reach it. Publishing SP
+metadata is a complete, useful act — it is the half of the handshake the admin performs in someone else's
+console, which takes real change-control time. Said in the UI as words rather than a disabled control, in
+ADR-0016 §D14, and in a canary test asserting the 404 that **P1b must change by hand.**
+
+**Docs written because the code already cited them.** ADR-0016 closes ~15 dangling references that `(1/2)`
+shipped with; `docs/data-dictionary.md` §27/§28 cover the two tables `(1/2)` added without a section, the
+same gap ADR-0012 records H22a closing for `domains`. Also the audit spec's §1 row and §2 redaction bullet,
+and a `FeatureGateException` arm — without it the refusal read *"Your plan doesn't include sso_saml."*
+
+**Lane discipline held.** Zero overlap with Lane A's JR5, which merged the same afternoon: no `docs/ux/*`, no
+`docs/feature-backlog.md`, no `tests/e2e/*`, no `resources/js/components/shell/`. The one shared file,
+`resources/js/Pages/Settings/Index.vue`, Lane A does not touch. ⚠️ **Lane A's axe specs sweep `/settings`
+without either lane editing the other's files**, so the new signpost card was cloned from the already
+axe-clean custom-domains card rather than authored fresh — an a11y defect there would have reddened Lane A's
+spec in a file Lane A was mid-edit on.

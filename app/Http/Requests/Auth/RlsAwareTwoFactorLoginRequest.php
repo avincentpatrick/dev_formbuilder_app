@@ -8,8 +8,8 @@ use App\Auth\RlsAwareUserProvider;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Fortify\Contracts\FailedTwoFactorLoginResponse;
 use Laravel\Fortify\Http\Requests\TwoFactorLoginRequest;
 
@@ -121,6 +121,17 @@ final class RlsAwareTwoFactorLoginRequest extends TwoFactorLoginRequest
      * see {@see RlsAwareUserProvider::retrieveById()}. That reset is load-bearing: the object returned here
      * becomes `Auth::user()` for the rest of a successful POST, and `meridian_auth` holds grants on `users`
      * only, so an elevated model leaking into request code would fail on the first relation it touched.
+     *
+     * ⚠️ BUILT FROM THE GUARD'S CONFIGURED PROVIDER RATHER THAN READ OFF THE GUARD, AND THAT IS A TYPING
+     * DECISION AS MUCH AS A STYLE ONE. The obvious `app(StatefulGuard::class)->getProvider()` type-checks
+     * only by accident: `getProvider()` is declared on neither `StatefulGuard` nor `Guard` — it exists on
+     * the concrete `SessionGuard` — and Larastan lets it pass solely because it boots the container during
+     * analysis and resolves the concrete class. Any change that stops the container booting cleanly under
+     * static analysis turns this into "call to an undefined method" at level 8, in a file whose whole
+     * purpose is to keep a lockout closed. `createUserProvider()` is declared to return `?UserProvider`,
+     * which does declare `retrieveById()`, so the guarantee comes from the contract instead of from the
+     * analyser's runtime behaviour. It builds the same `rls_aware` provider from the same config, and the
+     * provider is stateless, so a fresh instance is equivalent to the guard's own.
      */
     private function resolvePendingUser(): ?Authenticatable
     {
@@ -130,6 +141,9 @@ final class RlsAwareTwoFactorLoginRequest extends TwoFactorLoginRequest
             return null;
         }
 
-        return app(StatefulGuard::class)->getProvider()->retrieveById($id);
+        $guard = (string) config('fortify.guard', 'web');
+
+        return Auth::createUserProvider((string) config("auth.guards.{$guard}.provider"))
+            ?->retrieveById($id);
     }
 }

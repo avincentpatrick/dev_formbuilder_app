@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Auth\RlsAwareUserProvider;
 use App\Enums\AccentToken;
 use App\Enums\FontSizeScale;
 use App\Enums\ThemeMode;
@@ -84,9 +83,24 @@ class User extends Authenticatable implements MustVerifyEmail
      * {@see RlsAwareUserProvider} already documents for the password-reset save.
      *
      * Switch-call-restore rather than a GUC change, mirroring
-     * {@see RlsAwareUserProvider::updateRememberToken()}: the object this is called on becomes
+     * {@see \App\Auth\RlsAwareUserProvider::updateRememberToken()}: the object this is called on becomes
      * `Auth::user()` moments later, and `meridian_auth` holds grants on `users` alone, so leaving it
      * elevated would fail on the first relation the request touched. `finally`, so a throw cannot strand it.
+     * The restore is asserted by `TwoFactorChallengeTest`'s recovery-code case, which is the only path that
+     * reaches this method at all.
+     *
+     * ⚠️ THE WHOLE TRAIT BODY RUNS INSIDE THE ELEVATED WINDOW, NOT JUST THE `save()`, AND THAT IS A
+     * CONSTRAINT ON FUTURE CODE RATHER THAN A BUG TODAY. The aliased method dispatches
+     * `RecoveryCodeReplaced` and fires the model's own saving/saved events before returning, so all of them
+     * see `$this` bound to `meridian_auth`. There are no listeners on that event and no `User` observer
+     * today — verified — but **a listener added later must not touch a relation or any table other than
+     * `users`**, or it will fail with a permission error on a path that only runs during a recovery-code
+     * sign-in. Narrowing the window would mean re-implementing the vendor's body, which is worse.
+     *
+     * ⚠️ The connection name is the literal rather than {@see \App\Auth\RlsAwareUserProvider}'s constant:
+     * five other call sites in `app/` spell it out (`CreateNewUser`, `UpdateUserProfileInformation`,
+     * `InvitationController`, `ImpersonationService`, `TenantMembershipService`), and a model reaching into
+     * the auth provider that is configured WITH it points the dependency the wrong way.
      *
      * @param  string  $code
      */
@@ -94,7 +108,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $original = $this->getConnectionName();
 
-        $this->setConnection(RlsAwareUserProvider::AUTH_CONNECTION);
+        $this->setConnection('pgsql_auth');
 
         try {
             $this->replaceRecoveryCodeOnCurrentConnection($code);

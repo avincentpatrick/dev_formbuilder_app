@@ -202,6 +202,15 @@ it('completes the sign-in with a recovery code AND rotates the code that was spe
 
     $this->assertAuthenticatedAs($user);
 
+    // ⚠️ THIS IS THE ONLY CASE THAT CAN SEE THE `finally` IN User::replaceRecoveryCode(), AND IT BELONGS
+    // HERE RATHER THAN ON THE TOTP CASE. That method is the one piece of this increment that deliberately
+    // elevates the model to `pgsql_auth`, and it is never called on the TOTP path — so asserting the
+    // connection there (as the first draft did) leaves the restore itself untested: deleting the whole
+    // `finally` block keeps every other assertion in this file green. `meridian_auth` holds grants on
+    // `users` alone, so a model left elevated at Auth::user() would fail on the first relation the next
+    // request code touched — and nothing else in the repository would notice.
+    expect(auth()->user()?->getConnectionName())->toBe(config('database.default'));
+
     $after = storedRecoveryCodes($user);
 
     expect($after)->not->toContain($spent)      // the spent one is gone …
@@ -227,7 +236,10 @@ it('refuses a wrong authentication code', function (): void {
         ->assertSessionHasErrors('code');
 
     $this->assertGuest();
-    expect($secretOwner->exists)->toBeTrue();
+
+    // The challenge is still live afterwards — a wrong code must not consume it. `hasValidCode()` forgets
+    // `login.id` only on success, so this is the assertion that says so.
+    expect(session()->has('login.id'))->toBeTrue();
 });
 
 it('turns a soft-deleted pending identity away at both verbs', function (): void {
@@ -236,10 +248,17 @@ it('turns a soft-deleted pending identity away at both verbs', function (): void
     // `$model::find()` did. Without this case, adding `->withTrashed()` to the lookup would go unnoticed.
     [$user, $secret] = twoFactorIdentity('trashed@2fachallenge.local', 'challenge-password-2026');
 
+    // ⚠️ THE DIVERT IS ASSERTED, NOT ASSUMED, AND WITHOUT THIS LINE THE CASE IS VACUOUS. Every assertion
+    // below is also satisfied by a login that never happened at all: with no `login.id` in the session the
+    // GET redirects to `login` and the POST bounces, so a broken fixture, a rejected credential or a
+    // throttled request would leave this case green while proving nothing about soft deletion. It would
+    // then be a silent duplicate of the "naming nobody" case underneath it.
     $this->post('http://acme.meridian.test/login', [
         'email' => 'trashed@2fachallenge.local',
         'password' => 'challenge-password-2026',
-    ]);
+    ])->assertRedirect('http://acme.meridian.test/two-factor-challenge');
+
+    expect(session()->has('login.id'))->toBeTrue();
 
     // ⚠️ ON THE PRIVILEGED CONNECTION. The row is committed outside the test transaction, so a default
     // connection UPDATE would affect ZERO rows, throw nothing, and leave this case passing against a live

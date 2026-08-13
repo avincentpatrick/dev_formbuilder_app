@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant\Sso;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RequireRecentPassword;
+use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Services\Sso\SsoGate;
 use App\Services\Sso\SsoStepUpService;
@@ -56,10 +57,14 @@ final class SsoStepUpController extends Controller
         $connection = $this->gate->activeConnectionOrAbort();
         $tenant = $this->currentTenant();
 
+        // Non-null by construction: this route is inside the authenticated group. The annotation is the
+        // repo's idiom for saying so to static analysis (AnalyticsController and a dozen others).
+        /** @var User $user */
+        $user = $request->user();
+
         $authRequest = $this->stepUps->start(
             connection: $connection,
-            // Non-null by construction: this route is inside the authenticated group.
-            user: $request->user(),
+            user: $user,
             // READ, not pulled: `redirect()->intended()` would forget the key, and the value is still needed
             // after the round trip if anything else in the session wants it. The completion hop redirects
             // from `return_to` on the row instead, which is bound to THIS request rather than to whichever

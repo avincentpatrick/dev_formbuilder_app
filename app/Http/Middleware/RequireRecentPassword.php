@@ -107,7 +107,12 @@ final class RequireRecentPassword extends RequirePassword
      */
     public function handle($request, Closure $next, $redirectToRoute = null, $passwordTimeoutSeconds = null)
     {
-        $timeout = $passwordTimeoutSeconds ?? (int) config('auth.step_up_timeout', 900);
+        // Cast the whole expression, not just the config read. A caller-supplied window arrives from a route
+        // string (`step-up:,60`) and is therefore `string|int`, which
+        // {@see RequirePassword::shouldConfirmPassword()} does not accept — and the parent only ever passed
+        // it straight through, so nothing had needed to narrow it until this class started asking the
+        // question itself.
+        $timeout = (int) ($passwordTimeoutSeconds ?? config('auth.step_up_timeout', 900));
 
         // An explicit `$redirectToRoute` is a caller overriding the destination; honour it rather than
         // silently sending them somewhere else. `expectsJson()` is excluded because the parent answers those

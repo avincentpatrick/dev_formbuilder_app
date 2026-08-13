@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Tenant\Sso;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RequireRecentPassword;
+use App\Models\User;
 use App\Services\Sso\SsoStepUpService;
 use App\Support\Sso\SsoReturnTo;
 use Illuminate\Http\RedirectResponse;
@@ -42,7 +43,12 @@ final class SsoStepUpCompletionController extends Controller
 
     public function __invoke(Request $request, string $requestId): RedirectResponse
     {
+        // Non-null by construction: this route is inside the authenticated group, so an expired session is
+        // bounced to the sign-in page by `auth` rather than arriving here. The annotation is the repo's
+        // idiom for saying so to static analysis.
+        /** @var User $user */
         $user = $request->user();
+
         $authRequest = $this->stepUps->redeem($requestId, $user);
 
         if ($authRequest === null) {

@@ -11,6 +11,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Tenancy\DomainPresenter;
+use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Authorization\AssignableRoles;
 
 /**
@@ -150,12 +151,20 @@ final class SsoConnectionPresenter
      */
     private function failures(): array
     {
-        return SsoAuthFailure::query()
+        $failures = SsoAuthFailure::query()
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->limit(self::RECENT_FAILURES)
-            ->get()
-            ->map(static fn (SsoAuthFailure $failure): array => [
+            ->get();
+
+        // Appended to a plain array rather than mapped over the collection, matching
+        // {@see TenantMembershipService::listMembers()}. `map()->all()` PRESERVES KEYS, and a prop that
+        // reached Inertia as an object with numeric keys instead of an array would render nothing while
+        // every server-side assertion still passed.
+        $rows = [];
+
+        foreach ($failures as $failure) {
+            $rows[] = [
                 'id' => (string) $failure->getKey(),
                 'reason' => $failure->reason->value,
                 'reason_label' => $failure->reason->label(),
@@ -164,8 +173,10 @@ final class SsoConnectionPresenter
                 'request_id' => $failure->request_id,
                 'ip_address' => $failure->ip_address,
                 'occurred_at' => $failure->occurred_at->toIso8601String(),
-            ])
-            ->all();
+            ];
+        }
+
+        return $rows;
     }
 
     /**

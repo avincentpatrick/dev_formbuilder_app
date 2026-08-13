@@ -81,7 +81,21 @@ class FortifyServiceProvider extends ServiceProvider
             'email' => $request->input('email'),
             'token' => $request->route('token'),
         ]));
-        Fortify::verifyEmailView(fn () => Inertia::render('auth/VerifyEmail'));
+        // ⚠️ `name`/`email` ARE NOT DECORATION — THEY ARE THE ESCAPE HATCH FROM A LOCKOUT J3a WOULD
+        // OTHERWISE CREATE. `UpdateUserProfileInformation` nulls `email_verified_at` whenever the address
+        // changes (correctly — a new address is unproven), and J3a mounts `verified` on the authenticated
+        // tenant group. So a member who fixes a typo in their own email is bounced HERE on their very next
+        // page load, and `/settings` — the only surface with an email field — is inside the gate they just
+        // fell behind. Without a correction form on this page the sole remaining action is "resend", which
+        // resends to the typo'd address forever.
+        //
+        // `PUT /user/profile-information` is a Fortify route carrying only `auth`, so it stays reachable
+        // while unverified; this page just needs the values to seed the form with. Fortify's own
+        // `EmailVerificationPromptController` passes nothing, which is why they are added here.
+        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/VerifyEmail', [
+            'name' => $request->user()?->name,
+            'email' => $request->user()?->email,
+        ]));
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
         // ⚠️ THE `url.intended` WRITE IS THE OTHER HALF OF I8a'S STEP-UP, AND WITHOUT IT THE FLOW STRANDS
         // PEOPLE. Fortify answers a successful confirmation with `redirect()->intended(...)`, but Laravel

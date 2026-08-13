@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\TenantUserStatus;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Notifications\Auth\WelcomeNotification;
@@ -72,13 +74,15 @@ it('never serializes a User, so a worker restores nothing under a null GUC', fun
     );
 });
 
-it('names the workspace and points at ITS dashboard when verified on a tenant subdomain', function (): void {
+it('names the workspace and points at ITS dashboard for an ACTUAL member', function (): void {
     $tenant = inboxTenant();
     $user = User::factory()->unverified()->create();
 
-    // Driven through a real request so `request()->getHost()` is the tenant subdomain — which is the only
-    // thing the listener has to work from, exactly as `JoinTenantOnRegistration` does.
-    $this->get('http://acme.meridian.test/nonexistent-probe');
+    // ⚠️ `makeActiveMember` IS THE POINT OF THIS LINE, AND A FIRST DRAFT OMITTED IT — which made this test
+    // assert the defect the case below now catches. The listener must not infer membership from the host.
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+    TenantContext::flush();
 
     $this->app['request']->headers->set('host', 'acme.meridian.test');
     $this->app['request']->server->set('HTTP_HOST', 'acme.meridian.test');
@@ -110,6 +114,59 @@ it('names no workspace on the central host, which is a real state and not a look
         WelcomeNotification::class,
         fn (WelcomeNotification $notification): bool => $notification->tenantName === ''
             && ! str_contains($notification->actionUrl, '/dashboard'),
+    );
+});
+
+it('claims no workspace for someone the seat quota refused, even on that workspace’s host', function (): void {
+    // ⚠️ THE DEFECT THE ADVERSARIAL PASS FOUND, AND IT IS NOT A CORNER. `joinOpenTenant()` returns null when
+    // the seat quota is full — its own "SILENT STATE 2 OF 2" — and `JoinTenantOnRegistration` discards that
+    // null deliberately, leaving a committed account with NO membership. The Free plan caps `active_seats`
+    // at 2, so the third person to self-register on any free-tier workspace lands here. They still verify on
+    // the tenant subdomain, so the host still resolves Acme.
+    //
+    // Inferring membership from the host would make the product's only non-transactional email tell the one
+    // person who was quietly refused a seat, in writing, that they are a member of the workspace that just
+    // kept them out — and point them at its dashboard. The host is not a membership.
+    $tenant = inboxTenant();
+    $nonMember = User::factory()->unverified()->create();
+
+    $this->app['request']->headers->set('host', 'acme.meridian.test');
+    $this->app['request']->server->set('HTTP_HOST', 'acme.meridian.test');
+
+    event(new Verified($nonMember));
+
+    Notification::assertSentOnDemand(
+        WelcomeNotification::class,
+        fn (WelcomeNotification $notification): bool => $notification->tenantName === ''
+            && ! str_contains($notification->actionUrl, '/dashboard'),
+    );
+});
+
+it('claims no workspace for an INVITED but not yet accepted membership', function (): void {
+    // §7: an unaccepted invitation grants nothing. Telling someone they are a member of a workspace they
+    // have not joined is the same lie as the case above, in the other direction — and it is reachable,
+    // because an invitee who registers independently verifies on the tenant host too.
+    $tenant = inboxTenant();
+    $invitee = User::factory()->unverified()->create();
+
+    enterTenant($tenant->id, $invitee->id);
+    TenantUser::create([
+        'user_id' => $invitee->id,
+        'status' => TenantUserStatus::Invited,
+        'invited_role_id' => catalogRole('viewer'),
+        'invited_at' => now(),
+        'invite_expires_at' => now()->addDay(),
+    ]);
+    TenantContext::flush();
+
+    $this->app['request']->headers->set('host', 'acme.meridian.test');
+    $this->app['request']->server->set('HTTP_HOST', 'acme.meridian.test');
+
+    event(new Verified($invitee));
+
+    Notification::assertSentOnDemand(
+        WelcomeNotification::class,
+        fn (WelcomeNotification $notification): bool => $notification->tenantName === '',
     );
 });
 

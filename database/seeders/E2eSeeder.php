@@ -1476,14 +1476,25 @@ class E2eSeeder extends Seeder
      * dashboard URL. Before J3a this seeder set no verification timestamp at all, so every e2e identity was
      * unverified and mounting the gate would have failed all 506 specs before one of them ran.
      *
-     * ⚠️ AND IT IS `forceFill`, NOT A FOURTH KEY IN `create()`, FOR A REASON THAT IS NOT THE OBVIOUS ONE.
-     * `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
-     * mass-assignable — but `artisan db:seed` wraps the whole run in `Model::unguarded()`
-     * (`SeedCommand::handle()`), so a fourth key WOULD work there and looks perfectly fine. It stops working
-     * the moment the seeder is constructed and run directly, which is exactly what
-     * `E2eSeederIdempotencyTest` and `DemoSeederIdempotencyTest` do: no ambient unguard, attribute silently
-     * dropped, and the only symptom is a user who is quietly unverified. `forceFill` does not depend on an
-     * ambient state that the caller happens to establish.
+     * ⚠️⚠️ ONE INSERT — `forceFill()` ON A NEW MODEL — AND NEVER `create()` THEN `save()`. THIS COST A RED
+     * E2E RUN, AND THE FIRST FIX FOR IT WAS ITSELF THE BUG.
+     *
+     * Two separate traps stack here, and only the second is fatal:
+     *   1. `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+     *      mass-assignable. `artisan db:seed` wraps the run in `Model::unguarded()`
+     *      (`SeedCommand::handle()`), so a fourth key in `create()` works THERE and silently drops the
+     *      moment the seeder is constructed and run directly — which is what `E2eSeederIdempotencyTest`
+     *      and `DemoSeederIdempotencyTest` do.
+     *   2. **The follow-up `save()` that looks like the obvious fix updates ZERO ROWS AND THROWS NOTHING.**
+     *      `users` carries a permissive INSERT policy but an **own-row UPDATE** policy keyed on
+     *      `app.current_user_id`, which is null throughout seeding — so a create-then-stamp pair matches no
+     *      UPDATE policy, reports success, and leaves the account unverified. With `verified` mounted on the
+     *      authenticated group that is a LOCKOUT: `tests/e2e/global-setup.ts` signs the demo owner in and is
+     *      redirected to `/email/verify`, and all 506 specs die before one runs. `promoteToSuperAdmin()`
+     *      below already carries the privileged-connection version of this same lesson.
+     *
+     * `forceFill()` on a NEW model carries the non-fillable column into the INSERT itself, where the
+     * permissive policy applies — the shape Lane B's P1b JIT provisioning independently arrived at.
      */
     private function resolveOrCreateUser(string $email, string $name, string $password, bool $verified = true): User
     {
@@ -1494,11 +1505,13 @@ class E2eSeeder extends Seeder
             return $existing;
         }
 
-        $user = User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password)]);
-
-        if ($verified) {
-            $user->forceFill(['email_verified_at' => now()])->save();
-        }
+        $user = new User;
+        $user->forceFill([
+            'name' => $name,
+            'email' => $email,
+            'password' => Hash::make($password),
+            'email_verified_at' => $verified ? now() : null,
+        ])->save();
 
         return $user;
     }

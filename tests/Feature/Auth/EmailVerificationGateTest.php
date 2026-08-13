@@ -156,6 +156,39 @@ it('refuses to mint an API token for an unverified member, in the documented env
     expect($response->json('error.code'))->toBe('forbidden');
 });
 
+it('gives a member behind the gate the values needed to correct their own address', function (): void {
+    // ⚠️ THE WORST FAILURE THIS GATE COULD CAUSE IS A SELF-INFLICTED LOCKOUT, AND THIS IS THE HALF OF THE
+    // ESCAPE HATCH THAT IS PROVEN. `UpdateUserProfileInformation` nulls `email_verified_at` whenever the
+    // address changes — correct, a new address is unproven — so a member who mistypes their own email in
+    // Settings is bounced here on their next page load, and `/settings` is the only OTHER surface with an
+    // email field and is inside the gate they just fell behind. Without a correction form on this page the
+    // sole remaining action is "resend", to the typo, forever.
+    //
+    // What this asserts: the notice page renders behind the gate and carries `name` and `email`. Both are
+    // load-bearing — Fortify's action validates and rewrites the pair together, so a form that submitted a
+    // blank name would be rejected, and one that guessed the address would show the wrong one.
+    //
+    // ⚠️ WHAT IT DELIBERATELY DOES NOT ASSERT, AND WHY: that the correction ROUND TRIP completes. It does
+    // not, and the cause is a pre-existing defect J3a discovered rather than caused — see
+    // `docs/feature-backlog.md`. `PUT /user/profile-information` is a Fortify route carrying no tenancy
+    // middleware, so `app.current_user_id` is unset; `users_users_visibility` is a SELECT policy, and
+    // PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — so the write matches no
+    // row, affects ZERO rows and throws nothing. Measured directly: an update with the GUC cleared reports
+    // 0 affected. Asserting a passing round trip here would encode that defect as the contract, which is
+    // exactly the mistake this file already made once with the impersonation exemption.
+    $this->withoutVite();
+    $user = memberOfTenant($this->tenant, verified: false);
+
+    $this->actingAs($user)->get('http://acme.meridian.test/dashboard')->assertRedirect();
+
+    $this->actingAs($user)
+        ->get(route('verification.notice'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('auth/VerifyEmail', false)
+            ->where('email', $user->email)
+            ->where('name', $user->name));
+});
+
 it('stops bouncing a member the moment they verify', function (): void {
     $this->withoutVite();
     $user = memberOfTenant($this->tenant, verified: false);

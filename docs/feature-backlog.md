@@ -150,6 +150,29 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
 ---
 
+## ⚠️ Discovered defects (found while building, not yet fixed)
+
+- **`PUT /user/profile-information` writes ZERO ROWS, silently — so changing your own name or email in
+  Settings does nothing at all.** Found in J3a, pre-existing since Phase 0. Fortify registers that route
+  with `['web', RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web]` and **no
+  tenancy middleware**, so `app.current_user_id` is unset for the request. `users_app_update` is permissive
+  (`USING (true) WITH CHECK (true)`), but PostgreSQL applies **SELECT** policies to an UPDATE whose `WHERE`
+  reads a column, and `users_users_visibility` requires either `id = app.current_user_id` or an ACTIVE
+  co-tenant membership. The row is therefore invisible to its own update: zero rows affected, no exception,
+  no log line. Measured directly — an update with the GUC cleared reports `0 affected` while the row is
+  plainly there.
+  **Why it matters more from J3a on:** `UpdateUserProfileInformation` nulls `email_verified_at` on an email
+  change, and J3a mounts `verified` on the authenticated tenant group, so this endpoint is now the only
+  escape from a verification lockout. Today the two defects cancel — the email never changes, so
+  verification is never nulled — which is not a property to ship on. `auth/VerifyEmail.vue` already carries
+  the correction form; it needs a write path that works.
+  **The fix is a decision, not a patch:** either give Fortify's authenticated routes a user-context
+  middleware, or have the action write on a connection that can see the row. Both have blast radius beyond
+  one endpoint (`/user/password`, the 2FA endpoints and `/user/confirm-password` share the same stack), which
+  is why J3a recorded it here rather than widening its own scope. `EmailVerificationGateTest`'s
+  "gives a member behind the gate the values needed to correct their own address" deliberately asserts only
+  the half that works, so nothing encodes the defect as the contract.
+
 ## Notes
 
 - Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here.

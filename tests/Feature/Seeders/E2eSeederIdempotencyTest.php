@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TenantUserStatus;
 use App\Models\Domain;
 use App\Models\Form;
 use App\Models\Notification;
@@ -11,6 +12,7 @@ use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\E2eSeeder;
@@ -236,4 +238,80 @@ it('converges the notification fixture, and keeps one row on the reviewer on pur
     expect($first['preferences'])->toBe([
         ['type' => 'review_requested', 'in_app' => false, 'email' => false],
     ]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| J3a — every seeded identity is VERIFIED, because the e2e suite cannot log in otherwise.
+|
+| ⚠️ THIS TEST EXISTS BECAUSE CI FOUND WHAT NOTHING LOCAL COULD. J3a mounted `verified` on the authenticated
+| tenant group, and `tests/e2e/global-setup.ts` signs the demo owner in and waits for a dashboard URL BEFORE
+| any spec runs — so an unverified seeded identity is not one red test, it is all 506 with none executed and
+| a 30-second timeout as the only diagnosis.
+|
+| The first repair was itself the bug, which is the part worth pinning. `User` declares
+| `#[Fillable(['name','email','password'])]`, so `email_verified_at` is not mass-assignable, and the obvious
+| fix — create the row, then stamp it — is a SILENT NO-OP: `users` carries a permissive INSERT policy but an
+| OWN-ROW UPDATE policy keyed on `app.current_user_id`, which is null throughout seeding. The follow-up
+| UPDATE matches no policy, affects zero rows, throws nothing, and the account stays unverified. It has to be
+| one INSERT (`forceFill()` on a NEW model). `promoteToSuperAdmin()` carries the privileged-connection
+| version of the same lesson, and Lane B's P1b JIT provisioning arrived at it independently.
+|
+| Read on `pgsql_privileged` for the reason the header above gives: identities are created on the default
+| connection inside RefreshDatabase's transaction, but the join-shape RLS on `users` hides them from an
+| unscoped read.
+*/
+it('verifies every seeded identity except the invitation placeholder', function (): void {
+    $seeder = new E2eSeeder;
+    $seeder->run();
+
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+
+    // ⚠️ TWO READS, BECAUSE ONE POLICY ARM CANNOT SEE BOTH KINDS OF ROW — and that asymmetry is the very
+    // thing under test. `users_users_visibility` reveals a row only when it is the ACTING user or an
+    // **active** co-tenant, so under a plain tenant context `pending@` (status Invited) is invisible and the
+    // one identity that must stay UNVERIFIED could not be checked at all.
+    //
+    // `tenant_users` is strict-RLS by TENANT rather than by status, so the invited membership row is
+    // visible; reading the placeholder as ITSELF (`app.current_user_id = <their id>`) then satisfies the
+    // policy's first arm.
+    //
+    // Neither read uses `pgsql_privileged`/`pgsql_auth`: those are separate SESSIONS and cannot see
+    // RefreshDatabase's uncommitted transaction, so a privileged read returns nothing and every assertion
+    // below passes vacuously — which is exactly how the first draft of this test went green while proving
+    // nothing.
+    [$active, $pendingVerifiedAt] = DB::transaction(function () use ($tenant): array {
+        TenantContext::applyLocal($tenant->id, null);
+        app(PermissionRegistrar::class)->setPermissionsTeamId($tenant->id);
+
+        $rows = User::query()
+            ->whereIn('email', ['demo@meridian.test', 'reviewer@meridian.test'])
+            ->pluck('email_verified_at', 'email')
+            ->all();
+
+        $pendingId = (string) TenantUser::query()
+            ->where('status', TenantUserStatus::Invited)
+            ->value('user_id');
+
+        TenantContext::applyLocal($tenant->id, $pendingId);
+        $pending = User::query()->whereKey($pendingId)->first();
+
+        return [$rows, $pending?->email_verified_at];
+    });
+
+    // Anti-vacuity: a renamed constant or a changed address would otherwise make every assertion below true
+    // over an empty set.
+    expect($active)->toHaveCount(2);
+
+    // `demo@` is the identity `tests/e2e/global-setup.ts` signs in as FIRST, so its verification is what the
+    // whole 506-spec suite rests on: unverified, the login lands on /email/verify, the wait for a dashboard
+    // URL times out, and every spec fails before one runs. That is the red run this test exists to prevent.
+    expect($active['demo@meridian.test'])->not->toBeNull()
+        ->and($active['reviewer@meridian.test'])->not->toBeNull();
+
+    // ⚠️ AND THE ONE THAT MUST STAY NULL. `InvitationController::show()` reads a null timestamp as
+    // `needsRegistration`, so stamping this placeholder turns the invitation page from "set a name and a
+    // password" into "sign in as the invited account" — silently breaking the fixture J3b's invitation
+    // accessibility scan depends on. Verifying everything is as wrong as verifying nothing.
+    expect($pendingVerifiedAt)->toBeNull();
 });

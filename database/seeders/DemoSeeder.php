@@ -1301,24 +1301,26 @@ class DemoSeeder extends Seeder
             return $this->resolvedUsers[$email] = $existing;
         }
 
-        $user = User::create([
+        // ⚠️ ONE INSERT VIA `forceFill()` ON A NEW MODEL. NOT `create()` PLUS A FOURTH KEY, AND NOT
+        // `create()` FOLLOWED BY A STAMP — the second of those is a silent no-op and it cost a red E2E run.
+        //
+        // `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+        // mass-assignable; `artisan db:seed` unguards the run (`SeedCommand::handle()`), which is why a
+        // fourth key appeared to work here for four increments and silently dropped whenever the seeder was
+        // constructed and run directly, as `DemoSeederIdempotencyTest` does. And the obvious repair — stamp
+        // it afterwards — is worse: `users` has a permissive INSERT policy but an OWN-ROW UPDATE policy keyed
+        // on `app.current_user_id`, which is null during seeding, so the follow-up UPDATE matches no policy,
+        // affects zero rows and throws nothing.
+        //
+        // Harmless until J3a mounted `verified` on the authenticated tenant group; from here an unverified
+        // demo account cannot reach `/dashboard` at all.
+        $user = new User;
+        $user->forceFill([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($password),
-        ]);
-
-        // ⚠️ THIS USED TO BE A FOURTH KEY IN `create()` ABOVE, AND IT WORKED EXACTLY HALF THE TIME.
-        // `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
-        // mass-assignable. `artisan db:seed` wraps the whole run in `Model::unguarded()`
-        // (`SeedCommand::handle()`), which is why every demo account in a normally-seeded database really is
-        // verified and nobody ever noticed. Construct the seeder and call `run()` directly — which
-        // `DemoSeederIdempotencyTest` does — and there is no ambient unguard, the attribute is silently
-        // dropped, and the demo tenant quietly fills with unverified accounts.
-        //
-        // Harmless until J3a, which mounts `verified` on the authenticated tenant group: from here an
-        // unverified demo account cannot reach `/dashboard` at all. `forceFill` does not depend on an ambient
-        // state the caller happens to establish.
-        $user->forceFill(['email_verified_at' => now()])->save();
+            'email_verified_at' => now(),
+        ])->save();
 
         return $this->resolvedUsers[$email] = $user;
     }

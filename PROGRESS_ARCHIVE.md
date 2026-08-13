@@ -2110,3 +2110,69 @@ and a `FeatureGateException` arm — without it the refusal read *"Your plan doe
 without either lane editing the other's files**, so the new signpost card was cloned from the already
 axe-clean custom-domains card rather than authored fresh — an a11y defect there would have reddened Lane A's
 spec in a file Lane A was mid-edit on.
+
+---
+
+## 2026-08-13 — LANE B: SSO/SAML `P1b` — the login round trip and JIT provisioning (PR #144, `0b445d4`, 6/6)
+
+**A tenant can now actually sign in with SAML**, which is the first time that sentence has been true. P1a shipped the trust anchor and published an ACS location nothing could reach; ADR-0016 §D14 recorded the gap deliberately and left a canary asserting `/sso/saml/login` and `/sso/saml/acs` both 404'd while a connection was Active. **That canary was rewritten by hand into the round trip it stood for** — activate → `GET /sso/saml/login` → post a signed assertion → authenticated on `/dashboard`, `last_login_at` stamped.
+
+CI: **Pest 3756 passed / 16,081 assertions** (P1a's 3712 **+44**, which is exactly the 11 login, 32 ACS and 1 org-2FA cases — the canary was rewritten, not added), **E2E 505 of 516**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,803 tests**. E2E 18m18s, Pest 6m52s. Two commits behind one PR, for P1a's reason: `(1/2)` alone redirects to an IdP whose answer nothing can consume.
+
+**WHAT SHIPPED.** `(1/2)` `SsoAuthnRequestBuilder`, `SsoAuthRequestService`, `SsoLoginController`, `/sso/saml/login`, two per-IP limiters, `SsoAuthRequestFactory`. `(2/2)` `SsoSamlSettings`, `SsoAssertionValidator`, `SsoAssertion`, `SsoIdentityResolver`, `SsoIdentity`, `SsoUserProvisioner`, `SsoLoginService`, `SsoAuthenticationException`, `SsoAcsController`, `/sso/saml/acs`, the CSRF exemption, `sp.login_url` through the presenter and the SP card, and `tests/Support/Sso/FakeIdp.php`. ADR-0016 gained **§D15–§D21**, its consequences and four revisit triggers; `docs/data-dictionary.md` §27/§28 gained the writer, the consumer and the `last_login_at` hazard. No migration — no new table, no new column; `last_login_at` already existed.
+
+### The finding worth carrying furthest: a library that reads `$_SERVER` is untested until you seed it
+
+`Response::isValid()` builds its `currentURL` — the value the assertion's `Destination` and `Recipient` are checked against — from `Utils::getSelfRoutedURLNoQuery()`, which reads `$_SERVER['REQUEST_URI']` and `HTTP_HOST`. **Laravel's test client never populates those**: it constructs a Symfony request and does not call `overrideGlobals()`. Left alone, `currentURL` collapses to the bare host — and php-saml's `destinationStrictlyMatches` defaults to **false**, making the comparison `strncmp($destination, $currentURL, strlen($currentURL))`, a **prefix match that passes**. The suite would have been green and the Destination check would not have been running: the H16b drift-excerpt shape again, in the direction that makes a control look present.
+
+`SsoSamlSettings::at()` pins host, port, protocol and request path from `SsoMetadataController::assertionConsumerServiceUrl()` — §D3's single composition point — and restores all of it plus `$_SERVER` in a `finally`, because these are process-global statics and a leak would retarget the next request's check. `destinationStrictlyMatches` is turned on, so an assertion destined for `…/sso/saml/acs.evil` is refused rather than accepted on a prefix.
+
+**The general rule this generalises to:** `_addDefaultValues()` also defaults `wantAssertionsSigned` and `rejectUnsolicitedResponsesWithInResponseTo` to **false**. Every security flag is now written out explicitly. **A default that happens to agree with you is a coincidence, not a control** — and nothing goes red the day it changes.
+
+### Clock skew is enforced twice, because php-saml's allowance is not configurable
+
+`Constants::ALLOWED_CLOCK_DRIFT` is a hard-coded **180 seconds**; `config('saml.clock_skew_seconds')` is **60**, and `config/saml.php` argues at length that the window is the period a captured assertion stays replayable. Both cannot be true unless somebody enforces the tighter one, so `assertWithinConditions()` runs a second pass over the assertion's own `Conditions` **after** the library is satisfied — never before, because timestamps nothing has verified a signature over are a claim rather than a condition. Pinned by a document 120 s stale (inside the library's allowance, outside ours) **and** by its mirror at 30 s, so the check cannot quietly become "refuse everything". Without the pass, the config file documenting the tolerance was lying.
+
+`FakeIdp::conditionsStaleBy()` had to move the window's **edge**, not slide it: the first draft slid the whole ±5-minute window by 120 s, which leaves it wide open, and the "refuses a stale assertion" case asserted nothing until that was found.
+
+### Look up, validate, then consume — the order is most of the security
+
+`isValid($requestId)` takes the expected id as an argument, so it has to be known before validation, and feeding it a value read from the document being validated would be checking a string against itself. Hence: read `InResponseTo` (untrusted, a lookup key only) → **read** the live unconsumed row → validate against *the row's* `request_id` → consume. Consuming at look-up time would let any unauthenticated caller invalidate a stranger's pending sign-in by posting a body carrying its `InResponseTo`. The atomic `consumed_at` UPDATE runs **before** the assertion-id cache ledger deliberately: it is the mechanism a cache eviction cannot silently turn into a no-op. `consumed_at` was left out of the model's `$fillable` so the read-then-write shape cannot reappear.
+
+### One INSERT, never a create-then-update, on any pre-auth path
+
+`users` has a permissive INSERT policy (`WITH CHECK (true)`) but an **own-row UPDATE** policy keyed on `app.current_user_id` — which is still NULL at the ACS, because `EstablishTenantDatabaseContext` runs before `auth` and there is no session yet. A follow-up `$user->save()` therefore **matches no policy, updates zero rows and throws nothing**, leaving `email_verified_at` null — which the `verified` middleware turns into a lockout with nothing to trace. Found by a test rather than by reading. `forceFill` on a new model carries the non-fillable column into the INSERT itself.
+
+### The four membership outcomes, and one defect found and deliberately left
+
+Active → in, with no write. **Suspended → REFUSED**: an explicit administrative sanction, and the one status the shared attach path would happily reactivate. **Invited → activated at the INVITED role**, ungated by the JIT toggle, because an admin who invited somebody as an Admin said something about that person by name and letting the directory's default demote them would make the invitation surface untrustworthy. Everything else → JIT at `default_role_name`. A full seat quota **refuses** rather than admitting a seatless member — a session with no membership sees an empty workspace through RLS and reads as data loss — inside one transaction, so the refusal orphans no account. `joinViaSso()` shares `joinOpenTenant()`'s entire body through a new private `attachMember()`; the only difference is the audit's `via`, because "which door did this person come through" is the only question the two doors answer differently.
+
+⚠️ **`joinOpenTenant()` REACTIVATES A SUSPENDED MEMBERSHIP, AND THAT IS A LIVE BUG ON THIS BRANCH.** On an open-registration workspace a suspended member can silently un-suspend themselves by re-registering. Same class as the bug this row guards against on the SSO path, in Lane B's own file, three-line fix — **recorded rather than folded in**, because it belongs to I5's registration flow and not to P1b.
+
+### Posture, and a cost written down rather than discovered
+
+Every ACS failure is the same 404 (§D4 extended from the gate to the whole endpoint): an ACS that explains why an assertion failed is an oracle for anyone tuning a forgery — "wrong audience" says the signature verified, "already consumed" says the request id was real. Reasons go to the log with a stable machine token and **never to `audits`**, which is append-only by RLS and never pruned, so an unauthenticated writer is an amplification primitive. **The accepted cost is in the ADR: an employee whose IdP clock has drifted sees a bare 404 and their admin has no in-app view of why.** A tenant-scoped failures panel is owed work, needing a bounded prunable store rather than the ledger.
+
+Org-level 2FA is **not** exempted for an SSO arrival, and that is now pinned by a test rather than a docblock: "require 2FA for all tenant members" is a control an admin switched on, and inferring an exemption from the presence of SSO would silently drop it. Both halves are asserted — the ACS still succeeds, and the *next* request is bounced — so the case is a statement about the policy rather than about where the middleware happens to be mounted.
+
+### php-saml owns the inbound half only
+
+The `AuthnRequest` is DOM-built here for two facts, not taste. Its `AuthnRequest` mints a **49-character** id (`ONELOGIN_` + sha1) with no seam to supply one, while `sso_auth_requests.request_id` is `char(33)` and the id is what `InResponseTo` is matched against. And it builds the document by **heredoc interpolation**, splicing the tenant-controlled `idp_sso_url` raw into `Destination="…"` — exactly what `SsoMetadataController` forbids; `SsoMetadataParser`'s `FILTER_VALIDATE_URL` closes it upstream today, but that is a property of a different class. Two consequences: **no `<samlp:RequestedAuthnContext>`** (the library defaults it ON, emitting `PasswordProtectedTransport` with `Comparison="exact"`, which refuses a successful passwordless or certificate-based login), and `ForceAuthn` emitted only when asked rather than as a literal `"false"`.
+
+### Two test-harness findings that will recur
+
+⚠️ **An existing member must be a COMMITTED identity.** The provisioner resolves through `TenantMembershipService::resolveUserByEmail()`, which reads on `pgsql_auth` — **a separate database session that cannot see `RefreshDatabase`'s open transaction**. A `User::factory()` user is therefore invisible to the code under test, the provisioner takes the JIT branch instead of the "already a member" branch, and the case silently measures the wrong path — surfacing only as a `users_email_unique` violation, because the INSERT can see what the SELECT could not. `committedTenantIdentity()` is the shape that reproduces production, and its email is random by design. The mirror image: **assertions about a JIT-created user must run on the DEFAULT connection**, or `->exists()->toBeFalse()` passes whether or not the row exists.
+
+⚠️ **Never identify a row by "the newest one."** `startLogin()` first read the latest `sso_auth_requests` row; two sign-ins started inside one second are a tie under any `orderBy` this table offers, PostgreSQL breaks ties by physical row order, and two cases were answering an already-consumed request. It now reads the `ID` out of the `SAMLRequest` the redirect actually carried — exact, and it re-proves the binding for free. Same defect as the `assignPlanTier` double-subscription tie.
+
+**`tests/Support/Sso/FakeIdp.php` is a real signer** — memoized RSA keypair, XML-DSig over the **assertion**, a knob per failure mode. `SsoConnectionFactory::certificate()` could not be reused: it throws the private key away. 32 ACS cases / 204 assertions cover unsigned, envelope-signed-only, an untrusted key, signature wrapping hidden in a schema-legal `<saml:Advice>`, wrong audience / destination / issuer, no NameID, both replay mechanisms independently, the skew pair, transport bounds, cross-tenant replay and all three provisioning refusals.
+
+### Gates
+
+PHPStan **delta zero** against the local baseline of 20 (the two it did add — `parse_url` returning `int|false` into `setSelfPort()`, and a null into `setBaseURLPath()` — were real and were fixed) · Pint clean, read from the JSON · controller/migration/job linters pass, **controllers 86 → 88, migrations unchanged at 95** · `openapi.json` byte-identical · vue-tsc clean · local full Pest 3421 passed / 14,702 assertions (needs `-d memory_limit=2G`, ~34 minutes, and dies at 128M partway through without it).
+
+⚠️ **The local Vitest pool is still broken and `--pool=threads` has its own false positive.** A full `npm test` ran **40 of 103 files** with `Failed to start forks worker` errors. Chunking by directory works. But under threads, `resources/js/components/notifications/relative-time.test.ts` fails environmentally — it sets `process.env.TZ` between calls and a worker **thread** cannot reset V8's cached ICU default zone. It is green under forks, which is what CI runs (103 files, 1,803 tests). Do not chase it.
+
+**The one user-facing way in is a URL on the SP-details card** (`sp.login_url`), which is lane hygiene rather than preference: `resources/js/Pages/auth/Login.vue` is the core file of Lane A's in-flight J3, and it renders neither a session `status` nor a generic error, so a redirect-with-flash there would have been silently invisible. A "continue with SSO" button is owed by the auth vertical.
+
+**`P1c` — protocol-aware step-up — is next, and P1b made it urgent.** A JIT-provisioned SSO user holds a random hash nobody knows; `RequireRecentPassword` compares `auth.password_confirmed_at`, and the only way to stamp it is a password they cannot produce. Every `step-up` route — including the SSO metadata import itself — is a dead end for exactly the users SSO was built for. The seam is already there and unused: `SsoAuthIntent::StepUp`, `force_authn`, `return_to`, and `mint()`'s three optional parameters.

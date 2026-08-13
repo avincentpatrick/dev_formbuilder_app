@@ -89,6 +89,26 @@ async function copy(field: string, text: string): Promise<void> {
             These addresses always use your workspace’s own subdomain, even if you serve public forms on a
             custom domain — your identity provider needs an address that does not change.
         </p>
+
+        <!-- The one row that is for the tenant's own people rather than for their IdP, so it is separated
+             from the <dl> above by a rule rather than folded into it. Same copy affordance, because the
+             thing an admin does with it is identical: put a string somewhere else. -->
+        <div class="sso-sp__signin">
+            <h3 class="sso-sp__subhead">Where your members sign in</h3>
+            <p class="sso-sp__lede">
+                Share this address, or point your identity provider’s “sign-in page” setting at it. Opening
+                it sends the person to your provider and back again.
+            </p>
+            <div class="sso-sp__def">
+                <code class="sso-sp__code">{{ sp.login_url }}</code>
+                <MdsIconButton
+                    icon="copy"
+                    :label="copied === 'login' ? 'Sign-in URL copied' : 'Copy sign-in URL'"
+                    @click="copy('login', sp.login_url)"
+                />
+                <span v-if="copied === 'login'" class="sso-sp__copied" role="status">Copied</span>
+            </div>
+        </div>
     </MdsCard>
 </template>
 
@@ -163,5 +183,20 @@ async function copy(field: string, text: string): Promise<void> {
 .sso-sp__copied {
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-status-success-fg);
+}
+
+.sso-sp__signin {
+    margin-block-start: var(--mds-space-4);
+    padding-block-start: var(--mds-space-4);
+    /* The sibling cards' divider token, copied rather than recalled — `--mds-color-border-subtle` is a
+       plausible name that does not exist, and `token-references.test.ts` reads source text. */
+    border-block-start: 1px solid var(--mds-color-border-default);
+}
+
+.sso-sp__subhead {
+    margin: 0 0 var(--mds-space-1);
+    font-size: var(--mds-type-body-sm-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-heading);
 }
 </style>

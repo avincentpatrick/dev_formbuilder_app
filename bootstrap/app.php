@@ -90,6 +90,23 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // ── THE SAML ASSERTION CONSUMER SERVICE IS THE ONLY CSRF-EXEMPT POST IN THIS APPLICATION (P1b) ──
+        // It is a cross-origin form POST from a tenant's identity provider. There is no token to send, and
+        // with SameSite=Lax no session cookie arrives either — which is not a gap, because this request
+        // CREATES the session rather than acting on one. CSRF protects an EXISTING authenticated session
+        // from being driven without its owner's intent; there is nothing here yet for it to protect.
+        //
+        // What replaces it is stronger than a token and is why `allow_unsolicited` is permanently false:
+        // the assertion must be signed by the tenant's own trust anchor AND carry an `InResponseTo` naming
+        // a live, unconsumed `sso_auth_requests` row this SP minted. A CSRF token only proves the browser
+        // visited us first; neither of those can be forged by someone who has not compromised the IdP.
+        //
+        // BY EXACT PATH, not `sso/saml/*`: a wildcard would sweep in `/sso/saml/metadata` and every future
+        // endpoint under that prefix, granting an exemption nobody decided to give — the
+        // EnforcePlatformMaintenance path-list lesson, in the direction that REMOVES a control. The tenant
+        // is identified from the host, so one entry covers every subdomain without naming any.
+        $middleware->validateCsrfTokens(except: ['sso/saml/acs']);
+
         // Platform maintenance (I5 / PRD Feature #10) — GLOBAL, not `web`. "Blocks the entire product"
         // includes /api/v1 (routes/api.php declares its own stacks) and the connector callbacks
         // (routes/connectors.php sits outside `web` entirely), so a group mount would leave two holes that

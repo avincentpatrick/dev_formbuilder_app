@@ -8,6 +8,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Tenancy\TenantContext;
 use Database\Factories\SsoConnectionFactory;
 use Database\Seeders\RolePermissionSeeder;
@@ -15,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Support\Sso\FakeIdp;
 
 uses(RefreshDatabase::class);
 
@@ -89,6 +91,9 @@ it('renders the page with the service-provider values an admin must paste into t
             ->where('data', null)
             ->where('sp.entity_id', 'http://acme.meridian.test/sso/saml/metadata')
             ->where('sp.acs_url', 'http://acme.meridian.test/sso/saml/acs')
+            // P1b. Currently the ONLY user-facing way into the flow, so its absence would take SSO offline
+            // with every other gate green.
+            ->where('sp.login_url', 'http://acme.meridian.test/sso/saml/login')
             ->where('can.configure', true)
             ->where('can.manage', true)
             ->where('entitled', true)
@@ -287,16 +292,42 @@ it('activates a connection and makes the service-provider metadata endpoint serv
     expect($response->getContent())->toContain('http://acme.meridian.test/sso/saml/acs');
 });
 
-it('leaves the login path absent until P1b, which is why an active connection is honest rather than complete', function (): void {
-    // P1b'S CANARY. An active connection publishes an ACS location that does not exist yet — inert, because
-    // config('saml.allow_unsolicited') is false and there is no SP-initiated entry point, so nothing can
-    // reach it. When P1b routes /sso/saml/login this test must be changed BY HAND, which is the point.
+it('completes the whole round trip once a connection is active — P1a’s canary, discharged', function (): void {
+    // ⚠️ THIS WAS P1a's CANARY AND IT HAS BEEN REWRITTEN BY HAND, WHICH WAS THE POINT OF LEAVING IT.
+    // It used to assert that `/sso/saml/login` and `/sso/saml/acs` both 404'd while a connection was Active
+    // — the honest statement of a slice that published an ACS location nothing could reach. P1b routes
+    // both, so the assertion is now the thing the canary was standing in for: activate, leave, come back
+    // with a signed assertion, and be somebody.
+    //
+    // It lives HERE rather than only in SsoAcsWebTest because this file owns the SETTINGS surface, and the
+    // claim being made is about that surface: "Active" now means what the status card says it means.
     enterTenant($this->tenant->id, $this->admin->id);
-    SsoConnection::factory()->active()->create();
+    FakeIdp::connection();
 
     expect(config('saml.allow_unsolicited'))->toBeFalse();
-    $this->get('http://acme.meridian.test/sso/saml/login')->assertNotFound();
-    $this->post('http://acme.meridian.test/sso/saml/acs')->assertNotFound();
+
+    $redirect = $this->get('http://acme.meridian.test/sso/saml/login')->assertRedirect();
+
+    $query = [];
+    parse_str((string) parse_url((string) $redirect->headers->get('Location'), PHP_URL_QUERY), $query);
+
+    $document = new DOMDocument;
+    $document->loadXML(SsoAuthnRequestBuilder::decodeTransport((string) ($query['SAMLRequest'] ?? '')));
+    $requestId = (string) $document->documentElement?->getAttribute('ID');
+
+    $assertion = (new FakeIdp(
+        'http://acme.meridian.test/sso/saml/acs',
+        'http://acme.meridian.test/sso/saml/metadata',
+        $requestId,
+    ))->as('grace@acme.test')->response();
+
+    $this->post('http://acme.meridian.test/sso/saml/acs', ['SAMLResponse' => $assertion])
+        ->assertRedirect('/dashboard');
+
+    $this->assertAuthenticated();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoConnection::query()->value('last_login_at'))->not->toBeNull();
 });
 
 it('disables and re-enables without a re-import', function (): void {

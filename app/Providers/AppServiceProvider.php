@@ -347,6 +347,36 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('connector-oauth', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('coauth:'.$request->ip()));
 
+        // SAML protocol endpoints (P1b / ADR-0016). Both are unauthenticated by necessity — the caller is a
+        // browser with no session yet, or an identity provider — so there is no token, no user and no
+        // tenant claim in the request worth trusting.
+        //
+        // ⚠️ KEYED ON IP **AND HOST**, AND THE HOST HALF IS WHAT MAKES THIS SAFE TO DEPLOY. A per-IP-only
+        // bucket is the obvious first answer and it is wrong for exactly the customer this feature exists
+        // for: an enterprise reaches us from a handful of NAT egress addresses, so ONE workspace's 09:00
+        // sign-in surge would exhaust the budget for every OTHER workspace behind the same corporate
+        // gateway. The host is the tenant (identification is by subdomain), so adding it confines a surge —
+        // or a grinder — to the workspace it belongs to. The IP half stays because the host is
+        // attacker-chosen and would otherwise be a free way to mint fresh buckets.
+        //
+        // ⚠️ SEPARATE BUCKETS, NOT ONE SHARED "saml". A completed sign-in costs exactly one hit of each, so
+        // sharing would halve whichever ceiling an operator thought they were setting — the
+        // `guest-challenge` lesson.
+        //
+        // 60/minute rather than the connector callback's 20: that endpoint is reached ONCE per connection
+        // by one admin, while these are reached by every member of a workspace every morning. The bound is
+        // against grinding forged assertions (each costs an XML signature validation), and 60/min/tenant/IP
+        // still refuses that while clearing a real login surge — a limit that locks out a legitimate
+        // workforce is not a security control, it is an outage with a security-shaped justification.
+        $samlKey = static fn (string $bucket, Request $request): string => $bucket.':'
+            .$request->ip().':'.$request->getHost();
+
+        RateLimiter::for('saml-login', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($samlKey('samllogin', $request)));
+
+        RateLimiter::for('saml-acs', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($samlKey('samlacs', $request)));
+
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum
         // personal-access-token auth used by the /api/v1 surface (api-specification.md §2.6 / §3).

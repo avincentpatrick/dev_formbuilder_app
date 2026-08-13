@@ -8,6 +8,9 @@ use App\Enums\SsoAuthIntent;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Services\Sso\SsoAuthRequestService;
+use Database\Factories\SsoAuthRequestFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -38,8 +41,20 @@ use Illuminate\Support\Carbon;
 class SsoAuthRequest extends Model implements TenantScoped
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<SsoAuthRequestFactory> */
+    use HasFactory;
+
     use HasUuidv7;
 
+    /**
+     * ⚠️ `consumed_at` IS DELIBERATELY ABSENT. Single-use is established by the conditional UPDATE in
+     * {@see SsoAuthRequestService::consume()}, whose affected-row count is the check, and
+     * leaving the column unfillable is what stops a well-meaning `fill(['consumed_at' => now()])` from
+     * quietly reintroducing the read-then-write race the class docblock above forbids.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'tenant_id',
         'sso_connection_id',

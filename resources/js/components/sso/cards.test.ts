@@ -73,7 +73,7 @@ function connection(overrides: Record<string, unknown> = {}) {
 }
 
 describe('SpDetailsCard', () => {
-    it('renders all three values an admin must copy, in every state', () => {
+    it('renders all four values an admin must copy, in every state', () => {
         // Shown even before anything is imported: the IdP has to be told about this SP first.
         const wrapper = mount(SpDetailsCard, {
             props: {
@@ -81,13 +81,20 @@ describe('SpDetailsCard', () => {
                     entity_id: 'http://acme.meridian.test/sso/saml/metadata',
                     acs_url: 'http://acme.meridian.test/sso/saml/acs',
                     metadata_url: 'http://acme.meridian.test/sso/saml/metadata',
+                    login_url: 'http://acme.meridian.test/sso/saml/login',
                 },
             },
             global: { stubs },
         });
 
-        expect(wrapper.findAll('code')).toHaveLength(3);
+        // Three for the identity provider, one (P1b) for the workspace's own people.
+        expect(wrapper.findAll('code')).toHaveLength(4);
         expect(wrapper.text()).toContain('/sso/saml/acs');
+        // The sign-in URL is currently the ONLY way into the flow — the login page's own button belongs to
+        // the auth vertical another lane is rebuilding. If this row ever silently stops rendering, SSO
+        // becomes unreachable with every other gate still green, which is precisely the mount-smoke gap
+        // this file exists for.
+        expect(wrapper.text()).toContain('/sso/saml/login');
     });
 });
 

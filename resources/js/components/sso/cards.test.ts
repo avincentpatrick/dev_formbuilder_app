@@ -32,8 +32,23 @@ vi.mock('@inertiajs/vue3', () => ({
 const SpDetailsCard = (await import('./SpDetailsCard.vue')).default;
 const IdpMetadataCard = (await import('./IdpMetadataCard.vue')).default;
 const SsoStatusCard = (await import('./SsoStatusCard.vue')).default;
+const SsoFailuresCard = (await import('./SsoFailuresCard.vue')).default;
 
 const stubs = { MdsCard: { template: '<div><slot name="header" /><slot /></div>' } };
+
+function failure(overrides: Record<string, unknown> = {}) {
+    return {
+        id: '019ff000-0000-7000-8000-000000000001',
+        reason: 'assertion_outside_conditions',
+        reason_label: 'Response was outside its validity window',
+        hint: 'The identity provider’s clock is out by more than the allowance. Check time synchronisation on that server.',
+        subject_email: null,
+        request_id: null,
+        ip_address: '203.0.113.4',
+        occurred_at: '2026-08-14T09:00:00+00:00',
+        ...overrides,
+    };
+}
 
 function connection(overrides: Record<string, unknown> = {}) {
     return {
@@ -153,15 +168,20 @@ describe('IdpMetadataCard', () => {
 });
 
 describe('SsoStatusCard', () => {
-    it('states the P1b boundary while the connection is active', () => {
-        // The gap is inert but not invisible: an admin who just switched something on expects sign-in to
-        // change. ADR-0016 §D14 requires this said in words rather than implied by a disabled control.
+    it('tells an active workspace that sign-in works and that passwords still do', () => {
+        // ⚠️ THIS CASE USED TO ASSERT THE OPPOSITE, AND IT WENT ON PASSING AFTER IT STOPPED BEING TRUE.
+        // P1a's banner said signing in with SSO "isn’t switched on yet", which was exact until P1b landed
+        // the round trip — after which the product told every admin their working sign-in did not work, and
+        // this test defended the wrong sentence. A test can only pin the copy; nothing can notice that a
+        // statement about a NEIGHBOURING increment has expired. Corrected in P1c, recorded here.
         const wrapper = mount(SsoStatusCard, {
             props: { connection: connection(), canManage: true, canConfigure: true, busy: false },
             global: { stubs },
         });
 
-        expect(wrapper.text()).toContain('isn’t switched on yet');
+        expect(wrapper.text()).toContain('can sign in with your identity provider now');
+        // The half that has not changed and must not: enabling SSO locks nobody out.
+        expect(wrapper.text()).toContain('Email and password still work');
     });
 
     it('keeps the switch usable for a downgraded tenant, so they can still turn it off', () => {
@@ -202,6 +222,73 @@ describe('SsoStatusCard', () => {
         });
 
         expect(wrapper.text()).toContain('Turn this on once you have added this workspace');
-        expect(wrapper.text()).not.toContain('isn’t switched on yet');
+        expect(wrapper.text()).not.toContain('can sign in with your identity provider now');
+    });
+});
+
+describe('SsoFailuresCard', () => {
+    it('renders the good state as good, not as an empty list waiting to be filled', () => {
+        // ⚠️ THE INVERSE OF EVERY OTHER EMPTY STATE IN THE PRODUCT. Elsewhere "nothing here" means "go and
+        // make one"; here it means everything is working, and the copy has to say so or an admin reads a
+        // healthy workspace as an unfinished one.
+        const wrapper = mount(SsoFailuresCard, {
+            props: { failures: [], serving: true },
+            global: { stubs },
+        });
+
+        expect(wrapper.text()).toContain('No failed sign-ins recorded');
+    });
+
+    it('says nothing has served yet while the connection is still draft', () => {
+        const wrapper = mount(SsoFailuresCard, {
+            props: { failures: [], serving: false },
+            global: { stubs },
+        });
+
+        expect(wrapper.text()).toContain('has not served a sign-in');
+    });
+
+    it('leads with the reason and follows it with something to actually do', () => {
+        const wrapper = mount(SsoFailuresCard, {
+            props: { failures: [failure()], serving: true },
+            global: { stubs },
+        });
+
+        expect(wrapper.text()).toContain('Response was outside its validity window');
+        // The hint is an instruction, not a restatement — the difference between an admin fixing NTP and
+        // an admin hunting through a certificate they never touched.
+        expect(wrapper.text()).toContain('Check time synchronisation');
+        expect(wrapper.find('time').attributes('datetime')).toBe('2026-08-14T09:00:00+00:00');
+    });
+
+    it('omits the account row entirely when no signature vouched for an address', () => {
+        // Null is the state for every PRE-validation refusal, and it is the common one. A row that rendered
+        // "Account: —" would invite an admin to read an absence as a fact about the person.
+        const wrapper = mount(SsoFailuresCard, {
+            props: { failures: [failure()], serving: true },
+            global: { stubs },
+        });
+
+        expect(wrapper.text()).not.toContain('Account');
+    });
+
+    it('shows the account and request id once there are any', () => {
+        const wrapper = mount(SsoFailuresCard, {
+            props: {
+                failures: [
+                    failure({
+                        reason: 'membership_suspended',
+                        reason_label: 'Membership is suspended',
+                        subject_email: 'ada@acme.test',
+                        request_id: '_0123456789abcdef0123456789abcdef',
+                    }),
+                ],
+                serving: true,
+            },
+            global: { stubs },
+        });
+
+        expect(wrapper.text()).toContain('ada@acme.test');
+        expect(wrapper.text()).toContain('_0123456789abcdef0123456789abcdef');
     });
 });

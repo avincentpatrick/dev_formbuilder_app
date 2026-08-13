@@ -77,6 +77,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sign-in failure log (P1c) — the two bounds that make it safe to keep at all
+    |--------------------------------------------------------------------------
+    |
+    | ADR-0016 §D19 accepted that a member whose IdP clock has drifted sees a bare 404 and their admin has no
+    | in-app view of why, and named the fix: a tenant-scoped failures panel fed by "a bounded, prunable
+    | store, because the obvious table is append-only and an anonymous endpoint must not be able to fill it".
+    |
+    | ⚠️ BOTH LIMITS ARE ENFORCED ON THE WRITE PATH, NOT BY A SCHEDULED JOB, and that is not a shortcut.
+    | `routes/console.php` records that nothing runs the scheduler on the production box yet, so a nightly
+    | prune would be a bound that exists in this repository and not on the machine — for a table an
+    | UNAUTHENTICATED endpoint appends to. `SsoAuthFailureRecorder` trims in the same call as the insert.
+    |
+    | The two are independent on purpose. The row cap answers "a stranger is grinding the ACS": it holds
+    | whatever the volume. The retention window answers "these rows carry an IP address and sometimes an
+    | email": they go on age even when the cap is nowhere near, which is data minimisation rather than
+    | housekeeping. 200 is roughly a screenful an admin might page through; a workspace generating more
+    | than that has a configuration problem the newest rows already describe.
+    |
+    */
+    'failure_log_max_rows' => (int) env('SAML_FAILURE_LOG_MAX_ROWS', 200),
+    'failure_retention_days' => (int) env('SAML_FAILURE_RETENTION_DAYS', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Assertion replay ledger
     |--------------------------------------------------------------------------
     |

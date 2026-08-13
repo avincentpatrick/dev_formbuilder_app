@@ -12,7 +12,9 @@ use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
+use App\Services\Sso\SsoAssertionValidator;
 use App\Services\Sso\SsoAuthenticationException;
+use App\Services\Sso\SsoAuthFailureRecorder;
 use App\Services\Sso\SsoGate;
 use App\Services\Sso\SsoLoginService;
 use App\Services\Sso\SsoUserProvisioner;
@@ -77,6 +79,8 @@ final class SsoAcsController extends Controller
     public function __construct(
         private readonly SsoGate $gate,
         private readonly SsoLoginService $logins,
+        private readonly SsoAssertionValidator $assertions,
+        private readonly SsoAuthFailureRecorder $failures,
     ) {}
 
     public function __invoke(Request $request): RedirectResponse
@@ -95,12 +99,17 @@ final class SsoAcsController extends Controller
             );
         } catch (SsoAuthenticationException $exception) {
             Log::warning('sso.acs.rejected', [
-                'reason' => $exception->reason,
+                'reason' => $exception->reason->value,
                 'detail' => $exception->getMessage(),
                 'tenant_id' => (string) $tenant->getKey(),
                 'connection_id' => (string) $connection->getKey(),
                 'ip' => $request->ip(),
             ]);
+
+            // The tenant's own half of the same event (P1c). Beside the log line rather than instead of it:
+            // the log is the operator's surface and holds everything, this is the admin's and holds what
+            // they can act on. It cannot change the response — see the recorder's docblock.
+            $this->failures->record($connection, $exception, $request->ip(), $this->claimedRequestId($request));
 
             abort(404);
         }
@@ -125,6 +134,24 @@ final class SsoAcsController extends Controller
         // never the attacker-controllable `RelayState` — chooses the destination, and P1c's step-up is its
         // first and so far only writer: nothing yet bounces an unauthenticated deep link through SSO.
         return redirect('/dashboard');
+    }
+
+    /**
+     * The `InResponseTo` the document CLAIMED, when it is shaped like an id we could have minted.
+     *
+     * For the panel only, and it is the one field there that comes from unvalidated input — which is why it
+     * passes {@see SsoAuthRequest::isMintedShape()} first and is null the moment it does not. A malformed
+     * document has no id to report and must not be able to make the recorder throw.
+     */
+    private function claimedRequestId(Request $request): ?string
+    {
+        try {
+            $claimed = $this->assertions->inResponseTo((string) $request->input('SAMLResponse', ''));
+        } catch (SsoAuthenticationException) {
+            return null;
+        }
+
+        return SsoAuthRequest::isMintedShape($claimed) ? $claimed : null;
     }
 
     /**

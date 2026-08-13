@@ -8,12 +8,18 @@
  * put it behind `can.configure` in the markup and undo that at the UI layer while the route stayed open.
  * Enabling is refused server-side instead: undo always, redo only on the plan.
  *
- * ⚠️ THE ACTIVE-STATE BANNER IS A STATEMENT, NOT A "COMING SOON" TEASER, AND IT IS LOAD-BEARING. An active
- * connection in P1a publishes correct SP metadata and accepts no logins, because `/sso/saml/login` and the
- * ACS land in P1b. That gap is unreachable (IdP-initiated SSO is refused permanently, and there is no
- * SP-initiated entry point yet) but it is not invisible to an admin who has just switched something on and
- * expects their users' sign-in to change. So the page says what did and did not just happen — the
- * `domains/Index.vue` rule that a wait is stated in words rather than implied by a disabled control.
+ * ⚠️ THE ACTIVE-STATE BANNER IS A STATEMENT OF WHAT IS TRUE RIGHT NOW, AND P1c HAD TO REWRITE IT.
+ * P1a shipped it saying "signing in with SSO isn't switched on yet — everyone continues to sign in with
+ * their email and password", which was exact then: an active connection published correct SP metadata and
+ * accepted no logins, because `/sso/saml/login` and the ACS landed in P1b. **P1b landed, and the sentence
+ * became false while continuing to render** — telling an admin their working sign-in does not work, which
+ * is worse than saying nothing. It now describes the live behaviour and points at the sign-in URL on the
+ * details card, which is still the only user-facing way in until the auth vertical adds a button.
+ *
+ * The rule the original was applying is right and survives: a wait, or a caveat, is stated in words rather
+ * than implied by a disabled control (the `domains/Index.vue` rule). The lesson added on top is that a
+ * sentence about what a NEIGHBOURING increment has not built yet has an expiry date, and nothing in the
+ * build will notice when it passes.
  */
 import { computed } from 'vue';
 import { MdsBadge, MdsBanner, MdsButton, MdsCard, MdsIcon, MdsSwitch } from '@meridian/design-system';
@@ -62,7 +68,7 @@ const canToggle = computed<boolean>(() => (isOn.value ? props.canManage : props.
             v-if="isOn"
             tone="info"
             icon="info"
-            message="Your identity provider can read this workspace’s details, so you can finish setup on their side. Signing in with SSO isn’t switched on yet — everyone continues to sign in with their email and password."
+            message="Members can sign in with your identity provider now, using the sign-in link below. Email and password still work, so nobody is locked out while you roll this out."
         />
 
         <div class="settings-row">

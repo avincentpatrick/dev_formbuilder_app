@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sso;
 
+use App\Enums\SsoFailureReason;
 use RuntimeException;
 use Throwable;
 
@@ -23,13 +24,32 @@ use Throwable;
  * ── ⚠️ WHY THESE ARE NOT AUDIT ROWS ─────────────────────────────────────────────────────────────────
  * `audits` is append-only by RLS policy and is never pruned. An UNAUTHENTICATED endpoint that writes to it
  * on every rejection is an amplification primitive: one script, one afternoon, a compliance ledger nobody
- * can read and nobody can clean. The failures are logged instead. The cost is stated rather than hidden —
- * a tenant admin has no in-app view of why a member's sign-in failed, and building one is a follow-up.
+ * can read and nobody can clean.
+ *
+ * ── P1c BUILT THE OTHER STORE, AND THE DISTINCTION IS THE WHOLE REASON IT COULD ─────────────────────
+ * The follow-up this docblock used to name is `sso_auth_failures`, written by {@see SsoAuthFailureRecorder}
+ * and read by the settings screen. It is not `audits` under another name: it is trimmed on every write to a
+ * bounded row count and a retention window, so an anonymous caller can fill it and gain nothing. The log
+ * line stays exactly where it was — the operator's surface and the tenant's are different surfaces.
  */
 final class SsoAuthenticationException extends RuntimeException
 {
-    private function __construct(public readonly string $reason, string $message, ?Throwable $previous = null)
-    {
+    /**
+     * ⚠️ `$subject` IS SET STRUCTURALLY, NEVER PARSED BACK OUT OF `$message` (P1c). Three factories below
+     * interpolate an email into their prose, and the failures panel needs that address as a field — reading
+     * it back with a regular expression would make the wording of a log line into a wire format.
+     *
+     * ⚠️ AND IT IS NULL FOR EVERY PRE-VALIDATION REFUSAL, WHICH IS THE POINT. An address only exists here
+     * once a signature over the assertion carrying it has verified. Recording one from a document that
+     * failed validation would put attacker-chosen text on an admin's screen and in a tenant's database, on
+     * an endpoint anyone on the internet can post to.
+     */
+    private function __construct(
+        public readonly SsoFailureReason $reason,
+        string $message,
+        ?Throwable $previous = null,
+        public readonly ?string $subject = null,
+    ) {
         parent::__construct($message, 0, $previous);
     }
 
@@ -41,17 +61,17 @@ final class SsoAuthenticationException extends RuntimeException
 
     public static function missingResponse(): self
     {
-        return new self('response_missing', 'The request carried no SAMLResponse field.');
+        return new self(SsoFailureReason::ResponseMissing, 'The request carried no SAMLResponse field.');
     }
 
     public static function responseTooLarge(int $bytes): self
     {
-        return new self('response_too_large', "The SAMLResponse field is {$bytes} bytes, beyond saml.max_response_bytes.");
+        return new self(SsoFailureReason::ResponseTooLarge, "The SAMLResponse field is {$bytes} bytes, beyond saml.max_response_bytes.");
     }
 
     public static function malformedResponse(string $detail, ?Throwable $previous = null): self
     {
-        return new self('response_malformed', "The SAMLResponse could not be read: {$detail}", $previous);
+        return new self(SsoFailureReason::ResponseMalformed, "The SAMLResponse could not be read: {$detail}", $previous);
     }
 
     /*
@@ -69,25 +89,25 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function unsolicited(): self
     {
-        return new self('unsolicited_assertion', 'The assertion carries no InResponseTo; IdP-initiated SSO is refused.');
+        return new self(SsoFailureReason::UnsolicitedAssertion, 'The assertion carries no InResponseTo; IdP-initiated SSO is refused.');
     }
 
     /** Never minted, minted by another tenant, already consumed, or expired — four things, one answer. */
     public static function unknownRequest(string $inResponseTo): self
     {
-        return new self('unknown_request', "No live authentication request matches InResponseTo {$inResponseTo}.");
+        return new self(SsoFailureReason::UnknownRequest, "No live authentication request matches InResponseTo {$inResponseTo}.");
     }
 
     /** The atomic consume lost its race: another request burned this row between the read and the write. */
     public static function requestReplayed(string $requestId): self
     {
-        return new self('request_replayed', "Authentication request {$requestId} was consumed concurrently.");
+        return new self(SsoFailureReason::RequestReplayed, "Authentication request {$requestId} was consumed concurrently.");
     }
 
     /** The second, independent ledger: this assertion id has been presented before (§D8). */
     public static function assertionReplayed(string $assertionId): self
     {
-        return new self('assertion_replayed', "Assertion {$assertionId} has already been consumed.");
+        return new self(SsoFailureReason::AssertionReplayed, "Assertion {$assertionId} has already been consumed.");
     }
 
     /*
@@ -99,7 +119,7 @@ final class SsoAuthenticationException extends RuntimeException
     /** php-saml refused it — signature, audience, destination, issuer, subject confirmation or schema. */
     public static function invalidAssertion(string $detail, ?Throwable $previous = null): self
     {
-        return new self('invalid_assertion', "The assertion failed validation: {$detail}", $previous);
+        return new self(SsoFailureReason::InvalidAssertion, "The assertion failed validation: {$detail}", $previous);
     }
 
     /**
@@ -112,7 +132,7 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function outsideConditions(string $detail): self
     {
-        return new self('assertion_outside_conditions', "The assertion is outside its Conditions window: {$detail}");
+        return new self(SsoFailureReason::AssertionOutsideConditions, "The assertion is outside its Conditions window: {$detail}");
     }
 
     /*
@@ -123,13 +143,13 @@ final class SsoAuthenticationException extends RuntimeException
 
     public static function noEmail(): self
     {
-        return new self('no_email', 'The assertion carries no usable email address for this connection.');
+        return new self(SsoFailureReason::NoEmail, 'The assertion carries no usable email address for this connection.');
     }
 
     /** A subject this workspace has never seen, on a connection whose admin turned JIT off. */
     public static function provisioningDisabled(string $email): self
     {
-        return new self('jit_disabled', "No member matches {$email} and just-in-time provisioning is disabled.");
+        return new self(SsoFailureReason::JitDisabled, "No member matches {$email} and just-in-time provisioning is disabled.", subject: $email);
     }
 
     /**
@@ -142,7 +162,7 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function membershipSuspended(string $email): self
     {
-        return new self('membership_suspended', "The membership for {$email} is suspended.");
+        return new self(SsoFailureReason::MembershipSuspended, "The membership for {$email} is suspended.", subject: $email);
     }
 
     /**
@@ -154,7 +174,7 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function seatQuotaExhausted(string $email): self
     {
-        return new self('seat_quota_exhausted', "The workspace has no seat available for {$email}.");
+        return new self(SsoFailureReason::SeatQuotaExhausted, "The workspace has no seat available for {$email}.", subject: $email);
     }
 
     /*
@@ -178,7 +198,7 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function stepUpNotForced(string $requestId): self
     {
-        return new self('step_up_not_forced', "Step-up request {$requestId} did not carry ForceAuthn.");
+        return new self(SsoFailureReason::StepUpNotForced, "Step-up request {$requestId} did not carry ForceAuthn.");
     }
 
     /**
@@ -190,7 +210,7 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function stepUpUnknownSubject(string $email): self
     {
-        return new self('step_up_unknown_subject', "No account matches {$email}; a step-up never provisions.");
+        return new self(SsoFailureReason::StepUpUnknownSubject, "No account matches {$email}; a step-up never provisions.", subject: $email);
     }
 
     /**
@@ -202,6 +222,6 @@ final class SsoAuthenticationException extends RuntimeException
      */
     public static function stepUpSubjectMismatch(string $email): self
     {
-        return new self('step_up_subject_mismatch', "The assertion re-authenticated {$email}, who is not the subject this step-up named.");
+        return new self(SsoFailureReason::StepUpSubjectMismatch, "The assertion re-authenticated {$email}, who is not the subject this step-up named.", subject: $email);
     }
 }

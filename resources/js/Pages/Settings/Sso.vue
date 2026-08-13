@@ -28,6 +28,7 @@ import SpDetailsCard from '@/components/sso/SpDetailsCard.vue';
 import IdpMetadataCard from '@/components/sso/IdpMetadataCard.vue';
 import SsoPolicyCard from '@/components/sso/SsoPolicyCard.vue';
 import SsoStatusCard from '@/components/sso/SsoStatusCard.vue';
+import SsoFailuresCard from '@/components/sso/SsoFailuresCard.vue';
 import type { SsoPageProps } from '@/components/sso/types';
 
 const props = defineProps<SsoPageProps>();
@@ -96,6 +97,12 @@ function remove(): void {
                 :attribute-keys="attributeKeys"
                 :can-configure="can.configure"
             />
+
+            <!-- P1c. LAST in the stack deliberately: it is a diagnostic an admin comes looking for, not
+                 something to walk past on the way to configuring the connection. It is also the one card
+                 that stays useful after a downgrade — `can.configure` hides the paid controls above, and
+                 the reason a member cannot sign in is not a paid capability. -->
+            <SsoFailuresCard v-if="data" :failures="failures" :serving="data.serves_protocol" />
         </div>
 
         <MdsEmptyState

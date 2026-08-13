@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Sso;
 
+use App\Enums\SsoFailureReason;
 use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
+use App\Models\SsoAuthFailure;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
@@ -36,6 +38,12 @@ use App\Support\Authorization\AssignableRoles;
  */
 final class SsoConnectionPresenter
 {
+    /**
+     * How many refusals the panel shows. Well under `saml.failure_log_max_rows` on purpose: the store's cap
+     * is a safety bound against a grinder, and showing all of it would turn a diagnostic list into a wall.
+     */
+    private const RECENT_FAILURES = 20;
+
     public function __construct(
         private readonly SsoConnectionService $connections,
         private readonly SsoCertificateInspector $inspector,
@@ -55,6 +63,9 @@ final class SsoConnectionPresenter
 
         return [
             'data' => $connection === null ? null : $this->row($connection),
+            // P1c. Discharges §D19's owed work: until now a member whose IdP clock had drifted saw a bare
+            // 404 and their admin had no in-app view of why.
+            'failures' => $connection === null ? [] : $this->failures(),
             'sp' => [
                 'entity_id' => SsoMetadataController::entityId($tenant),
                 'acs_url' => SsoMetadataController::assertionConsumerServiceUrl($tenant),
@@ -115,6 +126,46 @@ final class SsoConnectionPresenter
             'status' => $connection?->status->value,
             'status_label' => $connection?->status->label(),
         ];
+    }
+
+    /**
+     * The recent refusals this workspace's admin may act on (P1c — ADR-0016 §D26).
+     *
+     * ⚠️ THIS IS NOT THE ORACLE §D19 REFUSES TO BE, AND THE DIFFERENCE IS THE AUDIENCE. That posture makes
+     * every ACS response an indistinguishable 404 because an UNAUTHENTICATED caller who learns "wrong
+     * audience" has learned that the signature verified. The reader here is authenticated, holds
+     * `tenant.settings.manage` on this workspace, and is asking why their own colleague cannot sign in.
+     * Telling them discloses nothing an attacker could reach without already being an admin of the
+     * workspace they are attacking.
+     *
+     * ⚠️ THE ROWS ARE TRIMMED AT THE WRITE, so "twenty most recent" is a page, not an archive. Nothing here
+     * paginates deliberately: a panel that invited an admin to walk backwards through a bounded, silently
+     * shortening list would be promising history the store does not keep.
+     *
+     * `label` and `hint` are composed server-side from {@see SsoFailureReason} rather than mapped in the
+     * page, so the vocabulary the database CHECK pins, the thing the log prints and the sentence an admin
+     * reads all come from one enum.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function failures(): array
+    {
+        return SsoAuthFailure::query()
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit(self::RECENT_FAILURES)
+            ->get()
+            ->map(static fn (SsoAuthFailure $failure): array => [
+                'id' => (string) $failure->getKey(),
+                'reason' => $failure->reason->value,
+                'reason_label' => $failure->reason->label(),
+                'hint' => $failure->reason->hint(),
+                'subject_email' => $failure->subject_email,
+                'request_id' => $failure->request_id,
+                'ip_address' => $failure->ip_address,
+                'occurred_at' => $failure->occurred_at->toIso8601String(),
+            ])
+            ->all();
     }
 
     /**

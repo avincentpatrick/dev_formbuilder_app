@@ -113,6 +113,24 @@ class SsoAuthRequest extends Model implements TenantScoped
     }
 
     /**
+     * Whether a string is shaped like an id {@see mintRequestId()} could have produced.
+     *
+     * ⚠️ NOT AN EXISTENCE CHECK, AND NEVER A SUBSTITUTE FOR ONE. Its only caller is the failure recorder,
+     * which wants to store the `InResponseTo` an UNVALIDATED document claimed so an admin can correlate a
+     * panel row with a log line. That value is attacker-controlled text on its way into a `char(33)`
+     * column: a longer one makes the INSERT throw, the recorder swallow it, and the whole panel go quiet
+     * for as long as somebody keeps sending them. Storing it only when it matches the shape we mint turns
+     * that from a suppression primitive into a null.
+     *
+     * The lesson is `SsoIdentityResolver`'s, one layer out: a value being authentic is not the same as it
+     * being well-formed, and here it is not even authentic.
+     */
+    public static function isMintedShape(string $candidate): bool
+    {
+        return preg_match('/^_[0-9a-f]{32}$/', $candidate) === 1;
+    }
+
+    /**
      * Whether this request may still be consumed, ignoring single-use (which only the atomic UPDATE can
      * answer). Expiry is evaluated WITHOUT clock skew: the skew allowance exists for disagreement between
      * the IdP's clock and ours over timestamps THE IDP wrote, whereas `expires_at` is a value this host

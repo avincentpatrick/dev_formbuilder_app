@@ -28,7 +28,11 @@ use Illuminate\Contracts\Auth\Authenticatable;
  */
 class RlsAwareUserProvider extends EloquentUserProvider
 {
-    private const AUTH_CONNECTION = 'pgsql_auth';
+    /**
+     * Public so the one pre-auth WRITE that does not go through this class can name the same constant
+     * rather than repeat the string — see App\Models\User::replaceRecoveryCode() (Increment J3c1).
+     */
+    public const AUTH_CONNECTION = 'pgsql_auth';
 
     /**
      * Bind every provider query to the pre-auth connection. All of the parent's retrieve* methods

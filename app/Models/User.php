@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Auth\RlsAwareUserProvider;
 use App\Enums\AccentToken;
 use App\Enums\FontSizeScale;
 use App\Enums\ThemeMode;
@@ -55,7 +56,52 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasUuidv7;
     use Notifiable;
     use SoftDeletes;
-    use TwoFactorAuthenticatable;
+
+    // Aliased, not plain, so replaceRecoveryCode() below can wrap it — see that method for why.
+    use TwoFactorAuthenticatable {
+        replaceRecoveryCode as private replaceRecoveryCodeOnCurrentConnection;
+    }
+
+    /**
+     * Rotate a used recovery code on the connection that can actually see this row (Increment J3c1).
+     *
+     * ⚠️ THIS IS A PRE-AUTH WRITE, AND WITHOUT THE SWITCH IT SILENTLY DID NOTHING. Its only caller is
+     * Fortify's TwoFactorAuthenticatedSessionController::store(), which rotates the code the person just
+     * spent — BEFORE `Auth::login()`, so `app.current_user_id` is still unset. The trait's body is
+     * `forceFill([...])->save()` on the default connection, and while `users_app_update` is permissive,
+     * PostgreSQL applies the SELECT policy to an UPDATE whose WHERE reads a column: `users_users_visibility`
+     * matches nothing, the statement affects ZERO ROWS, throws nothing, `save()` returns true, and
+     * `RecoveryCodeReplaced` fires as if it had worked.
+     *
+     * The consequence is not cosmetic. Recovery codes are single-use by construction, so a rotation that
+     * never lands leaves the spent code VALID FOREVER — turning a lockout defect into a credential-reuse
+     * one. It is the same zero-row shape PR #147 fixed on six other Fortify endpoints, arriving on the one
+     * write that middleware cannot reach, because this write happens inside the login request itself.
+     *
+     * `pgsql_auth` can do it: `users_auth_select USING (true) TO meridian_auth` makes the row visible, the
+     * permissive `users_app_update` policy permits the write, and the apply_users_rls migration GRANTs
+     * SELECT + UPDATE on `users` to that role. This is the same asymmetry
+     * {@see RlsAwareUserProvider} already documents for the password-reset save.
+     *
+     * Switch-call-restore rather than a GUC change, mirroring
+     * {@see RlsAwareUserProvider::updateRememberToken()}: the object this is called on becomes
+     * `Auth::user()` moments later, and `meridian_auth` holds grants on `users` alone, so leaving it
+     * elevated would fail on the first relation the request touched. `finally`, so a throw cannot strand it.
+     *
+     * @param  string  $code
+     */
+    public function replaceRecoveryCode($code): void
+    {
+        $original = $this->getConnectionName();
+
+        $this->setConnection(RlsAwareUserProvider::AUTH_CONNECTION);
+
+        try {
+            $this->replaceRecoveryCodeOnCurrentConnection($code);
+        } finally {
+            $this->setConnection($original ?? (string) Config::get('database.default'));
+        }
+    }
 
     /**
      * Pin Spatie's guard for this model to the RBAC catalog's guard (`web`, per RolePermissionSeeder),

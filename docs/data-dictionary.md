@@ -1046,7 +1046,7 @@ The tenant's federated-identity trust anchor (P1a; ADR-0016). **Exactly one row 
 | `attribute_map` | `jsonb` | No | `'{}'` | No | Optional overrides mapping this IdP's assertion attribute names onto `email` / `name` / `first_name` / `last_name`. Empty = use the conventional names. |
 | `jit_provisioning_enabled` | `boolean` | No | `true` | No | Whether an unknown-but-authenticated subject is provisioned on first login (user decision, 2026-08-13: default ON). |
 | `default_role_name` | `varchar(30)` | No | `'viewer'` | No | The role a JIT-provisioned member receives. CHECK generated from `RolePermissionSeeder::ROLES` **minus `owner`** — RBAC §5 establishes Owner only by ownership transfer, and an IdP attribute must never be a path to it. |
-| `last_login_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the ACS (P1b). Deliberately **not** `$fillable` — it is machine-written, never part of a settings save. |
+| `last_login_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the ACS (P1b). Deliberately **not** `$fillable` — it is machine-written, never part of a settings save. ⚠️ Written with a direct one-column `UPDATE`, never a model `save()`: with `APP_PREVIOUS_KEYS` set, `originalIsEquivalent()` short-circuits to false for every `encrypted:` cast, so `idp_certificates` is permanently dirty and a save would rewrite the trust anchor on every single login. |
 | `created_by` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE SET NULL`. |
 | `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
 
@@ -1063,6 +1063,8 @@ The tenant's federated-identity trust anchor (P1a; ADR-0016). **Exactly one row 
 
 One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 §D8). The replay ledger: an assertion is only accepted against a row here that is still live, and consuming it is a one-way transition.
 
+**Writer and consumer (P1b):** `SsoAuthRequestService::mint()` from `GET /sso/saml/login`, `::findLive()` then `::consume()` from `POST /sso/saml/acs`. The look-up and the consume are deliberately two calls — see ADR-0016 §D18 — so a garbage POST carrying a guessed `InResponseTo` cannot invalidate somebody's pending sign-in, while single use still binds at the moment a session is created. `consumed_at` is **not** in the model's `$fillable`, so the only way to write it is the conditional UPDATE.
+
 | Column | Type | Nullable | Default | PII? | Description |
 |---|---|---|---|---|---|
 | `id` | `uuid` | No | `uuidv7()` | No | Primary key. |
@@ -1071,7 +1073,7 @@ One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 
 | `request_id` | `char(33)` | No | — | No | The `AuthnRequest` `@ID` echoed back as `InResponseTo`. `_` + 32 hex — the leading underscore is required, not cosmetic: `xs:ID` derives from `xs:NCName`, which may not begin with a digit, and some IdPs reject or mangle a bare hex string. **Globally unique, not per-tenant**: it is matched from an unauthenticated request body before any tenant scoping can be trusted, so a cross-tenant collision would be a second row a cross-tenant read could match. |
 | `intent` | `varchar(20)` — PHP enum: `SsoAuthIntent` | No | — | No | `login` (an unauthenticated visitor establishing a session) or `step_up` (an already-authenticated user re-proving identity for a high-blast-radius mutation). Load-bearing, not descriptive: it is what authorises the ACS to stamp `auth.password_confirmed_at`, and without it any successful assertion would silently refresh the step-up clock. CHECK from the enum. |
 | `user_id` | `uuid` | Yes | `NULL` | No | FK to `users.id`, `ON DELETE CASCADE`. The subject a `step_up` is about. A CHECK pins **both** directions — `step_up` requires it, `login` forbids it — because a login request carrying one would let a consumed login assertion masquerade as a step-up. |
-| `return_to` | `varchar(500)` | Yes | `NULL` | No | Where to land after a successful round trip. Chosen by the SP at mint time and **never** populated from SAML `RelayState`, which is attacker-controlled. |
+| `return_to` | `varchar(500)` | Yes | `NULL` | No | Where to land after a successful round trip. Chosen by the SP at mint time and **never** populated from SAML `RelayState`, which is attacker-controlled. **Always NULL as of P1b** (ADR-0016 §D21): nothing yet bounces an unauthenticated deep link through SSO, so there is no server-side origin to record, and taking one from the query string would be an open redirect. P1c's step-up is its first writer; the ACS lands on `/dashboard` unconditionally until then. |
 | `force_authn` | `boolean` | No | `false` | No | Whether the IdP was told not to answer from an existing session. One of the three conditions a step-up stamp requires. |
 | `issued_at` | `timestamptz` | No | — | No | — |
 | `expires_at` | `timestamptz` | No | — | No | `config('saml.authn_request_ttl_seconds')` after issue. Evaluated **without** clock skew: skew exists for disagreement over timestamps the *IdP* wrote, and this is a value this host wrote and reads back. |
@@ -1085,7 +1087,7 @@ One outstanding SAML `AuthnRequest` this Service Provider minted (P1a; ADR-0016 
 > - **RLS**: strict, same reasoning as §27 — the ACS is unauthenticated and tenant context comes from the host.
 > - **Expired rows are not deleted on read.** `consumed_at` and `expires_at` are both retained so the ACS can distinguish *expired* from *already used* from *never existed* — three different security events, only one of which is an attack.
 > - **This ledger exists because ADR-0009 §D3's stateless HMAC nonce does not transfer here**, and ADR-0009 says so itself: it declares the stateless `state` insufficient once a callback gains a side effect beyond writing the connection it names, and a SAML ACS establishes a session. An HMAC proves we minted a token; it cannot prove single use.
-> - A second, independent mechanism (a cache ledger keyed on the assertion's own `@ID`) covers an IdP that mints two assertions for one request. Both are required; neither subsumes the other.
+> - A second, independent mechanism (a cache ledger keyed on the assertion's own `@ID`, TTL `config('saml.assertion_replay_ttl_seconds')`, written with an atomic `Cache::add()`) covers an IdP that mints two assertions for one request — a case this table structurally cannot see, because both assertions legitimately answer distinct live rows. Both are required; neither subsumes the other, and **this one runs first**, because it is the mechanism a cache eviction cannot silently turn into a no-op.
 
 ---
 

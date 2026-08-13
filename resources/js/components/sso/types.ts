@@ -65,6 +65,11 @@ export interface SsoServiceProvider {
     entity_id: string;
     acs_url: string;
     metadata_url: string;
+    /**
+     * Where a member starts a sign-in (P1b). The odd one out: the three above are for the IdP, this one is
+     * for the workspace's own people — a bookmark, an intranet tile, or the IdP's "sign-in page URL" field.
+     */
+    login_url: string;
 }
 
 export interface SsoOption {

@@ -192,6 +192,43 @@ final class TenantMembershipService
      */
     public function joinOpenTenant(Tenant $tenant, User $user, string $roleName = 'viewer'): ?TenantUser
     {
+        return $this->attachMember($tenant, $user, $roleName, 'self_registration');
+    }
+
+    /**
+     * Materialize the membership an identity provider's assertion implies (P1b — ADR-0016 §D7).
+     *
+     * Shares {@see joinOpenTenant()}'s body entirely, and the sharing is the point: the context borrow, the
+     * `SET LOCAL` transaction, the seat-quota reservation, the reuse of a prior Declined/Removed row and
+     * the one-role-per-tenant `syncRoles` are all the same problem, and a second implementation would be
+     * right until the day one of them changed. What differs is one string — the audit's `via` — because
+     * "how did this person get in" is the only question the two doors answer differently, and the ledger is
+     * the only place the answer survives.
+     *
+     * ⚠️ THE ROLE IS THE TENANT'S CHOICE, NOT A DEFAULT. `sso_connections.default_role_name` is
+     * CHECK-constrained to the seeded catalog MINUS `owner` (see `AssignableRoles`), because RBAC §5
+     * establishes Owner only by ownership transfer and an IdP attribute must never be a path to it.
+     *
+     * ⚠️ AND THE CALLER MUST HAVE ALREADY REFUSED A SUSPENDED MEMBERSHIP. This method reactivates any
+     * non-Active row, which is correct for both doors' "not currently a member" states — but `Suspended` is
+     * an explicit administrative sanction and reactivating it would let SSO launder a decision an admin
+     * made. `App\Services\Sso\SsoUserProvisioner` checks that before calling here — named in prose rather
+     * than through `{@see}` on purpose, so this generic tenancy service imports nothing from the SSO seam
+     * and the dependency keeps pointing one way.
+     */
+    public function joinViaSso(Tenant $tenant, User $user, string $roleName): ?TenantUser
+    {
+        return $this->attachMember($tenant, $user, $roleName, 'sso_jit');
+    }
+
+    /**
+     * The shared membership write. See {@see joinOpenTenant()} for the context-borrow and quota reasoning.
+     *
+     * @param  string  $via  how the member arrived, for the audit payload — the only difference between the
+     *                       self-registration door and the SSO one
+     */
+    private function attachMember(Tenant $tenant, User $user, string $roleName, string $via): ?TenantUser
+    {
         $role = Role::query()->where('name', $roleName)->whereNull('tenant_id')->first();
 
         if ($role === null) {
@@ -205,7 +242,7 @@ final class TenantMembershipService
         $savedUser = TenantContext::currentUserId();
         $savedTeam = app(PermissionRegistrar::class)->getPermissionsTeamId();
 
-        return DB::transaction(function () use ($user, $role, $tenantId, $userId, $savedTenant, $savedUser, $savedTeam): ?TenantUser {
+        return DB::transaction(function () use ($user, $role, $tenantId, $userId, $via, $savedTenant, $savedUser, $savedTeam): ?TenantUser {
             TenantContext::applyLocal($tenantId, $userId);
             app(PermissionRegistrar::class)->setPermissionsTeamId($tenantId);
 
@@ -240,10 +277,10 @@ final class TenantMembershipService
 
                 $user->syncRoles([$role]);
 
-                // `via` is what distinguishes this row from an accepted invitation in the ledger — the two
-                // produce the same membership and the same role, and only the audit says which door it
-                // came through. Keyed on the membership's own uuid (tenant_users.id IS a uuid, so I2's
-                // 22P02 hazard does not apply here).
+                // `via` is what distinguishes this row from an accepted invitation in the ledger — the
+                // three doors produce the same membership and the same role, and only the audit says which
+                // one it came through. Keyed on the membership's own uuid (tenant_users.id IS a uuid, so
+                // I2's 22P02 hazard does not apply here).
                 $this->audit->record(
                     AuditEvent::Created,
                     'tenant_users',
@@ -252,7 +289,7 @@ final class TenantMembershipService
                         'user_id' => $userId,
                         'status' => TenantUserStatus::Active->value,
                         'role' => $role->name,
-                        'via' => 'self_registration',
+                        'via' => $via,
                     ],
                     actorId: $userId,
                 );
@@ -605,7 +642,22 @@ final class TenantMembershipService
         ]);
     }
 
-    private function resolveUserByEmail(string $email): ?User
+    /**
+     * The global identity behind an email address, resolved across the `users` RLS boundary.
+     *
+     * ⚠️ PUBLIC SINCE P1b, WITH ONE RULE ATTACHED. `pgsql_auth` carries a permissive `TO meridian_auth`
+     * carve-out, so the join-shape visibility policy is OR'd away entirely and this query sees EVERY user
+     * in the deployment — including members of other tenants. That is exactly what makes it the right tool
+     * for "is this email already an account anywhere?" and exactly what makes it dangerous:
+     * **no user-supplied predicate may ever run on this connection** (RBAC §9, and
+     * `MemberSearchArm` documents the same rule from the other side). Exact-email
+     * equality only. A `LIKE`, an `orWhere`, or a caller-chosen column here turns a uniqueness check into a
+     * cross-tenant directory.
+     *
+     * The model is hopped back onto the default connection before it is returned, so nothing downstream
+     * writes through the pre-auth role — the `CreateNewUser` / `InvitationController` idiom.
+     */
+    public function resolveUserByEmail(string $email): ?User
     {
         $user = User::on('pgsql_auth')->where('email', $email)->first();
         $user?->setConnection((string) config('database.default'));

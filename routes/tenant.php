@@ -39,6 +39,8 @@ use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SearchController;
+use App\Http\Controllers\Tenant\Sso\SsoAcsController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginController;
 use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
 use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
 use App\Http\Controllers\Tenant\SubmissionController;
@@ -957,6 +959,21 @@ Route::middleware([
     AppSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/sso/saml/metadata', SsoMetadataController::class)->name('sso.metadata');
+
+    // P1b — the login round trip. Both halves are unauthenticated and both carry their own per-IP limiter:
+    // the login path mints a database row on every hit, and the ACS runs XML signature validation over an
+    // attacker-supplied document, so each is work an anonymous caller can ask for repeatedly. Ceilings are
+    // generous against a human clicking "sign in" twice and tight against a script.
+    Route::get('/sso/saml/login', SsoLoginController::class)
+        ->middleware('throttle:saml-login')->name('sso.login');
+
+    // ⚠️ CSRF-EXEMPT, by exact path in bootstrap/app.php. A cross-origin form POST from an identity
+    // provider carries no token, and with SameSite=Lax no session cookie arrives either — which is not a
+    // gap, because this request CREATES the session rather than acting on one. What replaces the token is
+    // the `InResponseTo` binding to a row this SP minted, plus the assertion's signature. Without the
+    // exemption the entire feature is a 419.
+    Route::post('/sso/saml/acs', SsoAcsController::class)
+        ->middleware('throttle:saml-acs')->name('sso.acs');
 });
 
 /*

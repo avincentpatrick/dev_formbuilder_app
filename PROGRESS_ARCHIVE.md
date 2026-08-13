@@ -2176,3 +2176,91 @@ PHPStan **delta zero** against the local baseline of 20 (the two it did add — 
 **The one user-facing way in is a URL on the SP-details card** (`sp.login_url`), which is lane hygiene rather than preference: `resources/js/Pages/auth/Login.vue` is the core file of Lane A's in-flight J3, and it renders neither a session `status` nor a generic error, so a redirect-with-flash there would have been silently invisible. A "continue with SSO" button is owed by the auth vertical.
 
 **`P1c` — protocol-aware step-up — is next, and P1b made it urgent.** A JIT-provisioned SSO user holds a random hash nobody knows; `RequireRecentPassword` compares `auth.password_confirmed_at`, and the only way to stamp it is a password they cannot produce. Every `step-up` route — including the SSO metadata import itself — is a dead end for exactly the users SSO was built for. The seam is already there and unused: `SsoAuthIntent::StepUp`, `force_authn`, `return_to`, and `mint()`'s three optional parameters.
+
+---
+
+## 2026-08-13 — LANE A · J3a: the auth vertical's PHP half (PR #145)
+
+J3 was split into three on the user's decision (three sub-PRs; Google via a central callback + signed
+handoff; split panel on the front doors only). **J3a** is the PHP half: the four character classes, the
+`verified` gate, a welcome email, and `member_joined`. **J3b** (split-panel `AuthLayout`,
+`MdsPasswordStrength`, the four deferred auth-axe pages) and **J3c** (Google sign-in) remain.
+
+CI: Pest **3767/0** (16,016 assertions) · E2E **505 passed / 1 flaky**, full 18m01s · Vitest **103** ·
+Storybook axe **223/33** · lint **86/96/29** · `openapi.json` **byte-identical**.
+
+**⚠️ THE ROW WAS WRONG IN THREE PLACES — FIVE-FOR-FIVE.** The auth pages are not the unstyled B1 versions
+(`FortifyServiceProvider.php:50` is stale prose; all eight have been design-system-styled since C1, so J3b
+is a re-layout, not a styling pass). The split panel has NINE `AuthLayout` consumers, not seven. And
+`openapi.json` does **not** move — Scramble's `api_path` is `api/v1`, so a web-only increment cannot touch
+it; the row said to expect it to move and regenerate deliberately.
+
+**⚠️⚠️ THE ZERO-ROW UPDATE ON `users`, WHICH BIT TWICE AND IS THE LESSON OF THE INCREMENT.**
+`users_app_update` is permissive, but PostgreSQL applies **SELECT** policies to an UPDATE whose `WHERE`
+reads a column, and `users_users_visibility` needs `app.current_user_id` or an ACTIVE co-tenant. With no
+GUC the row is invisible to its own update: **zero rows affected, no exception, no log line.** Measured
+directly — `0 affected` with the GUC cleared while the row is plainly there.
+
+  1. **It took the E2E job red, and the fix was itself the bug.** My seeder repair used `User::create()`
+     then `forceFill(['email_verified_at' => …])->save()`. The second write landed nothing, so
+     `global-setup.ts` signed the demo owner in, was redirected to `/email/verify`, and **all 506 specs
+     died before one ran** — the exact failure the increment had set out to prevent. It must be ONE INSERT
+     (`forceFill()` on a NEW model). Lane B's P1b reached the same shape independently, and its PR
+     described this trap while I was reading it.
+  2. **It is also a live, pre-existing product bug**, now in `docs/feature-backlog.md` under "Discovered
+     defects": `PUT /user/profile-information` is a Fortify route with **no tenancy middleware**, so
+     changing your name or email in Settings does nothing at all, silently. It matters more from J3a on,
+     because that endpoint is the only escape from a verification lockout: `UpdateUserProfileInformation`
+     nulls `email_verified_at` on an email change, and `/settings` is inside the gate the member just fell
+     behind. `auth/VerifyEmail.vue` now names the address and carries a correction form; the write path it
+     needs is this bug, so `EmailVerificationGateTest` deliberately asserts **only the half that works**.
+     Today the two defects cancel — the email never changes, so verification is never nulled — which is not
+     a property to ship on. **J3b's first job.**
+
+**FOUR MORE DEFECTS THE ROW NEVER NAMED.** (a) Three tests reached `api.pwnedpasswords.com` on every CI run
+and stayed green either way, because `NotPwnedVerifier` catches a failed lookup and **fails OPEN to
+"uncompromised"** — a merge-blocking gate silently depending on a third party. `fakeHibp()` is now in
+`tests/Pest.php`, the only place it can live. (b) The bell's type map had drifted since I11b, and the test
+that should have caught it compared two hand-maintained copies of the same list; fixed as a class —
+`NOTIFICATION_VISUAL` is `Record<NotificationTypeKey, …>` (a missing case fails type-check) and
+`NotificationTypeParityTest` reads the TS union off disk and asserts it equals `NotificationType::values()`,
+the half TypeScript cannot see. (c) The welcome email inferred workspace membership from
+`request()->getHost()`; Free caps `active_seats` at **2**, so the third self-registrant on any free
+workspace would have been told in writing they were a member of the workspace that had just refused them —
+and **my own test asserted that behaviour**. (d) A redundant nullsafe of mine, found by measuring the
+PHPStan delta **by identifier** rather than by count.
+
+**SEVEN OF MY OWN CLAIMS WERE WRONG, AND EACH CORRECTION IS IN THE CODE RATHER THAN ONLY THE COMMIT LOG.**
+The written position of `'verified'` does not order it against `auth` (`bootstrap/app.php`'s `priority()`
+list does — moving the line reddens nothing). The `forbidden` envelope is scoped to `api/v1/*`. Deleting the
+impersonation exemption would **not** redden `impersonation.spec.ts`, because every seeded identity is
+verified and that branch is never reached there — one Pest case is its only guard. My invite-path assertion
+used an anonymous class and could not see the controller at all. `PasswordPolicyTest`'s fixtures were all
+ASCII, so `[0-9]` — the exact drift the class docblock names — passed. The rollback case asserted something
+that could not fail. And the seeder fix was the bug.
+
+**MUTATION DISCIPLINE, WITH A NEW RULE.** Eight mutations verified red-then-green. ⚠️ **Two "did not
+redden" results were failed string replacements, not weak tests** — verify the mutation actually applied
+before drawing a conclusion from it.
+
+**AN ADVERSARIAL PASS RAN AFTER 6/6 GREEN** (80 agents, five lenses, three independent skeptics per finding,
+each prompted to refute). One survived: the welcome email's membership inference. The skeptics also
+correctly refuted that finding's stated impact — they read `/dashboard`'s routes and found no `can:` gate,
+so the claimed 403 does not exist — which is the pass working in both directions. **And CI then found a
+defect the review had missed.** Neither replaces the other.
+
+**⚠️ LOCAL VITEST, CORRECTED.** `--pool=threads` is right, but its one casualty is `relative-time.test.ts`,
+which mutates `process.env.TZ` — a worker thread cannot honour that; the file is green under the default
+pool. The default (forks) pool inside the node container **cannot scale even chunked**: 8 of 21
+design-system files with 13 worker errors, and the same command then returned "no tests, 21 errors". Run
+the files your change touches individually, **retry a "no tests" result**, and treat CI as the authority.
+⚠️ And **`composer install` inside the app container after merging the other lane** — 31 SSO failures that
+looked like a merge break were P1b's `onelogin/php-saml` never having been installed here.
+
+**CROSS-LANE.** I flagged that P1b would need to stamp `email_verified_at` on JIT-provisioned users; Lane B
+had already done it, with the right reasoning. The P1b merge then hoisted `joinOpenTenant()`'s body into a
+shared `attachMember(Tenant, User, roleName, via)`, so **`member_joined` now fires for SSO joins too** — a
+decision, recorded at the emission site rather than left as an accident of the merge: the notification
+answers "who is in this workspace and when did they arrive", equally true of an IdP arrival, and `$via`
+distinguishes them in the audit ledger where the distinction belongs. The one merge conflict was that
+closure's `use` list (mine needed `$tenant`, theirs `$via`); resolved as the union, not by taking a side.

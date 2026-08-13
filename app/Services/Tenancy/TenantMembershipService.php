@@ -17,7 +17,6 @@ use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
 use App\Services\Admin\SuperAdminService;
 use App\Services\Entitlements\QuotaGuard;
-use App\Services\Sso\SsoUserProvisioner;
 use App\Support\Audit\AuditLogger;
 use App\Support\Branding\BrandPalette;
 use App\Support\Search\SearchTerms;
@@ -213,7 +212,9 @@ final class TenantMembershipService
      * ⚠️ AND THE CALLER MUST HAVE ALREADY REFUSED A SUSPENDED MEMBERSHIP. This method reactivates any
      * non-Active row, which is correct for both doors' "not currently a member" states — but `Suspended` is
      * an explicit administrative sanction and reactivating it would let SSO launder a decision an admin
-     * made. {@see SsoUserProvisioner} checks that before calling here.
+     * made. `App\Services\Sso\SsoUserProvisioner` checks that before calling here — named in prose rather
+     * than through `{@see}` on purpose, so this generic tenancy service imports nothing from the SSO seam
+     * and the dependency keeps pointing one way.
      */
     public function joinViaSso(Tenant $tenant, User $user, string $roleName): ?TenantUser
     {

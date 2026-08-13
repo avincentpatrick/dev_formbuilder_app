@@ -1931,3 +1931,75 @@ deliberately excluded from tenant self-service at `ToggleableModules.php:27`, an
 directory at all. The user settled three forks on 2026-08-13 — **SAML 2.0 only** behind a protocol-neutral
 seam, **step-up re-authenticates via the IdP with `ForceAuthn`** rather than a local password, and
 **JIT provisioning at a tenant-configured default role with a per-tenant toggle defaulting ON**.
+
+---
+
+## 2026-08-13 — LANE A · JR5: the builder's responsive layout (the last JR row)
+
+Branch `jr5-builder-tabs`, zero PHP. The session opened on a prompt two rows stale (it asked for JR3, merged
+at #137; JR4 was merged at #141), and the row itself was wrong in three of its five words — **four-for-four
+now on verifying a doc-sourced row against the code before planning against it.**
+
+`Builder.vue`'s single `@media (max-width: 1024px)` rule **already linearized all three panes**, so nothing
+was hidden, off-screen or sideways-scrolling at 375px; the cost was ergonomic (scroll past ~31 palette
+buttons to reach the canvas). The defect the row never named is arithmetic: the builder is the app's only
+fluid page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
+below — **785px at a 1025px viewport against 960px at a 1024px one**. The three-column grid stayed on above
+1024, so across **1025–1200 the canvas track was 185px**, a state no Playwright project (375/834/1440) has
+ever rendered.
+
+One `@container (max-width: 60em)` on a container `.builder` establishes itself replaces the media query and
+fixes all three bands. **60em = 960px answers two independent questions that agree**: `260 + 340 + 360`,
+and `1024 − 64` (the widest box that can exist while the sidebar is still a rail) — the second is what makes
+the switch continuous across the sidebar swap. The inclusivity of `max-width` is load-bearing; at
+`59.9375em` the inversion returns from the other side. `em` not `px`, pinned by a `font-size` declaration on
+the container, so the threshold is 960 / 1080 / 1200px across the three type scales.
+
+The switcher is `MdsSegmentedControl` — a **radiogroup, deliberately not a tablist**: thirteen `[role="tab"]`
+locators across three specs, four of them loops that click every match, would have been joined by a second
+tablist. `MdsTabs` remains J4's, and DSR §3.4 now says not to retrofit it here. This does **not** reopen the
+J2b "no tab strip on the builder" decision: that refused a *navigation* row of links with routes and gates,
+and this carries no href, no `aria-current`, no landmark, and is `display: none` above the threshold.
+
+**Measured, 36 cases, zero failures**, plus a toolbar win that was measured rather than estimated: **375px
+369px → 225px (−144px)**, 834px 225px → 177px.
+
+**Two live defects fixed en route.** `.builder`'s `grid-template-rows: auto 1fr` assumed two children, so a
+warnings banner took the panes' flexible row. And **`MdsSegmentedControl` had no `position` on its fieldset**
+while its `<legend>` and `<input>`s are absolutely-positioned visually-hidden nodes — at 375px with the
+config pane selected the 1px legend sat 73px below the workspace and **the page gained 73px of real vertical
+scroll**. G11 found the identical bug horizontally on `MdsDataTable`, whose own comment already called it "a
+latent bug in this component". Same one-line fix; the component had **no unit test** until now (six Storybook stories already ran under the merge-blocking axe gate).
+
+**Two environment findings that cost real time and belong in the next hand-off.** (1) The local Vitest forks
+pool now fails **green**: a full run took 88 minutes and reported "50 passed (50)" with 50
+`Failed to start forks worker` errors and **exit code 0** — half the suite silently never ran, and the file
+count itself lied. `--pool=threads` starts workers reliably but OOMs on the full set; chunking by directory
+works. File count is now **101**. (2) **`tsconfig.json` excludes `resources/js/**/*.test.ts` and does not
+cover `tests/e2e/`**, so `npm run type-check` never sees either and Playwright is transpile-only — the six
+edited specs and both new test files were type-checked separately under `--strict`.
+
+**An adversarial pass run AFTER 6/6 CI green found a real regression every gate had passed**, which is the
+strongest argument yet for running one on a layout increment. 26 findings across five lenses, each refuted
+by three independent verifiers. The one that mattered: `saveError` is rendered in exactly one place in the
+client — `ConfigPanel.vue`'s `<p v-if="saveError" role="alert">` — inside the config pane, so a write that
+failed while the author was on Add or Form mounted that alert inside a `display: none` subtree: not painted,
+not in the accessibility tree, never announced. The replaced rule only linearized, so it was reachable at
+every width before this increment; the silence was new, on exactly the paths most likely to fail. Fixed with
+`watch(saveError, …)`. **The finding was first reported as refuted because I grepped `Builder.vue` for an
+error surface — the surface lives in `ConfigPanel.vue`. Grep the component that OWNS the state, not the page
+that composes it.**
+
+**Two of the new assertions could not fail, which is worse than not having them.** The `@container` positive
+assertions were satisfied by the page's own script comment, which spells the literal string — a revert to a
+viewport media query would have stayed green. The `v-if` negative assertion required the directive after the
+class attribute, while this repo writes directives first. Both anchored, and all three strengthened
+assertions mutation-tested against the broken code before being believed.
+
+**And a number called "measured" was computed, and computed wrong.** The old canvas track was **185px, not
+183px**: `box-sizing: border-box` is global, so the 1px pane borders sit inside the 260/340 tracks — which
+this increment's own sweep already proved (box 1200 → canvas 600, box 961 → canvas 361, neither showing a
+border subtraction). The 60em derivation is `260 + 340 + 360`. Two prose overclaims went the same way:
+"nothing reads scrollHeight" (FieldPalette reads its own; no *gate* asserts on the document's) and
+"MdsSegmentedControl had no test at all" (no *unit* test — six Storybook stories already ran under the axe
+gate).

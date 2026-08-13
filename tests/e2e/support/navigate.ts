@@ -1,4 +1,4 @@
-import { type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * One form's entry on `/forms`, in WHATEVER view the page is currently rendering (JR3).
@@ -72,4 +72,60 @@ export async function openBuilder(page: Page, formTitle: string): Promise<void> 
 
     await page.getByRole('navigation', { name: formTitle }).getByRole('link', { name: 'Builder' }).click();
     await page.waitForURL('**/builder', { timeout: 30_000 });
+}
+
+/**
+ * The builder's three panes, keyed by the pane switcher's own label (JR5).
+ *
+ * The label is what gets clicked and the selector is what gets awaited, so the two live together — a
+ * relabelled segment breaks compilation here rather than timing out in eleven call sites.
+ */
+const BUILDER_PANES = {
+    fields: { label: 'Add', selector: '.builder__pane--left' },
+    canvas: { label: 'Form', selector: '.builder__pane--canvas' },
+    settings: { label: 'Settings', selector: '.builder__pane--config' },
+} as const;
+
+/**
+ * Put ONE of the builder's three panes on screen, at whatever width the project is running (JR5).
+ *
+ * ── WHY EVERY BUILDER SPEC NOW NEEDS THIS ───────────────────────────────────────────────────────────────
+ * JR5 replaced the builder's `@media (max-width: 1024px)` linearization — which stacked all three panes
+ * into one scrolling column, so everything was on screen and no spec ever had to ask for a pane — with
+ * `@container (max-width: 60em)`, below which exactly ONE pane is displayed. Anything a spec reaches for
+ * inside the palette, the canvas or the config panel now has to say which pane it wants first.
+ *
+ * ⚠️ RUNTIME-CONDITIONAL, NEVER `info.project.name`. The threshold is 60em of the BUILDER's own box, and
+ * a container query's `em` resolves against the container's own font size — 16/18/20px across §2.9's three
+ * scales, so 60em is 960 / 1080 / 1200px. `personalization-axe.spec.ts` therefore reaches the compact
+ * layout AT THE 1440 DESKTOP PROJECT the moment it sets `data-font-size="extra_large"`. A helper keyed on
+ * the project name would be wrong there, and only there, which is exactly where nobody would look.
+ *
+ * ⚠️ THE CLICK LANDS ON THE OPTION'S LABEL TEXT, NOT ON THE RADIO. `MdsSegmentedControl` hides its inputs
+ * at 1×1px with `clip`, so `.check()` on one is an actionability coin-flip. Clicking the visible label is
+ * the pattern `builder-axe.spec.ts` already uses for the Structure/Logic control. The `getByText` is scoped
+ * to the switcher and the control's `ariaLabel` deliberately shares no word with any option, so the
+ * visually-hidden legend cannot resolve as a second match.
+ *
+ * Returns FALSE when the switcher is not on screen — i.e. the builder is wide and all three panes are
+ * already up — so a caller can skip a per-pane scan that would duplicate the whole-page one:
+ *
+ *     if (await showBuilderPane(page, 'fields')) { await scan(page, 'compact — Add'); }
+ */
+export async function showBuilderPane(
+    page: Page,
+    pane: keyof typeof BUILDER_PANES,
+): Promise<boolean> {
+    // Hydration settle. `.builder__panes` exists only once Vue has rendered, and this REPLACES the
+    // `getByRole('tab').first()` settle three specs used — that locator resolved into ConfigPanel's
+    // tablist, which is no longer on screen at a width where the config pane is not the selected one.
+    await page.locator('.builder__panes').waitFor({ state: 'visible', timeout: 30_000 });
+
+    const strip = page.locator('.builder__pane-switch');
+    if (!(await strip.isVisible())) return false;
+
+    await strip.getByText(BUILDER_PANES[pane].label, { exact: true }).click();
+    await expect(page.locator(BUILDER_PANES[pane].selector)).toBeVisible({ timeout: 30_000 });
+
+    return true;
 }

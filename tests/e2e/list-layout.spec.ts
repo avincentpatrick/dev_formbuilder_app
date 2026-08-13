@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { settlePaint } from './support/axe';
+import { openBuilder } from './support/navigate';
 
 /**
  * Increment JR4 — the two properties this increment adds, neither of which any existing gate can see.
+ * (JR5 added a third at the bottom of this file, for the same structural reason: the builder's compact
+ * layout is a container query, and a container query is invisible to every other gate in this repo.)
  *
  * ⚠️ `assertClean` CANNOT STAND IN FOR EITHER OF THESE, AND THAT IS STRUCTURAL RATHER THAN AN OVERSIGHT.
  * `.app-shell` is `overflow-x: clip` (`AppLayout.vue`), so a table wider than its region is CLIPPED, not
@@ -73,4 +76,40 @@ test('the wide column fills a 1600px window, and a form page still does not', as
     // Unchanged, and that is the point of an opt-in list: 1600px of 640px-wide settings cards would be
     // 900px of dead canvas beside a column of controls.
     expect(Math.round(form!.width), 'a form page must keep its measure').toBe(1200);
+});
+
+// ── JR5 — THE BUILDER'S COMPACT LAYOUT ──────────────────────────────────────────────────────────────────
+// Same blindness, second surface, which is why this case lives here rather than in a new file: the header
+// above describes a general problem (`.app-shell` is `overflow-x: clip`, so `assertClean` reads a document
+// width that can never grow), not a JR4-specific one.
+//
+// What no other gate in this repo can see: below `@container (max-width: 60em)` of the builder's own box
+// exactly ONE pane is displayed and the other two are `display: none`. A broken `--show-*` mapping — a typo
+// in one CSS selector — would hide all three and leave a blank workspace that axe reports as perfectly
+// clean, `assertClean` reports as non-overflowing, and every source-text assertion in
+// `builder-layout.test.ts` still passes. Counting the panes that actually have a box is the only thing
+// that catches it.
+test('the builder shows exactly one pane below its threshold, and three above', async ({ page }, info) => {
+    await openBuilder(page, 'Community Health Survey');
+    await page.locator('.builder__panes').waitFor({ state: 'visible', timeout: 30_000 });
+    await settlePaint(page);
+
+    const panes = page.locator('.builder__pane');
+
+    // `display: none`, never `v-if` — three gates in this suite need these attached at every width.
+    expect(await panes.count(), 'the three panes must stay in the DOM at every width').toBe(3);
+
+    const shown = await panes.evaluateAll(
+        (els) => els.filter((el) => (el as HTMLElement).offsetParent !== null).length,
+    );
+    const compact = await page.locator('.builder__pane-switch').isVisible();
+
+    expect(shown, compact ? 'compact: exactly one pane' : 'wide: all three panes').toBe(compact ? 1 : 3);
+
+    // Anti-vacuity in BOTH directions, and it is what pins the threshold itself. The builder's box is
+    // `viewport − sidebar`: 375 − 0 (drawer) and 834 − 64 are far below 60em (960px), while 1440 − 240 is
+    // 1200px and above it. A threshold that drifted either way would leave a project on the wrong side.
+    expect(compact, `${info.project.name} landed on the wrong side of 60em`).toBe(
+        info.project.name !== 'desktop',
+    );
 });

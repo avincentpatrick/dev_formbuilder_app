@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
-import { formEntry, openBuilder } from './support/navigate';
+import { formEntry, openBuilder, showBuilderPane } from './support/navigate';
 
 // Composed-page responsive + accessibility gate. Each authenticated tenant page is scanned at the
 // three reference viewports (the config's projects) in light AND dark for zero WCAG 2.2 AA violations,
@@ -140,12 +140,14 @@ for (const p of filteredToZero) {
 
 // The interactive builder (D4a). Reached by clicking through the list and then the HUB's Builder tab (no id
 // in the URL) — see `support/navigate`, which owns that two-step walk for all six specs that need it; the
-// page auto-selects the first field on load, so the config panel + tabs are mounted for the scan. The
-// full interaction-driven pass (opening dialogs, keyboard reorder + aria-live) is D4b.
+// page auto-selects the first field on load, so the config panel + tabs are MOUNTED for the scan at every
+// width, and (since JR5) ON SCREEN below 60em of the builder's own container only when the Settings pane
+// is the selected one. The full interaction-driven pass (opening dialogs, keyboard reorder + aria-live)
+// is D4b, which also walks all three panes so the narrow projects keep scanning the palette and canvas.
 for (const theme of themes) {
     test(`Builder (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await openBuilder(page, 'Community Health Survey');
-        await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await showBuilderPane(page, 'settings');
         await forceTheme(page, theme);
         await assertClean(page, 'Builder');
     });
@@ -254,7 +256,7 @@ for (const theme of themes) {
 for (const theme of themes) {
     test(`Builder logic view (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await openBuilder(page, 'Logic Notices Demo');
-        await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await showBuilderPane(page, 'canvas');
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         // The server-derived notice, so the widest state of the card is on screen when the scan runs.
         await page.getByText(/comes later in the form/).waitFor({ state: 'visible', timeout: 15_000 });
@@ -264,17 +266,20 @@ for (const theme of themes) {
 }
 
 // The structured CONDITION EDITOR (H21d2) in its widest state — a nested group, whose rows carry five
-// controls each and whose nesting adds an indent rule per level. At 375px the config pane is full width
-// (the builder's ≤1024px pane linearization) and the rows stack to one control per line; above 640px they
-// become a wrapping flex row. Both sides of that breakpoint are covered by the three-viewport matrix, and
-// the overflow assertion is the point: a non-wrapping row in a shared primitive has reddened this gate
+// controls each and whose nesting adds an indent rule per level. Below 60em of the builder's own container
+// the config pane is the ONLY pane on screen and takes the full width — JR5's pane switcher, not the
+// ≤1024px linearization this comment used to describe; nothing stacks any more, and the pane has to be
+// SELECTED before anything inside it can be clicked. The rows stack to one control per line below 640px
+// and become a wrapping flex row above it, and both sides are still covered by the three-viewport matrix.
+// The overflow assertion is the point: a non-wrapping row in a shared primitive has reddened this gate
 // three times (H12b, H14, H15b), and this is the deepest control nesting the builder has.
 for (const theme of themes) {
     test(`Builder condition editor (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await openBuilder(page, 'Logic Notices Demo');
-        await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 10_000 });
+        await showBuilderPane(page, 'canvas');
         await page.locator('.builder__centre-tabs').getByText('Logic').click();
         await page.locator('button.rail__head', { hasText: 'Grouped gate' }).click();
+        await showBuilderPane(page, 'settings');
         await page.locator('[role="tab"]', { hasText: 'Advanced' }).click();
         await page.getByLabel('Condition 1.1 subject').waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);

@@ -447,3 +447,124 @@ layout gets three Storybook stories at a narrow container so axe sees it at all,
 the threshold from the same two edges rather than adjusting it by eye.
 
 ---
+
+## #13 — The form builder switches panes on its container, and takes a control the builder was refused (`resources/js/Pages/forms/Builder.vue`)
+
+**The rules being excepted.** Two. §2.7 names three breakpoint tokens (`mobile-max` 480px, `tablet-max`
+1024px, `desktop-min` 1025px) and §6 says the library implements the bands mobile-first with `min-width`
+media queries — the builder's compact layout is a **`@container (max-width: 60em)`** query on a container
+the page establishes on `.builder` itself. And §6's *"components carry their own responsive behaviour;
+pages never add breakpoint logic"* — this is a **page**, because the thing being switched is a three-pane
+workspace that no component owns.
+
+**Why (measured, JR5).** The rule replaced was `@media (max-width: 1024px)`, and it was **not broken**:
+nothing was hidden, nothing was off-screen, nothing scrolled sideways. It was wrong twice over.
+**Ergonomically**, it stacked all three panes into one scrolling column, so reaching the canvas at 375px
+meant scrolling past roughly thirty-one palette buttons and reaching the config panel meant scrolling past
+the whole canvas. **Arithmetically**, 1024 is not a width this page ever has. The builder is the app's only
+fluid page (`AppLayout.vue`'s `FLUID_PAGES`), so its box is `viewport − sidebar`, and the sidebar is 240px
+above 1024px and a 64px rail at or below it — the box is therefore **785px at a 1025px viewport and 960px
+at a 1024px one**, the same inversion #12 documents, arriving on the builder. The three-column grid stayed
+on above 1024, so across **1025–1200 the canvas track was `785 − 260 − 340 = 185px`**. Playwright's
+projects are 375 / 834 / 1440, so **no gate in this repo has ever rendered that state**.
+
+**Why 60em rather than a token.** 960px is the answer to two independent questions and they agree. It is
+`260 (palette) + 340 (config) + 360 (the smallest canvas worth having)`. It is
+also `1024 − 64`: the widest box that can exist while the sidebar is still a rail — so, exactly as #12's 896
+does, it makes the transition **continuous across the sidebar swap**: compact at 1024, compact at 1025,
+three panes from 1201 up. **The inclusivity of `max-width` is load-bearing.** At `59.9375em` the 1024px
+viewport (box exactly 960) would flip to the WIDE layout while 1025px (box 785) stayed compact —
+reintroducing the inversion from the other side. `em` rather than `px` because §2.9's font-size axis scales
+the type but not a px literal; the threshold resolves to **960 / 1080 / 1200px** across the three scales,
+which is pinned by declaring `font-size: var(--mds-type-body-lg-font-size)` on the container (`app.css`
+already puts that value on `body`, so it is a no-op today and a guarantee afterwards). A `var()` is not
+available: container-query conditions cannot read custom properties — the same dead end #12 records, and the
+same reason the three §2.7 tokens have never had a single reference anywhere in the stylesheets.
+
+**Why `container-type` is on `.builder` and not on `.builder__panes`.** A container query never matches its
+own container, and the compact layout has to rewrite `.builder__panes`'s `grid-template-columns` — declare
+it there and that one declaration is unreachable (`DataTable.vue`, verbatim). The toolbar compaction is
+keyed on the same threshold and the toolbar is a *sibling* of `.builder__panes`, so `.builder` is the only
+element that contains both. **`contain: layout` was audited before it was declared**, since `container-type`
+implies it and it makes the element a containing block for `position: fixed` *and* `position: absolute`
+descendants and opens a new stacking context: there is no `position: fixed` anywhere in the builder tree,
+the one `position: absolute` (`BuilderCanvas.vue`'s `.canvas__sr`) is the sr-only clip pattern with every
+offset `auto`, and all six dialogs on the page are `MdsModal`, which `<Teleport to="body">`s outside
+`.builder` entirely. Block size is not contained, so the `height: 100%` chain still resolves.
+
+**Two live defects fixed en route, because this increment would otherwise have inherited both.**
+
+1. `.builder` was `grid-template-rows: auto 1fr`, which assumes two children; with an import- or
+   publish-warnings banner up there are three, so the **banner** took the `1fr` row — sunken background and
+   border, visibly filling the page — while `.builder__panes` fell into an implicit `auto` row. The old
+   linearized panes were `height: auto` and survived it. A single-pane workspace does not, so `.builder` is
+   a column flex container now, which is correct for any number of banners.
+2. **`MdsSegmentedControl` had no `position` on its fieldset while its `<legend>` and its radio `<input>`s
+   are the `position: absolute` + `clip: rect(0 0 0 0)` visually-hidden pattern** — so their containing
+   block resolved outside the control and no scroll container between it and the document could clip them.
+   Measured by this increment's sweep: at 375px with the config pane selected, the group's 1px hidden
+   legend sat **73px below** a workspace that is `height: 100%` from `<body>` down, and **the page gained
+   73px of real vertical scroll** — directly falsifying this layout's central claim that the shown pane
+   scrolls inside itself. **This is the second time the repo has hit this exact bug**: G11 found it
+   horizontally on `MdsDataTable`, whose `position: relative` carries a comment saying it is "a latent bug
+   in this component". It was latent in `MdsSegmentedControl` too, in every consumer, and only became
+   visible once an ancestor finally tried to clip. Fixed in the component with the same one line, and
+   pinned by a new `SegmentedControl.test.ts` — the component had no unit test until now (six Storybook stories already ran under the merge-blocking axe gate). **No gate here
+   can execute the check**: the e2e overflow assertion reads `documentElement.scrollWidth`, which
+   `.app-shell { overflow-x: clip }` pins flat, no GATE asserts on document `scrollHeight`, happy-dom lays nothing out,
+   and axe has no rule for a hidden node extending the page.
+
+**Scope of the exception.** One page, one query, one toolbar. §2.7's three tokens remain the contract for
+everything genuinely keyed on the window — the sidebar's three states, the shell padding, the modal's
+full-screen sheet — and none of those moved.
+
+**Known costs, stated rather than discovered later.** Five.
+
+1. **Nothing in this repo can execute a container query.** The threshold and its reasoning are pinned as
+   **source-text assertions** in `resources/js/Pages/forms/builder-layout.test.ts`, and the layout itself by
+   a case in `tests/e2e/list-layout.spec.ts` that counts the panes which actually have a box. **There are no
+   Storybook stories, deliberately** — unlike #12, whose collapse lived in a component whose scoped CSS
+   Storybook loads. These rules live in a page's scoped `<style>`, which Storybook cannot reach without
+   importing the page, and a hand-built composition story would exercise a *copy* of the CSS: green while
+   the page regressed.
+2. **A whole-page axe scan below the threshold covers one pane instead of three.** `builder-axe.spec.ts` and
+   `personalization-axe.spec.ts` now walk the panes and scan each. That recovers the per-pane coverage but
+   **not the composed state** — heading order across panes, landmark uniqueness, and one pane's text against
+   another's surface were all previously measured with the three panes on screen together, and three
+   separate scans do not reproduce it. That loss is real and irreducible at these widths.
+3. **Selecting a field in the canvas does not bring the config panel with it.** At compact widths the author
+   taps the field, then taps *Settings*. An auto-switch is the right product answer and is filed to
+   `docs/feature-backlog.md`; it is not here because the page auto-selects a field on mount, so the watcher
+   would fire on load and override the default pane, and because pane state driven by store events reorders
+   what eight e2e sequences see in a suite that cannot run on the development host.
+
+   ⚠️ **THE ONE EXCEPTION TO THAT, AND AN ADVERSARIAL PASS IS WHAT FOUND IT.** `saveError` is rendered in
+   exactly **one** place in the entire client — `ConfigPanel.vue`'s `<p v-if="saveError" role="alert">` —
+   which lives inside the config pane. So a write that failed while the author was on *Add* or *Form* would
+   have mounted that alert inside a `display: none` subtree: not painted, not in the accessibility tree,
+   never announced. The replaced rule only linearized, so the alert was reachable at every width before this
+   increment — **the silence would have been new**, and new on exactly the paths most likely to fail
+   (deleting or duplicating a field, adding a section, inserting from the library, undo/redo). A
+   `watch(saveError, …)` that pulls the config pane on screen is therefore shipped, and it is acceptable
+   where the `selection` watcher was not for two reasons: `saveError` starts null so nothing fires on
+   mount, and above the threshold all three panes are shown so it is a no-op. **WCAG 3.3.1 / 4.1.3.**
+
+   **What is *not* fixed here, because it is genuinely older than this increment:** `.builder__save`
+   (`role="status" aria-live="polite"`) is driven by `saving = pending.count > 0`, and `guard()` catches
+   the throw, so the count returns to zero on the failure path and the page politely announces *"All
+   changes saved"* at the moment the write failed — at every width, on `phase1-completion` today. Filed to
+   `docs/feature-backlog.md` rather than folded in, because inferring success from "nothing in flight" is a
+   store defect, not a layout one.
+4. **At `extra_large` the threshold is 1200px of container, so a 1440px desktop is compact.** That is the
+   `em` choice working as designed — the 260/340 pane columns are px literals that do not grow with the type
+   — but it means any test helper keyed on `info.project.name` rather than on what is actually on screen
+   would be wrong at the desktop project, and only there. `showBuilderPane()` asks the page.
+5. **`MdsSegmentedControl` has no wrap and no overflow handling**, and `.app-shell { overflow-x: clip }`
+   means a switcher that does not fit would spill invisibly. The three labels measure ~272px of 351px at
+   375px under `extra_large` + OpenDyslexic; `personalization-axe.spec.ts` asserts the element's own
+   `scrollWidth` rather than trusting that arithmetic.
+
+**Disposition:** accepted. If the sidebar widths, the pane widths, or `body`'s font-size token ever change,
+re-derive 60em from the same two edges rather than adjusting it by eye.
+
+---

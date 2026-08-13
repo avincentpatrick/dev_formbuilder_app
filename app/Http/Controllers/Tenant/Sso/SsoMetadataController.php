@@ -103,6 +103,20 @@ final class SsoMetadataController extends Controller
         return TenantUrl::to($tenant, '/sso/saml/acs');
     }
 
+    /**
+     * Where a member of this workspace starts an SP-initiated sign-in (P1b).
+     *
+     * Composed here for the same reason the other two are: the settings screen publishes this address to an
+     * admin who will paste it into a bookmark, an intranet tile or their IdP's "sign-in page URL" field, and
+     * a second derivation would be right until the day the app host changed. Also the canonical subdomain,
+     * never a custom domain — a login that begins on a host the assertion cannot be delivered back to fails
+     * at the ACS with nothing useful to say.
+     */
+    public static function loginUrl(Tenant $tenant): string
+    {
+        return TenantUrl::to($tenant, '/sso/saml/login');
+    }
+
     private function assertionConsumerService(DOMDocument $document, Tenant $tenant): DOMElement
     {
         $acs = $document->createElementNS(self::NS_MD, 'md:AssertionConsumerService');

@@ -62,6 +62,12 @@ final class SsoConnectionPresenter
                 // identifier that names it. Emitted separately anyway because an admin pasting into an IdP
                 // console is filling two differently-labelled boxes and should not have to know that.
                 'metadata_url' => SsoMetadataController::entityId($tenant),
+                // P1b. Unlike the three above, this one is for the tenant's own PEOPLE rather than for
+                // their IdP: it is the address a member visits to start a sign-in. It is published here
+                // because it is currently the only way in — the sign-in page's own "continue with SSO"
+                // button belongs to the auth vertical, which another lane is rebuilding, and shipping a
+                // button into a file being rewritten underneath us is how two lanes lose an afternoon.
+                'login_url' => SsoMetadataController::loginUrl($tenant),
             ],
             'roles' => AssignableRoles::options(),
             'nameIdFormats' => $this->nameIdFormats(),

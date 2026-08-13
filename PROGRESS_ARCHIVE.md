@@ -1883,3 +1883,51 @@ the scroll wrapper's own box rather than a document width `overflow-x: clip` kee
 forked before Lane B's connector work landed; 3615 is what `phase1-completion` totals with both lanes merged.
 A branch number and an integration number are different measurements — compare against the same base, or
 against zero delta on an increment that touches no PHP.
+
+---
+
+## 2026-08-13 — LANE B: H16c unblocked and completed (#139 `5501c7c`, #140 `f3c85ed`), and the CI diagnosis corrected
+
+**The previous session's CI diagnosis was wrong, and it was wrong in the confident direction.** It recorded
+*"push events work; pull_request events are not producing runs"*, measured from "the last pull_request run of
+any kind is h16c1's at 18:22". That measurement was **already stale when it was written**: Lane A's #141 got a
+successful `pull_request` run at **21:17 the same evening**. `pull_request` events were healthy throughout.
+
+**The real cause: both PRs genuinely CONFLICTED with `phase1-completion`.** GitHub does not dispatch a
+`pull_request` event for a branch whose `refs/pull/N/merge` it cannot compute — no mergeable merge commit,
+no run, ever. That is why opening, closing/reopening and retargeting all produced nothing: close/reopen was
+the one lever the entry recommended and the one that addresses nothing. The tell was sitting in plain sight —
+**`gh pr view <n> --json mergeable` returned `UNKNOWN`**, which means unmergeable, not "CI is down".
+
+**The conflict was a stacked-PR + squash-merge artifact, not a content clash.** #138 was squash-merged as
+`c13b91b`, while `h16c2`/`h16c3` still carried the original `1a6b976`; git therefore saw two unrelated commits
+both ADDING `AirtableConnector.php` → an `add/add` conflict, plus content conflicts in `ConnectorProviderKey.php`
+and `config/connectors.php`. **`git diff 1a6b976 c13b91b` was EMPTY** — identical trees, pure history shape.
+Two cheap checks sized the fix before touching anything: no `app/`, `config/` or `routes/` file had changed on
+the base since `c13b91b`, and the branch docs commit `e2db26d` had a **patch-id identical** to the base's
+`94b45c8` (`af7bbe58…`), so a rebase would drop it automatically — and it did, reporting *"patch contents
+already upstream"*. `git rebase --onto origin/phase1-completion <merged-sha>` + `--force-with-lease` flipped
+`mergeable` to `MERGEABLE` and produced a run **within seconds**. #140 hit the same conflict a second time
+after #139 squash-merged, exactly as predicted.
+
+**Results: both merged on a genuine 6/6.** #139 Pest 6m47s / E2E 17m42s; #140 Pest 6m41s / E2E 18m10s;
+Static, Contract, a11y and Frontend green on both. The 6/6 bar held — no repeat of the I5 precedent.
+
+**⚠️ A LANE-COLLISION NEAR-MISS, AND THE GENERAL RULE IT YIELDS.** #140's rebase conflicted in
+`PROGRESS_ARCHIVE.md`, presenting as *"HEAD has 63 lines, incoming has none"* — because HEAD held **Lane A's
+JR4 archive entry** while Lane B's own entry had already auto-merged above it. A blanket `--ours`/`--theirs`
+across both tracker files would have **silently deleted one lane's archive entry**, and the diff would have
+looked plausible either way. Resolved per-file instead: surgical marker removal in `PROGRESS_ARCHIVE.md` to
+keep BOTH entries, `--ours` in `PROGRESS.md` where the branch's text was genuinely superseded. Both files
+ended byte-identical to the base, so #140 shipped **code only**. **When two lanes share a file, resolve
+per-file and re-grep for the other lane's content before continuing** — the conflict presentation actively
+hides whose work is on which side.
+
+**Phase 3's Lane B remainder is now empty**, so by Rule 5's never-idle clause the lane entered **Phase 4 on
+SSO/SAML**. Planned against the code rather than the docs, which paid immediately: **`sso_saml` is a seeded
+entitlement key with zero enforcement consumers** — granted to Enterprise at `PlanCatalog.php:47,65`,
+deliberately excluded from tenant self-service at `ToggleableModules.php:27`, and consumed by nothing in
+`app/` or `routes/`. There is no `laravel/socialite`, no SAML package and no `app/Http/Controllers/Auth/`
+directory at all. The user settled three forks on 2026-08-13 — **SAML 2.0 only** behind a protocol-neutral
+seam, **step-up re-authenticates via the IdP with `ForceAuthn`** rather than a local password, and
+**JIT provisioning at a tenant-configured default role with a per-tenant toggle defaulting ON**.

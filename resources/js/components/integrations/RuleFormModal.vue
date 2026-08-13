@@ -24,7 +24,8 @@ import {
 import { fetchChannels } from './integrationsClient';
 import { CHANNEL_PLACEHOLDER, channelWarning, toChannelOptions } from './channel-options';
 import SheetsRuleFields from './SheetsRuleFields.vue';
-import type { Channel, Option, RuleRow } from './types';
+import AirtableRuleFields from './AirtableRuleFields.vue';
+import type { Channel, DestinationKind, Option, RuleRow } from './types';
 
 const props = defineProps<{
     open: boolean;
@@ -34,6 +35,15 @@ const props = defineProps<{
     rule?: RuleRow | null;
     /** The grant's provider key (H16b). Absent behaves as Slack, which is the pre-H16b shape. */
     provider?: string | null;
+    /**
+     * The shape of this grant's destination (H16c), resolved server-side.
+     *
+     * ⚠️ EVERY BEHAVIOURAL BRANCH BELOW READS THIS, NOT `provider`. Until H16c the modal asked
+     * `provider === 'google_sheets'` — the front end's only provider literal — which would have handed an
+     * Airtable grant Slack's channel picker, Slack's event list and Slack's `config` shape. Absent behaves as
+     * `channel`, which is the pre-H16b shape.
+     */
+    destinationKind?: DestinationKind | null;
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -72,17 +82,27 @@ const channelError = computed<string | undefined>(
     () => (form.errors as Record<string, string | undefined>)['config.channel_id'],
 );
 
-/** H16b — a tabular provider swaps the channel picker for the sheet destination + column map. */
-const isTabular = computed<boolean>(() => props.provider === 'google_sheets');
+/** H16b — a tabular provider swaps the channel picker for a destination + column map. */
+const isTabular = computed<boolean>(() => props.destinationKind === 'tabular');
 
-type SheetsDraft = {
+/**
+ * WHICH tabular editor. This is the one thing capabilities cannot answer, and saying so is more useful than
+ * pretending otherwise: two providers whose destinations are shaped differently need two components, and only
+ * the provider identifies which. It is ONE map in ONE place rather than a branch per behaviour, and a fourth
+ * provider that reuses an existing destination shape needs no entry at all.
+ */
+const tabularEditor = computed(() => (props.provider === 'airtable' ? AirtableRuleFields : SheetsRuleFields));
+
+type TabularDraft = {
     spreadsheet_id: string;
     spreadsheet_title: string;
     sheet_name: string;
+    /** Airtable's stable table id. Sheets sends none, and the server stores null. */
+    sheet_id?: string | null;
     columns: { header: string; field_key: string | null }[];
 };
 
-const sheetsDraft = ref<SheetsDraft | null>(null);
+const sheetsDraft = ref<TabularDraft | null>(null);
 
 /**
  * ⚠️ THE EVENT LIST IS NARROWED, NOT JUST STYLED — and the server enforces the same rule in `after()`.
@@ -111,9 +131,9 @@ const manualChannel = computed<boolean>(() => channelsLoaded.value && !channelsL
 
 async function loadChannels(force = false): Promise<void> {
     if (!props.connectionId) return;
-    // A tabular provider has no channel_lister by design (drive.file cannot enumerate), so the sidecar would
-    // answer with the "no destination list" message every time this modal opened. Not calling is both
-    // cheaper and the difference between a picker that degrades and one that reports a failure that is not one.
+    // This picker serves CHANNEL destinations only. A tabular editor fetches its own destination list — the
+    // Airtable one calls the very same sidecar for bases — so firing here as well would double the request
+    // and leave the result somewhere nothing renders it.
     if (isTabular.value) return;
     if (channelsLoaded.value && !force) return;
 
@@ -178,6 +198,9 @@ function submit(): void {
                   spreadsheet_id: sheetsDraft.value?.spreadsheet_id ?? '',
                   spreadsheet_title: sheetsDraft.value?.spreadsheet_title ?? null,
                   sheet_name: sheetsDraft.value?.sheet_name ?? null,
+                  // Null rather than absent for a provider without one, so a PATCH cannot leave a stale id
+                  // behind: `config` is replaced WHOLESALE, and an omitted key would simply vanish.
+                  sheet_id: sheetsDraft.value?.sheet_id ?? null,
                   // No `fingerprint` — the server derives it from these headers through
                   // `ColumnMapping::author()`. Sending one from here would be a second implementation of
                   // `ColumnFingerprint`'s normalisation, kept in step by nothing.
@@ -239,7 +262,11 @@ function submit(): void {
                 </p>
             </fieldset>
 
-            <SheetsRuleFields
+            <!-- The destination editor for this grant. `:is` rather than a v-if chain (H16c): the two editors
+                 take an identical prop set and emit an identical `change`, so a chain would repeat six
+                 bindings per provider and be the thing that drifts when a seventh is added. -->
+            <component
+                :is="tabularEditor"
                 v-if="isTabular"
                 :connection-id="connectionId"
                 :form-id="form.form_id"
@@ -293,7 +320,7 @@ function submit(): void {
                 </div>
             </MdsFormField>
 
-            <!-- Not rendered for a tabular provider: SheetsRuleFields owns its own always-present live
+            <!-- Not rendered for a tabular provider: the destination editor owns its own always-present live
                  region, and two competing `aria-live` regions on one form is worse than one — this one would
                  be permanently empty, which is exactly the "region with nothing to say" the H15b note warns
                  about, doubled. -->

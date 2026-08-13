@@ -50,7 +50,17 @@ export type ConnectionCard = {
     connected_by_name: string | null;
     created_at: string;
     can: { update: boolean; delete: boolean };
+    /**
+     * The shape of this grant's destination (H16c), resolved server-side.
+     *
+     * It replaced the front end's ONLY provider literal — `props.provider === 'google_sheets'` in
+     * `RuleFormModal`, which would have handed an Airtable grant Slack's channel picker, Slack's event list
+     * and Slack's `config` shape.
+     */
+    destination_kind: DestinationKind;
 };
+
+export type DestinationKind = 'channel' | 'tabular';
 
 export type RuleRow = {
     id: string;

@@ -9,6 +9,8 @@ use App\Enums\SsoProtocol;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use Database\Factories\SsoConnectionFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -44,6 +46,10 @@ use Illuminate\Support\Carbon;
 class SsoConnection extends Model implements TenantScoped
 {
     use BelongsToTenant;
+
+    /** @use HasFactory<SsoConnectionFactory> */
+    use HasFactory;
+
     use HasUuidv7;
 
     protected $fillable = [

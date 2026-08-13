@@ -40,6 +40,7 @@ use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SearchController;
 use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
+use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionEditController;
@@ -219,6 +220,49 @@ Route::middleware([
         ->middleware(['can:tenant.settings.manage', 'feature:branding'])->name('settings.branding.logo.store');
     Route::delete('/settings/branding/logo', [BrandingController::class, 'destroyLogo'])
         ->middleware('can:tenant.settings.manage')->name('settings.branding.logo.destroy');
+
+    // Single sign-on — the TENANT CONFIGURATION surface (Phase 4, P1a, ADR-0016). The protocol surface is a
+    // different route group entirely, mounted without `auth` further down this file; these four are ordinary
+    // authenticated settings routes and share nothing with it but a feature name.
+    //
+    // NO `{connection}` SEGMENT, AND NOT BY OMISSION: `sso_connections` is UNIQUE on `tenant_id` (§D2), so
+    // the resource is a singleton and the row is reached by RLS rather than by an id. A future multi-IdP
+    // row would change the LOGIN surface (which provider does the login page offer?), not just this path.
+    //
+    // ⚠️ THE GATING ASYMMETRY IS DELIBERATE AND MUST NOT BE "TIDIED UP" INTO CONSISTENCY — the third
+    // instance of ADR-0012 §D9 in this file, after /domains below and branding above. Only the two writes
+    // that can CREATE or WIDEN carry `feature:sso_saml`; the read, the on/off switch and the removal do not,
+    // because a tenant downgraded off Enterprise still has an identity provider pointed at this SP and must
+    // retain a path to undo what a paid tier let them create.
+    //
+    // ⚠️ THE STATUS TOGGLE IS ON THE UNGATED SIDE, AND THE FIRST DRAFT OF THIS BLOCK HAD IT ON THE OTHER —
+    // which left a downgraded tenant able to DELETE the trust anchor but not DISABLE it. "Destroy or
+    // nothing" is the inverse of an escape hatch, and against SsoConnectionStatus::Disabled's own contract
+    // (retained so the anchor and its audit history survive a suspension). Enabling is still gated, in
+    // SsoConnectionService::changeStatus() rather than here, because one route serves both directions:
+    // a tenant may always undo, never redo.
+    //
+    // ⚠️ `step-up` GUARDS THE IMPORT AND ONLY THE IMPORT. Rewriting idp_certificates is a complete
+    // authentication takeover for the tenant — a larger blast radius than members.role or members.remove,
+    // both of which already carry it (I8a, PRD #14). It is NOT on the read (a password prompt to look at a
+    // page devalues the prompt where it means something), nor on the status toggle or the delete, which must
+    // stay reachable per the asymmetry above. Safe here because the import is a plain Inertia visit, which
+    // gets RequirePassword's redirect — never mount `step-up` on a JSON sidecar, which gets a bare 423.
+    //
+    // ⚠️ THE IMPORT IS A `PUT` BECAUSE ITS PAYLOAD IS A STRING. @inertiajs/core does NOT method-spoof, and
+    // PHP populates $_FILES only for a multipart POST — so a PUT carrying an upload arrives EMPTY. The page
+    // reads any chosen file client-side into the same textarea to keep the wire JSON. If a real file input
+    // is ever added, this becomes a POST (the /settings/branding/logo precedent).
+    Route::get('/settings/sso', [SsoSettingsController::class, 'show'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso');
+    Route::put('/settings/sso/idp-metadata', [SsoSettingsController::class, 'importMetadata'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml', 'step-up'])->name('settings.sso.metadata');
+    Route::patch('/settings/sso', [SsoSettingsController::class, 'update'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml'])->name('settings.sso.update');
+    Route::patch('/settings/sso/status', [SsoSettingsController::class, 'updateStatus'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.status');
+    Route::delete('/settings/sso', [SsoSettingsController::class, 'destroy'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.destroy');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).

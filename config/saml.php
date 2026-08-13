@@ -93,6 +93,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Metadata document limit
+    |--------------------------------------------------------------------------
+    |
+    | The same posture as `max_response_bytes` above, on the other document a tenant can hand us. A real
+    | identity-provider metadata document is a few KB; a federation aggregate is refused by the parser on
+    | its own terms (§D10). This bound exists because there was none, and the cost is measurable: 16 MB of
+    | well-formed, DOCTYPE-free XML peaks at ~38 MB of DOM on top of the source string, so a multi-MB paste
+    | is a plausible fatal against a 128 MB memory_limit — and a fatal has no toast and no 422.
+    |
+    | ⚠️ Enforced TWICE, and the duplication is the point (the StoreBrandingLogoRequest posture): the form
+    | request bounds it so the tenant gets a field error, and `SsoMetadataParser::parse()` re-checks before
+    | `loadXML()` so a second caller that forgot cannot reach the parser. Both count BYTES — Laravel's
+    | `max:` rule on a string counts characters, which is not the same thing for a UTF-8 document.
+    |
+    */
+    'max_metadata_bytes' => (int) env('SAML_MAX_METADATA_BYTES', 256 * 1024),
+
+    /*
+    |--------------------------------------------------------------------------
     | Protocol posture — the three answers that are NOT configurable
     |--------------------------------------------------------------------------
     |

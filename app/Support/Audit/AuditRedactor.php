@@ -39,6 +39,19 @@ final class AuditRedactor
         // detects the omission. Highest blast radius of anything on this list — these tokens act inside the
         // tenant's own third-party workspace, not against this platform.
         'connection' => ['access_token', 'refresh_token'],
+        // The tenant's IdP signing certificates (P1a / ADR-0016 §D12) — and the ONE entry here that is
+        // not a secret. A signing certificate is public by construction; `encrypted:array` on that column
+        // is an INTEGRITY claim, because anything that can silently rewrite it makes the application trust
+        // assertions minted by a key of the attacker's choosing.
+        //
+        // It is registered anyway, and for a mechanical reason rather than a confidentiality one:
+        // `Model::getOriginal()` maps every attribute through `transformModelValue()`, so it returns this
+        // column DECRYPTED — while `$hidden` guards only `toArray()`/`toJson()`. The repo's ordinary
+        // snapshot idiom (`Arr::only($model->getOriginal(), …)`, TenantSettingsService:102) would therefore
+        // write plaintext keys into a table that is append-only by RLS policy and never pruned.
+        // SsoConnectionService builds its payload by hand and the column is structurally absent from it;
+        // this line is what makes a later "simplification" produce [REDACTED] instead of a wall of base64.
+        'sso_connection' => ['idp_certificates'],
         'tenant_users' => ['invite_token'],
         'personal_access_tokens' => ['token'],
     ];

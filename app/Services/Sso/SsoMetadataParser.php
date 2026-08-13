@@ -87,11 +87,36 @@ final class SsoMetadataParser
         return hash('sha256', implode("\n", $certificates));
     }
 
+    /**
+     * PEM-armour a bare base64 DER certificate, the way OpenSSL wants it.
+     *
+     * ⚠️ PUBLIC because {@see SsoCertificateInspector} must armour a STORED certificate
+     * exactly as this class armoured it at import — a different line width or a missing trailing newline
+     * makes OpenSSL refuse a certificate it already accepted, which would present as "your trust anchor
+     * became unreadable" with nothing having changed. One construction, two callers.
+     */
+    public static function pem(string $base64Der): string
+    {
+        return "-----BEGIN CERTIFICATE-----\n"
+            .chunk_split($base64Der, 64, "\n")
+            ."-----END CERTIFICATE-----\n";
+    }
+
     /** @throws SsoMetadataException */
     private function parseHardened(string $xml): DOMDocument
     {
         if (trim($xml) === '') {
             throw new SsoMetadataException('The metadata document is empty.');
+        }
+
+        // The second of the two size gates (config/saml.php `max_metadata_bytes`). The form request is the
+        // first and gives the tenant a field error; this one is what is CORRECT, because it cannot be
+        // bypassed by a caller that forgot the request. Measured before it existed: 16 MB of well-formed
+        // XML peaks at ~38 MB of DOM, so this runs BEFORE loadXML() allocates anything.
+        $limit = (int) config('saml.max_metadata_bytes');
+
+        if ($limit > 0 && strlen($xml) > $limit) {
+            throw new SsoMetadataException('The metadata document is too large to be identity-provider metadata.');
         }
 
         $previous = libxml_use_internal_errors(true);
@@ -254,9 +279,7 @@ final class SsoMetadataParser
      */
     private function assertParsable(string $base64Der): void
     {
-        $pem = "-----BEGIN CERTIFICATE-----\n"
-            .chunk_split($base64Der, 64, "\n")
-            ."-----END CERTIFICATE-----\n";
+        $pem = self::pem($base64Der);
 
         $previous = libxml_use_internal_errors(true);
 

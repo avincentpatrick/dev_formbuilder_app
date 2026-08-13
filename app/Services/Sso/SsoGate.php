@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sso;
 
+use App\Http\Middleware\RequireFeature;
 use App\Models\SsoConnection;
 use App\Services\Entitlements\EntitlementService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -61,9 +62,21 @@ final class SsoGate
      * Separate from {@see activeConnectionOrAbort()} on purpose: a tenant that is entitled but has not yet
      * configured anything must reach the settings form, and a tenant whose connection is `Draft` must be able
      * to finish it. Neither may serve the protocol.
+     *
+     * ⚠️ THE `currentPlan() === null` ARM IS NOT A FAIL-OPEN BUG, AND REMOVING IT MAKES EVERY GATE TEST LIE.
+     * This must agree with {@see RequireFeature}, which blocks only when a plan actually
+     * RESOLVES and denies the key — "no catalog to gate against" passes through, so dev and test environments
+     * with no seeded plans are not gated. A bare `feature('sso_saml')` here fails CLOSED, and the two
+     * together produce the worst possible pair: on a tenant with no plan the write ROUTE admits the request
+     * while this page tells the user they are not entitled. A test that skipped `assignPlanTier()` would then
+     * assert a gate that is not doing anything, in the direction that makes it look present.
+     *
+     * `activeConnectionOrAbort()` above deliberately does NOT take this arm — it is a protocol question with
+     * no UI to contradict, and there fail-closed is the correct posture.
      */
     public function isEntitled(): bool
     {
-        return $this->entitlements->feature('sso_saml');
+        return $this->entitlements->currentPlan() === null
+            || $this->entitlements->feature('sso_saml');
     }
 }

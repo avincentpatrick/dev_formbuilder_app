@@ -42,6 +42,7 @@ use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Database\Factories\SsoConnectionFactory;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -991,4 +992,40 @@ function shareTokenFor(Form $form, ?int $now = null): string
         (string) $form->current_published_version_id,
         $now,
     )->token;
+}
+
+/*
+|--------------------------------------------------------------------------
+| SSO/SAML fixtures (P1a).
+|--------------------------------------------------------------------------
+| Here rather than in a test file for the reason this file's header already records: a top-level function
+| declared inside a spec resolves only when THAT spec happens to be loaded into the process, so a
+| single-file run of any other SSO suite dies with "Call to undefined function". Three suites use this one.
+*/
+
+/**
+ * A minimal, valid identity-provider metadata document.
+ *
+ * `$certificate` defaults to `SsoConnectionFactory::certificate()`, which is a real self-signed key
+ * memoized per process — generated rather than hard-coded, because a fixed base64 blob would expire and
+ * turn every green test red on some future date with no code change to blame.
+ */
+function idpMetadataXml(?string $certificate = null, string $entityId = 'https://idp.example.com/saml2'): string
+{
+    $certificate ??= SsoConnectionFactory::certificate();
+
+    return <<<XML
+    <?xml version="1.0"?>
+    <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{$entityId}">
+      <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+        <KeyDescriptor use="signing">
+          <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+            <X509Data><X509Certificate>{$certificate}</X509Certificate></X509Data>
+          </KeyInfo>
+        </KeyDescriptor>
+        <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
+        <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/saml2/sso"/>
+      </IDPSSODescriptor>
+    </EntityDescriptor>
+    XML;
 }

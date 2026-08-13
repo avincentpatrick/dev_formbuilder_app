@@ -136,6 +136,11 @@ it('gates exactly the intended routes and no others', function (): void {
     expect($gated('members.role'))->toBeTrue();
     expect($gated('members.remove'))->toBeTrue();
     expect($gated('members.ownership'))->toBeTrue();
+    // P1a — rewriting a tenant's IdP signing certificates is a COMPLETE authentication takeover for that
+    // tenant (the create_sso_connections_table docblock says so in as many words), which is a larger blast
+    // radius than any of the three above. Only the import is gated: not the read, and not the status
+    // toggle or the delete, which ADR-0016 §D5 keeps reachable for a downgraded tenant.
+    expect($gated('settings.sso.metadata'))->toBeTrue();
     expect($gated('admin.tenants.assign-plan'))->toBeTrue();
     expect($gated('admin.tenants.index'))->toBeTrue();
     expect($gated('admin.settings.update'))->toBeTrue();

@@ -2374,3 +2374,117 @@ immediately before it on this integration branch (Lane A's #147, which merged wh
 arithmetic does not close. Both new files are confirmed present in the CI log, so nothing was dropped.
 **Fourth time: compare a branch number only against a run of the same base** — Lane A's 3767, which the P1c
 prompt would have had me compare against, was two merges stale before this row finished.
+
+
+## 2026-08-14 — LANE A · J3b: the auth vertical's design half, and the P0 its first job uncovered (PRs #147 `84459b4`, #148 `b22084e`, both 6/6)
+
+**Two PRs on the user's decision, fix first.** J3b's first job was not design: J3a had recorded a zero-row
+write on `PUT /user/profile-information` and deliberately not fixed it. Splitting the increment got that off
+the integration branch in hours instead of behind a multi-day design pass.
+
+**#147 — THE DEFECT WAS SIX ENDPOINTS, NOT ONE, AND THE SIXTH WAS A PERMANENT LOCKOUT.**
+`config/fortify.php` mounted every Fortify route with no tenancy middleware, so `app.current_user_id` was
+unset. `users_app_update` is permissive — but PostgreSQL applies SELECT policies to an UPDATE whose `WHERE`
+reads a column, and `users_users_visibility` needs the acting user or an ACTIVE co-tenant, so the row was
+invisible to its own update: zero rows, no exception, no log line, and `save()` does not inspect the
+affected-row count. Casualties: `PUT /user/profile-information`, `PUT /user/password`, the four 2FA writes —
+and **`GET /email/verify/{id}/{hash}`, which the backlog entry never named.** `markEmailAsVerified()` wrote
+nothing while `save()` still returned `true`, so `Verified` fired and the redirect carried `?verified=1`.
+With J3a's `verified` gate mounted, a new registrant could follow a valid link, be told it worked, and be
+bounced back forever — their only escape being the correction form that posts to the first broken endpoint.
+
+The fix is one middleware on the group. The alternative — writing on a connection that can see the row —
+**could not have reached the four vendor-owned 2FA/verification controllers at all.** `priority()` cannot
+substitute for the line: it reorders what a route already carries and never adds. Documented boundary: it
+runs before the controller, so a write issued after `Auth::login()` in the same request still has no GUC.
+
+⚠️ **WHY 3,767 PASSING TESTS NEVER CAUGHT IT — THE HARNESS SUPPLIED THE MISSING GUC.** `enterTenant()`
+issues `SET LOCAL`, `RefreshDatabase` wraps the test in one transaction, and the route had no `terminate()`
+to clear it. `TwoFactorEnrollmentTest` asserted a full enrol → confirm → recovery-codes round trip **that
+wrote nothing in production**. A regression test therefore has to clear the GUC with
+`TenantContext::applyLocal(null, null)` — `forget()` is session-scoped and cannot clear an in-transaction
+`SET LOCAL`. Measured before relying on it: a session-scoped `set_config` issued AFTER a `SET LOCAL` DOES
+take effect, which is what lets the fixed middleware win from inside the transaction. Verified red-then-green
+both ways: 5 failed → 5 passed, and reverting the config line (with the revert confirmed applied) reddened 6
+while leaving the 9 pre-existing cases green.
+
+**A second false claim found at the source.** `TenantIsolation`'s docblock called the `users` UPDATE/DELETE
+policies "own-row" when both are `USING (true)`, and its inline comment asserted that permissive writes let
+Fortify's account management update the user's own row — the false premise the whole defect rested on. The
+misdiagnosis had already propagated into Lane B's P1b notes. Both corrected in place.
+
+**#148 — THE DESIGN HALF.** `AuthLayout` gains `variant?: 'card' | 'split'` defaulting to `card`, so seven
+of its nine consumers needed no edit; Login and Register pass `split`, whose value panel is compressed from
+`Welcome.vue`'s own `capabilities` so the landing page and the front door cannot describe the product
+differently. `MdsPasswordStrength` renders the SERVER's list — `PasswordPolicy::requirements()` had **zero
+production consumers** and now ships to four surfaces as per-view props. `password-policy.test.ts` finally
+exists (`PasswordPolicyTest.php:141-154` had been naming it since J3a); it READS the PHP off disk rather
+than copying the patterns, and drifting `\p{N}` → `[0-9]` reddens exactly the non-ASCII case.
+
+⚠️ **THE CONTAINER-QUERY THRESHOLD WAS OFF BY EXACTLY THE PADDING — JR3's LESSON, REPEATED.** `@container`
+measures the CONTENT box, so `.auth`'s 2 × `--mds-space-6` is outside it: 54em engages at a **912px
+viewport**, not the 864 the first comment claimed. Measured: 911 is the card, 912 is the split, container
+863 vs 864. Exceptions-log #12 already records JR3 paying for this on `MdsDataTable`; it is in the log twice
+now (#14). **A number I called derived was stated in the wrong box model, in an increment whose whole claim
+was measurement.**
+
+⚠️ **`AuthLayout` DELIBERATELY TAKES NO `overflow-x: clip`.** That clip pins `documentElement.scrollWidth`
+flat, which is why the e2e overflow assertion can no longer fail on any authenticated page (#12, #13). The
+auth pages are the one place it still measures something real, and this increment added four scans that
+depend on it.
+
+**THE CONTAINING-BLOCK DEFECT IS NOW A GATE RATHER THAN A DISCOVERY.** `MdsSpinner` and `MdsTimeSeriesChart`
+were instances four and five. Rather than a fourth per-component test, `clipped-node-containment.test.ts`
+scans the whole tree: the design system must have **zero**, the app tree **exactly seven** known ones, so an
+eighth fails where it is written. The seven are recorded and deliberately unfixed — the fix is one line, the
+verification is not, and whether each is *live* depends on an ancestor scroll container source text cannot
+see. ⚠️ It needed an explicit `WALK_TIMEOUT_MS`: the default 5s timed out under contention and read as a
+real failure.
+
+**⚠️⚠️ THE SCAN THAT COULD NOT BE BUILT IS THE INCREMENT'S BIGGEST FINDING: THE TWO-FACTOR CHALLENGE PAGE IS
+UNREACHABLE BY ANYONE.** Measured: `POST /login` → 302 → `/two-factor-challenge`, then that page → 302 →
+`/login`. Fortify's `TwoFactorLoginRequest::hasChallengedUser()` resolves the pending user with
+`$model::find(session('login.id'))` on the DEFAULT connection, and mid-login `app.current_user_id` is NULL —
+so `users_users_visibility` hides the row, `find()` returns null, and the controller concludes there is no
+challenged user. **It is the read-side twin of the write-side bug #147 fixed**, and anyone who actually
+enrols in 2FA is locked out at their next sign-in. Nothing caught it because **no seeded identity has ever
+had a real TOTP secret** — the E2E super-admin carries `two_factor_confirmed_at` with a NULL secret on
+purpose. Recorded in `docs/feature-backlog.md` and NOT fixed: the natural fix widens when the user GUC is
+set, which is security-relevant, and its blast radius includes `two-factor.login.store` and the recovery-code
+path. `twofactor@meridian.test` is seeded and unused, waiting for it.
+
+**SIX-FOR-SIX ON VERIFYING A ROW AGAINST THE CODE.** The row was wrong in five more places, and three of
+them removed most of the seeder risk that took E2E red in J3a: `/two-factor/required` carries no enforcement
+gate and needed no fixture; Fortify's `GET /reset-password/{token}` validates nothing, so any token renders
+the same DOM; the 2FA identity needs no membership. Plus `AuthLayout` had nine consumers, not seven, and
+`PasswordPolicy::requirements()` had no consumers at all.
+
+**A PREMISE THAT CANNOT BE MIRRORED IN PEST, AND THE ASYMMETRY THAT HIDES IT.** A test driving `POST /login`
+for a **seeder-created** identity fails under `RefreshDatabase` — `retrieveByCredentials()` resolves on
+`pgsql_auth`, a separate session that cannot see the open transaction — and it fails as `Call to a member
+function all() on array` from inside Fortify, which reads like an application bug. A case driving the SAME
+seeded user via `actingAs()` passes, because that never touches `retrieveByCredentials()`.
+
+**TWO CI FAILURES ON THE FIRST #148 RUN.** gitleaks flagged the fixture `password: 'Abcdefghijk1'` — and a
+`gitleaks:allow` directive **must sit on the same line as the match**; on the line above it does nothing.
+And the two-factor scan, which is the finding above. ⚠️ **A cancelled run is not a green one**: my own push
+cancelled the first run and a `gh run watch` on it still exited 0. Parse `conclusion` per job.
+
+**⚠️ AND A NEAR-MISS OF MY OWN, IN THIS FILE'S SIBLING.** The first attempt at the next-prompt update sliced
+`PROGRESS.md` with `str.index()` — and **Standing Rule 7(e) quotes the whole Lane A prompt inline**, so the
+first match was at line 50 and the edit deleted 921 lines. Caught by reading `git diff --stat` before
+committing. Anchor tracker edits on a **column-0 line match**, never on a substring that the file quotes.
+
+**CI on #148: Pest 3856 / 16,516 assertions, E2E 530 passed (16.4m), Vitest 106 files, Storybook axe 229
+across 34 suites, lint 88/96/29, `openapi.json` byte-identical.** ⚠️ The Pest figure is NOT a delta — Lane B
+merged P1c (#146) into the base mid-flight. Against P1c's own 3850/16,479 the delta is **+6 tests / +37
+assertions**, exactly the six `AuthScanFixturesTest` cases; Vitest **+3** and axe **+6 stories / +1 suite**
+are exact; E2E 505 → 530 is +24 for the four working scans plus one previously-flaky case now passing.
+**Fifth time: compare a branch number only against a run of the same base** — and note J3a's own recorded
+3767/16,016 was stale, since the run that actually merged #145 reported **3811 / 16,279**.
+
+**Sweep: 57 rows** (3 pages × 8 viewports × 2 themes + 3 personalization cases) — zero horizontal overflow,
+exactly one `<h1>` everywhere, exactly one "Sign in" button on login, no extra document `scrollHeight` at
+375 × `extra_large` × OpenDyslexic. ⚠️ It measured **geometry, not appearance**: no screenshots were
+reviewed, and contrast rests on the axe gates instead. ⚠️ A standalone sweep script must live in the **repo
+root** to resolve `playwright`; a scratchpad copy cannot.

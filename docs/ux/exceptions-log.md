@@ -29,6 +29,18 @@ folded into a shared guest-shell primitive rather than remaining a separate app-
 It lives in the app (`resources/js/Layouts/`) rather than the package for now because it is
 Inertia-specific and the public-runtime SPA that would share it does not yet exist.
 
+> ⚠️ **AMENDED 2026-08-14 (J3b) — THE "INTENTIONALLY NARROWER (~400px)" RATIONALE NO LONGER DESCRIBES TWO
+> OF THE NINE CONSUMERS, AND A STALE ENTRY IS THE FAILURE MODE #6 ALREADY RECORDS.** `AuthLayout` now
+> takes a `variant` prop. `card` remains everything above and is still the default, which is why seven
+> consumers needed no edit at all. `split` adds a value panel beside the card and is used by **Login and
+> Register only** — a user decision of record (2026-08-13). See **#14** for that variant's own
+> derivation, cost and scope.
+>
+> Two corrections to the text above while it is being read: the consumer list is **nine**, not the seven
+> named ("sign in, register, forgot/reset password, confirm password, 2FA challenge, verify email,
+> invitation accept" omits `auth/TwoFactorRequired.vue`); and the claim of "no tenant/form branding" has
+> been false since the invitation page began passing a tenant name into the title.
+
 ---
 
 ## #2 — Icon system (`packages/design-system/src/components/Icon/`)
@@ -249,6 +261,28 @@ slim auth card (exception #1) is ~400px, which is narrower than a hero can work 
 tokens above are reserved in the DSR for exactly this class of surface ("marketing/onboarding hero text
 only — never inside the authenticated app shell"). This is the first page to claim that reservation, which
 is what turns it from a specification into a use.
+
+> ⚠️ **AMENDED 2026-08-14 (J3b) — THE EXCLUSIVITY CLAIM ABOVE WAS ALREADY FALSE IN TWO WAYS BEFORE J3b
+> TOUCHED IT, AND ONLY ONE OF THEM IS J3b's DOING.** The sentence "the only surface in the product that
+> consumes `--mds-type-display`, `--mds-space-16` and `--mds-space-24`" was wrong when it was written:
+>
+> · **`--mds-space-16` is used inside the authenticated app shell** — `TopNav.vue` reads it as the nav's
+>   64px height, with DSR §3.4 explicitly sanctioning that, and `NotificationBell.vue` positions its panel
+>   from it. So the token was never exclusive to this page.
+> · **`--mds-space-24` is not used by `Welcome.vue` at all.** Nor is it used anywhere else; grep returns
+>   only the comment in that file claiming it. `--mds-space-20` has **zero** references repo-wide. The
+>   marketing-scale spacing this page really uses is `--mds-space-16` and `--mds-space-10`.
+>
+> What genuinely was exclusive to `Welcome.vue` is the **`--mds-type-display-*` role**, and J3b's split
+> auth panel (**#14**) is now its second consumer. That is a deliberate, in-policy use rather than a
+> breach: DSR §2.9 scopes the role to "onboarding/marketing hero text only — **never inside the
+> authenticated app shell**", and an unauthenticated front door is not the authenticated app shell.
+>
+> ⚠️ The disposition below ("if a second marketing page ever appears the two should share a real layout
+> component") is deliberately **not** actioned. The auth panel is not a second marketing *page*; it is a
+> panel inside an existing layout that already had an exception of its own. Extracting a shared component
+> for one heading and three list items would be the invention DSR §2.2 warns against. Revisit if a third
+> surface wants the display role.
 
 **Disposition:** Accepted as a **marketing surface**, not a new top-level shell — nothing else may adopt it,
 and if a second marketing page ever appears the two should share a real layout component rather than each
@@ -568,3 +602,90 @@ full-screen sheet — and none of those moved.
 re-derive 60em from the same two edges rather than adjusting it by eye.
 
 ---
+
+## #14 — The split-panel auth layout on the two front doors (`resources/js/Layouts/AuthLayout.vue`)
+
+**Introduced:** Phase 1 completion · Increment J3b (the auth design vertical).
+
+**The rules being excepted.** Two. DSR §3.0 defines exactly two shells and permits no third variant
+without a documented exception — already covered for this file by **#1**, which this entry extends rather
+than replaces. And DSR §2.9 reserves `--mds-type-display-*` for "onboarding/marketing hero text only",
+which **#8** recorded as belonging to `Welcome.vue` alone; the panel's headline is its second consumer.
+
+**What deviates.** `AuthLayout` gains `variant?: 'card' | 'split'`, defaulting to `card`. The `split`
+variant renders a value panel — one display-type headline and three icon-led proof points, compressed
+from `Welcome.vue`'s own `capabilities` so the landing page and the front door cannot describe the
+product differently — beside the existing card. It is used by **Login and Register only**, a user
+decision of record (2026-08-13): the seven utility pages keep the card, because a one-field "check your
+email" page inside a two-column marketing frame reads as a mistake rather than as a brand.
+
+**Why a container query rather than a media query.** The threshold is `@container (min-width: 54em)` on
+`.auth`, which sets `container-type: inline-size` and pins `font-size: var(--mds-type-body-lg-font-size)`.
+A media query's `em` resolves against the ROOT font size, which `[data-font-size]` never moves — it
+re-points the `--mds-type-*` tokens instead — so a media query would be correct at exactly one of the
+three type scales. A container query's `em` resolves against the container's own font size, so the
+threshold grows with the text it protects. The pin is a no-op today (`resources/css/app.css` already sets
+that value on `body`), which is the point: it is a guarantee against a future edit to that rule.
+
+The precedent is **#13**, which made the same argument for the builder, and **#12** for `MdsDataTable`.
+
+**⚠️ 54em is a CONTAINER width and the first draft of the code comment gave it as a viewport width.**
+A container query measures the CONTENT box, so `.auth`'s 2 × `--mds-space-6` of padding is outside it:
+54em = 864px of container is reached at a **912px viewport**. Measured on the running app — viewport 911
+is the card and 912 is the split, with the container reading 863 and 864 respectively. **#12** records
+JR3 paying for precisely this on `MdsDataTable` (a 260px threshold written in the belief it would never
+fire, firing on every 300px card); it has now cost two increments, which is why it is in the log twice.
+
+The number itself is derived from what must fit rather than from a device: a 400px card + a
+`--mds-space-8` gap + a 26rem panel is 848px, and 864 clears it with the slack a shrinking flex item
+needs.
+
+**⚠️ The layout deliberately does NOT take `overflow-x: clip`, diverging from `AppLayout`.** That is the
+opposite of a tidy-up and it is the entry's most reversible-looking decision. `assertClean` measures
+`document.documentElement.scrollWidth`, and **#12** and **#13** both record that `.app-shell`'s clip pins
+that flat — so on every authenticated page the assertion can no longer fail. The auth pages are the one
+place in the product where it still measures something real, and J3b added four more scans that depend on
+it. Clipping here would hide exactly the regressions those scans exist to catch. The layout is required
+to genuinely not overflow instead, which the panel's `display: none` below the threshold provides.
+
+**Three constraints that are not design choices.**
+
+- **Exactly one `<h1>`.** `responsive-axe.spec.ts` settles on `getByRole('heading', { level: 1 })` and the
+  card's title already is one, so the panel's headline is a `<p>` carrying the display role.
+- **No control in the panel whose accessible name contains "Sign in".** `global-setup.ts` locates the
+  submit button with a NON-exact `getByRole('button', { name: 'Sign in' })`, twice, before any spec runs.
+  A second match is a strict-mode violation in global setup — not a handful of failures but the whole
+  suite with none executed. The panel therefore carries no link and no button at all.
+- **The panel is an `<aside>`**, so its content sits inside a landmark and axe's `region` rule is
+  satisfied without a second `<main>`.
+
+**What was migrated rather than restyled.** The layout's second, non-scoped `<style>` block exported five
+global classes to all nine consumers. Two are gone, replaced by real components: `.auth-remember` →
+`MdsCheckbox` (its only consumer was Login's raw 16px checkbox, which had neither the 44px touch target
+nor a non-colour state signifier) and `.auth-alert`/`.auth-alert--error` → `MdsBanner` across its three
+consumers. Three remain global — `.auth-form`, `.auth-note`, `.auth-links`.
+
+**⚠️ `:slotted()` is the obvious way to scope those three and it does not work here**, which is worth
+recording so it is not re-attempted: it applies to slot-content ROOT nodes only, and
+`auth/VerifyEmail.vue` nests a `.auth-note` inside a `.auth-form`. Covering every nesting a page might
+invent needs descendant chains more fragile than the leak, and the leak is bounded — the file is
+chunk-loaded by those nine pages and nothing else.
+
+**Known costs, stated rather than discovered later.**
+
+- **Nothing in this repository can execute a container query.** happy-dom computes no layout and Vitest
+  never lays out CSS, so the threshold is held by the e2e scans and by the measurement above, not by a
+  unit test. Same cost **#12** and **#13** each record.
+- **The panel is invisible to CI's accessibility gate below 912px and only there.** `auth-axe.spec.ts`
+  runs at the suite's three viewports; the desktop project is 1440px, so the split IS scanned — but a
+  regression that only appears between 912px and 1440px would be seen by no automated check.
+- **`AuthLayout` still hard-codes the wordmark "Meridian"** while `Welcome.vue` takes `appName` from
+  config. Pre-existing, untouched here: threading a prop through seven Fortify view closures and two
+  controllers for one string is not this increment's work, and doing it halfway would be worse.
+
+**Scope of the exception.** One layout, one variant, two pages. The three breakpoint tokens remain the
+contract for everything genuinely keyed on the window, and no other surface may adopt the display role
+without amending **#8** again.
+
+---
+

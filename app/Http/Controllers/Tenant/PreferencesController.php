@@ -18,6 +18,7 @@ use App\Services\Sso\SsoConnectionPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
 use App\Support\Auth\PasswordConfirmation;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -71,6 +72,11 @@ final class PreferencesController extends Controller
                 'confirmed' => $user->two_factor_confirmed_at !== null,
                 'needs_password_confirmation' => PasswordConfirmation::isStale($request),
             ],
+            // J3b: the password card on this page changes a password through the same
+            // `Password::defaults()` chain registration and reset use, so it renders the same checklist.
+            // Standing Rule 2 — a live checklist on the sign-up form but not on the change-password form
+            // is exactly the per-page divergence "one shared design system" exists to prevent.
+            'passwordPolicy' => PasswordPolicy::requirements(),
             // Tenant-level draft settings (H10). Only Owner/Admin (tenant.settings.manage) may edit; the page
             // hides the card otherwise. The effective value falls back to the 30-day default when unset.
             'draftSettings' => [

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { centralOrigin as sharedCentralOrigin } from './support/hosts';
 import { assertClean, forceTheme } from './support/axe';
 import { formEntry, openBuilder, showBuilderPane } from './support/navigate';
 
@@ -92,6 +93,19 @@ const pages = [
     // every page of the super-admin console — a page an administrator meets in the middle of a task they
     // have already started, which is precisely when an accessibility failure is most costly.
     { name: 'Confirm password', path: '/user/confirm-password' },
+    // J3b — the 2FA enrolment interstitial, which until now was scanned by NOTHING despite embedding the
+    // widest content in the auth family: the shared `TwoFactorSetup` panel, a QR code and an eight-item
+    // recovery-code list inside a ~400px card. It belongs here rather than in `auth-axe.spec.ts` for the
+    // same reason Confirm password does — it sits behind `auth`, and a session-less visit would be
+    // redirected to /login and would scan that instead, passing while covering nothing.
+    //
+    // No fixture is required and that is worth stating, because the row that asked for this page assumed
+    // one was: `TwoFactorRequiredController` renders for ANY authenticated user whose
+    // `two_factor_confirmed_at` is null, and redirects away only once it is set. The route carries no
+    // enforcement gate — `EnforceTenantTwoFactor` is what sends people here, not what guards it — so the
+    // workspace's `security.require_two_factor` setting is irrelevant to reaching it, and the seeded demo
+    // owner has never enrolled.
+    { name: 'Two-factor required', path: '/two-factor/required' },
 ];
 
 const themes = ['light', 'dark'] as const;
@@ -571,12 +585,16 @@ for (const theme of themes) {
 // The standing exclusion recorded in playwright.config.ts is specifically about `superadmin.mfa` needing a
 // TOTP in CI, which is why /admin/* is covered by a Storybook story instead. `/` has no MFA requirement and
 // no auth requirement at all, so it joins the real-browser scan on its own merits — and it needs to, being
-// the one page in the product built on the marketing-scale type and space tokens that appear nowhere else.
+// a page built on the marketing-scale type tokens. (That clause used to read "the one page in the product
+// built on the marketing-scale type and space tokens that appear nowhere else" — false twice over, and
+// corrected in J3b: `--mds-space-16` was always used by the top nav and the notification panel, and the
+// display role now has a second consumer in the split auth panel. See exceptions-log #8 and #14.)
 //
 // ⚠️ ABSOLUTE URL, DELIBERATELY. playwright.config.ts's `baseURL` is the TENANT host, so a relative
 // page.goto('/') lands on the workspace root — which since I6 redirects to /dashboard. That redirect is
 // worth asserting too, and the second block below does exactly that.
-const centralOrigin = (process.env.E2E_BASE_URL ?? 'http://acme.meridian.test:8000').replace('acme.', '');
+// The shared derivation (see `support/hosts.ts`), not the third hand-rolled copy of the same transform.
+const centralOrigin = sharedCentralOrigin;
 
 for (const theme of themes) {
     test(`Platform landing (${theme}) — accessible & no horizontal overflow`, async ({ browser }) => {

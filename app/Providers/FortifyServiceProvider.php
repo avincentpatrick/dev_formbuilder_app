@@ -66,8 +66,11 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
-        // Inertia views (unstyled in B1; the design-system-styled versions land with the app shell in
-        // Increment C). config/fortify.php sets `views => true` so these routes are registered.
+        // Inertia views. config/fortify.php sets `views => true` so these routes are registered.
+        // (This comment used to say the pages were "unstyled in B1; the design-system-styled versions land
+        // with the app shell in Increment C" — that has been false since C1 shipped all eight of them, and
+        // it was still being read as current in J3a. A stale note about the state of the code is worse than
+        // no note, because it is trusted.)
         // canRegister (I5) comes from the SAME RegistrationGate the GateRegistration middleware consults,
         // so the link on this page and the reachability of the route it points at are one answer rather
         // than two that agree until they don't. Resolved per request (it depends on the host and on two
@@ -75,11 +78,18 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'canRegister' => app(RegistrationGate::class)->allows($request),
         ]));
-        Fortify::registerView(fn () => Inertia::render('auth/Register'));
+        // `passwordPolicy` (J3b) is the SERVER'S OWN RULE LIST, shipped so `MdsPasswordStrength` renders it
+        // rather than restating it. Per-view rather than a shared Inertia prop, on HandleInertiaRequests'
+        // own stated criterion — a shared prop is for something that paints every page, and this paints
+        // four. `PasswordPolicy::requirements()` is pure, so there is nothing to memoize.
+        Fortify::registerView(fn () => Inertia::render('auth/Register', [
+            'passwordPolicy' => PasswordPolicy::requirements(),
+        ]));
         Fortify::requestPasswordResetLinkView(fn () => Inertia::render('auth/ForgotPassword'));
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [
             'email' => $request->input('email'),
             'token' => $request->route('token'),
+            'passwordPolicy' => PasswordPolicy::requirements(),
         ]));
         // ⚠️ `name`/`email` ARE NOT DECORATION — THEY ARE THE ESCAPE HATCH FROM A LOCKOUT J3a WOULD
         // OTHERWISE CREATE. `UpdateUserProfileInformation` nulls `email_verified_at` whenever the address

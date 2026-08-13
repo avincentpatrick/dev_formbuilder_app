@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,6 +42,11 @@ final class InvitationController extends Controller
             'email' => $user?->email,
             'needsRegistration' => $user !== null && $user->email_verified_at === null,
             'token' => $token,
+            // J3b: this page sets a password when `needsRegistration`, through the same
+            // `Password::defaults()` every other surface validates against — so it gets the same
+            // checklist. Standing Rule 2: a live checklist on Register but not here would be the drift
+            // "one shared design system, no exceptions" exists to prevent.
+            'passwordPolicy' => PasswordPolicy::requirements(),
         ]);
     }
 

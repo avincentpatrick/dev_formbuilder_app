@@ -63,6 +63,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -101,6 +102,57 @@ class E2eSeeder extends Seeder
 
     private const PENDING_EMAIL = 'pending@meridian.test';
 
+    /**
+     * A KNOWN password for the unverified placeholder (J3b). It previously carried `Str::random(48)`,
+     * which is right for a placeholder nobody signs in as — but the verify-email accessibility scan has
+     * to actually BE that person, and `/email/verify` sits behind `auth`. Signing in is the only way to
+     * reach the page a locked-out member sees.
+     */
+    private const PENDING_PASSWORD = 'meridian-e2e-2026';
+
+    /**
+     * A deterministic invite token (J3b), so `/invitations/{token}` is addressable by a spec.
+     *
+     * The stored column is the SHA-256 of this string — `InvitationController::resolvePendingInvite()`
+     * hashes what it is given and matches on the digest, so the plaintext never touches the database and
+     * a fixed value here leaks nothing that a fixed seeded password does not. It was `Str::random(48)`
+     * before, which is correct for a real invite and makes the page unreachable to a test.
+     */
+    private const INVITE_TOKEN = 'e2e-invitation-token-do-not-reuse-in-production';
+
+    /**
+     * A user enrolled in two-factor (J3b), for the `/two-factor-challenge` scan.
+     *
+     * ⚠️ DELIBERATELY NOT A MEMBER OF ANY WORKSPACE. Fortify authenticates on credentials alone, and
+     * `RedirectIfTwoFactorAuthenticatable` diverts to the challenge BEFORE the login completes — so no
+     * membership is needed to reach that page. Giving them one would add a row to `/members`, which
+     * `responsive-axe` already loads, for no benefit: this identity exists to be stopped at the door.
+     */
+    private const TWO_FACTOR_EMAIL = 'twofactor@meridian.test';
+
+    private const TWO_FACTOR_PASSWORD = 'meridian-e2e-2026';
+
+    /**
+     * A syntactically valid base32 TOTP secret. It is never used to derive a code — the scan renders the
+     * challenge form and stops — but `hasEnabledTwoFactorAuthentication()` reads the column for
+     * null-ness, so a placeholder that could not be decoded would be a trap for the next person who
+     * tries to extend this fixture into a full sign-in.
+     */
+    private const TWO_FACTOR_SECRET = 'ABCDEFGHIJKLMNOP';
+
+    /**
+     * The password-reset fixture (J3b). Plaintext here, `Hash::make()`d into `password_reset_tokens`,
+     * because Laravel's DatabaseTokenRepository stores a hash and compares with `Hash::check()`.
+     *
+     * ⚠️ THE PAGE ITSELF NEEDS NONE OF THIS, AND THAT IS WORTH KNOWING BEFORE SOMEBODY "FIXES" A SCAN
+     * THAT LOOKS UNDER-BUILT. Fortify's `GET /reset-password/{token}` renders the form without
+     * consulting the token at all — validation happens on POST — so the DOM an accessibility scan sees
+     * is identical for any token string. The row is seeded anyway so the fixture is HONEST: a future
+     * test that submits the form has a token that actually resolves, rather than discovering on the day
+     * that the scan had been passing over a dead link.
+     */
+    private const RESET_TOKEN = 'e2e-password-reset-token';
+
     /** A second ACTIVE member (G10b2) — the grant modal needs a recipient other than the acting Owner. */
     private const REVIEWER_EMAIL = 'reviewer@meridian.test';
 
@@ -135,6 +187,8 @@ class E2eSeeder extends Seeder
         // it: this writes one central `users` row and touches nothing tenant-scoped.
         $this->seedSuperAdmin();
 
+        $this->seedAuthScanFixtures();
+
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
         // ⚠️ THE ONE IDENTITY THAT MUST STAY UNVERIFIED, AND IT IS NOT AN OVERSIGHT.
         // `InvitationController::show()` reads `email_verified_at === null` as `needsRegistration`, so
@@ -142,7 +196,7 @@ class E2eSeeder extends Seeder
         // as the invited account" — silently breaking the invite fixture, and with it the invitation
         // accessibility scan J3b adds. It is also the only unverified user in the fixture, which makes it the
         // natural subject for the `verified` gate's own e2e coverage.
-        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48), verified: false);
+        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', self::PENDING_PASSWORD, verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
@@ -197,7 +251,7 @@ class E2eSeeder extends Seeder
                     'invited_by' => $owner->id,
                     'invited_at' => now(),
                     'invite_expires_at' => now()->addDays(7),
-                    'invite_token' => hash('sha256', Str::random(48)),
+                    'invite_token' => hash('sha256', self::INVITE_TOKEN),
                 ]);
             }
 
@@ -1496,6 +1550,40 @@ class E2eSeeder extends Seeder
      * `forceFill()` on a NEW model carries the non-fillable column into the INSERT itself, where the
      * permissive policy applies — the shape Lane B's P1b JIT provisioning independently arrived at.
      */
+    /**
+     * The two standalone fixtures the J3b accessibility scans need, neither of which belongs to a
+     * workspace (see the constants above for why the two-factor identity deliberately has no membership).
+     *
+     * ⚠️ THE 2FA USER IS ONE INSERT, NOT A CREATE-THEN-STAMP. `two_factor_secret` and
+     * `two_factor_confirmed_at` go into the INSERT itself, where `users_app_insert`'s permissive policy
+     * applies. A follow-up `save()` would match no row — `app.current_user_id` is null throughout seeding
+     * and PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — so it would report
+     * success, write nothing, and leave an identity that never challenges. That is the defect J3b's first
+     * PR fixed in the product and the one this seeder has already been bitten by once.
+     */
+    private function seedAuthScanFixtures(): void
+    {
+        if (User::on('pgsql_auth')->where('email', self::TWO_FACTOR_EMAIL)->doesntExist()) {
+            $user = new User;
+            $user->forceFill([
+                'name' => 'Tessa Twofactor',
+                'email' => self::TWO_FACTOR_EMAIL,
+                'password' => Hash::make(self::TWO_FACTOR_PASSWORD),
+                'email_verified_at' => now(),
+                'two_factor_secret' => Fortify::currentEncrypter()->encrypt(self::TWO_FACTOR_SECRET),
+                'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode([])),
+                'two_factor_confirmed_at' => now(),
+            ])->save();
+        }
+
+        // `updateOrInsert`, because the table's primary key is the EMAIL: a second seeder run would
+        // otherwise violate it rather than refresh the row. Not tenant-scoped and not under RLS.
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => self::OWNER_EMAIL],
+            ['token' => Hash::make(self::RESET_TOKEN), 'created_at' => now()],
+        );
+    }
+
     private function resolveOrCreateUser(string $email, string $name, string $password, bool $verified = true): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();

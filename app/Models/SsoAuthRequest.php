@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Enums\SsoAuthIntent;
+use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\HasUuidv7;
+use App\Models\Concerns\TenantScoped;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+
+/**
+ * The SP's memory of an AuthnRequest it minted (Phase 4, P1a — ADR-0016). The ACS's `InResponseTo` check is
+ * a lookup against this table, and {@see $consumed_at} is what makes a request single-use.
+ *
+ * ⚠️ NOTHING HERE MAY BE CONSUMED BY READING THE MODEL AND THEN SAVING IT. The consume step must be a
+ * conditional UPDATE whose affected-row count is the check — a read-then-write leaves a window in which two
+ * concurrent replays both see `consumed_at IS NULL` and both proceed. See `SsoAcsController`.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $sso_connection_id
+ * @property string $request_id
+ * @property SsoAuthIntent $intent
+ * @property ?string $user_id
+ * @property ?string $return_to
+ * @property bool $force_authn
+ * @property Carbon $issued_at
+ * @property Carbon $expires_at
+ * @property ?Carbon $consumed_at
+ * @property ?string $ip_address
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ */
+class SsoAuthRequest extends Model implements TenantScoped
+{
+    use BelongsToTenant;
+    use HasUuidv7;
+
+    protected $fillable = [
+        'tenant_id',
+        'sso_connection_id',
+        'request_id',
+        'intent',
+        'user_id',
+        'return_to',
+        'force_authn',
+        'issued_at',
+        'expires_at',
+        'ip_address',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'intent' => SsoAuthIntent::class,
+            'force_authn' => 'boolean',
+            'issued_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'consumed_at' => 'datetime',
+        ];
+    }
+
+    /** @return BelongsTo<SsoConnection, $this> */
+    public function connection(): BelongsTo
+    {
+        return $this->belongsTo(SsoConnection::class, 'sso_connection_id');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Mint a request id valid as an `xs:ID`.
+     *
+     * The leading underscore is required, not cosmetic: `xs:ID` derives from `xs:NCName`, which may not begin
+     * with a digit, and a bare hex string does so half the time. Some IdPs reject such a request outright;
+     * worse, others accept it and echo back a mangled `InResponseTo` that then fails to match.
+     */
+    public static function mintRequestId(): string
+    {
+        return '_'.bin2hex(random_bytes(16));
+    }
+
+    /**
+     * Whether this request may still be consumed, ignoring single-use (which only the atomic UPDATE can
+     * answer). Expiry is evaluated WITHOUT clock skew: the skew allowance exists for disagreement between
+     * the IdP's clock and ours over timestamps THE IDP wrote, whereas `expires_at` is a value this host
+     * wrote and reads back — there is no second clock to disagree with.
+     */
+    public function isLive(?Carbon $now = null): bool
+    {
+        return $this->consumed_at === null && $this->expires_at->isAfter($now ?? Carbon::now());
+    }
+}

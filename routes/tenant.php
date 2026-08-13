@@ -39,6 +39,7 @@ use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SearchController;
+use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionEditController;
@@ -882,6 +883,36 @@ Route::middleware([
     // TenantBrandingService::isActive(), because an unentitled tenant must answer 404 (an image that is
     // not there) and not the middleware's 403 (an image that exists and is being withheld).
     Route::get('/branding/logo', BrandingLogoController::class)->name('branding.logo');
+});
+
+/*
+| SAML 2.0 Service Provider — the PROTOCOL surface (Phase 4, P1a, ADR-0016). Same subdomain pipeline as the
+| invitation group and WITHOUT `auth`, for the same structural reason one step further out: the caller is an
+| identity provider, or a browser being bounced through one, and on the login path there is by definition no
+| session yet — requiring auth would be circular. Tenant context is still established BEFORE any query, which
+| is what makes the strict-RLS `sso_connections` row visible and confines it to its own tenant.
+|
+| ⚠️ THE TENANT COMES FROM THE HOST, NEVER FROM THE REQUEST BODY. An attacker choosing which tenant to
+| address chooses only which public subdomain to visit; the assertion's audience is then checked against THAT
+| tenant's SP entity id, so a response minted for another tenant dies on the audience check.
+|
+| ⚠️ NOT `feature:sso_saml` — the gate is inside the controller, via SsoGate. RequireFeature answers a web
+| request with back() plus a toast, which is meaningless for a cross-origin POST from an IdP, and any answer
+| other than 404 discloses another organisation's plan to an unauthenticated caller. Unentitled, unconfigured,
+| draft and disabled must all be indistinguishable — the BrandingLogoController posture above, on a surface
+| where the disclosure matters more.
+|
+| AppSecurityHeaders is mandatory here rather than incidental: `frame-ancestors 'none'` on a request that
+| mints a session is what stops the whole flow being driven inside an attacker's iframe.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/sso/saml/metadata', SsoMetadataController::class)->name('sso.metadata');
 });
 
 /*

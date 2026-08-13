@@ -13,21 +13,22 @@ import { NOTIFICATION_VISUAL, notificationVisual } from './type-visual';
  * `success`, two share `warning`. Writing them down here is what stops the next reader "fixing" the
  * collisions by inventing variants — `BadgeVariant` is closed at five.
  */
-const SERVER_TYPES = [
-    'submission_received',
-    'submission_returned',
-    'submission_approved',
-    'review_requested',
-    'export_ready',
-    'member_invited',
-    'webhook_failed',
-] as const;
+/**
+ * ⚠️ DERIVED FROM THE MAP, NOT RE-TYPED BESIDE IT — AND THE PREVIOUS VERSION IS WHY.
+ * This was a hand-written list of seven literals, and a test literally named "gives all seven server types
+ * a visual" that compared the map's keys against it. Both were edited together, so when I11b added
+ * `impersonation_started` to the PHP enum and touched neither, the assertion went on passing: it only ever
+ * proved that two hand-maintained copies of the same list agreed with each other.
+ *
+ * Completeness is now a COMPILE-TIME property — `NOTIFICATION_VISUAL` is `Record<NotificationTypeKey, …>`,
+ * so a missing case fails `npm run type-check` — and parity with the PHP enum is `NotificationTypeParityTest`
+ * on the server side, which is the only place that can read both. What is left for this file is what it was
+ * always uniquely able to check: that the glyphs exist, that they are distinct, and that the colour bands
+ * still say what the docblock claims.
+ */
+const SERVER_TYPES = Object.keys(NOTIFICATION_VISUAL);
 
 describe('notificationVisual', () => {
-    it('gives all seven server types a visual', () => {
-        expect(Object.keys(NOTIFICATION_VISUAL).sort()).toEqual([...SERVER_TYPES].sort());
-    });
-
     it('uses only glyphs that exist in the shared icon registry', () => {
         for (const type of SERVER_TYPES) {
             const { icon } = notificationVisual(type);
@@ -54,12 +55,22 @@ describe('notificationVisual', () => {
         expect(danger).toEqual(['webhook_failed']);
     });
 
-    it('bands the two “you owe an action” types warning, and the two “finished” types success', () => {
+    it('bands each type by the question it asks the reader, per the map’s own docblock', () => {
         const byVariant = (variant: string): string[] =>
-            SERVER_TYPES.filter((type) => notificationVisual(type).variant === variant);
+            SERVER_TYPES.filter((type) => notificationVisual(type).variant === variant).sort();
 
-        expect(byVariant('warning').sort()).toEqual(['review_requested', 'submission_returned']);
-        expect(byVariant('success').sort()).toEqual(['export_ready', 'submission_approved']);
-        expect(byVariant('info').sort()).toEqual(['member_invited', 'submission_received']);
+        // warning is now THREE: the two "you owe an action" types plus `impersonation_started`, which is a
+        // disclosure the Owner is meant to notice rather than a routine happening.
+        expect(byVariant('warning')).toEqual(['impersonation_started', 'review_requested', 'submission_returned']);
+        expect(byVariant('success')).toEqual(['export_ready', 'submission_approved']);
+        expect(byVariant('info')).toEqual(['member_invited', 'member_joined', 'submission_received']);
+    });
+
+    it('gives the invited/joined pair different glyphs, because they are a sequence and not a synonym', () => {
+        // The same person is usually both, minutes apart, in the same popover. Sharing `user-plus` would
+        // make the second row look like a duplicate of the first — which is also what the uniqueness
+        // assertion above enforces generally, restated here because THIS pair is the one likely to be
+        // "tidied" by someone who reads them as the same event.
+        expect(notificationVisual('member_invited').icon).not.toBe(notificationVisual('member_joined').icon);
     });
 });

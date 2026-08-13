@@ -26,6 +26,7 @@ use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
+use App\Http\Middleware\EnsureVerifiedEmail;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
@@ -128,7 +129,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // window (auth.step_up_timeout, 15 min) than the framework's `password.confirm` default of three
         // hours. ⚠️ Never mount it on a route a JSON sidecar calls: RequirePassword answers an
         // `Accept: application/json` request with a bare 423 instead of redirecting. See the class.
+        // verified (J3a) — OVERRIDES the framework's own `verified` alias rather than adding a second name,
+        // so every future `->middleware('verified')` gets the impersonation exemption and the documented
+        // JSON envelope by default. Two things the stock EnsureEmailIsVerified cannot express; see the class.
         $middleware->alias([
+            'verified' => EnsureVerifiedEmail::class,
             'tenant.context' => EstablishTenantDatabaseContext::class,
             'superadmin' => EnsureSuperAdmin::class,
             'superadmin.mfa' => EnsureSuperAdminMfa::class,

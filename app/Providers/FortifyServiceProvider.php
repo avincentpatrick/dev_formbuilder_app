@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
 use App\Services\Settings\RegistrationGate;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,9 +38,27 @@ class FortifyServiceProvider extends ServiceProvider
             $config['model'],
         ));
 
-        // Breached-password check (OWASP ASVS L1) + a 12-char minimum, inherited by registration,
-        // password reset, and password update via Password::defaults() in PasswordValidationRules.
-        Password::defaults(fn () => Password::min(12)->uncompromised());
+        // Breached-password check (OWASP ASVS L1) + a 12-char minimum + the four character classes
+        // (user decision of record 2026-08-09), inherited by registration, password reset, password
+        // update AND invitation-accept via Password::defaults() in PasswordValidationRules.
+        //
+        // ⚠️ THE CHAIN ORDER IS COSMETIC AND MUST NOT BE READ AS PRECEDENCE. `Rules\Password::passes()`
+        // runs the length and all four class checks inside ONE inner validator, and reaches
+        // `uncompromised()` only if that validator passes — structurally, whatever order they are
+        // written in. So every class failure short-circuits the HIBP lookup, which is why a fixture that
+        // fails a class makes a breach test pass with ZERO requests sent. `AuthenticationTest` guards
+        // both breach cases against exactly that.
+        //
+        // `letters()` is implied by `mixedCase()` at runtime and is named anyway: four classes is the
+        // decision, and a reader of this line should not have to know that one call subsumes another.
+        // The minimum lives on PasswordPolicy so the number the strength checklist renders and the
+        // number the validator enforces cannot be two numbers.
+        Password::defaults(fn () => Password::min(PasswordPolicy::MIN_LENGTH)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols()
+            ->uncompromised());
 
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
@@ -62,7 +81,21 @@ class FortifyServiceProvider extends ServiceProvider
             'email' => $request->input('email'),
             'token' => $request->route('token'),
         ]));
-        Fortify::verifyEmailView(fn () => Inertia::render('auth/VerifyEmail'));
+        // ⚠️ `name`/`email` ARE NOT DECORATION — THEY ARE THE ESCAPE HATCH FROM A LOCKOUT J3a WOULD
+        // OTHERWISE CREATE. `UpdateUserProfileInformation` nulls `email_verified_at` whenever the address
+        // changes (correctly — a new address is unproven), and J3a mounts `verified` on the authenticated
+        // tenant group. So a member who fixes a typo in their own email is bounced HERE on their very next
+        // page load, and `/settings` — the only surface with an email field — is inside the gate they just
+        // fell behind. Without a correction form on this page the sole remaining action is "resend", which
+        // resends to the typo'd address forever.
+        //
+        // `PUT /user/profile-information` is a Fortify route carrying only `auth`, so it stays reachable
+        // while unverified; this page just needs the values to seed the form with. Fortify's own
+        // `EmailVerificationPromptController` passes nothing, which is why they are added here.
+        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/VerifyEmail', [
+            'name' => $request->user()?->name,
+            'email' => $request->user()?->email,
+        ]));
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
         // ⚠️ THE `url.intended` WRITE IS THE OTHER HALF OF I8a'S STEP-UP, AND WITHOUT IT THE FLOW STRANDS
         // PEOPLE. Fortify answers a successful confirmation with `redirect()->intended(...)`, but Laravel

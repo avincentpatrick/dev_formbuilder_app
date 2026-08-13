@@ -1,4 +1,5 @@
 import type { BadgeVariant, IconName } from '@meridian/design-system';
+import type { NotificationTypeKey } from './types';
 
 /**
  * Notification TYPE → the row's glyph and colour band (Increment I4).
@@ -38,9 +39,26 @@ import type { BadgeVariant, IconName } from '@meridian/design-system';
  * `type-visual.test.ts` asserts every glyph named here exists in the shared registry, because a typo
  * renders an empty 24×24 box that no other gate would see.
  */
-export const NOTIFICATION_VISUAL: Record<string, { icon: IconName; variant: BadgeVariant }> = {
+type NotificationVisual = { icon: IconName; variant: BadgeVariant };
+
+/**
+ * ⚠️ `Record<NotificationTypeKey, …>`, NOT `Record<string, …>` — AND THAT CHANGE IS THE POINT OF J3a's
+ * EDIT TO THIS FILE. Under `Record<string, …>` a new enum case simply fell through to the bell fallback,
+ * which is exactly what happened to `impersonation_started` for two increments: correct behaviour, no
+ * error, and nobody looking. Keyed on the union, the same omission is a `npm run type-check` failure in a
+ * file the frontend job actually compiles.
+ */
+export const NOTIFICATION_VISUAL: Record<NotificationTypeKey, NotificationVisual> = {
     submission_received: { icon: 'inbox', variant: 'info' },
     member_invited: { icon: 'user-plus', variant: 'info' },
+    // I11b, added in J3a — the drift this file's guard now prevents. `shield` is the set's security mark and
+    // matches how `audit/event-variant.ts` already bands the same event; `warning` because it is a
+    // disclosure the reader is meant to notice, not a routine happening.
+    impersonation_started: { icon: 'shield', variant: 'warning' },
+    // J3a — a person walked in the front door of the workspace. `users` (the group) rather than `user-plus`,
+    // which `member_invited` holds: the two events are a pair and must stay distinguishable at a glance,
+    // and the test below asserts no two types share a glyph precisely so this cannot be "tidied".
+    member_joined: { icon: 'users', variant: 'info' },
     submission_approved: { icon: 'check', variant: 'success' },
     export_ready: { icon: 'download', variant: 'success' },
     review_requested: { icon: 'search', variant: 'warning' },
@@ -51,10 +69,12 @@ export const NOTIFICATION_VISUAL: Record<string, { icon: IconName; variant: Badg
 /**
  * Never throws; an unrecognised type reads as "a notification" rather than as something it is not.
  *
- * This is why `NotificationRow.type` is typed `string` and not a seven-case union: the enum can gain a
- * case server-first, and a row arriving with one must render quietly rather than crash the shell that is
- * mounted on every page.
+ * This is why `NotificationRow.type` is typed `string` and not a closed union: the enum can gain a case
+ * server-first, and a row arriving with one must render quietly rather than crash the shell that is
+ * mounted on every page. The cast is what lets a `string` index a union-keyed record — it widens the
+ * lookup, never the map, so the compile-time completeness guarantee above is untouched.
  */
-export function notificationVisual(type: string): { icon: IconName; variant: BadgeVariant } {
-    return NOTIFICATION_VISUAL[type] ?? { icon: 'bell', variant: 'neutral' };
+export function notificationVisual(type: string): NotificationVisual {
+    return (NOTIFICATION_VISUAL as Record<string, NotificationVisual | undefined>)[type]
+        ?? { icon: 'bell', variant: 'neutral' };
 }

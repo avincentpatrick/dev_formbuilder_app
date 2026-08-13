@@ -100,6 +100,26 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
     'auth',
+    // verified (J3a) — PRD Feature #14's verification half, which had been built end-to-end and enforced on
+    // ZERO routes since Phase 0. The alias resolves to App\Http\Middleware\EnsureVerifiedEmail, which
+    // OVERRIDES the framework default (bootstrap/app.php) to exempt impersonated sessions and to answer a
+    // JSON caller in kind. Its own interstitial is Fortify's `/email/verify`, outside this group.
+    //
+    // ⚠️ ITS POSITION RELATIVE TO `auth` IS NOT WHAT ORDERS THEM, AND WRITING IT HERE IS NOT THE GUARANTEE
+    // IT LOOKS LIKE. `AuthenticatesRequests` is in bootstrap/app.php's `$middleware->priority()` list and
+    // `EnsureVerifiedEmail` is not, so `auth` is pulled ahead of this wherever either is written — moving
+    // this line above `auth` changes nothing, which is why no test can catch that edit. It is written after
+    // `auth` because that is what the pipeline does, not because the line enforces it.
+    //
+    // WHAT THIS POSITION *DOES* CONTROL is the order against the two gates BELOW, which are likewise absent
+    // from the priority list and therefore run in written order. Both matter:
+    //  · before EnforceTenantTwoFactor — so an unverified member under org-2FA enforcement proves the
+    //    mailbox BEFORE being asked to enrol a second factor against an address nobody has confirmed they
+    //    own. Reversed, they enrol first and verify second, which is the wrong way round.
+    //  · it is also the cheapest check here: `email_verified_at` rides along on the row
+    //    RlsAwareUserProvider already loaded, so unlike the 2FA gate's tenant-scoped settings read this
+    //    needs no query and no RLS GUC.
+    'verified',
     // AppSecurityHeaders (I1) — frame-ancestors 'none' + nosniff + Referrer-Policy on every authenticated
     // page. Named here rather than globally on `web` on purpose: the guest runtime below also uses `web`,
     // and a global mount would set frame-ancestors 'none' on it and break every embed in the product.

@@ -26,6 +26,8 @@ it('pins the case order, because the DB CHECKs are generated from it', function 
         // are generated from this list, so a case slotted in beside a thematic sibling would rewrite the
         // vocabulary of every case after it.
         'impersonation_started',
+        // J3a — appended for the same reason, and NOT beside `member_invited` where it thematically belongs.
+        'member_joined',
     ]);
 });
 
@@ -82,6 +84,14 @@ it('names only real roles, and only for the types that address a role', function
     // additive but narrowing it after Admins have come to expect the notice is not.
     expect(NotificationType::ImpersonationStarted->recipientRoles())->toBe(['owner']);
 
+    // J3a — owner+admin, matching `member_invited` rather than `impersonation_started`. The two member
+    // events are the two doors into a workspace and answer the same governance question, so an Admin told
+    // that a seat was OFFERED and not that one was TAKEN has half a ledger. Pinned so the pair cannot drift
+    // apart on a scoping decision that was made about them together.
+    expect(NotificationType::MemberJoined->recipientRoles())
+        ->toBe(NotificationType::MemberInvited->recipientRoles())
+        ->toBe(['owner', 'admin']);
+
     // The four types whose recipient is a specific person the emitting site already knows.
     foreach ([
         NotificationType::SubmissionReturned,
@@ -117,7 +127,10 @@ it('points each type at one destination, shared by the bell and the email', func
         // I11b — unconditional, and asserted with an EMPTY payload on purpose: this is the only type whose
         // destination does not depend on an id, so a future "return null when the payload is thin" tidy-up
         // would silently break the one link §9 requires to work.
-        ->and(NotificationType::ImpersonationStarted->pathFor([]))->toBe('audit-log');
+        ->and(NotificationType::ImpersonationStarted->pathFor([]))->toBe('audit-log')
+        // J3a — the same destination `member_invited` points at, and likewise unconditional: the members
+        // page is where a new arrival is acted on. Asserted with an EMPTY payload for the reason above.
+        ->and(NotificationType::MemberJoined->pathFor([]))->toBe('members');
 });
 
 it('returns no path rather than a broken one when the payload lacks its identifier', function (): void {

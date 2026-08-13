@@ -37,6 +37,14 @@ uses(RefreshDatabase::class);
 */
 
 beforeEach(function (): void {
+    // ⚠️ WITHOUT THIS, THE TWO REGISTRATION CASES BELOW REACHED api.pwnedpasswords.com ON EVERY CI RUN, AND
+    // STAYED GREEN WHILE THEY DID. `Password::uncompromised()` is a shipped default and `NotPwnedVerifier`
+    // CATCHES a failed lookup, `report()`s it, and returns an empty collection — i.e. it FAILS OPEN to
+    // "uncompromised". So the suite passed with or without egress and nothing ever announced the
+    // dependency. I8a closed this in `AuthenticationTest` alone; J3a found it here and in
+    // `MembershipRoutesTest` and moved the helper to tests/Pest.php. See `fakeHibp()`'s docblock.
+    fakeHibp();
+
     TenantContext::flush();
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
     app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -94,8 +102,8 @@ it('404s /register on a tenant subdomain by default — invitation only', functi
     $this->post('http://acme.meridian.test/register', [
         'name' => 'Nobody',
         'email' => 'nobody@example.test',
-        'password' => 'correct-horse-battery',
-        'password_confirmation' => 'correct-horse-battery',
+        'password' => 'Correct-Horse-Battery-9',
+        'password_confirmation' => 'Correct-Horse-Battery-9',
     ])->assertNotFound();
 
     // ⚠️ ASSERTED THROUGH THE SESSION, NOT THROUGH `users`. Two RLS/harness facts make a direct row read
@@ -116,8 +124,8 @@ it('joins the workspace as a Viewer when it is open, and audits the door it came
     $this->post('http://acme.meridian.test/register', [
         'name' => 'New Joiner',
         'email' => 'joiner@example.test',
-        'password' => 'correct-horse-battery-staple',
-        'password_confirmation' => 'correct-horse-battery-staple',
+        'password' => 'Correct-Horse-Battery-9',
+        'password_confirmation' => 'Correct-Horse-Battery-9',
     ])->assertRedirect();
 
     $this->assertAuthenticated();
@@ -150,8 +158,8 @@ it('leaves central-host registration exactly as it was — an account with no wo
     $this->post('http://meridian.test/register', [
         'name' => 'Central Person',
         'email' => 'central@example.test',
-        'password' => 'correct-horse-battery-staple',
-        'password_confirmation' => 'correct-horse-battery-staple',
+        'password' => 'Correct-Horse-Battery-9',
+        'password_confirmation' => 'Correct-Horse-Battery-9',
     ])->assertRedirect();
 
     $this->assertAuthenticated();

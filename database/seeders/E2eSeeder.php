@@ -80,6 +80,18 @@ class E2eSeeder extends Seeder
 
     private const OWNER_EMAIL = 'demo@meridian.test';
 
+    /**
+     * ⚠️ DO NOT "FIX" THIS TO SATISFY J3a'S FOUR CHARACTER CLASSES. IT IS EXEMPT BY CONSTRUCTION.
+     *
+     * Every seeded password is written through `Hash::make()` and read back by `Hash::check()` on the LOGIN
+     * path, which has no opinion whatever about character classes — `Password::defaults()` governs a password
+     * being CHOSEN, not one being verified. Nothing in the suite re-registers or resets with these strings:
+     * their only consumers are `POST /login` here and in `tests/e2e/global-setup.ts`.
+     *
+     * Changing them would churn this file, {@see DemoSeeder}, `tests/e2e/global-setup.ts`,
+     * `tests/e2e/support/console.ts`, `docs/TESTING-GUIDE.md` and the tracker's next-prompt — for zero
+     * behavioural gain, while breaking every credential the user has memorised.
+     */
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
 
     /** The central-domain console operator (Increment I10e) — see seedSuperAdmin(). */
@@ -124,7 +136,13 @@ class E2eSeeder extends Seeder
         $this->seedSuperAdmin();
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
-        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
+        // ⚠️ THE ONE IDENTITY THAT MUST STAY UNVERIFIED, AND IT IS NOT AN OVERSIGHT.
+        // `InvitationController::show()` reads `email_verified_at === null` as `needsRegistration`, so
+        // stamping this placeholder turns the invitation page from "set a name and a password" into "sign in
+        // as the invited account" — silently breaking the invite fixture, and with it the invitation
+        // accessibility scan J3b adds. It is also the only unverified user in the fixture, which makes it the
+        // natural subject for the `verified` gate's own e2e coverage.
+        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48), verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
@@ -1451,7 +1469,34 @@ class E2eSeeder extends Seeder
         }
     }
 
-    private function resolveOrCreateUser(string $email, string $name, string $password): User
+    /**
+     * ⚠️ `$verified` IS LOAD-BEARING FROM J3a, AND THE DEFAULT IS THE ONE THAT KEEPS THE E2E SUITE ALIVE.
+     * `routes/tenant.php`'s authenticated group now carries `verified`, so an unverified identity is bounced
+     * to `/email/verify` — including at `tests/e2e/global-setup.ts`'s very first navigation, which waits on a
+     * dashboard URL. Before J3a this seeder set no verification timestamp at all, so every e2e identity was
+     * unverified and mounting the gate would have failed all 506 specs before one of them ran.
+     *
+     * ⚠️⚠️ ONE INSERT — `forceFill()` ON A NEW MODEL — AND NEVER `create()` THEN `save()`. THIS COST A RED
+     * E2E RUN, AND THE FIRST FIX FOR IT WAS ITSELF THE BUG.
+     *
+     * Two separate traps stack here, and only the second is fatal:
+     *   1. `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+     *      mass-assignable. `artisan db:seed` wraps the run in `Model::unguarded()`
+     *      (`SeedCommand::handle()`), so a fourth key in `create()` works THERE and silently drops the
+     *      moment the seeder is constructed and run directly — which is what `E2eSeederIdempotencyTest`
+     *      and `DemoSeederIdempotencyTest` do.
+     *   2. **The follow-up `save()` that looks like the obvious fix updates ZERO ROWS AND THROWS NOTHING.**
+     *      `users` carries a permissive INSERT policy but an **own-row UPDATE** policy keyed on
+     *      `app.current_user_id`, which is null throughout seeding — so a create-then-stamp pair matches no
+     *      UPDATE policy, reports success, and leaves the account unverified. With `verified` mounted on the
+     *      authenticated group that is a LOCKOUT: `tests/e2e/global-setup.ts` signs the demo owner in and is
+     *      redirected to `/email/verify`, and all 506 specs die before one runs. `promoteToSuperAdmin()`
+     *      below already carries the privileged-connection version of this same lesson.
+     *
+     * `forceFill()` on a NEW model carries the non-fillable column into the INSERT itself, where the
+     * permissive policy applies — the shape Lane B's P1b JIT provisioning independently arrived at.
+     */
+    private function resolveOrCreateUser(string $email, string $name, string $password, bool $verified = true): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();
         if ($existing !== null) {
@@ -1460,7 +1505,15 @@ class E2eSeeder extends Seeder
             return $existing;
         }
 
-        return User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password)]);
+        $user = new User;
+        $user->forceFill([
+            'name' => $name,
+            'email' => $email,
+            'password' => Hash::make($password),
+            'email_verified_at' => $verified ? now() : null,
+        ])->save();
+
+        return $user;
     }
 
     private function roleId(string $name): string

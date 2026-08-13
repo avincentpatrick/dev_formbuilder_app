@@ -148,11 +148,12 @@ it('converges every table on a re-seed rather than doubling it', function (): vo
     // Structure that holds at ANY scale — the volume-dependent numbers live in the full-scale test below.
     expect($first['forms'])->toBe(6)
         ->and($first['published'])->toBe(5)          // one is a deliberate never-published draft
-        // 8 types × 2 recipients. Was 7 × 2 until I11b appended `impersonation_started` — a literal here
-        // rather than `count(NotificationType::cases()) * 2` on purpose: a hard-coded number is what makes
-        // adding a case a decision someone has to confirm, instead of a total that silently follows the
-        // enum wherever it goes.
-        ->and($first['notifications'])->toBe(16)
+        // 9 types × 2 recipients. Was 7 × 2 until I11b appended `impersonation_started`, and 8 × 2 until
+        // J3a appended `member_joined` — a literal here rather than `count(NotificationType::cases()) * 2`
+        // on purpose: a hard-coded number is what makes adding a case a decision someone has to confirm,
+        // instead of a total that silently follows the enum wherever it goes. It worked exactly as intended
+        // both times.
+        ->and($first['notifications'])->toBe(18)
         ->and($first['feedback'])->toBe(4)           // one per FeedbackStatus case
         ->and($first['index'])->toBeGreaterThan(0)   // the question explorer has real values to summarise
         ->and($first['answers'])->toBe($first['submissions']); // exactly one answer row per submission

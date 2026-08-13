@@ -86,7 +86,14 @@ class DemoSeeder extends Seeder
 {
     use DeterministicIds;
 
-    /** One password for every seeded demo account — low-entropy on purpose, `gitleaks` scans this repo. */
+    /**
+     * One password for every seeded demo account — low-entropy on purpose, `gitleaks` scans this repo.
+     *
+     * ⚠️ EXEMPT FROM J3a'S FOUR CHARACTER CLASSES, AND DELIBERATELY SO. It is written through `Hash::make()`
+     * and read by `Hash::check()` on the login path; `Password::defaults()` governs a password being CHOSEN,
+     * never one being verified. Nothing re-registers or resets with it. See E2eSeeder::OWNER_PASSWORD's
+     * docblock for the full argument.
+     */
     public const PASSWORD = 'meridian-demo-2026';
 
     public const DEMO_SLUG = 'demo';
@@ -1294,12 +1301,28 @@ class DemoSeeder extends Seeder
             return $this->resolvedUsers[$email] = $existing;
         }
 
-        return $this->resolvedUsers[$email] = User::create([
+        // ⚠️ ONE INSERT VIA `forceFill()` ON A NEW MODEL. NOT `create()` PLUS A FOURTH KEY, AND NOT
+        // `create()` FOLLOWED BY A STAMP — the second of those is a silent no-op and it cost a red E2E run.
+        //
+        // `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+        // mass-assignable; `artisan db:seed` unguards the run (`SeedCommand::handle()`), which is why a
+        // fourth key appeared to work here for four increments and silently dropped whenever the seeder was
+        // constructed and run directly, as `DemoSeederIdempotencyTest` does. And the obvious repair — stamp
+        // it afterwards — is worse: `users` has a permissive INSERT policy but an OWN-ROW UPDATE policy keyed
+        // on `app.current_user_id`, which is null during seeding, so the follow-up UPDATE matches no policy,
+        // affects zero rows and throws nothing.
+        //
+        // Harmless until J3a mounted `verified` on the authenticated tenant group; from here an unverified
+        // demo account cannot reach `/dashboard` at all.
+        $user = new User;
+        $user->forceFill([
             'name' => $name,
             'email' => $email,
             'password' => Hash::make($password),
             'email_verified_at' => now(),
-        ]);
+        ])->save();
+
+        return $this->resolvedUsers[$email] = $user;
     }
 
     /**

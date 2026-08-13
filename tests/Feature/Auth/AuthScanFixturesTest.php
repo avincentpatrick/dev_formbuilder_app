@@ -102,6 +102,62 @@ it('gives the unverified placeholder a password the spec can actually sign in wi
         ->and(Hash::check('meridian-e2e-2026', (string) $hash))->toBeTrue();
 });
 
+it('lands the seeded placeholder on the verification notice, which is where the scan expects them', function (): void {
+    // ⚠️ THE SPEC CANNOT PROVE ITS OWN PREMISE AND THIS CAN. `auth-axe.spec.ts` signs in as this identity
+    // and waits for `/email/verify`; if the request stopped anywhere else the wait would time out with
+    // "Timeout 30000ms exceeded" and no indication of which of several gates had answered.
+    //
+    // The premise is not obvious, which is exactly why it is asserted: this identity's membership is
+    // INVITED, not active, so it is NOT the case `EmailVerificationGateTest` covers. A non-member reaching
+    // a tenant route could plausibly be answered by a membership check, a 403, or an empty workspace
+    // before `verified` ever runs — and the spec would then be scanning whatever that produced.
+    (new E2eSeeder)->run();
+
+    $tenant = Tenant::query()->where('slug', 'acme')->firstOrFail();
+
+    $pending = DB::transaction(function () use ($tenant): ?User {
+        TenantContext::applyLocal($tenant->id, null);
+        $id = (string) TenantUser::query()->where('status', TenantUserStatus::Invited)->value('user_id');
+        TenantContext::applyLocal($tenant->id, $id);
+
+        return User::query()->whereKey($id)->first();
+    });
+
+    expect($pending)->not->toBeNull();
+
+    $this->actingAs($pending)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertRedirect(route('verification.notice'));
+});
+
+/*
+| ⚠️ THE TWO-FACTOR PREMISE IS NOT ASSERTED HERE, AND THE REASON IS A TRAP WORTH THE PARAGRAPH.
+|
+| `auth-axe.spec.ts` signs in as `twofactor@meridian.test` and expects to be diverted to
+| `/two-factor-challenge`. The obvious mirror — POST /login and assert the redirect — CANNOT WORK under
+| `RefreshDatabase`, and it fails in a way that reads like an application bug rather than a test-harness
+| limit: the login throws `ValidationException::withMessages()` from deep inside Fortify, which surfaces
+| as "Call to a member function all() on array" pointing at the assertion line.
+|
+| The cause is the one PROGRESS.md already records for SSO provisioning, arriving from a new direction:
+| `RlsAwareUserProvider::retrieveByCredentials()` resolves on `pgsql_auth`, a SEPARATE SESSION which
+| cannot see RefreshDatabase's open transaction. The seeded identity therefore does not exist as far as
+| the credential lookup is concerned, authentication legitimately fails, and the case would be measuring
+| the failure path forever.
+|
+| ⚠️ NOTE THE ASYMMETRY THAT MAKES THIS EASY TO GET WRONG: the case above it, which drives the same
+| seeder's PENDING user, passes — because `actingAs()` sets the user on the guard directly and never goes
+| near `retrieveByCredentials()`. A mirror is available for one and not the other, and the difference is
+| invisible from the test's shape.
+|
+| VERIFIED OUT-OF-TRANSACTION INSTEAD, and recorded rather than left implicit: a probe without
+| `RefreshDatabase` (so the seeder's writes commit and `pgsql_auth` can see them) answered
+| `302 → http://acme.meridian.test/two-factor-challenge`. That confirms both halves the spec depends on —
+| that the secret was written by the seeder's single INSERT, and that no workspace membership is needed to
+| reach the challenge. The probe is not kept as a test: it would commit fixture rows outside a
+| transaction and leak them into every suite that ran afterwards.
+*/
+
 it('publishes the password policy to every page that renders the checklist', function (): void {
     // ⚠️ ASSERTED PER PAGE, NOT ONCE. `PasswordPolicy::requirements()` is pure and cannot fail; what CAN
     // fail is a render site that forgets to pass it, and each of these four is a separate closure or

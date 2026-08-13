@@ -199,7 +199,46 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   </details>
 
-- ⚠️ **THE TWO-FACTOR CHALLENGE PAGE IS UNREACHABLE, SO ANYONE WHO ACTUALLY ENROLS IN 2FA IS LOCKED OUT
+- ~~⚠️ **THE TWO-FACTOR CHALLENGE PAGE IS UNREACHABLE, SO ANYONE WHO ACTUALLY ENROLS IN 2FA IS LOCKED OUT
+  AT THEIR NEXT SIGN-IN.**~~ ✅ **FIXED IN J3c1.** `GET /two-factor-challenge` answers 200 and renders;
+  the TOTP and recovery-code paths both complete a sign-in. Measured on the running app, the same way the
+  defect was.
+
+  **The fix is NOT the one this entry predicted, and the difference is the point.** The entry called for
+  giving the mid-login request a user context from `session('login.id')` — "a security-relevant widening
+  of when `app.current_user_id` is set". That was considered and **refused**. It redefines what the GUC
+  MEANS: every RLS policy in the schema is written against "the authenticated user", while `login.id`
+  names somebody who has passed factor ONE. It also cannot be scoped to the page — Fortify registers its
+  whole route set from one config-level middleware array with no per-route hook — so the widening would
+  land on `/login`, `/register`, `/forgot-password` and `/reset-password` too.
+
+  The actual cause was narrower than "no user context". `EloquentUserProvider::getModel()` returns a
+  **class-string**, so Fortify's `$model::find(...)` is a STATIC call that bypasses
+  `RlsAwareUserProvider::createModel()` — the class's own "single routing point". The provider was
+  correctly configured and simply unreachable from that line. `App\Http\Requests\Auth\RlsAwareTwoFactorLoginRequest`
+  resolves through `retrieveById()` instead, which is the pre-auth read path B1 built and the rest of the
+  application already used. **`EstablishTenantDatabaseContext` is untouched and this increment widens
+  nothing.** (That middleware was never causal, incidentally: for a guest it applies `(null, null)`, the
+  value the request already had.)
+
+  ⚠️ **THE BLAST RADIUS WAS ONE ITEM WIDER THAN THIS ENTRY KNEW, AND THE EXTRA ONE FAILS OPEN.** The entry
+  named `two-factor.login.store` and the recovery-code path as READS that resolve the same way. The
+  recovery path also **writes**: `store()` calls `$user->replaceRecoveryCode($code)` to rotate the code
+  just spent, before `Auth::login()`, so that write had no user GUC — the identical zero-row shape PR #147
+  fixed on six other endpoints. It affected zero rows, threw nothing, returned `true`, and dispatched
+  `RecoveryCodeReplaced`. **A used recovery code was never rotated and stayed valid forever.** Measured on
+  the running app with the fix disabled: the sign-in still succeeded and the spent code was still in the
+  list. Recovery codes are single-use by construction, so a read-only fix would have shipped a
+  credential-reuse defect in place of a lockout. Fixed on `App\Models\User::replaceRecoveryCode()`, which
+  performs the write on `pgsql_auth` and restores the connection in a `finally`.
+
+  Covered by `tests/Feature/Auth/TwoFactorChallengeTest.php` (six cases, each mutation-tested against the
+  broken code) and scanned in both panel states by `tests/e2e/auth-axe.spec.ts`. The seeded
+  `twofactor@meridian.test` identity, kept unused since J3b for exactly this, is what the scan drives.
+
+  <details><summary>Original entry (J3b)</summary>
+
+  ⚠️ **THE TWO-FACTOR CHALLENGE PAGE IS UNREACHABLE, SO ANYONE WHO ACTUALLY ENROLS IN 2FA IS LOCKED OUT
   AT THEIR NEXT SIGN-IN.** Found in J3b while building an accessibility scan for that page; measured on
   the running app, not inferred:
 
@@ -227,6 +266,8 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   from `session('login.id')`, which is a security-relevant widening of when `app.current_user_id` is set
   and deserves its own increment and its own tests. Note the blast radius is wider than the one page —
   `two-factor.login.store` and the recovery-code path resolve the same way.
+
+  </details>
 
 - **Seven components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
   nothing themselves**, so that node's containing block is established outside the component and no scroll

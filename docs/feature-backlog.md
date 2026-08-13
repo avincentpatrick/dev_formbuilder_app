@@ -150,10 +150,34 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
 ---
 
-## ⚠️ Discovered defects (found while building, not yet fixed)
+## ⚠️ Discovered defects (found while building)
 
-- **`PUT /user/profile-information` writes ZERO ROWS, silently — so changing your own name or email in
-  Settings does nothing at all.** Found in J3a, pre-existing since Phase 0. Fortify registers that route
+- ~~**`PUT /user/profile-information` writes ZERO ROWS, silently — so changing your own name or email in
+  Settings does nothing at all.**~~ ✅ **FIXED IN J3b.** `config/fortify.php` now mounts
+  `EstablishTenantDatabaseContext` on the Fortify group, so `app.current_user_id` is set for the request
+  and the row is visible to its own update. `tests/Feature/Auth/FortifyRouteContextTest.php` pins all
+  five write endpoints; every case was verified red against the unfixed code first (5 failed → 5 passed),
+  and `EmailVerificationGateTest`'s correction case now asserts the full round trip instead of stopping
+  short of it.
+
+  ⚠️ **THE ENTRY BELOW UNDERSTATED THE BLAST RADIUS AND THE SEVERITY, AND THE MISSING ROW WAS THE
+  SERIOUS ONE.** `GET /email/verify/{id}/{hash}` is registered inside the same Fortify group
+  (`vendor/laravel/fortify/routes/routes.php:90`), so `markEmailAsVerified()` was also writing zero rows
+  — while `save()` still returned `true`, so `event(new Verified($user))` fired and the redirect carried
+  `?verified=1`. Combined with the `verified` gate J3a mounted, **a newly registered user could follow a
+  valid verification link, be told it worked, and be bounced back to the notice page forever** — with
+  their only escape being the correction form that posts to the endpoint in the entry's own title. Both
+  doors were the same broken door. Measured, not inferred: the test asserting `email_verified_at` is
+  stamped failed against the unfixed code.
+
+  The entry's own framing is preserved below, because the reasoning was right about the mechanism and
+  the "fix is a decision" call was correct — the decision taken was the user-context middleware, since
+  the connection-swap alternative could not have reached the four vendor-owned 2FA/verification
+  controllers at all.
+
+  <details><summary>Original entry (J3a)</summary>
+
+  Found in J3a, pre-existing since Phase 0. Fortify registers that route
   with `['web', RequirePlatformHost, AppSecurityHeaders, GateRegistration, Authenticate:web]` and **no
   tenancy middleware**, so `app.current_user_id` is unset for the request. `users_app_update` is permissive
   (`USING (true) WITH CHECK (true)`), but PostgreSQL applies **SELECT** policies to an UPDATE whose `WHERE`
@@ -172,6 +196,8 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   is why J3a recorded it here rather than widening its own scope. `EmailVerificationGateTest`'s
   "gives a member behind the gate the values needed to correct their own address" deliberately asserts only
   the half that works, so nothing encodes the defect as the contract.
+
+  </details>
 
 ## Notes
 

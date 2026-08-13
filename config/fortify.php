@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\GateRegistration;
 use App\Http\Middleware\RequirePlatformHost;
 use Laravel\Fortify\Features;
@@ -118,7 +119,41 @@ return [
     // here because Fortify has no per-route middleware hook — Features::registration() registers both verbs
     // with THIS list — which is exactly why that class checks `$request->is('register')` before it does
     // anything: applied indiscriminately it would 404 /login for everyone.
-    'middleware' => ['web', RequirePlatformHost::class, AppSecurityHeaders::class, GateRegistration::class],
+    //
+    // ⚠️ EstablishTenantDatabaseContext (J3b) IS NOT AN ENHANCEMENT — WITHOUT IT SIX ENDPOINTS ON THIS
+    // GROUP WROTE ZERO ROWS, SILENTLY, AND HAD DONE SINCE PHASE 0. `users_app_update` is permissive, but
+    // PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column, and
+    // `users_users_visibility` needs `app.current_user_id` or an ACTIVE co-tenant. With neither GUC set
+    // the row is invisible to its own update: no rows affected, no exception, and Eloquent's save() does
+    // not inspect the count, so every caller was told it worked. The casualties were
+    // PUT /user/profile-information, PUT /user/password, the four 2FA writes — and
+    // GET /email/verify/{id}/{hash}, which made J3a's `verified` gate a permanent lockout for anyone who
+    // had to pass it. `tests/Feature/Auth/FortifyRouteContextTest.php` pins all five.
+    //
+    // It is appended HERE for the same reason GateRegistration is: Fortify has no per-route middleware
+    // hook. And bootstrap/app.php's priority() cannot substitute for this line — priority REORDERS
+    // middleware a route already carries and never adds one (see the note at that call site). What
+    // priority does contribute is the ordering: this class sits after AuthenticatesRequests there, so
+    // `$request->user()` is resolved before it is read.
+    //
+    // Safe on the guest routes in this same group: resolveTenant() returns null when no tenant is bound
+    // and `$request->user()` is null for a guest, so /login, /register and /forgot-password apply
+    // (null, null) — the value they already had. Note the tenant is null on ALL of these, subdomain or
+    // not, because stancl's identification middleware is not on this group either; `users` is a global
+    // table and the policy's self arm (`id = app.current_user_id`) is the one that matters here.
+    //
+    // ⚠️ THE ONE THING THIS DOES NOT COVER, stated rather than discovered later: it runs BEFORE the
+    // controller, so it fixes writes by an already-authenticated user. A write issued AFTER Auth::login()
+    // in the same request still has no user GUC — the trap SsoUserProvisioner.php:145 and
+    // E2eSeeder both document. Nothing on `users` does that today (`last_login_at` belongs to
+    // `sso_connections`), so this is a boundary to respect, not a gap to close.
+    'middleware' => [
+        'web',
+        RequirePlatformHost::class,
+        AppSecurityHeaders::class,
+        GateRegistration::class,
+        EstablishTenantDatabaseContext::class,
+    ],
 
     /*
     |--------------------------------------------------------------------------

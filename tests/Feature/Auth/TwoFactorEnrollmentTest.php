@@ -121,6 +121,19 @@ it('enrols, confirms and issues recovery codes once the password is confirmed', 
         ->post('http://acme.meridian.test/user/two-factor-authentication')
         ->assertRedirect();
 
+    // ⚠️ RE-ENTER THE TENANT BEFORE EVERY RE-READ IN THIS CASE, AND THE REASON IS THE POINT OF J3b.
+    // `config/fortify.php` now carries `EstablishTenantDatabaseContext`, so a Fortify request ends with
+    // its terminate() calling `TenantContext::forget()` — a session-scoped set_config, which overrides
+    // the SET LOCAL `enterTenant()` issued in beforeEach. That is CORRECT and is what production does;
+    // the consequence for a test is that the ambient context does not survive a request to these routes,
+    // so a bare `refresh()` afterwards reads as nobody and `users_users_visibility` hides the row.
+    //
+    // ⚠️ AND NOTE WHAT THAT MEANS ABOUT THIS CASE BEFORE J3b: it was GREEN while the endpoints it drives
+    // wrote ZERO ROWS. The stale SET LOCAL leaked through the request, so the re-reads worked and the
+    // assertions passed — over a round trip that did nothing at all in production. The harness was
+    // supplying the exact GUC the product was missing. See tests/Feature/Auth/FortifyRouteContextTest.php.
+    enterTenant($this->tenant->id, $this->owner->id);
+
     $this->owner->refresh();
     expect($this->owner->two_factor_secret)->not->toBeNull();
     expect($this->owner->two_factor_confirmed_at)->toBeNull();
@@ -149,6 +162,8 @@ it('enrols, confirms and issues recovery codes once the password is confirmed', 
     $this->actingAs($this->owner)
         ->post('http://acme.meridian.test/user/confirmed-two-factor-authentication', ['code' => $code])
         ->assertRedirect();
+
+    enterTenant($this->tenant->id, $this->owner->id);
 
     $this->owner->refresh();
     expect($this->owner->two_factor_confirmed_at)->not->toBeNull();

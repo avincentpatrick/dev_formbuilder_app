@@ -57,6 +57,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Step-up completion window (P1c)
+    |--------------------------------------------------------------------------
+    |
+    | How long a step-up stays redeemable AFTER its assertion has been validated — i.e. between the ACS
+    | marking `sso_auth_requests.verified_at` and the browser arriving at the same-site completion hop that
+    | actually stamps `auth.password_confirmed_at`.
+    |
+    | Deliberately two orders of magnitude tighter than `authn_request_ttl_seconds` above, because it covers
+    | something completely different: not a human authenticating at their IdP, but a single 302 being
+    | followed. Ninety seconds is generous for one network hop and short enough that a `request_id` left in
+    | a browser's history, a referrer header or a proxy log stops being worth anything almost immediately.
+    |
+    | It is a SECOND bound, never the only one: redemption also requires the row to be unredeemed and the
+    | session to belong to the user the row names, and neither of those expires.
+    |
+    */
+    'step_up_completion_ttl_seconds' => (int) env('SAML_STEP_UP_COMPLETION_TTL_SECONDS', 90),
+
+    /*
+    |--------------------------------------------------------------------------
     | Assertion replay ledger
     |--------------------------------------------------------------------------
     |

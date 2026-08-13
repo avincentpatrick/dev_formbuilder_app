@@ -43,6 +43,8 @@ use App\Http\Controllers\Tenant\Sso\SsoAcsController;
 use App\Http\Controllers\Tenant\Sso\SsoLoginController;
 use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
 use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
+use App\Http\Controllers\Tenant\Sso\SsoStepUpCompletionController;
+use App\Http\Controllers\Tenant\Sso\SsoStepUpController;
 use App\Http\Controllers\Tenant\SubmissionController;
 use App\Http\Controllers\Tenant\SubmissionDraftController;
 use App\Http\Controllers\Tenant\SubmissionEditController;
@@ -285,6 +287,39 @@ Route::middleware([
         ->middleware('can:tenant.settings.manage')->name('settings.sso.status');
     Route::delete('/settings/sso', [SsoSettingsController::class, 'destroy'])
         ->middleware('can:tenant.settings.manage')->name('settings.sso.destroy');
+
+    /*
+    | SSO STEP-UP (Phase 4, P1c, ADR-0016 §D22–§D24) — the protocol answer to `step-up`, and the reason two
+    | SAML routes live in the AUTHENTICATED group while the other three sit in the unauthenticated protocol
+    | group far below.
+    |
+    | Both of these are about a session that already exists: the first asks the tenant's IdP to re-prove the
+    | member currently signed in, and the second is where that proof is finally converted into
+    | `auth.password_confirmed_at`. Neither is reachable by an identity provider, and neither is part of the
+    | metadata this SP publishes.
+    |
+    | ⚠️ NEITHER MAY EVER CARRY `step-up` ITSELF. RequireRecentPassword redirects INTO the first and out of
+    | the second, so gating either is an infinite redirect between two routes that each look correct in
+    | isolation. There is no test that would read as "this route is missing a middleware", which is why the
+    | warning is here rather than in a comment beside an assertion.
+    |
+    | ⚠️ NO `can:` GATE, AND THAT IS NOT AN OMISSION. Step-up is not a permission — it is how ANY member
+    | proves they are still at the keyboard. The four surfaces it guards carry their own `can:` (settings
+    | manage, roles.assign, members.remove, ownership.transfer), so authorising the proof as well would mean
+    | a member who is refused permission gets a 403 from a route whose only job is to say "yes, it is me".
+    |
+    | ⚠️ NOT `feature:sso_saml` EITHER — SsoGate answers inside the controller, so an unentitled or
+    | unconfigured workspace gets the same 404 the rest of the SAML surface gives rather than
+    | RequireFeature's back()-with-a-toast, which would bounce a member into a redirect loop with the gate.
+    |
+    | The completion hop takes the `request_id` as a path segment because a row must NEVER be identified by
+    | being the newest one — two step-ups begun inside one second are a tie, and PostgreSQL breaks ties by
+    | physical order. The id alone stamps nothing: the session must also be the one the row names.
+    */
+    Route::get('/sso/saml/step-up', SsoStepUpController::class)
+        ->middleware('throttle:saml-step-up')->name('sso.step-up');
+    Route::get('/sso/saml/step-up/complete/{requestId}', SsoStepUpCompletionController::class)
+        ->name('sso.step-up.complete');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).

@@ -156,4 +156,52 @@ final class SsoAuthenticationException extends RuntimeException
     {
         return new self('seat_quota_exhausted', "The workspace has no seat available for {$email}.");
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Step-up (P1c) — the three conditions, refused one at a time
+    |--------------------------------------------------------------------------
+    |
+    | `SsoAuthIntent`'s docblock states why the stamp requires intent AND subject AND ForceAuthn together.
+    | These are the arms that fire when one of them does not hold at the ACS. The third condition — a
+    | `user_id` matching the CURRENTLY AUTHENTICATED user — cannot be evaluated here at all (the ACS has no
+    | session; see the P1c migration), so its refusal lives on the completion hop instead.
+    |
+    */
+
+    /**
+     * A step-up row whose request did not carry `ForceAuthn`.
+     *
+     * Unreachable through `SsoStepUpController`, which always sets it, and checked anyway: without it the
+     * IdP was free to answer from an existing session, so the assertion proves the person had signed in at
+     * some point rather than that they are at the keyboard now — which is the entire content of a step-up.
+     */
+    public static function stepUpNotForced(string $requestId): self
+    {
+        return new self('step_up_not_forced', "Step-up request {$requestId} did not carry ForceAuthn.");
+    }
+
+    /**
+     * The assertion validated, but its subject is not an account this deployment knows.
+     *
+     * A step-up NEVER provisions: the person already has a session, so an assertion naming somebody we have
+     * never seen is a mismatch rather than a new joiner. Distinguished from {@see stepUpSubjectMismatch()}
+     * only in the log — on the wire both are the same 404.
+     */
+    public static function stepUpUnknownSubject(string $email): self
+    {
+        return new self('step_up_unknown_subject', "No account matches {$email}; a step-up never provisions.");
+    }
+
+    /**
+     * The IdP re-authenticated somebody ELSE.
+     *
+     * Legitimate on a shared machine — the person signed in at the IdP under their other account — and it
+     * must still refuse: the pending action belongs to the session that asked, and quietly stamping its
+     * clock on the strength of a different human's credentials is the failure this check exists for.
+     */
+    public static function stepUpSubjectMismatch(string $email): self
+    {
+        return new self('step_up_subject_mismatch', "The assertion re-authenticated {$email}, who is not the subject this step-up named.");
+    }
 }

@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant\Sso;
 
+use App\Enums\SsoAuthIntent;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Middleware\EnforceTenantTwoFactor;
+use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
+use App\Models\Tenant;
 use App\Services\Sso\SsoAuthenticationException;
 use App\Services\Sso\SsoGate;
 use App\Services\Sso\SsoLoginService;
+use App\Services\Sso\SsoUserProvisioner;
+use App\Support\Sso\SsoSession;
+use App\Support\Tenancy\TenantUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +49,15 @@ use Illuminate\Support\Facades\Log;
  * signed by the tenant's own trust anchor AND name a live, unconsumed `sso_auth_requests` row this SP
  * minted. `bootstrap/app.php` carries the exemption by exact path.
  *
+ * ── ⚠️ "THERE IS NO SESSION" IS LITERAL, AND P1c IS WHERE IT STARTED MATTERING ──────────────────────
+ * `config/session.php` sets `same_site` to `lax`, and a cross-site top-level POST does not carry a Lax
+ * cookie. So this request never sees the session the browser already has — it only ever CREATES one. For a
+ * login that is invisible. For a step-up it is decisive: `Auth::id()` here is null even when the person is
+ * signed in two tabs away, so the third of {@see SsoAuthIntent}'s three conditions cannot be evaluated at
+ * this endpoint at all. That is why the step-up arm below marks the row and hands off to a same-site GET
+ * instead of finishing here, and why it must NOT call `Auth::login()`: doing so would replace the member's
+ * real session with a fresh one, orphaning whatever it held, in the name of confirming their identity.
+ *
  * ⚠️ THE TENANT COMES FROM THE HOST, NEVER FROM THE BODY. An attacker choosing which workspace to address
  * chooses only which public subdomain to visit; the assertion's audience is then checked against THAT
  * tenant's SP entity id, so a response minted for another tenant dies on the audience check before any
@@ -70,7 +85,7 @@ final class SsoAcsController extends Controller
         $tenant = $this->currentTenant();
 
         try {
-            $user = $this->logins->consumeAssertion(
+            $outcome = $this->logins->consumeAssertion(
                 $tenant,
                 $connection,
                 // `input()` rather than `validate()`: a validation failure would answer 302-with-errors,
@@ -90,18 +105,49 @@ final class SsoAcsController extends Controller
             abort(404);
         }
 
+        if ($outcome->intent === SsoAuthIntent::StepUp) {
+            return $this->handOffStepUp($tenant, $outcome->request);
+        }
+
         // ⚠️ ORDER IS LOAD-BEARING, and it is the ImpersonationSessionController lesson verbatim:
         // `Auth::login()` calls `Session::migrate(true)`, which regenerates the session id. Anything
         // written to the session BEFORE it lands on the pre-login session — Laravel carries the data
         // across, so it appears to work and breaks silently the day that stops being true.
-        Auth::login($user);
+        Auth::login($outcome->user);
+
+        // AFTER the migrate above, for that reason and no other. This is the identity source of the session
+        // now in the browser's hands, and it is what makes a later step-up go to the IdP.
+        SsoSession::markAuthenticated($request->session());
 
         $this->stampLastLogin($connection);
 
-        // `/dashboard` unconditionally. `sso_auth_requests.return_to` exists so the SP — never the
-        // attacker-controllable `RelayState` — chooses the destination, but P1b never populates it: no flow
-        // bounces an unauthenticated deep link through SSO yet. P1c's step-up is its first writer.
+        // `/dashboard` unconditionally on the login arm. `sso_auth_requests.return_to` exists so the SP —
+        // never the attacker-controllable `RelayState` — chooses the destination, and P1c's step-up is its
+        // first and so far only writer: nothing yet bounces an unauthenticated deep link through SSO.
         return redirect('/dashboard');
+    }
+
+    /**
+     * The step-up arm — mark nothing more than "a signed assertion answered this", and hand back to a
+     * same-site GET where the member's real session exists.
+     *
+     * ⚠️ NO `Auth::login()`, NO `last_login_at`, NO PROVISIONING. Each absence is a decision:
+     *   · logging in would replace the session this step-up is being performed FOR (see the class docblock);
+     *   · `last_login_at` is what an admin reads to answer "is sign-in working", and a working step-up
+     *     silently keeping that column fresh would let a broken login path look healthy for weeks;
+     *   · provisioning is {@see SsoUserProvisioner}'s job on the login path only — a step-up is defined
+     *     against a session that already exists, so an unknown subject is a mismatch and was refused
+     *     upstream by `SsoStepUpService::matchSubject()`.
+     *
+     * The redirect target is composed with {@see TenantUrl::to()} rather than `route()`: the tenant route
+     * groups declare no `->domain()`, so the named-route generator would emit the CENTRAL host and the
+     * browser would arrive somewhere with neither this tenant's context nor this member's cookie.
+     */
+    private function handOffStepUp(Tenant $tenant, SsoAuthRequest $authRequest): RedirectResponse
+    {
+        return redirect()->away(
+            TenantUrl::to($tenant, 'sso/saml/step-up/complete/'.$authRequest->request_id)
+        );
     }
 
     /**

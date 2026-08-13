@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
 use App\Services\Sso\SsoAuthRequestService;
+use App\Services\Sso\SsoStepUpService;
 use Database\Factories\SsoAuthRequestFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $issued_at
  * @property Carbon $expires_at
  * @property ?Carbon $consumed_at
+ * @property ?Carbon $verified_at
+ * @property ?Carbon $completed_at
  * @property ?string $ip_address
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
@@ -48,10 +51,11 @@ class SsoAuthRequest extends Model implements TenantScoped
     use HasUuidv7;
 
     /**
-     * ⚠️ `consumed_at` IS DELIBERATELY ABSENT. Single-use is established by the conditional UPDATE in
-     * {@see SsoAuthRequestService::consume()}, whose affected-row count is the check, and
-     * leaving the column unfillable is what stops a well-meaning `fill(['consumed_at' => now()])` from
-     * quietly reintroducing the read-then-write race the class docblock above forbids.
+     * ⚠️ `consumed_at`, `verified_at` AND `completed_at` ARE ALL DELIBERATELY ABSENT. Single-use is
+     * established by the conditional UPDATEs in {@see SsoAuthRequestService::consume()} and
+     * {@see SsoStepUpService::redeem()}, whose affected-row counts are the check, and leaving the columns
+     * unfillable is what stops a well-meaning `fill(['consumed_at' => now()])` from quietly reintroducing
+     * the read-then-write race the class docblock above forbids.
      *
      * @var list<string>
      */
@@ -79,6 +83,8 @@ class SsoAuthRequest extends Model implements TenantScoped
             'issued_at' => 'datetime',
             'expires_at' => 'datetime',
             'consumed_at' => 'datetime',
+            'verified_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 

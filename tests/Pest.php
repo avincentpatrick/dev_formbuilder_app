@@ -39,6 +39,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
@@ -55,6 +56,7 @@ use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
+use Tests\Support\Auth\FakeGoogleIdentityProvider;
 use Tests\Support\FakeDnsTxtResolver;
 use Tests\TestCase;
 
@@ -437,6 +439,27 @@ function fakeDns(array $records = []): FakeDnsTxtResolver
 {
     $fake = new FakeDnsTxtResolver($records);
     app()->instance(DnsTxtResolver::class, $fake);
+
+    return $fake;
+}
+
+/**
+ * Bind a recording, in-memory Google for the sign-in tests (J3c2).
+ *
+ * Live Google credentials are an input only the product owner can supply, so this is what every case
+ * downstream of the seam runs against — the `fakeDns()` shape, for the same reason. The returned object
+ * RECORDS: `->authorizeCalls` proves which state crossed the hop and with which redirect URI, and
+ * `->exchangeCalls` proves a replayed callback never reached Google a second time. Neither is visible
+ * from the resulting session.
+ *
+ * Knobs for the refusals, which is what makes it worth having: `->unverifiedEmail()` (this flow's analogue
+ * of an invalid signature), `->refusingExchange()`, and `->as($sub, $email)` to drive linkage and the
+ * subject-mismatch takeover case.
+ */
+function fakeGoogle(): FakeGoogleIdentityProvider
+{
+    $fake = new FakeGoogleIdentityProvider;
+    app()->instance(GoogleIdentityProvider::class, $fake);
 
     return $fake;
 }

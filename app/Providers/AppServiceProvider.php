@@ -42,6 +42,8 @@ use App\Services\Search\SearchPresenter;
 use App\Services\Search\SearchService;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Auth\GoogleIdentityProvider;
+use App\Support\Auth\SocialiteGoogleIdentityProvider;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
@@ -197,6 +199,20 @@ class AppServiceProvider extends ServiceProvider
         // draws agree by chance, so the transaction-retry path that recovers from one would ship unexercised.
         // Binding a scripted issuer is what makes it deterministic — see SubmissionReferenceIssuer.
         $this->app->singleton(SubmissionReferenceIssuer::class, RandomSubmissionReferenceIssuer::class);
+
+        // Google sign-in's one piece of third-party I/O (J3c2, ADR-0017 §D10). `singleton` for the same
+        // reason as the two above: it holds no tenant, no user and no token, so there is nothing to leak
+        // across requests — the identity it returns is handed straight to the caller.
+        //
+        // An interface at all because live Google credentials are an input only the product owner can
+        // supply, and the build was not allowed to wait on them. Everything downstream — provisioning,
+        // membership, the two-factor fork, the handoff — is exercised against
+        // Tests\Support\Auth\FakeGoogleIdentityProvider via the `fakeGoogle()` helper.
+        //
+        // ⚠️ ADR-0009 rejects Socialite BY NAME for the connector lane, and this binding stands on an
+        // explicit carve-out written into that ADR rather than in spite of it. ConnectorProvider does not
+        // adopt Socialite and must not.
+        $this->app->singleton(GoogleIdentityProvider::class, SocialiteGoogleIdentityProvider::class);
     }
 
     /**

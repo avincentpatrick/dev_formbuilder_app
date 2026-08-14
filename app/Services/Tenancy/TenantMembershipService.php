@@ -224,6 +224,33 @@ final class TenantMembershipService
     }
 
     /**
+     * Materialize the membership a first-party Google sign-in implies (J3c2 — ADR-0017 §D8).
+     *
+     * The FOURTH door, and — like the third — one string different from the other three. Everything that
+     * makes this correct (the context borrow, the `SET LOCAL` transaction, the seat-quota reservation, the
+     * Suspended refusal, the reuse of a prior Declined/Removed row, one-role-per-tenant `syncRoles`) is
+     * {@see attachMember()}'s, deliberately, because a second implementation would be right until the day
+     * one of them changed. §D8 says "ADR-0016 §D20 verbatim" and this is what verbatim has to mean.
+     *
+     * ⚠️ THE ROLE IS RESOLVED BY THE CALLER, AND FOR THIS DOOR THAT IS LOAD-BEARING RATHER THAN STYLISTIC.
+     * {@see attachMember()} overwrites `invited_role_id` with whatever role it is handed, so §D20's
+     * "Invited → activated at the INVITED role" cannot be expressed here — it has to be decided before the
+     * call. {@see \App\Services\Auth\GoogleSignInProvisioner::roleFor()} is where that happens, mirroring
+     * how SSO passes `sso_connections.default_role_name`. An absent membership gets `viewer`, the same
+     * least-privileged default {@see joinOpenTenant()} argues for: someone who arrived holding a Google
+     * account has proved nothing about what they should be able to do.
+     *
+     * ⚠️ AND THE GATE IS `RegistrationGate`, NOT A NEW TOGGLE — asked by the CALLER, before it reaches here.
+     * SSO asks `jit_provisioning_enabled`, which a workspace admin configured; this door has no tenant-side
+     * configuration, so the question "may a stranger become a member here?" is the one `/register` already
+     * answers. One gate, two consumers, which is that class's stated reason for existing.
+     */
+    public function joinViaGoogle(Tenant $tenant, User $user, string $roleName): ?TenantUser
+    {
+        return $this->attachMember($tenant, $user, $roleName, 'google_sign_in');
+    }
+
+    /**
      * The shared membership write. See {@see joinOpenTenant()} for the context-borrow and quota reasoning.
      *
      * @param  string  $via  how the member arrived, for the audit payload — the only difference between the

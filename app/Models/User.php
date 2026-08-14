@@ -39,6 +39,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $id
  * @property string $name
  * @property string $email
+ * @property ?Carbon $email_verified_at
+ * @property ?string $google_id Google's `sub` (J3c2 / ADR-0017 §D1). Unique; NULL on almost every row.
  * @property bool $is_super_admin Global platform-staff flag (RBAC §9); never a Spatie role.
  * @property ?Carbon $two_factor_confirmed_at Set once 2FA enrollment is confirmed.
  */

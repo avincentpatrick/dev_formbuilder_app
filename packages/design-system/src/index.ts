@@ -24,6 +24,15 @@ export { default as MdsStatTile } from './components/StatTile/StatTile.vue';
 export { default as MdsEmptyState } from './components/EmptyState/EmptyState.vue';
 export { default as MdsSegmentedControl } from './components/SegmentedControl/SegmentedControl.vue';
 export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
+// The determinate half of DSR §3.9, beside the indeterminate one above (J4a). §3.9's governing rule is that
+// a spinner is never used for an operation with a knowable fraction complete, so the two belong together
+// here. It renders its label and its numeric value UNCONDITIONALLY: "a bar alone is not sufficient" is a
+// rule this API makes unwriteable rather than merely documents, the same way MdsBadge's `dot` cannot be
+// used to build the bare coloured disc §3.8 forbids. ⚠️ The step-count variant §3.9 also specifies is NOT
+// built — see the as-built note there, and `resources/public-runtime/components/ProgressIndicator.vue`,
+// which is its reference implementation and its first refactor target.
+export { default as MdsProgress } from './components/Progress/Progress.vue';
+export { type ProgressTone, type ProgressSize } from './components/Progress/Progress.vue';
 export { default as MdsBadge } from './components/Badge/Badge.vue';
 export { default as MdsBanner } from './components/Banner/Banner.vue';
 export { type BannerTone } from './components/Banner/Banner.vue';

@@ -36,6 +36,15 @@ export { type ProgressTone, type ProgressSize } from './components/Progress/Prog
 export { default as MdsBadge } from './components/Badge/Badge.vue';
 export { default as MdsBanner } from './components/Banner/Banner.vue';
 export { type BannerTone } from './components/Banner/Banner.vue';
+// The in-flow contextual message (J4a), and MdsBanner's SIBLING rather than its replacement. The split is
+// four questions, each enforced by a prop that exists or does not — see DSR §3.7a and the docblock. Banner
+// states a CONDITION in one line, is fixed-polite because the condition was already true when the page
+// loaded, and has no dismiss because hiding a live fact is not a feature. Alert carries rich content, may
+// opt into `assertive` for something that JUST happened, may be dismissed, and has a success tone.
+// ⚠️ Do not "unify" them: Banner's role="status" argument is load-bearing for the impersonation surface,
+// and position is NOT the discriminator — `SsoStatusCard` already mounts a Banner inside a card, correctly.
+export { default as MdsAlert } from './components/Alert/Alert.vue';
+export { type AlertTone } from './components/Alert/Alert.vue';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';

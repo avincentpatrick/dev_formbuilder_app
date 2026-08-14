@@ -201,6 +201,52 @@ N-consecutive-failures demotion becomes worth building).
 
 ---
 
+## 8b. Per-Tenant Extract Runbook (P2b — ADR-0018)
+
+`php artisan tenants:extract <id|slug|hostname> [--path=…]` writes one workspace's record as one NDJSON
+file per table plus a `manifest.json`, into `storage/app/tenant-extracts/<slug>-<timestamp>/` by default.
+Used for offboarding, an isolation-clause customer, or answering "what exactly do you hold for us".
+
+**Before you run it**
+
+1. **Run as the application role.** The command refuses a SUPERUSER/BYPASSRLS connection and writes nothing
+   — that refusal is the guard working, *not* a misconfiguration to route around by pointing `DB_USERNAME`
+   at `meridian`. On that role every RLS policy is ignored and the artefact would be **every** tenant's rows
+   in a directory bearing one tenant's name.
+2. **Pick an empty destination.** It refuses a directory that already has files in it; merging two
+   point-in-time artefacts produces a manifest that describes neither.
+3. **Expect it to hold a read transaction** for the duration (REPEATABLE READ, for a consistent snapshot
+   across all 43 tables). On a large tenant, run it in the maintenance window you would use for a backup.
+
+**After it finishes — read the manifest, not just the row count**
+
+- `snapshot.isolation_level` and `snapshot.role` are **read back from the session**, so they say what
+  actually happened. `repeatable read` + the app role is the expected pair.
+- `unresolved_user_references` lists ids that extracted rows point at and the extract does not contain.
+  **This is normal**, and the command warns about it on the console: the `users` policy admits only the
+  workspace's ACTIVE members, so an outstanding invitation, a removed or suspended member whose forms
+  remain, and the platform operator on an `impersonation_tokens` row all land here. Read it before handing
+  the artefact over — it is the list you will be asked about.
+- `not_extracted` states, in the file itself, what was deliberately left out and why.
+
+**⚠️ Choose the destination for its ACL, because the command's own permissions do nothing on this host.**
+The writer asks for `0700`, which is a POSIX control: **on this Windows Server box PHP ignores `mkdir()`'s
+mode and `chmod()` only toggles the read-only attribute**, so the extract directory simply inherits the ACL
+of whatever it is created under. Pass `--path` pointing inside a directory you have already restricted —
+the same location §5 puts database dumps in — rather than accepting the `storage/app/tenant-extracts/`
+default, which inherits the web application's own tree. Confirm with `icacls <path>` before you run it, not
+after.
+
+**⚠️ What the artefact is, for retention purposes.** One workspace's entire record in plaintext — every
+submission answer, every respondent email the forms collected. It carries **no credentials** (ADR-0018 §D3
+withholds them), but nothing in the command encrypts, transfers or expires it. Treat it as you would a
+database dump under §5: move it to the same protected location, and delete the working copy when the
+transfer is confirmed. **It is NOT a GDPR subject-access response** — see
+`docs/data-privacy-gdpr-compliance.md` §3, which explains why using it as one would over- and
+under-disclose at the same time.
+
+---
+
 ## 9. Out of Scope / Deferred
 - Metrics, dashboards, alerting, on-call → Doc #23 (this doc's §5.5 incident skeleton points there).
 - Automated zero-downtime release-swap on Windows → future enhancement (§3.1).

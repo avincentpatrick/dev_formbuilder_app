@@ -689,3 +689,62 @@ without amending **#8** again.
 
 ---
 
+## #15 — Google's four-colour mark, as local markup outside the icon set (`resources/js/components/auth/GoogleMark.vue`)
+
+**Introduced:** Phase 1 completion · Increment J3c2 (first-party Google sign-in, ADR-0017).
+
+**The rules being excepted.** Two, and the first is written into the icon set itself.
+`packages/design-system/src/components/Icon/icons.ts` opens by declaring the set "hand-authored line-art
+glyphs (24×24, stroke-based, no external icon dependency so the embeddable guest runtime stays
+request-free)", and its `plug` glyph carries the standing decision in as many words: *"Deliberately
+generic rather than a vendor mark — the set is hand-authored line art, and a brand logo would be neither
+line art nor ours."* And DSR §2.1 makes the token palette the single source of colour; this component
+hard-codes four hexes.
+
+**What deviates.** A local SFC rendering Google's "G" as four filled paths — `#4285F4`, `#34A853`,
+`#FBBC05`, `#EA4335` — passed through `MdsButton`'s default slot on the "Continue with Google" control.
+`icons.ts` is **not amended** and `IconName` never gains a `google` key.
+
+**Why it cannot be an `MdsIcon`, structurally rather than by preference.** Every value in `icons` is a
+SINGLE path `d` string, and `Icon.vue` renders it `fill: none; stroke: currentColor`. A four-colour
+filled mark is not expressible in that model at all — it is four paths with four fills and no stroke. The
+only way to make `iconLeft="google"` typecheck would be to widen both the data shape and the renderer,
+for one glyph, in a package the guest runtime also ships.
+
+**Why the hexes are raw literals, which is the sharper half of this entry.** They are Google's brand
+colours, not this product's. A token would promise three things that must all be false here: that the
+value follows the theme, that it responds to the tenant's accent ramp, and that light and dark differ.
+Google's Branding Guidelines require the mark to be reproduced exactly, so the correct behaviour is to be
+*inert* to everything the token system exists to vary. `token-references.test.ts` is unaffected — it
+asserts that every `var(--mds-*)` reference RESOLVES, and this file makes none.
+
+**Rejected alternatives.**
+
+- **No mark at all.** Cheapest, and it becomes a compliance problem the day real credentials arrive:
+  Google's guidelines require the G on the button.
+- **A `brand/` icon set beside the line-art one.** It makes `MdsIcon` polymorphic over two rendering
+  models — `stroke: currentColor` line art and multi-fill vendor artwork — so every consumer's mental
+  model of what an icon *is* would depend on which set the name came from.
+- **An `<img>` or a data URI.** Both defeat the set's own "no external dependency, request-free" premise
+  or bloat the bundle with a base64 blob that no reviewer can read in a diff.
+
+**Known costs, stated rather than discovered later.**
+
+- **The mark does not respond to the theme, and that is the whole point** — so on a future surface with a
+  saturated background it may need a white plate behind it. Nothing in the repo enforces contrast for it,
+  because axe cannot judge decorative `aria-hidden` artwork.
+- **A second provider means a second file like this**, not a shared abstraction. That is deliberate at
+  n=1; ADR-0017 §D1 names the same threshold for the `google_id` column, so both would be revisited by
+  the same trigger.
+- **The label is a CI constraint, not a design choice.** It must read "Continue with Google" and may
+  never contain "Sign in": `tests/e2e/global-setup.ts` locates the submit control with a NON-exact
+  `getByRole('button', { name: 'Sign in' })`, twice, before any spec runs, so a second substring match is
+  a strict-mode violation that fails global setup and takes the whole suite with it. **#14** records the
+  identical constraint for the marketing panel. A Vitest case asserts the accessible name does not match
+  `/sign in/i`, which is that failure caught in five milliseconds instead of a CI cycle.
+
+**Scope of the exception.** One component, one glyph, one consumer. The icon set's line-art rule is
+unamended and still binds everything else.
+
+---
+

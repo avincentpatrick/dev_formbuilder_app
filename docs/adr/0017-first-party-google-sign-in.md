@@ -113,6 +113,32 @@ seriously while refusing to widen either the session cookie's scope or the meani
   re-opens a consent screen, and the authorization `code` behind it is single-use at Google — §D3's
   original bound, still sound for the leg it was written about.
 
+  > **⚠ D6a — THE MINT ROUTE TAKES FORTIFY'S PIPELINE, NOT THE TENANT ONE, AND THE FIRST PLAN HAD THIS
+  > WRONG.** The obvious placement for `GET /auth/google/redirect` is `routes/tenant.php` beside the SAML
+  > login path, behind `InitializeTenancyBySubdomain` + `PreventAccessFromCentralDomains`. **That cannot
+  > serve §D12's central arm**, which is a decision of record: `routes/tenant.php` declares no
+  > `->domain()`, so a central-host request matches the route and dies in identification. Nor can the URI
+  > simply be registered in both files — `routes/google-auth.php` is loaded from `withRouting(then:)`
+  > while `routes/tenant.php` is mapped later from `TenancyServiceProvider::mapRoutes()` inside
+  > `booted()`, so the tenant copy would be **dead code that no test notices**. And ADR-0009 §D2's
+  > `Route::domain(config('tenancy.central_domain'))` is already ruled out here because it does not match
+  > `localhost`, which would make the flow unexercisable against the fake on a dev box.
+  >
+  > So the mint takes `/login`'s own shape: `web` + `RequirePlatformHost`, **no** `Route::domain()`, ONE
+  > registration serving the central host and every tenant subdomain, 404 on exactly one class of host —
+  > a custom domain, which is the phishing surface a domain constraint would actually be for (H22a). The
+  > workspace is resolved from the HOST by `PlatformHost::tenantFor()`, exactly as `RegistrationGate`
+  > already resolves it for `/register` with no tenancy middleware at all.
+  >
+  > **Accepted cost, and it is a real one:** that route therefore has no ambient RLS context, and
+  > `google_auth_requests` is strict-RLS — so `GoogleAuthRequestService::mint()` must BORROW a context
+  > inside a transaction (`TenantSettingRegistry::forTenant()`'s idiom) or the INSERT is refused. A
+  > refusal is the safe direction, but it is one more place where a missing GUC is the failure mode. Only
+  > the completion hop is tenant-only, and it keeps the full pipeline and a real GUC.
+  >
+  > **Revisit trigger:** `routes/tenant.php` ever gaining a `->domain()`, which would make the collision
+  > argument above obsolete and the tenant placement viable again.
+
 - **D7 — The handoff back to the tenant host is a hashed, 60-second, single-use DB row.** This is the leg
   §D3's revisit trigger fires against, because it is the one that creates a session. `google_auth_requests`
   stores the SHA-256 of a token that travels in a URL (the `impersonation_tokens` precedent), and

@@ -1126,6 +1126,54 @@ One refused SAML sign-in, kept so a tenant's own admin can see why (P1c; ADR-001
 
 ---
 
+## 30. `google_auth_requests`
+
+One in-flight first-party Google sign-in (J3c2; ADR-0017 §D7). Its life is three writes on two hosts: **mint** on the tenant host (a `state_id` and nothing asserted), **attach** on the central callback (stamps `consumed_at`, the four `google_*` columns and a handoff hash), **redeem** back on the tenant host (stamps `completed_at`; the session is created only after that succeeds).
+
+**Writer:** `GoogleAuthRequestService` — the only one, and every state transition is a **conditional UPDATE whose affected-row count is the check**. **Reader:** the same class, plus `GoogleCompleteController` reading the identity back off the redeemed row.
+
+⚠️ **WHY THERE IS A TABLE HERE WHEN ADR-0009 §D3 SAYS A SIGNED HMAC IS ENOUGH.** §D3's own revisit trigger — "a callback gains a side effect beyond writing the connection it names" — has fired: a sign-in *establishes a session*. An HMAC proves we minted a token; it cannot prove the token has not been presented before, and single-use requires remembering. But only ONE of the two legs needs it: the outbound `state` stays a stateless signed token (replaying it re-opens a consent screen, and the authorization code behind it is single-use at Google), while the **handoff** — the hop carrying a validated identity to the host that can actually set a cookie — is this row.
+
+⚠️ **THE CENTRAL-HOST ARM HAS NO ROW AT ALL** (§D12). `tenant_id` is NOT NULL because `TenantIsolation::nullableGlobalSql()` widens SELECT only — every write stays strict — so a tenant-less row is literally unwritable on the app connection. The central arm needs no handoff anyway: callback and session share a host. The constraint agrees with the design rather than limiting it.
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `uuid` | No | `uuidv7()` | No | Primary key. Time-ordered, which is what makes the trim's tiebreak total. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
+| `state_id` | `char(32)` | No | — | No | 128 bits of CSPRNG, the `SsoAuthRequest::mintRequestId()` budget without its leading `_` (that character satisfies SAML's `xs:ID` and has no analogue in an OAuth `state`). ⚠️ **UNIQUE GLOBALLY**, not per tenant: it is matched from an unauthenticated callback before any tenant scoping can be trusted, so a cross-tenant collision would be a second row the lookup could match. Carried inside the signed `state` as its `sid` claim. |
+| `return_to` | `varchar(500)` | Yes | `NULL` | No | A **PATH**, never a URL — `SsoReturnTo`-sanitised on the way in and re-validated on the way out. Nothing compares hosts; see §28 and ADR-0016 §D25 for why a host comparison is the check that keeps being got wrong. |
+| `issued_at` | `timestamptz` | No | — | No | Mint time. The trim's retention arm and its newest-N ordering both read it. |
+| `expires_at` | `timestamptz` | No | — | No | How long the consent screen may stay open (`google-auth.state.ttl_seconds`, 600). |
+| `consumed_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the CENTRAL callback. NULL = the state is unspent. **Not `$fillable`.** |
+| `handoff_hash` | `char(64)` | Yes | `NULL` | No | ⚠️ **SHA-256 of the token, NEVER the token.** The plaintext travels in a URL path, so it lands in browser history, any proxy log and any `Referer` — the `impersonation_tokens` precedent, for exactly that reason. Unique globally, same argument as `state_id`. **Not `$fillable`.** |
+| `handoff_expires_at` | `timestamptz` | Yes | `NULL` | No | 60 seconds (`google-auth.handoff.ttl_seconds`). Generous for one browser redirect and mean for anything copied out of a log first. **Not `$fillable`.** |
+| `google_sub` | `varchar(255)` | Yes | `NULL` | **Yes (pseudonymous)** | Google's stable account identifier. **This is the identity; the address is not** (§D2). **Not `$fillable`.** |
+| `google_email` | `varchar(255)` | Yes | `NULL` | **Yes** | The address Google asserted, used once as a joining hint under §D4's conditions. |
+| `google_email_verified` | `boolean` | Yes | `NULL` | No | This flow's analogue of SAML's signature check (§D3), compared `=== true` at the callback **and** again in the provisioner. |
+| `google_name` | `varchar(255)` | Yes | `NULL` | **Yes** | Display name, falling back to the local part of the address (`users.name` is NOT NULL and is rendered in the roster). |
+| `completed_at` | `timestamptz` | Yes | `NULL` | No | Stamped by the tenant hop. Its presence is what makes the handoff single-use. **Not `$fillable`.** |
+| `ip_address` | `varchar(45)` | Yes | `NULL` | **Yes (conditional)** | The client's address at mint (45 = `INET6_ADDRSTRLEN`). Half the reason the retention window is data minimisation and not merely housekeeping. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | — |
+
+**Uniqueness**: `state_id`, `handoff_hash` (both global). Index on `(tenant_id, expires_at)`, serving the trim scan and the liveness lookup.
+
+**CHECK constraints** — three, pinning the ORDER of the flow at the database rather than trusting it to the service:
+
+- `handoff_hash IS NULL OR consumed_at IS NOT NULL` — a row cannot carry the evidence of a validated identity without having been consumed for one. Without it, anyone holding a `state_id` could mint themselves a session.
+- `completed_at IS NULL OR handoff_hash IS NOT NULL` — a row cannot claim to have been redeemed before it was issued.
+- `consumed_at IS NULL OR (google_sub IS NOT NULL AND google_email IS NOT NULL AND google_email_verified IS NOT NULL)` — a consumed row MUST carry the identity it was consumed for, so a half-written row fails here rather than surfacing as a null-email lookup three layers away.
+
+> **Design Notes**
+> - **RLS**: strict. The writer is unauthenticated and the tenant comes from the signed state (at the callback) or the host (everywhere else), so there is never an `app.current_user_id` at insert time. ⚠️ The mint route carries no tenancy middleware at all — it serves the central host too — so `GoogleAuthRequestService::mint()` **borrows** the context inside a transaction, the `TenantSettingRegistry::forTenant()` idiom. Without a GUC the INSERT is *refused*, not mis-scoped.
+> - **The wrong-tenant refusal is RLS, not an `if`.** A handoff minted for workspace A and presented on B's host matches nothing, because B's context was established before the redeem ran. There is deliberately no `tenant_id` predicate in the service.
+> - **The `google_*` columns are post-validation-only**, which is a disclosure rule rather than a tidiness one — §29's rule applied here. They are written only after Google's answer verifies, so nothing an anonymous caller supplies can reach a tenant's database through them.
+> - **Bounded on the WRITE path** (`google-auth.requests.max_rows_per_tenant`, 500; `retention_days`, 7), trimmed in the same call as the insert, for §29's measured reason: nothing runs the scheduler on the production box. ⚠️ The cap is **"not among the newest N"**, never "older than the Nth" — the mint endpoint is unauthenticated and can write many rows inside one second, and a timestamp comparison keeps every tied row.
+> - **There is no `google_auth_failures` twin** (§D9). `sso_auth_failures` exists because a tenant admin configures a SAML trust anchor and must debug their own certificate; Google sign-in has **no tenant-side configuration to get wrong**, so those rows would feed no surface. Refusals go to the log and never to `audits`.
+
+**Linkage lives on `users`, not here.** `users.google_id` (`varchar(255)`, nullable, **unique**) is where a Google account attaches to a local identity — a column rather than a `social_identities` table, per ADR-0017 §D1: the existence check must resolve on the `pgsql_auth` connection, and a column rides the existing `GRANT SELECT, UPDATE ON users TO meridian_auth` and the `TO meridian_auth` write policy for free, where a second table needs a new GRANT and a new policy on the most sensitive role in the deployment. `users` itself remains out of this document's scope (see the header) and is specified in the RBAC doc.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1249,6 +1297,10 @@ sso_auth_requests.user_id              -> users.id           (external, nullable
 sso_auth_failures.tenant_id            -> tenants.id
 sso_auth_failures.(tenant_id,
                    sso_connection_id)  -> sso_connections (tenant_id, id)   (composite, CASCADE)
+
+google_auth_requests.tenant_id         -> tenants.id                        (CASCADE)
+                                          (no user FK: the user is the OUTCOME of this flow, and the
+                                           linkage lives on users.google_id — see §30 and ADR-0017 §D1)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

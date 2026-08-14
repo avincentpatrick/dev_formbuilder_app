@@ -348,6 +348,58 @@ Unique constraint: `(tenant_id, user_id)` — a person has at most one membershi
 4. **Remove** (by an Admin/Owner): a single transaction — `status → removed`, `removed_at`/`removed_by` set, the corresponding tenant-scoped `model_has_roles` row deleted, and every tenant-scoped Sanctum token for that user revoked. Called out as one atomic operation explicitly because Spatie has no awareness of `tenant_users`'s lifecycle on its own — nothing in the package automatically cleans up role/token state when this application-level table changes; the application must own that transaction.
 5. **Ownership transfer** (Owner-only capability, `tenant.ownership.transfer`): updates `tenants.owner_user_id` to the new Owner, changes the outgoing Owner's `model_has_roles` row to `Admin` (never leaves them roleless), and grants the incoming member the `Owner` role — all inside one transaction, logged via `audits` (`event = 'permission_changed'`).
 
+### 7.1 The four doors into a workspace
+
+Membership can be created by four different flows, and **all four share one method** —
+`TenantMembershipService::attachMember()`. That sharing is the design rather than a refactoring
+convenience: the RLS context borrow, the `SET LOCAL` transaction, the seat-quota reservation, the reuse
+of a prior `declined`/`removed` row, the `suspended` refusal and the one-role-per-tenant `syncRoles()`
+are the same problem every time, and a second implementation would be correct until the day one of them
+changed. What differs between the doors is **one string**, recorded in the audit payload as `via`,
+because "how did this person get in" is the only question they answer differently and the ledger is the
+only place the answer survives.
+
+| Door | `via` | Entry point | Gate on a NEW membership |
+|---|---|---|---|
+| Invitation | *(no `attachMember()` call — see step 2 above)* | `InvitationController` | The invite itself; an admin named this person |
+| Self-registration on a workspace subdomain | `self_registration` | `JoinTenantOnRegistration` (a `Registered` listener) | `RegistrationGate` (via the `GateRegistration` middleware on `/register`) |
+| SAML JIT provisioning (P1b) | `sso_jit` | `SsoUserProvisioner` | `sso_connections.jit_provisioning_enabled` |
+| **First-party Google sign-in (J3c2)** | **`google_sign_in`** | `GoogleSignInProvisioner` | **`RegistrationGate`** |
+
+**Why Google's gate is `RegistrationGate` and not a new toggle.** SSO asks a per-connection flag because a
+workspace administrator configured that trust anchor and can reason about it. Google sign-in has **no
+tenant-side configuration at all**, so the question it needs answered — "may somebody who is not yet a
+member become one here?" — is exactly the question `/register` already answers. Reusing it means the
+button's visibility and the flow's outcome cannot disagree, which is that class's stated reason for
+existing. **Stated consequence:** `registration.invite_only` is fail-closed TRUE, so on a default
+workspace Google works for existing members and invited people only, and a stranger is refused. That is
+correct behaviour, not a defect report.
+
+**Three refusals that are shared, and one that is not.**
+
+- **`suspended` → refused, at every door.** An administrative sanction that a new door quietly reversed
+  would be unenforceable in exactly the workspaces most likely to rely on it. Both `attachMember()` and
+  each provisioner check it; the duplication is deliberate, so the guarantee holds for future callers.
+- **A full seat quota → refused.** ⚠️ But the two provisioners translate the refusal differently and both
+  are right. `attachMember()` returns `null`; `JoinTenantOnRegistration` **discards** it (the person keeps
+  an account with no workspace, which is what central-host registration already produces), while
+  `SsoUserProvisioner` and `GoogleSignInProvisioner` **raise** it, because they are about to establish a
+  session and a session with no membership sees an empty product through RLS and reads as data loss. The
+  raise happens inside their transaction, so a freshly created account is discarded with it.
+- **`invited` → activated at the INVITED role, never at the door's default.** ⚠️ This lives in each
+  provisioner and **cannot** live in `attachMember()`, which overwrites `invited_role_id` with whatever
+  role it is handed. An admin who invited somebody as an Admin expressed an intent about that person, and
+  letting a sign-in door silently demote them would make the invitation surface untrustworthy.
+- **Not shared: what a brand-new member's role is.** SSO uses the connection's `default_role_name`
+  (CHECK-constrained to the catalog minus `owner`, because §5 establishes Owner only by ownership
+  transfer). Google has no per-workspace setting and uses `viewer`, `joinOpenTenant()`'s reasoning
+  unchanged: somebody who arrived holding a consumer account has proved nothing about what they should be
+  able to do, and an Owner can promote them from the Members page.
+
+`MemberJoined` fires from inside `attachMember()`'s transaction for every `via`, so the Owner's
+notification is identical whichever door was used — the distinction belongs in the audit ledger, where it
+is, and not in a bell.
+
 ---
 
 ## 8. `resource_grants` + `scope_nodes` — Per-Resource Access Scoping

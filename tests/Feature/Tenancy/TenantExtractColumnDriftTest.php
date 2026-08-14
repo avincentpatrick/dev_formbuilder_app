@@ -51,6 +51,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'form_versions' => 'change_summary checksum created_at description form_id id published_at published_by schema_snapshot status superseded_at tenant_id title updated_at version_number',
     'forms' => 'allow_api_import allow_guest_submissions allow_manual_encoding allow_ocr_linelist allow_ocr_single allow_offline_sync archived_at bot_challenge capability_flags closes_at confirmation_message confirmation_message_translations created_at created_by current_published_version_id default_locale deleted_at description draft_version_id guest_rate_limit_per_minute id max_responses opens_at owner_user_id public_slug published_at save_and_resume schedule_state scope_node_id search_vector single_page_mode status supported_locales tenant_id theme timezone title updated_at updated_by',
     'global_probes' => 'created_at id note tenant_id updated_at',
+    'google_auth_requests' => 'completed_at consumed_at created_at expires_at google_email google_email_verified google_name google_sub handoff_expires_at handoff_hash id ip_address issued_at return_to state_id tenant_id updated_at',
     'impersonation_tokens' => 'consumed_at created_at expires_at id ip_address operator_id target_user_id tenant_id token_hash updated_at',
     'legacy_overrides' => 'created_at feature_flags id tenant_id updated_at',
     'model_has_permissions' => 'model_id model_type permission_id tenant_id',
@@ -76,7 +77,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'tenant_users' => 'created_at id invite_expires_at invite_token invited_at invited_by invited_role_id joined_at removed_at removed_by status tenant_id updated_at user_id',
     'tenants' => 'brand_ramp created_at data default_locale draft_ttl_days id logo_attachment_id maintenance_message maintenance_mode name owner_user_id primary_color slug status supported_locales updated_at',
     'usage_counters' => 'created_at id last_incremented_at limit_snapshot metric period_end period_start subscription_id tenant_id updated_at value',
-    'users' => 'created_at deleted_at email email_verified_at id is_super_admin last_active_tenant_id name password privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',
+    'users' => 'created_at deleted_at email email_verified_at google_id id is_super_admin last_active_tenant_id name password privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',
     'webhook_deliveries' => 'attempt_count connection_subscription_id created_at event_id event_type id last_attempted_at max_attempts next_retry_at payload payload_attachment_id response_body_excerpt response_status_code response_time_ms signature status tenant_id updated_at webhook_endpoint_id',
     'webhook_endpoints' => 'consecutive_failure_count created_at created_by deleted_at disabled_reason event_types form_id id last_failure_at last_success_at name secret secret_previous secret_previous_expires_at signing_algorithm status tenant_id updated_at url',
 ];
@@ -197,13 +198,37 @@ it('aliases every transformed expression to the column key it is stored under', 
 
 it('withholds every credential column on users', function (): void {
     // Named individually rather than counted, because a count passes when one is swapped for another.
-    // These five are the ones that authenticate a CENTRAL identity — ADR-0017 Context §2: one human, one
-    // password, N workspaces — so extracting any of them hands one tenant material for an account that is
-    // still live in workspaces it has nothing to do with.
+    // These are the ones that authenticate or globally identify a CENTRAL identity — ADR-0017 Context §2:
+    // one human, one password, N workspaces — so extracting any of them hands one tenant material for an
+    // account that is still live in workspaces it has nothing to do with.
+    //
+    // ⚠️ `google_id` JOINED THIS LIST BY WAY OF A CROSS-LANE FAILURE WORTH RECORDING. It arrived in J3c2,
+    // this file arrived in P2b, and each merged green on a base that did not contain the other — so the
+    // integration branch went red on the census the moment they met, and the column had no withholding at
+    // all until then. The census guarded the SHAPE and this list guards the DECISION; a census entry alone
+    // would have gone green while shipping the column into the next artefact, which is precisely what the
+    // "decide first, then paste" warning at the top of this file exists to prevent.
     expect(array_keys(TenantExtractColumns::withheldFor('users')))
         ->toContain('password')
         ->toContain('remember_token')
         ->toContain('two_factor_secret')
         ->toContain('two_factor_recovery_codes')
-        ->toContain('last_active_tenant_id');
+        ->toContain('last_active_tenant_id')
+        ->toContain('google_id');
+});
+
+it('withholds the live half of an in-flight Google sign-in', function (): void {
+    // The same decision on the other table J3c2 added. `google_auth_requests` rows are extracted — a tenant
+    // may legitimately see THAT a sign-in was attempted and when, on the `impersonation_tokens` precedent —
+    // but `handoff_hash` finishes that sign-in for whoever holds the preimage, and `google_sub` is the same
+    // globally unique join key as `users.google_id` reaching a second table.
+    expect(array_keys(TenantExtractColumns::withheldFor('google_auth_requests')))
+        ->toContain('handoff_hash')
+        ->toContain('state_id')
+        ->toContain('google_sub');
+
+    // ⭐ And the row itself must still be extractable, or the guard above would be vacuously satisfied by a
+    // table nobody reads. `google_email` is deliberately NOT withheld: the attempt was made against THIS
+    // workspace, so it is this workspace's record.
+    expect(TenantExtractColumns::withheldFor('google_auth_requests'))->not->toHaveKey('google_email');
 });

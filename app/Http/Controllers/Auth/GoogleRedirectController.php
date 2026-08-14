@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Tenant\Sso\SsoStepUpCompletionController;
 use App\Services\Auth\GoogleAuthRequestService;
 use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
@@ -58,7 +59,7 @@ final class GoogleRedirectController
      * ⚠️ Note the connector flow does NOT supply this binding either — its `uid` claim names the member a
      * connection is attributed to, and its callback lands on a host that never sees the tenant session, so
      * it could not compare a cookie if it wanted to. The precedent that DOES bind is
-     * {@see \App\Http\Controllers\Tenant\Sso\SsoStepUpCompletionController}, which compares the request's
+     * {@see SsoStepUpCompletionController}, which compares the request's
      * `user_id` against the person actually signed in on the host it completes on — the same shape as the
      * check below, on the same kind of same-site hop.
      *

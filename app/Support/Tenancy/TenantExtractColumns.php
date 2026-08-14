@@ -70,6 +70,26 @@ final class TenantExtractColumns
             'search_vector' => 'A derived tsvector maintained by trigger from columns that ARE extracted. Not '
                 .'portable across PostgreSQL text-search configurations and reproducible by reindexing.',
         ],
+        'google_auth_requests' => [
+            'handoff_hash' => 'A LIVE single-use credential (Increment J3c2 — the first-party Google sign-in ADR, '
+                .'cited by increment rather than by number on purpose: that document is mid-renumber out of a '
+                .'collision with this lane\'s own 0017, so neither its number nor its filename is stable today). '
+                .'The row is a sign-in attempt in flight; '
+                .'whoever holds the preimage of this hash before `handoff_expires_at` can complete that sign-in as '
+                .'the person named in the same row. The tenant may legitimately see THAT an attempt happened and '
+                .'when — which is why the row is extracted rather than the table skipped, on the '
+                .'`impersonation_tokens` precedent above — but never the material that finishes it.',
+            'state_id' => 'The correlator for an in-flight, still-redeemable pre-auth request. It is not the signed '
+                .'`state` itself (that lives only in the caller\'s browser), but it is the handle that names which '
+                .'request a token belongs to, and an unconsumed row is a live one. Withheld with `handoff_hash` '
+                .'rather than separately, because the two are only dangerous together and the artefact has no '
+                .'reason to carry either half.',
+            'google_sub' => 'Google\'s stable, globally unique subject identifier for a CENTRAL identity — the same '
+                .'value as `users.google_id`, and withheld for the same reason. It is constant across every '
+                .'workspace the person belongs to, so two tenants each holding an extract could join on it and '
+                .'prove they share a member. That is the one cross-tenant fact this architecture exists to '
+                .'withhold, and it is the `last_active_tenant_id` argument reaching a second column.',
+        ],
         'impersonation_tokens' => [
             'token_hash' => 'Credential material for the operator impersonation path. The row is extracted so the '
                 .'tenant can see THAT an impersonation was authorised and when; the hash adds nothing a reader needs.',
@@ -112,6 +132,13 @@ final class TenantExtractColumns
             'last_active_tenant_id' => 'ANOTHER WORKSPACE\'S UUID. Extracting it discloses that a shared member '
                 .'also belongs somewhere else, which is the one cross-tenant fact this whole architecture exists '
                 .'to withhold.',
+            'google_id' => 'Google\'s `sub` for a CENTRAL identity (Increment J3c2), and it is `last_active_tenant_id`\'s '
+                .'argument in a stronger form. That column discloses that a member belongs somewhere else; this one '
+                .'is a stable, globally unique JOIN KEY, so two tenants each holding an extract could match rows on '
+                .'it and establish exactly WHICH members they share — without either operator ever being told. It '
+                .'is also the same class as `password` above: material for an identity that stays live in workspaces '
+                .'this tenant has nothing to do with. A tenant that needs to know how its members sign in has '
+                .'`email` and the membership roster; it does not need the platform-wide handle.',
             'tos_accepted_at' => 'The person\'s contractual relationship with the platform operator, not with '
                 .'this tenant.',
             'privacy_policy_accepted_at' => 'As `tos_accepted_at`: the timestamp records acceptance of THIS '

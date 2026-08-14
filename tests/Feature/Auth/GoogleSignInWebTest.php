@@ -13,10 +13,13 @@ use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Auth\GoogleSignInProvisioner;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Support\Auth\GoogleAuthStateService;
+use App\Support\Auth\GoogleIdentity;
 use App\Support\Auth\GoogleIdentityProvider;
+use App\Support\Auth\GoogleSignInRefusedException;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Auth\Events\Registered;
@@ -25,6 +28,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Ramsey\Uuid\Uuid;
@@ -586,11 +590,42 @@ it('refuses a suspended membership rather than quietly reversing the sanction', 
     makeActiveMember($member, 'admin');
     TenantUser::query()->where('user_id', $member->id)->update(['status' => TenantUserStatus::Suspended]);
 
+    Log::spy();
+
     $this->get(googleWalkToCompletion())->assertRedirect('/login?google=failed');
     $this->assertGuest();
 
     enterTenant($this->tenant->id, $member->id);
     expect(TenantUser::query()->sole()->status)->toBe(TenantUserStatus::Suspended);
+
+    // ⚠️ THE LOGGED REASON IS ASSERTED, AND THE MUTATION PASS IS WHY. Deleting the provisioner's Suspended
+    // check left this case GREEN: `attachMember()` refuses a suspended row too (P1c added the guard to the
+    // shared path deliberately), so `joinViaGoogle()` returns null and the flow still refuses — just with
+    // `seat_quota_exhausted` as its reason instead. The user-facing outcome is uniform by design (§D9), so
+    // the log is the ONLY place an operator can tell "this person is suspended" from "this workspace is
+    // full". Without this assertion the duplication is untested and the reason can rot silently.
+    Log::shouldHaveReceived('warning')->withArgs(
+        fn (string $message, array $context = []): bool => $message === 'auth.google.complete.rejected'
+            && ($context['reason'] ?? null) === 'membership_suspended',
+    );
+});
+
+it('refuses an unverified identity at the provisioner too, not only at the callback', function (): void {
+    // ⚠️ ADR-0017 §D3 says `email_verified` is checked TWICE, and the mutation pass found only ONE of the
+    // two defended: deleting the provisioner's copy left all 31 cases green, because the callback refuses
+    // first and the flow never reaches the second. That second check is a backstop for a STORED row whose
+    // `google_email_verified` is not true — unreachable today thanks to the migration's identity CHECK
+    // constraint and `attach()`, and exactly the kind of defence that rots silently when nothing exercises
+    // it. Driven directly, because the HTTP path deliberately cannot reach it.
+    enterTenant($this->tenant->id);
+
+    $unverified = new GoogleIdentity('sub-never-verified', 'unverified@example.test', false, 'Nobody');
+
+    expect(fn () => app(GoogleSignInProvisioner::class)->provision($this->tenant, $unverified, request()))
+        ->toThrow(GoogleSignInRefusedException::class);
+
+    // And nothing was created on the way to the refusal.
+    expect(User::on('pgsql_auth')->where('email', 'unverified@example.test')->exists())->toBeFalse();
 });
 
 it('activates an invitation at the INVITED role, not at the default', function (): void {

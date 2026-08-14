@@ -13,6 +13,7 @@
         "laravel/fortify": "^1.36",
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.3",
+        "laravel/socialite": "^5.29",
         "laravel/tinker": "^3.0",
         "onelogin/php-saml": "^4.3",
         "openspout/openspout": "^4",

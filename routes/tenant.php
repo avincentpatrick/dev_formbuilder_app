@@ -31,6 +31,7 @@ use App\Http\Controllers\Tenant\FormShareController;
 use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
+use App\Http\Controllers\Tenant\GoogleCompleteController;
 use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
@@ -1029,6 +1030,41 @@ Route::middleware([
     // exemption the entire feature is a 419.
     Route::post('/sso/saml/acs', SsoAcsController::class)
         ->middleware('throttle:saml-acs')->name('sso.acs');
+});
+
+/*
+| Google sign-in — the completion hop (Increment J3c2 — ADR-0017 §D7). The same unauthenticated
+| tenant-context pipeline as the SAML protocol group above, and for the same reason: this request CREATES a
+| session rather than acting on one, so `auth` here would be circular.
+|
+| ⚠️ ONLY THE COMPLETION HOP LIVES HERE. The mint and the callback are in `routes/google-auth.php`, because
+| both must also serve the CENTRAL host and this file declares no `->domain()` — a central-host request
+| would match a route registered here and then die in `InitializeTenancyBySubdomain`. This one is
+| tenant-only by construction: it exists precisely because the session cookie is host-only and the browser
+| has to come back to the workspace's own host to be given one.
+|
+| ⚠️ THE `{handoff}` PATTERN IS PART OF THE CONTROL, NOT A TIDY-UP. Constraining it to 64 hex characters
+| means a malformed token 404s at the router, before it reaches a `hash('sha256', …)` lookup — the
+| `SsoAuthRequest::isMintedShape()` discipline, which exists because unvalidated text on its way to a
+| fixed-width column is how an endpoint gets a suppression primitive.
+|
+| Its own limiter, never shared with the mint route: a completed sign-in costs exactly one hit of each, so
+| a shared bucket would halve whichever ceiling an operator thought they were setting.
+|
+| AppSecurityHeaders is mandatory rather than incidental here: `frame-ancestors 'none'` on a request that
+| mints a session is what stops the whole flow being driven inside an attacker's iframe.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/auth/google/complete/{handoff}', GoogleCompleteController::class)
+        ->where('handoff', '[0-9a-f]{64}')
+        ->middleware('throttle:google-auth-complete')
+        ->name('auth.google.complete');
 });
 
 /*

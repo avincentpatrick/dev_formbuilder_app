@@ -241,3 +241,46 @@ it('keeps the breach row unevaluatable all the way to the page', function (): vo
             return $page;
         });
 });
+
+it('publishes canUseGoogle to both front doors, from the same gate the route asks', function (): void {
+    // ⚠️ PER SURFACE, for the reason the password-policy case above gives: `loginView` and `registerView`
+    // are two separate closures, and until J3c2 only one of them even took a `Request`. A page rendering
+    // `GoogleSignInButton` without the prop is a runtime error in the browser that no PHP test would
+    // otherwise see.
+    $this->withoutVite();
+
+    config([
+        'services.google.client_id' => 'configured-client-id',
+        'services.google.client_secret' => 'configured-client-secret',
+    ]);
+
+    // ⚠️ THE `false` SECOND ARGUMENT IS MANDATORY. Inertia's default page path is `resource_path('js/pages')`
+    // — LOWERCASE — against this repo's `resources/js/Pages`, with no `config/inertia.php` to correct it.
+    // The existence check therefore passes on Windows and CANNOT pass on Linux CI.
+    $this->get('http://meridian.test/login')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('auth/Login', false)->where('canUseGoogle', true));
+
+    $this->get('http://meridian.test/register')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('auth/Register', false)->where('canUseGoogle', true));
+});
+
+it('hides the Google button on a deployment with no Google client, on both doors', function (): void {
+    // An unconfigured deployment is a SUPPORTED state, not a broken one — which is what let this whole
+    // increment ship without waiting on a credential only the product owner can supply. The button and the
+    // routes come from one object, so a visible control can never point at a 404.
+    $this->withoutVite();
+
+    config(['services.google.client_id' => '', 'services.google.client_secret' => '']);
+
+    $this->get('http://meridian.test/login')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('auth/Login', false)->where('canUseGoogle', false));
+
+    $this->get('http://meridian.test/register')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('auth/Register', false)->where('canUseGoogle', false));
+
+    $this->get('http://meridian.test/auth/google/redirect')->assertNotFound();
+});

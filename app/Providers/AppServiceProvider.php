@@ -42,6 +42,9 @@ use App\Services\Search\SearchPresenter;
 use App\Services\Search\SearchService;
 use App\Services\Settings\PlatformSettings;
 use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Auth\GoogleAuthStateService;
+use App\Support\Auth\GoogleIdentityProvider;
+use App\Support\Auth\SocialiteGoogleIdentityProvider;
 use App\Support\Connectors\ConnectorOAuthStateService;
 use App\Support\Guest\GuestChallengeService;
 use App\Support\Guest\GuestShareTokenService;
@@ -127,6 +130,25 @@ class AppServiceProvider extends ServiceProvider
             return new ConnectorOAuthStateService($key, (int) config('connectors.state.ttl', 600));
         });
 
+        // The Google sign-in `state` signer (J3c2 / ADR-0017 §D6) — the FOURTH token family. Same wire
+        // format and the same reason as the connector state above: the session cookie is host-only, so a
+        // tenant session is unreadable at the central callback.
+        //
+        // ⚠️ THE DOMAIN SEPARATOR IS WHAT KEEPS THE TWO FAMILIES APART, AND IT REPLACES A CLAIM. The
+        // connector state carries a `prov` claim so a token minted for one provider cannot be replayed at
+        // another's callback; this one has a single provider, and a connector token presented here simply
+        // fails the MAC check because the key differs. That is a stronger guarantee than a comparison and
+        // needs no code to enforce — but it means changing this separator invalidates every in-flight
+        // consent, exactly as it would for the three above.
+        $this->app->singleton(GoogleAuthStateService::class, function (): GoogleAuthStateService {
+            $configuredKey = config('google-auth.state.key');
+            $key = is_string($configuredKey) && $configuredKey !== ''
+                ? $configuredKey
+                : hash_hmac('sha256', 'google-signin-state.v1', (string) config('app.key'));
+
+            return new GoogleAuthStateService($key, (int) config('google-auth.state.ttl_seconds', 600));
+        });
+
         // The per-instance authorization resolver (Increment G10a). `scoped`, NOT `singleton`: it memoizes
         // a user's grants per (user, tenant) for the life of one request, and under Octane a singleton
         // would carry that memo — an authorization cache — across requests.
@@ -197,6 +219,20 @@ class AppServiceProvider extends ServiceProvider
         // draws agree by chance, so the transaction-retry path that recovers from one would ship unexercised.
         // Binding a scripted issuer is what makes it deterministic — see SubmissionReferenceIssuer.
         $this->app->singleton(SubmissionReferenceIssuer::class, RandomSubmissionReferenceIssuer::class);
+
+        // Google sign-in's one piece of third-party I/O (J3c2, ADR-0017 §D10). `singleton` for the same
+        // reason as the two above: it holds no tenant, no user and no token, so there is nothing to leak
+        // across requests — the identity it returns is handed straight to the caller.
+        //
+        // An interface at all because live Google credentials are an input only the product owner can
+        // supply, and the build was not allowed to wait on them. Everything downstream — provisioning,
+        // membership, the two-factor fork, the handoff — is exercised against
+        // Tests\Support\Auth\FakeGoogleIdentityProvider via the `fakeGoogle()` helper.
+        //
+        // ⚠️ ADR-0009 rejects Socialite BY NAME for the connector lane, and this binding stands on an
+        // explicit carve-out written into that ADR rather than in spite of it. ConnectorProvider does not
+        // adopt Socialite and must not.
+        $this->app->singleton(GoogleIdentityProvider::class, SocialiteGoogleIdentityProvider::class);
     }
 
     /**
@@ -385,6 +421,36 @@ class AppServiceProvider extends ServiceProvider
         // which is the actual cost of this endpoint, one INSERT per hit.
         RateLimiter::for('saml-step-up', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('samlstepup:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // First-party Google sign-in (J3c2 / ADR-0017). All three endpoints are unauthenticated by
+        // necessity — a sign-in has no session yet — so, as with SAML, there is no user and no tenant claim
+        // in the request worth keying on.
+        //
+        // ⚠️ KEYED ON IP **AND HOST**, THE SAML ARGUMENT UNCHANGED: a workspace behind a corporate NAT must
+        // not be able to exhaust another workspace's budget from the same egress address. The host half is
+        // attacker-chosen, which is why the IP half stays.
+        //
+        // ⚠️ THREE BUCKETS, NEVER ONE SHARED "google". A completed sign-in costs exactly one hit of each, so
+        // a shared bucket would silently enforce a third of whatever ceiling an operator set — the
+        // `guest-challenge` lesson, which cost a documented 30/min becoming 15/min.
+        //
+        // The mint is the tightest at 20/minute because it is the only one that WRITES a row per hit, and
+        // `google_auth_requests` is bounded on the write path precisely because this endpoint is open to
+        // anyone. The callback and the completion hop sit at 60 for the SAML reason: they are reached by
+        // every member of a workspace, and a limit that locks out a legitimate workforce is an outage with
+        // a security-shaped justification. Note the callback's real cost is an outbound HTTPS round trip to
+        // Google, so its ceiling also bounds what an anonymous caller can make this server spend.
+        $googleKey = static fn (string $bucket, Request $request): string => $bucket.':'
+            .$request->ip().':'.$request->getHost();
+
+        RateLimiter::for('google-auth', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by($googleKey('gauth', $request)));
+
+        RateLimiter::for('google-auth-callback', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($googleKey('gauthcb', $request)));
+
+        RateLimiter::for('google-auth-complete', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($googleKey('gauthdone', $request)));
 
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum

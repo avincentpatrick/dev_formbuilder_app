@@ -55,6 +55,48 @@ Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy
 - **Per-tenant secrets** (webhook signing secrets) are application data — encrypted in the database (Laravel encrypted cast, `docs/data-dictionary.md` §14), a distinct concern from the server `.env`.
 - **Rotation**: server secrets rotated annually at minimum and immediately on suspected compromise (a manual runbook step; no automated rotation in Phase 1).
 
+### 4.1 Third-party OAuth clients that must be registered by hand
+
+Two Google clients exist and they are **not** interchangeable. Registering one set of credentials in both
+places is the mistake this section exists to prevent — they have different consent screens, different
+scopes and very different blast radii.
+
+| Purpose | `.env` keys | Redirect URI to register | If unset |
+|---|---|---|---|
+| **First-party sign-in** (J3c2 / ADR-0017) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the flow cannot be started — a **supported** state, see the note below |
+| **Google Sheets connector** (H16a / ADR-0009) | `GOOGLE_CONNECTOR_CLIENT_ID`, `GOOGLE_CONNECTOR_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/oauth/google_sheets/callback` | the connector cannot be connected; the consent screen refuses |
+
+⚠️ **"Unconfigured" closes the DOOR, not all three routes, and an earlier draft of this table said
+otherwise.** Only `GET /auth/google/redirect` consults `GoogleSignInGate` and 404s. The callback and the
+completion hop stay **registered and reachable**, and answer the same closed `?google=failed` bounce every
+other refusal produces — the callback because its `state` cannot verify, the completion hop because its
+handoff matches no row. That is harmless (neither can mint a session without a row this deployment never
+wrote) but it is not absence, and an operator auditing the surface deserves the true statement rather than
+the reassuring one. The distinction was found by an adversarial review after CI was green.
+
+**Sign-in client — the console settings this app cannot detect the absence of.**
+
+- Publish exactly `openid`, `email` and `profile`. Nothing else is requested: a sign-in asking for Drive
+  scopes would *be* a connector and would fall under ADR-0009's token-custody rules in full.
+- Set the user type to **External** unless every expected user is inside your own Workspace organisation.
+- ⚠️ **ONE redirect URI serves every workspace.** Google rejects wildcard redirect URIs for an identity
+  client exactly as it does for an API one, which is why the callback lands on the central host and
+  carries the workspace inside a signed `state` rather than in a session. Do not attempt to register
+  per-tenant subdomains.
+- ⚠️ **The URI is DERIVED from `APP_URL`, not configured separately.** Google matches it byte for byte
+  between the authorize step and the token exchange, so a third environment variable would be a third
+  chance to get it wrong — and wrong only in production, where the host differs from a developer's. If
+  `APP_URL` is not the central host with the correct scheme and port, sign-in fails with
+  `redirect_uri_mismatch` and nothing else.
+
+**Key rotation, and the one difference from the connector lane.** The sign-in `state` is signed with a key
+derived from `APP_KEY` with a domain separator, so an `APP_KEY` rotation invalidates every consent screen
+currently open — a **~10-minute** window, and the person simply presses the button again. That is a far
+milder consequence than the connector lane's, where §4's `APP_PREVIOUS_KEYS` gap means a rotation would
+make stored connector tokens undecryptable (still open, recorded in the threat model §9.8). Nothing about
+Google sign-in is stored encrypted, because nothing about it is retained: the flow reads an identity once
+and discards the token. `GOOGLE_SIGNIN_STATE_KEY` exists only to rotate that one family independently.
+
 ---
 
 ## 5. PostgreSQL Backup & Disaster-Recovery Runbook (self-managed)

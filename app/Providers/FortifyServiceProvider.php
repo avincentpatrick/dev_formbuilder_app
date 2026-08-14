@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Auth\RlsAwareUserProvider;
 use App\Http\Requests\Auth\RlsAwareTwoFactorLoginRequest;
+use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\PasswordPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -91,15 +92,26 @@ class FortifyServiceProvider extends ServiceProvider
         // so the link on this page and the reachability of the route it points at are one answer rather
         // than two that agree until they don't. Resolved per request (it depends on the host and on two
         // settings rows), never memoized here.
+        // canUseGoogle (J3c2) works the same way and for the same reason — one gate, and the button's
+        // visibility comes from the object the redirect route itself asks, so a visible control can never
+        // point at a 404. ⚠️ It is deliberately NOT `RegistrationGate`: that answers "may a stranger create
+        // an account here", while this button is mostly pressed by people who already have one. See
+        // GoogleSignInGate for the accepted cost of the other direction (ADR-0017 §D8).
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'canRegister' => app(RegistrationGate::class)->allows($request),
+            'canUseGoogle' => app(GoogleSignInGate::class)->allows($request),
         ]));
         // `passwordPolicy` (J3b) is the SERVER'S OWN RULE LIST, shipped so `MdsPasswordStrength` renders it
         // rather than restating it. Per-view rather than a shared Inertia prop, on HandleInertiaRequests'
         // own stated criterion — a shared prop is for something that paints every page, and this paints
         // four. `PasswordPolicy::requirements()` is pure, so there is nothing to memoize.
-        Fortify::registerView(fn () => Inertia::render('auth/Register', [
+        // ⚠️ THIS CLOSURE GAINED ITS `Request` IN J3c2 AND THAT IS NOT COSMETIC. Fortify passes one to every
+        // view closure; this page simply had nothing host-dependent to say until now, while `loginView`
+        // above always did. `canUseGoogle` is a question about the HOST, so the parameter is the whole
+        // mechanism rather than a signature tidy-up.
+        Fortify::registerView(fn (Request $request) => Inertia::render('auth/Register', [
             'passwordPolicy' => PasswordPolicy::requirements(),
+            'canUseGoogle' => app(GoogleSignInGate::class)->allows($request),
         ]));
         Fortify::requestPasswordResetLinkView(fn () => Inertia::render('auth/ForgotPassword'));
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [

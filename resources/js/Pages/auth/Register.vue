@@ -11,10 +11,16 @@ import {
   type PasswordRequirement,
 } from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton.vue';
 
 // The SERVER's rule list, published by App\Support\Auth\PasswordPolicy. Nothing about the policy is
 // restated here, so the checklist and the validator that judges this password cannot disagree.
-defineProps<{ passwordPolicy: PasswordRequirement[] }>();
+//
+// J3c2 — `canUseGoogle` comes from GoogleSignInGate, the same object /auth/google/redirect asks. Note
+// this page is the one `auth-axe.spec.ts` scans on the CENTRAL host, because RegistrationGate consults
+// `registration.invite_only` on a subdomain and that defaults TRUE — so the central arm of the Google
+// flow is also the arm this button is scanned on.
+defineProps<{ passwordPolicy: PasswordRequirement[]; canUseGoogle: boolean }>();
 
 const form = useForm({ name: '', email: '', password: '', password_confirmation: '' });
 
@@ -78,6 +84,8 @@ function submit(): void {
 
       <MdsButton type="submit" :loading="form.processing">Create account</MdsButton>
     </form>
+
+    <GoogleSignInButton v-if="canUseGoogle" />
 
     <nav class="auth-links">
       <a href="/login">Already have an account? Sign in</a>

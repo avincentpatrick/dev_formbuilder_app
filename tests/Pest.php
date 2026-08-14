@@ -39,6 +39,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
@@ -55,6 +56,7 @@ use Illuminate\Support\Str;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
+use Tests\Support\Auth\FakeGoogleIdentityProvider;
 use Tests\Support\FakeDnsTxtResolver;
 use Tests\TestCase;
 
@@ -133,19 +135,29 @@ function apiMember(string $roleName): User
  * ⚠️ RANDOM EMAIL, AND NEVER DELETED IN AN `afterEach`. These rows outlive the transaction and are cleaned
  * only by `migrate:fresh`; a fixed address collides on the second run and pollutes every later file, and a
  * DELETE deadlocks against the open locks.
+ *
+ * ⚠️ `$verified` GAINED A PARAMETER IN J3c2 RATHER THAN A FIFTH COPY OF THE HELPER. Google sign-in links
+ * onto an existing account ONLY when that account has already proved it owns its address (ADR-0017 §D4), so
+ * the refusal arm needs an UNVERIFIED committed identity — and until now every committed helper here
+ * (`committedSuperAdmin`, `committedPlainUser`, this one) hard-set the column. Defaulting to `true` means no
+ * existing caller moves. ⚠️ Pest helpers are GLOBAL and a duplicate name passes every per-file run while
+ * fatalling only on the full suite, which is why this is a parameter and not a `committedUnverifiedIdentity`.
+ *
+ * @param  bool  $verified  false produces an account that exists and has NOT confirmed its address — the
+ *                          §D4 refusal case, and the only shape in which linking would be a takeover.
  */
-function committedTenantIdentity(string $name = 'Committed Member'): User
+function committedTenantIdentity(string $name = 'Committed Member', bool $verified = true, ?string $email = null): User
 {
     /** @var User $user */
     $user = User::on('pgsql_privileged')->forceCreate([
         'name' => $name,
-        'email' => Str::lower(Str::random(12)).'@identity.test',
+        'email' => $email ?? Str::lower(Str::random(12)).'@identity.test',
         'password' => Hash::make('secret-password-123'),
         // J3a — `routes/tenant.php`'s authenticated group carries `verified`, so an identity handed to
         // `actingAs()` without this is bounced to `/email/verify` and every assertion about the page under
         // test reads as a product failure. `UserFactory` already defaults it; the hand-rolled committed
         // identities did not, because before J3a nothing consumed the column.
-        'email_verified_at' => now(),
+        'email_verified_at' => $verified ? now() : null,
     ]);
     $user->setConnection((string) config('database.default'));
 
@@ -437,6 +449,27 @@ function fakeDns(array $records = []): FakeDnsTxtResolver
 {
     $fake = new FakeDnsTxtResolver($records);
     app()->instance(DnsTxtResolver::class, $fake);
+
+    return $fake;
+}
+
+/**
+ * Bind a recording, in-memory Google for the sign-in tests (J3c2).
+ *
+ * Live Google credentials are an input only the product owner can supply, so this is what every case
+ * downstream of the seam runs against — the `fakeDns()` shape, for the same reason. The returned object
+ * RECORDS: `->authorizeCalls` proves which state crossed the hop and with which redirect URI, and
+ * `->exchangeCalls` proves a replayed callback never reached Google a second time. Neither is visible
+ * from the resulting session.
+ *
+ * Knobs for the refusals, which is what makes it worth having: `->unverifiedEmail()` (this flow's analogue
+ * of an invalid signature), `->refusingExchange()`, and `->as($sub, $email)` to drive linkage and the
+ * subject-mismatch takeover case.
+ */
+function fakeGoogle(): FakeGoogleIdentityProvider
+{
+    $fake = new FakeGoogleIdentityProvider;
+    app()->instance(GoogleIdentityProvider::class, $fake);
 
     return $fake;
 }

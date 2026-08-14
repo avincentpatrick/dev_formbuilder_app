@@ -6,15 +6,11 @@
  */
 import { computed, nextTick, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { MdsIcon } from '@meridian/design-system';
+import { MdsAvatar, MdsIcon } from '@meridian/design-system';
 import { useDismissable } from '@/composables/useDismissable';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
-const initials = computed(() => {
-    const parts = (user.value?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2);
-    return parts.map((p) => p[0]!.toUpperCase()).join('') || '?';
-});
 
 const open = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
@@ -71,7 +67,7 @@ function logout(): void {
             aria-label="Account menu"
             @click="toggle"
         >
-            <span class="account__avatar" aria-hidden="true">{{ initials }}</span>
+            <MdsAvatar :name="user?.name ?? null" size="md" />
             <MdsIcon name="chevron-down" size="sm" aria-hidden="true" />
         </button>
 
@@ -126,18 +122,6 @@ function logout(): void {
     outline-offset: 2px;
 }
 
-.account__avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-action-primary-bg);
-    color: var(--mds-color-text-on-primary);
-    font-size: var(--mds-type-caption-font-size);
-    font-weight: var(--mds-font-weight-semibold);
-}
 
 .account__menu {
     position: absolute;

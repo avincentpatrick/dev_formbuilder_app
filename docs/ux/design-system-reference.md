@@ -1055,6 +1055,22 @@ Contrast, colour-channel and text-alternative obligations are in §4.1.
 >   Found by looking at the running page, exactly as H24b1's draft tiles were, and pinned by two Vitest
 >   cases that each redden under a different one-line mutation.
 
+### 3.12 Avatars *(**AS-BUILT since J4a** — `MdsAvatar`)*
+
+A person's initials in a filled disc, used wherever a roster, a ledger or a list names people: the members table, the audit log's actor column, the submissions inbox's respondent column, and the account menu's own trigger.
+
+**It is ALWAYS decorative, and no prop changes that.** `aria-hidden` is unconditional. The governing rule: *an avatar in this system is always accompanied by the person's visible name; an avatar that must carry a name is not an avatar, it is a link or a button whose accessible name is the person.* Announcing "DO" beside "Demo Owner" is duplication, and it is the only thing a chip could contribute to a screen reader. ⚠️ **The reconsideration trigger is a CONSUMER, not an argument** — a stacked "+3 others" group, or an avatar with no adjacent name. Neither exists today, which is the same discipline that kept `rowHref` off `MdsDataTable` in §3.3.
+
+**Three sizes, each anchored to geometry that already existed:** `sm` 24px (a dense table row) · `md` 28px (`AccountMenu`'s trigger, unchanged through the migration — `NotificationBell`'s count bubble is dimensioned as its sibling) · `lg` 40px (`PageHeader`'s badge).
+
+⚠️ **`min-inline-size`/`min-block-size` + `aspect-ratio`, NEVER a fixed `width`/`height`.** `NotificationBell.vue` pins its own bubble and records the cost: the caption role is 12px by default and **15px under `[data-font-size="extra_large"]`**, which put 17px of text inside an 18px line box, clipping descenders and failing WCAG 1.4.12. An avatar that grows with the type scale is a slightly larger avatar; one that cannot is unreadable for exactly the people §2.9's accommodation exists for.
+
+**The derivation, and most of it is about scripts:** a missing or blank name renders `?` rather than an empty disc; only words beginning with a letter or a number count (`\p{L}`/`\p{N}`, so `"!!!"` falls back and a leading emoji is skipped — an `[A-Za-z]` test would discard every Arabic, CJK and Devanagari name); the initials are the first grapheme of the **first and last** word; a one-word name gives **one** grapheme, because two reads as an acronym for a Latin mononym and is *correct* for CJK, where 山田太郎's first two characters are the surname; graphemes come from `Intl.Segmenter`, never an index. ⚠️ **That last rule fixes a live defect rather than guarding a hypothetical one** — `AccountMenu` indexed with `[0]`, which takes half a surrogate pair for any name outside the BMP and rendered U+FFFD. Case is folded with `toUpperCase`, **not** `toLocaleUpperCase`: the locale-aware form makes the glyph depend on the reader's browser locale, so the same roster would show different letters to two colleagues.
+
+⚠️ **MONOCHROME, AND THE COLOURFUL ALTERNATIVE WAS MEASURED RATHER THAN DISLIKED.** Two tones only: `brand` (`action-primary-bg` on `text-on-primary`, 4.71:1 in both themes — the pair the account menu already wore) and `neutral` (`status-neutral-bg`/`-fg`, 9.94:1 light / 10.10:1 dark) for somebody who is not a full participant yet, such as a pending invite or an anonymous guest. Reusing the six-hue **form-identity** scale from §2.2 is the obvious idea and is wrong three times: as a solid fill under white text its dark identity-4 step measures **2.91:1** (that scale carries its own hue as TEXT on a 12% tint, a different visual object); `theme-overrides.test.ts` proves every identity hue sits ≥30° from every other and from every chromatic status hue, so drawing people from the same six would put a **person and a form at 0°** and destroy the mnemonic that scale exists for; and it would need a per-user identity integer nothing computes. Under "never colour alone" the hue could carry no meaning anyway. `docs/feature-backlog.md` records the four preconditions for revisiting.
+
+**No `src`, and that is not an omission.** Nothing in this product stores a profile photo — there is no `avatar_url` in the schema or the client, and the `Avatar` attachment kind has no user-facing producer. When one arrives the contract changes shape rather than gaining a prop: an image needs `alt`, a broken image needs an initials fallback, and that fallback needs an error handler. That is a different version of the component.
+
 ---
 
 ## 4. Accessibility Specification (WCAG AA baseline)

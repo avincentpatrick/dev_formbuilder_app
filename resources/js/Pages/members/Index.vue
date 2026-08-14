@@ -9,6 +9,7 @@
 import { reactive, ref } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
+    MdsAvatar,
     MdsBadge,
     MdsButton,
     MdsDataTable,
@@ -201,6 +202,19 @@ function canChangeRole(row: Member): boolean {
         </MdsFilterBar>
 
         <MdsDataTable :columns="columns" :rows="members" :loading="busy" caption="Workspace members" row-key="user_id">
+            <!-- J4a — the roster was four columns of plain text, which is the "monotone page shapes" half of
+                 the re-skin diagnosis. The chip is `aria-hidden` and the name is right beside it, so nothing
+                 is announced twice; `neutral` marks somebody who is not a participant yet, which is the one
+                 distinction a reader currently has to get from the Status column three columns away. -->
+            <template #cell-name="{ row }">
+                <span class="members__name">
+                    <MdsAvatar
+                        :name="(row as Member).name"
+                        :tone="(row as Member).status === 'active' ? 'brand' : 'neutral'"
+                    />
+                    <span>{{ (row as Member).name }}</span>
+                </span>
+            </template>
             <template #cell-status="{ value }">
                 <MdsBadge v-bind="statusVariant(String(value))" dot />
             </template>
@@ -385,5 +399,11 @@ function canChangeRole(row: Member): boolean {
     font-size: var(--mds-type-body-md-font-size);
     line-height: var(--mds-type-body-md-line-height);
     color: var(--mds-color-text-body);
+}
+.members__name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    min-width: 0;
 }
 </style>

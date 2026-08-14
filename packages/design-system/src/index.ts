@@ -33,6 +33,16 @@ export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
 // which is its reference implementation and its first refactor target.
 export { default as MdsProgress } from './components/Progress/Progress.vue';
 export { type ProgressTone, type ProgressSize } from './components/Progress/Progress.vue';
+// The initials chip (J4a). ALWAYS `aria-hidden`, and no prop changes that: an avatar in this system is
+// always beside the person's visible name, and one that must CARRY a name is not an avatar but a link whose
+// accessible name is the person. The reconsideration trigger is a CONSUMER — a stacked group, or an avatar
+// with no adjacent name — of which there are none, the same discipline that kept `rowHref` off MdsDataTable.
+// ⚠️ Monochrome on purpose: reusing `--mds-form-identity-*` measures 2.91:1 under white text in dark, and
+// would put a PERSON and a FORM at 0° in a scale whose own suite proves every member is 30° from every
+// other. There is no `src` either — nothing in this product stores a profile photo, and an image needs a
+// different contract (alt text, a broken-image fallback) rather than one more prop.
+export { default as MdsAvatar } from './components/Avatar/Avatar.vue';
+export { type AvatarSize, type AvatarTone } from './components/Avatar/Avatar.vue';
 export { default as MdsBadge } from './components/Badge/Badge.vue';
 export { default as MdsBanner } from './components/Banner/Banner.vue';
 export { type BannerTone } from './components/Banner/Banner.vue';

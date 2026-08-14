@@ -38,7 +38,8 @@ use Illuminate\Support\Facades\Schema;
  * **THE TRAP, and it fails SILENTLY: every real column here MUST also be listed in
  * {@see Tenant::getCustomColumns()}** or stancl/tenancy relocates the value into its `data` json
  * virtual-column store and reads it back as **null** — no error, no warning, just a tenant whose branding
- * never applies. `TenantCustomColumnsTest` pins that list, and this migration ships the three additions in
+ * never applies. `TenantColumnWhitelistTest` pins that list by set equality (this line cited
+ * `TenantCustomColumnsTest` until P2a — a file that has never existed), and this migration ships the three additions in
  * the same commit for exactly that reason.
  *
  * **`logo_attachment_id` is `ON DELETE SET NULL`, and the H25 finding applies:** PostgreSQL runs a

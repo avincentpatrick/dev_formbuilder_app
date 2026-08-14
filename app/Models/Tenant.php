@@ -53,7 +53,10 @@ class Tenant extends BaseTenant
         // 'status' MUST stay in this list. It is what makes scopeActive() below a real SQL predicate;
         // remove it and stancl silently relocates the value into the `data` json column, at which
         // point `where('status', …)` matches NOTHING and every tenant vanishes from every fan-out —
-        // with no error. TenantCustomColumnsTest pins this.
+        // with no error. `JobContractTest` pins this one specifically (ADR-0007 §D3/§D13 depend on the
+        // predicate being real SQL); `TenantColumnWhitelistTest` pins the whole list by set equality.
+        // ⚠️ This comment used to cite `TenantCustomColumnsTest`, and so do three migrations — that file has
+        // never existed in this repository. The claim was true; only the name was wrong.
         //
         // primary_color / brand_ramp / logo_attachment_id (H23a2, 2026_08_05_000003) are the same shape
         // again. Their failure mode is quieter than 'status' but no less real: branding would appear to
@@ -63,7 +66,19 @@ class Tenant extends BaseTenant
         // rows precisely so the guest runtime can read them off the already-resolved tenant with no extra
         // query — which is exactly the property that omitting them here would destroy, silently and in the
         // fail-OPEN direction (a null flag reads as "not in maintenance" and every form keeps serving).
-        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days', 'primary_color', 'brand_ramp', 'logo_attachment_id', 'maintenance_mode', 'maintenance_message'];
+        //
+        // created_at / updated_at (P2a) were MISSING until the set-equality guard in
+        // TenantColumnWhitelistTest found them, and the omission was not harmless. VirtualColumn's
+        // encodeAttributes() moves every non-custom attribute into `data` on save, and decodeVirtualColumn()
+        // then setAttribute()s every `data` key back OVER the real column on read — so `updated_at` read back
+        // a STALE snapshot taken at the previous save while the column held the true value. Measured on the
+        // dev database before the fix: column 19:54:38, `data` 19:54:11. `created_at` escaped notice only
+        // because it never changes, so its two copies always agreed.
+        //
+        // stancl's own default is ['id'] — the library expects EVERY real column to be listed, and Laravel's
+        // timestamps are real columns here. 2026_08_16_000001 strips the stale keys from rows written before
+        // this line existed; without it the decode loop keeps overwriting from `data` whatever this list says.
+        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days', 'primary_color', 'brand_ramp', 'logo_attachment_id', 'maintenance_mode', 'maintenance_message', 'created_at', 'updated_at'];
     }
 
     /**

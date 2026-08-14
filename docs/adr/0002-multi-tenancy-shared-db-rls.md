@@ -39,7 +39,7 @@ The following were already decided in the approved architecture plan and are tre
 
 - **Backend**: Laravel 11/12, PHP 8.3+.
 - **Database**: PostgreSQL (ADR-0001), specifically *because* it offers native Row-Level Security and JSONB+GIN, neither of which MySQL provides at parity.
-- **Multi-tenancy package**: `stancl/tenancy` v4, described in the plan as the "2026 production-standard package" for Laravel multi-tenancy, which natively supports both a single-database (shared-schema, discriminator-column) mode and a multi-database (one physical database per tenant) mode under one abstraction.
+- **Multi-tenancy package**: `stancl/tenancy`, described in the plan as the "2026 production-standard package" for Laravel multi-tenancy, which natively supports both a single-database (shared-schema, discriminator-column) mode and a multi-database (one physical database per tenant) mode under one abstraction. *(This ADR said "v4" here and in four other places; **v3.10.0** is what is installed — corrected 2026-08-14 by P2a, see the ⚠️ note under "Future migration path".)*
 - **RBAC**: Spatie Laravel-Permission, tenant-scoped via its "teams" feature (a separate, complementary concern to isolation — RBAC governs *what a user in Tenant A is allowed to do*; this ADR governs *whether Tenant A can touch Tenant B's rows at all*, regardless of role).
 - **Team size/stage**: a small team building toward an MVP launch, not a funded platform team standing up per-tenant infrastructure from day one. Cost and operational simplicity at this stage are real, first-class constraints, not excuses.
 - **Expected tenant profile at launch**: a modest number of tenants (low tens to low hundreds) growing over time; most tenants are expected to be cost-sensitive SMB/NGO/research customers, with a smaller number of larger, possibly compliance-driven (government/enterprise) tenants anticipated later rather than at launch. This assumption is a concrete extrapolation from the plan's phase roadmap (dedicated-DB tenancy and SSO/SAML/data-residency are explicitly Phase 4 items) rather than a number stated verbatim in the plan, and is noted here as such.
@@ -57,7 +57,7 @@ Three well-established isolation models exist for multi-tenant relational data, 
 
 ## Decision
 
-**Adopt shared database, shared schema, with a `tenant_id` discriminator column on every tenant-scoped table — implemented via `stancl/tenancy` v4 in single-database mode — and reinforce it with PostgreSQL Row-Level Security (RLS) policies on every tenant-scoped table as a database-enforced backstop.** Tenant context is treated as a system-wide constraint enforced independently at every architectural layer, not solely as an application-query concern.
+**Adopt shared database, shared schema, with a `tenant_id` discriminator column on every tenant-scoped table — implemented via `stancl/tenancy` in single-database mode — and reinforce it with PostgreSQL Row-Level Security (RLS) policies on every tenant-scoped table as a database-enforced backstop.** Tenant context is treated as a system-wide constraint enforced independently at every architectural layer, not solely as an application-query concern.
 
 This is a "trust, but verify" architecture: the application is expected to get tenant scoping right (global scopes, tenant-aware base models, middleware), and the database is configured to make it structurally impossible to serve cross-tenant rows even if the application layer fails to.
 
@@ -157,7 +157,7 @@ nobody had ever performed a platform action — a plausible lie on a compliance 
 `SELECT policyname FROM pg_policies WHERE policyname LIKE '%_superadmin_%'` an honest answer to "where does
 the operator hold an unrestricted read".
 
-### D4. `stancl/tenancy` v4 configuration specifics
+### D4. `stancl/tenancy` configuration specifics
 
 - Deployed in **single-database mode** (tenant identification + scoping only), not its multi-database/connection-swapping mode — the multi-database mode is explicitly reserved as the mechanism for the future Phase 4 dedicated-DB option (see below), not enabled now.
 - The **central app** (marketing site, tenant self-registration/signup, billing portal) runs outside any tenant context, on its own domain (e.g., `app.example.com` or a root marketing domain), consistent with stancl/tenancy's central/tenant app split.
@@ -208,7 +208,9 @@ Given the stated stakes, verification is treated as a first-class deliverable of
 
 The plan explicitly reserves a **dedicated-database tenancy option** for Phase 4, alongside SSO/SAML and data-residency options, for enterprise/compliance-driven tenants. This ADR does not build that option now, but it **does** commit to not foreclosing it:
 
-- `stancl/tenancy` v4 supports both single- and multi-database modes under one abstraction specifically so that a future switch is a *configuration and data-migration* exercise (extract one tenant's rows, provision a fresh isolated database, point that tenant's record at the new connection, backfill/replay) rather than a schema or package redesign.
+- `stancl/tenancy` supports both single- and multi-database modes under one abstraction specifically so that a future switch is a *configuration and data-migration* exercise (extract one tenant's rows, provision a fresh isolated database, point that tenant's record at the new connection, backfill/replay) rather than a schema or package redesign.
+
+  > ⚠️ **Corrected 2026-08-14 (P2a).** This bullet and §D4 below both said **v4**. The installed version is **v3.10.0** (`composer.json` pins `^3.10`; `composer.lock` agrees), and v4 has never been installed. The correction matters because the "one abstraction, so the switch is configuration" claim is the load-bearing premise of this whole section, and it was resting on a package version nobody had checked. ADR-0017 re-examines the claim against v3.10 as actually installed and finds it **partly false**: the stock `PostgreSQLSchemaManager` *replaces* `search_path` rather than prepending `public`, which would take PostGIS's `geometry` type, `users`, `tenants`, `jobs` and the `migrations` table out of scope in one config edit. The door this ADR promises to leave open is still open; it is not one line wide.
 - This is workable *only* because of decisions locked in now: `tenant_id` as a UUID (not an auto-increment integer that could collide across tenants once split into separate databases), no cross-tenant foreign keys or unique constraints (D5), and every tenant-scoped table already self-contained per `tenant_id` partition.
 - Building the actual extraction tooling (per-tenant export/import, connection-swapping configuration, a per-tenant migration runner for the multi-database mode) is explicitly **not** part of this decision and is deferred to a dedicated Phase 4 ADR once a specific customer or compliance driver justifies the investment — consistent with the plan's "migrate high-value tenants later, only if justified" guidance. This ADR's obligation is narrower and non-negotiable: do not design today's shared schema in a way that makes that future extraction hard.
 
@@ -230,7 +232,7 @@ One Postgres schema per tenant, same database instance, offers meaningfully bett
 - Migrations must run across N schemas (either a looped migration runner or per-schema migration state tracking), which is real, ongoing operational complexity absent from the shared-schema model, and grows linearly with tenant count rather than staying flat.
 - Laravel/Eloquent's tooling has comparatively weak native support for dynamic per-request `search_path`/schema switching relative to a simple global-scope-plus-column approach — this would be swimming against the framework's grain rather than with it.
 - Postgres schema count becomes a genuine operational concern at scale (system catalog bloat, `pg_dump`/backup/vacuum overhead across thousands of schemas) — a ceiling this product would eventually hit if it succeeds, meaning schema-per-tenant would likely require *another* migration later anyway, without buying the compensating simplicity benefit that shared-schema has today.
-- It does not match `stancl/tenancy` v4's most mature, best-documented mode (single-database), nor the plan's explicit instruction ("shared database, shared schema, `tenant_id` discriminator").
+- It does not match `stancl/tenancy`'s most mature, best-documented mode (single-database), nor the plan's explicit instruction ("shared database, shared schema, `tenant_id` discriminator").
 - It remains a theoretically valid option to revisit *if* a specific future compliance driver demands schema-level isolation without the full cost of database-per-tenant — but no such driver is currently anticipated, so it is not being built for speculatively.
 
 ### Database-per-tenant — rejected for MVP, explicitly revisited at Phase 4
@@ -253,5 +255,5 @@ Named explicitly as the alternative *to* the RLS reinforcement half of this deci
 
 - *Form-Builder SaaS — Documentation & Architecture Plan* (source of truth for this ADR): §1 (Recommended Tech Stack — Multi-tenancy row, Database row), §2.1 (Multi-Tenancy), §3 (Phase 0 and Phase 4 roadmap items), §5 (Best Practices — tenant scoping and `is_super_admin` items), Documentation Artifacts #9, #11, #21.
 - Legacy schema audit (`dev_pk_new`) — confirms the negative case directly: no `tenant_id` concept, no tenant-scoped authorization, and the specific cautionary precedent of the `users.id === 1` super-admin convention (duplicated across four code layers, silently transferable if user #1 were ever deleted and the ID reused) that this ADR's explicit `is_super_admin` boolean decision (D3) is designed to avoid repeating.
-- `stancl/tenancy` v4 documentation — single-database vs. multi-database tenancy modes (external reference; verify current package documentation at implementation time rather than treating any specific API detail above as pinned).
+- `stancl/tenancy` documentation — single-database vs. multi-database tenancy modes (external reference; verify current package documentation at implementation time rather than treating any specific API detail above as pinned).
 - PostgreSQL documentation — `CREATE POLICY`, `ALTER TABLE ... FORCE ROW LEVEL SECURITY`, `SET LOCAL` and `current_setting()` semantics under connection pooling (external reference; verify current version-specific behavior at implementation time).

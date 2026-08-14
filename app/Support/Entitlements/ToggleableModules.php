@@ -26,7 +26,10 @@ use App\Services\Entitlements\EntitlementService;
  *     state that escape hatch exists to prevent; `branding` is the same shape one step down.
  * The rest are excluded because a toggle would be theatre: `sso_saml`, `dedicated_db`, `data_residency` and
  * `embedded_payments` are provisioning/commercial arrangements, not features a tenant turns off on a
- * Tuesday, and none of them is built yet.
+ * Tuesday. ⚠️ This sentence used to end "and none of them is built yet", which stopped being true when SSO
+ * shipped (P1a–P1c) and nothing noticed — `sso_saml` now has a full vertical behind it and is excluded on
+ * the argument above alone, which is the durable half. `dedicated_db` and `data_residency` remain
+ * unbuilt AND unprovisioned (ADR-0017 §D5); `embedded_payments` is held.
  *
  * Adding a key here is a one-line change with no migration — `modules.<key>` is an open namespace in the
  * sparse `settings` table — but it MUST also exist in the plan catalog, which `ToggleableModulesTest` pins.

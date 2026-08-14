@@ -54,6 +54,27 @@ use Illuminate\Support\Arr;
  */
 final class TenantDetailPresenter
 {
+    /**
+     * Plan flags that describe a COMMERCIAL OR PROVISIONING ARRANGEMENT rather than a capability the
+     * application can switch on (Phase 4, P2a — ADR-0017 §D5). The plan may grant them; no mechanism yet
+     * delivers them.
+     *
+     * ⚠️ THIS TABLE TOLD OPERATORS DEDICATED-DB WAS LIVE FOR EVERY ENTERPRISE TENANT, AND NOTHING GREPPED
+     * FOR IT. The rows are GENERATED from `plans.feature_flags`, so the search a reader runs before
+     * concluding "nothing consumes this key yet" — `grep dedicated_db` — finds the seeder, a docblock and
+     * one negative unit test, and misses the only surface in the product that makes a claim about it.
+     * `EntitlementService::feature('dedicated_db')` resolves TRUE on Enterprise, `ToggleableModules` does
+     * not list it, so `effective` was true, `reason` was null, and the page rendered "Dedicated db | Yes |
+     * Yes | —" beside capabilities that genuinely work.
+     *
+     * `embedded_payments` is here for the same reason and is NOT a Phase-4 scope decision: payments are
+     * held, nothing consumes the Stripe-shaped columns (ADR-0008 §D1), and the row was making the same
+     * claim.
+     *
+     * @var list<string>
+     */
+    private const array NOT_PROVISIONED = ['dedicated_db', 'data_residency', 'embedded_payments'];
+
     public function __construct(
         private readonly SuperAdminService $superAdmin,
         private readonly CustomDomainService $domains,
@@ -343,12 +364,27 @@ final class TenantDetailPresenter
         $rows = [];
         foreach ($keys as $key) {
             $grants = (bool) ($grantedFlags[$key] ?? false);
-            $effective = (bool) ($entitlements['features'][$key] ?? false);
+            $notProvisioned = in_array($key, self::NOT_PROVISIONED, true);
+            // A provisioning arrangement is never "in effect" on the strength of a plan flag: the flag says
+            // the contract includes it, and nothing yet says the infrastructure exists. Reporting the
+            // entitlement here as the capability is what made this table claim dedicated-DB was live.
+            $effective = ! $notProvisioned && (bool) ($entitlements['features'][$key] ?? false);
 
             $rows[] = [
                 'key' => $key,
                 'label' => Arr::get(
-                    ['ocr_single' => 'OCR (single)', 'ocr_linelist' => 'OCR (line list)', 'api_access' => 'API access', 'sso_saml' => 'SSO (SAML)'],
+                    [
+                        'ocr_single' => 'OCR (single)',
+                        'ocr_linelist' => 'OCR (line list)',
+                        'api_access' => 'API access',
+                        'sso_saml' => 'SSO (SAML)',
+                        // Without these three the `ucfirst(str_replace(...))` fallback renders "Dedicated db",
+                        // "Data residency" and "Embedded payments" — the first of which read as a live
+                        // capability for a year. A key with no label is a key nobody chose the words for.
+                        'dedicated_db' => 'Dedicated database',
+                        'data_residency' => 'Data residency',
+                        'embedded_payments' => 'Embedded payments',
+                    ],
                     $key,
                     ucfirst(str_replace('_', ' ', $key)),
                 ),
@@ -357,6 +393,7 @@ final class TenantDetailPresenter
                 // Only `tenant_disabled` is reachable for a ToggleableModules key; anything else that is
                 // on without a grant came from a legacy_overrides row (ADR-0008 §D5).
                 'reason' => match (true) {
+                    $notProvisioned && $grants => 'not_provisioned',
                     $grants === $effective => null,
                     $grants && ! $effective && in_array($key, ToggleableModules::KEYS, true) => 'tenant_disabled',
                     $grants && ! $effective => 'unavailable',

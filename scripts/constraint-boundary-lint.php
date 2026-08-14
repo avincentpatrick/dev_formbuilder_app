@@ -131,6 +131,41 @@ foreach ($files as $file) {
         continue;
     }
 
+    // Raw DDL first: `DB::statement('CREATE UNIQUE INDEX …')` sits at the top level of `up()`, outside
+    // any Schema block, and nine of this schema's unique indexes are declared that way because a PARTIAL
+    // unique is not expressible through Blueprint at all.
+    foreach (raw_ddl_constraints($up, $finder) as [$name, $table, $columns, $kind, $line]) {
+        if (in_array($table, $dropped, true) || ! in_array($table, $tenantTables, true)) {
+            continue;
+        }
+
+        $constraints++;
+
+        if (in_array('tenant_id', $columns, true)) {
+            continue;
+        }
+
+        $recorded = $kind === 'unique'
+            ? ConstraintBoundaries::reasonForIndex($name)
+            : ConstraintBoundaries::reasonForForeignKey($name);
+
+        if ($recorded !== null) {
+            continue;
+        }
+
+        $violations[] = sprintf(
+            '%s:%d: raw DDL declares `%s` on %s (%s) without `tenant_id` in the key, on the tenant-scoped '
+                .'`%s` (ADR-0002 §D5). Add `tenant_id` to the key, or record it in '
+                .'`App\Support\Tenancy\ConstraintBoundaries` with a rationale.',
+            $relative,
+            $line,
+            $name,
+            $kind === 'unique' ? 'a unique index' : 'a foreign key',
+            implode(', ', $columns),
+            $table
+        );
+    }
+
     foreach (schema_blocks($up, $finder) as [$table, $stmts]) {
         if (in_array($table, $dropped, true)) {
             continue; // the table does not survive the migration run — see the pre-pass above
@@ -211,7 +246,7 @@ if ($violations !== []) {
 }
 
 fwrite(STDOUT, sprintf(
-    "Constraint boundary linter passed (%d migration file(s) scanned, %d constraint(s) checked, "
+    'Constraint boundary linter passed (%d migration file(s) scanned, %d constraint(s) checked, '
         ."%d foreign-key target(s) unresolved).\n",
     $scanned,
     $constraints,
@@ -234,6 +269,103 @@ function up_method_stmts(array $ast, NodeFinder $finder): array
     }
 
     return [];
+}
+
+/**
+ * Constraints declared in raw SQL passed to `DB::statement()` / `DB::unprepared()`, as
+ * [name, table, columns, 'unique'|'foreign', line].
+ *
+ * ⚠️ THIS RULE WAS SPECIFIED, NOT WRITTEN, AND THE MUTATION PASS IS WHAT NOTICED. Removing
+ * `settings_platform_key_unique` from the constant reddened the drift test and left this script at
+ * exit 0 — because that index, like eight others here, is a PARTIAL unique, which Blueprint cannot
+ * express, so it is raw DDL the Blueprint walk never saw. A gate silent on nine of the schema's
+ * unique indexes would have shipped looking complete.
+ *
+ * Reads the string LITERALS, not the file text, which is what keeps two `CREATE UNIQUE INDEX`
+ * occurrences inside docblocks in `add_reference_to_submissions` from being counted as DDL — the
+ * argument for AST over grep, made concrete.
+ *
+ * @param  array<int, Node>  $nodes
+ * @return list<array{0: string, 1: string, 2: list<string>, 3: string, 4: int}>
+ */
+function raw_ddl_constraints(array $nodes, NodeFinder $finder): array
+{
+    $found = [];
+
+    foreach ($finder->findInstanceOf($nodes, StaticCall::class) as $call) {
+        if (! $call->class instanceof Node\Name || $call->name instanceof Node\Expr) {
+            continue;
+        }
+
+        if ($call->class->getLast() !== 'DB'
+            || ! in_array($call->name->toString(), ['statement', 'unprepared'], true)) {
+            continue;
+        }
+
+        $first = $call->args[0] ?? null;
+        $sql = $first instanceof Node\Arg ? fold_string($first->value) : null;
+        if ($sql === null) {
+            continue;
+        }
+
+        if (preg_match('/CREATE\s+UNIQUE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([^)]*)\)/is', $sql, $m) === 1) {
+            $found[] = [$m[1], $m[2], sql_column_list($m[3]), 'unique', $call->getLine()];
+        }
+
+        if (preg_match('/ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s*\(([^)]*)\)/is', $sql, $m) === 1) {
+            $found[] = [$m[1], raw_altered_table($sql) ?? '', sql_column_list($m[2]), 'foreign', $call->getLine()];
+        }
+    }
+
+    return $found;
+}
+
+/** The table named by an `ALTER TABLE x …` statement. */
+function raw_altered_table(string $sql): ?string
+{
+    return preg_match('/ALTER\s+TABLE\s+(?:ONLY\s+)?(\w+)/is', $sql, $m) === 1 ? $m[1] : null;
+}
+
+/**
+ * Column names from a parenthesised SQL list.
+ *
+ * @return list<string>
+ */
+function sql_column_list(string $inner): array
+{
+    $columns = [];
+
+    foreach (explode(',', $inner) as $part) {
+        $name = trim($part);
+        if ($name !== '') {
+            $columns[] = $name;
+        }
+    }
+
+    return $columns;
+}
+
+/**
+ * Constant-fold a string expression: a literal, or a chain of them concatenated.
+ *
+ * Non-interpolated heredocs parse as plain `String_`, so they fold for free. Anything carrying a
+ * variable returns null and is skipped rather than half-read — a partially folded statement would
+ * produce a constraint name that matches nothing in the constant and read as a violation.
+ */
+function fold_string(Node $node): ?string
+{
+    if ($node instanceof String_) {
+        return $node->value;
+    }
+
+    if (! $node instanceof Node\Expr\BinaryOp\Concat) {
+        return null;
+    }
+
+    $left = fold_string($node->left);
+    $right = fold_string($node->right);
+
+    return $left === null || $right === null ? null : $left.$right;
 }
 
 /**

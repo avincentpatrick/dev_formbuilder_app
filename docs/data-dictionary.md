@@ -57,6 +57,8 @@ This document is the source of truth for column-level shape; it will be kept in 
 
 **Soft-delete convention:** tables holding tenant business records that benefit from an "undo"/trash grace period carry `deleted_at timestamptz nullable` (Eloquent `SoftDeletes`). This is distinct from **GDPR erasure**, which does not rely on soft-delete at all — erasure scrubs specific PII-bearing columns in place (see `submissions.pii_erased_at`) so that aggregate/statistical shape survives a subject-erasure request even though the personal data does not.
 
+**Foreign-key convention, and where this schema does not follow it (ADR-0002 §D5, measured by P2c 2026-08-14):** an FK between two tenant-scoped tables should be **composite** — `foreign(['tenant_id', 'x_id'])->references(['tenant_id', 'id'])` — because **PostgreSQL bypasses row security for referential-integrity checks**, so a single-column FK is not confined by RLS and its `ON DELETE` action is not either. Nine constraints use the composite shape (`sso_auth_requests` §31 spells out the reasoning); **29 do not**, and every table below whose FK column is documented without a composite note is one of them. Do not read a plain `→ parent(id)` entry in this document as "isolated by RLS" — it is isolated by the write path that sets it. The full list, with a rationale per constraint, is `App\Support\Tenancy\ConstraintBoundaries::FOREIGN_KEY_EXCEPTIONS`; drift in both directions is asserted by `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php`. The same applies to **13 unique indexes** whose key omits `tenant_id` and which are therefore enforced across all tenants at once.
+
 ---
 
 ## Table of Contents

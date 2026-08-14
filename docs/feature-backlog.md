@@ -152,6 +152,46 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
 ## ⚠️ Discovered defects (found while building)
 
+- **26 foreign keys can reference across a tenant boundary, and the database will act on them
+  (ADR-0002 §D5, measured by P2c).** Not a latent bug — no cross-tenant reference exists in the data,
+  because every write path resolves its parent under RLS before writing the child and reaching a
+  neighbour's row would additionally need a guessed UUIDv7. It is a missing *structural* guarantee:
+  PostgreSQL bypasses row security for referential-integrity checks, so the constraint layer would
+  accept one, and **20 of the 26 are `ON DELETE CASCADE`**, which turns a bad reference into a
+  cross-tenant delete. Recorded with a per-constraint rationale in
+  `App\Support\Tenancy\ConstraintBoundaries::FOREIGN_KEY_EXCEPTIONS`; new ones are blocked by
+  `ConstraintBoundaryDriftTest` and `scripts/constraint-boundary-lint.php`.
+
+  **What remediation costs, so the next session does not re-derive it.** The compliant shape is
+  `foreign(['tenant_id', 'x_id'])->references(['tenant_id', 'id'])->on('parent')`, which nine
+  constraints already use. It needs a `(tenant_id, id)` unique on the PARENT, and eight parents lack
+  one: `form_versions`, `form_fields`, `form_sections`, `submissions`, `attachments`, `roles`,
+  `permissions`, `subscriptions`. Then 26 drop/recreate pairs preserving each `ON DELETE` action
+  exactly. Two complications worth knowing before starting: **`forms` ↔ `form_versions` is circular**
+  (`form_versions.form_id` against `forms.draft_version_id`/`current_published_version_id`), so the
+  pair has to be handled together or deferred; and **`form_templates.source_form_version_id` legitimately
+  points at PLATFORM rows** with a NULL `tenant_id`, so plain equality is wrong for it and it needs the
+  widened shape rather than a mechanical rewrite.
+
+- **Three more cross-boundary FKs cannot be fixed this way at all**, because the SOURCE has no
+  `tenant_id` column to put in a key: `role_has_permissions`'s two, and `tenants.logo_attachment_id`
+  (the workspace branding logo, which points at the tenant-scoped `attachments` from the `tenants`
+  table itself — previously unrecorded anywhere). ⚠️ **`role_has_permissions` has a live trigger, not a
+  hypothetical one**: ADR-0017's "When to Revisit" records that the pivot leaks cross-tenant the day
+  `roles` acquires its first tenant-owned row, which `roles_tenant_insert` permits and nothing
+  prevents. Its safety today is a fact about the seeded data — all five roles are platform rows.
+
+- **Ten non-unique indexes on tenant-scoped tables do not lead with `tenant_id`** (ADR-0002 §D1's
+  ordering rule): `attachments_attachable_type_attachable_id_index`, `domains_custom_sweep_idx`,
+  `feedback_reports_submitted_at_index`, `field_library_usage_count_index`,
+  `form_templates_usage_count_index`, `model_has_permissions_model_id_model_type_index`,
+  `model_has_roles_model_id_model_type_index`, `personal_access_tokens_expires_at_index`,
+  `personal_access_tokens_tokenable_type_tokenable_id_index`, `submission_geo_index_geom_gist`. A
+  query-planning matter with **no isolation consequence** — a plain index constrains nothing, so it
+  cannot refuse a write or cascade a delete — which is why they are listed here rather than gated by
+  `ConstraintBoundaries`. Several are correct as they stand (a GiST geometry index, the polymorphic
+  morph lookups); the list is the measurement, not a work item.
+
 - ~~**`PUT /user/profile-information` writes ZERO ROWS, silently — so changing your own name or email in
   Settings does nothing at all.**~~ ✅ **FIXED IN J3b.** `config/fortify.php` now mounts
   `EstablishTenantDatabaseContext` on the Fortify group, so `app.current_user_id` is set for the request

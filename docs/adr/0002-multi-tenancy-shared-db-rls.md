@@ -170,6 +170,47 @@ the operator hold an unrestricted read".
 - Every raw/`DB::` query (reports, bulk operations, analytics) must explicitly include the tenant predicate in code and is flagged in code review as a location where the ORM global-scope convenience layer does *not* apply — RLS is the actual guarantee for these, which is precisely why RLS exists rather than treating "always use Eloquent" as sufficient policy.
 - Tenant-scoped Eloquent models extend a common base model / apply a common `BelongsToTenant` trait, so the global scope is structural (inherited), not something each new model author must remember to add manually.
 
+**Amendment (Increment P2c, 2026-08-14) — the rule is now measured, and the as-built schema does not satisfy it.**
+Nothing had ever checked the first clause. `App\Support\Tenancy\ConstraintBoundaries` holds the census with a
+rationale per entry; `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php` asserts it against `pg_index` and
+`pg_constraint` in both directions, and `scripts/constraint-boundary-lint.php` names the migration line that
+wrote each one. Measured on a freshly migrated `meridian_testing` (56 base tables):
+
+| | Total | Crossing the boundary | Recorded |
+|---|---|---|---|
+| Unique, non-primary indexes | 42 | 13 on a `tenant_id`-carrying table without it in the KEY | 13 |
+| Foreign keys | 112 | 29 whose TARGET carries `tenant_id` while the key does not | 29 |
+| Composite `(tenant_id, x_id)` FKs | 9 | — | the compliant shape |
+
+⚠️ **The unique half is mostly principled and the foreign-key half is mostly not.** Of the 13 indexes, 11 are
+values that are globally unique by definition (a hostname), matched before any tenant is resolved (an OAuth
+state on the central host, a SAML `InResponseTo`), or secrets where a cross-tenant collision would itself be
+the bug. The 29 foreign keys are different in kind: they are the Phase 0–1 core schema written before the
+convention was applied consistently. Every FK authored since `scope_nodes` (2026-07-20) uses the composite
+shape; the form and submission trees predate it. **This is a gap the ADR did not know it had, not a set of
+decisions it made** — see the Consequences correction below.
+
+⚠️ **RLS is not a backstop for either.** PostgreSQL documents that "referential integrity checks, such as
+unique or primary key constraints and foreign key references, always bypass row security". So a unique index
+without `tenant_id` can refuse a tenant a value because of a row it cannot see, and a foreign key without it
+will accept a reference to a neighbour's row and act on the `ON DELETE` clause — on 20 of the 29, `CASCADE`.
+`docs/data-dictionary.md` already states this for `sso_auth_requests`, whose FK is composite for exactly this
+reason; P2c is that reasoning applied to the rest of the schema.
+
+**The rule's third noun — "or index" — is discharged by D1's ordering rule, not here.** A non-unique index
+constrains nothing: it cannot refuse a write or cascade a delete, so it cannot span a boundary in any sense
+this ADR can enforce. Ten plain indexes on tenant-scoped tables do not lead with `tenant_id` (the PostGIS
+`submission_geo_index_geom_gist` and the polymorphic morph indexes among them); they are a query-planning
+matter under D1 and are listed in `docs/feature-backlog.md` rather than gated, because putting ten entries
+with no isolation consequence into the constant would dilute a list whose whole value is that every entry has
+one.
+
+**Remediation is deliberately NOT part of this increment.** It requires `(tenant_id, id)` unique indexes on
+eight parent tables that lack them, 26 FK drop/recreate pairs preserving each `ON DELETE` action, and a
+circular `forms` ↔ `form_versions` pair untangled — a schema increment with its own risk profile, filed in
+`docs/feature-backlog.md`. Three of the 29 cannot be remediated that way at all: `role_has_permissions`'s two
+and `tenants.logo_attachment_id` have no `tenant_id` column on the SOURCE to put in a key.
+
 ### D6. Verification & CI gates
 
 Given the stated stakes, verification is treated as a first-class deliverable of this decision, not an afterthought:
@@ -212,9 +253,15 @@ The plan explicitly reserves a **dedicated-database tenancy option** for Phase 4
 
   > ⚠️ **Corrected 2026-08-14 (P2a).** This bullet and §D4 below both said **v4**. The installed version is **v3.10.0** (`composer.json` pins `^3.10`; `composer.lock` agrees), and v4 has never been installed. The correction matters because the "one abstraction, so the switch is configuration" claim is the load-bearing premise of this whole section, and it was resting on a package version nobody had checked. ADR-0017 re-examines the claim against v3.10 as actually installed and finds it **partly false**: the stock `PostgreSQLSchemaManager` *replaces* `search_path` rather than prepending `public`, which would take PostGIS's `geometry` type, `users`, `tenants`, `jobs` and the `migrations` table out of scope in one config edit. The door this ADR promises to leave open is still open; it is not one line wide.
 - This is workable *only* because of decisions locked in now: `tenant_id` as a UUID (not an auto-increment integer that could collide across tenants once split into separate databases), no cross-tenant foreign keys or unique constraints (D5), and every tenant-scoped table already self-contained per `tenant_id` partition.
+
+  > ⚠️ **Corrected 2026-08-14 (P2c). "No cross-tenant foreign keys or unique constraints" was not true of this schema, and had never been checked.** There are **29 foreign keys whose target carries `tenant_id` while the key does not**, against 9 that use the composite shape — measured in D5's amendment above. The clause is offered here as a property that makes per-tenant extraction workable, so the error is load-bearing rather than cosmetic: a reader planning that work would have taken the hardest part as already done.
+  >
+  > **What the bullet gets right is the part that actually carried P2b.** UUID keys and per-`tenant_id` self-containment are real and are why `tenants:extract` was not hard to write. Cross-tenant references do not currently *exist* in the data — they are unreachable in practice because every write path resolves its parent under RLS first, and reaching a neighbour's row would additionally require guessing a UUIDv7. What is false is that the SCHEMA prevents them: PostgreSQL bypasses row security for referential-integrity checks, so the constraint layer would accept one, and on 20 of the 29 the `ON DELETE` action is `CASCADE`.
+  >
+  > **The same failure class as P2a's `Dedicated db | In effect: Yes` and P2b's `0700` directory mode** — a property asserted in prose that the platform does not provide. It is recorded rather than quietly fixed because the fix is a schema increment (see D5's amendment), and because the pattern is worth naming: all three were found by measuring something a document had only ever stated.
 - Building the actual extraction tooling (per-tenant export/import, connection-swapping configuration, a per-tenant migration runner for the multi-database mode) is explicitly **not** part of this decision and is deferred to a dedicated Phase 4 ADR once a specific customer or compliance driver justifies the investment — consistent with the plan's "migrate high-value tenants later, only if justified" guidance. This ADR's obligation is narrower and non-negotiable: do not design today's shared schema in a way that makes that future extraction hard.
 
-  > ✅ **Partially discharged 2026-08-14 (P2b, ADR-0018).** The **export** half of the first deliverable is built: `php artisan tenants:extract` writes one tenant's record as NDJSON plus a manifest. **The obligation above was met** — the extraction was not hard, and the reason is exactly the properties this section names: uuid keys, no cross-tenant FKs, every tenant-scoped table self-contained per `tenant_id`. What it was NOT is automatic. Two things had to be decided rather than derived, and both are the places the shared schema's convenience becomes a hazard at the boundary: **`users` is central**, so RLS there is a join and the extract is a roster with nine columns withheld; and **six tables' SELECT policies are deliberately wider than one tenant**, so RLS alone returns the platform catalog too. The **import** half, the connection swap and the per-tenant migration runner all remain deferred — see ADR-0018 "When to Revisit".
+  > ✅ **Partially discharged 2026-08-14 (P2b, ADR-0018).** The **export** half of the first deliverable is built: `php artisan tenants:extract` writes one tenant's record as NDJSON plus a manifest. **The obligation above was met** — the extraction was not hard, and the reason is exactly the properties this section names: uuid keys, no cross-tenant FKs, every tenant-scoped table self-contained per `tenant_id`. *(⚠️ Amended by P2c, 2026-08-14: "no cross-tenant FKs" is inherited from the bullet above and is false as written — there are 29 the constraint layer would accept. It held for P2b because none has ever been **exercised**, which is a fact about the write paths rather than about the schema. The distinction is the one the correction above draws, and it does not change P2b's outcome: `tenants:extract` already reports an unresolvable reference rather than dropping it, which is the behaviour a cross-tenant row would need.)* What it was NOT is automatic. Two things had to be decided rather than derived, and both are the places the shared schema's convenience becomes a hazard at the boundary: **`users` is central**, so RLS there is a join and the extract is a roster with nine columns withheld; and **six tables' SELECT policies are deliberately wider than one tenant**, so RLS alone returns the platform catalog too. The **import** half, the connection swap and the per-tenant migration runner all remain deferred — see ADR-0018 "When to Revisit".
 
 ---
 

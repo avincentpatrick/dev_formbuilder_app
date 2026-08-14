@@ -2575,6 +2575,117 @@ lockout went unrecorded there.
 **Environment:** Docker Desktop's engine wedged mid-session (500 on every API route) and needed a full
 restart plus `wsl --shutdown`; both lanes' stacks were brought back up afterwards.
 
+## 2026-08-14 — LANE A · J3c2 COMPLETE: first-party Google sign-in (PR #151, `7377a68`, 6/6)
+
+**"Continue with Google" on both front doors, on tenant hosts and the central host.** CI: Pest
+**3981 / 17,031 assertions**, E2E **541 passed / 1 flaky / 10 skipped**, Vitest **107 files / 1,835**,
+lint **93/100/29**, `openapi.json` untouched. Measured against the SAME base (`afaa023`, after Lane B
+merged P2a mid-flight): **+55 tests / +250 assertions**, reconciling exactly as 36 + 14 + 2 + 2 + 1.
+
+**THE ADVERSARIAL PASS FOUND A LIVE SECURITY DEFECT AFTER ALL SIX JOBS WERE GREEN.** Four independent
+lenses, every finding handed to a skeptic prompted to refute it: 8 raised, 3 refuted, **5 real**, two
+confirmed by the verifier RUNNING the mutation rather than reading it. The serious one is **OAuth
+login-CSRF**: nothing tied the browser that started a sign-in to the one that finished it, so an attacker
+could obtain an authorization code without spending it, hand the victim the callback URL, and have
+`Auth::login()` run on the ATTACKER's account in the VICTIM's browser — everything typed, uploaded or
+configured afterwards landing in an account somebody else controls. The tenant arm was the same attack
+against the handoff URL, accepted in any browser with an attacker-chosen `return_to`.
+
+**Why it was easy to miss, which is the transferable part.** ADR-0009 §D3 calls the signed `state` "the
+CSRF control". An HMAC over server-chosen data proves *we minted the token*; it proves nothing about who
+holds it — a statement about PROVENANCE that reads like one about ORIGIN. ⚠️ And the connector flow does
+**not** supply the missing half either: its `uid` claim names the member a connection is *attributed* to,
+and its callback lands on a host that never sees the tenant session. So this was never a protection J3c2
+dropped; it is one the family never had, and a sign-in is simply the first flow where its absence is
+exploitable. The first draft of the fix's own docblock said the opposite, and the refuting agent caught
+it — a reviewer correcting the reviewer's correction.
+
+**The fix costs one session key.** `google.flow_sid` holds the `state_id` of the flow this browser
+started and is compared at the two hops that create a session. No cross-host cookie and no token-format
+change are needed, because each of those hops is same-host with its own mint. It compares the flow's own
+id rather than merely requiring *some* value — otherwise an attacker who lures the victim through the
+mint route first would have handed them a binding.
+
+**THE SECOND HIGH FINDING WAS AN AVAILABILITY DEFECT WITH THE SAME ROOT CAUSE: A FAITHFUL PORT OF
+SOMETHING WHOSE TABLE MEANT THE OPPOSITE.** `trim()` copied `SsoAuthFailureRecorder::trim()`, whose table
+holds finished LOG rows, onto a table holding the LIVE state of every in-flight sign-in. The rank-only
+cap therefore deleted rows that were still redeemable: while one member sits on Google's consent screen
+for up to ten minutes, anyone at all can mint enough rows for that workspace to push theirs past the cap
+— **unauthenticated denial of *authentication* for an entire tenant**, with the log blaming
+`state_replayed` and pointing the operator at replay. Liveness is now the outer `AND`, and the
+consequence is stated rather than hidden: the table is capped at N *spent* rows plus whatever the rate
+limiter admits inside one state TTL, because deleting somebody's in-flight sign-in is not an acceptable
+answer to a capacity question.
+
+**TWO TESTS WERE VACUOUS AND BOTH GUARDED SOMETHING THAT MATTERS.** The seat-quota "no orphaned account"
+case asserted two things that were *unconditionally* false — one blocked by RLS with both GUCs cleared
+after `terminate()`, one on a connection that structurally cannot see `RefreshDatabase`'s transaction —
+so removing `provision()`'s `DB::transaction` left all 32 cases green while every full-workspace sign-in
+stranded a live account. It now RETRIES after raising the cap, where a survivor collides on
+`users_email_unique`. The trim case compared two reads of the same surviving rows: a tautology that
+passed even with the subquery inverted to keep the OLDEST N — an inversion that in production makes every
+mint past the cap delete the row it just wrote, permanently breaking sign-in for that workspace.
+
+**THREE DEFECTS WERE ALREADY IN THE TREE, AND ONE COST 100 MINUTES OF TEST RUNS.**
+
+- `GoogleAuthRequest` used `BelongsToTenant` **without `implements TenantScoped`**. The trait adds its
+  read scope unconditionally but gates the `tenant_id` auto-fill on the interface, so the model scoped
+  its reads, its relations worked, and only INSERTs were broken — reported as `42501 new row violates
+  row-level security policy`, which points at the RLS policy rather than at four missing characters in
+  the class declaration. It was the ONLY model in the tree missing the pairing; a new ~1s guard,
+  `tests/Unit/Models/TenantScopedContractTest.php`, now asserts it and is mutation-verified.
+- **A self-deadlock.** `users.google_id` is UNIQUE, so its UPDATE takes `FOR UPDATE`, while the
+  `tenant_users` INSERT takes `FOR KEY SHARE` on the same `users` row for its foreign key. The link runs
+  on `pgsql_auth` — a SEPARATE session — so ordering it inside the transaction made the request wait for
+  a transaction that could not commit until it returned. No error, no rollback, no timeout: two runs sat
+  for 26 and 75 minutes. **A Pest run that HANGS rather than fails is a lock, not a slow host** —
+  `pg_blocking_pids()` named the application's own connection, and a hand-run psql reproduction of the
+  INSERT with the same `set_config(..., true)` inside a savepoint SUCCEEDED, which ruled out the borrowed
+  context and left the lock interaction as the only candidate.
+- A genuine PHPStan `method.notFound` in the committed seam: `fromSocialiteUser()` was typed against
+  Socialite's `Contracts\User`, which has no `getRaw()` — it compiled, ran, and passed its unit tests
+  (which build a concrete `Two\User`) while being wrong the moment anything checked.
+
+**BOTH LANES INDEPENDENTLY HIT THE gitleaks QUOTING TRAP ON THE SAME DAY, FROM OPPOSITE DIRECTIONS.**
+Lane B's P2a found it when its PR went red; Lane A found it by running the pinned scanner locally before
+opening one. The paragraph explaining that quoting the fixture literal reproduces the match quoted it, on
+a line with no directive — the third occurrence. **The rule is upgraded: do not write the literal at all,
+name the fixture rather than its value.** A directive protects one line and must be remembered every
+time; not writing the value has nothing to forget. And run the scanner BEFORE opening a PR, because that
+failure is *inherited* rather than caused, so a green local branch proves nothing about a red base.
+
+**THE APPROVED ROUTE TABLE COULD NOT SERVE ITS OWN DECISION OF RECORD — EIGHT-FOR-EIGHT ON CHECKING A
+DOC-SOURCED ROW AGAINST THE CODE.** It placed the mint route in `routes/tenant.php`, which declares no
+`->domain()`, so a central-host request matches it and dies in identification — while the user's decision
+is that Google works on tenant hosts AND the central host. Registering the same URI in both files does
+not help: `routes/google-auth.php` loads from `withRouting(then:)` while `routes/tenant.php` is mapped
+later inside `booted()`, so the tenant copy would be dead code no test notices. Both now take Fortify's
+own pipeline, with the workspace resolved from the HOST as `RegistrationGate` already does for
+`/register`. ADR-0017 gains **§D6a** (this) and **§D6b** (the browser binding), and **§D8a** records that
+"and invited people" overstates what §D4 allows — an invitation placeholder is unverified, so a
+brand-new invitee is refused by the verified-account condition, correctly and by the decision of record.
+
+**MUTATION PASS: 16 MUTATIONS, ALL 16 REDDEN EXACTLY THE INTENDED CASE.** Two of the first eleven
+reddened NOTHING and both were real gaps: the provisioner's *second* `email_verified` check was
+undefended (the callback refuses first, so the flow never reaches it), and the Suspended refusal was
+masked by `attachMember()`'s own guard — the case passed while the logged reason silently changed from
+`membership_suspended` to `seat_quota_exhausted`, which is the only thing distinguishing them for an
+operator, since §D9 makes the user-facing outcome uniform. ⚠️ **The harness failed twice before any
+result was believed**: its first version used `grep -cF` on a multi-line needle and reported 212
+occurrences of a three-line string; J3c1's had reported "nothing reddened" through genuinely red runs.
+Both failures are indistinguishable from results, which is why every step now asserts its own
+precondition and prints "HARNESS FAILURE" rather than a number it cannot justify.
+
+**VISUAL SWEEP: 30 rows, 0 problems**, frames reviewed in both themes rather than only measured. ⚠️ The
+first sweep flagged all 30 for a 40px touch target and was WRONG: `MdsButton`'s visual box is 40px at
+size `md` and a `::before` overlay with `min-height: 44px` carries WCAG 2.5.8, so a naive
+`getBoundingClientRect()` check condemns every button in the product.
+
+**Also of note:** a THIRD session was editing the same working tree (writing `docs/ACCESS-MATRIX.md` on
+the user's request). `git add -A` swept its work into a commit, which had to be backed out and
+force-pushed; the rebase onto P2a was then done in a `git worktree` so that session's uncommitted files
+were never touched. **Check `git status` before staging when a second agent may hold the tree.**
+
 ## 2026-08-14 — LANE A · J3c2 (Google sign-in) begun: dependency, ADRs, seam, schema, state (branch `j3c2-google-signin`, no PR yet)
 
 **Six commits, pushed, nothing half-edited.** The increment was split so the riskiest and most

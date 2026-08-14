@@ -179,6 +179,14 @@ it('finds no unpinned global unique constraint or index on a tenant-scoped table
         // both own `forms.acme.com`. Scoping either per tenant would make the uniqueness meaningless.
         'domains_domain_unique',
         'domains_verification_token_unique',
+        // Google sign-in's two single-use tokens (J3c2 / ADR-0017 §D6, §D7). Both are matched from an
+        // UNAUTHENTICATED request before any tenant scoping can be trusted — the callback lands on the
+        // central host and the completion hop is reached by a browser holding only a URL — so a
+        // cross-tenant collision would be a SECOND ROW the lookup could legitimately match. Per-tenant
+        // uniqueness would make the lookup ambiguous exactly where it must not be. `handoff_hash` is a
+        // SHA-256 and additionally falls under the secrets rationale below.
+        'google_auth_requests_handoff_hash_unique',
+        'google_auth_requests_state_id_unique',
         // Secrets. A token that collides across tenants is a cross-tenant authentication bug, so global
         // uniqueness is the property being bought, not a boundary violation.
         'impersonation_tokens_token_hash_unique',

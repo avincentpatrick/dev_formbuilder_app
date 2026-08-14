@@ -60,6 +60,7 @@ final class TenantScopedTables
         'form_sections',
         'form_versions',
         'forms',
+        'google_auth_requests',
         'impersonation_tokens',
         'legacy_overrides',
         'model_has_permissions',

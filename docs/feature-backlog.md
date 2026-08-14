@@ -289,6 +289,41 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   asserts the design system has **zero** instances and that the app-tree list is **exactly** these seven,
   so an eighth fails at the moment it is written. ⚠️ The list may only ever shrink — do not add to it.
 
+### Design system — deferred from J4a, each with its preconditions stated
+
+- **`MdsTooltip`** — specified by DSR §3.4a, **not built**, because it has no clip-safe consumer today.
+  Three preconditions, all of them real work rather than a decision: (1) `.sidebar` is `overflow-y: auto`,
+  which forces `overflow-x: auto`, so the 64px rail §3.4/§6 asks for a tooltip in **clips** it — as do
+  `.mds-table__scroll` and `.palette` inside `.builder__pane { overflow: hidden }`; (2) escaping that needs
+  a `Teleport`, and a teleported node must interoperate with `Modal/inert-stack.ts` via
+  `data-mds-inert-exempt`, which only `MdsToastHost` holds today; (3) the two sites the J4 row named as
+  needing one **already state their reason in the page**, so the component would ship with zero consumers.
+  The full API design (Escape-dismissible without moving focus, hoverable with the gap bridged, persistent,
+  `aria-describedby` and never the accessible name) is settled — do not re-derive it.
+
+- **`MdsProgress`'s step-count variant** — DSR §3.9 specifies two variants and J4a built the percentage one.
+  ⚠️ Its reference implementation, `resources/public-runtime/components/ProgressIndicator.vue`, is **better
+  specified than §3.9 itself**: it carries a rule the section does not, that a step is "done" if it is in
+  the VISITED SET and never if its index is below the current one (H21b — relevance filtering means a
+  respondent can be on step 5 having never seen step 3). Put that rule in §3.9 before generalising.
+  Migrating it puts **17 assertions** at risk across `resources/public-runtime/__tests__/components.test.ts`
+  and `public-runtime-axe.spec.ts`, inside a separate Vue SPA that imports eight design-system components.
+  The second consumer is `Pages/submissions/Encode.vue:897-899` — a bare `p aria-live="polite"` reading
+  "Step 3 of 5" with no landmark and no navigable steps, pinned by nine assertions in `encode.test.ts`.
+
+- **A `--mds-person-identity-*` scale** — `MdsAvatar` is monochrome, and DSR §3.12 records why reusing the
+  form-identity six is wrong. Four preconditions before a coloured avatar is buildable: a scale of its own
+  with a JR3-shaped contrast suite; every hue ≥30° from every **status** hue AND from every **form-identity**
+  hue (a person and a form at 0° destroys the mnemonic that scale exists for); a dark re-point, because the
+  identity scale carries its hue as TEXT on a 12% tint and measures 2.91:1 as a solid fill under white; and
+  a server-side per-user identity integer, which nothing computes today.
+
+- **~20 hand-rolled notices remain** after J4a migrated thirteen. They are **not** a sweep: several carry
+  deliberate, individually-argued `role` choices (`Encode.vue` has five, each with its own rationale;
+  `SyncStatus.vue` records a deliberate demotion off `role="alert"`), and `resources/public-runtime/` is a
+  separate SPA that imports eight design-system components and would need `MdsAlert` added to that set.
+
+
 ## Notes
 
 - Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here.

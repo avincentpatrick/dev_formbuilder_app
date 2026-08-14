@@ -104,12 +104,15 @@ function openEndpoint(id: string): void {
 
         <PageHeader title="Webhooks" icon="activity">
             <template #actions>
+                <!-- J4a — the `title` naming the plan limit is DELETED rather than turned into a tooltip:
+                     a natively disabled button is not focusable, so it was unreachable by keyboard and by
+                     screen reader. `.webhooks__hint` below already says the same sentence in the page, on
+                     the same `atCap` condition, which is the answer DSR §3.4a prescribes. -->
                 <MdsButton
                     v-if="can.create"
                     variant="primary"
                     icon-left="plus"
                     :disabled="atCap"
-                    :title="atCap ? 'You’ve reached your plan’s endpoint limit.' : undefined"
                     @click="createOpen = true"
                 >
                     Add endpoint

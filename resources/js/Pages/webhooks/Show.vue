@@ -274,13 +274,20 @@ function formatDate(iso: string | null): string {
                     {{ formatDate((row as DeliveryRow).created_at) }}
                 </template>
                 <template #row-actions="{ row }">
+                    <!-- J4a — the `title` carrying "Re-enable the endpoint to redeliver" is DELETED, not
+                         replaced by a tooltip. A natively disabled control is not focusable and fires no
+                         pointer events, so that sentence was unreachable by keyboard and by screen reader,
+                         and reachable by mouse only if you happened to hover a control you could not press.
+                         The reason is already on the page — the alert above this table says the endpoint is
+                         disabled and how to resume it — which is exactly what DSR §3.4a prescribes, and what
+                         `RuleShow.vue` and `QuestionPicker.vue` already argued for. `label` still names the
+                         button for assistive tech. -->
                     <MdsIconButton
                         v-if="can.update"
                         icon="redo"
                         label="Redeliver"
                         size="sm"
                         :disabled="!isActive"
-                        :title="isActive ? 'Redeliver' : 'Re-enable the endpoint to redeliver'"
                         @click="redeliver((row as DeliveryRow).id)"
                     />
                 </template>

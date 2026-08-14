@@ -2730,3 +2730,74 @@ flow's analogue of SAML's signature check, it arrives inside a raw JSON array, a
 **Remaining** (listed precisely in the Lane A block and the next-prompt line): the request service, the
 middleware, the provisioner, three controllers and routes, the UI, ~24 feature cases, and the docs.
 
+## 2026-08-14 — LANE B / P2b: the per-tenant extraction substrate (PR #152)
+
+**The first of the three deliverables ADR-0002's "Future migration path" has deferred since 2026-07-03**, and
+the one ADR-0017 declined to build until its two entry criteria had answers. New **ADR-0018**. Both criteria
+turned out to follow from decisions already on the record, so nothing was escalated; both are recorded as
+reversible.
+
+**THE TWO ANSWERS.** **`users` is a membership roster** — nine columns withheld, each with a reason beside
+it. Four are credentials for a **central** identity (one human, N workspaces), so extracting them would hand
+one tenant material for an account still live in workspaces it has nothing to do with; `last_active_tenant_id`
+is *another workspace's UUID*, the single cross-tenant fact the architecture exists to withhold. **Platform-
+shared rows are out and counted** — the widened six are read under an explicit `tenant_id = ?` on top of RLS,
+driven by `TenantScopedTables::rlsReturnsSuperset()`, so P2a's classification is load-bearing rather than
+documentary. Measured: 10 templates, 6 library questions, 29 permissions, 5 roles excluded.
+
+⚠️ **THE DANGLING FOREIGN KEY ADR-0017 PREDICTED IS REAL AND IS REPORTED RATHER THAN REMOVED** — reproduced on
+the dev tenant before any test existed. The fix that bullet's phrasing invites, widening the GUC so the roster
+is "complete", was refused on J3c1's grounds and would additionally resolve the platform operator named by
+`impersonation_tokens.operator_id`, who belongs to no tenant at all. The 34 `users`-referencing columns are
+derived from `pg_constraint`, not listed — a list is what goes stale when a migration adds `forms.archived_by`.
+
+**THE FOUR WAYS A CLEAN RUN MEANS NOTHING.** Wrong role (verified live: as `meridian` it aborts and never
+creates the directory) · no context (the GUC is read back) · a **renamed** secret, where a `WITHHELD` entry
+matching no column filters nothing while every "password is withheld" assertion stays green · torn reads
+across 43 tables (one REPEATABLE READ transaction, isolation level **read back**, not promised).
+
+⚠️ **THE REPO WAS WRONG ABOUT ITS OWN DRIVER, AND MUTATION TESTING IS WHAT FOUND IT.** Deleting
+`ExtractRowEncoder`'s boolean branch left the end-to-end assertion green, so it was measured: on PHP 8.4.24 /
+pdo_pgsql 8.4.24 with `ATTR_EMULATE_PREPARES = false`, `boolean` returns a PHP bool and every integer width a
+PHP int, because a native prepared statement carries the column's type OID. **Four comments in this repo assert
+the `'t'`/`'f'` string behaviour** — Phase-0 folklore, true only under emulated prepares. Their `::int` casts
+stay correct; only the reason was wrong. The branch stays (one `options` override turns every flag into the
+string `"f"`, which a JSON-trusting destination reads as TRUTHY) and `DriverTypeMappingTest` pins the measured
+mapping. `numeric` stays a string — the driver's doing, not the encoder's.
+
+⚠️ **THE ADVERSARIAL PASS EARNED ITS PLACE FOR THE THIRD INCREMENT RUNNING, AFTER 6/6 WAS ALREADY GREEN.**
+(1) `assertWithheldColumnsExist()` — the guard whose entire value is stopping a credential reaching a file —
+was called **inside the write loop**, so a renamed secret on the 43rd table fired only after 42 had been
+written, leaving a directory of real tenant data produced by a run whose whole point was that it refused.
+Hoisted to a pre-flight. (2) **`0700` does nothing on the production host**: ADR-0005 is Windows Server 2016
+running PHP natively, where `mkdir()`'s mode is ignored and `chmod()` toggles only the read-only attribute —
+so the containing directory's ACL is the entire filesystem control, and three places claimed otherwise. Same
+failure class as P2a's `dedicated_db | In effect: Yes`. (3) The **GeoJSON transform had never been executed by
+anything** — the only `TRANSFORMED` entry, and no fixture had a geo row, so it shipped on inspection. That is
+the boolean finding recurring one file later: a coercion nothing can redden is either dead code or an unpinned
+assumption.
+
+**THE CENSUS GATE CAUGHT ITS OWN AUTHOR TWICE**, and the second was hidden behind the first because the check
+was an `expect()` inside a loop. Rewritten to collect and assert once — a gate that reveals its findings one
+per run teaches people to distrust its green.
+
+**PEST DELTA RECONCILED EXACTLY**, against a run of the SAME BASE that `afaa023` happens to have (31764000285):
+3926 / 16,781 → the five new files measured 82 passed / 182 assertions at that commit, and CI reported
++82 / +182. Closed on the first try.
+
+**NOT BUILT, ON PURPOSE**: import · attachment blob transfer · `user_ui_preferences` · **any HTTP surface**
+(a route needs a permission key, which is an authorization widening). **`docs/security-threat-model.md` still
+carries no SSO rows** — inherited from P1a–P1c, not created here, and still owed.
+
+⚠️ **AND ONE CROSS-LANE CONSEQUENCE THIS INCREMENT INHERITED RATHER THAN CAUSED.** Lane A flagged that two ADRs
+now carry the number **0017** — P2a's `0017-tenant-isolation-tiering` and J3c2's `0017-first-party-google-sign-in`.
+Neither lane erred: each checked the sequence before starting and each correctly saw 0016 as the highest.
+**ADR-0018 is unambiguous and the next free number is 0019**, and 0018's header now states in one line that every
+"ADR-0017" inside it means the tenant-isolation file. **Lane B did not renumber Lane A's file** — their own note
+asks for one deliberate reviewed commit rather than a tail-end sweep, and 117 occurrences across 65 files are
+interleaved between the two meanings, including inside shared documents where both lanes cite their own 0017 in
+adjacent paragraphs. **The generalisable rule: a globally-numbered artefact — an ADR, a migration timestamp, an
+exceptions-log entry — is a SHARED-NAMESPACE ALLOCATION and cannot be chosen safely from inside one lane.** The
+same session also produced a duplicate migration prefix (`2026_08_16_000001` twice), harmless only because the
+two migrations are independent.
+

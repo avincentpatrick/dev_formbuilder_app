@@ -14,6 +14,7 @@
 import { computed, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsCard,
@@ -140,20 +141,31 @@ function providerNotice(providerKey: string): string | null {
                 </template>
                 <p class="provider__description">{{ provider.description }}</p>
                 <p class="provider__scopes">Permissions requested: {{ provider.scopes.join(', ') }}</p>
-                <p v-if="!provider.configured" class="provider__notice">
-                    {{ provider.label }} isn’t configured on this deployment yet. Ask your administrator to add the
-                    app credentials before connecting.
-                </p>
+                <!-- J4a: a bare paragraph with no `role` becomes an info `MdsAlert` — a standing fact about
+                     the deployment that assistive tech was never told about. -->
+                <MdsAlert
+                    v-if="!provider.configured"
+                    class="provider__notice"
+                    tone="info"
+                    :message="`${provider.label} isn’t configured on this deployment yet. Ask your administrator to add the app credentials before connecting.`"
+                />
                 <!-- H16b — a standing condition of the DEPLOYMENT, stated up front rather than left for the
                      weekly "Reconnect needed" badge to imply. Icon AND words carry the meaning (WCAG 1.4.1);
                      the tinted surface follows DomainCard's `--wait` recipe, whose bg/fg pair is one of the
-                     few in the token set with a measured contrast guarantee. Deliberately not MdsBanner:
-                     that primitive takes a single-line `message` string, and this is three sentences whose
-                     whole job is to name a cause. -->
-                <p v-if="provider.notice" class="provider__caution">
-                    <MdsIcon name="alert" size="sm" class="provider__caution-icon" aria-hidden="true" />
-                    <span>{{ provider.notice }}</span>
-                </p>
+                     few in the token set with a measured contrast guarantee.
+                     ⚠️ J4a — THE REFUSAL THAT USED TO BE HERE IS CLOSED, NOT OVERTURNED. It read
+                     "deliberately not MdsBanner: that primitive takes a single-line `message` string, and
+                     this is three sentences whose whole job is to name a cause". That objection was to
+                     MdsBanner SPECIFICALLY and it was right; `MdsAlert` exists because of it. Note what this
+                     block already was: `status-warning-{bg,fg}` painted by hand, with an `alert` glyph and
+                     words beside it — an MdsAlert built at the call site. The only thing that changes is
+                     that the tokens and the 1.4.1 discipline now live in one place. -->
+                <MdsAlert
+                    v-if="provider.notice"
+                    class="provider__caution"
+                    tone="warning"
+                    :message="provider.notice"
+                />
                 <div class="provider__actions">
                     <!-- A real anchor, not router.visit: the next hop is Slack's origin, and Inertia would
                          try to parse a consent page as a JSON page response. -->
@@ -223,16 +235,20 @@ function providerNotice(providerKey: string): string | null {
                     </div>
                 </dl>
 
-                <p v-if="connection.status !== 'active'" class="connection__notice">
-                    This workspace isn’t delivering. Reconnect it above to resume — your rules are kept.
-                    <!-- H16b — the sentence PROGRESS:846 asks for. Repeated here rather than only on the
-                         provider card above because THIS is where the tenant arrives when it happens: the
-                         status badge already says "Reconnect needed", and a red badge with no cause reads as
-                         our bug rather than as Google's published policy. -->
-                    <template v-if="providerNotice(connection.provider)">
-                        {{ providerNotice(connection.provider) }}
-                    </template>
-                </p>
+                <!-- J4a: warning, because a connection that is configured and not delivering is a
+                     degradation rather than a neutral fact. Not `assertive` — it was already true on load. -->
+                <MdsAlert v-if="connection.status !== 'active'" class="connection__notice" tone="warning">
+                    <p>
+                        This workspace isn’t delivering. Reconnect it above to resume — your rules are kept.
+                        <!-- H16b — the sentence PROGRESS:846 asks for. Repeated here rather than only on the
+                             provider card above because THIS is where the tenant arrives when it happens: the
+                             status badge already says "Reconnect needed", and a red badge with no cause reads
+                             as our bug rather than as Google's published policy. -->
+                        <template v-if="providerNotice(connection.provider)">
+                            {{ providerNotice(connection.provider) }}
+                        </template>
+                    </p>
+                </MdsAlert>
 
                 <!-- Caption names the workspace: a tenant can connect several, and "Delivery rules" three
                      times over tells a screen-reader user nothing about which one they are in. -->
@@ -344,41 +360,14 @@ function providerNotice(providerKey: string): string | null {
 
 .provider__description,
 .provider__scopes,
-.provider__notice {
-    margin: 0 0 var(--mds-space-3);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-body-sm-font-size);
-    line-height: var(--mds-type-body-sm-line-height);
-    color: var(--mds-color-text-secondary);
-}
 
-.provider__notice {
-    color: var(--mds-color-text-body);
-}
 
 /* H16b — the standing 7-day caveat. A surface of its own rather than the same grey as every other hint,
    for the reason DomainCard's `--wait` note gives: this is the state a tenant is most likely to misread,
    and the misreading here is "this product's token handling is broken". `status-warning-{bg,fg}` is one of
    the few pairs in the token set with a measured contrast guarantee, and the icon carries the meaning
    alongside the colour (WCAG 1.4.1). */
-.provider__caution {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--mds-space-2);
-    margin: 0 0 var(--mds-space-3);
-    padding: var(--mds-space-3);
-    border-radius: var(--mds-radius-md);
-    background-color: var(--mds-color-status-warning-bg);
-    color: var(--mds-color-status-warning-fg);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-body-sm-font-size);
-    line-height: var(--mds-type-body-sm-line-height);
-}
 
-.provider__caution-icon {
-    flex-shrink: 0;
-    margin-top: 1px;
-}
 
 /* Wrap rather than overflow — the standing 375px rule for any row of actions. */
 .provider__actions,
@@ -443,11 +432,6 @@ function providerNotice(providerKey: string): string | null {
     overflow-wrap: anywhere;
 }
 
-.connection__notice {
-    margin: 0 0 var(--mds-space-4);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-body);
-}
 
 .connection__channel {
     display: inline-block;
@@ -498,5 +482,20 @@ function providerNotice(providerKey: string): string | null {
     outline: 2px solid var(--mds-color-focus-ring);
     outline-offset: 2px;
     border-radius: var(--mds-radius-sm);
+}
+/* J4a — the alerts own tint, padding, radius and type now; only the spacing they contributed to the
+   card's vertical rhythm survives. ⚠️ `.provider__notice` was declared TWICE in this stylesheet, the
+   second block existing only to override the first's colour — a pre-existing smell that disappears with
+   the hand-rolled markup rather than being carried forward. */
+.provider__notice {
+    margin-bottom: var(--mds-space-3);
+}
+
+.connection__notice {
+    margin-bottom: var(--mds-space-4);
+}
+
+.connection__notice p {
+    margin: 0;
 }
 </style>

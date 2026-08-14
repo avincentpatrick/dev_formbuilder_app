@@ -22,7 +22,7 @@
  */
 import { computed, ref } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { MdsButton, MdsCard, MdsEmptyState, MdsModal } from '@meridian/design-system';
+import { MdsAlert, MdsButton, MdsEmptyState, MdsModal } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import SpDetailsCard from '@/components/sso/SpDetailsCard.vue';
 import IdpMetadataCard from '@/components/sso/IdpMetadataCard.vue';
@@ -67,12 +67,15 @@ function remove(): void {
 
         <!-- The downgraded-tenant case. A statement of fact, never an upgrade CTA: Enterprise is held from
              sale, so a button here would point at a plan that cannot be bought. -->
-        <MdsCard v-if="!entitled && isConfigured" class="sso__notice">
-            <p class="sso__notice-text">
-                Single sign-on isn’t part of your current plan, so you can’t change how it’s configured. What
-                you have set up keeps working, and you can switch it off or remove it here at any time.
-            </p>
-        </MdsCard>
+        <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert`. Info rather than warning, and no
+             `actions` slot, because this states a fact and is deliberately not an upsell — see the plan-gate
+             copy rule this page has followed since H12. -->
+        <MdsAlert
+            v-if="!entitled && isConfigured"
+            class="sso__notice"
+            tone="info"
+            message="Single sign-on isn’t part of your current plan, so you can’t change how it’s configured. What you have set up keeps working, and you can switch it off or remove it here at any time."
+        />
 
         <div v-if="entitled || isConfigured" class="sso__stack">
             <SsoStatusCard
@@ -146,12 +149,6 @@ function remove(): void {
     max-width: 640px;
 }
 
-.sso__notice-text {
-    margin: 0;
-    color: var(--mds-color-text-secondary);
-    font-size: var(--mds-type-body-sm-font-size);
-    line-height: var(--mds-type-body-sm-line-height);
-}
 
 .sso__confirm {
     margin: 0 0 var(--mds-space-3);

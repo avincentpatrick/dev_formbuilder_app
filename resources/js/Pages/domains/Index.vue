@@ -23,7 +23,7 @@
  */
 import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsCard, MdsEmptyState, MdsFormField, MdsModal, MdsTextInput } from '@meridian/design-system';
+import { MdsAlert, MdsButton, MdsEmptyState, MdsFormField, MdsModal, MdsTextInput } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import DomainCard from '@/components/domains/DomainCard.vue';
 import DomainSetupGuide from '@/components/domains/DomainSetupGuide.vue';
@@ -113,12 +113,14 @@ function openAdd(): void {
 
         <!-- The downgraded-tenant case (ADR-0012 §D9). A statement of fact, never an upgrade CTA: Business
              is held from sale, so a button here would point at a plan that cannot be bought. -->
-        <MdsCard v-if="!entitled && hasDomains" class="domains__notice">
-            <p class="domains__notice-text">
-                Custom domains aren’t part of your current plan, so you can’t add or re-check domains. Any
-                domain already in service keeps working, and you can remove it here at any time.
-            </p>
-        </MdsCard>
+        <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert` — the twin of the SSO plan-gate
+             notice, and worded to state a fact rather than to upsell. -->
+        <MdsAlert
+            v-if="!entitled && hasDomains"
+            class="domains__notice"
+            tone="info"
+            message="Custom domains aren’t part of your current plan, so you can’t add or re-check domains. Any domain already in service keeps working, and you can remove it here at any time."
+        />
 
         <div v-if="hasDomains" class="domains__list">
             <DomainCard
@@ -206,13 +208,6 @@ function openAdd(): void {
     margin-bottom: var(--mds-space-5);
 }
 
-.domains__notice-text {
-    margin: 0;
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-body-md-font-size);
-    line-height: var(--mds-type-body-md-line-height);
-    color: var(--mds-color-text-body);
-}
 
 .domains__list {
     display: flex;

@@ -13,6 +13,7 @@ use App\Services\Tenancy\Extraction\TenantExtractService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 uses(RefreshDatabase::class);
@@ -277,6 +278,23 @@ it('restores the tenant context it was called with', function (): void {
     runExtract($acme, $this->extractDir);
 
     expect(TenantContext::currentTenantId())->toBe($other->id);
+});
+
+it('validates every table\'s column policy before it creates the destination', function (): void {
+    // ⚠️ AN ORDERING ASSERTION, AND THE ORDERING IS THE WHOLE POINT. `assertWithheldColumnsExist()` exists
+    // to stop a credential reaching a file. Run per table inside the write loop — which is where it was
+    // first written — a renamed secret on the 43rd table fires only after the other 42 have been written,
+    // so the "refusal" leaves a directory of real tenant data on disk that somebody now has to remember to
+    // delete. Hoisting it changes nothing about WHETHER it refuses and everything about what refusing costs.
+    //
+    // Driven by dropping a table rather than by renaming a column, because a rename needs DDL this suite
+    // would then have to unwind; both take the same pre-flight path and the same exception class.
+    [$acme] = twoPopulatedTenants();
+
+    DB::statement('drop table if exists global_probes cascade');
+
+    expect(fn () => runExtract($acme, $this->extractDir))->toThrow(TenantExtractException::class);
+    expect(File::isDirectory($this->extractDir))->toBeFalse();
 });
 
 it('writes no manifest when it refuses, so a failed run cannot be mistaken for a small one', function (): void {

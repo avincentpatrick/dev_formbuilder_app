@@ -95,6 +95,18 @@ final class TenantExtractService
         ExtractionGuard::assertContextEstablished($tenantId);
 
         $schema = ExtractSchema::read();
+
+        // `users` LAST, so the reconciliation below has both sides in hand. Nothing else depends on order.
+        $plan = [...$this->tablePlan(), 'users' => ExtractFilter::RlsUserJoin];
+
+        // ⚠️ EVERY TABLE'S COLUMN POLICY IS CHECKED BEFORE THE DESTINATION IS CREATED, and the ordering is
+        // the finding rather than the tidiness. Validated per table inside the loop, a renamed secret on the
+        // 43rd table fires only after the first 42 have been written — leaving a directory of real tenant
+        // data on disk that the operator now has to remember to delete, produced by a run whose whole point
+        // was that it REFUSED. `assertWithheldColumnsExist()` is the guard whose entire value is stopping a
+        // credential reaching a file, so it has to run while there is still no file.
+        $this->assertExtractable($plan, $schema);
+
         $writer->prepare();
 
         $reports = [];
@@ -102,9 +114,6 @@ final class TenantExtractService
         $referencedUsers = [];
         /** @var array<string, true> $extractedUserIds */
         $extractedUserIds = [];
-
-        // `users` LAST, so the reconciliation below has both sides in hand. Nothing else depends on order.
-        $plan = [...$this->tablePlan(), 'users' => ExtractFilter::RlsUserJoin];
 
         foreach ($plan as $table => $filter) {
             $reports[] = $this->extractTable(
@@ -161,6 +170,25 @@ final class TenantExtractService
     }
 
     /**
+     * Refuse the whole run before anything is written, if any planned table is missing from the database or
+     * withholds a column that no longer exists.
+     *
+     * @param  array<string, ExtractFilter>  $plan
+     *
+     * @throws TenantExtractException
+     */
+    private function assertExtractable(array $plan, ExtractSchema $schema): void
+    {
+        foreach (array_keys($plan) as $table) {
+            if (! $schema->has($table)) {
+                throw TenantExtractException::tableAbsent($table);
+            }
+
+            TenantExtractColumns::assertWithheldColumnsExist($table, $schema->columnsOf($table));
+        }
+    }
+
+    /**
      * @param  array<string, array<string, true>>  $referencedUsers
      * @param  array<string, true>  $extractedUserIds
      *
@@ -175,8 +203,9 @@ final class TenantExtractService
         array &$referencedUsers,
         array &$extractedUserIds,
     ): ExtractedTable {
+        // Already validated by assertExtractable() before the destination existed; read here without a
+        // second check rather than re-asserting, so there is exactly one place the refusal can come from.
         $catalogColumns = $schema->columnsOf($table);
-        TenantExtractColumns::assertWithheldColumnsExist($table, $catalogColumns);
 
         $verbatim = TenantExtractColumns::verbatimFor($table, $catalogColumns);
         $transformed = TenantExtractColumns::transformedFor($table);

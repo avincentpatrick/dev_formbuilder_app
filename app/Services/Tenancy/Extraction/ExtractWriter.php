@@ -52,9 +52,20 @@ final class ExtractWriter
             throw new RuntimeException("Could not create the extract directory {$this->directory}.");
         }
 
-        // 0700, not the default 0755. The directory holds one tenant's entire record; on a shared box the
-        // default would make it world-readable, which is a strange way to end a process whose whole subject
-        // is who may see what.
+        // 0700, not the default 0755 — the directory holds one tenant's entire record, and the default
+        // would make it world-readable on a shared box, which is a strange way to end a process whose whole
+        // subject is who may see what.
+        //
+        // ⚠️ AND IT IS A NO-OP ON THE PRODUCTION HOST, WHICH IS WHY THIS IS SPELLED OUT RATHER THAN LEFT AS
+        // A MODE ARGUMENT SOMEBODY WOULD READ AS PROTECTION. ADR-0005 puts production on **Windows Server
+        // 2016**, running PHP natively rather than in a container; there PHP ignores `mkdir()`'s mode
+        // entirely and `chmod()` toggles only the read-only attribute. The directory therefore inherits its
+        // parent's ACL, so **on the production host the containing directory's ACL is the whole of the
+        // access control** — see docs/deployment-infrastructure.md §8b, which tells the operator to place
+        // the destination somewhere already restricted rather than to trust this line.
+        //
+        // The `@` is deliberate: chmod legitimately fails on Windows and on network mounts, and a failure
+        // to tighten permissions that were never loose is not a reason to destroy the artefact.
         @chmod($this->directory, 0o700);
 
         if (! mkdir($tables = $this->directory.'/tables', 0o700) && ! is_dir($tables)) {

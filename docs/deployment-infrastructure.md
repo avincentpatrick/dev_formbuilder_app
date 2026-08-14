@@ -187,11 +187,19 @@ Used for offboarding, an isolation-clause customer, or answering "what exactly d
   the artefact over — it is the list you will be asked about.
 - `not_extracted` states, in the file itself, what was deliberately left out and why.
 
+**⚠️ Choose the destination for its ACL, because the command's own permissions do nothing on this host.**
+The writer asks for `0700`, which is a POSIX control: **on this Windows Server box PHP ignores `mkdir()`'s
+mode and `chmod()` only toggles the read-only attribute**, so the extract directory simply inherits the ACL
+of whatever it is created under. Pass `--path` pointing inside a directory you have already restricted —
+the same location §5 puts database dumps in — rather than accepting the `storage/app/tenant-extracts/`
+default, which inherits the web application's own tree. Confirm with `icacls <path>` before you run it, not
+after.
+
 **⚠️ What the artefact is, for retention purposes.** One workspace's entire record in plaintext — every
 submission answer, every respondent email the forms collected. It carries **no credentials** (ADR-0018 §D3
-withholds them) and the directory is created `0700`, but nothing in the command encrypts, transfers or
-expires it. Treat it as you would a database dump under §5: move it to the same protected location, and
-delete the working copy when the transfer is confirmed. **It is NOT a GDPR subject-access response** — see
+withholds them), but nothing in the command encrypts, transfers or expires it. Treat it as you would a
+database dump under §5: move it to the same protected location, and delete the working copy when the
+transfer is confirmed. **It is NOT a GDPR subject-access response** — see
 `docs/data-privacy-gdpr-compliance.md` §3, which explains why using it as one would over- and
 under-disclose at the same time.
 

@@ -170,11 +170,20 @@ describe('MdsProgress — the colour contract, held in source text', () => {
     });
 
     it('keeps its fill variable unprefixed, so the token gate ignores it', () => {
-        // ⭐ `token-references.test.ts` scans for `var(--mds-...)` and fails on any name that is not a real
-        // token — it never evaluates a fallback, so `var(--mds-progress-fill, 0%)` would red-light the whole
-        // package for a value that is not a token and was never meant to be.
+        // ⭐ `token-references.test.ts` scans every file for prefixed `var()` references and fails on any
+        // name that is not a real token. It never evaluates a fallback, so giving this component's fill
+        // variable the design-system prefix would red-light the whole package for a value that is not a
+        // token and was never meant to be.
+        //
+        // ⚠️ AND THIS COMMENT IS NOT ALLOWED TO SPELL THE PREFIXED NAME, WHICH IS THE THIRD TIME THIS EXACT
+        // DEFECT HAS FIRED IN THIS REPOSITORY AND THE FIRST TIME IN THIS GATE. The first draft explained the
+        // rule by quoting the forbidden spelling — and the scanner found it here, in the sentence warning
+        // against it. That scanner strips BLOCK comments before matching, so the component's own docblock
+        // may discuss it freely; a line comment like this one is scanned as source. gitleaks did the same
+        // thing twice on `PROGRESS_ARCHIVE.md`, where a lesson about a secret-scanner match reproduced the
+        // match. The general rule, stronger than "add a directive": name the thing, never quote it.
         expect(stylesheet).toContain('var(--progress-fill, 0%)');
-        expect(stylesheet).not.toMatch(/--mds-progress-/);
+        expect(stylesheet).not.toMatch(new RegExp(`--${'mds'}-progress-`));
         // Nothing here may ASSIGN an --mds-* property either; those belong to the token build.
         expect(stylesheet.replace(/var\([^)]*\)/g, '')).not.toMatch(/--mds-[\w-]+\s*:/);
     });

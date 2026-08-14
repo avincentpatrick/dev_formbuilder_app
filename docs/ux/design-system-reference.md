@@ -883,6 +883,40 @@ States: entering (`--mds-duration-base`, slide+fade), visible (auto-dismiss afte
 
 **Governing layout rule**: toasts communicate the *outcome* of an action the user just took (or an async event relevant right now); they never carry a primary call-to-action requiring navigation away from the current context (that's a banner or the dashboard's own notification center) — this keeps toasts genuinely ephemeral and prevents them from becoming a dumping ground for anything that "needs to tell the user something."
 
+> **The three of them in one line, because picking wrongly between them is the recurring mistake (J4a):**
+> **Toast** — it happened, and it leaves. **Alert** (§3.7a) — it happened, and it stays where it happened.
+> **Banner** (`MdsBanner`) — it was already true when the page loaded.
+> The consequence that makes this more than taxonomy: a toast is `role="status"` and *disappears*, so a
+> screen-reader user who arrives after it has gone has no way to learn the state at all. Anything that must
+> still be discoverable a minute later is not a toast.
+
+### 3.7a Alerts — and how to tell one from a Banner *(**AS-BUILT since J4a** — `MdsAlert`)*
+
+The in-flow contextual message: something happened, and the page is telling you about it where it happened. `MdsBanner` (§3.7's sibling above) is the other half — a **standing condition** the page is currently in. They are separate components because their accessibility contracts genuinely differ, and the split is enforced by the two APIs rather than by this paragraph.
+
+**Four questions decide it, and each is answered by a prop that exists or does not:**
+
+| | `MdsBanner` | `MdsAlert` |
+|---|---|---|
+| Can it be said in **one line**? | yes — `message: string` is the whole API | no — that is what the default slot is for |
+| Was it **already true** when the page loaded, or did it **just happen**? | already true ⇒ `role="status"`, no opt-out | may have just happened ⇒ `assertive` opt-in |
+| Can the user **dismiss** it while it is still true? | no — hiding a live condition hides a fact | yes — a message about an event is finished once read |
+| Is it **good news**? | no success tone; a "condition" of success is a contradiction | `success` exists |
+
+⚠️ **POSITION IS NOT PART OF THE BOUNDARY, and assuming it is would be the easy mistake.** `SsoStatusCard.vue` already mounts an `MdsBanner` *inside a card*, correctly — it is a standing condition that happens to live in a panel. What separates the two is the nature of the message, never where it sits on the page.
+
+⚠️ **AND NOTHING ABOUT `MdsAlert` WEAKENS §3.7's `role="status"` ARGUMENT FOR BANNER.** That component is deliberately *unable* to be assertive, because an impersonation notice announced before every page heading forever is hostile to the person it most affects. Alert may be assertive precisely because its subject is an event, which is over by the time it is announced.
+
+**The title is a `p`, never a heading.** An alert dropped into an arbitrary page cannot know its own heading level, and a wrong one breaks §4.1's heading-order rule that `MdsFilterBar` already carries a contract about. It is also unnecessary: both `alert` and `status` imply `aria-atomic="true"`, so title and body are announced as one unit and a heading inside a live region buys nothing.
+
+**The component never hides itself.** `dismissible` renders the control and `dismiss` is emitted; the `v-if` stays at the call site, because whether a dismissal should survive a reload, a navigation, or the rest of the session is a page decision every time — the same line `MdsToast` draws.
+
+**`warning` and `danger` share the `alert` glyph, which narrows something and says so.** Banner makes `icon` required precisely so the author chooses; Alert defaults it, because eleven call sites passing the same value is noise. The consequence, stated rather than buried: on those two tones the non-colour channel is the **words**, which is what §3.8/§4.1 actually require — but a page rendering a warning and a danger alert side by side should pass distinct icons. Minting a fifth glyph was rejected: Appendix B refuses additions by rule.
+
+**Tones reuse `--mds-color-status-{info|success|warning|danger}-{bg,fg}` exactly as Banner does**, so `theme-overrides.test.ts`'s existing measurements cover this component in both themes. A hand-picked hex here would be unmeasured by anything.
+
+> **As-built adoption (J4a):** thirteen surfaces. Five admin error banners that were **byte-identical apart from a class name** (`assertive`, because each is a thing that just failed under the operator's hand), and eight that carried **no `role` at all** — `webhooks/Show`, `integrations/RuleShow` ×2, `domains/Index`, `Settings/Sso`, `integrations/Index` ×3. ⚠️ Roughly twenty further hand-rolled notices remain in the app tree and are a recorded backlog row, **not** an oversight: several carry deliberate, individually-argued `role` choices (`Encode.vue` has five, each with its own rationale) and migrating them is a per-site decision rather than a sweep.
+
 ### 3.8 Badges / Status Pills
 
 Small, `--mds-radius-full`, single-line labels communicating a discrete state — submission status (`draft`/`submitted`/`screened_out`/`under_review`/`approved`/`returned`/`archived`, matching the `SubmissionStatus` enum in the Data Dictionary; `screened_out` was added in I9a and is **neutral**, not danger — a settled non-failure, the same rule `wont_fix`/`disabled`/`revoked` follow), form status (`draft`/`published`/`archived`), webhook delivery status, subscription-tier badges, etc. Each status maps to exactly one semantic color pairing (background tint + matching-hue text, e.g., `approved` → `--mds-success-50` background / `--mds-success-700` text; `returned` → `--mds-warning-50` / `--mds-warning-700`\*(text darkened beyond the default warning text token specifically for the small-pill-text-size case — see the contrast note in §4.1); `archived` → `--mds-neutral-100` / `--mds-neutral-600`), and — consistent with the "never color alone" rule threaded through this document — every pill's **text label is the status name itself**, never a bare colored dot.

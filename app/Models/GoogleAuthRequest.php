@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
+use App\Models\Concerns\TenantScoped;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -28,6 +29,15 @@ use Illuminate\Support\Carbon;
  * tidiness one. They are written only after Google's answer has verified, so nothing an anonymous caller
  * supplies can reach a tenant's database or an operator's screen through them.
  *
+ * ⚠️ `implements TenantScoped` IS LOAD-BEARING AND ITS ABSENCE FAILED SILENTLY IN EXACTLY ONE DIRECTION.
+ * {@see BelongsToTenant} adds its read scope unconditionally, but gates the `creating` auto-fill of
+ * `tenant_id` on `$model instanceof TenantScoped` — so a model carrying the trait WITHOUT the interface
+ * reads as though it were tenant-scoped and only its WRITES are broken. This class shipped that way for
+ * one commit: every INSERT left `tenant_id` null and PostgreSQL refused it as an RLS violation (42501)
+ * rather than as a null violation, which points the reader at the policy instead of at the model.
+ * `tests/Unit/Models/TenantScopedContractTest.php` now asserts the pairing across `app/Models` so the next
+ * one fails in milliseconds rather than inside an HTTP round trip.
+ *
  * @property string $id
  * @property string $tenant_id
  * @property string $state_id
@@ -44,7 +54,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $completed_at Stamped by the tenant hop. Its presence makes the handoff single-use.
  * @property ?string $ip_address
  */
-class GoogleAuthRequest extends Model
+class GoogleAuthRequest extends Model implements TenantScoped
 {
     use BelongsToTenant;
     use HasUuidv7;

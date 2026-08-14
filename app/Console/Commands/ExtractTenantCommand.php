@@ -68,9 +68,13 @@ final class ExtractTenantCommand extends Command
         // Domain::unscopedQuery(), never $tenant->domains() or whereHas(): the Domain model carries a
         // tenant-scoping global scope, and this command deliberately runs before any context exists, so the
         // scoped query would match nothing and report the domain as unknown.
-        return $tenant
+        $resolved = $tenant
             ?? Tenant::query()->where('slug', $needle)->first()
             ?? Domain::unscopedQuery()->where('domain', mb_strtolower($needle))->first()?->tenant;
+
+        // The `tenant` relation is typed against stancl's Tenant CONTRACT, not this application's model, so
+        // the narrowing is real rather than a cast to satisfy the analyser.
+        return $resolved instanceof Tenant ? $resolved : null;
     }
 
     private function destination(Tenant $tenant): string

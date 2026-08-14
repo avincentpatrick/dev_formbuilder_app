@@ -6,12 +6,13 @@ namespace App\Services\Tenancy\Extraction;
 
 use App\Enums\ExtractFilter;
 use App\Enums\TenantTableClass;
+use App\Support\Tenancy\TenantExtractColumns;
 
 /**
  * What the extractor did to one table, as reported in the manifest (Phase 4, P2b).
  *
  * The withheld map is carried per table rather than referenced by a pointer to
- * {@see \App\Support\Tenancy\TenantExtractColumns} because the artefact outlives this codebase. Somebody
+ * {@see TenantExtractColumns} because the artefact outlives this codebase. Somebody
  * reading an extract two years from now, on a machine that has never had this repository on it, must be
  * able to answer "what is NOT in this file and why" from the file itself.
  *

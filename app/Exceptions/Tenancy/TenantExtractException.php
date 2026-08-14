@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Tenancy;
 
-use App\Support\Tenancy\TenantExtractColumns;
 use RuntimeException;
 
 /**

@@ -13,6 +13,7 @@ use App\Support\Tenancy\TenantExtractColumns;
 use App\Support\Tenancy\TenantScopedTables;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -84,9 +85,14 @@ final class TenantExtractService
             DB::statement('set transaction isolation level repeatable read');
         }
 
+        // stancl's Tenant contract types the key as `int|string`, so it is narrowed ONCE here rather than
+        // cast at each of the four call sites — the GUC, the read-back, the manifest and every predicate
+        // must all be the same value, and four independent casts is four chances for them not to be.
+        $tenantId = (string) $tenant->id;
+
         ExtractionGuard::assertRlsSubjectRole();
-        TenantContext::applyLocal($tenant->id);
-        ExtractionGuard::assertContextEstablished($tenant->id);
+        TenantContext::applyLocal($tenantId);
+        ExtractionGuard::assertContextEstablished($tenantId);
 
         $schema = ExtractSchema::read();
         $writer->prepare();
@@ -102,15 +108,15 @@ final class TenantExtractService
 
         foreach ($plan as $table => $filter) {
             $reports[] = $this->extractTable(
-                $table, $filter, $tenant, $schema, $writer, $referencedUsers, $extractedUserIds
+                $table, $filter, $tenantId, $schema, $writer, $referencedUsers, $extractedUserIds
             );
         }
 
         $manifest = new ExtractManifest(
             tenant: [
-                'id' => $tenant->id,
-                'slug' => $tenant->slug,
-                'name' => $tenant->name,
+                'id' => $tenantId,
+                'slug' => (string) $tenant->slug,
+                'name' => (string) $tenant->name,
             ],
             generatedAt: CarbonImmutable::now()->toIso8601String(),
             snapshot: $this->snapshot(),
@@ -163,7 +169,7 @@ final class TenantExtractService
     private function extractTable(
         string $table,
         ExtractFilter $filter,
-        Tenant $tenant,
+        string $tenantId,
         ExtractSchema $schema,
         ExtractWriter $writer,
         array &$referencedUsers,
@@ -189,7 +195,7 @@ final class TenantExtractService
         $writer->openTable($table);
         $rows = 0;
 
-        $query = $this->query($table, $filter, $tenant, $schema, $verbatim, $transformed);
+        $query = $this->query($table, $filter, $tenantId, $schema, $verbatim, $transformed);
         $primaryKey = $schema->primaryKeyOf($table);
 
         // ⚠️ NOT `->cursor()`, WHICH WOULD BOUND NOTHING HERE. `pdo_pgsql` buffers a whole result set in
@@ -235,25 +241,29 @@ final class TenantExtractService
 
     /**
      * @param  list<string>  $verbatim
-     * @param  array<string, array{sql: string, type: string}>  $transformed
+     * @param  array<string, array{sql: literal-string, type: string}>  $transformed
      */
     private function query(
         string $table,
         ExtractFilter $filter,
-        Tenant $tenant,
+        string $tenantId,
         ExtractSchema $schema,
         array $verbatim,
         array $transformed,
     ): Builder {
-        $grammar = DB::connection()->getQueryGrammar();
+        // ->select() rather than ->selectRaw(): the verbatim names then go through the grammar's own
+        // wrapping instead of a hand-rolled implode, so the ONLY raw SQL in this class is the transformed
+        // expressions — and each of those is a `literal-string` constant in TenantExtractColumns, alias
+        // included, so nothing is concatenated here at all. That is what makes "where is the raw SQL"
+        // answerable by reading one constant.
+        /** @var list<string|Expression<literal-string>> $columns */
+        $columns = [...$verbatim];
 
-        $selects = array_map(static fn (string $c): string => $grammar->wrap($c), $verbatim);
-
-        foreach ($transformed as $column => $spec) {
-            $selects[] = $spec['sql'].' as '.$grammar->wrap($column);
+        foreach ($transformed as $spec) {
+            $columns[] = new Expression($spec['sql']);
         }
 
-        $query = DB::table($table)->selectRaw(implode(', ', $selects));
+        $query = DB::table($table)->select($columns);
 
         // ⚠️ The predicate on the widened six is what makes the platform catalog stay behind, and the
         // predicate on `domains`/`tenants` is the ONLY isolation those two have. Only ExtractFilter::Rls
@@ -261,7 +271,7 @@ final class TenantExtractService
         match ($filter) {
             ExtractFilter::RlsAndPredicate, ExtractFilter::PredicateOnly => $query->where(
                 $table === 'tenants' ? 'id' : 'tenant_id',
-                $tenant->id
+                $tenantId
             ),
             ExtractFilter::Rls, ExtractFilter::RlsUserJoin => null,
         };

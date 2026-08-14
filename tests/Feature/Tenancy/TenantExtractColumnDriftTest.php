@@ -181,6 +181,20 @@ it('withholds every transformed column from the verbatim select list', function 
     }
 });
 
+it('aliases every transformed expression to the column key it is stored under', function (): void {
+    // ⚠️ SILENT IF IT DRIFTS. The encoder looks a transformed column's type up by the ARRAY KEY, so an
+    // expression aliased to anything else produces a result column the encoder has never heard of: it
+    // falls through to the `text` default, the GeoJSON arrives as a JSON-encoded string instead of an
+    // object, and the artefact is well-formed and subtly wrong. The alias lives inside the SQL — rather
+    // than being concatenated on at query time — so that every byte of raw SQL sits in one readable
+    // constant; this assertion is the cost of that.
+    foreach (TenantExtractColumns::TRANSFORMED as $table => $columns) {
+        foreach ($columns as $column => $spec) {
+            expect($spec['sql'])->toEndWith(' as "'.$column.'"', "{$table}.{$column} aliases to something else");
+        }
+    }
+});
+
 it('withholds every credential column on users', function (): void {
     // Named individually rather than counted, because a count passes when one is swapped for another.
     // These five are the ones that authenticate a CENTRAL identity — ADR-0017 Context §2: one human, one

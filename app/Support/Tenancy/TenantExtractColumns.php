@@ -138,7 +138,13 @@ final class TenantExtractColumns
      * result type is not in `information_schema` and guessing it from the value is how a string that
      * happens to parse as JSON becomes an object.
      *
-     * @var array<string, array<string, array{sql: string, type: string}>>
+     * ⚠️ `sql` CARRIES ITS OWN ALIAS and must alias to the array key, which `TenantExtractColumnDriftTest`
+     * asserts. Two reasons, and the second is the real one: the encoder looks the result column up by that
+     * key, so a mismatch silently drops the transform's type coercion; and a `literal-string` here is what
+     * lets the expression reach the query builder without a runtime concatenation, which keeps every byte
+     * of raw SQL in this constant where it can be read, rather than assembled somewhere it cannot.
+     *
+     * @var array<string, array<string, array{sql: literal-string, type: string}>>
      */
     public const array TRANSFORMED = [
         'submission_geo_index' => [
@@ -146,7 +152,7 @@ final class TenantExtractColumns
             // completely unreadable. An extract exists to be read somewhere that is not this application, so
             // the interchange format wins over the storage format. ST_AsGeoJSON is lossless for the 2D
             // geometries this column holds and is what ADR-0006 §3.1 already treats as the wire shape.
-            'geom' => ['sql' => 'st_asgeojson(geom)', 'type' => 'jsonb'],
+            'geom' => ['sql' => 'st_asgeojson(geom) as "geom"', 'type' => 'jsonb'],
         ],
     ];
 
@@ -197,7 +203,7 @@ final class TenantExtractColumns
         return self::WITHHELD[$table] ?? [];
     }
 
-    /** @return array<string, array{sql: string, type: string}> */
+    /** @return array<string, array{sql: literal-string, type: string}> */
     public static function transformedFor(string $table): array
     {
         return self::TRANSFORMED[$table] ?? [];

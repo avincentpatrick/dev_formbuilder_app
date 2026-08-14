@@ -6,6 +6,7 @@ namespace App\Services\Tenancy\Extraction;
 
 use App\Exceptions\Tenancy\TenantExtractException;
 use App\Support\Tenancy\TenantExtractColumns;
+use App\Support\Tenancy\TenantScopedTables;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * All three questions are answered from the CATALOG rather than from a constant, and that split is
  * deliberate: shape is a fact and belongs to the database, while *policy over* that shape — which columns
  * may leave, which tables are the tenant's — is a decision and lives in {@see TenantExtractColumns} and
- * {@see \App\Support\Tenancy\TenantScopedTables}. Deriving a decision from the catalog is the mistake
+ * {@see TenantScopedTables}. Deriving a decision from the catalog is the mistake
  * ADR-0017 §D3 rejected by name; deriving a fact from it is the only correct source.
  *
  * ⚠️ Read on the same connection the extraction runs on. `information_schema` is filtered by what the

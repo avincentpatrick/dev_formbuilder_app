@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\TenantUser;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -82,7 +83,7 @@ it('warns on the console when the extract has references it could not resolve', 
 
     // The owner authored the form and is an ACTIVE member, so nothing dangles yet. Suspending the
     // membership is what takes them out of the `users` policy while leaving every row they wrote behind.
-    \App\Models\TenantUser::query()->where('user_id', $owner->id)->update(['status' => 'suspended']);
+    TenantUser::query()->where('user_id', $owner->id)->update(['status' => 'suspended']);
 
     $this->artisan('tenants:extract', ['tenant' => 'acme', '--path' => $this->dir])
         ->expectsOutputToContain('are NOT in this extract')

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Tenancy\Extraction;
 
+use App\Support\Tenancy\ExtractionGuard;
+
 /**
  * Turns one `pdo_pgsql` row into one JSON object (Phase 4, P2b — ADR-0018 §D5).
  *
@@ -17,7 +19,7 @@ namespace App\Services\Tenancy\Extraction;
  *
  * Native prepared statements carry the column's type OID, so the driver converts. The `'t'`/`'f'` folklore
  * is true only under EMULATED prepares, which is a connection option and not a law. Three other places in
- * this repo cast `::int` in SQL on the strength of it — {@see \App\Support\Tenancy\ExtractionGuard},
+ * this repo cast `::int` in SQL on the strength of it — {@see ExtractionGuard},
  * `TenantTableClassificationDriftTest`, `CrossTenantIsolationTest`. Those casts stay correct either way
  * (casting an int to an int is free); only their stated reason is stale.
  *

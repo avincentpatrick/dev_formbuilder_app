@@ -422,6 +422,36 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('saml-step-up', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('samlstepup:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
+        // First-party Google sign-in (J3c2 / ADR-0017). All three endpoints are unauthenticated by
+        // necessity — a sign-in has no session yet — so, as with SAML, there is no user and no tenant claim
+        // in the request worth keying on.
+        //
+        // ⚠️ KEYED ON IP **AND HOST**, THE SAML ARGUMENT UNCHANGED: a workspace behind a corporate NAT must
+        // not be able to exhaust another workspace's budget from the same egress address. The host half is
+        // attacker-chosen, which is why the IP half stays.
+        //
+        // ⚠️ THREE BUCKETS, NEVER ONE SHARED "google". A completed sign-in costs exactly one hit of each, so
+        // a shared bucket would silently enforce a third of whatever ceiling an operator set — the
+        // `guest-challenge` lesson, which cost a documented 30/min becoming 15/min.
+        //
+        // The mint is the tightest at 20/minute because it is the only one that WRITES a row per hit, and
+        // `google_auth_requests` is bounded on the write path precisely because this endpoint is open to
+        // anyone. The callback and the completion hop sit at 60 for the SAML reason: they are reached by
+        // every member of a workspace, and a limit that locks out a legitimate workforce is an outage with
+        // a security-shaped justification. Note the callback's real cost is an outbound HTTPS round trip to
+        // Google, so its ceiling also bounds what an anonymous caller can make this server spend.
+        $googleKey = static fn (string $bucket, Request $request): string => $bucket.':'
+            .$request->ip().':'.$request->getHost();
+
+        RateLimiter::for('google-auth', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by($googleKey('gauth', $request)));
+
+        RateLimiter::for('google-auth-callback', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($googleKey('gauthcb', $request)));
+
+        RateLimiter::for('google-auth-complete', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($googleKey('gauthdone', $request)));
+
         // OpenAPI 3.1 security scheme (Increment E). Scramble is a dev dependency; guard so a production
         // (`--no-dev`) install never touches its classes. The bearer scheme documents the Sanctum
         // personal-access-token auth used by the /api/v1 surface (api-specification.md §2.6 / §3).

@@ -33,6 +33,7 @@ use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
 use App\Http\Middleware\RequireRecentPassword;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Auth\InvalidGoogleAuthStateException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -82,6 +83,13 @@ return Application::configure(basePath: dirname(__DIR__))
             // `web`: a third-party GET from a consent screen carries no session and no CSRF token, and the
             // signed `state` parameter is the CSRF control (ADR-0009 §D3). The group declares its own stack.
             Route::group([], base_path('routes/connectors.php'));
+            // First-party Google sign-in (J3c2 / ADR-0017) — the mint and the callback. Loaded here rather
+            // than in routes/tenant.php because BOTH must also serve the central host, and that file
+            // declares no ->domain(). ⚠️ Loaded BEFORE TenancyServiceProvider::mapRoutes(), which runs in
+            // booted(): a same-URI route in routes/tenant.php would therefore be dead rather than
+            // conflicting, which is why the completion hop there uses a path these two do not.
+            // The group declares its own stack — Fortify's, not the connector one; see the file.
+            Route::group([], base_path('routes/google-auth.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -441,6 +449,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (InvalidConnectorStateException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(400, 'invalid_connector_state', $e->getMessage())
             : redirect()->away((string) config('app.url')));
+
+        // First-party Google sign-in `state` failures (J3c2 / ADR-0017 §D6). Thrown by
+        // EstablishGoogleAuthContext BEFORE any tenant context is set, so a forged/tampered/expired state
+        // never engages RLS. Same posture as the connector renderer above and one deliberate difference:
+        // it lands on `/login?google=failed` rather than the bare app URL, because unlike a connector
+        // callback this IS a sign-in and the person is mid-flow. The tenant host is NOT named — we could
+        // not verify which workspace this was, and naming one would disclose whether it exists. The closed
+        // `?google=failed` value is §D9's single indistinguishable outcome; nothing is echoed.
+        $exceptions->render(fn (InvalidGoogleAuthStateException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(400, 'invalid_google_auth_state', $e->getMessage())
+            : redirect()->away(rtrim((string) config('app.url'), '/').'/login?google=failed'));
 
         // A provider key with no configured adapter (H15a) — an unknown URL, not a server fault. 404 keeps
         // the non-disclosure posture the rest of the surface uses for "this does not exist".

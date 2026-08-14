@@ -7,27 +7,38 @@ namespace App\Services\Tenancy\Extraction;
 /**
  * Turns one `pdo_pgsql` row into one JSON object (Phase 4, P2b — ADR-0018 §D5).
  *
- * ── THE TWO COERCIONS THAT EXIST, AND WHY EVERYTHING ELSE STAYS A STRING ────────────────────────────────
- * `pdo_pgsql` hands back almost every value as a PHP string. Two of those strings are actively wrong if
- * written straight into JSON:
+ * ── WHAT THE DRIVER ACTUALLY RETURNS, MEASURED RATHER THAN RECALLED ─────────────────────────────────────
+ * ⚠️ THIS REPOSITORY HAS BELIEVED SINCE PHASE 0 THAT `pdo_pgsql` RETURNS BOOLEANS AS THE STRINGS `'t'` /
+ * `'f'`, AND ON THIS STACK IT DOES NOT. Measured on PHP 8.4.24 / pdo_pgsql 8.4.24 with Laravel's default
+ * `ATTR_EMULATE_PREPARES = false`:
  *
- *   - **`boolean` arrives as `'t'` / `'f'`**, and `(bool) 'f'` is TRUE. This is the same inversion
- *     {@see \App\Support\Tenancy\ExtractionGuard::assertRlsSubjectRole()} casts around in SQL and
- *     `TenantTableClassificationDriftTest` casts around in its assertions. Written verbatim, every boolean
- *     in the artefact would be the string "f", which a destination that trusts JSON types reads as truthy.
- *   - **`json` / `jsonb` arrive as encoded text**, so writing them verbatim nests a JSON document inside a
- *     JSON string and the reader has to know to decode twice. `submissions`' answers, `forms`' schema
- *     snapshot and `plans`' feature flags are all this shape — the substance of the extract, not an edge.
+ *   `boolean` → PHP bool · `smallint`/`integer`/`bigint` → PHP int · `double precision` → PHP float
+ *   `numeric` → **string** (`'1.50'`) · `json`/`jsonb` → **string** · every timestamp → **string**
  *
- * **Numerics deliberately stay strings.** `numeric`, `bigint` and `integer` are left exactly as PostgreSQL
- * rendered them. Casting them would be lossless for `integer` and lossy for `numeric` — PHP floats cannot
- * hold arbitrary precision, and a JSON number cannot express the difference between `1.50` and `1.5`,
- * which for a `numeric` column is a difference the database was storing on purpose. A reader that wants a
- * number can parse one; a reader handed a rounded float has no way back.
+ * Native prepared statements carry the column's type OID, so the driver converts. The `'t'`/`'f'` folklore
+ * is true only under EMULATED prepares, which is a connection option and not a law. Three other places in
+ * this repo cast `::int` in SQL on the strength of it — {@see \App\Support\Tenancy\ExtractionGuard},
+ * `TenantTableClassificationDriftTest`, `CrossTenantIsolationTest`. Those casts stay correct either way
+ * (casting an int to an int is free); only their stated reason is stale.
  *
- * Timestamps likewise stay in PostgreSQL's own rendering rather than being reformatted into ISO-8601 by
- * PHP: `timestamptz` already comes back with an offset, and re-formatting through Carbon would silently
- * apply the application timezone to a `timestamp without time zone`.
+ * ── SO WHY THE BOOLEAN BRANCH IS STILL HERE ─────────────────────────────────────────────────────────────
+ * Because the behaviour above is a property of a CONFIGURATION, not of PostgreSQL. Flip
+ * `ATTR_EMULATE_PREPARES` — which a `options` override in `config/database.php` can do in one line — and
+ * every boolean in every artefact silently becomes the string `"f"`, which a destination that trusts JSON
+ * types reads as TRUTHY. Every `is_pii`, `allow_guest_submissions` and `is_active` flag would arrive
+ * inverted, with nothing failing anywhere. The branch costs one comparison and closes that. `DriverTypeMappingTest`
+ * pins the measured behaviour above so a stack change is loud rather than silent.
+ *
+ * **`json` / `jsonb` are the load-bearing coercion**, and that one is live today: written verbatim they
+ * nest an encoded document inside a JSON string and the reader has to know to decode twice. `submissions`'
+ * answers and `form_versions`' schema snapshot are both this shape — the substance of the extract.
+ *
+ * **`numeric` is left as the string the driver gives**, and that is worth keeping rather than "fixing":
+ * PHP floats cannot hold arbitrary precision, and a JSON number cannot express the difference between
+ * `1.50` and `1.5`, which for a `numeric` column is a difference the database was storing on purpose.
+ * Timestamps likewise stay in PostgreSQL's own rendering — `timestamptz` already carries an offset, and
+ * re-formatting through Carbon would silently apply the application timezone to a `timestamp without time
+ * zone`.
  */
 final readonly class ExtractRowEncoder
 {

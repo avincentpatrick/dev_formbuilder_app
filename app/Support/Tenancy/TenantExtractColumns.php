@@ -86,7 +86,9 @@ final class TenantExtractColumns
         'submissions' => [
             'guest_token' => 'A live resume credential: it is the entire authentication for an in-flight guest '
                 .'draft, so anyone holding the extract could open and alter a response that has not been submitted.',
-            'search_vector' => 'Derived tsvector, as `forms.search_vector` above.',
+            'search_vector' => 'A derived tsvector maintained by trigger from the submission\'s own columns, '
+                .'as `forms.search_vector`. Not portable across PostgreSQL text-search configurations, and '
+                .'rebuilt by reindexing at any destination that wants one.',
         ],
         'tenant_users' => [
             'invite_token' => 'A live credential. An outstanding invitation is accepted by presenting this value, '
@@ -97,7 +99,8 @@ final class TenantExtractColumns
                 .'platform\'s identities are CENTRAL (ADR-0017 Context §2) — one human, one password, N workspaces. '
                 .'An extract handed to one tenant would therefore carry material for an identity that is still '
                 .'active in workspaces that tenant has nothing to do with.',
-            'remember_token' => 'A live session credential, for the same central identity.',
+            'remember_token' => 'A live session credential: presenting it authenticates as this person with '
+                .'no password and no second factor, on the same central identity as above.',
             'two_factor_secret' => 'The TOTP seed. Anyone holding it can generate the person\'s second factor '
                 .'indefinitely, which is strictly worse than holding the password.',
             'two_factor_recovery_codes' => 'Single-use second-factor bypasses for the same central identity.',
@@ -111,7 +114,9 @@ final class TenantExtractColumns
                 .'to withhold.',
             'tos_accepted_at' => 'The person\'s contractual relationship with the platform operator, not with '
                 .'this tenant.',
-            'privacy_policy_accepted_at' => 'As `tos_accepted_at`.',
+            'privacy_policy_accepted_at' => 'As `tos_accepted_at`: the timestamp records acceptance of THIS '
+                .'INSTALLATION\'S privacy policy, which is an agreement between the person and the platform '
+                .'operator. A tenant is not a party to it and cannot rely on it for their own consent record.',
         ],
         'webhook_endpoints' => [
             'secret' => 'The live HMAC signing secret. A reader holding it can forge a delivery that the tenant\'s '

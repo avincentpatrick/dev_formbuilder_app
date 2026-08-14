@@ -23,7 +23,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * ⚠️ BOTH COLUMNS MUST BE LISTED IN {@see Tenant::getCustomColumns()}. stancl treats any attribute not on
  * that whitelist as a virtual `data` json key: maintenance mode would appear to save, read back null, and
- * simply never apply — with a green write path the whole way. TenantCustomColumnsTest pins it.
+ * simply never apply — with a green write path the whole way. `TenantMaintenanceColumnsTest` pins these two
+ * columns and `TenantColumnWhitelistTest` pins the whole list by set equality; this line cited
+ * `TenantCustomColumnsTest` until P2a, which is a file that has never existed.
  *
  * `tenants` is the RLS-EXEMPT discriminator table and stays exempt; this is alter-only, so it is outside
  * scripts/migration-lint.php's scope (which keys on Schema::create) regardless.

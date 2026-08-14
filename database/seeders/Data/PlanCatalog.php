@@ -131,7 +131,12 @@ final class PlanCatalog
             self::tier(
                 PlanTier::Enterprise,
                 'Enterprise',
-                'SSO, dedicated tenancy, and data residency. Activates in Phase 4.',
+                // ⚠️ THIS STRING IS SEEDED INTO `plans.description` AND RENDERED. It read "SSO, dedicated
+                // tenancy, and data residency. Activates in Phase 4." — a sentence that was forward-looking
+                // when written, went half-true when SSO shipped (P1a–P1c), and named two capabilities that
+                // do not exist and have no mechanism (ADR-0017). Copy in a seeder is re-asserted on every
+                // `db:seed` and pinned by nothing that checks whether it is true.
+                'Single sign-on (SAML), unlimited usage, and negotiated terms.',
                 sort: 4,
                 active: false,
                 enabled: $enterprise,

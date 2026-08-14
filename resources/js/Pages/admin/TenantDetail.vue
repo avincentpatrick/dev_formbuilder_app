@@ -139,6 +139,10 @@ const REASON_COPY: Record<string, string> = {
     tenant_disabled: 'Switched off by the workspace in Settings → Modules',
     legacy_override: 'Grandfathered (ADR-0008 §D5)',
     unavailable: 'Granted by the plan but not in effect',
+    // P2a / ADR-0017 §D5. Sold, not built: the plan may include it and no mechanism delivers it. Until
+    // this row existed the table showed these keys as in effect, because the entitlement flag resolves
+    // true and nothing downstream knew the difference between an entitlement and an arrangement.
+    not_provisioned: 'Included in the plan; not provisioned — no mechanism exists yet (ADR-0017)',
 };
 
 const domainColumns: DataTableColumn[] = [

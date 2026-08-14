@@ -27,8 +27,20 @@ require __DIR__.'/../vendor/autoload.php';
 
 /**
  * Tables that legitimately carry (or resemble) a tenant discriminator yet are intentionally NOT
- * RLS-protected (ADR-0002 §D1). None of these declare a bare `tenant_id`; listed for clarity and so
- * the rule is explicit rather than implicit.
+ * RLS-protected (ADR-0002 §D1); listed for clarity and so the rule is explicit rather than implicit.
+ *
+ * ⚠️ THIS BLOCK USED TO CLAIM "None of these declare a bare `tenant_id`", AND THAT WAS FALSE.
+ * `domains` declares `tenant_id` NOT NULL and has `relrowsecurity = false` with zero policies — which is
+ * correct and deliberate (it is the table read to decide WHICH TENANT a request is, so scoping it by
+ * tenant would be circular), but it is exactly the case the sentence denied existed. Corrected by P2a,
+ * which found it by sweeping the catalog rather than by re-reading this file.
+ *
+ * The consequence is worth stating where the exemption lives: any future code that reasons "carries
+ * `tenant_id`, therefore RLS is filtering it" is wrong about `domains` specifically, and would read every
+ * tenant's hostnames. `App\Support\Tenancy\TenantScopedTables` holds that distinction as data, and
+ * `TenantTableClassificationDriftTest` fails if this list and the database ever disagree.
+ * (Named in backticks rather than `{@see}` on purpose: this is a standalone script, and Pint's
+ * fully_qualified_strict_types fixer turns a `{@see}` here into a real `use` import of an app class.)
  */
 const EXEMPT_TABLES = [
     'tenants',              // the central discriminator table itself

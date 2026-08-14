@@ -139,6 +139,39 @@ seriously while refusing to widen either the session cookie's scope or the meani
   > **Revisit trigger:** `routes/tenant.php` ever gaining a `->domain()`, which would make the collision
   > argument above obsolete and the tenant placement viable again.
 
+  > **⚠⚠ D6b — THE SIGNED STATE IS NOT A CSRF CONTROL ON ITS OWN, AND ADR-0009 §D3's WORDING MISLED THIS
+  > INCREMENT.** §D3 calls the signed `state` "the CSRF control". An HMAC over server-chosen data proves
+  > **we minted the token**; it proves nothing about who is holding it, which is a statement about
+  > provenance reading like one about origin. RFC 6749 §10.12 asks for the missing half explicitly: the
+  > `state` must be bound to the user agent's authenticated state.
+  >
+  > ⚠️ **The connector flow does not supply that binding either, and an early draft of this note wrongly
+  > said it did.** Its `uid` claim names the member a connection is *attributed* to, and its callback lands
+  > on a host that never sees the tenant session — it could not compare a cookie if it wanted to. So this
+  > is not a protection J3c2 dropped; it is one the family never had, and a sign-in is the first flow where
+  > its absence is exploitable. The precedent that DOES bind is `SsoStepUpCompletionController`, which
+  > compares the request's `user_id` against the person actually signed in on the host it completes on —
+  > the same shape, on the same kind of same-site hop.
+  >
+  > The consequence was live OAuth login-CSRF: an attacker obtains an authorization `code` without
+  > spending it, sends a victim the callback URL, and the victim's browser is signed in **as the
+  > attacker**, where everything they subsequently do lands in the attacker's account. The tenant arm was
+  > the same attack against the handoff URL, which any browser would redeem.
+  >
+  > **Decision: bind the flow to the browser with a session key, `google.flow_sid`, holding the
+  > `state_id` of the flow this browser started.** It is compared at the central callback and at the
+  > tenant completion hop — the two places that create a session — and both are same-host with their own
+  > mint, which is why no cross-host cookie is needed and the token format does not change. It compares
+  > the flow's own id rather than merely requiring some value, because an attacker who can lure the victim
+  > through `/auth/google/redirect` first would otherwise have given them a binding.
+  >
+  > **Accepted cost:** one in-flight Google sign-in per browser — a second press overwrites the key and
+  > strands the first. That is the correct behaviour for a sign-in and costs nothing real. **The key is
+  > deliberately NOT cleared on success**: single-use already belongs to `completed_at`, and clearing it
+  > would make a replay refuse as "unbound" rather than as "already redeemed", hiding which control fired.
+  > **Revisit trigger:** any future arm where the mint and the session-creating hop are on different
+  > hosts, which would need a real cross-host nonce instead.
+
 - **D7 — The handoff back to the tenant host is a hashed, 60-second, single-use DB row.** This is the leg
   §D3's revisit trigger fires against, because it is the one that creates a session. `google_auth_requests`
   stores the SHA-256 of a token that travels in a URL (the `impersonation_tokens` precedent), and
@@ -162,6 +195,18 @@ seriously while refusing to widen either the session cookie's scope or the meani
   orphaned `users` row survives. **Stated consequence:** on a default workspace (`invite_only` is
   fail-closed TRUE) Google works for existing members and invited people only, and a stranger is refused.
   That is correct, and it is not a bug report.
+
+  > **⚠ D8a — "AND INVITED PEOPLE" IS NARROWER THAN IT SOUNDS, AND THIS SENTENCE OVERSTATED IT.** An
+  > invitation to an address with no account creates a PLACEHOLDER `users` row with `email_verified_at`
+  > NULL (`TenantMembershipService::resolveOrCreateUser()`); only `InvitationController` stamps it, and
+  > only once the person accepts with a password. So a brand-new invitee who presses "Continue with
+  > Google" instead is refused by §D4's verified-account condition — correctly, and by the decision of
+  > record — which means the Invited arm of §D20 is reachable only for somebody who ALREADY had a verified
+  > account. The invitation link itself still works, so nobody is locked out; what is false is the implied
+  > parity. **Not changed here**, because widening §D4 to trust an unverified placeholder is exactly the
+  > takeover it exists to prevent. **Revisit trigger:** a decision to treat "arrived via an invite token"
+  > as its own proof of address ownership, which would make the placeholder verifiable without weakening
+  > §D4 for anyone else. Found by an adversarial review after CI was green.
 
 - **D9 — One indistinguishable bounce, to the log, never to `audits`.** Every refusal — unknown handoff,
   expired, replayed, wrong tenant, unverified email, suspended member, registration closed, quota full —

@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The three writes of one Google sign-in (Increment J3c2, ADR-0017 §D7) — {@see SsoAuthRequestService}'s
@@ -95,7 +97,20 @@ final class GoogleAuthRequestService
                     'ip_address' => $ip,
                 ]);
 
-                $this->trim($now);
+                // ⚠️ ISOLATED, AND FOR THE REASON `SsoAuthFailureRecorder::record()` ISOLATES ITS OWN TRIM:
+                // a housekeeping DELETE must never decide the fate of the write it accompanies. Without
+                // this, a lock wait or statement timeout inside the DELETE aborts the enclosing
+                // transaction, discards the row just inserted, AND makes the `finally` below fail with
+                // 25P02 ("current transaction is aborted") — which then REPLACES the original exception on
+                // its way out, so the operator is told the transaction was aborted and never which
+                // statement aborted it. A 500 here would also be distinguishable from ADR-0017 §D9's
+                // single indistinguishable bounce. Swallowing is normally a smell; here the alternative is
+                // letting a bound decide the availability of the endpoint it exists to protect.
+                try {
+                    $this->trim($now);
+                } catch (Throwable $error) {
+                    Log::warning('auth.google.mint.trim_failed', ['error' => $error->getMessage()]);
+                }
             } finally {
                 TenantContext::applyLocal($savedTenant, $savedUser);
             }
@@ -189,7 +204,25 @@ final class GoogleAuthRequestService
      * at exactly the volume it exists for. `ORDER BY issued_at DESC, id DESC` makes the ordering total (the
      * id is a UUIDv7, so it is itself time-ordered), and the subquery then names exactly N rows.
      *
-     * The row just inserted is the newest and is never its own casualty.
+     * ── ⚠️⚠️ AND IT ONLY EVER DELETES A ROW THAT IS ALREADY DEAD, WHICH THE PORTED VERSION DID NOT ──────
+     * This began as a faithful copy of `SsoAuthFailureRecorder::trim()`, and the two tables are opposites:
+     * that one holds finished LOG rows, while this one holds the LIVE state of every in-flight sign-in.
+     * A purely rank-based cap therefore evicted rows that were still redeemable, which is an
+     * **unauthenticated denial of authentication for a whole workspace**: while one person sits on Google's
+     * consent screen for up to ten minutes, anyone at all can mint enough rows for that tenant to push
+     * theirs past the cap — `throttle:google-auth` allows 20/min per (IP, host), so a handful of source
+     * addresses clears 500 inside that window. Their row vanishes, `attach()` matches nothing, and they are
+     * bounced with `state_replayed` logged, pointing the operator at replay rather than at eviction.
+     *
+     * So the liveness predicate below is the outer AND, and the cap/retention only choose among what is
+     * already spent. **Stated consequence, because it is a real change to what the bound promises:** the
+     * table is no longer hard-capped at N rows. It is capped at N *dead* rows plus however many LIVE ones
+     * the rate limiter admits inside one state TTL — which is the honest division of labour, because
+     * bounding concurrent live sign-ins is a rate-limiting question and deleting somebody's in-flight
+     * session is not an acceptable way to answer it.
+     *
+     * The row just inserted is live, so it can never be its own casualty — now by predicate rather than by
+     * happening to sort first.
      */
     private function trim(Carbon $now): void
     {
@@ -197,6 +230,17 @@ final class GoogleAuthRequestService
         $cutoff = $now->copy()->subDays((int) config('google-auth.requests.retention_days'));
 
         GoogleAuthRequest::query()
+            // DEAD = redeemed, or past the window in which it could still be used. A row with a handoff
+            // stays alive until `handoff_expires_at`; one that never got that far dies at `expires_at`.
+            ->where(function (Builder $dead) use ($now): void {
+                $dead->whereNotNull('completed_at')
+                    ->orWhere(function (Builder $stale) use ($now): void {
+                        $stale->whereNull('handoff_hash')->where('expires_at', '<', $now);
+                    })
+                    ->orWhere(function (Builder $handed) use ($now): void {
+                        $handed->whereNotNull('handoff_hash')->where('handoff_expires_at', '<', $now);
+                    });
+            })
             ->where(function (Builder $query) use ($cutoff, $cap): void {
                 $query->where('issued_at', '<', $cutoff)
                     ->orWhereNotIn('id', function (QueryBuilder $newest) use ($cap): void {

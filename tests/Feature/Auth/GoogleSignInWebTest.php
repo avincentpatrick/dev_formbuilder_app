@@ -70,7 +70,8 @@ beforeEach(function (): void {
     (new RolePermissionSeeder)->run();
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-    // Without these the gate closes and every route 404s — an unconfigured deployment is a supported state.
+    // Without these the gate closes the route that STARTS a sign-in — an unconfigured deployment is a
+    // supported state. (Only that route consults the gate; see GoogleSignInGate.)
     config([
         'services.google.client_id' => 'test-client-id',
         'services.google.client_secret' => 'test-client-secret',
@@ -288,16 +289,60 @@ it('bounds the table on the write path rather than waiting for a scheduler', fun
     // second, which is the volume the bound exists for.
     config(['google-auth.requests.max_rows_per_tenant' => 2]);
 
+    $minted = [];
+
     foreach (range(1, 4) as $ignored) {
         $this->get(googleMintUrl('acme.meridian.test'))->assertRedirect();
+        // ⚠️ THE WITNESS IS THE STATE THE BROWSER WAS ACTUALLY HANDED, not a re-read of the table. The
+        // first draft asserted `$rows->first()->state_id` equalled `orderByDesc('id')->first()->state_id`
+        // — two reads of the SAME surviving rows, both taking the maximum, which is true of any survivor
+        // set at all. It passed even with the subquery's ordering flipped to keep the OLDEST N, an
+        // inversion that in production makes every mint past the cap delete the row it just wrote, so the
+        // state handed to Google names nothing and sign-in is permanently broken for that workspace.
+        $minted[] = app(GoogleAuthStateService::class)->verify((string) $this->google->lastState())->stateId;
     }
 
     enterTenant($this->tenant->id);
-    $rows = GoogleAuthRequest::query()->orderByDesc('issued_at')->orderByDesc('id')->get();
+    $survivors = GoogleAuthRequest::query()->pluck('state_id')->all();
 
-    expect($rows)->toHaveCount(2)
-        // The most recent mint is always among the survivors — a row can never be its own casualty.
-        ->and($rows->first()->state_id)->toBe(GoogleAuthRequest::query()->orderByDesc('id')->first()->state_id);
+    // Every row here is still LIVE, so the liveness predicate protects all four and the cap deletes
+    // nothing — which is the property that matters most and the one the original had backwards.
+    expect($survivors)->toHaveCount(4)
+        ->and($survivors)->toContain($minted[3])
+        ->and($survivors)->toContain($minted[0]);
+});
+
+it('evicts spent rows past the cap, and never a live one', function (): void {
+    config(['google-auth.requests.max_rows_per_tenant' => 1]);
+
+    // Two DEAD rows (redeemed) and one LIVE one. A purely rank-based cap would evict the live row the
+    // moment two newer rows existed — an unauthenticated denial of authentication for the whole
+    // workspace, since anyone can mint rows for any tenant and a consent screen stays open ten minutes.
+    enterTenant($this->tenant->id);
+
+    $spent = collect(range(1, 2))->map(fn (int $i): GoogleAuthRequest => GoogleAuthRequest::query()->create([
+        'state_id' => GoogleAuthRequest::mintStateId(),
+        'issued_at' => now()->subMinutes(5),
+        'expires_at' => now()->subMinutes(1),
+    ]));
+
+    $live = GoogleAuthRequest::query()->create([
+        'state_id' => GoogleAuthRequest::mintStateId(),
+        'issued_at' => now()->subMinutes(2),
+        'expires_at' => now()->addMinutes(8),
+    ]);
+
+    TenantContext::flush();
+
+    // One more mint runs the trim.
+    $this->get(googleMintUrl('acme.meridian.test'))->assertRedirect();
+
+    enterTenant($this->tenant->id);
+    $remaining = GoogleAuthRequest::query()->pluck('state_id')->all();
+
+    expect($remaining)->toContain($live->state_id)
+        ->and($remaining)->not->toContain($spent[0]->state_id)
+        ->and($remaining)->not->toContain($spent[1]->state_id);
 });
 
 /*
@@ -455,11 +500,55 @@ it('refuses a replayed handoff, so one consent can never become two sessions', f
 
     $this->get($completion)->assertRedirect('/dashboard');
 
-    // A fresh session, or the second tab would simply already be authenticated and prove nothing.
-    $this->flushSession();
+    // ⚠️ LOG OUT WITHOUT FLUSHING THE SESSION. The first draft called `flushSession()`, which since the
+    // browser-binding fix would ALSO drop `google.flow_sid` — so the retry would be refused as unbound and
+    // this case would pass without ever exercising the conditional UPDATE it exists for. Keeping the
+    // binding means the ONLY thing left to refuse the retry is `completed_at`.
     Auth::logout();
 
     $this->get($completion)->assertRedirect('/login?google=failed');
+    $this->assertGuest();
+});
+
+it('refuses a handoff presented by a browser that did not start the flow', function (): void {
+    // ⚠️ OAuth LOGIN-CSRF, AND A SIGNED STATE DOES NOT PREVENT IT. An HMAC proves WE minted the token, not
+    // that this browser did. Without the binding, the completion URL is a bearer token: capture it from
+    // the callback's `Location` header, hand it to somebody else, and they are signed in as YOU — then
+    // type, upload and configure inside your account, with an attacker-chosen `return_to` choosing where
+    // they land. The adversarial pass found this after every gate was green.
+    $completion = googleWalkToCompletion();
+
+    // A different browser: no `google.flow_sid`, everything else identical.
+    $this->flushSession();
+
+    $this->get($completion)->assertRedirect('/login?google=failed');
+    $this->assertGuest();
+});
+
+it('refuses a central callback presented by a browser that did not start the flow', function (): void {
+    // The same attack on the arm that signs in at the callback itself, where there is no handoff at all.
+    $this->get(googleMintUrl('meridian.test'))->assertRedirect();
+    $state = (string) $this->google->lastState();
+
+    $this->flushSession();
+
+    $this->get(googleCallbackUrl($state))
+        ->assertRedirect('http://meridian.test/login?google=failed');
+    $this->assertGuest();
+});
+
+it('refuses a flow whose state belongs to a DIFFERENT sign-in this browser started', function (): void {
+    // ⚠️ PRESENCE IS NOT ENOUGH, WHICH IS WHY THE CHECK COMPARES THE `state_id`. An attacker who can lure
+    // the victim through `/auth/google/redirect` first would give them SOME binding; only comparing the
+    // flow's own id refuses the attacker's state in the victim's session.
+    $this->get(googleMintUrl('meridian.test'))->assertRedirect();
+    $attackerState = (string) $this->google->lastState();
+
+    // The victim now starts their own flow in the same browser, overwriting the binding.
+    $this->get(googleMintUrl('meridian.test'))->assertRedirect();
+
+    $this->get(googleCallbackUrl($attackerState))
+        ->assertRedirect('http://meridian.test/login?google=failed');
     $this->assertGuest();
 });
 
@@ -681,11 +770,22 @@ it('refuses a full workspace and leaves no orphaned account behind', function ()
     $this->get(googleWalkToCompletion())->assertRedirect('/login?google=failed');
     $this->assertGuest();
 
-    // ⚠️ THE ORPHAN IS THE POINT. The refusal is raised INSIDE the provisioner's transaction precisely so
-    // the account created moments earlier is discarded with it — a live account with no workspace sees an
-    // empty product through RLS and reads as data loss.
-    expect(User::query()->where('email', 'one-too-many@example.test')->exists())->toBeFalse()
-        ->and(User::on('pgsql_auth')->where('google_id', $subject)->exists())->toBeFalse();
+    // ⚠️⚠️ THE ORPHAN IS OBSERVED BY RETRYING, NOT BY QUERYING, AND THE FIRST DRAFT OF THIS CASE WAS
+    // ENTIRELY VACUOUS. It asserted `User::query()->where('email', …)->exists()` is false — but after the
+    // request the middleware's `terminate()` has cleared both GUCs, so `users_users_visibility` matches
+    // nothing and that is false whether the row exists or not — and `User::on('pgsql_auth')` is a separate
+    // session that structurally cannot see a row written inside `RefreshDatabase`'s open transaction. Both
+    // were unconditionally false. Deleting the `DB::transaction` wrapper in `provision()` left all 32 cases
+    // green while the flow stranded a live account with no workspace on every full-workspace sign-in.
+    //
+    // Raising the cap and walking the SAME identity through again is what makes the rollback observable:
+    // if the account survived, `resolveBySubject()` and `resolveUserByEmail()` are both blind to it (both
+    // on `pgsql_auth`), so `createUser()` re-INSERTs the same address and the flow dies on
+    // `users_email_unique`. A clean second walk therefore proves the first one left nothing behind.
+    googleSeatQuota(5);
+
+    $this->get(googleWalkToCompletion())->assertRedirect('/dashboard');
+    $this->assertAuthenticated();
 });
 
 /*

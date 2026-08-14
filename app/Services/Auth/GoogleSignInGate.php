@@ -45,8 +45,14 @@ final class GoogleSignInGate
      *
      * ⚠️ AN UNCONFIGURED DEPLOYMENT IS A SUPPORTED STATE, NOT A BROKEN ONE. Live Google credentials are an
      * input only the product owner can supply, so the whole feature has to be absent-by-default: the button
-     * does not render, the routes 404, and every behaviour behind them is still exercised in tests against
-     * `FakeGoogleIdentityProvider`. `config/services.php` says the same thing from the other side.
+     * does not render, the route that STARTS a sign-in 404s, and every behaviour behind it is still
+     * exercised in tests against `FakeGoogleIdentityProvider`.
+     *
+     * ⚠️ ONLY THE MINT ROUTE CONSULTS THIS, AND FOUR DOCUMENTS USED TO CLAIM ALL THREE DID. The callback
+     * and the completion hop stay registered and answer the same closed `?google=failed` bounce — their
+     * refusals come from a `state` that cannot verify and a handoff that matches no row, not from this
+     * gate. Harmless, and not the same statement as "those endpoints are absent"; an adversarial review
+     * after CI was green is what caught the difference.
      */
     public function configured(): bool
     {

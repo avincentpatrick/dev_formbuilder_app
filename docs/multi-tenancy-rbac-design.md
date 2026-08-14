@@ -350,8 +350,9 @@ Unique constraint: `(tenant_id, user_id)` — a person has at most one membershi
 
 ### 7.1 The four doors into a workspace
 
-Membership can be created by four different flows, and **all four share one method** —
-`TenantMembershipService::attachMember()`. That sharing is the design rather than a refactoring
+Membership can be created by four different flows, and **three of the four share one method** —
+`TenantMembershipService::attachMember()`. (The fourth, invitation acceptance, transitions a row that
+already exists rather than attaching a new member; see the table and the note at the end of this section.) That sharing is the design rather than a refactoring
 convenience: the RLS context borrow, the `SET LOCAL` transaction, the seat-quota reservation, the reuse
 of a prior `declined`/`removed` row, the `suspended` refusal and the one-role-per-tenant `syncRoles()`
 are the same problem every time, and a second implementation would be correct until the day one of them
@@ -397,8 +398,19 @@ correct behaviour, not a defect report.
   able to do, and an Owner can promote them from the Members page.
 
 `MemberJoined` fires from inside `attachMember()`'s transaction for every `via`, so the Owner's
-notification is identical whichever door was used — the distinction belongs in the audit ledger, where it
-is, and not in a bell.
+notification is identical across the three doors that go through it — the distinction belongs in the audit
+ledger, where it is, and not in a bell.
+
+⚠️ **BUT THAT IS THREE DOORS, NOT FOUR, AND THE GAP IS THE INVITATION ONE.** `attachMember()` is the only
+dispatch site for `MemberJoined` in the codebase, and `InvitationController` never calls it — an invitee
+accepting is a status transition on a row that already exists (§7 step 2), not an attach. So an Owner is
+told when somebody self-registers, is JIT-provisioned by their IdP, or signs in with Google, and is told
+**nothing** when the person they personally invited accepts — the one door where they had already
+expressed interest in that individual by name. Pre-existing rather than introduced by the fourth door, and
+recorded here because §7.1's first sentence read as though parity existed: a reader planning notification
+work would not discover the gap until testing invite acceptance by hand. Whether to close it is a product
+decision (an acceptance is arguably an answer to the Owner's own action rather than news), not an
+oversight to be quietly patched.
 
 ---
 

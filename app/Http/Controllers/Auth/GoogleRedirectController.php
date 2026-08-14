@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Auth;
 use App\Services\Auth\GoogleAuthRequestService;
 use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
+use App\Support\Auth\GoogleAuthStateService;
 use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Sso\SsoReturnTo;
 use App\Support\Tenancy\PlatformHost;
@@ -42,10 +43,38 @@ final class GoogleRedirectController
     /** The session key the central arm parks its destination under, for the length of one consent screen. */
     public const CENTRAL_RETURN_TO = 'google.return_to';
 
+    /**
+     * The `state_id` of the flow THIS browser started (J3c2, added after the adversarial pass).
+     *
+     * ⚠️ WITHOUT THIS, THE FLOW IS NOT BOUND TO A BROWSER AT ALL, AND A SIGNED STATE DOES NOT FIX THAT.
+     * An HMAC over server-chosen claims proves WE minted the token; it says nothing about who is holding
+     * it. So an attacker could start a sign-in, obtain the authorization `code` without spending it, and
+     * send a victim `…/auth/google/callback?code=…&state=…` — the victim's browser completes the exchange
+     * and is logged in as the ATTACKER, then types, uploads and configures inside the attacker's account.
+     * The tenant arm is the same attack against the handoff URL, which is accepted in any browser.
+     *
+     * This is OAuth login-CSRF (RFC 6749 §10.12: `state` must be bound to the user agent's authenticated
+     * state), and ADR-0009 §D3's "the signed state is the CSRF control" is what made it easy to miss.
+     * ⚠️ Note the connector flow does NOT supply this binding either — its `uid` claim names the member a
+     * connection is attributed to, and its callback lands on a host that never sees the tenant session, so
+     * it could not compare a cookie if it wanted to. The precedent that DOES bind is
+     * {@see \App\Http\Controllers\Tenant\Sso\SsoStepUpCompletionController}, which compares the request's
+     * `user_id` against the person actually signed in on the host it completes on — the same shape as the
+     * check below, on the same kind of same-site hop.
+     *
+     * The binding costs one session key and no token-format change, because on BOTH arms the hop that
+     * creates the session shares a host with the mint: the central callback is same-host with the central
+     * mint, and the tenant completion hop is same-host with the tenant mint. Comparing the flow's own
+     * `state_id` — rather than merely requiring SOME value — is what stops the attacker first luring the
+     * victim through `/auth/google/redirect` to populate their session.
+     */
+    public const FLOW_SID = 'google.flow_sid';
+
     public function __construct(
         private readonly GoogleSignInGate $gate,
         private readonly GoogleAuthRequestService $requests,
         private readonly GoogleIdentityProvider $google,
+        private readonly GoogleAuthStateService $states,
     ) {}
 
     public function __invoke(Request $request): RedirectResponse
@@ -58,6 +87,10 @@ final class GoogleRedirectController
         $returnTo = SsoReturnTo::sanitise($request->query('return_to') === null ? null : (string) $request->query('return_to'));
 
         $state = $this->requests->mint($tenant, $returnTo, $request->ip());
+
+        // Verifying the token we just minted is how the `state_id` is recovered without widening `mint()`'s
+        // return type — one HMAC, and it self-checks the thing we are about to rely on.
+        $request->session()->put(self::FLOW_SID, $this->states->verify($state)->stateId);
 
         if ($tenant === null) {
             $request->session()->put(self::CENTRAL_RETURN_TO, $returnTo);

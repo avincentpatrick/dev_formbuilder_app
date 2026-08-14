@@ -63,8 +63,16 @@ scopes and very different blast radii.
 
 | Purpose | `.env` keys | Redirect URI to register | If unset |
 |---|---|---|---|
-| **First-party sign-in** (J3c2 / ADR-0017) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the three routes 404 — a **supported** state |
+| **First-party sign-in** (J3c2 / ADR-0017) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the flow cannot be started — a **supported** state, see the note below |
 | **Google Sheets connector** (H16a / ADR-0009) | `GOOGLE_CONNECTOR_CLIENT_ID`, `GOOGLE_CONNECTOR_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/oauth/google_sheets/callback` | the connector cannot be connected; the consent screen refuses |
+
+⚠️ **"Unconfigured" closes the DOOR, not all three routes, and an earlier draft of this table said
+otherwise.** Only `GET /auth/google/redirect` consults `GoogleSignInGate` and 404s. The callback and the
+completion hop stay **registered and reachable**, and answer the same closed `?google=failed` bounce every
+other refusal produces — the callback because its `state` cannot verify, the completion hop because its
+handoff matches no row. That is harmless (neither can mint a session without a row this deployment never
+wrote) but it is not absence, and an operator auditing the surface deserves the true statement rather than
+the reassuring one. The distinction was found by an adversarial review after CI was green.
 
 **Sign-in client — the console settings this app cannot detect the absence of.**
 

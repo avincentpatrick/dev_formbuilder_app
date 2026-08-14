@@ -85,6 +85,15 @@ final class GoogleCallbackController
         }
 
         if ($state->isCentral()) {
+            // ⚠️ THE BROWSER THAT FINISHES MUST BE THE ONE THAT STARTED (see GoogleRedirectController's
+            // FLOW_SID docblock). The central arm signs in HERE, so the check belongs here; the tenant arm
+            // signs in one hop later and is checked there instead. Comparing the flow's own `state_id`
+            // rather than merely requiring some value is what stops an attacker luring the victim through
+            // the mint route first to populate their session.
+            if ($request->session()->get(GoogleRedirectController::FLOW_SID) !== $state->stateId) {
+                return $this->refuse($state, 'flow_not_bound_to_browser', $request);
+            }
+
             try {
                 $outcome = $this->provisioner->provision(null, $identity, $request);
             } catch (GoogleSignInRefusedException $exception) {

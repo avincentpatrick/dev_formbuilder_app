@@ -41,8 +41,9 @@ return [
     | conflating a sign-in block with an unrelated one of the same vendor name is a
     | mistake this file has made before, which is why they are kept apart by name.
     |
-    | Both may be left empty: `GoogleSignInGate` hides the button and closes the
-    | routes when they are, and the whole flow is exercised in tests against
+    | Both may be left empty: `GoogleSignInGate` hides the button and 404s the
+    | route that STARTS a sign-in when they are (the other two stay registered and
+    | answer the same closed bounce; they cannot mint a session without a row), and the whole flow is exercised in tests against
     | `FakeGoogleIdentityProvider`, so an unconfigured deployment is a supported
     | state rather than a broken one.
     |

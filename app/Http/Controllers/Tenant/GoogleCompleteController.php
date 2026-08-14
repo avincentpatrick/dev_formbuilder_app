@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Auth\GoogleRedirectController;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Models\GoogleAuthRequest;
 use App\Services\Auth\GoogleAuthRequestService;
@@ -57,6 +58,17 @@ final class GoogleCompleteController
         // deliberately indistinguishable from each other and from every other refusal (§D9).
         if ($row === null) {
             return $this->refuse('handoff_not_redeemable', $request);
+        }
+
+        // ⚠️ THE BROWSER THAT FINISHES MUST BE THE ONE THAT STARTED. This hop is same-host with the mint,
+        // so the tenant session that recorded the flow's `state_id` is readable here — which is the whole
+        // reason the binding needs no cross-host cookie. Without it the handoff URL is a bearer token
+        // accepted in ANY browser: capture it from the callback's `Location` and hand it to a victim, and
+        // they are signed in as somebody else with an attacker-chosen `return_to` picking the landing page.
+        // Checked AFTER the redeem, deliberately: the handoff is burned either way, so a stolen URL cannot
+        // be retried in the right browser once it has been tried in the wrong one.
+        if ($request->session()->get(GoogleRedirectController::FLOW_SID) !== $row->state_id) {
+            return $this->refuse('flow_not_bound_to_browser', $request);
         }
 
         try {

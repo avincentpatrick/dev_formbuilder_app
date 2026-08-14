@@ -7,6 +7,7 @@
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsDataTable,
@@ -60,7 +61,7 @@ function confirmAction(): void {
 
 <template>
     <AdminLayout title="Tenants" icon="building">
-        <p v-if="adminError" class="admin-tenants__alert" role="alert">{{ adminError }}</p>
+        <MdsAlert v-if="adminError" tone="danger" assertive :message="adminError" />
 
         <MdsDataTable :columns="columns" :rows="tenants" caption="All tenants" row-key="id">
             <!--
@@ -131,14 +132,6 @@ function confirmAction(): void {
  * bg-surface — recorded as a found defect on StatTile, and already fixed on admin/Feedback.vue. This was
  * the last admin page still disagreeing. /admin/* is excluded from the axe sweep, so nothing would catch it.
  */
-.admin-tenants__alert {
-    margin: 0 0 var(--mds-space-4);
-    padding: var(--mds-space-3);
-    border: 1px solid var(--mds-color-action-danger-bg);
-    border-radius: var(--mds-radius-md);
-    color: var(--mds-color-status-danger-fg);
-    font-size: var(--mds-type-body-md-font-size);
-}
 
 /* Always underlined, not hover-only: /admin/* is never axe-scanned, so a colour-only link would be
    invisible to every gate in the build. The token is what keeps it legible in dark. */

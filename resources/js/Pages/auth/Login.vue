@@ -9,11 +9,17 @@ import {
   MdsPasswordInput,
 } from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton.vue';
 
 // I5 — whether /register is reachable from HERE, on THIS host. The server answers it from the same
 // RegistrationGate the route middleware uses, precisely so the link and the route cannot disagree: a
 // visible "Create an account" that leads to a 404 is the exact failure that sharing one gate prevents.
-defineProps<{ canRegister: boolean }>();
+//
+// J3c2 — `canUseGoogle` is the same idea against a different gate: GoogleSignInGate, which is also what
+// /auth/google/redirect itself asks, so the button and the route it points at are one answer. It is
+// deliberately NOT RegistrationGate — see that class for why a workspace closed to strangers still shows
+// this button to its own members.
+defineProps<{ canRegister: boolean; canUseGoogle: boolean }>();
 
 const form = useForm({ email: '', password: '', remember: false });
 
@@ -62,6 +68,8 @@ function submit(): void {
 
       <MdsButton type="submit" :loading="form.processing">Sign in</MdsButton>
     </form>
+
+    <GoogleSignInButton v-if="canUseGoogle" />
 
     <nav class="auth-links">
       <a href="/forgot-password">Forgot your password?</a>

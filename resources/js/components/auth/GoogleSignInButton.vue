@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * "Continue with Google" (Increment J3c2 — ADR-0017).
+ * "Continue with Google" (Increment J3c2 — ADR-0019).
  *
  * ⚠️ THE LABEL IS "Continue with Google" AND MAY NEVER BECOME "Sign in with Google".
  * `tests/e2e/global-setup.ts` signs in TWICE before any spec in the suite runs, locating the submit

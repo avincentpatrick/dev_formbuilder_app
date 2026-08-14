@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Where a Google account attaches to a local identity (Increment J3c2, ADR-0017 §D1).
+ * Where a Google account attaches to a local identity (Increment J3c2, ADR-0019 §D1).
  *
  * ── A COLUMN, NOT A `social_identities` TABLE, AND THE REASON IS RLS RATHER THAN TASTE ────────────────
  * Any check for an existing account must resolve on the `pgsql_auth` connection: as `meridian_app` with

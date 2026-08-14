@@ -8,7 +8,7 @@ use App\Support\Connectors\ConnectorProvider;
 use App\Support\Tenancy\DnsTxtResolver;
 
 /**
- * Google's half of first-party sign-in, behind a contract (Increment J3c2, ADR-0017 §D10).
+ * Google's half of first-party sign-in, behind a contract (Increment J3c2, ADR-0019 §D10).
  *
  * An interface for the same reason {@see DnsTxtResolver} is one: the real implementation talks to a third
  * party over the network, so nothing downstream of it could be tested without either live credentials or
@@ -41,7 +41,7 @@ interface GoogleIdentityProvider
      *
      * ⚠️ EVERY FAILURE IS {@see GoogleAuthException}, INCLUDING TRANSPORT ONES. A caller on an
      * unauthenticated endpoint must not have to distinguish "Google said no" from "Guzzle threw", because
-     * both produce the same user-facing outcome (ADR-0017 §D9's single indistinguishable bounce) and
+     * both produce the same user-facing outcome (ADR-0019 §D9's single indistinguishable bounce) and
      * letting a raw client exception escape would put a provider's message on the way to a log line that
      * an anonymous caller can trigger at will.
      *

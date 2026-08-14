@@ -1033,7 +1033,7 @@ Route::middleware([
 });
 
 /*
-| Google sign-in — the completion hop (Increment J3c2 — ADR-0017 §D7). The same unauthenticated
+| Google sign-in — the completion hop (Increment J3c2 — ADR-0019 §D7). The same unauthenticated
 | tenant-context pipeline as the SAML protocol group above, and for the same reason: this request CREATES a
 | session rather than acting on one, so `auth` here would be circular.
 |

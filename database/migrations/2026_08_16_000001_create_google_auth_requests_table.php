@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * The in-flight state of a Google sign-in (Increment J3c2, ADR-0017 §D7).
+ * The in-flight state of a Google sign-in (Increment J3c2, ADR-0019 §D7).
  *
  * ── WHY A TABLE AT ALL, WHEN ADR-0009 §D3 SAYS A SIGNED HMAC IS ENOUGH ────────────────────────────────
  * Because §D3's own revisit trigger — "a flow where the callback has a side effect beyond writing the

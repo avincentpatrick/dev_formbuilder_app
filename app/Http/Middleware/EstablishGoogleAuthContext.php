@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Establishes the PostgreSQL RLS tenant context for the Google sign-in CALLBACK (J3c2, ADR-0017 §D6) —
+ * Establishes the PostgreSQL RLS tenant context for the Google sign-in CALLBACK (J3c2, ADR-0019 §D6) —
  * {@see EstablishConnectorOauthContext}'s sibling, for a request that arrives on the CENTRAL host with
  * neither a session nor a resolvable tenant.
  *

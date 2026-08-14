@@ -30,7 +30,7 @@ return [
 
     /*
     |----------------------------------------------------------------------
-    | Google — FIRST-PARTY END-USER SIGN-IN ONLY (Increment J3c2, ADR-0017).
+    | Google — FIRST-PARTY END-USER SIGN-IN ONLY (Increment J3c2, ADR-0019).
     |----------------------------------------------------------------------
     | ⚠️ NOT the Google Sheets CONNECTOR, whose credentials live in
     | `config/connectors.php` under `providers.google_sheets` and are governed by

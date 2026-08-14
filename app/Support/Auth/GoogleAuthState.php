@@ -9,7 +9,7 @@ namespace App\Support\Auth;
  *
  * ⚠️ `tenantId` IS NULLABLE AND THAT IS THE CENTRAL-HOST ARM, NOT A MISSING VALUE. A sign-in begun on the
  * central host belongs to no workspace — exactly like a central-host registration, which produces an
- * account with no membership — so the callback forks on this being null (ADR-0017 §D12). The connector
+ * account with no membership — so the callback forks on this being null (ADR-0019 §D12). The connector
  * equivalent has no such case, because a connector is always a tenant's.
  *
  * ⚠️ AND THERE IS NO `uid`, unlike the connector state. That token names the user who STARTED the flow,

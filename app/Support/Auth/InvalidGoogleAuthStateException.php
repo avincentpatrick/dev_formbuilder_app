@@ -11,7 +11,7 @@ use RuntimeException;
  *
  * ⚠️ ONE EXCEPTION FOR EVERY CAUSE, AND THE ABSENCE OF DETAIL IS THE POINT. Structure, signature, claim
  * shape and expiry all arrive here identically. This is an unauthenticated inbound surface: telling the
- * caller which half of the token to keep working on is a gift, and ADR-0017 §D9 gives every refusal in
+ * caller which half of the token to keep working on is a gift, and ADR-0019 §D9 gives every refusal in
  * this flow one indistinguishable outcome.
  */
 final class InvalidGoogleAuthStateException extends RuntimeException

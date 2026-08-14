@@ -83,7 +83,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // `web`: a third-party GET from a consent screen carries no session and no CSRF token, and the
             // signed `state` parameter is the CSRF control (ADR-0009 §D3). The group declares its own stack.
             Route::group([], base_path('routes/connectors.php'));
-            // First-party Google sign-in (J3c2 / ADR-0017) — the mint and the callback. Loaded here rather
+            // First-party Google sign-in (J3c2 / ADR-0019) — the mint and the callback. Loaded here rather
             // than in routes/tenant.php because BOTH must also serve the central host, and that file
             // declares no ->domain(). ⚠️ Loaded BEFORE TenancyServiceProvider::mapRoutes(), which runs in
             // booted(): a same-URI route in routes/tenant.php would therefore be dead rather than
@@ -450,7 +450,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ? ApiErrorResponse::make(400, 'invalid_connector_state', $e->getMessage())
             : redirect()->away((string) config('app.url')));
 
-        // First-party Google sign-in `state` failures (J3c2 / ADR-0017 §D6). Thrown by
+        // First-party Google sign-in `state` failures (J3c2 / ADR-0019 §D6). Thrown by
         // EstablishGoogleAuthContext BEFORE any tenant context is set, so a forged/tampered/expired state
         // never engages RLS. Same posture as the connector renderer above and one deliberate difference:
         // it lands on `/login?google=failed` rather than the bare app URL, because unlike a connector

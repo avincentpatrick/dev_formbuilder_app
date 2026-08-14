@@ -10,7 +10,7 @@ use Throwable;
 /**
  * Google could not be asked, or answered in a way this flow cannot use (Increment J3c2).
  *
- * ⚠️ THE MESSAGE IS FOR THE LOG AND NEVER FOR THE RESPONSE. ADR-0017 §D9 gives every refusal in this flow
+ * ⚠️ THE MESSAGE IS FOR THE LOG AND NEVER FOR THE RESPONSE. ADR-0019 §D9 gives every refusal in this flow
  * one indistinguishable outcome — `?google=failed` — so nothing here may reach a rendered page. The
  * previous exception is kept because an operator reading `auth.google.callback.rejected` needs to tell a
  * revoked client secret from a DNS failure, and neither is visible from the bounce.

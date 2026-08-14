@@ -14,7 +14,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 | Google credential.
 |
 | ⚠️ THE `email_verified` CASES ARE THE SECURITY ONES. That claim is this flow's analogue of SAML's
-| signature check (ADR-0017 §D3): it is the entire basis for believing the address belongs to the person
+| signature check (ADR-0019 §D3): it is the entire basis for believing the address belongs to the person
 | holding the account, and an account that can attach an UNVERIFIED alias could otherwise sign in as
 | somebody else's address. It arrives inside a raw JSON array, so it can be absent, null, or a string —
 | and `(bool) "false"` is `true`, which is the trap these cases exist for.

@@ -8,14 +8,14 @@ use App\Services\Auth\GoogleSignInProvisioner;
 use RuntimeException;
 
 /**
- * Google answered honestly and this product refuses anyway (Increment J3c2, ADR-0017 §D4, §D8).
+ * Google answered honestly and this product refuses anyway (Increment J3c2, ADR-0019 §D4, §D8).
  *
  * Distinct from {@see GoogleAuthException}, which means Google could not be asked or answered unusably.
  * Everything here is OUR policy: an unverified address, a subject that does not match the account holding
  * that email, a suspended membership, a closed workspace, a full seat quota.
  *
  * ⚠️ EVERY ONE OF THESE PRODUCES THE SAME `?google=failed`, AND THE `reason` NEVER REACHES THE RESPONSE.
- * ADR-0017 §D9 gives this flow one indistinguishable bounce, because the alternative is a disclosure
+ * ADR-0019 §D9 gives this flow one indistinguishable bounce, because the alternative is a disclosure
  * oracle: "your local account is not verified" tells a stranger that an account exists on that address,
  * and "this workspace is invitation-only" tells them the workspace exists. The reason is a LOG field, so
  * an operator answering "why can nobody sign in" is not left guessing — the two audiences get different

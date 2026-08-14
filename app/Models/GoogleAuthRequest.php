@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * One in-flight Google sign-in (Increment J3c2, ADR-0017 §D7).
+ * One in-flight Google sign-in (Increment J3c2, ADR-0019 §D7).
  *
  * Its life is three writes on two hosts:
  *   1. MINT   — tenant host, unauthenticated. A row with a `state_id` and nothing else asserted.
@@ -47,7 +47,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $consumed_at Stamped by the central callback. NULL = the state is unspent.
  * @property ?string $handoff_hash SHA-256 of the token that travels in the URL, never the token.
  * @property ?Carbon $handoff_expires_at
- * @property ?string $google_sub The stable identity (ADR-0017 §D2). The email is NOT the identity.
+ * @property ?string $google_sub The stable identity (ADR-0019 §D2). The email is NOT the identity.
  * @property ?string $google_email
  * @property ?bool $google_email_verified This flow's signature check (§D3).
  * @property ?string $google_name

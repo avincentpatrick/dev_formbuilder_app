@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| Google sign-in policy (Increment J3c2, ADR-0017)
+| Google sign-in policy (Increment J3c2, ADR-0019)
 |--------------------------------------------------------------------------
 | The knobs, kept apart from the CREDENTIALS in `config/services.php` for the same reason `config/saml.php`
 | is kept apart from a connection's own settings: these are decisions about the flow, and they must be
@@ -45,7 +45,7 @@ return [
 
     'requests' => [
         /*
-         * The write-path bound on `google_auth_requests` (ADR-0017 §D7).
+         * The write-path bound on `google_auth_requests` (ADR-0019 §D7).
          *
          * ⚠️ TRIMMED IN THE SAME CALL AS THE INSERT, NEVER BY A SCHEDULED JOB. `routes/console.php`
          * records that nothing runs the scheduler on the production box, so a nightly prune would be a

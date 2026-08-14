@@ -130,7 +130,7 @@ class AppServiceProvider extends ServiceProvider
             return new ConnectorOAuthStateService($key, (int) config('connectors.state.ttl', 600));
         });
 
-        // The Google sign-in `state` signer (J3c2 / ADR-0017 §D6) — the FOURTH token family. Same wire
+        // The Google sign-in `state` signer (J3c2 / ADR-0019 §D6) — the FOURTH token family. Same wire
         // format and the same reason as the connector state above: the session cookie is host-only, so a
         // tenant session is unreadable at the central callback.
         //
@@ -220,7 +220,7 @@ class AppServiceProvider extends ServiceProvider
         // Binding a scripted issuer is what makes it deterministic — see SubmissionReferenceIssuer.
         $this->app->singleton(SubmissionReferenceIssuer::class, RandomSubmissionReferenceIssuer::class);
 
-        // Google sign-in's one piece of third-party I/O (J3c2, ADR-0017 §D10). `singleton` for the same
+        // Google sign-in's one piece of third-party I/O (J3c2, ADR-0019 §D10). `singleton` for the same
         // reason as the two above: it holds no tenant, no user and no token, so there is nothing to leak
         // across requests — the identity it returns is handed straight to the caller.
         //
@@ -422,7 +422,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('saml-step-up', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('samlstepup:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
-        // First-party Google sign-in (J3c2 / ADR-0017). All three endpoints are unauthenticated by
+        // First-party Google sign-in (J3c2 / ADR-0019). All three endpoints are unauthenticated by
         // necessity — a sign-in has no session yet — so, as with SAML, there is no user and no tenant claim
         // in the request worth keying on.
         //

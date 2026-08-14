@@ -16,7 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 /**
- * Opens a Google sign-in (Increment J3c2, ADR-0017 §D6) — the only route in this flow a person reaches by
+ * Opens a Google sign-in (Increment J3c2, ADR-0019 §D6) — the only route in this flow a person reaches by
  * pressing something.
  *
  * ── ⚠️ ONE ROUTE FOR BOTH HOSTS, WHICH IS FORTIFY'S SHAPE AND NOT A COMPROMISE ───────────────────────

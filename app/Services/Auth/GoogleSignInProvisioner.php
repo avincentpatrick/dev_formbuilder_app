@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Turns a verified {@see GoogleIdentity} into somebody this product can sign in (J3c2 — ADR-0017 §D4/§D8).
+ * Turns a verified {@see GoogleIdentity} into somebody this product can sign in (J3c2 — ADR-0019 §D4/§D8).
  *
  * {@see SsoUserProvisioner}'s sibling, and the same connection reasoning applies: writes go on the DEFAULT
  * connection (`users_app_insert` is `WITH CHECK (true)`, precisely so registration and invite-placeholder

@@ -10,7 +10,7 @@ use App\Support\Tenancy\PlatformHost;
 use Illuminate\Http\Request;
 
 /**
- * May this request offer "Continue with Google" (Increment J3c2, ADR-0017)?
+ * May this request offer "Continue with Google" (Increment J3c2, ADR-0019)?
  *
  * ── ONE GATE, THREE CONSUMERS, SO THEY CANNOT DISAGREE ─────────────────────────────────────────────────
  * The login page's button, the register page's button, and the redirect route itself all ask this one
@@ -21,7 +21,7 @@ use Illuminate\Http\Request;
  * That gate answers "may a STRANGER create an account here", and this button is mostly pressed by people
  * who already have one. On a default workspace (`invite_only` is fail-closed TRUE) Google works for
  * existing members and invited people, and hiding the button there would take it away from exactly them.
- * ADR-0017 §D8 records the accepted cost of the other direction: **the button appears for some people it
+ * ADR-0019 §D8 records the accepted cost of the other direction: **the button appears for some people it
  * will refuse**, because whether a given Google account belongs to an existing member is a question the
  * page cannot ask before the person has pressed it. `GoogleSignInProvisioner` asks `RegistrationGate` at
  * the moment it becomes answerable — when a new account or a new membership would actually be created.

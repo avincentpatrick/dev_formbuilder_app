@@ -39,7 +39,7 @@ uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| First-party Google sign-in, end to end (Increment J3c2 — ADR-0017).
+| First-party Google sign-in, end to end (Increment J3c2 — ADR-0019).
 |--------------------------------------------------------------------------
 | Three hops on two hosts:
 |
@@ -239,7 +239,7 @@ it('runs on the central host with no row at all, because a tenant-less row is un
         ->assertRedirect()
         ->assertRedirectContains('accounts.google.test');
 
-    // ADR-0017 §D12: `TenantIsolation::nullableGlobalSql()` widens SELECT only, so strict writes make a
+    // ADR-0019 §D12: `TenantIsolation::nullableGlobalSql()` widens SELECT only, so strict writes make a
     // tenant-less row impossible — and the central arm needs no handoff anyway, callback and session
     // sharing a host. The state still verifies; `tid` is legitimately null.
     expect(GoogleAuthRequest::withoutTenantScope()->count())->toBe(0)
@@ -580,7 +580,7 @@ it('honours a return_to that survived both hops', function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Linkage — ADR-0017 §D4, the decision of record
+| Linkage — ADR-0019 §D4, the decision of record
 |--------------------------------------------------------------------------
 */
 
@@ -700,7 +700,7 @@ it('refuses a suspended membership rather than quietly reversing the sanction', 
 });
 
 it('refuses an unverified identity at the provisioner too, not only at the callback', function (): void {
-    // ⚠️ ADR-0017 §D3 says `email_verified` is checked TWICE, and the mutation pass found only ONE of the
+    // ⚠️ ADR-0019 §D3 says `email_verified` is checked TWICE, and the mutation pass found only ONE of the
     // two defended: deleting the provisioner's copy left all 31 cases green, because the callback refuses
     // first and the flow never reaches the second. That second check is a backstop for a STORED row whose
     // `google_email_verified` is not true — unreachable today thanks to the migration's identity CHECK
@@ -836,7 +836,7 @@ it('sends an enrolled member to the second factor instead of logging them straig
     enterTenant($this->tenant->id, $member->id);
     makeActiveMember($member, 'admin');
 
-    // ⚠️ THE DELIBERATE DIVERGENCE FROM ADR-0016 §D22 (ADR-0017 §D11). SAML treats the IdP as the
+    // ⚠️ THE DELIBERATE DIVERGENCE FROM ADR-0016 §D22 (ADR-0019 §D11). SAML treats the IdP as the
     // authentication authority; a Google account is a CONSUMER credential the end user chose, and this
     // product cannot know whether anything protects it. Someone who enrolled a TOTP must not find it
     // bypassed by a button on the same page.

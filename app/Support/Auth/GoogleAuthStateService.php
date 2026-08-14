@@ -9,7 +9,7 @@ use App\Support\Guest\GuestShareTokenService;
 use JsonException;
 
 /**
- * Mints and verifies the Google sign-in `state` (Increment J3c2, ADR-0009 §D3 as amended, ADR-0017 §D6).
+ * Mints and verifies the Google sign-in `state` (Increment J3c2, ADR-0009 §D3 as amended, ADR-0019 §D6).
  *
  * WHY A TOKEN AND NOT A SESSION, unchanged from ADR-0009: the session cookie is host-only
  * (`SESSION_DOMAIN` is null), so a session established at `acme.example.com` is not sent to the central
@@ -23,7 +23,7 @@ use JsonException;
  * afterwards, so a tamper is refused before the payload is parsed and long before any tenant GUC exists.
  *
  * ── THREE DIFFERENCES FROM THE CONNECTOR STATE, EACH DELIBERATE ───────────────────────────────────────
- * 1. **`tid` MAY BE NULL.** A sign-in begun on the central host belongs to no workspace (ADR-0017 §D12).
+ * 1. **`tid` MAY BE NULL.** A sign-in begun on the central host belongs to no workspace (ADR-0019 §D12).
  *    The connector flow has no such case. `null` is a legitimate verified value here, not a failure.
  * 2. **THERE IS NO `uid`.** A connector state names the user who started the flow, because the connection
  *    is attributed to them. Here the user is the OUTCOME — nobody is authenticated at mint time — so a
@@ -79,7 +79,7 @@ final class GoogleAuthStateService
      * is trusted before the MAC proves we wrote it. Does no database work and sets no context.
      *
      * Every failure collapses to one exception on purpose. This is an unauthenticated inbound surface, and
-     * telling a caller which half of the token to keep working on is a gift (ADR-0017 §D9).
+     * telling a caller which half of the token to keep working on is a gift (ADR-0019 §D9).
      *
      * @throws InvalidGoogleAuthStateException
      */

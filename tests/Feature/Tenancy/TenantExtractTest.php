@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ExtractFilter;
+use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Exceptions\Tenancy\TenantExtractException;
 use App\Models\Tenant;
@@ -226,6 +227,50 @@ it('decodes jsonb and types booleans rather than writing PostgreSQL\'s text rend
 
     expect($form['allow_guest_submissions'])->toBeBool();
     expect($form['supported_locales'])->toBeArray();
+});
+
+it('emits PostGIS geometry as GeoJSON rather than as EWKB hex', function (): void {
+    // ⚠️ WRITTEN BECAUSE NOTHING HAD EVER EXECUTED IT. `submission_geo_index.geom` is the ONLY entry in
+    // TenantExtractColumns::TRANSFORMED, and neither the dev tenant nor any fixture above has a geo row —
+    // so the whole transform path was shipping on inspection. That is the M5 lesson recurring one file
+    // later: a coercion nothing can redden is either dead code or an unpinned assumption.
+    //
+    // Two things are proven and they fail independently. The EXPRESSION: without it PostGIS returns the
+    // storage form (`0101000020E6100000…`), which is JSON-safe, unreadable, and would sail through every
+    // other assertion in this file. The TYPE: the alias is declared `jsonb` in TRANSFORMED, so the encoder
+    // decodes it — get that wrong and the artefact carries GeoJSON as an escaped STRING, which is exactly
+    // the double-encoding the jsonb coercion exists to prevent.
+    [$acme, , $owner] = twoPopulatedTenants();
+
+    $form = publishedInboxForm($acme, $owner, 'Geo intake');
+    $submission = seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'A']);
+    $fieldId = DB::table('form_fields')
+        ->where('form_version_id', $form->current_published_version_id)
+        ->value('id');
+
+    // Raw insert, not GeoIndexProjector: the subject is what the EXTRACT does with a stored geometry, and
+    // routing through the projector would make this a test of the projector's envelope handling instead.
+    // ⚠️ `id` is OMITTED, and it is the one column here that is not a uuid: `submission_geo_index.id` is a
+    // bigserial, unlike every other primary key in this schema. Supplying a uuid raises 22P02 — which is
+    // also why the extractor's keyset paging works on it (`id > ?` on a bigint) without any special case.
+    DB::insert(
+        'insert into submission_geo_index
+           (tenant_id, submission_id, form_version_id, form_field_id, field_key, geometry_type, geom,
+            created_at, updated_at)
+         values (?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), now(), now())',
+        [
+            $acme->id, $submission->id, $form->current_published_version_id,
+            $fieldId, 'location', 'Point', json_encode(['type' => 'Point', 'coordinates' => [120.9, 14.6]]),
+        ]
+    );
+
+    runExtract($acme, $this->extractDir);
+    $rows = readExtractTable($this->extractDir, 'submission_geo_index');
+
+    expect($rows)->toHaveCount(1);
+    expect($rows[0]['geom'])->toBeArray();
+    expect($rows[0]['geom']['type'])->toBe('Point');
+    expect($rows[0]['geom']['coordinates'][0])->toEqualWithDelta(120.9, 0.0001);
 });
 
 it('reports row counts that match what it actually wrote', function (): void {

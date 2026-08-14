@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { centralOrigin, tenantOrigin } from './support/hosts';
 
 /**
- * "Continue with Google" on the two front doors (Increment J3c2 — ADR-0017).
+ * "Continue with Google" on the two front doors (Increment J3c2 — ADR-0019).
  *
  * ⚠️ THIS SPEC IS MOSTLY A CANARY FOR `global-setup.ts`, AND THAT IS ITS REASON FOR EXISTING.
  * Global setup signs in TWICE before any spec in the suite runs, locating the submit control with

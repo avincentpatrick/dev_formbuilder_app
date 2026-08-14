@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The same-site hop that actually creates the session (Increment J3c2, ADR-0017 §D7).
+ * The same-site hop that actually creates the session (Increment J3c2, ADR-0019 §D7).
  *
  * ── WHY THIS EXISTS, AND IT IS NOT SAML's REASON ────────────────────────────────────────────────────
  * `SESSION_DOMAIN` is null, so the session cookie is HOST-ONLY: a session created at the central callback

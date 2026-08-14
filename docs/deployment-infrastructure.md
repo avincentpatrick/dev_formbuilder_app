@@ -63,7 +63,7 @@ scopes and very different blast radii.
 
 | Purpose | `.env` keys | Redirect URI to register | If unset |
 |---|---|---|---|
-| **First-party sign-in** (J3c2 / ADR-0017) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the flow cannot be started — a **supported** state, see the note below |
+| **First-party sign-in** (J3c2 / ADR-0019) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the flow cannot be started — a **supported** state, see the note below |
 | **Google Sheets connector** (H16a / ADR-0009) | `GOOGLE_CONNECTOR_CLIENT_ID`, `GOOGLE_CONNECTOR_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/oauth/google_sheets/callback` | the connector cannot be connected; the consent screen refuses |
 
 ⚠️ **"Unconfigured" closes the DOOR, not all three routes, and an earlier draft of this table said

@@ -2661,7 +2661,7 @@ is that Google works on tenant hosts AND the central host. Registering the same 
 not help: `routes/google-auth.php` loads from `withRouting(then:)` while `routes/tenant.php` is mapped
 later inside `booted()`, so the tenant copy would be dead code no test notices. Both now take Fortify's
 own pipeline, with the workspace resolved from the HOST as `RegistrationGate` already does for
-`/register`. ADR-0017 gains **§D6a** (this) and **§D6b** (the browser binding), and **§D8a** records that
+`/register`. ADR-0019 gains **§D6a** (this) and **§D6b** (the browser binding), and **§D8a** records that
 "and invited people" overstates what §D4 allows — an invitation placeholder is unverified, so a
 brand-new invitee is refused by the verified-account condition, correctly and by the decision of record.
 
@@ -2709,7 +2709,7 @@ reasons one at a time — `->stateless()` is Socialite's own mode for this topol
 first-party rather than the third-party package the clause objected to, and the adapter it said Socialite
 would replace **is written anyway**, so reverting is one binding line.
 
-**ADR-0017 written**, twelve sub-decisions. §D11 is the one to read: a user's own second factor still
+**ADR-0019 written**, twelve sub-decisions. §D11 is the one to read: a user's own second factor still
 applies, **deliberately diverging from ADR-0016 §D22's opposite answer for SAML**, because SAML is an
 enterprise trust anchor an administrator configured while Google is a consumer credential the end user
 chose. Recorded as a divergence with its argument, so it is not later "fixed" in either direction.

@@ -20,7 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Where Google sends the browser back (Increment J3c2, ADR-0009 §D2 as amended, ADR-0017 §D6).
+ * Where Google sends the browser back (Increment J3c2, ADR-0009 §D2 as amended, ADR-0019 §D6).
  *
  * ── ONE CENTRAL CALLBACK, BECAUSE GOOGLE REJECTS WILDCARD REDIRECT URIs ─────────────────────────────
  * An OAuth client registers ONE fixed redirect URI, so a per-tenant subdomain callback is unshippable past

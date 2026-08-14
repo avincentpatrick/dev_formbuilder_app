@@ -15,7 +15,7 @@ use Throwable;
  * it. That rejection is about the CONNECTOR lane, which holds a durable third-party credential so the
  * platform can act as the tenant inside the tenant's own workspace; this flow reads an identity once and
  * discards the token. See ADR-0009's Alternatives Considered, where the carve-out answers the rejection's
- * three reasons individually, and ADR-0017 §D10. `ConnectorProvider` does not adopt Socialite and must not.
+ * three reasons individually, and ADR-0019 §D10. `ConnectorProvider` does not adopt Socialite and must not.
  *
  * ⚠️ `->stateless()` IS LOAD-BEARING, AND IT IS WHAT ANSWERS THE ORIGINAL OBJECTION. It tells Socialite to
  * neither mint nor verify a `state` of its own, which is exactly right here: the callback lands on the

@@ -1128,7 +1128,7 @@ One refused SAML sign-in, kept so a tenant's own admin can see why (P1c; ADR-001
 
 ## 30. `google_auth_requests`
 
-One in-flight first-party Google sign-in (J3c2; ADR-0017 §D7). Its life is three writes on two hosts: **mint** on the tenant host (a `state_id` and nothing asserted), **attach** on the central callback (stamps `consumed_at`, the four `google_*` columns and a handoff hash), **redeem** back on the tenant host (stamps `completed_at`; the session is created only after that succeeds).
+One in-flight first-party Google sign-in (J3c2; ADR-0019 §D7). Its life is three writes on two hosts: **mint** on the tenant host (a `state_id` and nothing asserted), **attach** on the central callback (stamps `consumed_at`, the four `google_*` columns and a handoff hash), **redeem** back on the tenant host (stamps `completed_at`; the session is created only after that succeeds).
 
 **Writer:** `GoogleAuthRequestService` — the only one, and every state transition is a **conditional UPDATE whose affected-row count is the check**. **Reader:** the same class, plus `GoogleCompleteController` reading the identity back off the redeemed row.
 
@@ -1170,7 +1170,7 @@ One in-flight first-party Google sign-in (J3c2; ADR-0017 §D7). Its life is thre
 > - **Bounded on the WRITE path** (`google-auth.requests.max_rows_per_tenant`, 500; `retention_days`, 7), trimmed in the same call as the insert, for §29's measured reason: nothing runs the scheduler on the production box. ⚠️ The cap is **"not among the newest N"**, never "older than the Nth" — the mint endpoint is unauthenticated and can write many rows inside one second, and a timestamp comparison keeps every tied row.
 > - **There is no `google_auth_failures` twin** (§D9). `sso_auth_failures` exists because a tenant admin configures a SAML trust anchor and must debug their own certificate; Google sign-in has **no tenant-side configuration to get wrong**, so those rows would feed no surface. Refusals go to the log and never to `audits`.
 
-**Linkage lives on `users`, not here.** `users.google_id` (`varchar(255)`, nullable, **unique**) is where a Google account attaches to a local identity — a column rather than a `social_identities` table, per ADR-0017 §D1: the existence check must resolve on the `pgsql_auth` connection, and a column rides the existing `GRANT SELECT, UPDATE ON users TO meridian_auth` and the `TO meridian_auth` write policy for free, where a second table needs a new GRANT and a new policy on the most sensitive role in the deployment. `users` itself remains out of this document's scope (see the header) and is specified in the RBAC doc.
+**Linkage lives on `users`, not here.** `users.google_id` (`varchar(255)`, nullable, **unique**) is where a Google account attaches to a local identity — a column rather than a `social_identities` table, per ADR-0019 §D1: the existence check must resolve on the `pgsql_auth` connection, and a column rides the existing `GRANT SELECT, UPDATE ON users TO meridian_auth` and the `TO meridian_auth` write policy for free, where a second table needs a new GRANT and a new policy on the most sensitive role in the deployment. `users` itself remains out of this document's scope (see the header) and is specified in the RBAC doc.
 
 ---
 
@@ -1300,7 +1300,7 @@ sso_auth_failures.(tenant_id,
 
 google_auth_requests.tenant_id         -> tenants.id                        (CASCADE)
                                           (no user FK: the user is the OUTCOME of this flow, and the
-                                           linkage lives on users.google_id — see §30 and ADR-0017 §D1)
+                                           linkage lives on users.google_id — see §30 and ADR-0019 §D1)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

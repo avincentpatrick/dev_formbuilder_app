@@ -96,7 +96,7 @@ class FortifyServiceProvider extends ServiceProvider
         // visibility comes from the object the redirect route itself asks, so a visible control can never
         // point at a 404. ⚠️ It is deliberately NOT `RegistrationGate`: that answers "may a stranger create
         // an account here", while this button is mostly pressed by people who already have one. See
-        // GoogleSignInGate for the accepted cost of the other direction (ADR-0017 §D8).
+        // GoogleSignInGate for the accepted cost of the other direction (ADR-0019 §D8).
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'canRegister' => app(RegistrationGate::class)->allows($request),
             'canUseGoogle' => app(GoogleSignInGate::class)->allows($request),

@@ -20,7 +20,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
  * ⚠️ `subject` IS THE IDENTITY AND THE EMAIL IS NOT. Google's `sub` is stable for the life of the account;
  * the address is not — a Workspace administrator can reassign `alice@company.com` to a different human
  * after Alice leaves. Anything that keys a local account off the address is a takeover waiting for a
- * staff change, which is why ADR-0017 §D2 makes the email a one-time joining hint and §D5 forbids ever
+ * staff change, which is why ADR-0019 §D2 makes the email a one-time joining hint and §D5 forbids ever
  * rewriting `users.email` from it.
  */
 final readonly class GoogleIdentity
@@ -50,7 +50,7 @@ final readonly class GoogleIdentity
      * ⚠️ `emailVerified` IS A STRICT `=== true` AND FAILS CLOSED ON EVERYTHING ELSE. The claim arrives
      * inside a raw JSON array, so it may be absent, `null`, the STRING `"true"`, or `1`; a loose check
      * would accept the last two and — worse — `(bool) "false"` is `true`. This flag is J3c2's analogue of
-     * SAML's signature check (ADR-0017 §D3): it is the whole basis for believing the address belongs to
+     * SAML's signature check (ADR-0019 §D3): it is the whole basis for believing the address belongs to
      * the person holding the account, so the only acceptable failure direction is refusing a real user.
      *
      * The name falls back to the local part of the address rather than to an empty string: `users.name` is

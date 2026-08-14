@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * The three writes of one Google sign-in (Increment J3c2, ADR-0017 §D7) — {@see SsoAuthRequestService}'s
+ * The three writes of one Google sign-in (Increment J3c2, ADR-0019 §D7) — {@see SsoAuthRequestService}'s
  * sibling, and deliberately the same shapes.
  *
  *   · {@see mint()}   — tenant host, unauthenticated. A row with a `state_id` and nothing asserted.
@@ -40,7 +40,7 @@ use Throwable;
  * ── ⚠️ WHY `mint()` BORROWS A TENANT CONTEXT AND THE OTHER TWO DO NOT ────────────────────────────────
  * `/auth/google/redirect` is served on the central host AND every tenant subdomain from ONE route, exactly
  * as Fortify serves `/login` (`config/fortify.php`'s `'domain' => null` + `RequirePlatformHost`), because
- * the central arm of this flow has to work too (ADR-0017 §D12). That route therefore carries no tenancy
+ * the central arm of this flow has to work too (ADR-0019 §D12). That route therefore carries no tenancy
  * middleware and there is no ambient GUC — and `google_auth_requests` is STRICT-RLS, so without one the
  * INSERT is REFUSED, not mis-scoped. So it borrows the context itself, inside `DB::transaction` because
  * {@see TenantContext::applyLocal()} is `SET LOCAL` and a silent no-op outside one, restoring in `finally`.
@@ -61,7 +61,7 @@ final class GoogleAuthRequestService
     /**
      * Open a sign-in and return the signed `state` that carries it across the host boundary.
      *
-     * ⚠️ THE CENTRAL ARM GETS A STATE AND NO ROW, AND THAT IS NOT AN OPTIMISATION (ADR-0017 §D12). The
+     * ⚠️ THE CENTRAL ARM GETS A STATE AND NO ROW, AND THAT IS NOT AN OPTIMISATION (ADR-0019 §D12). The
      * central callback and the session it creates share a host, so there is nothing for a handoff to carry
      * — and `TenantIsolation::nullableGlobalSql()` widens SELECT only, so a tenant-less row is literally
      * unwritable on the app connection. Its replay bound is Google's single-use `code` plus the state's own
@@ -103,7 +103,7 @@ final class GoogleAuthRequestService
                 // transaction, discards the row just inserted, AND makes the `finally` below fail with
                 // 25P02 ("current transaction is aborted") — which then REPLACES the original exception on
                 // its way out, so the operator is told the transaction was aborted and never which
-                // statement aborted it. A 500 here would also be distinguishable from ADR-0017 §D9's
+                // statement aborted it. A 500 here would also be distinguishable from ADR-0019 §D9's
                 // single indistinguishable bounce. Swallowing is normally a smell; here the alternative is
                 // letting a bound decide the availability of the endpoint it exists to protect.
                 try {
@@ -125,7 +125,7 @@ final class GoogleAuthRequestService
      * Burn the state and attach the identity Google vouched for. Returns false if someone else won.
      *
      * A `false` here must be treated exactly as an invalid callback — it means the state was already spent,
-     * which is a replay, and ADR-0017 §D9 gives it the same indistinguishable bounce as everything else.
+     * which is a replay, and ADR-0019 §D9 gives it the same indistinguishable bounce as everything else.
      *
      * ⚠️ ONE STATEMENT, NOT AN UPDATE FOLLOWED BY A SECOND ONE FOR THE IDENTITY. The migration's
      * `google_auth_requests_identity_check` refuses a consumed row whose identity columns are null, so
@@ -192,7 +192,7 @@ final class GoogleAuthRequestService
     }
 
     /**
-     * Bound the table, in the same call as the insert (ADR-0017 §D7) — {@see SsoAuthFailureRecorder::trim()}
+     * Bound the table, in the same call as the insert (ADR-0019 §D7) — {@see SsoAuthFailureRecorder::trim()}
      * ported, because it is the same problem: an UNAUTHENTICATED endpoint writing rows.
      *
      * ⚠️ NOT A SCHEDULED PRUNE, AND THAT IS MEASURED RATHER THAN PREFERRED. `routes/console.php` records

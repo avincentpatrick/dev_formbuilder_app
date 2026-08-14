@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| First-party Google sign-in (Increment J3c2 — ADR-0017)
+| First-party Google sign-in (Increment J3c2 — ADR-0019)
 |--------------------------------------------------------------------------
 | Two of the flow's three routes. The third — the completion hop that actually creates the session — is in
 | `routes/tenant.php`, because it is the only one that is tenant-only.
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Route;
 | The connector callback group is `Route::domain(config('tenancy.central_domain'))` and sits OUTSIDE `web`.
 | Neither carries over, and each divergence is a decision:
 |
-|   · **`web` IS REQUIRED**, because the CENTRAL arm of this flow signs in at the callback (ADR-0017 §D12)
+|   · **`web` IS REQUIRED**, because the CENTRAL arm of this flow signs in at the callback (ADR-0019 §D12)
 |     and a sign-in needs a session. The connector callback writes a row and redirects; this one may mint a
 |     session, which is the largest side effect the application has. CSRF is not what protects either — the
 |     signed `state` is (ADR-0009 §D3) — but a session is not optional here.

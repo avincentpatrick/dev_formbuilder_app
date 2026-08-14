@@ -71,9 +71,9 @@ final class TenantExtractColumns
                 .'portable across PostgreSQL text-search configurations and reproducible by reindexing.',
         ],
         'google_auth_requests' => [
-            'handoff_hash' => 'A LIVE single-use credential (Increment J3c2 — the first-party Google sign-in ADR, '
-                .'cited by increment rather than by number on purpose: that document is mid-renumber out of a '
-                .'collision with this lane\'s own 0017, so neither its number nor its filename is stable today). '
+            'handoff_hash' => 'A LIVE single-use credential (Increment J3c2, ADR-0019 §D7 — that document was '
+                .'ADR-0017 when this entry was first written, and was renumbered out of a collision with this '
+                .'lane\'s own 0017 in the very next commit). '
                 .'The row is a sign-in attempt in flight; '
                 .'whoever holds the preimage of this hash before `handoff_expires_at` can complete that sign-in as '
                 .'the person named in the same row. The tenant may legitimately see THAT an attempt happened and '

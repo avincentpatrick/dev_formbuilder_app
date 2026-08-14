@@ -1,4 +1,22 @@
-# ADR-0017: First-Party Google Sign-In (identity linkage, one central callback, a single-use tenant handoff)
+# ADR-0019: First-Party Google Sign-In (identity linkage, one central callback, a single-use tenant handoff)
+
+> ⚠️ **THIS DOCUMENT WAS ADR-0017 WHEN IT WAS WRITTEN, AND A CITATION TO "ADR-0017" DATED ON OR BEFORE
+> 2026-08-14 MAY MEAN THIS FILE.** It shipped as 0017 in J3c2 (#151) and was renumbered to 0019 immediately
+> afterwards, because Lane B's `0017-tenant-isolation-tiering.md` (P2a, #150) had taken the same number on
+> the same integration branch. **Neither lane erred**: each read the sequence before starting and each
+> correctly saw 0016 as the highest — reading the current maximum is not a reservation. By arrival order
+> this one moved. Every in-repo reference was swept per-occurrence at the time, so nothing here should be
+> dangling; the warning exists for anything *outside* the repo — a PR description, a review comment, a
+> commit message from #151 — which cannot be swept.
+>
+> ⚠️ **0010 is NOT free despite the gap in the sequence.** `0011`, `0012` and `0013` each reserve it for
+> H1d, the OCR provider bake-off, and each says so in its own Related-ADRs line while declining to fill it.
+>
+> **The rule this cost us: a globally-numbered artefact — an ADR number, a migration timestamp, an
+> exceptions-log entry — is a shared-namespace allocation and cannot be chosen safely from inside one lane.**
+> The same session also produced a duplicate migration prefix (`2026_08_16_000001` twice), which is the same
+> defect with a luckier blast radius: the two migrations are independent and PostgreSQL does not care about
+> the tiebreak.
 
 ## Status
 

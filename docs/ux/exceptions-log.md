@@ -691,7 +691,7 @@ without amending **#8** again.
 
 ## #15 — Google's four-colour mark, as local markup outside the icon set (`resources/js/components/auth/GoogleMark.vue`)
 
-**Introduced:** Phase 1 completion · Increment J3c2 (first-party Google sign-in, ADR-0017).
+**Introduced:** Phase 1 completion · Increment J3c2 (first-party Google sign-in, ADR-0019).
 
 **The rules being excepted.** Two, and the first is written into the icon set itself.
 `packages/design-system/src/components/Icon/icons.ts` opens by declaring the set "hand-authored line-art
@@ -734,7 +734,7 @@ asserts that every `var(--mds-*)` reference RESOLVES, and this file makes none.
   saturated background it may need a white plate behind it. Nothing in the repo enforces contrast for it,
   because axe cannot judge decorative `aria-hidden` artwork.
 - **A second provider means a second file like this**, not a shared abstraction. That is deliberate at
-  n=1; ADR-0017 §D1 names the same threshold for the `google_id` column, so both would be revisited by
+  n=1; ADR-0019 §D1 names the same threshold for the `google_id` column, so both would be revisited by
   the same trigger.
 - **The label is a CI constraint, not a design choice.** It must read "Continue with Google" and may
   never contain "Sign in": `tests/e2e/global-setup.ts` locates the submit control with a NON-exact

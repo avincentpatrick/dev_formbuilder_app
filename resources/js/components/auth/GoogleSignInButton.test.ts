@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import GoogleSignInButton from './GoogleSignInButton.vue';
 
 /**
- * "Continue with Google" (Increment J3c2 — ADR-0017).
+ * "Continue with Google" (Increment J3c2 — ADR-0019).
  *
  * ⚠️ THE FIRST CASE IS A CANARY FOR THE E2E SUITE, NOT A COPY ASSERTION, AND THAT IS WHY IT IS HERE.
  * `tests/e2e/global-setup.ts` signs in twice before any spec runs, locating the submit control with

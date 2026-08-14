@@ -137,7 +137,7 @@ function apiMember(string $roleName): User
  * DELETE deadlocks against the open locks.
  *
  * ⚠️ `$verified` GAINED A PARAMETER IN J3c2 RATHER THAN A FIFTH COPY OF THE HELPER. Google sign-in links
- * onto an existing account ONLY when that account has already proved it owns its address (ADR-0017 §D4), so
+ * onto an existing account ONLY when that account has already proved it owns its address (ADR-0019 §D4), so
  * the refusal arm needs an UNVERIFIED committed identity — and until now every committed helper here
  * (`committedSuperAdmin`, `committedPlainUser`, this one) hard-set the column. Defaulting to `true` means no
  * existing caller moves. ⚠️ Pest helpers are GLOBAL and a duplicate name passes every per-file run while

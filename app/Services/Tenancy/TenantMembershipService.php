@@ -17,6 +17,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Notifications\TenantInvitationNotification;
 use App\Services\Admin\SuperAdminService;
+use App\Services\Auth\GoogleSignInProvisioner;
 use App\Services\Entitlements\QuotaGuard;
 use App\Support\Audit\AuditLogger;
 use App\Support\Branding\BrandPalette;
@@ -235,7 +236,7 @@ final class TenantMembershipService
      * ⚠️ THE ROLE IS RESOLVED BY THE CALLER, AND FOR THIS DOOR THAT IS LOAD-BEARING RATHER THAN STYLISTIC.
      * {@see attachMember()} overwrites `invited_role_id` with whatever role it is handed, so §D20's
      * "Invited → activated at the INVITED role" cannot be expressed here — it has to be decided before the
-     * call. {@see \App\Services\Auth\GoogleSignInProvisioner::roleFor()} is where that happens, mirroring
+     * call. {@see GoogleSignInProvisioner::roleFor()} is where that happens, mirroring
      * how SSO passes `sso_connections.default_role_name`. An absent membership gets `viewer`, the same
      * least-privileged default {@see joinOpenTenant()} argues for: someone who arrived holding a Google
      * account has proved nothing about what they should be able to do.

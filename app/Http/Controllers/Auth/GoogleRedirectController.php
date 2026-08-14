@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Services\Auth\GoogleAuthRequestService;
 use App\Services\Auth\GoogleSignInGate;
+use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Sso\SsoReturnTo;
 use App\Support\Tenancy\PlatformHost;
@@ -27,7 +28,7 @@ use Illuminate\Http\Request;
  * host and every tenant subdomain and 404ing exactly one class of host: a custom domain.
  *
  * The consequence is that the tenant comes from the HOST rather than from middleware, exactly as
- * {@see \App\Services\Settings\RegistrationGate::tenantFor()} resolves it for `/register`, and that
+ * {@see RegistrationGate::tenantFor()} resolves it for `/register`, and that
  * {@see GoogleAuthRequestService::mint()} has to borrow an RLS context to write its row.
  *
  * ── `return_to` IS SANITISED HERE AND RE-VALIDATED ON THE WAY OUT ───────────────────────────────────

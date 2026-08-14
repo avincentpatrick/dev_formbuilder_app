@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Auth;
 
+use App\Services\Auth\GoogleSignInProvisioner;
 use RuntimeException;
 
 /**
@@ -65,7 +66,7 @@ final class GoogleSignInRefusedException extends RuntimeException
      * The link UPDATE affected a number of rows other than one.
      *
      * Either a concurrent sign-in won the race, or — the case worth naming — the write ran somewhere it
-     * could not see the row. See {@see \App\Services\Auth\GoogleSignInProvisioner::link()}.
+     * could not see the row. See {@see GoogleSignInProvisioner::link()}.
      */
     public static function linkageNotWritten(): self
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Http\Middleware\EstablishGoogleAuthContext;
 use App\Models\GoogleAuthRequest;
 use App\Models\Tenant;
 use App\Services\Sso\SsoAuthFailureRecorder;
@@ -11,6 +12,7 @@ use App\Services\Sso\SsoAuthRequestService;
 use App\Support\Auth\GoogleAuthState;
 use App\Support\Auth\GoogleAuthStateService;
 use App\Support\Auth\GoogleIdentity;
+use App\Support\Sso\SsoReturnTo;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -41,7 +43,7 @@ use Illuminate\Support\Facades\DB;
  * INSERT is REFUSED, not mis-scoped. So it borrows the context itself, inside `DB::transaction` because
  * {@see TenantContext::applyLocal()} is `SET LOCAL` and a silent no-op outside one, restoring in `finally`.
  * That is `TenantSettingRegistry::forTenant()`'s idiom, on the same class of context-free auth route.
- * `attach()` runs behind {@see \App\Http\Middleware\EstablishGoogleAuthContext} and `redeem()` behind the
+ * `attach()` runs behind {@see EstablishGoogleAuthContext} and `redeem()` behind the
  * full tenant pipeline, so both already have a real GUC and neither may borrow one.
  *
  * ── ⚠️ THE WRONG-TENANT REFUSAL IS RLS, NOT AN `if` ──────────────────────────────────────────────────
@@ -63,7 +65,7 @@ final class GoogleAuthRequestService
      * unwritable on the app connection. Its replay bound is Google's single-use `code` plus the state's own
      * expiry, which is ADR-0009 §D3's original argument, still sound for the leg it was written about.
      *
-     * `$returnTo` is already {@see \App\Support\Sso\SsoReturnTo::sanitise()}d by the caller — a PATH, never
+     * `$returnTo` is already {@see SsoReturnTo::sanitise()}d by the caller — a PATH, never
      * a URL. It is re-validated on the way out too.
      */
     public function mint(?Tenant $tenant, ?string $returnTo, ?string $ip): string

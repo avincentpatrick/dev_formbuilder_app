@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Auth\RlsAwareUserProvider;
 use App\Enums\TenantUserStatus;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -46,15 +47,31 @@ use Illuminate\Support\Str;
  * INVITED ROLE (see {@see roleFor()}). Absent/Declined/Removed → gated on `RegistrationGate`, which is the
  * same answer the login page uses to decide whether to show the button at all. A full workspace REFUSES.
  *
- * ── ⚠️ ONE TRANSACTION, AND ONE WRITE DELIBERATELY OUTSIDE IT ───────────────────────────────────────
+ * ── ⚠️⚠️ ONE TRANSACTION, AND THE LINK MUST HAPPEN BEFORE IT OPENS — THIS IS A DEADLOCK, NOT A STYLE ──
  * Everything on the default connection is wrapped, so a seat-quota refusal cannot leave a freshly created
  * account orphaned — {@see SsoUserProvisioner}'s argument, for the same reason: a session with no
- * membership sees an empty workspace through RLS and reads as data loss. The `google_id` link runs on
- * `pgsql_auth`, a SEPARATE SESSION, so it is NOT enrolled in that transaction and a rollback cannot undo
- * it. That is why {@see provision()} performs it LAST, after every refusal that could roll back has
- * already been evaluated and after the membership write has succeeded. Stated rather than discovered
- * later: if the link itself fails, the transaction unwinds the membership, which is the direction that
- * leaves nothing half-done.
+ * membership sees an empty workspace through RLS and reads as data loss.
+ *
+ * The `google_id` link, however, runs on `pgsql_auth` — a SEPARATE SESSION that is not part of that
+ * transaction. The first version of this class performed it LAST, inside the transaction, reasoning that
+ * a rollback could then never strand a link. **That version hangs forever**, and the reason is a lock
+ * interaction neither half is obviously responsible for:
+ *
+ *   · `users.google_id` is UNIQUE. PostgreSQL's cheap `FOR NO KEY UPDATE` applies only when no
+ *     unique-indexed column changes, so this UPDATE takes a full **`FOR UPDATE`** row lock.
+ *   · `attachMember()`'s INSERT into `tenant_users` takes **`FOR KEY SHARE`** on the parent `users` row,
+ *     because `tenant_users_user_id_foreign` references it.
+ *   · Those two conflict — and the transaction holding the `FOR KEY SHARE` cannot commit until this
+ *     method returns. **The request blocks on itself**, with no error, no rollback and no timeout.
+ *
+ * Measured, not reasoned: a test run sat for over three hours with
+ * `pg_blocking_pids()` naming the application's own connection as the blocker.
+ *
+ * So resolution AND linkage run first, in {@see resolveAndLink()}, before any transaction exists. That
+ * ordering is also the honest model — linkage is an ACCOUNT fact, membership is a WORKSPACE fact — and
+ * its cost is recorded as residual 15 in `docs/security-threat-model.md` §9: a workspace-level refusal
+ * after a successful link leaves the account linked. Every §D4 condition was met, so that is correct on
+ * its own terms, and the next attempt resolves by `sub`.
  */
 final class GoogleSignInProvisioner
 {
@@ -71,32 +88,28 @@ final class GoogleSignInProvisioner
      */
     public function provision(?Tenant $tenant, GoogleIdentity $identity, Request $request): GoogleSignInOutcome
     {
-        return DB::transaction(function () use ($tenant, $identity, $request): GoogleSignInOutcome {
-            // §D3's second assertion. The first is at the callback, before anything is stored.
-            if (! $identity->emailVerified) {
-                throw GoogleSignInRefusedException::emailNotVerified();
-            }
+        // §D3's second assertion. The first is at the callback, before anything is stored.
+        if (! $identity->emailVerified) {
+            throw GoogleSignInRefusedException::emailNotVerified();
+        }
 
-            $user = $this->resolveBySubject($identity->subject);
-            $needsLink = false;
+        // ⚠️⚠️ RESOLUTION AND LINKAGE HAPPEN **BEFORE** THE TRANSACTION OPENS, AND THAT IS A DEADLOCK FIX
+        // RATHER THAN A TIDY-UP. See {@see link()} for the full mechanism; the short version is that
+        // `users.google_id` is UNIQUE, so updating it needs a `FOR UPDATE` row lock, while inserting the
+        // `tenant_users` row inside the transaction takes `FOR KEY SHARE` on the SAME `users` row for its
+        // foreign key. Those two conflict. Because the link runs on `pgsql_auth` — a separate session that
+        // is NOT part of this transaction — it would wait for a transaction that cannot commit until it
+        // returns. One request blocking on itself, forever, with no error and no rollback.
+        //
+        // Ordering it first also happens to be the honest model: linkage is an ACCOUNT fact and membership
+        // is a WORKSPACE fact, and the account question is fully answerable before the workspace one is
+        // asked. The accepted cost is recorded as residual 15 in `docs/security-threat-model.md` §9: a
+        // later workspace-level refusal (suspended, closed, quota) leaves the account linked. That is
+        // correct on its own terms — every §D4 condition was met — and the next attempt resolves by `sub`.
+        $resolved = $this->resolveAndLink($identity);
 
-            if ($user === null) {
-                $user = $this->memberships->resolveUserByEmail($identity->email);
-
-                if ($user !== null) {
-                    // Resolution by subject already failed, so a non-null `google_id` here is necessarily a
-                    // DIFFERENT one — §D2's reassigned address, arriving as somebody else's account.
-                    if ($user->google_id !== null) {
-                        throw GoogleSignInRefusedException::subjectMismatch();
-                    }
-
-                    if ($user->email_verified_at === null) {
-                        throw GoogleSignInRefusedException::localAccountUnverified();
-                    }
-
-                    $needsLink = true;
-                }
-            }
+        return DB::transaction(function () use ($tenant, $identity, $request, $resolved): GoogleSignInOutcome {
+            $user = $resolved;
 
             $membership = $user !== null && $tenant !== null ? $this->membershipFor($user) : null;
 
@@ -129,13 +142,44 @@ final class GoogleSignInProvisioner
                 }
             }
 
-            // LAST, for the reason in the class docblock: this one write is not in the transaction.
-            if ($needsLink) {
-                $this->link($user, $identity);
-            }
-
             return new GoogleSignInOutcome($user, $created);
         });
+    }
+
+    /**
+     * Answer "who is this?" entirely, including writing the link — all OUTSIDE any transaction.
+     *
+     * Returns null when nobody local matches, which is the caller's signal to create.
+     *
+     * @throws GoogleSignInRefusedException
+     */
+    private function resolveAndLink(GoogleIdentity $identity): ?User
+    {
+        $user = $this->resolveBySubject($identity->subject);
+
+        if ($user !== null) {
+            return $user;
+        }
+
+        $user = $this->memberships->resolveUserByEmail($identity->email);
+
+        if ($user === null) {
+            return null;
+        }
+
+        // Resolution by subject already failed, so a non-null `google_id` here is necessarily a DIFFERENT
+        // one — §D2's reassigned address, arriving as somebody else's account.
+        if ($user->google_id !== null) {
+            throw GoogleSignInRefusedException::subjectMismatch();
+        }
+
+        if ($user->email_verified_at === null) {
+            throw GoogleSignInRefusedException::localAccountUnverified();
+        }
+
+        $this->link($user, $identity);
+
+        return $user;
     }
 
     /**
@@ -176,8 +220,15 @@ final class GoogleSignInProvisioner
      * account cannot be linked onto either.
      *
      * There was no prior precedent in this codebase for an affected-count-checked write on this connection
-     * — {@see \App\Auth\RlsAwareUserProvider::updateRememberToken()} and {@see User::replaceRecoveryCode()}
+     * — {@see RlsAwareUserProvider::updateRememberToken()} and {@see User::replaceRecoveryCode()}
      * are the only other `pgsql_auth` writes and neither checks. This is the first.
+     *
+     * ⚠️⚠️ AND IT MUST NEVER BE CALLED FROM INSIDE A TRANSACTION ON THE DEFAULT CONNECTION. Because
+     * `google_id` is UNIQUE this UPDATE takes a full `FOR UPDATE` row lock, which conflicts with the
+     * `FOR KEY SHARE` that a `tenant_users` INSERT takes on the same `users` row for its foreign key. On a
+     * separate session it would then wait for a transaction that cannot commit until this call returns —
+     * the request blocking on itself, with no error, no rollback and no timeout. See the class docblock;
+     * this is why {@see resolveAndLink()} runs before {@see provision()} opens one.
      *
      * @throws GoogleSignInRefusedException
      */

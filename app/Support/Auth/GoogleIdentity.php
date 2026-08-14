@@ -6,7 +6,7 @@ namespace App\Support\Auth;
 
 use App\Support\Tenancy\DnsTxtResolver;
 use Illuminate\Support\Str;
-use Laravel\Socialite\Contracts\User as SocialiteUser;
+use Laravel\Socialite\Two\User as SocialiteUser;
 
 /**
  * What Google told us about a person, reduced to the four things this product acts on (Increment J3c2).
@@ -34,6 +34,14 @@ final readonly class GoogleIdentity
 
     /**
      * Map Socialite's user onto this contract.
+     *
+     * ⚠️ THE PARAMETER IS SOCIALITE'S **CONCRETE** `Two\User`, NOT ITS `Contracts\User`, AND PHPStan IS
+     * WHAT CAUGHT THAT. `getRaw()` — the accessor this whole method turns on, because `email_verified`
+     * lives only in the raw claim array — exists on the concrete class and is ABSENT from the interface.
+     * Typed against the contract this compiled, ran, and passed its unit tests (which build a `Two\User`),
+     * while being a `method.notFound` the moment anything checked. `AbstractProvider::userFromToken()` is
+     * documented `@return \Laravel\Socialite\Two\User`, so the concrete type is what the caller actually
+     * has and the narrower hint costs nothing.
      *
      * ⚠️ THIS IS THE UNIT UNDER TEST, AND THAT IS WHY IT IS HERE RATHER THAN INSIDE THE ADAPTER. Keeping
      * the mapping pure leaves {@see SocialiteGoogleIdentityProvider} as a thin call to a third party with

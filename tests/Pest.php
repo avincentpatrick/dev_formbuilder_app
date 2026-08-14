@@ -135,19 +135,29 @@ function apiMember(string $roleName): User
  * ⚠️ RANDOM EMAIL, AND NEVER DELETED IN AN `afterEach`. These rows outlive the transaction and are cleaned
  * only by `migrate:fresh`; a fixed address collides on the second run and pollutes every later file, and a
  * DELETE deadlocks against the open locks.
+ *
+ * ⚠️ `$verified` GAINED A PARAMETER IN J3c2 RATHER THAN A FIFTH COPY OF THE HELPER. Google sign-in links
+ * onto an existing account ONLY when that account has already proved it owns its address (ADR-0017 §D4), so
+ * the refusal arm needs an UNVERIFIED committed identity — and until now every committed helper here
+ * (`committedSuperAdmin`, `committedPlainUser`, this one) hard-set the column. Defaulting to `true` means no
+ * existing caller moves. ⚠️ Pest helpers are GLOBAL and a duplicate name passes every per-file run while
+ * fatalling only on the full suite, which is why this is a parameter and not a `committedUnverifiedIdentity`.
+ *
+ * @param  bool  $verified  false produces an account that exists and has NOT confirmed its address — the
+ *                          §D4 refusal case, and the only shape in which linking would be a takeover.
  */
-function committedTenantIdentity(string $name = 'Committed Member'): User
+function committedTenantIdentity(string $name = 'Committed Member', bool $verified = true, ?string $email = null): User
 {
     /** @var User $user */
     $user = User::on('pgsql_privileged')->forceCreate([
         'name' => $name,
-        'email' => Str::lower(Str::random(12)).'@identity.test',
+        'email' => $email ?? Str::lower(Str::random(12)).'@identity.test',
         'password' => Hash::make('secret-password-123'),
         // J3a — `routes/tenant.php`'s authenticated group carries `verified`, so an identity handed to
         // `actingAs()` without this is bounced to `/email/verify` and every assertion about the page under
         // test reads as a product failure. `UserFactory` already defaults it; the hand-rolled committed
         // identities did not, because before J3a nothing consumed the column.
-        'email_verified_at' => now(),
+        'email_verified_at' => $verified ? now() : null,
     ]);
     $user->setConnection((string) config('database.default'));
 

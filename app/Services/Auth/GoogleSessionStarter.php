@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Support\Auth\GoogleSignInOutcome;
+use App\Support\Sso\SsoReturnTo;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
 use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 
 /**
@@ -27,7 +29,7 @@ use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
  * otherwise find it silently bypassed by a button on the same page as the password form.
  *
  * Mechanically this is Fortify's own shape, copied from
- * {@see \Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable::twoFactorChallengeResponse()}: write
+ * {@see RedirectIfTwoFactorAuthenticatable::twoFactorChallengeResponse()}: write
  * `login.id`, dispatch the challenge event, redirect to `two-factor.login`. That page was UNREACHABLE BY
  * ANYONE until J3c1 repaired it, which is why this increment had to follow that one.
  *
@@ -46,7 +48,7 @@ use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 final class GoogleSessionStarter
 {
     /**
-     * @param  string  $destination  an already-validated PATH from {@see \App\Support\Sso\SsoReturnTo}
+     * @param  string  $destination  an already-validated PATH from {@see SsoReturnTo}
      */
     public function start(Request $request, GoogleSignInOutcome $outcome, string $destination): RedirectResponse
     {

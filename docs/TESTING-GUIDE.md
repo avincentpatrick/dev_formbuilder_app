@@ -64,6 +64,11 @@ Every account below uses the same password: **`meridian-demo-2026`**
 `invited@demo.test` also exists but **cannot sign in** — it is a pending invitation, so the Members roster has
 a pending row to show. That is intended.
 
+> **For the authorization detail behind these accounts, see [`ACCESS-MATRIX.md`](ACCESS-MATRIX.md)** — the
+> full 5-role × 29-permission grid, which destination each role can reach (and where the tenant's *plan*
+> hides a destination the role grants), the API token abilities, and the second stack on port 8081. This
+> guide stays the walkthrough; that document is the reference behind it.
+
 ### 0.3 First look
 
 1. Open <http://localhost:8080>. **Expect:** the platform landing page — a headline, a "Sign in" button, a

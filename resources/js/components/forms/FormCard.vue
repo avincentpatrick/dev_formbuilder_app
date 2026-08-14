@@ -16,7 +16,7 @@
  */
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import { MdsBadge, MdsCard, statusVariant } from '@meridian/design-system';
+import { MdsBadge, MdsCard, MdsProgress, statusVariant } from '@meridian/design-system';
 import { relativeTime } from '@/components/notifications/relative-time';
 import { formIdentityVar, type FormRow } from '@/types/forms';
 
@@ -161,29 +161,22 @@ function untilLabel(iso: string): string {
         </dl>
 
         <!-- A capped form shows its meter; everything else shows the schedule line in the same slot, so
-             cards keep a common height without one of them carrying an empty band. -->
-        <div v-if="capacity" class="form-card__capacity">
-            <span class="form-card__capacity-label">
-                Capacity
-                <b>{{ capacity.used }} / {{ capacity.cap }}</b>
-            </span>
-            <!-- `progressbar` with the real numbers, so the meter is not a decorative bar to a screen
-                 reader; the visible label carries the same figures for everyone else. -->
-            <span
-                class="form-card__meter"
-                role="progressbar"
-                :aria-valuenow="capacity.used"
-                :aria-valuemin="0"
-                :aria-valuemax="capacity.cap"
-                :aria-label="`Capacity: ${capacity.used} of ${capacity.cap} responses`"
-            >
-                <i
-                    class="form-card__meter-fill"
-                    :class="{ 'form-card__meter-fill--warn': capacity.percent >= 75 }"
-                    :style="{ width: `${capacity.percent}%` }"
-                />
-            </span>
-        </div>
+             cards keep a common height without one of them carrying an empty band.
+
+             J4a: this was the app's only hand-rolled `role="progressbar"` and is now `MdsProgress`. The
+             `v-if` stays HERE rather than moving into the component — `forms/index.test.ts:252` asserts a
+             form with no cap renders no progressbar at all, and "should this row have a meter" is a page
+             question, not the meter's. `valueText` carries the count because the cap is not always 100, so
+             a percentage would be announced over a number the user never sees. -->
+        <MdsProgress
+            v-if="capacity"
+            class="form-card__capacity"
+            label="Capacity"
+            :value="capacity.used"
+            :max="capacity.cap"
+            :value-text="`${capacity.used} / ${capacity.cap}`"
+            :tone="capacity.percent >= 75 ? 'warning' : 'default'"
+        />
         <p v-else class="form-card__schedule">{{ scheduleNote }}</p>
 
         <template #footer>
@@ -375,43 +368,12 @@ function untilLabel(iso: string): string {
     font-weight: var(--mds-font-weight-medium);
 }
 
+/* Only the spacing survives the J4a migration: the flex column, the space-between label row, the 5px
+   track and both fills moved into `MdsProgress`. The class stays on the component's root, where Vue's
+   scope-id lands, so this rule still applies — that is the `.detail__back` and `.encode__crumb` pattern,
+   where a migrated block's leftover CSS was deleted with its markup rather than left to rot. */
 .form-card__capacity {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mds-space-1);
     margin-top: var(--mds-space-3);
-}
-
-.form-card__capacity-label {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--mds-space-2);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-secondary);
-}
-
-.form-card__capacity-label b {
-    color: var(--mds-color-text-body);
-    font-variant-numeric: tabular-nums;
-}
-
-.form-card__meter {
-    display: block;
-    height: 5px;
-    border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-bg-sunken);
-    overflow: hidden;
-}
-
-.form-card__meter-fill {
-    display: block;
-    height: 100%;
-    border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-action-primary-bg);
-}
-
-.form-card__meter-fill--warn {
-    background-color: var(--mds-color-status-warning-fg);
 }
 
 .form-card__schedule {

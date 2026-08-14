@@ -17,7 +17,7 @@
  * a labelled file input, keyboard-operable remove/retry buttons, and an `aria-live` status/error region.
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { MdsButton } from '@meridian/design-system';
+import { MdsButton, MdsProgress } from '@meridian/design-system';
 
 import type { AnswerValue, EncodeField, MediaAttachmentRef, RequiredMarker } from './FieldInput.vue';
 
@@ -362,12 +362,18 @@ onBeforeUnmount(revokeAll);
                 <div class="media__meta">
                     <span class="media__name">{{ item.name }}</span>
 
-                    <progress
+                    <!-- J4a: was a bare `progress` element with NO accessible name — the filename is a
+                         sibling above it, not a label, so a screen reader announced a nameless bar. The
+                         label is "Uploading" rather than the filename, because the filename is already on
+                         screen and repeating it would announce the same string twice; it also makes this
+                         state carry a word like the two below it, which it did not before. -->
+                    <MdsProgress
                         v-if="item.status === 'uploading'"
                         class="media__progress"
+                        label="Uploading"
                         :value="item.progress"
-                        max="100"
-                    >{{ item.progress }}%</progress>
+                        :max="100"
+                    />
 
                     <span v-else-if="item.status === 'done'" class="media__status media__status--done">Uploaded</span>
                     <span v-else class="media__status media__status--error">{{ item.error }}</span>
@@ -514,9 +520,10 @@ onBeforeUnmount(revokeAll);
     color: var(--mds-color-text-heading);
 }
 
+/* Only the width survives: the track's own height now comes from MdsProgress's `sm` size, and the
+   6px here would have fought it. */
 .media__progress {
     width: 100%;
-    height: 6px;
 }
 
 .media__status {

@@ -178,9 +178,18 @@ wrote each one. Measured on a freshly migrated `meridian_testing` (56 base table
 
 | | Total | Crossing the boundary | Recorded |
 |---|---|---|---|
-| Unique, non-primary indexes | 42 | 13 on a `tenant_id`-carrying table without it in the KEY | 13 |
-| Foreign keys | 112 | 29 whose TARGET carries `tenant_id` while the key does not | 29 |
+| Unique, non-primary indexes | 43 | 13 on a `tenant_id`-carrying table without it in the KEY | 13 |
+| Foreign keys | 113 | 29 whose TARGET carries `tenant_id` while the key does not | 29 |
 | Composite `(tenant_id, x_id)` FKs | 9 | — | the compliant shape |
+
+⚠️ **The two TOTALS in this table were wrong when first written, and the way they were wrong is worth more than
+the numbers.** They said 42 and 112, taken from a `psql` census run against a `meridian_testing` that was two
+migrations stale — J3c2's `google_auth_requests` (2 unique indexes, 1 FK) and `users.google_id` (1 unique index)
+were simply not in it. The **crossing** counts were right throughout, because those came from the drift test,
+which runs under `RefreshDatabase` and therefore against a schema migrated seconds earlier. **A number
+measured against a convenient database and a number measured against a migrated one are different kinds of
+claim**, and only the second belongs in a document. P2a paid for this once already, sweeping a `meridian`
+three migrations behind and reporting every total one short.
 
 ⚠️ **The unique half is mostly principled and the foreign-key half is mostly not.** Of the 13 indexes, 11 are
 values that are globally unique by definition (a hostname), matched before any tenant is resolved (an OAuth

@@ -134,9 +134,38 @@ foreach ($files as $file) {
     // Raw DDL first: `DB::statement('CREATE UNIQUE INDEX …')` sits at the top level of `up()`, outside
     // any Schema block, and nine of this schema's unique indexes are declared that way because a PARTIAL
     // unique is not expressible through Blueprint at all.
-    foreach (raw_ddl_constraints($up, $finder) as [$name, $table, $columns, $kind, $line]) {
-        if (in_array($table, $dropped, true) || ! in_array($table, $tenantTables, true)) {
+    foreach (raw_ddl_constraints($up, $finder) as [$name, $table, $columns, $kind, $target, $line]) {
+        if ($kind === 'unreadable') {
+            $unresolved++;
+
             continue;
+        }
+
+        if (in_array($table, $dropped, true)) {
+            continue;
+        }
+
+        // A UNIQUE is judged on the table it sits ON; a FOREIGN KEY on the table it POINTS AT. Getting
+        // this the same way round as the Blueprint path below is not cosmetic — see the block there.
+        $resolved = null;
+
+        if ($kind === 'unique') {
+            if (! in_array($table, $tenantTables, true)) {
+                continue;
+            }
+        } elseif (! in_array('tenant_id', $columns, true)) {
+            // Compliance before resolution, for the reason spelled out on the Blueprint path below.
+            $resolved = resolve_target($target, $columns, $tenantTables);
+
+            if ($resolved === null) {
+                $unresolved++;
+
+                continue;
+            }
+
+            if (! in_array($resolved, $tenantTables, true)) {
+                continue;
+            }
         }
 
         $constraints++;
@@ -154,15 +183,15 @@ foreach ($files as $file) {
         }
 
         $violations[] = sprintf(
-            '%s:%d: raw DDL declares `%s` on %s (%s) without `tenant_id` in the key, on the tenant-scoped '
-                .'`%s` (ADR-0002 §D5). Add `tenant_id` to the key, or record it in '
+            '%s:%d: raw DDL declares `%s` as %s on (%s) without `tenant_id` in the key, crossing into the '
+                .'tenant-scoped `%s` (ADR-0002 §D5). Add `tenant_id` to the key, or record it in '
                 .'`App\Support\Tenancy\ConstraintBoundaries` with a rationale.',
             $relative,
             $line,
             $name,
             $kind === 'unique' ? 'a unique index' : 'a foreign key',
             implode(', ', $columns),
-            $table
+            $kind === 'unique' ? $table : ($resolved ?? $table)
         );
     }
 
@@ -174,11 +203,21 @@ foreach ($files as $file) {
         $carriesTenant = in_array($table, $tenantTables, true)
             || declares_tenant_column($stmts, $finder);
 
-        if (! $carriesTenant) {
-            continue; // no tenant dimension on this table, so nothing here can span a boundary
-        }
-
+        // ⚠️ A UNIQUE IS JUDGED ON ITS OWN TABLE; A FOREIGN KEY IS JUDGED ON THE TABLE IT POINTS AT, AND
+        // THIS BLOCK USED TO SKIP BOTH WHENEVER THE SOURCE HAD NO TENANT COLUMN. A unique index constrains
+        // the rows it sits on, so an untenanted table's unique spans nothing — that early return is right
+        // for uniques and only for uniques. A foreign key is the other way round: `role_has_permissions`
+        // and `tenants` carry no `tenant_id` and both point INTO tenant-scoped tables, which is the exact
+        // shape ConstraintBoundaries names as the reason its own predicate is written about the target.
+        // Gating on the source made this script blind to all three of them — so removing any of the three
+        // from the constant reddened the drift test and left this at exit 0, while the threat model claimed
+        // they were "blocked at authoring time". Found by the adversarial pass, after 4 of 6 CI jobs were
+        // green.
         foreach (unique_declarations($table, $stmts, $finder) as [$name, $columns, $line]) {
+            if (! $carriesTenant) {
+                continue;
+            }
+
             $constraints++;
 
             if (in_array('tenant_id', $columns, true) || ConstraintBoundaries::reasonForIndex($name) !== null) {
@@ -198,9 +237,13 @@ foreach ($files as $file) {
         }
 
         foreach (foreign_key_declarations($table, $stmts, $finder) as [$name, $columns, $target, $line]) {
-            $constraints++;
+            // ⚠️ ORDER MATTERS AND GETTING IT WRONG INFLATED `unresolved` FROM 0 TO 27. A key that already
+            // carries `tenant_id` is compliant whatever it points at, and resolving the target first sent
+            // every COMPOSITE key — two columns, so no `{stem}_id` to match — down the unresolved path.
+            // Compliance is cheaper to decide than resolution, so it is decided first.
+            if (in_array('tenant_id', $columns, true)) {
+                $constraints++;
 
-            if (in_array('tenant_id', $columns, true) || ConstraintBoundaries::reasonForForeignKey($name) !== null) {
                 continue;
             }
 
@@ -216,6 +259,12 @@ foreach ($files as $file) {
 
             if (! in_array($resolved, $tenantTables, true)) {
                 continue; // points at a central table (users, tenants, plans) — no boundary to cross
+            }
+
+            $constraints++;
+
+            if (ConstraintBoundaries::reasonForForeignKey($name) !== null) {
+                continue;
             }
 
             $violations[] = sprintf(
@@ -247,7 +296,7 @@ if ($violations !== []) {
 
 fwrite(STDOUT, sprintf(
     'Constraint boundary linter passed (%d migration file(s) scanned, %d constraint(s) checked, '
-        ."%d foreign-key target(s) unresolved).\n",
+        ."%d constraint(s) not statically readable).\n",
     $scanned,
     $constraints,
     $unresolved
@@ -273,7 +322,8 @@ function up_method_stmts(array $ast, NodeFinder $finder): array
 
 /**
  * Constraints declared in raw SQL passed to `DB::statement()` / `DB::unprepared()`, as
- * [name, table, columns, 'unique'|'foreign', line].
+ * [name, table, columns, 'unique'|'foreign', target|null, line]. A `null` name signals SQL that could
+ * not be folded, which the caller counts rather than discards.
  *
  * ⚠️ THIS RULE WAS SPECIFIED, NOT WRITTEN, AND THE MUTATION PASS IS WHAT NOTICED. Removing
  * `settings_platform_key_unique` from the constant reddened the drift test and left this script at
@@ -285,8 +335,13 @@ function up_method_stmts(array $ast, NodeFinder $finder): array
  * occurrences inside docblocks in `add_reference_to_submissions` from being counted as DDL — the
  * argument for AST over grep, made concrete.
  *
+ * ⚠️ `preg_match_all`, AND EVERY STATEMENT SPLIT ON `;` FIRST. `DB::unprepared()` exists to carry more
+ * than one statement, and a single-match parse would check the first `CREATE UNIQUE INDEX` in a string
+ * and silently pass the second. Splitting also keeps `raw_altered_table()` honest, which otherwise
+ * attributes every `ADD CONSTRAINT` in a multi-statement string to the FIRST `ALTER TABLE` in it.
+ *
  * @param  array<int, Node>  $nodes
- * @return list<array{0: string, 1: string, 2: list<string>, 3: string, 4: int}>
+ * @return list<array{0: string|null, 1: string, 2: list<string>, 3: string, 4: string|null, 5: int}>
  */
 function raw_ddl_constraints(array $nodes, NodeFinder $finder): array
 {
@@ -304,16 +359,44 @@ function raw_ddl_constraints(array $nodes, NodeFinder $finder): array
 
         $first = $call->args[0] ?? null;
         $sql = $first instanceof Node\Arg ? fold_string($first->value) : null;
+
         if ($sql === null) {
+            // ⚠️ REPORTED, NOT SKIPPED — BUT ONLY WHEN IT COULD PLAUSIBLY BE A CONSTRAINT. This branch
+            // used to `continue` in silence, which is the failure this script's own header names twice;
+            // 27 interpolated `DB::statement("… {$var} …")` calls exist in this tree. Reporting all 27 as
+            // a gap is the opposite failure: a permanently-nonzero blind-spot count is one nobody reads,
+            // and calling them "unresolved FK targets" was wrong twice over — they are neither FKs nor
+            // targets. So the literal fragments are inspected: if the parts the parser CAN see contain no
+            // constraint keyword, the statement is not constraint DDL and is not this gate's business.
+            // What survives is the honest residue — SQL that looks like a constraint and cannot be read.
+            $skeleton = $first instanceof Node\Arg ? sql_skeleton($first->value) : '';
+
+            if (preg_match('/CREATE\s+UNIQUE\s+INDEX|FOREIGN\s+KEY/i', $skeleton) === 1) {
+                $found[] = [null, '', [], 'unreadable', null, $call->getLine()];
+            }
+
             continue;
         }
 
-        if (preg_match('/CREATE\s+UNIQUE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([^)]*)\)/is', $sql, $m) === 1) {
-            $found[] = [$m[1], $m[2], sql_column_list($m[3]), 'unique', $call->getLine()];
-        }
+        foreach (explode(';', $sql) as $statement) {
+            if (preg_match_all('/CREATE\s+UNIQUE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([^)]*)\)/is', $statement, $ms, PREG_SET_ORDER) > 0) {
+                foreach ($ms as $m) {
+                    $found[] = [$m[1], $m[2], sql_column_list($m[3]), 'unique', null, $call->getLine()];
+                }
+            }
 
-        if (preg_match('/ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s*\(([^)]*)\)/is', $sql, $m) === 1) {
-            $found[] = [$m[1], raw_altered_table($sql) ?? '', sql_column_list($m[2]), 'foreign', $call->getLine()];
+            if (preg_match_all('/ADD\s+CONSTRAINT\s+(\w+)\s+FOREIGN\s+KEY\s*\(([^)]*)\)\s*REFERENCES\s+(\w+)/is', $statement, $ms, PREG_SET_ORDER) > 0) {
+                foreach ($ms as $m) {
+                    $found[] = [
+                        $m[1],
+                        raw_altered_table($statement) ?? '',
+                        sql_column_list($m[2]),
+                        'foreign',
+                        $m[3],
+                        $call->getLine(),
+                    ];
+                }
+            }
         }
     }
 
@@ -343,6 +426,37 @@ function sql_column_list(string $inner): array
     }
 
     return $columns;
+}
+
+/**
+ * The literal fragments of a string expression, with interpolations blanked out.
+ *
+ * Used only to ask "could this statement be constraint DDL at all". A `"ALTER TABLE {$t} ADD
+ * CONSTRAINT {$c} CHECK (…)"` yields a skeleton with no constraint keyword and is correctly ignored;
+ * one containing the literal words `FOREIGN KEY` is reported as unreadable even though its table and
+ * columns cannot be recovered.
+ */
+function sql_skeleton(Node $node): string
+{
+    if ($node instanceof String_) {
+        return $node->value;
+    }
+
+    if ($node instanceof Node\Expr\BinaryOp\Concat) {
+        return sql_skeleton($node->left).' '.sql_skeleton($node->right);
+    }
+
+    if ($node instanceof Node\Scalar\InterpolatedString) {
+        $text = '';
+
+        foreach ($node->parts as $part) {
+            $text .= $part instanceof Node\InterpolatedStringPart ? $part->value : ' ';
+        }
+
+        return $text;
+    }
+
+    return '';
 }
 
 /**

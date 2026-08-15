@@ -191,13 +191,32 @@ measured against a convenient database and a number measured against a migrated 
 claim**, and only the second belongs in a document. P2a paid for this once already, sweeping a `meridian`
 three migrations behind and reporting every total one short.
 
-⚠️ **The unique half is mostly principled and the foreign-key half is mostly not.** Of the 13 indexes, 11 are
-values that are globally unique by definition (a hostname), matched before any tenant is resolved (an OAuth
-state on the central host, a SAML `InResponseTo`), or secrets where a cross-tenant collision would itself be
-the bug. The 29 foreign keys are different in kind: they are the Phase 0–1 core schema written before the
-convention was applied consistently. Every FK authored since `scope_nodes` (2026-07-20) uses the composite
-shape; the form and submission trees predate it. **This is a gap the ADR did not know it had, not a set of
-decisions it made** — see the Consequences correction below.
+⚠️ **The FK crossing count moved too, and NOT for that reason — it went 26 → 29 when the predicate was
+corrected**, not when the database was refreshed. The first sweep asked "do both tables carry `tenant_id`",
+which silently drops every FK whose *source* has none: `role_has_permissions`'s two and
+`tenants.logo_attachment_id`. Recorded separately from the staleness lesson above so that a predicate bug is
+not laundered as a data-freshness one — they are different mistakes and only one of them is about
+databases.
+
+⚠️ **The unique half is mostly principled and the foreign-key half is mostly not.** Of the 13 indexes, **9**
+are values that are globally unique by definition (a hostname), matched before any tenant is resolved (an
+OAuth state on the central host, a SAML `InResponseTo`), or secrets where a cross-tenant collision would
+itself be the bug — and **4 are merely UUID-anchored**, which is a weaker claim: they are safe because
+guessing a UUIDv7 is infeasible, not because global uniqueness is the intent. *(An earlier draft said 11 and
+2. It promoted into the principled bucket the two entries whose own recorded reason says "what makes this
+safe is UUID unguessability, NOT referential integrity" — making the unique half look better founded than
+the catalog supports.)* ⚠️ **One of the 13 is not safe by intent at all**: `permissions_name_guard_name_unique`
+is `(name, guard_name)` where its sibling `roles_tenant_id_name_guard_name_unique` leads with the tenant, and
+`permissions_tenant_insert` permits a tenant-owned row today — so the asymmetry is a live defect recorded
+rather than fixed, with its own revisit trigger.
+
+The 29 foreign keys are different in kind: mostly the Phase 0–1 core schema, written before the convention
+was applied consistently. ⚠️ **But not "all of them", and the tidy version of that sentence did not survive
+checking**: `usage_counters_subscription_id_foreign` (07-23), `tenants_logo_attachment_id_foreign` (08-05)
+and `feedback_reports_screenshot_attachment_id_foreign` (08-07) were all authored *after* `scope_nodes`
+introduced the composite shape on 2026-07-20 — the last of them eighteen days after. **This is still a gap
+the ADR did not know it had rather than a set of decisions it made**, but the gap was being widened while
+nothing measured it, which is the argument for the gate rather than for a convention.
 
 ⚠️ **RLS is not a backstop for either.** PostgreSQL documents that "referential integrity checks, such as
 unique or primary key constraints and foreign key references, always bypass row security". So a unique index

@@ -41,6 +41,18 @@ use Tests\Feature\Tenancy\ConstraintBoundaryDriftTest;
  * Stated here rather than left implicit, because a reader who finds `users.email` missing from the list
  * below should be able to see that it was considered.
  *
+ * **Primary keys**, and this exclusion is the one a reader is most entitled to challenge, because the
+ * PostgreSQL sentence quoted above names "unique **or primary key** constraints" in the same breath. **39
+ * tenant-carrying tables have a primary key of `(id)` alone**, so by the predicate above they are 39 more
+ * boundary-crossing unique constraints. They are excluded because every one of those keys is a **UUIDv7**
+ * assigned by `HasUuidv7` before insert: a cross-tenant collision requires generating the same 128-bit
+ * value twice, not merely choosing the same natural key, so the existence oracle and the denial of service
+ * both evaporate. That is the same argument this file already makes for
+ * `submission_answer_index_submission_id_form_field_id_unique` below — stated here too rather than left to
+ * be inferred, since a reader who counts 39 unrecorded primary keys cannot otherwise tell whether somebody
+ * reasoned about them or nobody looked. ⚠️ It would stop holding for an integer or natural primary key,
+ * which is why ADR-0002 §D1 fixes `tenant_id` and every key as a UUID in the first place.
+ *
  * **Non-unique indexes.** §D5's "or index" clause is discharged by §D1's rule that `tenant_id` leads a
  * composite index on a tenant-scoped table — a performance property, not an isolation one, since a plain
  * index constrains nothing and cannot refuse or cascade anything. Ten such indexes do not lead with
@@ -96,9 +108,19 @@ final class ConstraintBoundaries
         'personal_access_tokens_token_unique' => 'The hashed API token, presented on requests that carry no '
             .'tenant context until the token itself resolves one. Same argument as above in both halves: '
             .'unreadable per-tenant, and a collision would authenticate the wrong workspace.',
+        // ── Safe on today's DATA, and nothing holds that data in place ───────────────────────────────────
         'permissions_name_guard_name_unique' => 'The 29 permission keys are PLATFORM rows with a NULL '
-            .'`tenant_id` — the product\'s own vocabulary, identical for every tenant (ADR-0002 §D1). The '
-            .'table carries `tenant_id` only so the widened SELECT policy can be expressed on it.',
+            .'`tenant_id` — the product\'s own vocabulary, identical for every tenant (ADR-0002 §D1) — so '
+            .'no two tenants contend for a name today. ⚠️ THAT IS A FACT ABOUT THE SEEDED ROWS, NOT ABOUT '
+            .'THIS INDEX, AND `permissions` IS NOT `roles`. `permissions_tenant_insert` exists with the '
+            .'same `with_check (tenant_id = current_setting(...))` shape `roles_tenant_insert` has, and '
+            .'`meridian_app` holds INSERT on the table — so a tenant-owned permission row is insertable by '
+            .'the ordinary application connection right now. `roles` survives that because its unique is '
+            .'`(tenant_id, name, guard_name)`; THIS one is `(name, guard_name)`, so the moment two tenants '
+            .'define a permission with the same name the second gets a 23505 against a row it cannot see — '
+            .'the existence oracle in this class\'s own header. The asymmetry is the defect, and the fix is '
+            .'to make this index match the one on `roles`; it is recorded here rather than changed because '
+            .'P2c ships no migration. Revisit trigger: the first non-NULL `permissions.tenant_id`.',
 
         // ── Anchored on a tenant-scoped UUID, so a collision is unreachable without guessing one ─────────
         'submission_answer_index_submission_id_form_field_id_unique' => 'One projection row per queryable '
@@ -140,12 +162,18 @@ final class ConstraintBoundaries
      *
      * ⚠️ THIS LIST IS A MEASUREMENT, NOT AN ENDORSEMENT, AND ADR-0002 CLAIMED IT WAS EMPTY. The Consequences
      * section offers "no cross-tenant foreign keys or unique constraints (D5)" as one of the properties that
-     * keeps per-tenant extraction workable. There are 26, all predating the convention rather than defying
-     * it: every constraint written since `scope_nodes` (2026-07-20) uses the composite shape, and the core
-     * form/submission tree from Phase 0–1 does not. Remediation is a schema increment of its own — it needs
-     * `(tenant_id, id)` uniques on eight parent tables and a circular `forms` ↔ `form_versions` pair
-     * untangled — and is filed in `docs/feature-backlog.md`. What this list buys today is that the 27th
-     * cannot be added silently.
+     * keeps per-tenant extraction workable. There are **29**, and what this list buys today is that the
+     * **30th** cannot be added silently. Remediation covers 26 of them — it needs `(tenant_id, id)` uniques
+     * on eight parent tables and a circular `forms` ↔ `form_versions` pair untangled, and is filed in
+     * `docs/feature-backlog.md`; the other three have no `tenant_id` on the source to add.
+     *
+     * ⚠️ AND "ALL PREDATING THE CONVENTION" WAS TOO KIND TO ITSELF. An earlier draft said every FK written
+     * since `scope_nodes` (2026-07-20) uses the composite shape. Three do not:
+     * `usage_counters_subscription_id_foreign` (07-23), `tenants_logo_attachment_id_foreign` (08-05) and
+     * `feedback_reports_screenshot_attachment_id_foreign` (08-07) — the last **eighteen days** after the
+     * convention appeared, and written as a fluent single-column `foreignUuid()->constrained()`. The
+     * majority genuinely are Phase 0–1 legacy, but "legacy" was doing work in that sentence that the dates
+     * do not support, and the comfortable version of the story is the one that stops a gate being built.
      *
      * The `ON DELETE` action is named in each reason because it is the difference between a dangling pointer
      * and a cross-tenant delete.
@@ -209,9 +237,18 @@ final class ConstraintBoundaries
 
         // ── Template and attachment edges ────────────────────────────────────────────────────────────────
         'form_templates_source_form_version_id_foreign' => 'The version a template was captured from (SET '
-            .'NULL). ⚠️ The one edge here that legitimately points at a PLATFORM row: the 10 catalog '
-            .'templates have a NULL `tenant_id`, so a composite key would need the widened shape rather than '
-            .'plain equality, which is why remediating this one is not a mechanical rewrite.',
+            .'NULL), written by the capture path from a version it loaded tenant-scoped. ⚠️ AN EARLIER '
+            .'DRAFT OF THIS ENTRY CALLED IT "the one edge that legitimately points at a PLATFORM row" AND '
+            .'WAS WRONG THREE TIMES OVER, IN THE ONE ENTRY WHERE THIS CLASS\'S CENTRAL DISTINCTION BITES. '
+            .'(1) It does not point at a platform row: `form_versions.tenant_id` is NOT NULL, so no platform '
+            .'`form_versions` exists — the nullable `tenant_id` is on the SOURCE, and inverting source and '
+            .'target is precisely the mistake the FOREIGN_KEY_EXCEPTIONS docblock warns about. (2) The '
+            .'obstacle it claimed was imaginary: foreign keys default to MATCH SIMPLE, which SKIPS the check '
+            .'entirely when any key column is NULL, so a composite `(tenant_id, source_form_version_id)` '
+            .'needs no "widened shape" — `generalize_webhook_deliveries_owner` documents that exact '
+            .'mechanism in this repo. (3) The premise is moot anyway: `PlatformTemplateSeeder` sets '
+            .'`source_form_version_id => null` on all 10 catalog templates, so no platform row has ever '
+            .'exercised the edge. Remediating this one IS mechanical.',
         'form_templates_cover_image_attachment_id_foreign' => 'A template\'s cover image (SET NULL), uploaded '
             .'in the same request that creates the template and under the same tenant context.',
         'feedback_reports_screenshot_attachment_id_foreign' => 'The screenshot captured with a feedback report '
@@ -249,8 +286,12 @@ final class ConstraintBoundaries
         // ── Entitlement ──────────────────────────────────────────────────────────────────────────────────
         'usage_counters_subscription_id_foreign' => 'The subscription a metered counter is billed against '
             .'(SET NULL, ADR-0008). Resolved from the tenant\'s own single active subscription rather than '
-            .'from any caller-supplied id, and `usage_counters` is already uniquely keyed on '
-            .'`(tenant_id, metric, period_start)`.',
+            .'from any caller-supplied id — `UsageMeter` reads it through the tenant scope and never accepts '
+            .'a subscription id as input. ⚠️ An earlier draft added "and `usage_counters` is already '
+            .'uniquely keyed on `(tenant_id, metric, period_start)`" as if that mitigated anything. It does '
+            .'not: that unique constrains the metric and the period, and says nothing whatever about which '
+            .'subscription `subscription_id` points at. A true fact offered as a safety argument is worse '
+            .'than no second argument, because it reads as one.',
     ];
 
     /**

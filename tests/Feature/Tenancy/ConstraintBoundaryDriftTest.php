@@ -65,6 +65,7 @@ function boundaryCrossingUniqueIndexes(): array
              from unnest(i.indkey) with ordinality as k(attnum, ord)
              join pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
              where a.attname = 'tenant_id'
+               and k.ord <= i.indnkeyatts
            )"
     );
 

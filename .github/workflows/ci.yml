@@ -79,6 +79,13 @@ jobs:
       - name: Job payload linter (tenant-aware base class, queue name, scalar payloads)
         run: composer run job-payload-lint
 
+      # ADR-0002 §D5. Its companion is tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php, which is
+      # the authority — it reads pg_index/pg_constraint on a migrated database. THIS job has no Postgres
+      # service and no .env, which is exactly why the §D5 gate is two halves rather than one: the drift
+      # test says which constraint crosses the boundary, this says which migration line wrote it.
+      - name: Constraint boundary linter (no FK or unique may span a tenant boundary)
+        run: composer run constraint-boundary-lint
+
       - name: Composer audit (SCA)
         run: composer audit
 

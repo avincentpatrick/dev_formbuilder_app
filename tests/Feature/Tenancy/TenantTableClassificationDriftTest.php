@@ -142,63 +142,17 @@ it('keeps the append-only ledger strict, despite its nullable column', function 
     expect((string) $nullable->is_nullable)->toBe('YES');
 })->with(['audits', 'personal_access_tokens']);
 
-it('finds no unpinned global unique constraint or index on a tenant-scoped table', function (): void {
-    // ADR-0002 §D5: "No foreign key, unique constraint, or index may span tenant boundaries", because a
-    // global constraint is a real obstacle to the per-tenant extraction path this row exists to enable.
-    // Nothing has ever checked it.
-    //
-    // ⚠️ SCANS pg_index, NOT pg_constraint. Laravel emits a PARTIAL unique (`->unique()->where(...)`) as a
-    // bare index with no constraint row, so a pg_constraint-only sweep silently misses three of the ten
-    // below — and misses precisely the ones a reviewer is least likely to spot by eye.
-    /** @var list<object{idx: string}> $rows */
-    $rows = DB::select(
-        "select i.indexrelid::regclass::text as idx
-         from pg_index i
-         join pg_class c on c.oid = i.indrelid
-         join pg_namespace n on n.oid = c.relnamespace
-         where n.nspname = 'public'
-           and i.indisunique
-           and not i.indisprimary
-           and exists (
-             select 1 from information_schema.columns ic
-             where ic.table_schema = 'public' and ic.table_name = c.relname
-               and ic.column_name = 'tenant_id'
-           )
-           and pg_get_indexdef(i.indexrelid) not like '%tenant_id%'"
-    );
-
-    // Sorted in PHP, not in SQL. The database's `order by` uses the en_US.utf8 collation, which does not
-    // weight underscores the way a byte comparison does — so an SQL-ordered expectation would be pinned to
-    // the collation of whichever cluster ran it.
-    $found = array_map(static fn (object $r): string => (string) $r->idx, $rows);
-    sort($found);
-
-    // Each of these is globally unique for a stated reason; none is an accident.
-    expect($found)->toBe([
-        // A hostname and a DNS challenge token are globally unique BY DEFINITION — two tenants cannot
-        // both own `forms.acme.com`. Scoping either per tenant would make the uniqueness meaningless.
-        'domains_domain_unique',
-        'domains_verification_token_unique',
-        // Google sign-in's two single-use tokens (J3c2 / ADR-0017 §D6, §D7). Both are matched from an
-        // UNAUTHENTICATED request before any tenant scoping can be trusted — the callback lands on the
-        // central host and the completion hop is reached by a browser holding only a URL — so a
-        // cross-tenant collision would be a SECOND ROW the lookup could legitimately match. Per-tenant
-        // uniqueness would make the lookup ambiguous exactly where it must not be. `handoff_hash` is a
-        // SHA-256 and additionally falls under the secrets rationale below.
-        'google_auth_requests_handoff_hash_unique',
-        'google_auth_requests_state_id_unique',
-        // Secrets. A token that collides across tenants is a cross-tenant authentication bug, so global
-        // uniqueness is the property being bought, not a boundary violation.
-        'impersonation_tokens_token_hash_unique',
-        'permissions_name_guard_name_unique',
-        'personal_access_tokens_token_unique',
-        // The SAML `InResponseTo` this SP mints. An IdP correlates on it with no notion of our tenants.
-        'sso_auth_requests_request_id_unique',
-        // Transitively tenant-safe: both columns are FKs to tenant-scoped tables, so a collision across
-        // tenants is unreachable without a prior isolation failure upstream.
-        'submission_answer_index_submission_id_form_field_id_unique',
-        'submission_geo_index_submission_id_form_field_id_unique',
-        'webhook_deliveries_endpoint_event_unique',
-        'webhook_deliveries_subscription_event_unique',
-    ]);
-});
+/*
+ * ⚠️ THE ADR-0002 §D5 UNIQUE-INDEX CASE MOVED OUT IN P2c, to ConstraintBoundaryDriftTest, and it did not
+ * survive the move unchanged. This file is about TABLE CLASSIFICATION; §D5 is about constraints, and the
+ * two grew apart the moment the FK half was added beside it. Two things changed in the move, both worth
+ * knowing if you come looking for the case that used to sit here:
+ *
+ *   1. It filtered on `pg_get_indexdef(...) not like '%tenant_id%'`, which matches an index's WHERE clause
+ *      as readily as its key. `settings_platform_key_unique` — `ON settings (key) WHERE (tenant_id IS
+ *      NULL)`, a bare global unique on a tenant-carrying table — was invisible to it. The replacement
+ *      expands `indkey` and asks about the KEY.
+ *   2. Its twelve reasons lived in inline comments inside the expectation, which was the right shape while
+ *      the list had exactly one consumer. It now has two (the drift test and
+ *      `scripts/constraint-boundary-lint.php`), so they live in App\Support\Tenancy\ConstraintBoundaries.
+ */

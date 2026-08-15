@@ -13,6 +13,8 @@ use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Sso\FakeIdp;
 
@@ -438,6 +440,34 @@ it('refuses a completion hop for a request id that was never minted', function (
     asSsoSession($this->admin);
 
     $this->get(STEP_UP_HOST.'/sso/saml/step-up/complete/'.SsoAuthRequest::mintRequestId())->assertNotFound();
+});
+
+it('turns away an id that could never have been minted BEFORE the controller runs (P1d)', function (): void {
+    asSsoSession($this->admin);
+
+    // ⚠️ THE STATUS CODE ALONE CANNOT TELL THESE APART, WHICH IS WHY THIS CASE ASSERTS THE LOG INSTEAD.
+    // Both a router refusal and `redeem()` returning null answer 404 — that is §D4's whole point. What the
+    // pattern constraint changes is whether an unbounded guessing surface exists behind `auth` at all: with
+    // it, a value that is not `_` plus 32 hex characters never reaches a lookup and writes no line; without
+    // it, every guess costs a query and a log entry, which is also how an attacker drowns the operator's
+    // surface in noise. The Google handoff has pinned its token at the router since J3c2.
+    Log::spy();
+
+    $this->get(STEP_UP_HOST.'/sso/saml/step-up/complete/not-a-minted-id')->assertNotFound();
+
+    Log::shouldNotHaveReceived('warning');
+});
+
+it('carries its own rate limiter and its own pattern, because the id is guessable input (P1d)', function (): void {
+    $route = collect(Route::getRoutes()->getRoutes())
+        ->first(fn ($candidate): bool => $candidate->getName() === 'sso.step-up.complete');
+
+    expect($route)->not->toBeNull()
+        ->and($route->gatherMiddleware())->toContain('throttle:saml-step-up-complete')
+        // A SEPARATE bucket from `saml-step-up`: one completed step-up costs exactly one hit of each, so
+        // sharing would halve whichever ceiling an operator thought they were setting.
+        ->and($route->gatherMiddleware())->not->toContain('throttle:saml-step-up')
+        ->and($route->wheres['requestId'] ?? null)->toBe('_[0-9a-f]{32}');
 });
 
 /*

@@ -2801,3 +2801,56 @@ exceptions-log entry — is a SHARED-NAMESPACE ALLOCATION and cannot be chosen s
 same session also produced a duplicate migration prefix (`2026_08_16_000001` twice), harmless only because the
 two migrations are independent.
 
+## 2026-08-15 — J4a (design-system primitives), plus two unblocking PRs neither lane could have caught
+
+**Merged: #153** (ADR-0017 → ADR-0019), **#154** (the red integration branch), **#156** (J4a itself). Lane A.
+
+**The session opened by finding `phase1-completion` ALREADY RED at two commits, and nobody had noticed.**
+J3c2 added `users.google_id` and the `google_auth_requests` table; P2b added a drift test with a hard-coded
+per-table census. Each PR was green on its own base; they met on the integration branch and the census went
+stale in the same merge that created it. **The census failure was only the symptom — `google_id` had no
+withholding decision at all**, so it was scheduled to leave the building in the next tenant extract. It is
+withheld now as a stable globally-unique JOIN KEY: two tenants each holding an extract could match rows on it
+and establish exactly which members they share, with neither operator ever being told. Pinned BY NAME, and
+both mutations reddened exactly one test against a verified green baseline of 51.
+
+**The ADR collision was resolved per-occurrence, not by a global replace.** 133 refs across 66 files, 72 moved
+and 61 stayed, decided by reading each line — a path rule would have been wrong in both directions
+(`deployment-infrastructure.md` reads as Lane B's and its one reference is Lane A's; `technical-architecture.md:526`
+reads as neither and is wholly Lane B's). ⚠️ **0010 looked free and is not**: ADR-0011, -0012 and -0013 each
+reserve it for H1d and each says so while declining to fill it.
+
+**J4a shipped three primitives and 20 adopted surfaces, with zero PHP.** The row was wrong in five places
+(ten-for-ten now on verifying one against the code): "~15 primitives" is a number nobody has ever itemised,
+`MdsBreadcrumb` had already shipped in J2a, the two breadcrumb stragglers were the wrong two, `MdsTooltip`'s
+named defects were already fixed in page text, and one "notice" was a date-range caption pinned verbatim by a
+test.
+
+**Six lessons worth carrying:**
+
+1. **A call-site class overriding a shared component needs more than one class-worth of specificity, or it is
+   luck.** Vue puts the child's scope-id and the parent's on the SAME root element, so
+   `.mds-alert[data-v-child]` and `.builder__warnings[data-v-parent]` are both (0,2,0) and bundle injection
+   order decides. Found by the adversarial pass AFTER 6/6 green; no gate here can see it, because the banner
+   renders only after an import produces warnings.
+2. **Name the thing, never quote it.** A guard that scans text matched the comment explaining the guard —
+   three times, in three different gates. `token-references.test.ts` strips BLOCK comments but scans line
+   comments, so a `//` explaining that a variable must not carry the design-system prefix failed by spelling
+   it. gitleaks had already done this twice.
+3. **A pipe hides the exit status you care about.** `npx storybook build … | tail -5 && echo OK` reads *tail's*
+   status. Same family as reading Pint's exit code instead of its JSON.
+4. **`height:` matches inside `line-height:`** — a hyphen is a non-word character. The assertion failed
+   against a CORRECT stylesheet and would have been "fixed" by deleting a line-height the component needs.
+5. **An astral initial is two UTF-16 units.** `AccountMenu` indexed with `[0]` and rendered U+FFFD for any
+   non-BMP name — and the replacement reintroduced the same class of bug two lines below the comment warning
+   about it, via a `.slice(0, 2)`. Only an astral test case can tell the two implementations apart.
+6. **Reviewing frames is not measuring them.** The sweep's numbers were all clean; looking at the frames is
+   what confirmed the pending-invite chip reads neutral against brand, and that 0 audit rows with `is_system`
+   carry an avatar.
+
+**Deferred with reasons stated rather than dropped:** `MdsTooltip` (structurally blocked — `.sidebar` is
+`overflow-y: auto`, which forces `overflow-x: auto`, so the rail DSR §3.4/§6 asks for a tooltip in clips it;
+needs a `Teleport` interoperating with `Modal/inert-stack.ts`), the `MdsProgress` step-count variant (its
+reference implementation is better specified than §3.9 and migrating risks 17 assertions in a separate SPA),
+a person-identity colour scale (reusing the form-identity six measures 2.91:1 under white in dark and would
+put a person and a form at 0°), and ~20 further notices that carry individually-argued `role` choices.

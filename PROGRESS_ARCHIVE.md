@@ -2856,3 +2856,42 @@ needs a `Teleport` interoperating with `Modal/inert-stack.ts`), the `MdsProgress
 reference implementation is better specified than §3.9 and migrating risks 17 assertions in a separate SPA),
 a person-identity colour scale (reusing the form-identity six measures 2.91:1 under white in dark and would
 put a person and a form at 0°), and ~20 further notices that carry individually-argued `role` choices.
+
+---
+
+## 2026-08-15 — CROSS-LANE ALIGNMENT: one boundary map, a namespace ledger, and what a lane does when its queue empties
+
+User-requested alignment while **both lanes were merged and idle** (zero open PRs, both worktrees clean,
+base `be67d06`). Docs-only; no code file changed, so no gate could move.
+
+**The defect was duplication, not disagreement.** Each lane's next-prompt restated its own copy of the
+subsystem split rather than pointing at one authority, and the copies drifted until they contradicted:
+Lane A's conceded five named subtrees to Lane B; Lane B's claimed all of `app/Services/`, all of
+`app/Support/` and all of `config/`. Lane A's very next row (J4b) edits `app/Support/Navigation/CrumbTrail.php`
+— its own under one map, a trespass under the other, **with both lanes reading their own map correctly.**
+Same shape as the ADR-0017 collision, same fix: one authority in Standing Rule 7(b), referenced and never
+copied, with "a restated boundary is itself the defect" written into both prompts.
+
+**Two user calls, both reversible.** `app/Services/` and `app/Support/` are not wholesale Lane B's — it owns
+`{Sso,Tenancy,Connectors}` under each, and `app/Support/Navigation/` is Lane A's on the merits (Lane A wrote
+`CrumbTrail` in J2d). `resources/public-runtime/` goes to Lane B for the CRDT row, with the cost stated up
+front: it is one of the three chunks Lane A's Vitest gate sums, so Lane A's 110-file baseline moves.
+
+**The finding that would have stalled the project silently.** Both lanes would soon have reported "queue
+empty" with a real build row outstanding — the **full gamification engine** (the 2026-08-09 decision of
+record, the last increment before deployment) is in neither queue, and nothing said what a lane does when
+its rows run out. New Rule 7(f): first lane to empty claims gamification; last lane to empty **recommends**
+the final integration PR rather than performing it; the held list re-enters at that merge and no earlier.
+
+**Also closed:** the ADR/migration namespace ledger as Rule 7(g) (next free is 0020; **0010 is reserved for
+H1d and is not free**, per its own citations in `0011:8`, `0012:8`, `0013:8`); the note that
+`phase1-completion` is checked out in `fb-lane-b` so the other lane must branch from `origin/`, never local
+HEAD; and the Phase-4 roadmap row, stale by four merged PRs and still calling two foreclosed rows "not started".
+
+**Remaining after this:** Lane A J4b -> J4c -> J5; Lane B threat-model SSO section -> CRDT sync; then
+gamification; then the final integration PR to `main`.
+
+**Lesson, and it generalises past this repo:** a coordination rule that is *copied* into each participant's
+briefing has no single point of truth, so it drifts silently and each participant keeps verifying against its
+own copy. Duplication is what made the drift invisible, not carelessness. The same reasoning already applies
+here to globally-numbered artefacts (ADRs, migration prefixes): reading the current maximum is not a reservation.

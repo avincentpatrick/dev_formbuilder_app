@@ -799,7 +799,14 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 >
 > **THE COLLAPSED RAIL'S TOOLTIP IS BUILT (§3.4a), AND IT IS GATED TO THE RAIL BAND — 481–1024px, NOT "≤1024px".** Above 1024px the label is in the item, so a bubble repeating it is noise. Below 480px the drawer restores the label *and* there is no hover — but **focus still fires, and the drawer moves focus programmatically when it opens**, so an ungated tooltip would appear unbidden on mobile and then consume the first Escape before the drawer could act on it. The `title` attribute it replaces was never an answer to this line: a native title does not appear on keyboard focus at all, which is half of what this bullet asks for.
 >
-> **THE ACTIVE ITEM'S ACCENT BAR IS `--mds-color-action-primary-fg`.** The `--mds-primary-600` this section originally named maps to `-bg`, and the rule at the end of the `MdsTabNav` note below governs every coloured rule, edge and indicator in this document: `-bg` is a fill whose only guaranteed contrast is against the text printed *on* it. The bar is painted on the active item's tint and is a non-text UI component owing 3:1 against it. Same defect J4a measured on the capacity meter, and axe checks no indicator contrast, so no gate here can see it.
+> **⚠️ THE ACTIVE ITEM'S ACCENT BAR IS `--mds-color-action-primary-fg`, AND THE `-bg` IT REPLACED WAS AN OUTRIGHT 1.4.11 FAILURE IN DARK — MEASURED, NOT INFERRED.** The `--mds-primary-600` this section originally named maps to `-bg`, and the rule at the end of the `MdsTabNav` note below governs every coloured rule, edge and indicator in this document: `-bg` is a fill whose only guaranteed contrast is against the text printed *on* it.
+>
+> | | `-bg` (before) | `-fg` (J4b) |
+> |---|---|---|
+> | Light, on the active tint | 4.38:1 | **6.51:1** |
+> | Dark, on the active tint | **2.54:1** ❌ | **6.15:1** |
+>
+> A non-text UI component owes **3:1**, so the dark value was a real failure rather than a near miss — and the cause is visible in the token itself: `-bg` resolves to the *same* `rgb(14,111,232)` in both themes, so the identical fill was being asked to carry a light ground and a dark one. **Unlike J4a's capacity meter, which measured 4.24/3.95 and was therefore a hygiene fix, this one was failing.** ⚠️ **No gate in this repository could have found it: axe checks no border or indicator contrast at all**, and the bar is one of three signifiers (tint and bold weight are the others), so the active item still *looked* identified. Only a measurement finds this class of defect — which is the same conclusion the `MdsTabNav` note reached from its own numbers, and the reason its closing instruction is stated as an unconditional rule rather than a threshold.
 
 **Breadcrumbs** *(**AS-BUILT since J2a** — `MdsBreadcrumb`)*: used on any screen nested more than one level below a primary sidebar section (e.g., Forms → *[Form Name]* → Submissions → *[Submission #1234]*). Each crumb is a real link except the current (final) one, which is plain text with `aria-current="page"`.
 

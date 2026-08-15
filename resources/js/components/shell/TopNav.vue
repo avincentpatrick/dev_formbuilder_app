@@ -29,7 +29,7 @@ import NotificationBell from './NotificationBell.vue';
 import FeedbackButton from './FeedbackButton.vue';
 import AccountMenu from './AccountMenu.vue';
 
-defineProps<{ scrolled: boolean }>();
+defineProps<{ scrolled: boolean; drawerOpen: boolean }>();
 const emit = defineEmits<{ 'toggle-drawer': [] }>();
 
 /**
@@ -45,10 +45,21 @@ const initialQuery = computed(() => {
 <template>
     <header class="topnav" :class="{ 'is-scrolled': scrolled }">
         <div class="topnav__left">
+            <!--
+                ⚠️ WHILE THE DRAWER IS OPEN THIS BUTTON IS ITSELF INERT, AND THAT IS STATED RATHER THAN
+                DISCOVERED. The drawer takes the page (J4b), so everything outside it — this bar included —
+                is marked inert; the control advertising `aria-expanded="true"` therefore cannot be used to
+                collapse what it opened. Escape and the scrim are the close paths, exactly as MdsModal
+                treats its own opener. `data-mds-inert-exempt` is NOT a fix here: the exemption only works
+                on an element the inert walk actually visits, i.e. an off-path sibling, and this button is
+                nested inside the header that gets marked — so the attribute would do nothing, silently.
+            -->
             <button
                 type="button"
                 class="topnav__hamburger"
-                aria-label="Open navigation"
+                :aria-label="drawerOpen ? 'Close navigation' : 'Open navigation'"
+                :aria-expanded="drawerOpen"
+                aria-controls="app-drawer"
                 @click="emit('toggle-drawer')"
             >
                 <MdsIcon name="menu" size="md" aria-hidden="true" />

@@ -19,13 +19,23 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
     page: {
         component: 'Dashboard',
+        url: '/dashboard',
         props: {} as Record<string, unknown>,
     },
+    /** The reactive proxy the component actually reads. Assigned by the factory below. */
+    live: null as null | { component: string; url: string; props: Record<string, unknown> },
 }));
 
-vi.mock('@inertiajs/vue3', () => ({
-    usePage: () => mocks.page,
-}));
+// ⚠️ THE PROXY IS NEEDED FOR ONE CASE AND HARMLESS FOR THE REST. `usePage()` is reactive in Inertia, and
+// J4b's drawer reset watches `page.url` — a plain object would let the watcher be written wrong and still
+// pass. Mutating `mocks.page` directly still WORKS for every pre-J4b case, because those set their values
+// before mounting and reads pass through the proxy; only change NOTIFICATION requires going through
+// `mocks.live`, which is exactly what the navigation case does.
+vi.mock('@inertiajs/vue3', async () => {
+    const { reactive } = await import('vue');
+    mocks.live = reactive(mocks.page);
+    return { usePage: () => mocks.live };
+});
 
 const AppLayout = (await import('./AppLayout.vue')).default;
 
@@ -93,5 +103,61 @@ describe('AppLayout — the full-bleed builder still wins', () => {
         // focus stop there would be one the user cannot see move (the note at the template's tabindex).
         expect(render('forms/Builder').find('.app-shell__content').attributes('tabindex')).toBeUndefined();
         expect(render('forms/Index').find('.app-shell__content').attributes('tabindex')).toBe('0');
+    });
+});
+
+
+/**
+ * The mobile drawer's shell-side state (J4b). It had no coverage at all before this increment — which is
+ * how it kept a boolean that survives navigation with nothing to reset it.
+ */
+describe('AppLayout — the mobile drawer', () => {
+    function shell(): VueWrapper {
+        mocks.page.component = 'Dashboard';
+        mocks.page.url = '/dashboard';
+        mocks.page.props = {};
+        return mount(AppLayout, { global: { stubs } });
+    }
+
+    it('starts closed and hands the state to both children', () => {
+        const wrapper = shell();
+
+        expect(wrapper.findComponent({ name: 'Sidebar' }).props('drawerOpen')).toBe(false);
+        expect(wrapper.findComponent({ name: 'TopNav' }).props('drawerOpen')).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('toggles from the top nav and closes on the sidebar’s own request', async () => {
+        const wrapper = shell();
+        const nav = wrapper.findComponent({ name: 'TopNav' });
+        const sidebar = wrapper.findComponent({ name: 'Sidebar' });
+
+        nav.vm.$emit('toggle-drawer');
+        await wrapper.vm.$nextTick();
+        expect(sidebar.props('drawerOpen')).toBe(true);
+        expect(nav.props('drawerOpen')).toBe(true);
+
+        sidebar.vm.$emit('close');
+        await wrapper.vm.$nextTick();
+        expect(sidebar.props('drawerOpen')).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('closes itself on ANY navigation, not only on a nav-link click', async () => {
+        // ⭐ THE CASE THE PERSISTENT LAYOUT MAKES NECESSARY. This layout instance survives Inertia visits,
+        // so `drawerOpen` does too. Sidebar emits `close` when one of ITS links is clicked — but a
+        // command-palette jump, the compact search link, the account menu and the browser's Back button all
+        // navigate without one. Since J4b that is not merely untidy: the drawer would stay open over the new
+        // page with that page's content marked inert behind a scrim nobody asked for.
+        const wrapper = shell();
+        wrapper.findComponent({ name: 'TopNav' }).vm.$emit('toggle-drawer');
+        await wrapper.vm.$nextTick();
+        expect(wrapper.findComponent({ name: 'Sidebar' }).props('drawerOpen')).toBe(true);
+
+        mocks.live!.url = '/forms';
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.findComponent({ name: 'Sidebar' }).props('drawerOpen')).toBe(false);
+        wrapper.unmount();
     });
 });

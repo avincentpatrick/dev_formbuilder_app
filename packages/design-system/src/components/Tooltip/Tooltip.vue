@@ -56,8 +56,19 @@ const props = withDefaults(
          * empty subtree, and scanning one is the vacuous green this repo has shipped before.
          */
         defaultVisible?: boolean;
+        /**
+         * Turn the tooltip off while keeping the trigger exactly where it is.
+         *
+         * ⚠️ THIS EXISTS BECAUSE A TOOLTIP IS OFTEN WANTED AT ONE BREAKPOINT AND NOISE AT THE OTHERS, AND
+         * THE ALTERNATIVE IS WORSE. The consumer that needs it — the sidebar — shows full labels above
+         * 1024px and inside its mobile drawer, and only hides them in the 64px rail between. Wrapping the
+         * trigger conditionally would mean spelling the same link twice, so the wrapper stays and the
+         * behaviour is what switches. A disabled tooltip also drops `aria-describedby`, so it never
+         * describes an element with something the reader cannot summon.
+         */
+        disabled?: boolean;
     }>(),
-    { placement: 'top', teleport: true, block: false, defaultVisible: false },
+    { placement: 'top', teleport: true, block: false, defaultVisible: false, disabled: false },
 );
 
 defineSlots<{
@@ -114,7 +125,7 @@ function reposition(): void {
 }
 
 function show(): void {
-    if (dismissed.value) return;
+    if (dismissed.value || props.disabled) return;
     cancelHide();
     visible.value = true;
     // The bubble must exist and have been measured before it can be placed.
@@ -167,6 +178,10 @@ function onViewportChange(): void {
 // ⚠️ `scroll` IS CAPTURED, AND IT HAS TO BE: scroll does not bubble from an element, and both the
 // sidebar and the shell's content region are their own scroll containers. A bubble-phase document
 // listener would miss every scroll that actually moves this tooltip's anchor.
+watch(() => props.disabled, (isDisabled) => {
+    if (isDisabled) hideNow();
+});
+
 watch(visible, (isVisible) => {
     if (isVisible) {
         document.addEventListener('keydown', onDocumentKeydown, true);

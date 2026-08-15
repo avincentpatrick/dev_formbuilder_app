@@ -11,10 +11,21 @@ use Illuminate\Support\Carbon;
  * Reads what a stored IdP signing certificate SAYS about itself, for the settings screen (P1a — ADR-0016 §D11).
  *
  * A pure, stateless lookup: no database, no framework state beyond the clock, exhaustively unit-testable —
- * the {@see AuditableTypes} posture. Separate from the presenter rather than private to it
- * because P1b's ACS asks the same question ("is this key inside its validity window right now?") of the same
- * bytes, and a second implementation of that is how the settings page and the login path come to disagree
- * about whether a certificate is live.
+ * the {@see AuditableTypes} posture. Separate from the presenter rather than private to it so that a second
+ * implementation of "is this key inside its validity window right now?" never has to be written.
+ *
+ * ── ⚠️ CORRECTED IN P1d: THE ACS DOES NOT ASK THIS QUESTION, AND THIS DOCBLOCK USED TO SAY IT DID ────
+ * The previous wording claimed "P1b's ACS asks the same question of the same bytes". It does not. This
+ * class has exactly one consumer — {@see SsoConnectionPresenter} — and php-saml verifies an assertion's
+ * signature against the stored certificate WITHOUT parsing its validity window, so **an expired IdP signing
+ * certificate keeps authenticating assertions indefinitely** while `/settings/sso` renders it as expired.
+ *
+ * That is recorded as a Residual in `docs/security-threat-model.md` §8 and §9 item 18 rather than fixed
+ * here, because refusing at the ACS turns a rollover an admin has not finished into a total outage for that
+ * workspace; the correct shape is §D11's roll-up rule — refuse only when NO certificate in the set is
+ * currently valid — applied on the login path, which is a behaviour change owed its own increment.
+ *
+ * A false claim about a control is worse than a missing one: it stops the next reader looking.
  *
  * ── WHY THE PARSER DOES NOT DO THIS AT IMPORT ────────────────────────────────────────────────────────
  * {@see SsoMetadataParser::assertParsable()} deliberately checks parsability and NOT validity dates: an IdP

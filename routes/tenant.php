@@ -319,7 +319,16 @@ Route::middleware([
     */
     Route::get('/sso/saml/step-up', SsoStepUpController::class)
         ->middleware('throttle:saml-step-up')->name('sso.step-up');
+    //
+    // ⚠️ THE SEGMENT IS PINNED AT THE ROUTER AND THROTTLED (P1d), MATCHING THE GOOGLE HANDOFF'S POSTURE.
+    // `SsoAuthRequest::mintRequestId()` produces `_` plus 32 hex characters, so a value that cannot be one
+    // now 404s before `redeem()` runs a lookup at all — the shape `->where('handoff', ...)` already gives
+    // the sibling flow. Neither the constraint nor the limiter is the security boundary (the session must
+    // still be the one the row names); what they remove is a free, unbounded guessing surface behind
+    // `auth`, which is the one thing this route offered that its sibling did not.
     Route::get('/sso/saml/step-up/complete/{requestId}', SsoStepUpCompletionController::class)
+        ->where('requestId', '_[0-9a-f]{32}')
+        ->middleware('throttle:saml-step-up-complete')
         ->name('sso.step-up.complete');
 
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
@@ -1014,7 +1023,13 @@ Route::middleware([
     EstablishTenantDatabaseContext::class,
     AppSecurityHeaders::class,
 ])->group(function (): void {
-    Route::get('/sso/saml/metadata', SsoMetadataController::class)->name('sso.metadata');
+    // ⚠️ THIS ENDPOINT CARRIED NO LIMITER UNTIL P1d, WHILE THE COMMENT BELOW JUSTIFIED ONE FOR "BOTH
+    // HALVES" OF THE ROUND TRIP AND NEVER MENTIONED IT — an asymmetry that reads as an oversight rather
+    // than a decision. It is unauthenticated, reachable by anyone holding a hostname, and composes a DOM
+    // document per request. Same ceiling as its siblings on purpose: an identity provider legitimately
+    // re-fetches SP metadata on a schedule.
+    Route::get('/sso/saml/metadata', SsoMetadataController::class)
+        ->middleware('throttle:saml-metadata')->name('sso.metadata');
 
     // P1b — the login round trip. Both halves are unauthenticated and both carry their own per-IP limiter:
     // the login path mints a database row on every hit, and the ACS runs XML signature validation over an

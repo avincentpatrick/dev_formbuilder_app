@@ -29,7 +29,15 @@ use Illuminate\Support\Facades\Schema;
  * `consumed_at` and `expires_at` are both kept so the ACS can distinguish "already used" from "expired" from
  * "never existed". Those are three different security events and only one of them — replay of a consumed
  * request — is an attack in progress. Deleting on consume collapses all three into "unknown request" and
- * throws away the one signal worth alerting on. A scheduled prune drops rows well past `expires_at`.
+ * throws away the one signal worth alerting on.
+ *
+ * ⚠️ CORRECTED IN P1d: THIS LINE USED TO PROMISE "a scheduled prune drops rows well past `expires_at`", AND
+ * NO SUCH COMMAND, JOB OR SCHEDULE ENTRY WAS EVER WRITTEN — while `routes/console.php` records that nothing
+ * runs the scheduler on the production box, so even a written one would have been a bound existing in this
+ * repository and not on the machine. For a table an UNAUTHENTICATED endpoint appends to, one row per hit.
+ * The bound is now on the WRITE path in {@see SsoAuthRequestService::trim()}, and only rows that are already
+ * consumed or already expired are eligible — an in-flight sign-in is never evictable, which is the J3c2
+ * lesson this exact trim shape taught on `google_auth_requests`.
  *
  * `return_to` is stored HERE rather than echoed through SAML `RelayState`, and that is a security decision:
  * `RelayState` is attacker-controllable round-trip data, so redirecting to it is a textbook open redirect.

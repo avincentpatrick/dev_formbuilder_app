@@ -31,6 +31,15 @@ use Throwable;
  * the assertion's own `Conditions` after the library is satisfied. Without it the configured tolerance is
  * decorative and the file that documents it is lying.
  *
+ * ⚠️ SCOPED IN P1d: THE SECOND PASS COVERS `Conditions` AND NOTHING ELSE, WHICH THIS PARAGRAPH DID NOT SAY.
+ * `assertWithinConditions()` reads `//saml:Assertion/saml:Conditions`. The library separately judges
+ * `SubjectConfirmationData`'s `NotBefore`/`NotOnOrAfter` and `SessionNotOnOrAfter` at its own 180 seconds,
+ * and neither is reachable from here. So the effective tolerance is 60s on the element this SP re-checks
+ * and up to 180s on the ones it does not — stated rather than left as an unqualified "the window is 60
+ * seconds". Bounded in practice by the two replay ledgers, which are what actually make a captured
+ * assertion single-use; the skew bound is the second layer, never the first.
+ * `docs/security-threat-model.md` §9 item 19.
+ *
  * ── THE DOCUMENT IS PARSED TWICE, KNOWINGLY ─────────────────────────────────────────────────────────
  * Once by {@see inResponseTo()} to read the one attribute that says which request this answers — needed
  * BEFORE validation, because `isValid()` takes the expected id as an argument and feeding it a value read

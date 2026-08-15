@@ -413,6 +413,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('saml-acs', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($samlKey('samlacs', $request)));
 
+        // ⚠️ THE THIRD PROTOCOL ENDPOINT HAD NO LIMITER AT ALL UNTIL P1d, AND THE OMISSION LOOKS LIKE AN
+        // OVERSIGHT RATHER THAN A DECISION: the comment above justifies limiters for "both halves" of the
+        // login round trip and simply does not mention metadata, which is unauthenticated, reachable by
+        // anyone holding a hostname, and builds a DOM document per request. Same key and same ceiling as
+        // its siblings — deliberately not tighter, because an identity provider legitimately re-fetches SP
+        // metadata on a schedule and a bound that breaks a refresh is an outage wearing a control's name.
+        RateLimiter::for('saml-metadata', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($samlKey('samlmetadata', $request)));
+
         // Step-up (P1c) — the third SAML bucket, and the only one KEYED ON THE USER rather than on IP+host.
         // It can be, because unlike the two above this route is inside the authenticated group, and it
         // should be: a shared NAT egress is precisely the enterprise shape the comment above worries about,
@@ -421,6 +430,14 @@ class AppServiceProvider extends ServiceProvider
         // which is the actual cost of this endpoint, one INSERT per hit.
         RateLimiter::for('saml-step-up', fn (Request $request): Limit => Limit::perMinute(20)
             ->by('samlstepup:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        // The completion hop (P1c), unlimited until P1d. A SEPARATE bucket for the reason stated above —
+        // one completed step-up costs exactly one hit of each, so sharing would halve whichever ceiling an
+        // operator thought they were setting. User-keyed like its sibling, since the route is inside the
+        // authenticated group. What it bounds is guessing: `redeem()` looks a `request_id` up before it can
+        // refuse one, so an authenticated member could otherwise grind a `char(33)` id at no cost.
+        RateLimiter::for('saml-step-up-complete', fn (Request $request): Limit => Limit::perMinute(20)
+            ->by('samlstepupdone:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
 
         // First-party Google sign-in (J3c2 / ADR-0019). All three endpoints are unauthenticated by
         // necessity — a sign-in has no session yet — so, as with SAML, there is no user and no tenant claim

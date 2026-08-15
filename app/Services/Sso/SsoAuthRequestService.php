@@ -11,6 +11,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The SP's memory of the AuthnRequests it has minted (Phase 4, P1b — ADR-0016 §D8).
@@ -74,7 +76,23 @@ final class SsoAuthRequestService
             'ip_address' => $ip,
         ])->save();
 
-        $this->trim($now);
+        // ⚠️ HOUSEKEEPING MUST NEVER DECIDE WHETHER A SIGN-IN BEGINS. The trim is a DELETE added to the
+        // authentication mint path, and the realistic way it fails is a deadlock: two concurrent mints for
+        // one tenant issue DELETEs over overlapping row sets with no guaranteed lock-acquisition order.
+        // Unguarded, that turns "the table is a little larger than it should be" into `GET /sso/saml/login`
+        // answering 500 — an outage strictly worse than the unbounded growth this bound exists to stop.
+        // {@see SsoAuthFailureRecorder::record()} swallows for the same reason one layer over.
+        //
+        // ⚠️ DELIBERATELY UNTESTED, AND THE REASON IS THE ONE P2a RECORDED FOR ITS OWN MISSING CASE.
+        // `RefreshDatabase` wraps every test in a transaction, and a raised PostgreSQL error ABORTS that
+        // transaction — so a case that forced this failure could not then observe a recovered request, and
+        // the "fix" it invited would be pinning the harness's behaviour instead of the product's. In
+        // production `mint()` runs in no transaction at all, which is what makes the recovery real.
+        try {
+            $this->trim($now);
+        } catch (Throwable $error) {
+            Log::warning('sso.authn_request.trim_failed', ['error' => $error->getMessage()]);
+        }
 
         return $request;
     }

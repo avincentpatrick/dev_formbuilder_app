@@ -1,0 +1,24 @@
+{
+    "z-index": {
+        "menu": {
+            "value": "30",
+            "comment": "Anchored panels that open from the top nav — the account menu, the notification popover, the feedback trigger. NAMED, NOT INVENTED: this is the literal those three already carried before the scale existed."
+        },
+        "drawer": {
+            "value": "40",
+            "comment": "The sidebar's off-canvas drawer and its scrim, at or below 480px. Above the anchored panels because the drawer covers the whole viewport including the bar they hang from."
+        },
+        "modal": {
+            "value": "1000",
+            "comment": "⚠️ MUST EQUAL TWO THINGS AT ONCE, AND A VITEST CASE HOLDS THEM TOGETHER: the modal backdrop's own rule, and the base the inert stack raises each open backdrop from by its depth. A scale that drifts from the code it describes is worse than no scale, because it reads as authoritative."
+        },
+        "tooltip": {
+            "value": "1050",
+            "comment": "Above any realistic modal stack (the base plus its depth) and below the toasts. A tooltip is not a surface at a distance from the page — it is an annotation glued to its trigger, so it must paint over whatever contains that trigger, including a dialog. That is why its paint order and its shadow tier disagree; see the elevation table."
+        },
+        "toast": {
+            "value": "1100",
+            "comment": "The toast host. Highest by design: a toast must read above an open modal, and the host is the one surface exempt from the inert stack so it keeps announcing while a dialog owns the page."
+        }
+    }
+}

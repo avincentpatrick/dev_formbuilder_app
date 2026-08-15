@@ -276,7 +276,7 @@ onBeforeUnmount(closePage);
 .mds-modal__backdrop {
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: var(--mds-z-index-modal, 1000);
     display: flex;
     align-items: center;
     justify-content: center;

@@ -42,7 +42,7 @@ defineEmits<{ dismiss: [id: ToastItem['id']] }>();
     position: fixed;
     top: var(--mds-space-4);
     right: var(--mds-space-4);
-    z-index: 1100;
+    z-index: var(--mds-z-index-toast, 1100);
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);

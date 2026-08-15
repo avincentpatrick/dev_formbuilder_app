@@ -11,9 +11,11 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
+    MdsAlert,
     MdsBreadcrumb,
     MdsButton,
     MdsCheckbox,
+    MdsEmptyState,
     MdsModal,
     MdsSegmentedControl,
 } from '@meridian/design-system';
@@ -380,50 +382,68 @@ function submitImport(): void {
             </div>
         </header>
 
-        <div
+        <!--
+            J4a — TWO NEAR-IDENTICAL BANNERS BECOME ONE COMPONENT USED TWICE. The markup below was
+            duplicated verbatim in this file apart from its copy and its dismiss ref: the same wrapper, the
+            same title/list body, the same hand-rolled Dismiss button. That is what MdsAlert is for.
+
+            ⚠️ THE TONE CHANGES WHAT THE BUILDER LOOKS LIKE, DELIBERATELY. `.builder__warnings` painted
+            `--mds-color-bg-sunken` with a bottom border — a NEUTRAL GREY strip announcing a warning, which
+            is one of the thirty individually-safe choices the re-skin diagnosis names. It is amber now.
+
+            ⚠️ `flex-shrink: 0` ON THE CALL-SITE CLASS IS LOAD-BEARING AND MUST SURVIVE. JR5 records this as
+            the child that used to steal the panes' flexible row and fill the page while the panes collapsed
+            into an implicit one. The class stays on the MdsAlert root, where Vue puts this component's
+            scope-id, together with the full-bleed geometry the chrome needs (square corners, the wider
+            horizontal padding, the bottom rule) — the component's own radius and padding are for an in-flow
+            panel, and this is a strip spanning the workspace.
+
+            Not `assertive`: an import warning is true from the moment the page renders. `role="status"` and
+            `aria-live="polite"` came free — MdsAlert's default IS `role="status"`, which is what the
+            hand-rolled version had spelled out.
+        -->
+        <MdsAlert
             v-if="importWarnings.length > 0 && !warningsDismissed"
             class="builder__warnings"
-            role="status"
-            aria-live="polite"
+            tone="warning"
+            :title="`Imported with ${importWarnings.length} ${importWarnings.length === 1 ? 'warning' : 'warnings'}`"
+            dismissible
+            dismiss-label="Dismiss import warnings"
+            @dismiss="warningsDismissed = true"
         >
-            <div class="builder__warnings-body">
-                <strong class="builder__warnings-title">
-                    Imported with {{ importWarnings.length }}
-                    {{ importWarnings.length === 1 ? 'warning' : 'warnings' }}
-                </strong>
-                <ul class="builder__warnings-list">
-                    <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
-                </ul>
-            </div>
-            <MdsButton variant="tertiary" icon-left="close" @click="warningsDismissed = true">
-                Dismiss
-            </MdsButton>
-        </div>
+            <ul class="builder__warnings-list">
+                <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
+            </ul>
+        </MdsAlert>
 
-        <div
+        <MdsAlert
             v-if="publishWarnings.length > 0 && !publishWarningsDismissed"
             class="builder__warnings"
-            role="status"
-            aria-live="polite"
+            tone="warning"
+            :title="`Published, with ${publishWarnings.length} ${publishWarnings.length === 1 ? 'note' : 'notes'} about your conditions`"
+            dismissible
+            dismiss-label="Dismiss publish notes"
+            @dismiss="publishWarningsDismissed = true"
         >
-            <div class="builder__warnings-body">
-                <strong class="builder__warnings-title">
-                    Published, with {{ publishWarnings.length }}
-                    {{ publishWarnings.length === 1 ? 'note' : 'notes' }} about your conditions
-                </strong>
-                <ul class="builder__warnings-list">
-                    <li v-for="(warning, i) in publishWarnings" :key="i">{{ warning }}</li>
-                </ul>
-            </div>
-            <MdsButton variant="tertiary" icon-left="close" @click="publishWarningsDismissed = true">
-                Dismiss
-            </MdsButton>
-        </div>
+            <ul class="builder__warnings-list">
+                <li v-for="(warning, i) in publishWarnings" :key="i">{{ warning }}</li>
+            </ul>
+        </MdsAlert>
 
-        <div v-if="readOnly" class="builder__blocked">
-            This form has no editable draft. Restore or publish a version from the
-            <Link href="/forms">forms list</Link> first.
-        </div>
+        <!-- J4a: this replaces all three panes rather than sitting beside them, so it is a page STATE and
+             `MdsEmptyState` is the shared pattern for one — not an alert. It also had no `role` and no
+             illustration: a centred grey paragraph was the entire read-only experience of this page. -->
+        <MdsEmptyState
+            v-if="readOnly"
+            class="builder__blocked"
+            illustration="default"
+            headline="This form has no editable draft"
+            description="Restore or publish a version from the forms list to start editing again."
+        >
+            <template #action>
+                <MdsButton as="a" href="/forms" variant="primary" icon-left="forms">Go to forms</MdsButton>
+            </template>
+        </MdsEmptyState>
 
         <div v-else class="builder__panes" :class="`builder__panes--show-${pane}`">
             <!--
@@ -687,31 +707,40 @@ function submitImport(): void {
     white-space: nowrap;
 }
 
+/* MdsEmptyState brings its own centring, medallion and type; only the breathing room around it in the
+   builder's flex column is this page's business. */
 .builder__blocked {
     padding: var(--mds-space-8);
-    color: var(--mds-color-text-secondary);
-    text-align: center;
 }
 
 /* Post-import warnings banner (Increment G7b) — dismissible, above the panes. `flex-shrink: 0` since JR5:
    this is the child that used to steal the panes' flexible row. */
-.builder__warnings {
-    display: flex;
+/* ⚠️ `flex-shrink: 0` IS LOAD-BEARING AND PREDATES THE COMPONENT — JR5 records this as the child that
+   used to steal the panes' flexible row, filling the page while the panes collapsed into an implicit one.
+   The rest is full-bleed CHROME geometry the shared component correctly does not provide: a strip spanning
+   the workspace has square corners and a rule under it, where an in-flow panel has neither. Tint, type and
+   the dismiss control now come from MdsAlert. */
+/*
+ * ⚠️ THE DOUBLED CLASS IS NOT A TYPO — IT IS THE POINT, AND THE ADVERSARIAL PASS IS WHAT FOUND IT.
+ *
+ * Two of these declarations CONTRADICT the component's own: `MdsAlert` sets `border-radius: md` and a
+ * uniform `space-3` padding, which are right for an in-flow panel and wrong for a strip spanning the
+ * workspace. Vue puts the CHILD's scope-id and the PARENT's scope-id on the same root element, so the two
+ * rules compile to `.mds-alert[data-v-child]` and `.builder__warnings[data-v-parent]` — **identical
+ * specificity, (0,2,0) each**. Which one wins is then decided by injection order in the bundle, i.e. by
+ * whichever module Vite happened to evaluate last. That is a coin flip, and it is invisible to every gate
+ * here: this banner only renders after an import produces warnings, so the visual sweep never drew it.
+ *
+ * Repeating the class takes this to (0,3,0) and settles it. Cheaper than the alternative — a `--full-bleed`
+ * variant on the shared component — for a shape exactly one page needs.
+ */
+.builder__warnings.builder__warnings {
     flex-shrink: 0;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--mds-space-4);
     padding: var(--mds-space-3) var(--mds-space-6);
+    border-radius: 0;
     border-bottom: 1px solid var(--mds-color-border-default);
-    background-color: var(--mds-color-bg-sunken);
 }
 
-.builder__warnings-title {
-    display: block;
-    margin-bottom: var(--mds-space-1);
-    color: var(--mds-color-text-heading);
-    font-size: var(--mds-type-body-sm-font-size);
-}
 
 .builder__warnings-list {
     margin: 0;

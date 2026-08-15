@@ -9,6 +9,7 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsCard,
@@ -236,12 +237,19 @@ function formatDate(iso: string | null): string {
             </MdsCard>
         </div>
 
-        <MdsCard v-if="!isActive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- J4a: was an `MdsCard` with no `role` at all — a statement of the page's current condition that
+             assistive tech was never told about. `MdsAlert` at the info tone, not `MdsBanner`, because the
+             body is more than one line and interpolates the status; and NOT `assertive`, because this was
+             already true when the page loaded. ⚠️ The inner paragraph drops `.detail__prose`: that class
+             pins `color: var(--mds-color-text-body)`, which would override the alert's tone foreground and
+             leave text on a tinted field with no measured contrast. It has two other consumers on this
+             page, so it is left alone rather than edited. -->
+        <MdsAlert v-if="!isActive" class="detail__notice" tone="info">
+            <p>
                 This endpoint is <strong>{{ endpoint.status }}</strong> and isn’t delivering. Re-enable it to resume
                 deliveries — that also clears the failure counter. Existing deliveries can be re-queued once it’s active.
             </p>
-        </MdsCard>
+        </MdsAlert>
 
         <section class="detail__log">
             <h2 class="detail__card-title detail__log-title">Delivery log</h2>
@@ -266,13 +274,20 @@ function formatDate(iso: string | null): string {
                     {{ formatDate((row as DeliveryRow).created_at) }}
                 </template>
                 <template #row-actions="{ row }">
+                    <!-- J4a — the `title` carrying "Re-enable the endpoint to redeliver" is DELETED, not
+                         replaced by a tooltip. A natively disabled control is not focusable and fires no
+                         pointer events, so that sentence was unreachable by keyboard and by screen reader,
+                         and reachable by mouse only if you happened to hover a control you could not press.
+                         The reason is already on the page — the alert above this table says the endpoint is
+                         disabled and how to resume it — which is exactly what DSR §3.4a prescribes, and what
+                         `RuleShow.vue` and `QuestionPicker.vue` already argued for. `label` still names the
+                         button for assistive tech. -->
                     <MdsIconButton
                         v-if="can.update"
                         icon="redo"
                         label="Redeliver"
                         size="sm"
                         :disabled="!isActive"
-                        :title="isActive ? 'Redeliver' : 'Re-enable the endpoint to redeliver'"
                         @click="redeliver((row as DeliveryRow).id)"
                     />
                 </template>
@@ -353,8 +368,15 @@ function formatDate(iso: string | null): string {
     margin-bottom: var(--mds-space-5);
 }
 
+/* The alert owns its tint, padding and radius now; only the spacing between it and the log below
+   survives. The descendant reset is needed because the slotted paragraph is compiled in THIS component,
+   so it carries this scope-id and no longer inherits `.detail__prose`'s margin reset. */
 .detail__notice {
     margin-bottom: var(--mds-space-5);
+}
+
+.detail__notice p {
+    margin: 0;
 }
 
 .detail__card-title {

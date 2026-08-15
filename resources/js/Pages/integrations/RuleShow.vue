@@ -19,6 +19,7 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsCard,
@@ -196,8 +197,11 @@ function formatDate(iso: string | null): string {
             </MdsCard>
         </div>
 
-        <MdsCard v-if="!grantLive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert`. The paragraph drops
+             `.detail__prose`, which pins `color: var(--mds-color-text-body)` and would override the alert's
+             tone foreground on a tinted field; that class has two other consumers here and is left alone. -->
+        <MdsAlert v-if="!grantLive" class="detail__notice" tone="info">
+            <p>
                 <template v-if="connection === null || connection.disconnected">
                     The workspace this rule delivered to was <strong>disconnected</strong>. Reconnect it from
                     Integrations to resume — this rule is kept and paused until you do.
@@ -206,10 +210,12 @@ function formatDate(iso: string | null): string {
                     This workspace needs to be reconnected before anything is delivered.
                 </template>
             </p>
-        </MdsCard>
+        </MdsAlert>
 
-        <MdsCard v-else-if="!isActive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- The paused-rule twin. `warning` rather than `info`: the rule is configured and expected to be
+             delivering, and is not. Still not `assertive` — it was already true on load. -->
+        <MdsAlert v-else-if="!isActive" class="detail__notice" tone="warning">
+            <p>
                 This rule is <strong>{{ rule.status }}</strong> and isn’t delivering. Resume it to start again —
                 that also clears the failure counter.
             </p>
@@ -243,7 +249,7 @@ function formatDate(iso: string | null): string {
                     Open in {{ connection?.provider_label ?? 'the provider' }}
                 </MdsButton>
             </div>
-        </MdsCard>
+        </MdsAlert>
 
         <section class="detail__log">
             <h2 class="detail__card-title detail__log-title">Delivery log</h2>
@@ -360,8 +366,14 @@ function formatDate(iso: string | null): string {
     font-family: var(--mds-font-family-mono);
 }
 
+/* The alert owns tint, padding and radius; only the spacing survives. The descendant reset is needed
+   because slotted content is compiled in THIS component and no longer inherits `.detail__prose`. */
 .detail__notice {
     margin-bottom: var(--mds-space-5);
+}
+
+.detail__notice p {
+    margin: 0;
 }
 
 /* H16b — the adapter's own explanation for a paused rule, on the warning surface. Same recipe as the

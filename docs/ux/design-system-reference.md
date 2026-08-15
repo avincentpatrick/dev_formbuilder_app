@@ -851,6 +851,20 @@ Be precise about the precedent, because copying it verbatim is not enough. `resp
 
 **Governing layout rule**: exactly one navigation paradigm operates at each nesting depth — sidebar for primary sections, tabs for views-of-one-resource, breadcrumbs for path context — and they are never substituted for each other (e.g., a page never uses tabs where breadcrumbs are called for, which is a common ad hoc drift point this rule exists to prevent).
 
+### 3.4a Tooltips — and when a tooltip is the wrong answer *(rule established J4a; **component NOT built**)*
+
+**There is no `MdsTooltip`, and J4a deliberately did not build one.** The row that scheduled it assumed two live defects needed one; checking them against the code found that **both pages already state their reason in the page itself**, so the correct change was to delete two leftover `title` attributes. That left the component with **no consumer at all**, and shipping an unconsumed primitive is how a documented system comes to describe things nobody uses.
+
+⚠️ **AND IT COULD NOT HAVE WORKED WHERE §3.4 AND §6 ASK FOR IT ANYWAY.** The collapsed sidebar rail is the one place this document *requires* a tooltip — and `.sidebar` is `overflow-y: auto`, which per CSS Overflow 3 forces `overflow-x: auto` on the other axis, so an in-flow tooltip in a 64px rail is **clipped**, and adds an internal scrollbar the e2e overflow assertion cannot see. The same is true of `.mds-table__scroll` (where the second candidate lived) and of `.palette` inside `.builder__pane { overflow: hidden }`. Escaping any of them needs CSS anchor positioning (not portable) or a `Teleport`, and a teleported node has to interoperate with `Modal/inert-stack.ts` via `data-mds-inert-exempt` — today `MdsToastHost` is the only holder of that exemption. That is the real work, and it is J4b's.
+
+**THE RULE THAT DOES SHIP, because it is what the two deletions were applications of: a natively `disabled` control is not focusable and fires no pointer events, so a `title` on one is unreachable by keyboard AND by assistive technology, and reachable by mouse only for someone hovering a control they cannot press.** Explanatory text on a disabled control is therefore not "a tooltip we should upgrade" — it is information that is already lost. Three permitted answers, in order:
+
+1. **Put the reason in the page, as text.** This is the design of record. `integrations/RuleShow.vue` and `analytics/QuestionPicker.vue` both argue it in their own comments, and `webhooks/Show.vue` and `webhooks/Index.vue` both already *did* it while carrying the redundant `title` besides.
+2. **Replace `disabled` with `aria-disabled="true"`** on an enabled, no-op control — it stays focusable, at the cost of a tab stop that does nothing. Needs a written justification at the call site.
+3. **Remove the control**, as `members/Index.vue` does with `canChangeRole`.
+
+**When the component is built, its contract is already decided (WCAG 1.4.13):** dismissible with Escape *without moving focus*; hoverable, with the gap between trigger and bubble bridged rather than left as a dead zone; persistent, with no auto-hide; and `aria-describedby`, **never** the accessible name — §4.5 forbids a title-tooltip standing in for one. A tooltip is also never the sole carrier of information on a touch device, where there is no hover at all.
+
 ### 3.5 Cards
 
 The default content container for the dashboard, forms list (grid view), and settings panels. Default state: `--mds-color-bg-surface` fill, **`--mds-radius-xl` corners** (the page-level card tier, §2.6 — wired by JR2), `--mds-shadow-1` (or `--mds-shadow-0` flat when inside an already-elevated context like a modal), `--mds-space-5` internal padding, `--mds-color-border-default` 1px border (used **together with** the shadow, not instead of it, so cards remain legible in contexts/zoom levels where shadows render faintly). Interactive cards (e.g., a clickable form-summary card) add a hover state (`--mds-shadow-2` **plus an accent edge, `--mds-color-action-primary-fg`**) and a focus-visible ring when reached via keyboard, and must be a real `<button>`/`<a>`, never a `<div>` with a click handler (§4.5).
@@ -883,6 +897,40 @@ States: entering (`--mds-duration-base`, slide+fade), visible (auto-dismiss afte
 
 **Governing layout rule**: toasts communicate the *outcome* of an action the user just took (or an async event relevant right now); they never carry a primary call-to-action requiring navigation away from the current context (that's a banner or the dashboard's own notification center) — this keeps toasts genuinely ephemeral and prevents them from becoming a dumping ground for anything that "needs to tell the user something."
 
+> **The three of them in one line, because picking wrongly between them is the recurring mistake (J4a):**
+> **Toast** — it happened, and it leaves. **Alert** (§3.7a) — it happened, and it stays where it happened.
+> **Banner** (`MdsBanner`) — it was already true when the page loaded.
+> The consequence that makes this more than taxonomy: a toast is `role="status"` and *disappears*, so a
+> screen-reader user who arrives after it has gone has no way to learn the state at all. Anything that must
+> still be discoverable a minute later is not a toast.
+
+### 3.7a Alerts — and how to tell one from a Banner *(**AS-BUILT since J4a** — `MdsAlert`)*
+
+The in-flow contextual message: something happened, and the page is telling you about it where it happened. `MdsBanner` (§3.7's sibling above) is the other half — a **standing condition** the page is currently in. They are separate components because their accessibility contracts genuinely differ, and the split is enforced by the two APIs rather than by this paragraph.
+
+**Four questions decide it, and each is answered by a prop that exists or does not:**
+
+| | `MdsBanner` | `MdsAlert` |
+|---|---|---|
+| Can it be said in **one line**? | yes — `message: string` is the whole API | no — that is what the default slot is for |
+| Was it **already true** when the page loaded, or did it **just happen**? | already true ⇒ `role="status"`, no opt-out | may have just happened ⇒ `assertive` opt-in |
+| Can the user **dismiss** it while it is still true? | no — hiding a live condition hides a fact | yes — a message about an event is finished once read |
+| Is it **good news**? | no success tone; a "condition" of success is a contradiction | `success` exists |
+
+⚠️ **POSITION IS NOT PART OF THE BOUNDARY, and assuming it is would be the easy mistake.** `SsoStatusCard.vue` already mounts an `MdsBanner` *inside a card*, correctly — it is a standing condition that happens to live in a panel. What separates the two is the nature of the message, never where it sits on the page.
+
+⚠️ **AND NOTHING ABOUT `MdsAlert` WEAKENS §3.7's `role="status"` ARGUMENT FOR BANNER.** That component is deliberately *unable* to be assertive, because an impersonation notice announced before every page heading forever is hostile to the person it most affects. Alert may be assertive precisely because its subject is an event, which is over by the time it is announced.
+
+**The title is a `p`, never a heading.** An alert dropped into an arbitrary page cannot know its own heading level, and a wrong one breaks §4.1's heading-order rule that `MdsFilterBar` already carries a contract about. It is also unnecessary: both `alert` and `status` imply `aria-atomic="true"`, so title and body are announced as one unit and a heading inside a live region buys nothing.
+
+**The component never hides itself.** `dismissible` renders the control and `dismiss` is emitted; the `v-if` stays at the call site, because whether a dismissal should survive a reload, a navigation, or the rest of the session is a page decision every time — the same line `MdsToast` draws.
+
+**`warning` and `danger` share the `alert` glyph, which narrows something and says so.** Banner makes `icon` required precisely so the author chooses; Alert defaults it, because eleven call sites passing the same value is noise. The consequence, stated rather than buried: on those two tones the non-colour channel is the **words**, which is what §3.8/§4.1 actually require — but a page rendering a warning and a danger alert side by side should pass distinct icons. Minting a fifth glyph was rejected: Appendix B refuses additions by rule.
+
+**Tones reuse `--mds-color-status-{info|success|warning|danger}-{bg,fg}` exactly as Banner does**, so `theme-overrides.test.ts`'s existing measurements cover this component in both themes. A hand-picked hex here would be unmeasured by anything.
+
+> **As-built adoption (J4a):** thirteen surfaces. Five admin error banners that were **byte-identical apart from a class name** (`assertive`, because each is a thing that just failed under the operator's hand), and eight that carried **no `role` at all** — `webhooks/Show`, `integrations/RuleShow` ×2, `domains/Index`, `Settings/Sso`, `integrations/Index` ×3. ⚠️ Roughly twenty further hand-rolled notices remain in the app tree and are a recorded backlog row, **not** an oversight: several carry deliberate, individually-argued `role` choices (`Encode.vue` has five, each with its own rationale) and migrating them is a per-site decision rather than a sweep.
+
 ### 3.8 Badges / Status Pills
 
 Small, `--mds-radius-full`, single-line labels communicating a discrete state — submission status (`draft`/`submitted`/`screened_out`/`under_review`/`approved`/`returned`/`archived`, matching the `SubmissionStatus` enum in the Data Dictionary; `screened_out` was added in I9a and is **neutral**, not danger — a settled non-failure, the same rule `wont_fix`/`disabled`/`revoked` follow), form status (`draft`/`published`/`archived`), webhook delivery status, subscription-tier badges, etc. Each status maps to exactly one semantic color pairing (background tint + matching-hue text, e.g., `approved` → `--mds-success-50` background / `--mds-success-700` text; `returned` → `--mds-warning-50` / `--mds-warning-700`\*(text darkened beyond the default warning text token specifically for the small-pill-text-size case — see the contrast note in §4.1); `archived` → `--mds-neutral-100` / `--mds-neutral-600`), and — consistent with the "never color alone" rule threaded through this document — every pill's **text label is the status name itself**, never a bare colored dot.
@@ -907,6 +955,16 @@ Three distinct patterns, used for three distinct situations — they are not int
 - **Determinate progress bar** — for measurable, bounded operations with a meaningful *fill level* (file upload percentage, async export job progress). Track: `--mds-neutral-200`; fill: `--mds-primary-600`; always paired with a numeric label ("62%") — a bar alone is not sufficient (screen-reader and low-vision users need the numeric equivalent, not just the visual fill level). Two variants of this same component:
   - **Percentage variant** (default) — a filled track plus a percentage label, for operations where the fraction-complete itself is the meaningful signal (uploads, exports).
   - **Step-count variant** — text-only, no filled track: "Step X of N" (optionally with the current step's title, e.g. "Step 3 of 5: Household Members"), used specifically for multi-step form navigation (Form-Filling UX Flow Spec §3.2). A labeled step count is more legible than a bar when N is small (the common case — most forms have well under 10 sections), and it gives screen-reader users a concrete, announceable position rather than an abstract percentage. Each already-completed step in this variant is rendered as a tappable/clickable target to navigate back.
+
+> **AS-BUILT (J4a) — `MdsProgress` ships the PERCENTAGE variant. The step-count variant is specified above and deliberately NOT built.**
+>
+> **The label row is unconditional, and that is the API doing the arguing rather than this document.** There is no `labelHidden` prop and no way to render the track on its own, so "a bar alone is not sufficient" is unwriteable-wrong rather than merely written down — the same move `MdsBadge`'s `dot` makes against §3.8's bare coloured disc. `aria-labelledby` points at the visible label (one string, one node, so WCAG 2.5.3 holds by construction), and **`aria-valuetext` is always set** because `aria-valuenow="58"` with `aria-valuemax="100"` is announced "58 percent", which is wrong twice over when the unit is responses against a cap that is not 100.
+>
+> ⚠️ **THE FILL MOVED FROM `-bg` TO `-fg`, AND THAT IS A VISIBLE CHANGE TO `/forms`, NOT A REFACTOR.** The hand-rolled meter this replaces filled with `--mds-color-action-primary-bg`, measuring **4.24:1 light / 3.95:1 dark** against `--mds-color-bg-sunken`. §3.4's standing rule — *for any coloured rule, edge or indicator reach for `-fg`, never `-bg`* — gives **6.30:1 / 9.56:1**, and `-fg` additionally carries the per-tenant brand-ramp guarantee that `-bg` does not. Capacity meters therefore go `#0E6FE8` → `#1156B2` in light and `#8FBCFF` in dark. The warning tone already used `status-warning-fg` and is unchanged.
+>
+> ⚠️ **The fill width rides a component-local `--progress-fill`, and the missing `--mds-` prefix is load-bearing.** `token-references.test.ts` scans every file for `var(--mds-…)` and fails on any name that is not a real token — it never evaluates a fallback, so a prefixed spelling would red-light the whole package for a value that is not a token and was never meant to be.
+>
+> **Why the step-count variant is not built, stated so a later increment does not read the gap as an oversight.** Its reference implementation already exists and is *better specified than this section*: `resources/public-runtime/components/ProgressIndicator.vue` renders a `nav`-labelled "Step X of N" with each visited step navigable, and it carries a rule §3.9 does not — **a step is "done" if it is in the VISITED SET, never if its index is below the current one** (H21b; relevance filtering means a respondent can be on step 5 having never seen step 3). That rule belongs in this spec before any shared component absorbs it. Migrating it also puts **17 assertions** at risk across `resources/public-runtime/__tests__/components.test.ts` and `public-runtime-axe.spec.ts`, inside a **separate Vue SPA** that imports eight design-system components and none of the rest. The second consumer, when it comes, is `Pages/submissions/Encode.vue:897-899` — a bare `p aria-live="polite"` reading "Step 3 of 5" with no landmark and no navigable steps, pinned by nine assertions in `encode.test.ts`. This is the `TabNav`/`Tabs` precedent: specify both, build the one with a consumer, and name the other's first refactor target.
 - **Skeleton** — for structural/layout-preserving loading (table rows, card grids, dashboard KPI tiles) as described in §3.3 — deliberately distinct from a spinner because it prevents layout shift and communicates *approximately what's coming*, not just *that something is happening*.
 
 **Governing layout rule**: a spinner is never used for an operation that has a knowable duration/step-count (that's always one of the two determinate-bar variants above) — this rule exists specifically because indeterminate spinners on measurable operations (e.g., a multi-file batch upload) are a common, confusing anti-pattern this system rules out by construction. Choosing between the percentage and step-count variants is not a per-page style choice — it follows directly from whether the operation has a meaningful continuous fill level (percentage) or a small number of discrete named steps (step-count); a page never invents a third presentation for either case.
@@ -1010,6 +1068,22 @@ Contrast, colour-channel and text-alternative obligations are in §4.1.
 >   read "Pick a question" — the radio and the card disagreeing about whether a question had been picked.
 >   Found by looking at the running page, exactly as H24b1's draft tiles were, and pinned by two Vitest
 >   cases that each redden under a different one-line mutation.
+
+### 3.12 Avatars *(**AS-BUILT since J4a** — `MdsAvatar`)*
+
+A person's initials in a filled disc, used wherever a roster, a ledger or a list names people: the members table, the audit log's actor column, the submissions inbox's respondent column, and the account menu's own trigger.
+
+**It is ALWAYS decorative, and no prop changes that.** `aria-hidden` is unconditional. The governing rule: *an avatar in this system is always accompanied by the person's visible name; an avatar that must carry a name is not an avatar, it is a link or a button whose accessible name is the person.* Announcing "DO" beside "Demo Owner" is duplication, and it is the only thing a chip could contribute to a screen reader. ⚠️ **The reconsideration trigger is a CONSUMER, not an argument** — a stacked "+3 others" group, or an avatar with no adjacent name. Neither exists today, which is the same discipline that kept `rowHref` off `MdsDataTable` in §3.3.
+
+**Three sizes, each anchored to geometry that already existed:** `sm` 24px (a dense table row) · `md` 28px (`AccountMenu`'s trigger, unchanged through the migration — `NotificationBell`'s count bubble is dimensioned as its sibling) · `lg` 40px (`PageHeader`'s badge).
+
+⚠️ **`min-inline-size`/`min-block-size` + `aspect-ratio`, NEVER a fixed `width`/`height`.** `NotificationBell.vue` pins its own bubble and records the cost: the caption role is 12px by default and **15px under `[data-font-size="extra_large"]`**, which put 17px of text inside an 18px line box, clipping descenders and failing WCAG 1.4.12. An avatar that grows with the type scale is a slightly larger avatar; one that cannot is unreadable for exactly the people §2.9's accommodation exists for.
+
+**The derivation, and most of it is about scripts:** a missing or blank name renders `?` rather than an empty disc; only words beginning with a letter or a number count (`\p{L}`/`\p{N}`, so `"!!!"` falls back and a leading emoji is skipped — an `[A-Za-z]` test would discard every Arabic, CJK and Devanagari name); the initials are the first grapheme of the **first and last** word; a one-word name gives **one** grapheme, because two reads as an acronym for a Latin mononym and is *correct* for CJK, where 山田太郎's first two characters are the surname; graphemes come from `Intl.Segmenter`, never an index. ⚠️ **That last rule fixes a live defect rather than guarding a hypothetical one** — `AccountMenu` indexed with `[0]`, which takes half a surrogate pair for any name outside the BMP and rendered U+FFFD. Case is folded with `toUpperCase`, **not** `toLocaleUpperCase`: the locale-aware form makes the glyph depend on the reader's browser locale, so the same roster would show different letters to two colleagues.
+
+⚠️ **MONOCHROME, AND THE COLOURFUL ALTERNATIVE WAS MEASURED RATHER THAN DISLIKED.** Two tones only: `brand` (`action-primary-bg` on `text-on-primary`, 4.71:1 in both themes — the pair the account menu already wore) and `neutral` (`status-neutral-bg`/`-fg`, 9.94:1 light / 10.10:1 dark) for somebody who is not a full participant yet, such as a pending invite or an anonymous guest. Reusing the six-hue **form-identity** scale from §2.2 is the obvious idea and is wrong three times: as a solid fill under white text its dark identity-4 step measures **2.91:1** (that scale carries its own hue as TEXT on a 12% tint, a different visual object); `theme-overrides.test.ts` proves every identity hue sits ≥30° from every other and from every chromatic status hue, so drawing people from the same six would put a **person and a form at 0°** and destroy the mnemonic that scale exists for; and it would need a per-user identity integer nothing computes. Under "never colour alone" the hue could carry no meaning anyway. `docs/feature-backlog.md` records the four preconditions for revisiting.
+
+**No `src`, and that is not an omission.** Nothing in this product stores a profile photo — there is no `avatar_url` in the schema or the client, and the `Avatar` attachment kind has no user-facing producer. When one arrives the contract changes shape rather than gaining a prop: an image needs `alt`, a broken image needs an initials fallback, and that fallback needs an error handler. That is a different version of the component.
 
 ---
 

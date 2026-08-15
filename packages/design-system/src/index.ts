@@ -24,9 +24,37 @@ export { default as MdsStatTile } from './components/StatTile/StatTile.vue';
 export { default as MdsEmptyState } from './components/EmptyState/EmptyState.vue';
 export { default as MdsSegmentedControl } from './components/SegmentedControl/SegmentedControl.vue';
 export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
+// The determinate half of DSR §3.9, beside the indeterminate one above (J4a). §3.9's governing rule is that
+// a spinner is never used for an operation with a knowable fraction complete, so the two belong together
+// here. It renders its label and its numeric value UNCONDITIONALLY: "a bar alone is not sufficient" is a
+// rule this API makes unwriteable rather than merely documents, the same way MdsBadge's `dot` cannot be
+// used to build the bare coloured disc §3.8 forbids. ⚠️ The step-count variant §3.9 also specifies is NOT
+// built — see the as-built note there, and `resources/public-runtime/components/ProgressIndicator.vue`,
+// which is its reference implementation and its first refactor target.
+export { default as MdsProgress } from './components/Progress/Progress.vue';
+export { type ProgressTone, type ProgressSize } from './components/Progress/Progress.vue';
+// The initials chip (J4a). ALWAYS `aria-hidden`, and no prop changes that: an avatar in this system is
+// always beside the person's visible name, and one that must CARRY a name is not an avatar but a link whose
+// accessible name is the person. The reconsideration trigger is a CONSUMER — a stacked group, or an avatar
+// with no adjacent name — of which there are none, the same discipline that kept `rowHref` off MdsDataTable.
+// ⚠️ Monochrome on purpose: reusing `--mds-form-identity-*` measures 2.91:1 under white text in dark, and
+// would put a PERSON and a FORM at 0° in a scale whose own suite proves every member is 30° from every
+// other. There is no `src` either — nothing in this product stores a profile photo, and an image needs a
+// different contract (alt text, a broken-image fallback) rather than one more prop.
+export { default as MdsAvatar } from './components/Avatar/Avatar.vue';
+export { type AvatarSize, type AvatarTone } from './components/Avatar/Avatar.vue';
 export { default as MdsBadge } from './components/Badge/Badge.vue';
 export { default as MdsBanner } from './components/Banner/Banner.vue';
 export { type BannerTone } from './components/Banner/Banner.vue';
+// The in-flow contextual message (J4a), and MdsBanner's SIBLING rather than its replacement. The split is
+// four questions, each enforced by a prop that exists or does not — see DSR §3.7a and the docblock. Banner
+// states a CONDITION in one line, is fixed-polite because the condition was already true when the page
+// loaded, and has no dismiss because hiding a live fact is not a feature. Alert carries rich content, may
+// opt into `assertive` for something that JUST happened, may be dismissed, and has a success tone.
+// ⚠️ Do not "unify" them: Banner's role="status" argument is load-bearing for the impersonation surface,
+// and position is NOT the discriminator — `SsoStatusCard` already mounts a Banner inside a card, correctly.
+export { default as MdsAlert } from './components/Alert/Alert.vue';
+export { type AlertTone } from './components/Alert/Alert.vue';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';

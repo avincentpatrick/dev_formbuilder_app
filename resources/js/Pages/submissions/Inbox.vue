@@ -35,6 +35,7 @@
 import { computed, reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    MdsAvatar,
     MdsBadge,
     MdsBreadcrumb,
     MdsButton,
@@ -347,6 +348,24 @@ function formatDate(iso: string | null): string {
                 </Link>
                 <span v-else>{{ (row as SubmissionRow).form_title }}</span>
             </template>
+            <!-- J4a. ⚠️ TWO CALL-SITE GUARDS, BOTH OF THEM THIS PAGE'S KNOWLEDGE RATHER THAN THE CHIP'S.
+                 `SubmissionInboxPresenter::respondentLabel()` returns exactly three shapes: a real person's
+                 name, the literal "Guest", or an em dash. The dash means no respondent is recorded, so there
+                 is nobody to draw. "Guest" DOES get a chip, in the neutral tone — and the distinction from
+                 the audit log's `is_system` rows, which get none, is deliberate rather than inconsistent: a
+                 guest is a real human who happens to be unidentified, whereas "System" is the platform
+                 acting on its own, and a machine wearing a person's initials is a lie. A magic-string list
+                 inside MdsAvatar would put this page's vocabulary in the design system. -->
+            <template #cell-respondent="{ row }">
+                <span v-if="(row as SubmissionRow).respondent === '—'">—</span>
+                <span v-else class="inbox__respondent">
+                    <MdsAvatar
+                        :name="(row as SubmissionRow).respondent"
+                        :tone="(row as SubmissionRow).respondent === 'Guest' ? 'neutral' : 'brand'"
+                    />
+                    <span>{{ (row as SubmissionRow).respondent }}</span>
+                </span>
+            </template>
             <template #cell-status="{ row }">
                 <div class="inbox__status">
                     <!-- `dot` (JR2): the inbox status column, the second of the two scannable status
@@ -473,5 +492,11 @@ function formatDate(iso: string | null): string {
 
 .inbox__reference:hover {
     text-decoration: underline;
+}
+.inbox__respondent {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    min-width: 0;
 }
 </style>

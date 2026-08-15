@@ -21,6 +21,7 @@
 import { reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    MdsAvatar,
     MdsBadge,
     MdsButton,
     MdsDataTable,
@@ -267,6 +268,13 @@ function summarize(row: AuditRow): string {
             -->
             <template #cell-actor="{ row }">
                 <div class="audit__actor">
+                    <!-- ⚠️ A SYSTEM ROW RENDERS NO CHIP. `actor` is the literal string "System" for anything
+                         the platform did on its own, and a machine wearing a person's initials in a person's
+                         circle is a lie the reader has no way to see through — on the one page whose entire
+                         job is saying who did what. The guard is at the CALL SITE rather than a magic-string
+                         list inside the component, because "which of my actors are people" is this page's
+                         knowledge, not the design system's. -->
+                    <MdsAvatar v-if="!(row as AuditRow).is_system" :name="(row as AuditRow).actor" />
                     <span>{{ (row as AuditRow).actor }}</span>
                     <span v-if="(row as AuditRow).acting_as" class="audit__acting-as">
                         via {{ (row as AuditRow).acting_as }}

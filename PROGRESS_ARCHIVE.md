@@ -2895,3 +2895,61 @@ gamification; then the final integration PR to `main`.
 briefing has no single point of truth, so it drifts silently and each participant keeps verifying against its
 own copy. Duplication is what made the drift invisible, not carelessness. The same reasoning already applies
 here to globally-numbered artefacts (ADRs, migration prefixes): reading the current maximum is not a reservation.
+
+---
+
+## 2026-08-15 — LANE B, `P1d`: the threat model's SSO section, and the login-CSRF it found
+
+`docs/security-threat-model.md` had carried **no SSO rows at all** since P1a, which three documents said
+in their own words and none of them fixed. It gains **§2 +2 surface rows** (the ACS on its own; the
+tenant-facing SAML endpoints), **§3 +1** (cross-tenant assertion acceptance), a **19-row SAML table in §8**,
+and **§9 items 17–25**, with item 8 widened.
+
+**The row said "section" and the document's own preamble forbade one in writing** — J3c1 had already
+argued that a new §9 renumbers Residual Risks and Out of Scope while six documents cite §4–§8 by number.
+Verified live against four §9 citations. So the content went *into* the existing sections on the
+bolded-bridge idiom §5 and §7 already use. Ten-for-ten on verifying a doc-sourced row against the artefact.
+
+**The finding that outgrew the row: the SAML login arm has no browser-flow binding.** Structurally the
+login-CSRF J3c2's adversarial pass found in the Google path. Measured rather than reasoned — `GET
+/sso/saml/login` writes **zero** session keys, and an assertion posted from a session that had never
+visited the mint endpoint answered `302 /dashboard`, authenticated as the asserted subject. Google's fix
+cannot be reused: both of its session-creating hops share a host with the mint, while the ACS is a
+cross-site POST under `SameSite=Lax` and structurally receives no cookie. It needs the same-site
+completion hop the step-up arm already has. **User decision: verify, then split** — recorded as the
+document's second `Open` verdict and scheduled as **P1e**, now in the Lane B queue ahead of CRDT sync. The
+probe was deliberately not committed; P1e commits the inverse.
+
+**Three controls this repository documented and never built**, the fifth, sixth and seventh instances of
+that pattern and the first time three landed together: an `SsoCertificateInspector` docblock claiming the
+ACS checks certificate validity dates (it has one consumer, the settings presenter, and php-saml parses no
+validity dates anywhere — so an expired signing certificate authenticates indefinitely); a "scheduled
+prune" of `sso_auth_requests` that never existed, for a table an unauthenticated endpoint appends to one
+row per hit; and a 60-second clock-skew narrowing that covers `Conditions` only while the library still
+judges `SubjectConfirmationData` and `SessionNotOnOrAfter` at its hard-coded 180.
+
+**Built:** the trim (liveness as the outer `AND`, so no in-flight sign-in is evictable at any volume — the
+J3c2 defect, not repeated), a limiter on `/sso/saml/metadata`, and a router-level pattern plus throttle on
+the step-up completion hop.
+
+**The adversarial pass found a defect in this increment's own new code**, five increments running: the trim
+is a DELETE on the authentication mint path, and a deadlock between two concurrent mints would have
+answered `GET /sso/saml/login` with a 500 — worse than the unbounded growth it fixes. Guarded, with the
+threat-model row amended to claim a best-effort bound rather than an invariant.
+
+**Mutation pass: 8 mutations, all 8 reddened, zero undefended.** Each verified APPLIED by md5 with its
+needle asserted to match exactly once; M0 proved the harness green first; the tree was asserted clean
+before and after every step. M1 (deleting the liveness predicate) reddens four cases and still does with
+the guard in place. **M8 is the transferable one: a `throttle:` alias naming an unregistered limiter
+resolves to an unlimited passthrough and fails silently, so a middleware assertion alone is vacuous.**
+
+**Also repaired:** `security-threat-model.md:51` was blank, severing P2c's constraint-boundary row from
+§3's table so the section's highest-consequence isolation row had been rendering as a literal paragraph of
+pipes since P2c merged — invisible to every gate, since nothing lints markdown, and found by counting
+cells per line.
+
+**Lesson, and it is the uncomfortable one:** seven line-number citations into this document across four
+files were converted to section citations — three already stale before this increment — and then the same
+anti-pattern turned up **five times in this increment's own new prose**, caught only by re-reading the
+diff. The author of a rule is not exempt from it, and a document that cites by line number is a citation
+with an expiry date nobody can see.

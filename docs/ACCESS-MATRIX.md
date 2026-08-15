@@ -373,7 +373,7 @@ Holding **any one** of the listed permissions grants the ability.
 
 Other things that will look like bugs and are not:
 
-- **Personal 2FA still applies to a Google-linked account.** This diverges from ADR-0016 §138 on
+- **Personal 2FA still applies to a Google-linked account.** This diverges from ADR-0016 §D22 on
   purpose (the J3c decision). Google linking happens only onto an already-verified account.
 - **`invited@demo.test` cannot sign in** — it is a pending invitation with a random discarded password.
 - **`CENTRAL_DOMAIN=localhost`** in `.env`, diverging from `meridian.test`, because the super-admin

@@ -652,7 +652,7 @@ Every row-list page takes a `?q`. These are not search *arms* — they narrow a 
 
 1. **Impersonation — deferred.** The platform console does **not** support "log in as this user" in Phase 0. It is a large security surface and would need an `acting_as_user_id`-style `audits` column (and the `audits` table itself, which does not exist until Phase 1) to keep a super-admin's own actions distinguishable from actions taken while impersonating. Revisit when support tooling genuinely requires it; design the `acting_as_user_id` column alongside the Phase-1 `audits` table if so.
 
-   > **AS BUILT (I11a, 2026-08-09) — the PRECONDITION IS MET; THE FEATURE IS NOT BUILT YET.** `audits.acting_as_user_id` exists, is written by `AuditLogger` on every row, and is read by both viewers, the CSV/XLSX export and `/api/v1`. It landed **before** I11b's actual impersonation, deliberately: a release in which the ledger could be lied to but not record the lie is the window `security-threat-model.md`:144 describes, and shipping the column first closes it by construction.
+   > **AS BUILT (I11a, 2026-08-09) — the PRECONDITION IS MET; THE FEATURE IS NOT BUILT YET.** `audits.acting_as_user_id` exists, is written by `AuditLogger` on every row, and is read by both viewers, the CSV/XLSX export and `/api/v1`. It landed **before** I11b's actual impersonation, deliberately: a release in which the ledger could be lied to but not record the lie is the window `security-threat-model.md` §8 describes, and shipping the column first closes it by construction.
    >
    > ⚠️ **This entry is a DEFERRAL, not a specification, and reading it as one is a trap I11b must avoid.** The single sentence above is the *entire* impersonation requirement in this repository — a grep for `impersonat` across `docs/`, the PRD, the backlog, the ADRs and the threat model returns nothing else normative. Actor eligibility, a banner, the exit path, session TTL, read-only vs read-write, and notifying the tenant were all **unspecified**, and were therefore decided with the product owner on 2026-08-09 rather than inferred: **full read-write impersonation, fully audited; any ACTIVE tenant member may be impersonated but never another super-admin and never yourself; the affected tenant sees it in their OWN `/audit-log` and the Owner is notified through I3's notification substrate.** Those four are decisions of record — do not re-derive them.
    >
@@ -692,7 +692,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 ## 11. Out of Scope / Deferred
 
 - Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification).
-- SSO/SAML → Phase 4 (architecture plan §3).
+- ~~SSO/SAML → Phase 4 (architecture plan §3).~~ **BUILT (P1a–P1c, ADR-0016)** — a per-tenant SAML 2.0 Service Provider, SP-initiated only, Enterprise-gated. §7.1 above already describes JIT provisioning as one of the four doors, so this line was contradicting its own document. Its threat surface is `docs/security-threat-model.md` §8.
 - Dedicated-database tenancy → ADR-0002's own explicitly deferred future ADR.
 - GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc).
 - Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum).

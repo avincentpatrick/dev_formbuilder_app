@@ -12,6 +12,7 @@ use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -259,4 +260,26 @@ it('carries its own rate limiter, because an anonymous caller can mint rows here
 
     expect($route)->not->toBeNull()
         ->and($route->gatherMiddleware())->toContain('throttle:saml-login');
+});
+
+it('gives the metadata endpoint its own limiter too — it had none until P1d', function (): void {
+    // ⚠️ THE THIRD PROTOCOL ROUTE WAS UNBOUNDED WHILE THE COMMENT BESIDE IT JUSTIFIED LIMITERS FOR "BOTH
+    // HALVES" OF THE ROUND TRIP AND NEVER MENTIONED IT. It is unauthenticated, reachable by anyone holding
+    // a hostname, and composes a DOM document per request — so the asymmetry reads as an oversight rather
+    // than a decision. A SEPARATE bucket, for the reason the provider's own comment gives: sharing one
+    // would halve whichever ceiling an operator thought they were setting.
+    $route = collect(Route::getRoutes()->getRoutes())
+        ->first(fn ($candidate): bool => $candidate->getName() === 'sso.metadata');
+
+    expect($route)->not->toBeNull()
+        ->and($route->gatherMiddleware())->toContain('throttle:saml-metadata')
+        ->and($route->gatherMiddleware())->not->toContain('throttle:saml-login');
+});
+
+it('registers every SAML limiter it names, so a throttle alias cannot be a typo', function (): void {
+    // A `throttle:` middleware naming a limiter nobody registered does not fail loudly — it resolves to an
+    // unlimited passthrough, so the two assertions above would stay green over a bound that does not exist.
+    foreach (['saml-login', 'saml-acs', 'saml-metadata', 'saml-step-up', 'saml-step-up-complete'] as $name) {
+        expect(RateLimiter::limiter($name))->not->toBeNull("limiter [{$name}] is not registered");
+    }
 });

@@ -57,6 +57,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | AuthnRequest store bounds (P1d) — the prune this file used to describe and nobody had written
+    |--------------------------------------------------------------------------
+    |
+    | ⚠️ THIS TABLE'S OWN MIGRATION SAID "a scheduled prune drops rows well past `expires_at`" AND NO SUCH
+    | COMMAND, JOB OR SCHEDULE ENTRY HAS EVER EXISTED. `routes/console.php` records that
+    | nothing runs the scheduler on the production box in any case, so even a written one would have been a
+    | bound living in this repository and not on the machine — for a table `GET /sso/saml/login` appends to,
+    | unauthenticated, one row per hit. Corrected by bounding the WRITE path instead, on the
+    | `SsoAuthFailureRecorder` and `google_auth_requests` pattern: the two newer tables of this family both
+    | got this and the oldest did not.
+    |
+    | ⚠️⚠️ ONLY ALREADY-DEAD ROWS ARE ELIGIBLE, AND THE LIVENESS PREDICATE IS THE OUTER `AND` RATHER THAN A
+    | REFINEMENT. J3c2 ported a rank-only cap of exactly this shape onto a table holding LIVE rows and
+    | produced unauthenticated denial of *authentication*: anyone could mint enough rows to push a member's
+    | pending sign-in past the cap while they sat on a consent screen, after which their sign-in failed and
+    | the log blamed a replay. Here a row becomes eligible only once it is consumed or expired, so no
+    | in-flight sign-in can be evicted by anybody, at any volume.
+    |
+    | Deleting a spent row cannot re-enable a replay: `findLive()` requires the row to EXIST and be
+    | unconsumed and unexpired, so an absent row is refused exactly as a consumed one is. What it costs is
+    | resolution in the LOG — a replay of a pruned request reads as "never minted" rather than "already
+    | used" — which is why the window is days rather than minutes even though a request dies in ten.
+    |
+    | The two limits are independent for the same reason they are on the failure log: the cap answers a
+    | grinder, the retention window answers the fact that these rows carry an IP address.
+    |
+    */
+    'authn_request_max_rows' => (int) env('SAML_AUTHN_REQUEST_MAX_ROWS', 500),
+    'authn_request_retention_days' => (int) env('SAML_AUTHN_REQUEST_RETENTION_DAYS', 7),
+
+    /*
+    |--------------------------------------------------------------------------
     | Step-up completion window (P1c)
     |--------------------------------------------------------------------------
     |

@@ -8,7 +8,11 @@ use App\Enums\SsoAuthIntent;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * The SP's memory of the AuthnRequests it has minted (Phase 4, P1b — ADR-0016 §D8).
@@ -72,7 +76,78 @@ final class SsoAuthRequestService
             'ip_address' => $ip,
         ])->save();
 
+        // ⚠️ HOUSEKEEPING MUST NEVER DECIDE WHETHER A SIGN-IN BEGINS. The trim is a DELETE added to the
+        // authentication mint path, and the realistic way it fails is a deadlock: two concurrent mints for
+        // one tenant issue DELETEs over overlapping row sets with no guaranteed lock-acquisition order.
+        // Unguarded, that turns "the table is a little larger than it should be" into `GET /sso/saml/login`
+        // answering 500 — an outage strictly worse than the unbounded growth this bound exists to stop.
+        // {@see SsoAuthFailureRecorder::record()} swallows for the same reason one layer over.
+        //
+        // ⚠️ DELIBERATELY UNTESTED, AND THE REASON IS THE ONE P2a RECORDED FOR ITS OWN MISSING CASE.
+        // `RefreshDatabase` wraps every test in a transaction, and a raised PostgreSQL error ABORTS that
+        // transaction — so a case that forced this failure could not then observe a recovered request, and
+        // the "fix" it invited would be pinning the harness's behaviour instead of the product's. In
+        // production `mint()` runs in no transaction at all, which is what makes the recovery real.
+        try {
+            $this->trim($now);
+        } catch (Throwable $error) {
+            Log::warning('sso.authn_request.trim_failed', ['error' => $error->getMessage()]);
+        }
+
         return $request;
+    }
+
+    /**
+     * Drop dead rows past the retention window or beyond the row cap, for the current tenant (P1d).
+     *
+     * ⚠️ WHY THIS IS ON THE WRITE PATH AND NOT IN THE SCHEDULER. `config/saml.php` and this table's own
+     * migration both described "a scheduled prune" and neither a command nor a schedule entry was ever
+     * written — while `routes/console.php` records that nothing runs the scheduler on the production box, so
+     * even a written one would have been a bound existing in this repository and not on the machine. The
+     * endpoint that fills this table is unauthenticated and writes one row per hit, which is the same
+     * argument {@see SsoAuthFailureRecorder::trim()} already makes for the table next door.
+     *
+     * ⚠️⚠️ THE LIVENESS PREDICATE IS THE OUTER `AND`, AND IT IS THE WHOLE DESIGN RATHER THAN A REFINEMENT.
+     * A rank-only cap of this shape was ported onto a table of LIVE rows in J3c2 and produced unauthenticated
+     * denial of *authentication* — anybody could push a member's pending row past the cap while they sat on
+     * a consent screen. Only a consumed or expired row is eligible here, so no in-flight sign-in is evictable
+     * by anyone at any volume. The stated consequence: this table is capped at N *dead* rows plus whatever
+     * the rate limiter admits inside one TTL, which is the honest division of labour.
+     *
+     * Deleting a spent row cannot re-enable a replay — {@see findLive()} requires the row to EXIST and be
+     * unconsumed and unexpired, so an absent row is refused exactly as a consumed one is; what is lost is
+     * resolution in the log, where a pruned replay reads as "never minted" rather than "already used".
+     *
+     * The cap is "not among the newest N", never "older than the Nth": a grinder writes many rows inside one
+     * second and a timestamp comparison keeps every tied row, i.e. fails at exactly the volume it exists for.
+     * `ORDER BY issued_at DESC, id DESC` makes the ordering total. RLS is the tenant scoping — there is no
+     * `tenant_id` predicate because under strict isolation there cannot be a cross-tenant row to match.
+     */
+    private function trim(Carbon $now): void
+    {
+        $cap = (int) config('saml.authn_request_max_rows');
+        $cutoff = $now->copy()->subDays((int) config('saml.authn_request_retention_days'));
+
+        SsoAuthRequest::query()
+            ->where(function (Builder $dead) use ($now): void {
+                $dead->whereNotNull('consumed_at')->orWhere('expires_at', '<=', $now);
+            })
+            ->where(function (Builder $beyond) use ($cutoff, $cap, $now): void {
+                $beyond->where('issued_at', '<', $cutoff)
+                    ->orWhereNotIn('id', function (QueryBuilder $newest) use ($cap, $now): void {
+                        $newest->select('id')
+                            ->from('sso_auth_requests')
+                            // The cap counts DEAD rows only, so a burst of live ones cannot consume the
+                            // allowance and make the retained history shorter than it says it is.
+                            ->where(function (QueryBuilder $dead) use ($now): void {
+                                $dead->whereNotNull('consumed_at')->orWhere('expires_at', '<=', $now);
+                            })
+                            ->orderByDesc('issued_at')
+                            ->orderByDesc('id')
+                            ->limit($cap);
+                    });
+            })
+            ->delete();
     }
 
     /**

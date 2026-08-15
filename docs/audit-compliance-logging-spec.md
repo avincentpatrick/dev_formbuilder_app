@@ -52,7 +52,7 @@ only what belongs to no tenant, which today is the `settings` row above. Cross-t
 `user_id` is the **effective** actor: whose authority the action ran under. `acting_as_user_id` is the
 **real** human when those differ — the platform operator driving an impersonated session — and is `NULL`
 on every ordinary row. Together they satisfy the only requirement RBAC §9:433 states about impersonation,
-and close the risk `security-threat-model.md`:144 names.
+and close the risk `security-threat-model.md` §8 names.
 
 Three consequences worth stating once, because each has already caught something:
 

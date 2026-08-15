@@ -91,7 +91,8 @@ final class ConstraintBoundaries
 
         // ── Matched before a tenant is known, so a per-tenant index would be unreadable at lookup time ───
         'google_auth_requests_state_id_unique' => 'Google sign-in\'s OAuth state, matched on the CENTRAL host '
-            .'from an unauthenticated callback (0017-first-party-google-sign-in). A cross-tenant collision '
+            .'from an unauthenticated callback (ADR-0019, first-party Google sign-in — that document was '
+            .'0017 until the two lanes\' collision was resolved by renumbering it). A cross-tenant collision '
             .'would give the lookup a second row it could legitimately match, which is ambiguity exactly '
             .'where the flow must be unambiguous.',
         'google_auth_requests_handoff_hash_unique' => 'The single-use handoff token\'s SHA-256, presented by a '
@@ -257,7 +258,7 @@ final class ConstraintBoundaries
 
         // ── Spatie RBAC pivots: safe because of a precondition, not because of a constraint ──────────────
         'model_has_roles_role_id_foreign' => 'The role side of Spatie\'s role assignment (CASCADE). ⚠️ SAFE '
-            .'ONLY BECAUSE ALL FIVE `roles` ROWS ARE PLATFORM ROWS TODAY — 0017-tenant-isolation-tiering\'s '
+            .'ONLY BECAUSE ALL FIVE `roles` ROWS ARE PLATFORM ROWS TODAY — ADR-0017 (tenant isolation tiering)\'s '
             .'"When to Revisit" states that `roles_tenant_insert` permits a tenant-owned role and that the '
             .'moment one exists this pivot leaks cross-tenant with two CASCADE edges and no policy to stop '
             .'it. That is a precondition nothing enforces, not a property of this constraint.',
@@ -272,7 +273,7 @@ final class ConstraintBoundaries
         'role_has_permissions_role_id_foreign' => 'Spatie\'s global role→permission mapping (CASCADE). The '
             .'PIVOT carries no `tenant_id` at all — ADR-0002 §D1 calls it "global-to-global … no tenant '
             .'dimension" — so there is no column a composite key could use, while `roles` DOES carry one. '
-            .'⚠️ This is the exact constraint 0017-tenant-isolation-tiering\'s "When to Revisit" names: the '
+            .'⚠️ This is the exact constraint ADR-0017 (tenant isolation tiering)\'s "When to Revisit" names: the '
             .'sentence is true only while all five roles are platform rows, and nothing enforces that.',
         'role_has_permissions_permission_id_foreign' => 'The permission side of the same untenanted pivot '
             .'(CASCADE). Identical shape and identical precondition — the 29 permissions are platform rows, '

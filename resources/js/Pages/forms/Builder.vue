@@ -720,7 +720,21 @@ function submitImport(): void {
    The rest is full-bleed CHROME geometry the shared component correctly does not provide: a strip spanning
    the workspace has square corners and a rule under it, where an in-flow panel has neither. Tint, type and
    the dismiss control now come from MdsAlert. */
-.builder__warnings {
+/*
+ * ⚠️ THE DOUBLED CLASS IS NOT A TYPO — IT IS THE POINT, AND THE ADVERSARIAL PASS IS WHAT FOUND IT.
+ *
+ * Two of these declarations CONTRADICT the component's own: `MdsAlert` sets `border-radius: md` and a
+ * uniform `space-3` padding, which are right for an in-flow panel and wrong for a strip spanning the
+ * workspace. Vue puts the CHILD's scope-id and the PARENT's scope-id on the same root element, so the two
+ * rules compile to `.mds-alert[data-v-child]` and `.builder__warnings[data-v-parent]` — **identical
+ * specificity, (0,2,0) each**. Which one wins is then decided by injection order in the bundle, i.e. by
+ * whichever module Vite happened to evaluate last. That is a coin flip, and it is invisible to every gate
+ * here: this banner only renders after an import produces warnings, so the visual sweep never drew it.
+ *
+ * Repeating the class takes this to (0,3,0) and settles it. Cheaper than the alternative — a `--full-bleed`
+ * variant on the shared component — for a shape exactly one page needs.
+ */
+.builder__warnings.builder__warnings {
     flex-shrink: 0;
     padding: var(--mds-space-3) var(--mds-space-6);
     border-radius: 0;

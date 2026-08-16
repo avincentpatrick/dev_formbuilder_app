@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $consumed_at
  * @property ?Carbon $verified_at
  * @property ?Carbon $completed_at
+ * @property ?string $resolved_user_id
  * @property ?string $ip_address
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
@@ -51,11 +52,16 @@ class SsoAuthRequest extends Model implements TenantScoped
     use HasUuidv7;
 
     /**
-     * ⚠️ `consumed_at`, `verified_at` AND `completed_at` ARE ALL DELIBERATELY ABSENT. Single-use is
-     * established by the conditional UPDATEs in {@see SsoAuthRequestService::consume()} and
+     * ⚠️ `consumed_at`, `verified_at`, `completed_at` AND `resolved_user_id` ARE ALL DELIBERATELY ABSENT.
+     * Single-use is established by the conditional UPDATEs in {@see SsoAuthRequestService::consume()} and
      * {@see SsoStepUpService::redeem()}, whose affected-row counts are the check, and leaving the columns
      * unfillable is what stops a well-meaning `fill(['consumed_at' => now()])` from quietly reintroducing
      * the read-then-write race the class docblock above forbids.
+     *
+     * `resolved_user_id` (P1e) is absent for a stronger reason than the other three: it is the column the
+     * login completion hop reads to decide WHO to sign in, so a `fill()` reaching it would be a way to
+     * choose an account. It is post-validation-only — a disclosure rule rather than a tidiness one, the
+     * posture `GoogleAuthRequest`'s identity columns already take.
      *
      * @var list<string>
      */

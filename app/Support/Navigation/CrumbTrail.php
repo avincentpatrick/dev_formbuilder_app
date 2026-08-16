@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Navigation;
 
+use App\Models\Connection;
 use App\Models\Form;
 use App\Models\Submission;
 use App\Models\User;
+use App\Models\WebhookEndpoint;
 use App\Policies\FormPolicy;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Support\Forms\FormHubLink;
 use App\Support\Forms\FormTabSet;
@@ -76,6 +79,47 @@ final class CrumbTrail
         $trail = new self($user);
 
         return $trail->push('Forms', $user->can('viewAny', Form::class) ? '/forms' : null);
+    }
+
+    /**
+     * Open the trail at `Webhooks`.
+     *
+     * ⚠️ TWO GATES, AND ASKING ONLY THE POLICY WOULD REBUILD THE DEFECT THIS CLASS EXISTS TO CLOSE. Every
+     * other root here needs one question answered, because every other root is guarded by a policy alone.
+     * `/webhooks` is guarded by `can:viewAny,WebhookEndpoint` **and** `feature:webhooks`, so a tenant that
+     * downgrades off Starter keeps the ability and loses the route — and a crumb that consulted the policy
+     * alone would hand that reader a link which bounces off middleware. That is exactly the shape of J2c's
+     * `/forms` crumb 403ing for a Viewer, one layer further out.
+     *
+     * The entitlement service is a parameter rather than a container lookup so the refusal is reachable in a
+     * test without booting a tenant, which is the same reason {@see DestinationCatalog} injects it.
+     */
+    public static function webhooks(User $user, EntitlementService $entitlements): self
+    {
+        $trail = new self($user);
+
+        $reachable = $user->can('viewAny', WebhookEndpoint::class) && $entitlements->feature('webhooks');
+
+        return $trail->push('Webhooks', $reachable ? '/webhooks' : null);
+    }
+
+    /**
+     * Open the trail at `Integrations`.
+     *
+     * Same two-gate shape as {@see webhooks()} — `can:viewAny,Connection` plus `feature:native_connectors`.
+     *
+     * ⚠️ AND A RULE'S TRAIL STOPS HERE RATHER THAN PASSING THROUGH ITS CONNECTION, BECAUSE THE CONNECTION
+     * HAS NO PAGE. `/integrations/rules/{rule}` is a flat route; there is no `/integrations/connections/{id}`
+     * to link a middle crumb at. Inventing one would be the `scopes/Index.vue` mistake — a trail that reads
+     * like a path through pages that do not exist.
+     */
+    public static function integrations(User $user, EntitlementService $entitlements): self
+    {
+        $trail = new self($user);
+
+        $reachable = $user->can('viewAny', Connection::class) && $entitlements->feature('native_connectors');
+
+        return $trail->push('Integrations', $reachable ? '/integrations' : null);
     }
 
     /**

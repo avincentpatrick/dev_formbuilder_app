@@ -411,7 +411,7 @@ for (const theme of themes) {
             .getByRole('button', { name: 'View endpoint' })
             .click();
         await page.waitForURL(/\/webhooks\/[0-9a-f-]{36}$/, { timeout: 30_000 });
-        await page.getByRole('link', { name: 'Back to webhooks' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await page.getByRole('navigation', { name: 'Breadcrumb' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Webhook detail');
     });
@@ -431,7 +431,7 @@ for (const theme of themes) {
             .getByRole('button', { name: 'View rule' })
             .click();
         await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
-        await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await page.getByRole('navigation', { name: 'Breadcrumb' }).waitFor({ state: 'visible', timeout: 10_000 });
         await forceTheme(page, theme);
         await assertClean(page, 'Integration rule detail');
     });
@@ -457,7 +457,7 @@ for (const theme of themes) {
             .getByRole('button', { name: 'View rule' })
             .click();
         await page.waitForURL(/\/integrations\/rules\/[0-9a-f-]{36}$/, { timeout: 30_000 });
-        await page.getByRole('link', { name: 'Back to integrations' }).waitFor({ state: 'visible', timeout: 10_000 });
+        await page.getByRole('navigation', { name: 'Breadcrumb' }).waitFor({ state: 'visible', timeout: 10_000 });
         // The card this increment exists for. Waiting on it rather than assuming it means a seeder change
         // that dropped the blocked delivery fails HERE, loudly, instead of quietly scanning a page without it.
         await page.getByRole('button', { name: 'Review columns' }).waitFor({ state: 'visible', timeout: 10_000 });

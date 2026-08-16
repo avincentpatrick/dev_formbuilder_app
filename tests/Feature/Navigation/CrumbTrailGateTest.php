@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
+use App\Services\Entitlements\EntitlementService;
 use App\Support\Navigation\CrumbTrail;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -251,4 +253,63 @@ it('never emits an href on the crumb that closes the trail', function (): void {
 
     expect(end($trail))->toBe(['label' => 'Builder'])
         ->and(array_key_exists('href', end($trail)))->toBeFalse();
+});
+
+/*
+|--------------------------------------------------------------------------
+| The two-gate roots (J4b2)
+|--------------------------------------------------------------------------
+|
+| ⚠️ EVERY OTHER ROOT IN THIS CLASS ANSWERS ONE QUESTION, BECAUSE EVERY OTHER ROOT IS GUARDED BY A POLICY
+| ALONE. `/webhooks` and `/integrations` are guarded by a policy AND a plan feature, so a tenant that
+| downgrades keeps the ability and loses the route. A crumb consulting the policy alone would hand that
+| reader a link that bounces off middleware — J2c's `/forms`-403s-for-a-Viewer defect, one layer out.
+|
+| The permission arm and the feature arm are asserted SEPARATELY on purpose: an implementation that ANDs
+| the wrong pair, or that forgets one entirely, passes a combined test that only ever varies both at once.
+|
+*/
+
+it('links the Webhooks root for a reader who holds the permission on a plan that carries the feature', function (): void {
+    assignPlanTier(PlanTier::Starter);
+
+    $trail = CrumbTrail::webhooks($this->owner, app(EntitlementService::class))->current('Ops relay');
+
+    expect($trail[0])->toBe(['label' => 'Webhooks', 'href' => '/webhooks']);
+});
+
+it('withholds the Webhooks href on a plan without the feature, and keeps the label', function (): void {
+    // ⭐ THE FEATURE ARM. The owner still holds `webhooks.manage` here — only the plan changed — so an
+    // implementation that asks the policy alone emits a live href to a route its own middleware refuses.
+    // Text degradation rather than absence, per the class docblock: dropping the crumb would renumber the
+    // trail and make one page render a different DEPTH per tenant.
+    assignPlanTier(PlanTier::Free);
+
+    $trail = CrumbTrail::webhooks($this->owner, app(EntitlementService::class))->current('Ops relay');
+
+    expect($trail[0])->toBe(['label' => 'Webhooks'])
+        ->and(array_key_exists('href', $trail[0]))->toBeFalse();
+});
+
+it('withholds the Webhooks href from a Viewer even on an entitled plan', function (): void {
+    // ⭐ THE PERMISSION ARM, varied alone. Together with the case above this pins the AND rather than
+    // either half of it.
+    assignPlanTier(PlanTier::Starter);
+
+    $viewer = User::factory()->create();
+    makeActiveMember($viewer, 'viewer');
+
+    $trail = CrumbTrail::webhooks($viewer, app(EntitlementService::class))->current('Ops relay');
+
+    expect($trail[0])->toBe(['label' => 'Webhooks']);
+});
+
+it('applies the same two gates to the Integrations root', function (): void {
+    assignPlanTier(PlanTier::Starter);
+    expect(CrumbTrail::integrations($this->owner, app(EntitlementService::class))->current('Intake to Slack')[0])
+        ->toBe(['label' => 'Integrations', 'href' => '/integrations']);
+
+    assignPlanTier(PlanTier::Free);
+    expect(CrumbTrail::integrations($this->owner, app(EntitlementService::class))->current('Intake to Slack')[0])
+        ->toBe(['label' => 'Integrations']);
 });

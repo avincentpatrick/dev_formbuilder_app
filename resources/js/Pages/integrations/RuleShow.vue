@@ -19,6 +19,7 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsBreadcrumb,
     MdsAlert,
     MdsBadge,
     MdsButton,
@@ -30,6 +31,7 @@ import {
     MdsPagination,
     statusVariant,
     type DataTableColumn,
+    type BreadcrumbItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import RuleFormModal from '@/components/integrations/RuleFormModal.vue';
@@ -39,6 +41,8 @@ import type { ConnectionCard, DeliveryRow, Meta, Option, RuleDetail } from '@/co
 import type { FlashTestResult } from '@/types/inertia';
 
 const props = defineProps<{
+    /** Server-built (J2d): `Integrations / {rule name}`, each crumb resolved against its own gate. */
+    crumbs: BreadcrumbItem[];
     connection: ConnectionCard | null;
     rule: RuleDetail;
     deliveries: { data: DeliveryRow[]; meta: Meta };
@@ -118,9 +122,10 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Integration rule · ${rule.name}`" />
 
-        <Link href="/integrations" class="detail__back">← Back to integrations</Link>
-
         <PageHeader :title="rule.name" icon="plug">
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
                 <template v-if="can.update">
                     <!-- No `title` explaining the disabled state: a natively disabled button is not focusable,
@@ -318,13 +323,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-3);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-secondary);
-}
-
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));

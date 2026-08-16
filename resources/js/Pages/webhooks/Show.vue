@@ -9,6 +9,7 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsBreadcrumb,
     MdsAlert,
     MdsBadge,
     MdsButton,
@@ -20,6 +21,7 @@ import {
     MdsPagination,
     statusVariant,
     type DataTableColumn,
+    type BreadcrumbItem,
 } from '@meridian/design-system';
 import type { FlashNewSecret, FlashTestResult } from '@/types/inertia';
 import PageHeader from '@/components/shell/PageHeader.vue';
@@ -69,6 +71,8 @@ type DeliveryRow = {
 };
 
 const props = defineProps<{
+    /** Server-built (J2d): `Webhooks / {endpoint name}`, each crumb resolved against its own gate. */
+    crumbs: BreadcrumbItem[];
     endpoint: EndpointDetail;
     deliveries: { data: DeliveryRow[]; meta: Meta };
     forms: Option[];
@@ -177,9 +181,10 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Webhook · ${endpoint.name}`" />
 
-        <Link href="/webhooks" class="detail__back">← Back to webhooks</Link>
-
         <PageHeader :title="endpoint.name" icon="activity">
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
                 <template v-if="can.update">
                     <MdsButton variant="tertiary" icon-left="activity" @click="sendTest">Send test ping</MdsButton>
@@ -349,18 +354,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-4);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-action-primary-fg);
-    text-decoration: none;
-}
-
-.detail__back:hover {
-    text-decoration: underline;
-}
-
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));

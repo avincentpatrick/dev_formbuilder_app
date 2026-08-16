@@ -12,9 +12,11 @@ use App\Http\Requests\Tenant\UpdateWebhookRequest;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEndpointPresenter;
 use App\Services\Webhooks\WebhookEndpointService;
 use App\Services\Webhooks\WebhookTester;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -49,12 +51,19 @@ final class WebhookController extends Controller
     }
 
     /** One endpoint's detail + its paginated delivery log + the edit-modal catalogs. */
-    public function show(Request $request, WebhookEndpoint $webhookEndpoint, WebhookEndpointPresenter $presenter): Response
-    {
+    public function show(
+        Request $request,
+        WebhookEndpoint $webhookEndpoint,
+        WebhookEndpointPresenter $presenter,
+        EntitlementService $entitlements,
+    ): Response {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('webhooks/Show', $presenter->show($user, $webhookEndpoint));
+        return Inertia::render('webhooks/Show', [
+            ...$presenter->show($user, $webhookEndpoint),
+            'crumbs' => CrumbTrail::webhooks($user, $entitlements)->current($webhookEndpoint->name),
+        ]);
     }
 
     /** Create an endpoint, then land on its Show page with the plaintext secret flashed for a one-time reveal. */

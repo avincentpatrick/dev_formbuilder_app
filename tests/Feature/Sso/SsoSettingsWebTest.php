@@ -321,8 +321,13 @@ it('completes the whole round trip once a connection is active — P1a’s canar
         $requestId,
     ))->as('grace@acme.test')->response();
 
-    $this->post('http://acme.meridian.test/sso/saml/acs', ['SAMLResponse' => $assertion])
-        ->assertRedirect('/dashboard');
+    // P1a's canary now has to walk the whole trip, which is the point rather than an inconvenience: since
+    // P1e the ACS finishes nothing, so a canary that stopped there would stop certifying that a member can
+    // actually get in. `last_login_at` moved to the hop with the sign-in, for the same reason.
+    $handOff = $this->post('http://acme.meridian.test/sso/saml/acs', ['SAMLResponse' => $assertion])
+        ->assertRedirect('http://acme.meridian.test/sso/saml/login/complete/'.$requestId);
+
+    $this->get((string) $handOff->headers->get('Location'))->assertRedirect('/dashboard');
 
     $this->assertAuthenticated();
 

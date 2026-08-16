@@ -18,7 +18,9 @@ use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Sso\FakeIdp;
 
@@ -178,8 +180,16 @@ it('signs an existing active member in and lands them on the dashboard', functio
 
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($member->email)->response()])
-        ->assertRedirect('/dashboard');
+    // ⚠️ WRITTEN LONGHAND RATHER THAN THROUGH `completeSamlLogin()`, BECAUSE THE TWO-HOP SHAPE IS THIS
+    // CASE'S SUBJECT (P1e). The ACS marks the row and hands back; it authenticates nobody, because it is a
+    // cross-site POST that carries no cookie and could only ever create a session in whichever browser
+    // posted — which is the defect the completion hop exists to close.
+    $handOff = $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($member->email)->response()])
+        ->assertRedirect('http://acme.meridian.test/sso/saml/login/complete/'.$request->request_id);
+
+    $this->assertGuest();
+
+    $this->get((string) $handOff->headers->get('Location'))->assertRedirect('/dashboard');
 
     $this->assertAuthenticatedAs($member);
 
@@ -192,7 +202,7 @@ it('signs an existing active member in and lands them on the dashboard', functio
 it('provisions an unknown subject just in time, at the role the connection names', function (): void {
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -223,7 +233,7 @@ it('provisions an unknown subject just in time, at the role the connection names
 it('records how the member got in, so the ledger can tell SSO from an invitation', function (): void {
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -238,7 +248,16 @@ it('stamps the connection so an admin can see the trust anchor is being used', f
     expect(storedSsoConnection($this->tenant, $this->admin)?->last_login_at)->toBeNull();
 
     $request = startLogin($this->tenant, $this->admin);
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->response()])->assertRedirect('/dashboard');
+
+    // ⚠️ THE STAMP MOVED TO THE COMPLETION HOP IN P1e, AND THIS IS THE CASE THAT PINS IT. `last_login_at` is
+    // what an admin reads to answer "is sign-in working"; a verified assertion whose browser never came back
+    // is not a sign-in, so leaving the stamp at the ACS would let a broken hop look healthy for weeks — the
+    // lie ADR-0016 §D23 already refused to let a working step-up tell about a broken login path.
+    $handOff = $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->response()])->assertRedirect();
+
+    expect(storedSsoConnection($this->tenant, $this->admin)?->last_login_at)->toBeNull();
+
+    $this->get((string) $handOff->headers->get('Location'))->assertRedirect('/dashboard');
 
     $connection = storedSsoConnection($this->tenant, $this->admin);
 
@@ -263,7 +282,7 @@ it('takes the email from the attribute the tenant mapped, when the NameID is not
         ->withAttributes(['urn:oid:0.9.2342.19200300.100.1.3' => 'Grace@ACME.test'])
         ->response();
 
-    $this->post(ACME_ACS, ['SAMLResponse' => $response])->assertRedirect('/dashboard');
+    completeSamlLogin($request, $response)->assertRedirect('/dashboard');
 
     // Lower-cased: `users.email` is matched by exact equality, so an IdP that changes capitalisation
     // between logins would otherwise provision a second account for the same person.
@@ -284,7 +303,7 @@ it('composes a display name from the mapped first and last name attributes', fun
         ->withAttributes(['givenName' => 'Grace', 'sn' => 'Hopper'])
         ->response();
 
-    $this->post(ACME_ACS, ['SAMLResponse' => $response])->assertRedirect('/dashboard');
+    completeSamlLogin($request, $response)->assertRedirect('/dashboard');
 
     enterTenant($this->tenant->id, $this->admin->id);
     expect(User::query()->where('email', 'grace@acme.test')->value('name'))->toBe('Grace Hopper');
@@ -314,7 +333,7 @@ it('honours a pending invitation’s role rather than the connection default', f
 
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($invitee->email)->response()])
+    completeSamlLogin($request, answering($request)->as($invitee->email)->response())
         ->assertRedirect('/dashboard');
 
     enterTenant($this->tenant->id, $this->admin->id);
@@ -364,7 +383,9 @@ it('refuses the same assertion posted twice — the consumed_at mechanism', func
     $request = startLogin($this->tenant, $this->admin);
     $payload = ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()];
 
-    $this->post(ACME_ACS, $payload)->assertRedirect('/dashboard');
+    // The FIRST trip is followed all the way through, so what cannot be replayed is a COMPLETED sign-in
+    // rather than merely a consumed row (P1e).
+    completeSamlLogin($request, $payload['SAMLResponse'])->assertRedirect('/dashboard');
 
     // A fresh session, so the refusal is measured rather than masked by the first request's cookie.
     $this->flushSession();
@@ -387,9 +408,8 @@ it('refuses a second assertion that reuses one id across two live requests — t
 
     expect($first->request_id)->not->toBe($second->request_id);
 
-    $this->post(ACME_ACS, [
-        'SAMLResponse' => answering($first)->as('grace@acme.test')->withAssertionId($assertionId)->response(),
-    ])->assertRedirect('/dashboard');
+    completeSamlLogin($first, answering($first)->as('grace@acme.test')->withAssertionId($assertionId)->response())
+        ->assertRedirect('/dashboard');
 
     $this->flushSession();
     $this->app['auth']->forgetGuards();
@@ -521,7 +541,7 @@ it('still accepts an assertion inside the configured skew, so the tighter pass i
     // quietly turned into an outage.
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->conditionsStaleBy(30)->response()])
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->conditionsStaleBy(30)->response())
         ->assertRedirect('/dashboard');
 });
 
@@ -554,14 +574,47 @@ it('refuses a response beyond the configured byte bound before parsing anything'
     $this->assertGuest();
 });
 
-it('accepts the POST without a CSRF token, because there is none to send', function (): void {
-    // A cross-origin form post from an IdP carries no token. Without the exemption in bootstrap/app.php the
-    // whole feature is a 419 — and a 419 is not a 404, so this asserts the exemption is present rather than
-    // the failure merely being uniform.
+it('hands the browser no session cookie, so the one that started the flow survives the round trip', function (): void {
+    // ⚠️ THE ONLY ASSERTION IN THIS SUITE THAT CAN SEE THIS, AND THE REASON IT IS A HEADER ASSERTION.
+    // Inside `web`, `StartSession` runs here, finds no cookie (SameSite=Lax withholds it from a cross-site
+    // POST — the premise the whole seam rests on), generates a fresh id, and emits it unconditionally: its
+    // only guard is `! is_null(session.driver)`. Same name, same path, host-only, so a real browser REPLACES
+    // the member's cookie and then follows our 302 carrying an EMPTY session.
+    //
+    // Nothing else here can catch it. The Pest client never feeds `Set-Cookie` into the next request and
+    // `Store::loadSession()` merges onto a memoised store, so attributes survive an id change in-process —
+    // the harness models the session as a process global, a browser models it as a cookie. Worse, the
+    // breakage and the security refusal share ONE observable: a 404 at the completion hop. So this is
+    // asserted on the response header, which is the only place the two differ.
     $request = startLogin($this->tenant, $this->admin);
 
     $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
+        ->assertCookieMissing(config('session.cookie'))
+        ->assertCookieMissing('XSRF-TOKEN');
+});
+
+it('accepts the POST without a CSRF token, and is no longer even reachable by the middleware', function (): void {
+    // ⚠️ THIS CASE'S OLD CLAIM STOPPED BEING TRUE IN P1e AND THE COMMENT DID NOT NOTICE. It read "without the
+    // exemption in bootstrap/app.php the whole feature is a 419", which asserted the exemption was doing the
+    // work. P1e took this route out of the `web` group, so `ValidateCsrfToken` is not in its pipeline at all
+    // and deleting that `except` entry now changes nothing — the round-trip half of this case had become
+    // unfailable while still describing itself as a control.
+    //
+    // So it asserts the structure instead, which CAN break: the middleware is genuinely absent, AND the
+    // exemption is still configured for the day somebody moves this route back inside a stateful stack.
+    $request = startLogin($this->tenant, $this->admin);
+
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
+
+    $route = collect(Route::getRoutes()->getRoutes())->first(fn ($candidate) => $candidate->uri() === 'sso/saml/acs');
+
+    expect($route)->not->toBeNull()
+        ->and($route->gatherMiddleware())->not->toContain('web')
+        ->and($route->gatherMiddleware())->not->toContain(ValidateCsrfToken::class)
+        // Belt AND braces: kept deliberately, because the day it becomes load-bearing again there is no
+        // other warning. `bootstrap/app.php` lists it by EXACT path, never a wildcard.
+        ->and((new ValidateCsrfToken(app(), app('encrypter')))->getExcludedPaths())->toContain('sso/saml/acs');
 });
 
 it('does not exempt an SSO arrival from a workspace’s own 2FA enforcement', function (): void {
@@ -569,9 +622,17 @@ it('does not exempt an SSO arrival from a workspace’s own 2FA enforcement', fu
     // members" is a policy an admin switched on; inferring an exemption from the presence of SSO would
     // silently drop it. A workspace whose IdP already performs MFA turns the setting off — their call.
     //
-    // The ACS itself still succeeds: it is outside the authenticated group, so the gate applies to the
-    // NEXT request, exactly as it does after a password login. Asserting both halves is what makes this a
-    // statement about the policy rather than about where the middleware happens to be mounted.
+    // The round trip itself still succeeds: neither the ACS nor the completion hop is inside the
+    // authenticated group, so the gate applies to the next request that IS — exactly as it does after a
+    // password login. Asserting every half is what makes this a statement about the policy rather than about
+    // where the middleware happens to be mounted.
+    //
+    // ⚠️ P1e INSERTED A HOP BETWEEN THE ASSERTION AND `/dashboard`, AND THIS CASE HAD TO FOLLOW IT RATHER
+    // THAN BE RE-POINTED. Left asserting the ACS's `Location` alone, the trailing `GET /dashboard` below
+    // would meet an unauthenticated session and answer the sign-in page — a redirect, still not the
+    // two-factor page, so the case would keep failing for a new reason. Re-pointed WITHOUT following the
+    // hop it would have gone green while measuring nothing: the gate under test only ever fires for a
+    // session that exists, and the hop is now the only thing that creates one.
     enterTenant($this->tenant->id, $this->admin->id);
     app(TenantSettingRegistry::class)->put(
         $this->tenant,
@@ -581,7 +642,7 @@ it('does not exempt an SSO arrival from a workspace’s own 2FA enforcement', fu
 
     $request = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as('grace@acme.test')->response()])
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
 
     $this->withoutVite()
@@ -689,6 +750,6 @@ it('refuses rather than admitting a seatless member, and orphans no account doin
     setSeatQuota(10);
     $second = startLogin($this->tenant, $this->admin);
 
-    $this->post(ACME_ACS, ['SAMLResponse' => answering($second)->as('grace@acme.test')->response()])
+    completeSamlLogin($second, answering($second)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
 });

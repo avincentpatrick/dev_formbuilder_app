@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Services\Sso\SsoAuthRequestService;
 use App\Services\Sso\SsoGate;
+use App\Support\Sso\SsoSession;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -64,6 +65,19 @@ final class SsoLoginController extends Controller
             forceAuthn: false,
             ip: $request->ip(),
         );
+
+        // ⚠️ THE ONE THING THIS ENDPOINT DID NOT DO UNTIL P1e, AND ITS ABSENCE WAS A LIVE DEFECT.
+        // The row above proves that THIS SP MINTED THIS FLOW. Nothing proved who was HOLDING it — so an
+        // attacker with an account at the tenant's own directory could start a flow, collect a real signed
+        // assertion for it, withhold the identity provider's auto-POST form, and induce a victim's browser to
+        // submit it. The ACS would then have signed the victim's browser in as the attacker.
+        //
+        // The ACS cannot make this comparison: it is a cross-site POST, `SameSite=Lax` sends it no cookie,
+        // and since P1e it starts no session at all. This request CAN — it is same-site and the browser is
+        // holding the cookie right now — so the binding is written here and read one hop after the ACS, by
+        // `SsoLoginCompletionController`. `request_id` rather than a second secret: it is already 128 bits
+        // and already single-use, and the step-up arm already accepts the identical exposure in a URL.
+        SsoSession::rememberPendingLogin($request->session(), $authRequest->request_id);
 
         // `away()` rather than `to()`: this is somebody else's host, and Laravel's own URL generator would
         // otherwise treat the value as a path to be rewritten against ours.

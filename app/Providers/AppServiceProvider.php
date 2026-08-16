@@ -422,6 +422,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('saml-metadata', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($samlKey('samlmetadata', $request)));
 
+        // The login completion hop (P1e). A SEPARATE bucket for the reason its siblings state — one completed
+        // sign-in costs exactly one hit of each, so sharing would halve whichever ceiling an operator thought
+        // they were setting. ⚠️ IP+host rather than user-keyed, unlike the two step-up buckets below: nobody
+        // is signed in on this route, which is the whole point of it. 60/min matches `google-auth-complete`,
+        // the endpoint of the same shape, and is generous against a browser that retries a redirect.
+        RateLimiter::for('saml-login-complete', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($samlKey('samllogindone', $request)));
+
         // Step-up (P1c) — the third SAML bucket, and the only one KEYED ON THE USER rather than on IP+host.
         // It can be, because unlike the two above this route is inside the authenticated group, and it
         // should be: a shared NAT egress is precisely the enterprise shape the comment above worries about,

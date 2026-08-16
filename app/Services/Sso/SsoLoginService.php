@@ -26,6 +26,9 @@ use Illuminate\Support\Facades\Cache;
  *  4. CONSUME the row — the atomic conditional UPDATE whose affected-row count is the check.
  *  5. Record the assertion's own `@ID` in the replay ledger.
  *  6. Resolve the identity, then FORK ON THE ROW'S INTENT — provision (login) or match (step-up).
+ *  7. MARK the row with what was established, because this request cannot act on it. Neither arm finishes
+ *     here: both hand the browser back to a same-site GET on the tenant's own host, which is the only leg of
+ *     the flow that carries a cookie. Everything this step writes is what that hop has to read.
  *
  * ── ⚠️ THE FORK IS AFTER THE CONSUME, DELIBERATELY (P1c) ────────────────────────────────────────────
  * A step-up that fails its subject check has still had a real, signed, single-use assertion presented
@@ -81,9 +84,21 @@ final class SsoLoginService
 
         $identity = $this->identities->resolve($connection, $assertion);
 
-        $user = $authRequest->intent === SsoAuthIntent::StepUp
-            ? $this->stepUps->matchSubject($authRequest, $identity)
-            : $this->provisioner->provision($tenant, $connection, $identity);
+        if ($authRequest->intent === SsoAuthIntent::StepUp) {
+            // Marks the row itself, once its own three conditions hold. Kept inside that method rather than
+            // hoisted here, because on that arm the mark means "the assertion agreed with who we asked about"
+            // and there is nothing to record beyond the timestamp.
+            $user = $this->stepUps->matchSubject($authRequest, $identity);
+        } else {
+            $user = $this->provisioner->provision($tenant, $connection, $identity);
+
+            // ⚠️ STEP 7, AND P1e's WHOLE REASON FOR EXISTING. This request cannot create a session — it is a
+            // cross-site POST with no cookie — so the only thing it can do with the identity it has just
+            // established is write it down for the same-site hop that CAN. Without this the hop would be
+            // entitled to redeem a row and have nobody to sign in, which is why the database refuses a
+            // verified login row that carries no subject rather than leaving it to this line.
+            $this->requests->markVerified($authRequest, $user);
+        }
 
         return new SsoAuthOutcome($authRequest->intent, $user, $authRequest);
     }

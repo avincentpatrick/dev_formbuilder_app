@@ -109,10 +109,11 @@ final class SsoStepUpService
             throw SsoAuthenticationException::stepUpSubjectMismatch($identity->email);
         }
 
-        // A one-column UPDATE rather than a model save, for the same reason `consume()` is one: `verified_at`
-        // is not `$fillable`, and the only evidence that a signed assertion was ever presented against this
-        // row must not be writable by a `fill()` somewhere else.
-        SsoAuthRequest::query()->whereKey($request->getKey())->update(['verified_at' => Carbon::now()]);
+        // No subject is passed: on this arm `user_id` already names who we asked about, written at mint by an
+        // authenticated session, and the comparison three lines up is what proves the assertion agreed with
+        // it. `resolved_user_id` is the LOGIN arm's answer to a question this arm asked in advance, and
+        // `sso_auth_requests_login_subject_check` refuses one on a step-up row.
+        $this->requests->markVerified($request);
 
         return $user;
     }

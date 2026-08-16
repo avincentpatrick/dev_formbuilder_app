@@ -48,11 +48,15 @@ return new class extends Migration
     {
         Schema::table('sso_auth_requests', function (Blueprint $table): void {
             // The ACS's mark: a signed assertion answering THIS request was validated, and its subject
-            // resolved to the user the request names. Null on every login row.
+            // resolved. ⚠️ "Null on every login row" was true when this was written and stopped being true in
+            // P1e, which gave the login arm the same hop for the same cookie policy — corrected here rather
+            // than left for the next reader to disbelieve.
             $table->timestampTz('verified_at')->nullable();
 
-            // The completion hop's mark: the browser came back on the original session, `Auth::id()` matched
-            // `user_id`, and `auth.password_confirmed_at` was stamped. Single-use.
+            // The completion hop's mark: the browser came back on the original session and the flow finished.
+            // Single-use. On a step-up that means `auth.password_confirmed_at` was stamped; on a login (P1e)
+            // it means `Auth::login()` ran on a subject re-read under RLS. Both are "the browser came back", which
+            // is why one column.
             $table->timestampTz('completed_at')->nullable();
         });
 

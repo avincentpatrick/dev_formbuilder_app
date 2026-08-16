@@ -9,6 +9,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
+use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -158,7 +159,12 @@ it('redirects to the identity provider and remembers that it did', function (): 
         // so accepting one from the query string would be an open redirect wearing a column name.
         ->and($request->return_to)->toBeNull()
         ->and($request->sso_connection_id)->toBe((string) $connection->getKey())
-        ->and($request->ip_address)->not->toBeNull();
+        ->and($request->ip_address)->not->toBeNull()
+        // P1e's three, all null until an assertion comes back: the ACS writes the first two together
+        // because a CHECK refuses a verified login row with no subject, and the hop writes the third.
+        ->and($request->verified_at)->toBeNull()
+        ->and($request->resolved_user_id)->toBeNull()
+        ->and($request->completed_at)->toBeNull();
 
     // `xs:ID` derives from `xs:NCName`, which may not begin with a digit — a bare hex string does so half
     // the time, and some IdPs echo back a mangled InResponseTo that then fails to match.
@@ -279,7 +285,26 @@ it('gives the metadata endpoint its own limiter too — it had none until P1d', 
 it('registers every SAML limiter it names, so a throttle alias cannot be a typo', function (): void {
     // A `throttle:` middleware naming a limiter nobody registered does not fail loudly — it resolves to an
     // unlimited passthrough, so the two assertions above would stay green over a bound that does not exist.
-    foreach (['saml-login', 'saml-acs', 'saml-metadata', 'saml-step-up', 'saml-step-up-complete'] as $name) {
+    foreach (['saml-login', 'saml-acs', 'saml-metadata', 'saml-step-up', 'saml-step-up-complete', 'saml-login-complete'] as $name) {
         expect(RateLimiter::limiter($name))->not->toBeNull("limiter [{$name}] is not registered");
     }
+});
+
+it('remembers in this browser which flow it started, because the ACS cannot ask', function (): void {
+    // ⚠️ THIS ENDPOINT WROTE ZERO SESSION KEYS UNTIL P1e, AND THAT ABSENCE WAS THE DEFECT. The row it mints
+    // proves this SP started the flow; nothing proved WHO was holding it, so an attacker with an account at
+    // the tenant's own directory could obtain a real assertion and have a victim's browser complete their
+    // sign-in. The ACS cannot make the comparison — it is a cross-site POST that carries no cookie — so the
+    // binding is written here, on the one leg before it that the browser's session reaches.
+    enterTenant($this->tenant->id, $this->admin->id);
+    SsoConnection::factory()->active()->create();
+
+    $this->get(loginUrl())->assertRedirect();
+
+    $request = mintedRequest($this->tenant, $this->admin);
+
+    // The flow's OWN id, never a flag: a hop that merely required the session to hold something would be
+    // defeated by luring the victim through this route first to populate their session.
+    expect(SsoSession::hasPendingLogin(session()->driver(), $request->request_id))->toBeTrue()
+        ->and(session()->driver()->get(SsoSession::PENDING_LOGIN_IDS))->toBe([$request->request_id]);
 });

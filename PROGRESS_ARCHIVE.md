@@ -3053,3 +3053,62 @@ line-start occurrence inside the note warning about the first two. Rewritten wit
 "name the thing, never quote it" of the session, and the only one to booby-trap its own remedy. The rule
 that survives: **assert the resulting LINE COUNT, because a marker check tells you what you found and only
 the line count tells you what you destroyed.**
+
+---
+
+## 2026-08-16 — LANE B: P1e, the SAML login arm's browser-flow binding (PR #165, `05abb23`)
+
+Closed the threat model's second `Open` verdict — §8's solicited-assertion row and §9 item 22 — reproduced
+during P1d rather than inferred. `GET /sso/saml/login` wrote zero session keys, so an assertion posted from a
+browser that never visited the mint answered `302 /dashboard` as the asserted subject: an attacker holding an
+account at the tenant's own IdP could withhold the auto-POST form and have a victim's browser complete their
+sign-in. Google's one-line fix could not be borrowed — the ACS is a genuinely cross-site POST under
+`SameSite=Lax` and receives no cookie — so the login arm got the same-site completion hop the step-up arm has
+had since P1c. 6/6, CI **Pest 4117 / 17,508** and **E2E 540**, **+25 / +224** against base `1527211`'s own run,
+**predicted before the run and matched to the digit on both numbers**.
+
+**Verifying the row found three more things it did not say — eleven-for-eleven.** A CHECK constraint forbids a
+login row from carrying `user_id`, so the prescribed hop had nowhere to learn who to sign in; the answer was a
+new `resolved_user_id` rather than widening a constraint three docblocks cite by name. Then two live defects
+nobody had filed. **The ACS was replacing the browser's session cookie** — measured with `curl`, not reasoned:
+inside `web`, `StartSession` mints a fresh id when no cookie arrives and emits it unconditionally, so a browser
+replaced the member's real cookie and followed the 302 with an empty one. **P1c's step-up hop had therefore
+never worked in a real browser**, and P1e would have 404'd for everybody — with the outage and the security
+refusal sharing one observable, so an acceptance test would have passed either way. No test here could see it:
+the Pest client never feeds `Set-Cookie` forward and the store is memoised per process. **The harness models
+the session as a process global; a browser models it as a cookie.** And **the trim was evicting sign-ins still
+in flight**, because `consumed_at IS NOT NULL` stopped meaning "finished" when P1c introduced the hop — the
+corrected three-armed shape already existed on `google_auth_requests`, ported forward when J3c2 hit this and
+never back to the table it came from.
+
+**18 mutations across three rounds, zero undefended — and the survivors were the interesting part.** M2,
+deleting the browser comparison, reddens exactly the three binding cases and nothing else. M12, putting the ACS
+back in `web`, reddens exactly one: the cookie header assertion. Round 1's four survivors were each a guard
+masked by a redundant partner, so **reporting "4 undefended" would have been as wrong as reporting "0"**; round
+2 removed both halves of each pair, two reddened, one exposed a genuine gap that gained a test, and one
+survives by construction because a CHECK makes its two guards equivalent.
+
+⚠️ **The harness itself failed twice, and both failures are the lesson.** Its first run printed
+**"M0 baseline: 0 passed / 0 failed" and accepted that as green** — a gate that reports only a verdict cannot
+tell "nothing is wrong" from "nothing was examined", and M0 now asserts an expected count. Its second run
+crashed decoding Pest's UTF-8 output under cp1252 **between applying a mutation and reverting it**, leaving a
+deleted security call in the working tree. **A mutation harness that can exit with a mutation still applied is
+more dangerous than no harness.**
+
+⚠️ **The adversarial pass found four more after the work looked done — sixth increment running — and the worst
+was a comment.** Four places named `Auth::loginUsingId()` as the call the hop makes; the code deliberately does
+the opposite, because that resolves on `pgsql_auth` whose policy is `USING (true)`. **Reconciling code to those
+comments would have made any account in the deployment signable into any workspace.** Also: no `SsoGate` on the
+hop (so an admin's kill switch did not stop in-flight completions, and `last_login_at` refreshed on a disabled
+connection), a missing UPDATE predicate, and two tests that had quietly become unfailable.
+
+⚠️ **Three self-inflicted defects in my own diff, all caught by checking rather than reading:** a severed table
+row — P1d's own `:51` defect reintroduced by the increment citing it, found by counting cells per line; a bash
+double-quoted string that command-substituted two backticked identifiers out of an ADR; and a column documented
+against `audits` because the anchor matched the file's first `user_id` row. Plus one **false positive I
+correctly did not act on** — `\|` is a legal escaped pipe.
+
+ADR-0016 gained §D27–§D30 in place on the P2c precedent; **no ADR number was allocated, `0020` stays free and
+`0010` stays reserved for H1d.** The base moved four PRs under me while this was in flight; the rebase was
+**conflict-free**, which is Rule 7(b)'s boundary earning its keep. **CRDT sync is now the last named Lane B
+row, and Rule 7(f) governs from there.**

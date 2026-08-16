@@ -105,9 +105,14 @@ export function placeTooltip(
         : OPPOSITE[preferred];
 
     if (placement === 'top' || placement === 'bottom') {
-        const top = placement === 'top'
+        // ⚠️ THE MAIN AXIS IS CLAMPED TOO. When neither side fits, the preferred one is kept (above) and
+        // this is what the docstring means by letting the clamp handle it. Without it the bubble is
+        // positioned off-screen and, being `position: fixed`, is simply cut off — no scrollbar, and
+        // nothing the document-level overflow assertion can see.
+        const rawTop = placement === 'top'
             ? anchor.top - bubble.height - TOOLTIP_OFFSET
             : anchor.top + anchor.height + TOOLTIP_OFFSET;
+        const top = clamp(rawTop, VIEWPORT_PAD, viewport.height - bubble.height - VIEWPORT_PAD);
 
         return {
             placement,
@@ -120,9 +125,10 @@ export function placeTooltip(
         };
     }
 
-    const left = placement === 'left'
+    const rawLeft = placement === 'left'
         ? anchor.left - bubble.width - TOOLTIP_OFFSET
         : anchor.left + anchor.width + TOOLTIP_OFFSET;
+    const left = clamp(rawLeft, VIEWPORT_PAD, viewport.width - bubble.width - VIEWPORT_PAD);
 
     return {
         placement,

@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { markRaw } from 'vue';
+import { h, markRaw } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Menu, { type MenuItem } from './Menu.vue';
 
@@ -296,6 +296,49 @@ describe('MdsMenu — heterogeneous items', () => {
         await item?.trigger('click');
         expect(wrapper.emitted('select')).toBeUndefined();
         expect(wrapper.find('[role="menu"]').exists()).toBe(true);
+    });
+});
+
+describe('MdsMenu — a disabled item cannot navigate', () => {
+    it('renders a disabled item with an href as a BUTTON, never through the link component', async () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS. `preventDefault` in the click handler is not enough on its own:
+        // the injected link component brings its OWN click handler, and Vue merges a fall-through handler
+        // after the component's — so an Inertia visit is already issued by the time this component's guard
+        // runs. The row would navigate while announcing itself unavailable, and the menu would stay open
+        // because the guard returns before `close`. Rendering a plain button removes the navigation rather
+        // than trying to out-run it.
+        const visited: string[] = [];
+        const Stub = markRaw({
+            props: { href: { type: String, required: true } },
+            setup(props: { href: string }) {
+                return () => h('a', { href: props.href, onClick: () => visited.push(props.href) }, 'x');
+            },
+        });
+
+        const wrapper = mountMenu({
+            linkComponent: Stub,
+            items: [{ id: 'transfer', label: 'Transfer ownership', href: '/transfer', disabled: true }],
+        });
+        await wrapper.get('button.mds-menu__trigger').trigger('click');
+
+        const item = wrapper.findAll('[role="menuitem"]')[0];
+        expect(item?.element.tagName).toBe('BUTTON');
+        expect(item?.attributes('href')).toBeUndefined();
+        expect(item?.attributes('aria-disabled')).toBe('true');
+
+        await item?.trigger('click');
+        expect(visited).toEqual([]);
+        expect(wrapper.emitted('select')).toBeUndefined();
+    });
+
+    it('still routes an ENABLED item through the link component', async () => {
+        // The other direction, so the guard cannot be "fixed" by never using linkComponent at all.
+        const wrapper = mountMenu();
+        await wrapper.get('button.mds-menu__trigger').trigger('click');
+
+        const link = wrapper.findAll('[role="menuitem"]')[0];
+        expect(link?.element.tagName).toBe('A');
+        expect(link?.attributes('href')).toBe('/settings');
     });
 });
 

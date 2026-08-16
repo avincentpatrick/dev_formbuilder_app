@@ -136,6 +136,24 @@ function onKeydown(event: KeyboardEvent): void {
     >
         <div class="sidebar-scrim" @click="emit('close')" />
         <nav class="sidebar" aria-label="Primary">
+            <!--
+                ⚠️ THE DRAWER OWES A REACHABLE CLOSE CONTROL, AND THE ADVERSARIAL PASS IS WHAT ESTABLISHED
+                THAT. Taking the page marks the top nav inert, and the hamburger with it — so the one
+                control whose accessible name is "Close navigation" leaves the accessibility tree the
+                moment it would be needed. The original reasoning here was that Escape and the scrim were
+                enough "exactly as MdsModal treats its opener", and that comparison was FALSE: MdsModal
+                ships a labelled close button INSIDE its panel for precisely this reason. The scrim is a
+                bare div with no role, no name and no tab stop, so screen-reader swipe navigation never
+                lands on it and a switch-access user cannot reach it at all. Without this button the only
+                way out of an open drawer on touch is to navigate somewhere else.
+
+                It is hidden above 480px with `display: none` rather than `v-if`, so it is absent from the
+                accessibility tree at the widths where there is no drawer, and the markup does not depend
+                on a media query having been evaluated in JavaScript before first paint.
+            -->
+            <button type="button" class="sidebar__close" aria-label="Close navigation" @click="emit('close')">
+                <MdsIcon name="close" size="md" aria-hidden="true" />
+            </button>
             <div v-for="group in visibleGroups" :key="group.key" class="sidebar__group">
                 <!--
                     ⚠️ A <div>, AND THE ELEMENT TYPE IS PINNED BY THREE SEPARATE THINGS.
@@ -202,6 +220,10 @@ function onKeydown(event: KeyboardEvent): void {
     background-color: var(--mds-color-bg-surface);
     border-right: 1px solid var(--mds-color-border-default);
     overflow-y: auto;
+}
+
+.sidebar__close {
+    display: none;
 }
 
 .sidebar__group + .sidebar__group {
@@ -366,6 +388,29 @@ a.sidebar__item:focus-visible {
         height: auto;
         margin: 0;
         clip: auto;
+    }
+    /* The drawer's own dismiss control — see the template comment. 44px to satisfy the touch-target
+       minimum §4.4 applies at every breakpoint, not only this one. */
+    .sidebar__close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        margin-left: auto;
+        margin-bottom: var(--mds-space-2);
+        border: none;
+        border-radius: var(--mds-radius-md);
+        background-color: transparent;
+        color: var(--mds-color-text-secondary);
+        cursor: pointer;
+    }
+    .sidebar__close:hover {
+        background-color: var(--mds-color-bg-sunken);
+    }
+    .sidebar__close:focus-visible {
+        outline: 2px solid var(--mds-color-focus-ring);
+        outline-offset: -2px;
     }
     .sidebar__group-label {
         display: block;

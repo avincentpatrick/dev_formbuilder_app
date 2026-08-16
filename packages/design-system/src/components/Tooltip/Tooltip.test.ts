@@ -285,6 +285,35 @@ describe('MdsTooltip — placement is computed, and the geometry is pure', () =>
         expect(anchorOffscreen({ top: 400, left: 1000, width: 40, height: 40 }, VIEWPORT)).toBe(true);
     });
 
+    it('clamps the MAIN axis when neither side fits, not just the cross axis', () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS, AND THE DOCSTRING ALREADY PROMISED IT. When both sides are too
+        // tight the preferred one is kept — and without clamping the main axis the bubble is placed off
+        // screen. Being `position: fixed` it is then simply cut off: no scrollbar, and nothing the
+        // document-level overflow assertion can see. The flip case above asserts the PLACEMENT string, so
+        // it passes straight over this; only the coordinate catches it.
+        // Neither side has room for bubble + offset + pad, so the preferred side is kept and the
+        // coordinate must still land inside the glass.
+        const bubble = { width: 120, height: 40 };
+
+        const tight = { width: 260, height: 800 };
+        const midRight = { top: 400, left: 100, width: 40, height: 40 };
+        const horizontal = placeTooltip(midRight, bubble, tight, 'right');
+        expect(horizontal.placement).toBe('right');
+        expect(horizontal.left).toBeGreaterThanOrEqual(VIEWPORT_PAD);
+        expect(horizontal.left + bubble.width).toBeLessThanOrEqual(tight.width - VIEWPORT_PAD);
+
+        const short = { width: 1000, height: 120 };
+        const vertical = placeTooltip({ top: 50, left: 400, width: 40, height: 40 }, bubble, short, 'top');
+        expect(vertical.placement).toBe('top');
+        expect(vertical.top).toBeGreaterThanOrEqual(VIEWPORT_PAD);
+        expect(vertical.top + bubble.height).toBeLessThanOrEqual(short.height - VIEWPORT_PAD);
+
+        // And when the bubble is genuinely wider than the viewport allows, the readable edge wins rather
+        // than the overflow being split across both sides — which is what `clamp` documents.
+        const impossible = placeTooltip(midRight, { width: 400, height: 40 }, tight, 'right');
+        expect(impossible.left).toBe(VIEWPORT_PAD);
+    });
+
     it('treats an UNMEASURED anchor as present, not as absent', () => {
         // ⭐ THE REGRESSION THIS SUITE ACTUALLY CAUGHT. An all-zeros rect satisfies `top + height <= 0`,
         // so without the zero-area guard the tooltip shows, measures on the next tick, decides its own

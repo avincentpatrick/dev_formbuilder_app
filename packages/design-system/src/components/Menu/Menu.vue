@@ -118,6 +118,17 @@ function close(returnFocus: boolean): void {
     if (returnFocus) triggerEl.value?.focus();
 }
 
+/**
+ * ⚠️ A DISABLED ITEM IS NEVER RENDERED AS A LINK, AND `preventDefault` IS NOT ENOUGH ON ITS OWN.
+ * The injected link component brings its own click handler, and Vue merges a fall-through handler
+ * AFTER the component's own — so an Inertia visit has already been issued by the time this
+ * component's guard runs, and the row navigates while announcing itself unavailable. Rendering a
+ * plain button instead removes the navigation rather than trying to out-run it.
+ */
+function isLink(item: MenuItem): boolean {
+    return item.href !== undefined && item.disabled !== true;
+}
+
 function onActivate(item: MenuItem, event: Event): void {
     if (item.disabled === true) {
         // aria-disabled is advisory to the browser, so the click still arrives and must be refused here.
@@ -225,11 +236,11 @@ onBeforeUnmount(() => {
                 @keydown="onMenuKeydown"
             >
                 <component
-                    :is="item.href === undefined ? 'button' : linkComponent"
+                    :is="isLink(item) ? linkComponent : 'button'"
                     v-for="item in items"
                     :key="item.id"
-                    :href="item.href"
-                    :type="item.href === undefined ? 'button' : undefined"
+                    :href="isLink(item) ? item.href : undefined"
+                    :type="isLink(item) ? undefined : 'button'"
                     role="menuitem"
                     tabindex="-1"
                     class="mds-menu__item"

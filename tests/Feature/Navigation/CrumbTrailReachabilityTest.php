@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\PlanTier;
 use App\Enums\SubmissionStatus;
+use App\Models\Connection;
+use App\Models\ConnectionSubscription;
 use App\Models\User;
+use App\Models\WebhookEndpoint;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +49,24 @@ beforeEach(function (): void {
     $this->form = publishedInboxForm($this->tenant, $this->owner, 'Clinic Intake');
     $this->submission = seedInboxSubmission($this->form, $this->owner, SubmissionStatus::Submitted, ['full_name' => 'Ada']);
     $this->draft = seedInboxSubmission($this->form, $this->owner, SubmissionStatus::Draft, ['full_name' => 'Grace']);
+
+    // ⚠️ THE PLAN IS PART OF THE FIXTURE, NOT SCAFFOLDING. The two roots added in J4b2 ask a plan
+    // FEATURE as well as a policy, and a tenant with no subscription answers false to every feature —
+    // so without this the webhook and rule trails would be label-only and the navigation cases below
+    // would fail for a reason that has nothing to do with reachability. Starter carries both.
+    assignPlanTier(PlanTier::Starter);
+
+    $this->endpoint = WebhookEndpoint::factory()->create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Ops relay',
+    ]);
+
+    $connection = Connection::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->rule = ConnectionSubscription::factory()->create([
+        'tenant_id' => $this->tenant->id,
+        'connection_id' => $connection->id,
+        'name' => 'Intake to Slack',
+    ]);
 });
 
 afterEach(function (): void {
@@ -65,6 +87,8 @@ function trailPageUrl(string $page, object $ctx): string
         'encode' => '/forms/'.$ctx->form->id.'/submissions/create',
         'resume' => '/submissions/'.$ctx->draft->id.'/resume',
         'edit' => '/submissions/'.$ctx->submission->id.'/edit',
+        'webhook' => '/webhooks/'.$ctx->endpoint->id,
+        'rule' => '/integrations/rules/'.$ctx->rule->id,
     };
 }
 
@@ -108,6 +132,13 @@ it('renders the trail every page is supposed to have, in the expected shape', fu
     'encode' => ['encode', ['Forms', 'Clinic Intake', 'New response']],
     'resume' => ['resume', ['Forms', 'Clinic Intake', 'Continue response']],
     'edit' => ['edit', ['Forms', 'Clinic Intake', 'Responses', 'Response', 'Edit answers']],
+    // ⚠️ TWO CRUMBS, NOT THREE, AND THE MISSING ONE IS DELIBERATE. Both pages receive a server-resolved
+    // `form_url`, so a `Webhooks / {form} / {endpoint}` trail is expressible — and it would be a lie: a
+    // breadcrumb is a PATH, and there is no `/webhooks/{form}` route to stand on. That is the same
+    // error as treating `scopes/Index.vue`'s selected-node ancestry as a page trail. A rule's
+    // connection has no detail route at all, so it has no middle crumb available even in principle.
+    'webhook' => ['webhook', ['Webhooks', 'Ops relay']],
+    'rule' => ['rule', ['Integrations', 'Intake to Slack']],
 ]);
 
 it('offers a crumb whose href resolves to a real page', function (string $page, int $index) use ($props): void {
@@ -149,6 +180,8 @@ it('offers a crumb whose href resolves to a real page', function (string $page, 
     'edit/form' => ['edit', 1],
     'edit/responses' => ['edit', 2],
     'edit/submission' => ['edit', 3],
+    'webhook/Webhooks' => ['webhook', 0],
+    'rule/Integrations' => ['rule', 0],
 ]);
 
 it('points Cancel at the crumb before the tail, on every encode mode', function (string $page) use ($props): void {

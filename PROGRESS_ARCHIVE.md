@@ -3009,3 +3009,47 @@ root identity change; and the tooltip's capture-phase Escape is page-global.
 Also shipped: a `tokens/z-index.json` scale naming five rungs that were literals in four files, with a Vitest case
 holding the modal rung equal to the inert stack's own constant; and DSR §3.4.1 amended, because it said the inert
 exemption "belongs to the toast host alone" while §3.4a — in the same file — instructed J4b to take a second one.
+
+## 2026-08-16 — LANE A · J4b2 (PR #162): the breadcrumb closure, and a crumb that was stricter than its route
+
+The last two of DSR §3.4's six migrations — `webhooks/Show` and `integrations/RuleShow` — now render
+`MdsBreadcrumb` from a server-built trail. J4b is closed. CI Pest **4106 / 17,296**; PHPStan delta 0; lint
+93/101/29 unmoved; `openapi.json` byte-identical.
+
+**The row called it controller wiring; it was blocked twice in the server.** `CrumbTrail` had no generic
+crumb API, and both roots carry a plan FEATURE as well as a policy while nothing in the class had ever
+consulted entitlements. Twelve-for-twelve now on checking a row against the code.
+
+**And the fix for that second blocker introduced a defect of its own, caught by the adversarial pass after
+6/6 — sixth increment running.** `RequireFeature` fails **open** on a null plan (`currentPlan() !== null &&
+! feature($key)`, which its docblock calls a "dev/test has no plans" pass-through); `feature()` returns
+**false** in that same state, because `currentPlan()?->featureEnabled() ?? false` cannot tell *denied* from
+*nothing to ask*. The crumb was therefore **strictly stronger than the route it mirrors** — request
+admitted, page 200, root crumb inert — and the unconditional back-link had been deleted in the same commit,
+so there was no other way out. Already live in the green suite: two existing test files assert 200 on those
+routes with no plan seeded, and nothing asserts `crumbs`. **A crumb must offer exactly what the route
+accepts: more permissive hands out links that bounce, stricter hands out dead ends.**
+
+**The mutation pass had a general hole: I varied the OPERATOR and never the OPERANDS.** Three mutations all
+reddened correctly, yet copying one method's body verbatim into the other survived everything — every
+seeded plan granting `webhooks` also grants `native_connectors`, and every role holding one permission
+holds the other. The module toggle is the one seam that separates them, and now pins both.
+
+**Two docblocks were corrected rather than left flattering** — they claimed a live protection for a reader
+who cannot reach these pages, since the detail routes carry the same feature middleware and each policy's
+`view()`/`viewAny()` are identical. Labelled as fail-closed guards no shipped route can observe.
+
+**Two crumbs, not three,** though a form middle-crumb was available for free from `form_url`: a breadcrumb
+is a path, and there is no `/webhooks/{form}` route to stand on.
+
+**Separately, a self-inflicted one worth recording.** The J4b1 tracker update (#160) deleted **1,086 lines**
+of PROGRESS.md — Current Status, the roadmap and the ledger — because the script replaced from the FIRST
+occurrence of the hand-off marker, which is the example inside Rule 7(e), not the real line ~1,085 lines
+below. It merged: docs-only changes are green by construction, and the `grep -c` used afterwards returned 1,
+which reads as success and was in fact the symptom. Restored as #161, verified by normalized diff (exactly 4
+lines removed, all four intended). ⚠️ **And the first version of the warning added to Rule 7(e) made it
+worse** — it quoted the marker to advise anchoring on it, the quote wrapped, and that created a third
+line-start occurrence inside the note warning about the first two. Rewritten without quoting it. Fifth
+"name the thing, never quote it" of the session, and the only one to booby-trap its own remedy. The rule
+that survives: **assert the resulting LINE COUNT, because a marker check tells you what you found and only
+the line count tells you what you destroyed.**

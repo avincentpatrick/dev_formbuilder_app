@@ -84,21 +84,32 @@ final class CrumbTrail
     /**
      * Open the trail at `Webhooks`.
      *
-     * ⚠️ TWO GATES, AND ASKING ONLY THE POLICY WOULD REBUILD THE DEFECT THIS CLASS EXISTS TO CLOSE. Every
-     * other root here needs one question answered, because every other root is guarded by a policy alone.
-     * `/webhooks` is guarded by `can:viewAny,WebhookEndpoint` **and** `feature:webhooks`, so a tenant that
-     * downgrades off Starter keeps the ability and loses the route — and a crumb that consulted the policy
-     * alone would hand that reader a link which bounces off middleware. That is exactly the shape of J2c's
-     * `/forms` crumb 403ing for a Viewer, one layer further out.
+     * ⚠️ TWO GATES, BECAUSE `/webhooks` CARRIES TWO — `can:viewAny,WebhookEndpoint` and `feature:webhooks`.
+     * Every other root in this class answers one question, because every other root is guarded by a policy
+     * alone.
      *
-     * The entitlement service is a parameter rather than a container lookup so the refusal is reachable in a
-     * test without booting a tenant, which is the same reason {@see DestinationCatalog} injects it.
+     * ⚠️ BOTH CONJUNCTS ARE FAIL-CLOSED GUARDS THAT NO SHIPPED ROUTE CAN OBSERVE, AND THEY ARE LABELLED AS
+     * SUCH RATHER THAN PRESENTED AS A LIVE RULE — the convention `formSubmissions()` and `submission()`
+     * already follow below. An earlier version of this docblock claimed the feature arm caught a tenant
+     * that had downgraded off Starter; the adversarial pass showed that reader cannot be on this page,
+     * because `webhooks.show` carries the SAME `feature:webhooks` middleware and refuses them first, and
+     * because {@see WebhookEndpointPolicy::view()} and `viewAny()` are the same permission check. The
+     * guards are kept because the method is a general root — a future caller need not be on the detail
+     * page — and because a crumb whose reachability is asserted rather than asked is how this class's
+     * original defect was written.
+     *
+     * ⚠️ WHAT *IS* LIVE IS THE NULL-PLAN MIRROR — see {@see featureAdmits()}. Asking `feature()` directly
+     * is strictly stronger than the route, and being stricter than the route is what strands a reader.
+     *
+     * The entitlement service is a parameter rather than a container lookup so both branches are reachable
+     * in a test without booting a tenant, which is the same reason {@see DestinationCatalog} injects it.
      */
     public static function webhooks(User $user, EntitlementService $entitlements): self
     {
         $trail = new self($user);
 
-        $reachable = $user->can('viewAny', WebhookEndpoint::class) && $entitlements->feature('webhooks');
+        $reachable = $user->can('viewAny', WebhookEndpoint::class)
+            && self::featureAdmits($entitlements, 'webhooks');
 
         return $trail->push('Webhooks', $reachable ? '/webhooks' : null);
     }
@@ -106,7 +117,10 @@ final class CrumbTrail
     /**
      * Open the trail at `Integrations`.
      *
-     * Same two-gate shape as {@see webhooks()} — `can:viewAny,Connection` plus `feature:native_connectors`.
+     * Same two-gate shape as {@see webhooks()}, including the part worth repeating: `can:viewAny,Connection`
+     * and `feature:native_connectors` are both fail-closed guards this page cannot exercise, because
+     * `integrations.rules.show` carries the same feature middleware and the two policies check the same
+     * permission. The null-plan mirror in {@see featureAdmits()} is the live half.
      *
      * ⚠️ AND A RULE'S TRAIL STOPS HERE RATHER THAN PASSING THROUGH ITS CONNECTION, BECAUSE THE CONNECTION
      * HAS NO PAGE. `/integrations/rules/{rule}` is a flat route; there is no `/integrations/connections/{id}`
@@ -117,7 +131,8 @@ final class CrumbTrail
     {
         $trail = new self($user);
 
-        $reachable = $user->can('viewAny', Connection::class) && $entitlements->feature('native_connectors');
+        $reachable = $user->can('viewAny', Connection::class)
+            && self::featureAdmits($entitlements, 'native_connectors');
 
         return $trail->push('Integrations', $reachable ? '/integrations' : null);
     }
@@ -216,6 +231,29 @@ final class CrumbTrail
     public static function exitFrom(array $trail): ?string
     {
         return $trail[count($trail) - 2]['href'] ?? null;
+    }
+
+    /**
+     * Would `RequireFeature` admit this request? — asked exactly as the middleware asks it.
+     *
+     * ⚠️ ASKING `feature()` DIRECTLY IS STRICTLY STRONGER THAN THE ROUTE, AND THE GAP IS A STRANDED READER.
+     * {@see RequireFeature} passes through when there is no plan catalog at all
+     * (`currentPlan() !== null && ! feature($key)`), which its own docblock calls a "dev/test has no plans"
+     * pass-through rather than a fail-open. {@see EntitlementService::feature()} returns **false** in that
+     * same state, because `currentPlan()?->featureEnabled() ?? false` cannot distinguish "denied" from
+     * "nothing to ask". So a crumb built on `feature()` alone withholds the href on a request the
+     * middleware ADMITS: the page renders 200, its root crumb is inert text, and — since J4b2 deleted the
+     * unconditional back-link in the same commit — there is no other way back. That is this class's own
+     * defect with the sign flipped, and it is reachable wherever the catalog is unseeded: a deploy that
+     * migrates before seeding, a restored database, and the several existing feature tests that assert
+     * 200 on these very routes with no plan present.
+     *
+     * The reason this is a mirror rather than a judgement: a crumb must offer exactly what the route
+     * accepts. Being more permissive hands out links that bounce; being stricter hands out dead ends.
+     */
+    private static function featureAdmits(EntitlementService $entitlements, string $key): bool
+    {
+        return $entitlements->currentPlan() === null || $entitlements->feature($key);
     }
 
     /**

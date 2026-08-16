@@ -7,6 +7,8 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Entitlements\ToggleableModules;
 use App\Support\Navigation\CrumbTrail;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -312,4 +314,54 @@ it('applies the same two gates to the Integrations root', function (): void {
     assignPlanTier(PlanTier::Free);
     expect(CrumbTrail::integrations($this->owner, app(EntitlementService::class))->current('Intake to Slack')[0])
         ->toBe(['label' => 'Integrations']);
+});
+
+it('offers the root when there is no plan catalog at all, because the ROUTE does', function (): void {
+    /*
+     * ⭐ FOUND BY THE ADVERSARIAL PASS, AND IT IS THIS CLASS'S OWN DEFECT WITH THE SIGN FLIPPED.
+     *
+     * {@see RequireFeature} passes through when `currentPlan()` is null — its docblock calls that a
+     * "dev/test has no plans" pass-through — while `EntitlementService::feature()` returns FALSE in the
+     * same state, because it cannot tell "denied" from "nothing to ask". A crumb built on `feature()`
+     * alone is therefore STRICTLY STRONGER than the route it mirrors: the request is admitted, the page
+     * renders 200, and its root crumb is inert text. J4b2 deleted the unconditional back-link in the same
+     * commit, so that reader has no way out at all.
+     *
+     * It is not hypothetical: several existing feature tests assert 200 on these very routes with no plan
+     * seeded, and every one of those responses carried a dead root crumb until this was fixed.
+     */
+    expect(app(EntitlementService::class)->currentPlan())->toBeNull();
+
+    $trail = CrumbTrail::webhooks($this->owner, app(EntitlementService::class))->current('Ops relay');
+
+    expect($trail[0])->toBe(['label' => 'Webhooks', 'href' => '/webhooks']);
+});
+
+it('tells the two feature keys apart, and the two policy subjects with them', function (): void {
+    /*
+     * ⭐ THE COPY-PASTE CASE, AND WITHOUT IT THE TWO METHODS ARE INTERCHANGEABLE. Every seeded plan that
+     * grants `webhooks` also grants `native_connectors`, and every role holding `webhooks.manage` also
+     * holds `integrations.manage` — so a body copied verbatim from one method into the other passes every
+     * other case in this file. The mutation testing done on these methods varied the OPERATOR and caught
+     * the AND; it never varied the OPERANDS, which is exactly what this case exists to pin.
+     *
+     * The module toggle is the one seam in the product that separates the two keys: it is ANDed with the
+     * plan flag inside `feature()`, and it can only ever subtract.
+     */
+    assignPlanTier(PlanTier::Starter);
+
+    app(TenantSettingRegistry::class)->put($this->tenant, [
+        ToggleableModules::settingKey('webhooks') => false,
+    ]);
+    app(EntitlementService::class)->forget();
+
+    $entitlements = app(EntitlementService::class);
+
+    expect($entitlements->feature('webhooks'))->toBeFalse()
+        ->and($entitlements->feature('native_connectors'))->toBeTrue();
+
+    expect(CrumbTrail::webhooks($this->owner, $entitlements)->current('Ops relay')[0])
+        ->toBe(['label' => 'Webhooks']);
+    expect(CrumbTrail::integrations($this->owner, $entitlements)->current('Intake to Slack')[0])
+        ->toBe(['label' => 'Integrations', 'href' => '/integrations']);
 });

@@ -347,6 +347,17 @@ written down as "cannot run here at all". The two are easy to confuse and the di
 is **merge-blocking**, and a gate believed unrunnable is a gate nobody runs. J4b found that out by shipping
 a PR that failed on it.
 
+⚠️ **AND IT HAS A COST ON THE OTHER SIDE OF THE BIND MOUNT, MEASURED IN J4c: `ds:install` BREAKS THE NODE
+CONTAINER'S VITE, AND THEREFORE THE VISUAL SWEEP.** That install runs on the HOST and writes win32-native
+binaries — `@esbuild/win32-x64`, `@rollup/rollup-win32-*` — into `packages/design-system/node_modules`,
+which is the **same bind-mounted path `dev_formbuilder_app-node-1` reads**. The container's own `npm install`
+then dies trying to unlink one (`EIO … unlink … esbuild.exe`) and the container **exits**; Vite stops
+serving and every subsequent screenshot is of nothing at all. **`rm -rf packages/design-system/node_modules`
+and restart the container** — the directory is gitignored (`.gitignore:20`), and the Storybook gate simply
+re-installs it next time. **Order the two gates so the sweep comes after the reinstall, or expect to pay
+this once per increment.** ⚠️ Also note `test-storybook` needs a SERVER: build to `storybook-static`, serve
+it, and pass `--url`; there is no default that finds a static directory.
+
 ⚠️ **AND IT CATCHES THINGS NOTHING ELSE DOES.** The failure that exposed this was a Vue SFC parse error —
 *"Element is missing end tag"*, at a position past the end of the file — raised by `plugin-vue` under the
 Storybook build while **the application's own build, `vue-tsc` and Vitest all compiled the same component

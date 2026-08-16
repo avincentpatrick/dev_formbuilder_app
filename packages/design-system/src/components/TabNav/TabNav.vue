@@ -27,8 +27,12 @@
  *
  * So: a navigation landmark containing plain links, with `aria-current="page"` on the active one. That is
  * what the APG itself prescribes for navigation that merely *looks* like tabs, and it is why this component
- * is `TabNav` rather than `Tabs`. Building the in-page tablist to §3.4's spec remains J4's, under the name
- * `Tabs`; the two are different components and the DSR now says so.
+ * is `TabNav` rather than `Tabs`. ⚠️ **`MdsTabs` EXISTS AS OF J4c AND THIS COMPONENT IS NOT AN OLDER
+ * VERSION OF IT** — they are siblings, and the two paragraphs above are exactly why neither may be folded
+ * into the other. One difference is worth naming here because it looks like an inconsistency and is not:
+ * a `current` matching no item resolves to -1 here and marks nothing, while `MdsTabs` keeps its first tab
+ * as the tab stop in the same case. Its items are buttons under a roving tabindex, so a strip with no stop
+ * would be unreachable by keyboard; these are links, which stay focusable whatever this component marks.
  *
  * ── The scroll region is deliberately NOT focusable, unlike MdsDataTable's ──────────────────────────────
  * `.mds-tabnav__list` is `overflow-x: auto`, so a strip too wide for its container scrolls — and

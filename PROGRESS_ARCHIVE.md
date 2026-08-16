@@ -3112,3 +3112,59 @@ ADR-0016 gained §D27–§D30 in place on the P2c precedent; **no ADR number was
 `0010` stays reserved for H1d.** The base moved four PRs under me while this was in flight; the rebase was
 **conflict-free**, which is Rule 7(b)'s boundary earning its keep. **CRDT sync is now the last named Lane B
 row, and Rule 7(f) governs from there.**
+
+---
+
+## 2026-08-17 — LANE A · J4c1: `MdsTabs`, and a tab underline that had been failing 1.4.11 in teal dark
+
+**`MdsTabs` is built and adopted into `ConfigPanel.vue`** — the product's ONLY in-page tablist, so the
+primitive had exactly one possible consumer and that consumer was the reason it was owed. Zero PHP, so
+Pest, PHPStan, the three lint gates and `openapi.json` cannot move (`openapi.json` regenerated with
+`scramble:export` and diffed rather than asserted). Vitest **116 files / 1,991 tests**, exit 0 on all three
+chunks; Storybook axe **40 suites / 284**. No exceptions-log entry, no ADR.
+
+**The extraction bought scrutiny rather than reuse — J4b's `MdsMenu` justification — and found three
+defects the same way. Thirteen-for-thirteen on checking a row against the code.** An app-tree component
+gets no story and therefore no `checkA11y` scan, and the builder's thirteen end-to-end locators click every
+tab on that page without ever asking what any of them POINTS AT. Hidden by that gap: no `aria-controls`
+anywhere; a `tabpanel` with `tabindex="0"` while full of form controls, which the APG reserves for panels
+holding nothing focusable; and that panel then setting `outline: none`, so the redundant stop it minted was
+invisible to whoever landed on it.
+
+**The fourth was a live WCAG 1.4.11 failure, and only measurement separated it from hygiene.** The selected
+tab's 2px underline used `action-primary-bg` — a fill, guaranteed only against the text printed on it. Third
+time the project has paid for that substitution (J2a on `MdsTabNav`, J4a on the accent bar), and **DSR §3.4's
+own Tabs paragraph was still prescribing it**, which is how it came to be implemented: a leftover
+instruction in a spec is not inert. Measured in the running builder, old → new: blueprint light 4.71 → 7.01,
+blueprint dark 3.42 → 8.29, teal light 7.48 → 7.48 (one colour for both tokens there), **teal dark
+2.41 → 6.39**. The 2.41 is below the 3:1 a non-text indicator owes, on a §2.9 accent any user can pick.
+The four new values reproduce `MdsTabNav`'s recorded JR1 numbers to the digit.
+
+**The mutation pass disproved one of my own docblocks.** J4b2's hole was varying the operator and never the
+operands, so this varied strings and subjects. Eleven mutations; the dangling-`aria-controls` version, the
+wrong-tab label, the restored panel tabindex, the missing tab stop, the fill token, the flipped arrow and an
+undiscriminating tab set all reddened, and a control correctly survived. **But mutating the call site from
+`ariaLabel` to `aria-label` also survived, and the docblock said that would leave the tablist unnamed.** Vue
+CAMELIZES a hyphenated prop key, so the prop is filled either way and only `vue-tsc` rejects it. Corrected
+in place. ⚠️ **The harness itself had a bug worth keeping: `grep -F -c` counts matching LINES, not needle
+occurrences**, so every multi-line needle reported a false count — it refused to mutate rather than
+mis-applying, which is the safe direction, but a mis-counting guard silently skips coverage.
+
+**The builder prohibition survived the component's arrival rather than expiring with it.** DSR §3.4 forbids
+retrofitting a tablist onto the pane switcher; that note was written when `MdsTabs` did not exist and reads
+as if it were waiting for one. J4c1 adopted the primitive into `ConfigPanel` on that same page and touched
+neither the pane switcher nor the Structure ⇄ Logic toggle. `ConfigPanel.test.ts` now asserts the page holds
+exactly one tablist, so the argument has a gate as well as a paragraph.
+
+**Two inherited numbers corrected by measuring the base tree.** The Vitest baseline is **114 files / 1,968
+tests**, not the 1,964 the hand-off carried — J4b2 added 4 and never restated the total — so J4c1's delta is
++2 files / +23, reconciling exactly. And a `resources/js` chunk printed "52 passed (52)" against 53 files
+and exited 1 on its first run, 53/808 on two re-runs: **the test delta names the casualty the file count
+only counts** (808 − 797 = 11 = `useTheme.test.ts`).
+
+**A new gate-ordering cost, paid once.** `npm run ds:install` runs on the HOST and writes win32-native
+binaries into `packages/design-system/node_modules` — the same bind-mounted path the node container reads —
+after which the container's own install dies on `EIO … unlink … esbuild.exe` and the container EXITS. Vite
+stops serving and every subsequent screenshot is of nothing at all. `rm -rf` that directory (gitignored)
+and restart. Recorded in `docs/feature-backlog.md` beside the "the Storybook gate runs locally" note, which
+had the how and not this.

@@ -454,8 +454,11 @@ function submitImport(): void {
                 than contradicts: that was a NAVIGATION strip of links with routes and gates; this is a
                 radiogroup switching already-mounted panes of the same page).
 
-                ⚠️ `MdsSegmentedControl`, i.e. a RADIOGROUP — DELIBERATELY NOT A TABLIST, and not a
-                candidate for J4's MdsTabs later either. Thirteen locators across builder-axe,
+                ⚠️ `MdsSegmentedControl`, i.e. a RADIOGROUP — DELIBERATELY NOT A TABLIST. **`MdsTabs` NOW
+                EXISTS (J4c) AND THIS IS STILL NOT A CANDIDATE FOR IT — the prohibition survived the
+                component's arrival rather than expiring with it**, and J4c adopted the primitive into
+                `ConfigPanel` on this same page without touching this control. Thirteen locators across
+                builder-axe,
                 responsive-axe and personalization-axe walk `[role="tab"]` on this page — four of them
                 loops that CLICK every match — and a second tablist would join ConfigPanel's in all of
                 them, clicking pane tabs mid-scan. It is also the wrong ARIA: the panes are this control's

@@ -1,10 +1,30 @@
 <script setup lang="ts">
 /**
- * The builder's right pane: the config editor for the selected field or section. The panel switcher uses
- * real tab semantics (role=tablist / tab / tabpanel + arrow-key roving) — deliberately NOT
- * MdsSegmentedControl, which is a radiogroup. Content edits update the local model immediately (so the
- * canvas reflects them live) and the store debounces one persist + one undo/redo entry per editing burst;
- * structural changes (move field to another section) go through their own reorder command.
+ * The builder's right pane: the config editor for the selected field or section. Content edits update the
+ * local model immediately (so the canvas reflects them live) and the store debounces one persist + one
+ * undo/redo entry per editing burst; structural changes (move field to another section) go through their
+ * own reorder command.
+ *
+ * ── THE SWITCHER IS `MdsTabs` AS OF J4c, AND IT USED TO BE HAND-ROLLED HERE ─────────────────────────────
+ * Real tab semantics — deliberately NOT MdsSegmentedControl, which is a radiogroup — but the markup now
+ * lives in the package. It was the product's ONLY in-page tablist, so it was both the component's sole
+ * possible consumer and the reason the primitive was owed.
+ *
+ * ⚠️ THE MOVE BOUGHT SCRUTINY RATHER THAN REUSE, WHICH IS THE SAME JUSTIFICATION J4b RECORDED FOR MdsMenu,
+ * AND IT FOUND THREE DEFECTS THE SAME WAY. An application-tree component gets no Storybook story and
+ * therefore no accessibility scan; the builder's end-to-end specs click every tab on this page and have
+ * never once asked what any of them points at. What that hid: the selected tab's underline drawn with a
+ * FILL token on a non-text indicator (the WCAG 1.4.11 substitution J2a measured on MdsTabNav and J4a on the
+ * personalization accent bar); a panel carrying a tabindex of 0 while full of form controls, which the APG
+ * reserves for panels holding nothing focusable; and that panel then suppressing its own focus ring, so the
+ * redundant stop it minted was invisible to whoever landed on it. None of the three is visible in a diff,
+ * a screenshot, or a passing spec.
+ *
+ * ⚠️ THIS PAGE MAY HOLD EXACTLY ONE TABLIST, NOW AND PERMANENTLY. Thirteen end-to-end locators walk the tab
+ * role on the builder — four of them loops that CLICK every match — so a second one would have its tabs
+ * clicked mid-scan and every settle locator would resolve to whichever strip came first in the DOM. The
+ * compact pane switcher and the Structure-versus-Logic toggle stay radiogroups; DSR §3.4 carries the
+ * prohibition and Builder.vue restates it at the call site.
  */
 import { computed, ref, watch } from 'vue';
 import {
@@ -14,6 +34,7 @@ import {
     MdsNumberInput,
     MdsSegmentedControl,
     MdsSelect,
+    MdsTabs,
     MdsTextInput,
     MdsTextarea,
 } from '@meridian/design-system';
@@ -97,7 +118,6 @@ const tabs = computed<{ key: string; label: string }[]>(() => {
 });
 
 const activeTab = ref('basics');
-const tabRefs = ref<HTMLButtonElement[]>([]);
 
 watch(
     () => field.value?.uid ?? section.value?.uid ?? null,
@@ -108,22 +128,6 @@ watch(
 watch(tabs, (list) => {
     if (!list.some((t) => t.key === activeTab.value)) activeTab.value = list[0]?.key ?? 'basics';
 });
-
-function selectTab(key: string): void {
-    activeTab.value = key;
-}
-function onTabKeydown(event: KeyboardEvent, index: number): void {
-    const list = tabs.value;
-    let next = index;
-    if (event.key === 'ArrowRight') next = (index + 1) % list.length;
-    else if (event.key === 'ArrowLeft') next = (index - 1 + list.length) % list.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = list.length - 1;
-    else return;
-    event.preventDefault();
-    activeTab.value = list[next].key;
-    tabRefs.value[next]?.focus();
-}
 
 const advanced = computed(() => (field.value ? advancedTypes.has(field.value.field_type) : false));
 const isCalculated = computed(() => field.value?.field_type === 'calculated');
@@ -239,317 +243,294 @@ watch(librarySaved, (value) => {
         </div>
 
         <template v-else>
-            <div class="config__tabs" role="tablist" aria-label="Configuration sections">
-                <button
-                    v-for="(tab, i) in tabs"
-                    :key="tab.key"
-                    ref="tabRefs"
-                    type="button"
-                    role="tab"
-                    :id="`config-tab-${tab.key}`"
-                    :aria-selected="activeTab === tab.key"
-                    :tabindex="activeTab === tab.key ? 0 : -1"
-                    class="config__tab"
-                    :class="{ 'is-active': activeTab === tab.key }"
-                    @click="selectTab(tab.key)"
-                    @keydown="onTabKeydown($event, i)"
-                >
-                    {{ tab.label }}
-                </button>
-            </div>
-
+            <!-- Above the strip, not between the strip and its own panel. A save failure is about the pane
+                 rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
+                 place it could not belong. -->
             <p v-if="saveError" class="config__error" role="alert">{{ saveError }}</p>
 
-            <!-- ── Field editor ─────────────────────────────────────────────── -->
-            <div
-                v-if="field"
-                :id="`config-panel-${activeTab}`"
-                role="tabpanel"
-                :aria-labelledby="`config-tab-${activeTab}`"
-                tabindex="0"
-                class="config__panel"
+            <MdsTabs
+                :items="tabs"
+                :model-value="activeTab"
+                ariaLabel="Configuration sections"
+                @update:model-value="activeTab = $event"
             >
-                <p v-if="advanced && configEditor === null" class="config__note">
-                    Baseline settings for this advanced field type. Its full editor and runtime arrive with the
-                    form engine.
-                </p>
+                <!-- ── Field editor ─────────────────────────────────────────── -->
+                <template v-if="field">
+                    <p v-if="advanced && configEditor === null" class="config__note">
+                        Baseline settings for this advanced field type. Its full editor and runtime arrive with the
+                        form engine.
+                    </p>
 
-                <template v-if="activeTab === 'basics'">
-                    <MdsFormField label="Label" v-slot="{ id }">
-                        <MdsTextInput :id="id" :model-value="field.label" @update:model-value="setField('label', $event)" />
-                    </MdsFormField>
-                    <MdsFormField
-                        v-if="isCalculated"
-                        label="Calculation formula"
-                        help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
-                        v-slot="{ id, describedby }"
-                    >
-                        <MdsTextarea
-                            :id="id"
-                            :describedby="describedby"
-                            :model-value="calculatedFormula"
-                            :rows="2"
-                            placeholder="e.g. ${quantity} * ${unit_price}"
-                            @update:model-value="setConfig('calculated_formula', $event || null)"
-                        />
-                    </MdsFormField>
-                    <MdsFormField label="Help text" v-slot="{ id }">
-                        <MdsTextarea
-                            :id="id"
-                            :model-value="field.hint ?? ''"
-                            :rows="2"
-                            @update:model-value="setField('hint', $event || null)"
-                        />
-                    </MdsFormField>
-                    <MdsFormField v-if="!isCalculated" label="Placeholder" v-slot="{ id }">
-                        <MdsTextInput
-                            :id="id"
-                            :model-value="field.placeholder ?? ''"
-                            @update:model-value="setField('placeholder', $event || null)"
-                        />
-                    </MdsFormField>
-                    <div v-if="!isCalculated" class="config__group">
-                        <span class="config__group-label">Requiredness</span>
-                        <MdsSegmentedControl
-                            :model-value="field.is_required"
-                            :options="requiredOptions"
-                            ariaLabel="Requiredness"
-                            @update:model-value="setField('is_required', $event)"
-                        />
-                    </div>
-                </template>
-
-                <template v-else-if="activeTab === 'options'">
-                    <ChoicesEditor :options="choices" @update:options="setConfig('options', $event)" />
-                </template>
-
-                <template v-else-if="activeTab === 'cascading'">
-                    <CascadingEditor
-                        :levels="cascadeLevels"
-                        :options="cascadeOptions"
-                        @update:levels="setConfig('levels', $event)"
-                        @update:options="setConfig('options', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
-                    <MatrixEditor
-                        :rows="gridRows"
-                        :columns="gridColumns"
-                        :cells="gridCells"
-                        @update:rows="setConfig('rows', $event)"
-                        @update:columns="setConfig('columns', $event)"
-                        @update:cells="setConfig('cells', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'grid'">
-                    <LikertMatrixEditor
-                        :rows="gridRows"
-                        :columns="gridColumns"
-                        @update:rows="setConfig('rows', $event)"
-                        @update:columns="setConfig('columns', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'geo'">
-                    <GeoEditor
-                        :field-type="field.field_type"
-                        :capture-altitude="geoCaptureAltitude"
-                        :accuracy-threshold="geoAccuracyThreshold"
-                        :default-center="geoDefaultCenter"
-                        :default-zoom="geoDefaultZoom"
-                        @update:captureAltitude="setConfig('capture_altitude', $event)"
-                        @update:accuracyThreshold="setConfig('accuracy_threshold', $event)"
-                        @update:defaultCenter="setConfig('default_center', $event)"
-                        @update:defaultZoom="setConfig('default_zoom', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'media'">
-                    <MediaEditor
-                        :field-type="field.field_type"
-                        :accepted-types="mediaAcceptedTypes"
-                        :max-file-size-bytes="mediaMaxFileSizeBytes"
-                        :max-count="mediaMaxCount"
-                        :min-count="mediaMinCount"
-                        :capture-source="mediaCaptureSource"
-                        @update:acceptedTypes="setConfig('accepted_types', $event)"
-                        @update:maxFileSizeBytes="setConfig('max_file_size_bytes', $event)"
-                        @update:maxCount="setConfig('max_count', $event)"
-                        @update:minCount="setConfig('min_count', $event)"
-                        @update:captureSource="setConfig('capture_source', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'prefill'">
-                    <PrefillEditor
-                        :field-key="field.key"
-                        :source="prefillSource"
-                        :url-param="prefillUrlParam"
-                        :default-value="field.default_value"
-                        @update:source="setConfig('prefill_source', $event)"
-                        @update:urlParam="setConfig('url_param', $event)"
-                        @update:defaultValue="setField('default_value', $event)"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'validation'">
-                    <ValidationEditor
-                        :validations="field.validations"
-                        :rule-types="enums.validation_rule_types"
-                        :operators="enums.comparison_operators"
-                        @update:validations="setValidations"
-                    />
-                </template>
-
-                <template v-else-if="activeTab === 'advanced'">
-                    <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." v-slot="{ id, describedby }">
-                        <MdsTextInput
-                            :id="id"
-                            :describedby="describedby"
-                            :model-value="field.key"
-                            @update:model-value="setField('key', $event)"
-                        />
-                    </MdsFormField>
-                    <MdsFormField label="Section" v-slot="{ id }">
-                        <MdsSelect
-                            :id="id"
-                            :model-value="field.form_section_id ?? ''"
-                            :options="sectionOptions"
-                            @update:model-value="reparent($event)"
-                        />
-                    </MdsFormField>
-                    <ConditionEditor
-                        :key="`field-${field.uid}`"
-                        :expression="field.relevant_expression"
-                        :catalogue="catalogue"
-                        legend="Show this question only when…"
-                        @update:expression="setField('relevant_expression', $event)"
-                    />
-                    <MdsFormField label="Appearance hint" v-slot="{ id }">
-                        <MdsTextInput
-                            :id="id"
-                            :model-value="field.appearance ?? ''"
-                            @update:model-value="setField('appearance', $event || null)"
-                        />
-                    </MdsFormField>
-                    <MdsFormField label="Default value" v-slot="{ id }">
-                        <MdsTextInput
-                            :id="id"
-                            :model-value="field.default_value ?? ''"
-                            @update:model-value="setField('default_value', $event || null)"
-                        />
-                    </MdsFormField>
-                    <div class="config__checks">
-                        <MdsCheckbox
-                            :model-value="field.is_pii"
-                            label="Contains personal data (PII)"
-                            @update:model-value="setField('is_pii', $event)"
-                        />
-                        <MdsCheckbox
-                            :model-value="field.is_sensitive"
-                            label="Sensitive"
-                            @update:model-value="setField('is_sensitive', $event)"
-                        />
-                        <MdsCheckbox
-                            :model-value="field.is_queryable"
-                            label="Indexed for reporting"
-                            @update:model-value="setField('is_queryable', $event)"
-                        />
-                    </div>
-                    <MdsFormField v-if="field.is_queryable" label="Indexed data type" v-slot="{ id }">
-                        <MdsSelect
-                            :id="id"
-                            :model-value="field.indexed_data_type ?? ''"
-                            :options="enums.indexed_data_types"
-                            placeholder="Choose a type"
-                            @update:model-value="setField('indexed_data_type', $event || null)"
-                        />
-                    </MdsFormField>
-
-                    <!-- Save this field to the reusable question library (Increment G9b) — one click; the item
-                         is named from the label and appears in the left-pane Library. -->
-                    <div class="config__library">
-                        <MdsButton
-                            variant="secondary"
-                            icon-left="plus"
-                            :disabled="saving"
-                            @click="saveToLibrary"
+                    <template v-if="activeTab === 'basics'">
+                        <MdsFormField label="Label" v-slot="{ id }">
+                            <MdsTextInput :id="id" :model-value="field.label" @update:model-value="setField('label', $event)" />
+                        </MdsFormField>
+                        <MdsFormField
+                            v-if="isCalculated"
+                            label="Calculation formula"
+                            help="Evaluated on the server. Use ${field} references, arithmetic (+ - * /), comparisons, and if()/count()/int()/today()/now()."
+                            v-slot="{ id, describedby }"
                         >
-                            Save to library
-                        </MdsButton>
-                        <p v-if="librarySaved" class="config__library-note" role="status" aria-live="polite">
-                            Saved “{{ librarySaved }}” to your library.
-                        </p>
-                    </div>
-                </template>
-            </div>
-
-            <!-- ── Section editor ───────────────────────────────────────────── -->
-            <div
-                v-else-if="section"
-                :id="`config-panel-${activeTab}`"
-                role="tabpanel"
-                :aria-labelledby="`config-tab-${activeTab}`"
-                tabindex="0"
-                class="config__panel"
-            >
-                <template v-if="activeTab === 'basics'">
-                    <MdsFormField label="Section title" v-slot="{ id }">
-                        <MdsTextInput :id="id" :model-value="section.label" @update:model-value="setSection('label', $event)" />
-                    </MdsFormField>
-                    <MdsFormField label="Section key" help="Lowercase, unique within the form." v-slot="{ id, describedby }">
-                        <MdsTextInput
-                            :id="id"
-                            :describedby="describedby"
-                            :model-value="section.key"
-                            @update:model-value="setSection('key', $event)"
-                        />
-                    </MdsFormField>
-                    <MdsFormField label="Description" v-slot="{ id }">
-                        <MdsTextarea
-                            :id="id"
-                            :model-value="section.description ?? ''"
-                            :rows="2"
-                            @update:model-value="setSection('description', $event || null)"
-                        />
-                    </MdsFormField>
-                </template>
-
-                <template v-else-if="activeTab === 'advanced'">
-                    <MdsCheckbox
-                        :model-value="section.is_repeatable"
-                        label="Repeatable group"
-                        @update:model-value="setSection('is_repeatable', $event)"
-                    />
-                    <div v-if="section.is_repeatable" class="config__row">
-                        <MdsFormField label="Min instances" v-slot="{ id }">
-                            <MdsNumberInput
+                            <MdsTextarea
                                 :id="id"
-                                :model-value="section.min_instances"
-                                :min="0"
-                                @update:model-value="setSection('min_instances', $event)"
+                                :describedby="describedby"
+                                :model-value="calculatedFormula"
+                                :rows="2"
+                                placeholder="e.g. ${quantity} * ${unit_price}"
+                                @update:model-value="setConfig('calculated_formula', $event || null)"
                             />
                         </MdsFormField>
-                        <MdsFormField label="Max instances" v-slot="{ id }">
-                            <MdsNumberInput
+                        <MdsFormField label="Help text" v-slot="{ id }">
+                            <MdsTextarea
                                 :id="id"
-                                :model-value="section.max_instances"
-                                :min="0"
-                                @update:model-value="setSection('max_instances', $event)"
+                                :model-value="field.hint ?? ''"
+                                :rows="2"
+                                @update:model-value="setField('hint', $event || null)"
                             />
                         </MdsFormField>
-                    </div>
-                    <ConditionEditor
-                        :key="`section-${section.uid}`"
-                        :expression="section.relevant_expression"
-                        :catalogue="catalogue"
-                        legend="Show this section only when…"
-                        @update:expression="setSection('relevant_expression', $event)"
-                    />
+                        <MdsFormField v-if="!isCalculated" label="Placeholder" v-slot="{ id }">
+                            <MdsTextInput
+                                :id="id"
+                                :model-value="field.placeholder ?? ''"
+                                @update:model-value="setField('placeholder', $event || null)"
+                            />
+                        </MdsFormField>
+                        <div v-if="!isCalculated" class="config__group">
+                            <span class="config__group-label">Requiredness</span>
+                            <MdsSegmentedControl
+                                :model-value="field.is_required"
+                                :options="requiredOptions"
+                                ariaLabel="Requiredness"
+                                @update:model-value="setField('is_required', $event)"
+                            />
+                        </div>
+                    </template>
+
+                    <template v-else-if="activeTab === 'options'">
+                        <ChoicesEditor :options="choices" @update:options="setConfig('options', $event)" />
+                    </template>
+
+                    <template v-else-if="activeTab === 'cascading'">
+                        <CascadingEditor
+                            :levels="cascadeLevels"
+                            :options="cascadeOptions"
+                            @update:levels="setConfig('levels', $event)"
+                            @update:options="setConfig('options', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
+                        <MatrixEditor
+                            :rows="gridRows"
+                            :columns="gridColumns"
+                            :cells="gridCells"
+                            @update:rows="setConfig('rows', $event)"
+                            @update:columns="setConfig('columns', $event)"
+                            @update:cells="setConfig('cells', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'grid'">
+                        <LikertMatrixEditor
+                            :rows="gridRows"
+                            :columns="gridColumns"
+                            @update:rows="setConfig('rows', $event)"
+                            @update:columns="setConfig('columns', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'geo'">
+                        <GeoEditor
+                            :field-type="field.field_type"
+                            :capture-altitude="geoCaptureAltitude"
+                            :accuracy-threshold="geoAccuracyThreshold"
+                            :default-center="geoDefaultCenter"
+                            :default-zoom="geoDefaultZoom"
+                            @update:captureAltitude="setConfig('capture_altitude', $event)"
+                            @update:accuracyThreshold="setConfig('accuracy_threshold', $event)"
+                            @update:defaultCenter="setConfig('default_center', $event)"
+                            @update:defaultZoom="setConfig('default_zoom', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'media'">
+                        <MediaEditor
+                            :field-type="field.field_type"
+                            :accepted-types="mediaAcceptedTypes"
+                            :max-file-size-bytes="mediaMaxFileSizeBytes"
+                            :max-count="mediaMaxCount"
+                            :min-count="mediaMinCount"
+                            :capture-source="mediaCaptureSource"
+                            @update:acceptedTypes="setConfig('accepted_types', $event)"
+                            @update:maxFileSizeBytes="setConfig('max_file_size_bytes', $event)"
+                            @update:maxCount="setConfig('max_count', $event)"
+                            @update:minCount="setConfig('min_count', $event)"
+                            @update:captureSource="setConfig('capture_source', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'prefill'">
+                        <PrefillEditor
+                            :field-key="field.key"
+                            :source="prefillSource"
+                            :url-param="prefillUrlParam"
+                            :default-value="field.default_value"
+                            @update:source="setConfig('prefill_source', $event)"
+                            @update:urlParam="setConfig('url_param', $event)"
+                            @update:defaultValue="setField('default_value', $event)"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'validation'">
+                        <ValidationEditor
+                            :validations="field.validations"
+                            :rule-types="enums.validation_rule_types"
+                            :operators="enums.comparison_operators"
+                            @update:validations="setValidations"
+                        />
+                    </template>
+
+                    <template v-else-if="activeTab === 'advanced'">
+                        <MdsFormField label="Field key" help="Referenced in expressions and exports. Lowercase, unique." v-slot="{ id, describedby }">
+                            <MdsTextInput
+                                :id="id"
+                                :describedby="describedby"
+                                :model-value="field.key"
+                                @update:model-value="setField('key', $event)"
+                            />
+                        </MdsFormField>
+                        <MdsFormField label="Section" v-slot="{ id }">
+                            <MdsSelect
+                                :id="id"
+                                :model-value="field.form_section_id ?? ''"
+                                :options="sectionOptions"
+                                @update:model-value="reparent($event)"
+                            />
+                        </MdsFormField>
+                        <ConditionEditor
+                            :key="`field-${field.uid}`"
+                            :expression="field.relevant_expression"
+                            :catalogue="catalogue"
+                            legend="Show this question only when…"
+                            @update:expression="setField('relevant_expression', $event)"
+                        />
+                        <MdsFormField label="Appearance hint" v-slot="{ id }">
+                            <MdsTextInput
+                                :id="id"
+                                :model-value="field.appearance ?? ''"
+                                @update:model-value="setField('appearance', $event || null)"
+                            />
+                        </MdsFormField>
+                        <MdsFormField label="Default value" v-slot="{ id }">
+                            <MdsTextInput
+                                :id="id"
+                                :model-value="field.default_value ?? ''"
+                                @update:model-value="setField('default_value', $event || null)"
+                            />
+                        </MdsFormField>
+                        <div class="config__checks">
+                            <MdsCheckbox
+                                :model-value="field.is_pii"
+                                label="Contains personal data (PII)"
+                                @update:model-value="setField('is_pii', $event)"
+                            />
+                            <MdsCheckbox
+                                :model-value="field.is_sensitive"
+                                label="Sensitive"
+                                @update:model-value="setField('is_sensitive', $event)"
+                            />
+                            <MdsCheckbox
+                                :model-value="field.is_queryable"
+                                label="Indexed for reporting"
+                                @update:model-value="setField('is_queryable', $event)"
+                            />
+                        </div>
+                        <MdsFormField v-if="field.is_queryable" label="Indexed data type" v-slot="{ id }">
+                            <MdsSelect
+                                :id="id"
+                                :model-value="field.indexed_data_type ?? ''"
+                                :options="enums.indexed_data_types"
+                                placeholder="Choose a type"
+                                @update:model-value="setField('indexed_data_type', $event || null)"
+                            />
+                        </MdsFormField>
+
+                        <!-- Save this field to the reusable question library (Increment G9b) — one click; the item
+                             is named from the label and appears in the left-pane Library. -->
+                        <div class="config__library">
+                            <MdsButton
+                                variant="secondary"
+                                icon-left="plus"
+                                :disabled="saving"
+                                @click="saveToLibrary"
+                            >
+                                Save to library
+                            </MdsButton>
+                            <p v-if="librarySaved" class="config__library-note" role="status" aria-live="polite">
+                                Saved “{{ librarySaved }}” to your library.
+                            </p>
+                        </div>
+                    </template>
                 </template>
-            </div>
+
+                <!-- ── Section editor ───────────────────────────────────────── -->
+                <template v-else-if="section">
+                    <template v-if="activeTab === 'basics'">
+                        <MdsFormField label="Section title" v-slot="{ id }">
+                            <MdsTextInput :id="id" :model-value="section.label" @update:model-value="setSection('label', $event)" />
+                        </MdsFormField>
+                        <MdsFormField label="Section key" help="Lowercase, unique within the form." v-slot="{ id, describedby }">
+                            <MdsTextInput
+                                :id="id"
+                                :describedby="describedby"
+                                :model-value="section.key"
+                                @update:model-value="setSection('key', $event)"
+                            />
+                        </MdsFormField>
+                        <MdsFormField label="Description" v-slot="{ id }">
+                            <MdsTextarea
+                                :id="id"
+                                :model-value="section.description ?? ''"
+                                :rows="2"
+                                @update:model-value="setSection('description', $event || null)"
+                            />
+                        </MdsFormField>
+                    </template>
+
+                    <template v-else-if="activeTab === 'advanced'">
+                        <MdsCheckbox
+                            :model-value="section.is_repeatable"
+                            label="Repeatable group"
+                            @update:model-value="setSection('is_repeatable', $event)"
+                        />
+                        <div v-if="section.is_repeatable" class="config__row">
+                            <MdsFormField label="Min instances" v-slot="{ id }">
+                                <MdsNumberInput
+                                    :id="id"
+                                    :model-value="section.min_instances"
+                                    :min="0"
+                                    @update:model-value="setSection('min_instances', $event)"
+                                />
+                            </MdsFormField>
+                            <MdsFormField label="Max instances" v-slot="{ id }">
+                                <MdsNumberInput
+                                    :id="id"
+                                    :model-value="section.max_instances"
+                                    :min="0"
+                                    @update:model-value="setSection('max_instances', $event)"
+                                />
+                            </MdsFormField>
+                        </div>
+                        <ConditionEditor
+                            :key="`section-${section.uid}`"
+                            :expression="section.relevant_expression"
+                            :catalogue="catalogue"
+                            legend="Show this section only when…"
+                            @update:expression="setSection('relevant_expression', $event)"
+                        />
+                    </template>
+                </template>
+            </MdsTabs>
         </template>
     </div>
 </template>
@@ -571,44 +552,19 @@ watch(librarySaved, (value) => {
     text-align: center;
 }
 
-.config__tabs {
-    display: flex;
-    gap: var(--mds-space-1);
-    border-bottom: 1px solid var(--mds-color-border-default);
-}
-
-.config__tab {
-    padding: var(--mds-space-2) var(--mds-space-3);
-    border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    background: transparent;
-    color: var(--mds-color-text-secondary);
-    font-family: var(--mds-font-family-body);
-    font-size: var(--mds-type-label-font-size);
-    font-weight: var(--mds-font-weight-medium);
-    cursor: pointer;
-}
-
-.config__tab.is-active {
-    color: var(--mds-color-action-primary-fg);
-    border-bottom-color: var(--mds-color-action-primary-bg);
-}
-
-.config__tab:focus-visible {
-    outline: 2px solid var(--mds-color-focus-ring);
-    outline-offset: 1px;
-    border-radius: var(--mds-radius-sm);
-}
-
-.config__panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mds-space-4);
-}
-.config__panel:focus-visible {
-    outline: none;
-}
+/*
+ * `.config__tabs`, `.config__tab` and `.config__panel` are DELETED, not left behind — a migration removes
+ * the old scoped CSS with the markup, or dead rules for an element that is no longer on the page read to
+ * the next author as a component still in use (DSR §3.4's own as-built rule, learned twice on breadcrumbs).
+ *
+ * Three defects went with them, and none was cosmetic. The selected tab's 2px underline was
+ * `action-primary-bg` — a FILL, guaranteed only against the text printed on it, on a non-text indicator
+ * that owes 3:1 against the surface behind it; the same substitution J2a measured on MdsTabNav and J4a
+ * measured on the personalization accent bar. The panel carried a tabindex of 0 while being full of form
+ * controls, which the APG reserves for panels holding nothing focusable, so it was a redundant stop in the
+ * app's tightest pane. And it then suppressed its own focus ring, so the stop it had just minted was
+ * invisible to whoever landed on it.
+ */
 
 .config__error {
     margin: 0;

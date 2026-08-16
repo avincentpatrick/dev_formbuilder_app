@@ -42,6 +42,7 @@ use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
 use App\Support\Auth\GoogleIdentityProvider;
 use App\Support\Guest\GuestShareTokenService;
+use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -1135,6 +1136,15 @@ function idpMetadataXml(?string $certificate = null, string $entityId = 'https:/
  */
 function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string $host = 'http://acme.meridian.test'): TestResponse
 {
+    // ⚠️ THE PRECONDITION IS ASSERTED RATHER THAN ASSUMED, AND THE FAILURE MODE IT GUARDS IS ASYMMETRIC.
+    // This helper does not establish the browser binding — the real mint does, and every caller reaches it
+    // through one. A future case that fabricated a row, or called `SsoAuthRequestService::mint()` directly
+    // (which touches no session), and then asserted a REFUSAL would pass while measuring "no binding"
+    // rather than the condition it names. That is the "green for a different reason than its name claims"
+    // shape, and one expectation converts it into a failure nobody can misread.
+    expect(SsoSession::hasPendingLogin(session()->driver(), $request->request_id))
+        ->toBeTrue('completeSamlLogin() requires the binding the real mint writes — drive GET /sso/saml/login');
+
     $handOff = test()->post($host.'/sso/saml/acs', ['SAMLResponse' => $samlResponse])
         ->assertRedirect($host.'/sso/saml/login/complete/'.$request->request_id);
 

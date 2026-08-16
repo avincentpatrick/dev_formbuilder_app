@@ -67,7 +67,17 @@ return new class extends Migration
         Schema::table('sso_auth_requests', function (Blueprint $table): void {
             // WHO the assertion resolved to, written by the ACS in the same statement as `verified_at` and
             // never at mint, where an unauthenticated caller has no subject to name. Read exactly once, by the
-            // same-site hop, to decide who `Auth::loginUsingId()` is handed.
+            // same-site hop, which re-reads the subject on the DEFAULT connection and NEVER through
+            // `Auth::loginUsingId()` — that resolves on `pgsql_auth`, whose select policy is `USING (true)`,
+            // i.e. every account in the deployment with no membership predicate at all. See the controller.
+            //
+            // ⚠️ `ON DELETE CASCADE`, AND THAT IS A REAL CONSEQUENCE RATHER THAN A DEFAULT. Before P1e a login
+            // row referenced no user at all, so deleting an account left the request ledger intact; now
+            // deleting one prunes every login row that resolved to them. `ON DELETE SET NULL` — the obvious
+            // alternative — is UNAVAILABLE by construction: `sso_auth_requests_login_resolution_check` refuses
+            // a verified login row carrying no subject, so nulling the column would violate it. The ledger
+            // property this table's retention policy describes ("distinguish expired from already used from
+            // never existed") therefore does not survive an erasure for that subject's own rows.
             $table->foreignUuid('resolved_user_id')->nullable()->constrained('users')->cascadeOnDelete();
         });
 

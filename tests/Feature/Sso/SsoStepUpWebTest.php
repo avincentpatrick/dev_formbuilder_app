@@ -145,7 +145,7 @@ it('marks the session as identity-provider established when a login round trip c
 
     // ⚠️ THE MARKER MOVED TO THE COMPLETION HOP IN P1e, ALONG WITH THE SIGN-IN ITSELF. The ACS creates no
     // session on either arm now, so the identity-source marker cannot be written there — it is written where
-    // `Auth::loginUsingId()` runs, after the migration that call performs.
+    // `Auth::login()` runs, after the session migration that call performs.
     $handOff = $this->post(STEP_UP_ACS, [
         'SAMLResponse' => (new FakeIdp(STEP_UP_ACS, STEP_UP_SP, $login->request_id))
             ->as($this->admin->email)

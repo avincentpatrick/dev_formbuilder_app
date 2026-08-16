@@ -22,8 +22,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The Assertion Consumer Service — where an identity provider's signed assertion becomes a session
- * (Phase 4, P1b — ADR-0016).
+ * The Assertion Consumer Service — where an identity provider's signed assertion is validated and written
+ * down (Phase 4, P1b; it stopped creating the session in P1e — ADR-0016 §D27, §D29).
  *
  * ── ⚠️ EVERY FAILURE IS THE SAME 404, AND THE COST IS STATED RATHER THAN HIDDEN ──────────────────────
  * §D4 fixed this posture for the protocol surface and it extends to the whole of this endpoint. An ACS
@@ -42,10 +42,13 @@ use Illuminate\Support\Facades\Log;
  * `tenant_users` with `via => 'sso_jit'`.
  *
  * ── UNAUTHENTICATED, CSRF-EXEMPT, AND NEITHER IS A GAP ──────────────────────────────────────────────
- * The caller is an identity provider posting cross-origin. There is no session to require — this request
- * creates one — and no CSRF token to present. What replaces the token is stronger: the assertion must be
- * signed by the tenant's own trust anchor AND name a live, unconsumed `sso_auth_requests` row this SP
- * minted. `bootstrap/app.php` carries the exemption by exact path.
+ * The caller is an identity provider posting cross-origin. There is no session to require — and since P1e
+ * none to create either — and no CSRF token to present. ⚠️ Nor, since P1e, is there a CSRF middleware to
+ * be exempt FROM: this route left the stateful stack, so `bootstrap/app.php`'s `except` entry is belt and
+ * braces held for the day somebody moves it back, rather than the thing standing between here and a 419.
+ *
+ * What replaces the token is stronger: the assertion must be signed by the tenant's own trust anchor AND
+ * name a live, unconsumed `sso_auth_requests` row this SP minted.
  *
  * ── ⚠️ "THERE IS NO SESSION" IS NOW LITERAL IN BOTH DIRECTIONS (P1c, then P1e) ──────────────────────
  * `config/session.php` sets `same_site` to `lax`, and a cross-site top-level POST does not carry a Lax

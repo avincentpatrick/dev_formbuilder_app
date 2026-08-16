@@ -18,7 +18,9 @@ use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Sso\FakeIdp;
 
@@ -591,14 +593,28 @@ it('hands the browser no session cookie, so the one that started the flow surviv
         ->assertCookieMissing('XSRF-TOKEN');
 });
 
-it('accepts the POST without a CSRF token, because there is none to send', function (): void {
-    // A cross-origin form post from an IdP carries no token. Without the exemption in bootstrap/app.php the
-    // whole feature is a 419 — and a 419 is not a 404, so this asserts the exemption is present rather than
-    // the failure merely being uniform.
+it('accepts the POST without a CSRF token, and is no longer even reachable by the middleware', function (): void {
+    // ⚠️ THIS CASE'S OLD CLAIM STOPPED BEING TRUE IN P1e AND THE COMMENT DID NOT NOTICE. It read "without the
+    // exemption in bootstrap/app.php the whole feature is a 419", which asserted the exemption was doing the
+    // work. P1e took this route out of the `web` group, so `ValidateCsrfToken` is not in its pipeline at all
+    // and deleting that `except` entry now changes nothing — the round-trip half of this case had become
+    // unfailable while still describing itself as a control.
+    //
+    // So it asserts the structure instead, which CAN break: the middleware is genuinely absent, AND the
+    // exemption is still configured for the day somebody moves this route back inside a stateful stack.
     $request = startLogin($this->tenant, $this->admin);
 
     completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
         ->assertRedirect('/dashboard');
+
+    $route = collect(Route::getRoutes()->getRoutes())->first(fn ($candidate) => $candidate->uri() === 'sso/saml/acs');
+
+    expect($route)->not->toBeNull()
+        ->and($route->gatherMiddleware())->not->toContain('web')
+        ->and($route->gatherMiddleware())->not->toContain(ValidateCsrfToken::class)
+        // Belt AND braces: kept deliberately, because the day it becomes load-bearing again there is no
+        // other warning. `bootstrap/app.php` lists it by EXACT path, never a wildcard.
+        ->and((new ValidateCsrfToken(app(), app('encrypter')))->getExcludedPaths())->toContain('sso/saml/acs');
 });
 
 it('does not exempt an SSO arrival from a workspace’s own 2FA enforcement', function (): void {

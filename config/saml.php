@@ -113,7 +113,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | The same bound, on the other arm: how long a validated LOGIN stays redeemable between the ACS marking
-    | `verified_at` and the browser arriving at the same-site hop that actually calls `Auth::loginUsingId()`.
+    | `verified_at` and the browser arriving at the same-site hop that actually signs
+    | the member in — on the DEFAULT connection, never through `Auth::loginUsingId()`, for the reason
+    | `SsoLoginCompletionController` gives at length.
     | Same default, same reasoning — it covers one 302 being followed, not a human authenticating.
     |
     | ⚠️ ITS OWN KEY RATHER THAN A REUSE OF THE STEP-UP'S, AND THAT IS NOT BOOKKEEPING. A knob named for one

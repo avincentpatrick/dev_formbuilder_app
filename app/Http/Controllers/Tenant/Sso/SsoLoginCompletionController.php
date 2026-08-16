@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Tenant\GoogleCompleteController;
 use App\Models\SsoConnection;
 use App\Models\User;
+use App\Services\Sso\SsoGate;
 use App\Services\Sso\SsoLoginCompletionService;
 use App\Support\Sso\SsoReturnTo;
 use App\Support\Sso\SsoSession;
@@ -56,10 +57,24 @@ use Illuminate\Support\Facades\Log;
  */
 final class SsoLoginCompletionController extends Controller
 {
-    public function __construct(private readonly SsoLoginCompletionService $completions) {}
+    public function __construct(
+        private readonly SsoGate $gate,
+        private readonly SsoLoginCompletionService $completions,
+    ) {}
 
     public function __invoke(Request $request, string $requestId): RedirectResponse
     {
+        // ⚠️ THE GATE IS CONSULTED HERE TOO, AND THE STEP-UP HOP'S PRECEDENT IS DELIBERATELY NOT FOLLOWED.
+        // `SsoStepUpCompletionController` asks no gate, on the reasoning that re-asking turns a race into a
+        // lockout mid-authentication. That reasoning does not survive the difference between the two arms:
+        // a step-up grants `auth.password_confirmed_at` to a session that already exists, whereas this hop
+        // MINTS one. So the ninety seconds after an admin hits the status kill switch — the escape hatch
+        // `/settings/sso` advertises as surviving a plan downgrade — would otherwise still be minting
+        // sessions for a connection they had just disabled, and `stampLastLogin()` below would refresh
+        // `last_login_at` on it, telling that admin sign-in was healthy on a connection they turned off.
+        // The cost is one already-cached read and the answer is the same 404 as every other refusal (§D4).
+        $this->gate->activeConnectionOrAbort();
+
         $authRequest = $this->completions->redeem($requestId);
 
         if ($authRequest === null) {
@@ -82,9 +97,13 @@ final class SsoLoginCompletionController extends Controller
 
         // ⚠️ READ ON THE DEFAULT CONNECTION, AND THE RLS POLICY THERE IS A SECOND CONTROL RATHER THAN AN
         // OBSTACLE. `users_visibility` is `id = app.current_user_id OR EXISTS(an ACTIVE tenant_users row for
-        // app.current_tenant_id)`. Nobody is signed in here, so the first arm is dead and the second is the
+        // app.current_tenant_id)`. In the ordinary case nobody is signed in here, so the second arm is the
         // whole predicate: this row's subject is visible if and only if they are an ACTIVE MEMBER OF THIS
-        // WORKSPACE, enforced by the database. A member suspended in the ninety seconds since the ACS is
+        // WORKSPACE, enforced by the database. ⚠️ Not an absolute: this route carries no `guest` either,
+        // because `SsoLoginController` deliberately supports re-authenticating as somebody else on a shared
+        // machine, and such a visitor DOES set `app.current_user_id` — the first arm can then reveal only
+        // the visitor to themselves, which adds nothing a session they already hold did not.
+        // A member suspended in the ninety seconds since the ACS is
         // refused here without this file containing a comparison, which is `GoogleCompleteController`'s
         // "the wrong-tenant refusal is RLS rather than a comparison" one door along.
         //
@@ -99,6 +118,14 @@ final class SsoLoginCompletionController extends Controller
         $user = User::query()->whereKey($authRequest->resolved_user_id)->first();
 
         if ($user === null) {
+            // ⚠️ THE BINDING IS SPENT ON THIS REFUSAL TOO, AND IT IS THE ONLY REFUSAL THAT NEEDS IT. The row
+            // was burned by the redeem above, so the binding authorises nothing from here on — but leaving
+            // it in the list would occupy one of five slots until four newer mints pushed it out, shrinking
+            // the concurrency budget the list exists to provide. The other refusals need no such line: the
+            // `flow_not_bound_to_browser` arm is reached precisely BECAUSE this session holds no binding for
+            // the row, and the `redeem()` arm never learned which row it was.
+            SsoSession::forgetPendingLogin($request->session(), $authRequest->request_id);
+
             return $this->refuse('subject_unresolvable', $requestId, $request);
         }
 

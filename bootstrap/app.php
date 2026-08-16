@@ -101,8 +101,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // ── THE SAML ASSERTION CONSUMER SERVICE IS THE ONLY CSRF-EXEMPT POST IN THIS APPLICATION (P1b) ──
         // It is a cross-origin form POST from a tenant's identity provider. There is no token to send, and
         // with SameSite=Lax no session cookie arrives either — which is not a gap, because this request
-        // CREATES the session rather than acting on one. CSRF protects an EXISTING authenticated session
-        // from being driven without its owner's intent; there is nothing here yet for it to protect.
+        // acts on no session. CSRF protects an EXISTING authenticated session from being driven without
+        // its owner's intent; there is nothing here for it to protect. ⚠️ P1b said this request "CREATES
+        // the session"; P1e moved that to a same-site hop, and also took this route out of the `web`
+        // group — so `ValidateCsrfToken` no longer runs on it at all and this entry is now belt AND
+        // braces. It is kept, not deleted, because the day somebody puts that route back inside a
+        // stateful stack is the day it becomes load-bearing again with no other warning.
         //
         // What replaces it is stronger than a token and is why `allow_unsolicited` is permanently false:
         // the assertion must be signed by the tenant's own trust anchor AND carry an `InResponseTo` naming

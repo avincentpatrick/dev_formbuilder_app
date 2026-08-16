@@ -1084,7 +1084,12 @@ Route::middleware([
 | `bootstrap/app.php` is now belt AND braces rather than the only thing standing between this route and a
 | 419, and it stays exactly where it is for the day somebody moves this route back.
 |
-| ⚠️ WHAT IT COSTS, STATED RATHER THAN DISCOVERED: nothing in this pipeline may touch `$request->session()`.
+| ⚠️ WHAT IT COSTS, STATED RATHER THAN DISCOVERED: nothing in this pipeline may touch `$request->session()`
+| — and "this pipeline" includes the EXCEPTION RENDERERS, which is the half a middleware list does not
+| show you. An exception escaping this controller is rendered by the global handler, and the one that can
+| (`MembershipException`, from a connection naming a role absent from the catalog) renders as
+| `back()->withErrors()` — a flash into a store nothing saves, and a 302 to the identity provider's own
+| Referer instead of the uniform 404 §D4 promises. Pre-existing, recorded as §9 item 27's neighbour.
 | `EstablishTenantDatabaseContext` reads `$request->user()`, which resolves through the container's session
 | store rather than the request's and answers null here exactly as it did before. If a future ACS arm needs
 | the session, it needs the completion hop instead — that is the whole shape of P1c and P1e.

@@ -79,6 +79,14 @@ final class SsoLoginCompletionService
 
         $affected = SsoAuthRequest::query()
             ->where('request_id', $requestId)
+            // ⚠️ THE INTENT IS REPEATED HERE TOO, AND THE ADVERSARIAL PASS IS WHY. It is redundant TODAY —
+            // `sso_auth_requests_login_subject_check` forbids `resolved_user_id` on a step-up row, so the
+            // subject predicate below is an implicit intent predicate. That is exactly the contingency the
+            // guard above is written for: a future migration dropping that CHECK would silently make this
+            // UPDATE willing to redeem a step-up row, skipping that arm's ForceAuthn, window and subject
+            // checks. The doctrine in this class docblock is that the repetition IS the mechanism, and it
+            // was applied to one guard and not its twin.
+            ->where('intent', SsoAuthIntent::Login)
             ->whereNotNull('verified_at')
             ->whereNotNull('resolved_user_id')
             ->whereNull('completed_at')

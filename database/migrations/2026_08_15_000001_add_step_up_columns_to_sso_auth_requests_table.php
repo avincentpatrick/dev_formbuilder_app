@@ -55,7 +55,8 @@ return new class extends Migration
 
             // The completion hop's mark: the browser came back on the original session and the flow finished.
             // Single-use. On a step-up that means `auth.password_confirmed_at` was stamped; on a login (P1e)
-            // it means `Auth::loginUsingId()` ran. Both are "the browser came back", which is why one column.
+            // it means `Auth::login()` ran on a subject re-read under RLS. Both are "the browser came back", which
+            // is why one column.
             $table->timestampTz('completed_at')->nullable();
         });
 

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\PlanTier;
 use App\Enums\SsoAuthIntent;
+use App\Enums\TenantUserStatus;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Sso\SsoSession;
@@ -385,7 +387,10 @@ it('holds only the newest few pending flows, because the mint is unauthenticated
         beginLogin($this->tenant, $this->admin);
     }
 
-    expect(SsoSession::hasPendingLogin(session()->driver(), $oldest->request_id))->toBeFalse();
+    // ⚠️ BOTH HALVES. Asserting only the eviction would stay green under an implementation that replaced
+    // the list with a single value on every mint — which is the opposite of what the list is for.
+    expect(SsoSession::hasPendingLogin(session()->driver(), $oldest->request_id))->toBeFalse()
+        ->and(session()->driver()->get(SsoSession::PENDING_LOGIN_IDS))->toHaveCount(5);
 });
 
 /*
@@ -425,4 +430,59 @@ it('carries its own rate limiter and its own pattern, because the id is guessabl
         // not fail loudly — it resolves to an UNLIMITED PASSTHROUGH, so the assertion above would stay green
         // over a bound that is not there.
         ->and(RateLimiter::limiter('saml-login-complete'))->not->toBeNull();
+});
+
+it('refuses a member who stopped being active between the ACS and the hop', function (): void {
+    // ⚠️ THE CASE THAT CERTIFIES THIS INCREMENT'S HEADLINE RLS ARGUMENT, AND NOTHING ASSERTED IT UNTIL THE
+    // ADVERSARIAL PASS SAID SO. The controller re-reads the subject on the DEFAULT connection precisely so
+    // that `users_visibility` — `EXISTS(an ACTIVE tenant_users row for this tenant)` — refuses somebody who
+    // is no longer a live member, WITHOUT this codebase containing a comparison to get wrong. That claim was
+    // a comment with no test behind it.
+    $request = beginLogin($this->tenant, $this->admin);
+    $location = handOffFor($request, $this->member->email);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    TenantUser::query()->where('user_id', $this->member->getKey())
+        ->update(['status' => TenantUserStatus::Suspended]);
+
+    $this->get($location)->assertNotFound();
+    $this->assertGuest();
+});
+
+it('cannot be completed on a neighbouring workspace’s host', function (): void {
+    // `redeem()` carries no `tenant_id` predicate on purpose — writing one would suggest the guarantee lived
+    // in PHP. RLS is the whole of it, and nothing asserted that either: a future `withoutGlobalScopes()` or a
+    // policy regression would have reddened nothing.
+    $neighbour = Tenant::create(['name' => 'Beta', 'slug' => 'beta', 'default_locale' => 'en']);
+    $neighbour->domains()->create(['domain' => 'beta']);
+
+    $request = beginLogin($this->tenant, $this->admin);
+    handOffFor($request, $this->member->email);
+
+    $this->get('http://beta.meridian.test/sso/saml/login/complete/'.$request->request_id)->assertNotFound();
+    $this->assertGuest();
+
+    // ...and the victim tenant's row is untouched, so this is a refusal rather than a cross-tenant burn.
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoAuthRequest::query()->where('request_id', $request->request_id)->value('completed_at'))->toBeNull();
+});
+
+it('refuses once an admin has disabled the connection, even inside the completion window', function (): void {
+    // ⚠️ THE STEP-UP HOP CONSULTS NO GATE AND THIS ONE DOES, WHICH IS A DELIBERATE DIVERGENCE. A step-up
+    // grants `auth.password_confirmed_at` to a session that already exists; this hop MINTS one. So the
+    // status kill switch — the escape hatch `/settings/sso` advertises as surviving a plan downgrade — has
+    // to mean something within the ninety seconds after an assertion was verified, or an admin who has just
+    // disabled a compromised connection would still be handing out sessions for it.
+    $request = beginLogin($this->tenant, $this->admin);
+    $location = handOffFor($request, $this->member->email);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    SsoConnection::query()->update(['status' => 'disabled']);
+
+    $this->get($location)->assertNotFound();
+    $this->assertGuest();
+
+    // And `last_login_at` was not refreshed on a connection the admin had just turned off.
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoConnection::query()->value('last_login_at'))->toBeNull();
 });

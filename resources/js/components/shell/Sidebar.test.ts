@@ -1,5 +1,5 @@
-import { mount, type VueWrapper } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * The shell's nav gating (Increment H24b2 — the repo's first Sidebar test).
@@ -234,5 +234,345 @@ describe('Sidebar — the Audit log destination', () => {
         expect(labels(wrapper).join(' ')).toContain('Audit log');
         expect(labels(wrapper).join(' ')).not.toContain('Analytics');
         wrapper.unmount();
+    });
+});
+
+/**
+ * Grouping (J4b). The nav was a flat twelve whose grouping lived only in three comments; this is the
+ * data model catching up with the prose. Nothing about which items a user sees changes — the cases above
+ * pass unedited, which is the evidence — so what needs proving is the structure and, above all, that a
+ * heading never appears over nothing.
+ */
+describe('Sidebar — grouping', () => {
+    const ALL_FEATURES = {
+        advanced_analytics: true,
+        webhooks: true,
+        native_connectors: true,
+        custom_domain: true,
+    };
+
+    /** Group labels only — the helper above deliberately cannot see them, which is the point of the <div>. */
+    function groupLabels(wrapper: VueWrapper): string[] {
+        return wrapper.findAll('.sidebar__group-label').map((n) => n.text().trim());
+    }
+
+    it('does not reorder the nav — the flat order is derived from the groups', async () => {
+        // ⭐ The whole claim that this change is presentational. `navItems` is built by flattening the
+        // groups, so if a future edit moves an item between runs this is what notices.
+        const { navGroups, navItems } = await import('./nav-model');
+
+        expect(navItems.map((i) => i.key)).toEqual([
+            'forms', 'submissions', 'dashboard', 'analytics',
+            'members', 'scopes', 'audit', 'feedback',
+            'webhooks', 'integrations', 'domains',
+            'settings',
+        ]);
+        expect(navGroups.flatMap((g) => g.items.map((i) => i.key))).toEqual(navItems.map((i) => i.key));
+    });
+
+    it('gives every item exactly one group', async () => {
+        // Cheap, and it catches the copy-paste that lands an item in two runs or drops it from all of them.
+        const { navGroups } = await import('./nav-model');
+        const keys = navGroups.flatMap((g) => g.items.map((i) => i.key));
+
+        expect(new Set(keys).size).toBe(keys.length);
+        expect(new Set(navGroups.map((g) => g.key)).size).toBe(navGroups.length);
+    });
+
+    it('puts nothing but list items directly inside a list', () => {
+        // ⭐ axe's `list` rule is WCAG-tagged and therefore inside the end-to-end scan's tag set, and the
+        // sidebar is scanned on every whole-page assertClean — so the obvious markup (a heading between the
+        // <ul> and its <li>s) would redden roughly forty cases at once. This asserts it in milliseconds
+        // instead, which is the only reason it is cheap to get right.
+        const wrapper = render(allAbilities(), ALL_FEATURES);
+
+        for (const list of wrapper.findAll('ul')) {
+            for (const child of Array.from(list.element.children)) {
+                expect(child.tagName).toBe('LI');
+            }
+        }
+        wrapper.unmount();
+    });
+
+    it('labels the two runs that need a name, and leaves the other two unlabelled', () => {
+        const wrapper = render(allAbilities(), ALL_FEATURES);
+
+        expect(groupLabels(wrapper)).toEqual(['Administration', 'Connections']);
+        expect(wrapper.findAll('.sidebar__group')).toHaveLength(4);
+        wrapper.unmount();
+    });
+
+    it('renders a group label as a DIV, and never as text the item-label helper can see', () => {
+        // ⭐ TWO GATES PIN THIS ELEMENT TYPE AND THEY PULL IN OPPOSITE DIRECTIONS. A <span> would join
+        // `labels()`, whose six negative assertions above check that four item names are ABSENT for gated
+        // users — a group called "Connections" is safe, but the guard has to exist before someone renames
+        // one. An <h2> would put shell chrome at the top of every page's heading outline, since this nav
+        // renders ahead of the page's own <h1>.
+        const wrapper = render(allAbilities(), ALL_FEATURES);
+
+        for (const label of wrapper.findAll('.sidebar__group-label')) {
+            expect(label.element.tagName).toBe('DIV');
+            expect(label.findAll('span')).toHaveLength(0);
+        }
+
+        const itemText = labels(wrapper).join(' ');
+        for (const name of groupLabels(wrapper)) {
+            expect(itemText).not.toContain(name);
+        }
+        wrapper.unmount();
+    });
+
+    it('names a labelled list through aria-labelledby, and leaves an unlabelled one with no attribute', () => {
+        // An empty string would be a dangling idref rather than an absent name, which axe flags and which
+        // reads to a screen reader as a group named after nothing.
+        const wrapper = render(allAbilities(), ALL_FEATURES);
+        const lists = wrapper.findAll('ul');
+
+        expect(lists[0]?.attributes('aria-labelledby')).toBeUndefined();
+
+        const named = lists.filter((l) => l.attributes('aria-labelledby') !== undefined);
+        expect(named).toHaveLength(2);
+        for (const list of named) {
+            const id = list.attributes('aria-labelledby');
+            expect(wrapper.find(`#${id}`).exists()).toBe(true);
+        }
+        wrapper.unmount();
+    });
+
+    it('carries list semantics explicitly, since list-style: none strips them in Safari', () => {
+        const wrapper = render(allAbilities(), ALL_FEATURES);
+
+        for (const list of wrapper.findAll('ul')) {
+            expect(list.attributes('role')).toBe('list');
+        }
+        wrapper.unmount();
+    });
+
+    it('drops a group whose items are ALL gated away, rather than heading an empty run', () => {
+        // ⭐ THE CASE THE WHOLE FILTER EXISTS FOR, ON A REAL CONFIGURATION RATHER THAN A CONTRIVED ONE. An
+        // Owner on Free holds every permission and no plan features, so all three Connections items vanish
+        // while Administration stays whole. An unconditional heading prints a category over nothing here.
+        const wrapper = render(allAbilities(), {});
+
+        expect(groupLabels(wrapper)).toEqual(['Administration']);
+        expect(labels(wrapper).join(' ')).not.toContain('Webhooks');
+        wrapper.unmount();
+    });
+
+    it('renders no headings at all at the two-item floor', () => {
+        // ⭐ Off-tenant chrome resolves every ability false and every feature absent, leaving only the two
+        // ungated destinations. Two runs, two items, zero labels — a heading over one item is noise, and a
+        // heading over none is a defect.
+        const wrapper = render({}, {});
+
+        expect(groupLabels(wrapper)).toEqual([]);
+        expect(wrapper.findAll('.sidebar__group')).toHaveLength(2);
+        expect(labels(wrapper).join(' ')).toContain('Dashboard');
+        expect(labels(wrapper).join(' ')).toContain('Settings');
+        wrapper.unmount();
+    });
+});
+
+/**
+ * The mobile drawer taking the page (J4b).
+ *
+ * Before this increment the drawer rendered a full-viewport scrim over a page that stayed entirely
+ * tabbable and entirely announced — the defect DSR §3.6 forbids in as many words, and the one I10a had
+ * already removed from MdsModal. None of it had any unit coverage at all.
+ *
+ * Everything here fails SILENTLY in a browser: a page left inert throws nothing and looks normal until a
+ * keyboard user finds they cannot reach it. So these are assertions about state that has no appearance.
+ */
+describe('Sidebar — the drawer takes the page', () => {
+    const ALL_FEATURES = {
+        advanced_analytics: true,
+        webhooks: true,
+        native_connectors: true,
+        custom_domain: true,
+    };
+
+    /**
+     * happy-dom ships a real MediaQueryList, but stubbing keeps these independent of its media engine.
+     *
+     * ⚠️ IT MUST KEY ON THE QUERY, AND THE FIRST VERSION OF THIS HELPER DID NOT. The sidebar registers
+     * TWO queries — the drawer's maximum and the rail's band — so a stub that ignores its argument hands
+     * both listeners the same slot and the second registration silently overwrites the first. Firing then
+     * drives the wrong one, and the case fails looking exactly like a component that forgot to emit.
+     *
+     * ⚠️ And the returned `fire` belongs to THIS stub. Calling `stubMatchMedia` again to fire a change
+     * installs a fresh closure the mounted component never registered on.
+     */
+    function stubMatchMedia(matching: string[]): { fire: (query: string, next: boolean) => void } {
+        const handlers = new Map<string, (e: MediaQueryListEvent) => void>();
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            configurable: true,
+            value: (query: string) => ({
+                matches: matching.includes(query),
+                addEventListener: (_: string, fn: (e: MediaQueryListEvent) => void) => {
+                    handlers.set(query, fn);
+                },
+                removeEventListener: () => handlers.delete(query),
+            }),
+        });
+        return {
+            fire: (query: string, next: boolean) =>
+                handlers.get(query)?.({ matches: next } as MediaQueryListEvent),
+        };
+    }
+
+    const MOBILE = '(max-width: 480px)';
+    const RAIL = '(min-width: 481px) and (max-width: 1024px)';
+
+    /**
+     * ⚠️ MOUNTED WRAPPERS ARE TRACKED AND UNMOUNTED BEFORE THE BODY IS CLEARED, AND THIS IS NOT HYGIENE.
+     * A case that fails mid-test never reaches its own `unmount()`, so a bare `innerHTML = ''` tears the
+     * teleport anchors out from under a component that is still mounted — and the NEXT case then dies in
+     * Vue's renderer with `Cannot read properties of null (reading 'insertBefore')`. That is one real
+     * failure wearing the costume of two, and the second one points at innocent code.
+     */
+    const mounted: VueWrapper[] = [];
+
+    function renderDrawer(open: boolean): VueWrapper {
+        mocks.pageProps.props = {
+            auth: { user: { name: 'Demo Owner' }, can: allAbilities() },
+            entitlements: { features: ALL_FEATURES },
+        };
+        const wrapper = mount(Sidebar, { props: { drawerOpen: open }, attachTo: document.body });
+        mounted.push(wrapper);
+        return wrapper;
+    }
+
+    /** A stand-in for the shell content the walk should mark. */
+    function background(): HTMLElement {
+        const el = document.createElement('main');
+        document.body.appendChild(el);
+        return el;
+    }
+
+    afterEach(() => {
+        while (mounted.length > 0) mounted.pop()?.unmount();
+        document.body.innerHTML = '';
+    });
+
+    it('takes NOTHING above the mobile breakpoint, however open the drawer is', async () => {
+        // ⭐ THE BUG THIS GATE EXISTS FOR. The seam is viewport-agnostic and `drawerOpen` is layout state
+        // that survives Inertia visits, so without the media gate a stale-open drawer would mark <main>
+        // inert at desktop — where there is no drawer and no scrim to explain why the page went dead.
+        stubMatchMedia([RAIL]);
+        const bg = background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        expect(bg.hasAttribute('inert')).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('marks the page inert at the mobile breakpoint and releases it on close', async () => {
+        stubMatchMedia([MOBILE]);
+        const bg = background();
+        const wrapper = renderDrawer(false);
+        await flushPromises();
+        expect(bg.hasAttribute('inert')).toBe(false);
+
+        await wrapper.setProps({ drawerOpen: true });
+        await flushPromises();
+        expect(bg.hasAttribute('inert')).toBe(true);
+
+        await wrapper.setProps({ drawerOpen: false });
+        await flushPromises();
+        expect(bg.hasAttribute('inert')).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('never marks its own scrim, which is what the filed blocker said it would', async () => {
+        // ⭐ THE ASSERTION THAT REFUTES THE BACKLOG ROW. It held that this stack could not be reused
+        // because the walk "would mark its own siblings within the shell". The scrim is a CHILD of the
+        // pushed root, so it is on the path and never visited — and if it were marked, the drawer's
+        // primary dismiss affordance would stop taking clicks.
+        stubMatchMedia([MOBILE]);
+        background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        const scrim = document.querySelector('.sidebar-scrim') as HTMLElement;
+        expect(scrim).not.toBeNull();
+        expect(scrim.hasAttribute('inert')).toBe(false);
+        expect(scrim.closest('[inert]')).toBeNull();
+
+        wrapper.unmount();
+    });
+
+    it('moves focus into the drawer on open', async () => {
+        // ⭐ Not a nicety: by this point the opener is inside the inert subtree, so leaving focus there
+        // makes the user agent drop it to <body> — from where the root-bound Escape handler can never
+        // fire. That is a keyboard trap, reached through the very change meant to prevent one.
+        stubMatchMedia([MOBILE]);
+        background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        expect(document.activeElement).toBe(document.querySelector('.sidebar__item'));
+    });
+
+    it('closes itself when the viewport grows past the breakpoint', async () => {
+        const media = stubMatchMedia([MOBILE]);
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        media.fire(MOBILE, false);
+        await flushPromises();
+
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('emits close on Escape while open, and stays silent while closed', async () => {
+        stubMatchMedia([MOBILE]);
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        await wrapper.get('#app-drawer').trigger('keydown', { key: 'Escape' });
+        expect(wrapper.emitted('close')).toHaveLength(1);
+
+        const closed = renderDrawer(false);
+        await closed.get('#app-drawer').trigger('keydown', { key: 'Escape' });
+        expect(closed.emitted('close')).toBeUndefined();
+    });
+
+    it('carries a labelled close control that survives its own inerting', async () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS, AND IT IS A REGRESSION THIS INCREMENT INTRODUCED. Taking the
+        // page marks the top nav inert and the hamburger with it — so the one control named "Close
+        // navigation" leaves the accessibility tree exactly when it is needed. The scrim is not a
+        // substitute: it is a bare div with no role, no accessible name and no tab stop, so screen-reader
+        // swipe navigation never lands on it and switch access cannot reach it at all. Without this
+        // button the only way out of an open drawer is to navigate somewhere else.
+        stubMatchMedia([MOBILE]);
+        background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        const close = wrapper.get('.sidebar__close');
+        expect(close.attributes('aria-label')).toBe('Close navigation');
+        expect(close.element.tagName).toBe('BUTTON');
+
+        // Inside the pushed root, so it is never marked by the walk that inerts the hamburger.
+        expect(close.element.closest('[inert]')).toBeNull();
+        expect(wrapper.get('#app-drawer').element.contains(close.element)).toBe(true);
+
+        await close.trigger('click');
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('releases the page if it unmounts while open', async () => {
+        // A drawer unmounted mid-navigation would otherwise strand the page it left behind.
+        stubMatchMedia([MOBILE]);
+        const bg = background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+        expect(bg.hasAttribute('inert')).toBe(true);
+
+        wrapper.unmount();
+        expect(bg.hasAttribute('inert')).toBe(false);
     });
 });

@@ -55,6 +55,36 @@ export { type BannerTone } from './components/Banner/Banner.vue';
 // and position is NOT the discriminator — `SsoStatusCard` already mounts a Banner inside a card, correctly.
 export { default as MdsAlert } from './components/Alert/Alert.vue';
 export { type AlertTone } from './components/Alert/Alert.vue';
+// The hover/focus label the collapsed sidebar rail has required since DSR §3.4 and §6 were written (J4b).
+// ⚠️ IT TELEPORTS, AND THAT IS CORRECTNESS RATHER THAN CONVENIENCE: its consumer sits inside a box with
+// `overflow-y: auto`, which per CSS Overflow 3 drags the other axis to `auto` too, so an in-flow bubble is
+// clipped AND adds a scrollbar the document-level e2e overflow check cannot see. The teleported root
+// therefore carries `data-mds-inert-exempt` — the second holder after MdsToastHost, and the reason §3.4.1's
+// "that exemption belongs to the toast host alone" was narrowed in this increment.
+// ⚠️ `aria-describedby` reaches the trigger through a SCOPED SLOT, never a wrapper attribute: the wrapper is
+// not focusable, so an attribute there is never announced. Bind `trigger` onto the real control.
+export { default as MdsTooltip } from './components/Tooltip/Tooltip.vue';
+export { type TooltipPlacement } from './components/Tooltip/position';
+// The anchored action menu (J4b), extracted from the account menu that had been carrying this behaviour
+// alone in the application tree. ⚠️ THE MOVE BOUGHT SCRUTINY RATHER THAN REUSE: an app-tree component gets
+// no story and therefore no accessibility scan, which is how a `role="menu"` holding non-menuitem children
+// survived every increment since it was written. A menu owns ONLY menuitems; a header is a sibling, wired
+// as the menu's description so entering it announces who is signed in.
+// ⚠️ Escape binds on the component's own ROOT, not on `document` — MdsModal listens on its panel, an
+// ancestor of any menu inside a dialog, so a document-level bubble listener is too late and closes the
+// dialog instead. MdsTooltip solves the same problem the opposite way, with a document CAPTURE listener,
+// because it never holds focus. Do not "align" the two.
+// ⚠️ It does NOT teleport and must not be mounted inside a scroll container — that needs MdsTooltip's
+// teleport-plus-exemption construction, not a change here.
+export { default as MdsMenu } from './components/Menu/Menu.vue';
+export type { MenuItem } from './components/Menu/Menu.vue';
+// The take-the-page sequence MdsModal has owned since I10a, extracted in J4b for surfaces that need the
+// same guarantee WITHOUT being dialogs — the sidebar's mobile drawer first, whose root wraps the primary
+// navigation landmark at all three breakpoints and must not acquire `role="dialog"` at one of them.
+// ⚠️ It is not a focus trap and does not need one: with the background inert there is nothing tabbable
+// left outside the root. What it does supply is focus MANAGEMENT, and skipping that is a keyboard trap —
+// once the stack is pushed, the opener is inert, so focus left on it is dropped to the body.
+export { useInertBackground, type InertBackgroundOptions } from './components/Modal/useInertBackground';
 export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';

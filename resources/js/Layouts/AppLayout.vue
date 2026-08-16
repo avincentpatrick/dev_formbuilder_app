@@ -76,21 +76,24 @@ function onScroll(event: Event): void {
     scrolled.value = (event.target as HTMLElement).scrollTop > 4;
 }
 
-function onKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && drawerOpen.value) {
-        drawerOpen.value = false;
-    }
-}
+// ⚠️ THE DRAWER IS CLOSED ON EVERY NAVIGATION, AND THE `close` EMIT IS NOT ENOUGH ON ITS OWN. This is a
+// PERSISTENT layout, so `drawerOpen` survives Inertia visits. Sidebar emits `close` when one of its own
+// links is clicked, but a command-palette jump, the compact search link, the account menu and the browser's
+// Back button all navigate without one — leaving the drawer open over the new page and, since J4b, leaving
+// that page's content inert behind a scrim nobody asked for.
+watch(() => page.url, () => {
+    drawerOpen.value = false;
+});
 </script>
 
 <template>
-    <div class="app-shell" @keydown="onKeydown">
+    <div class="app-shell">
         <!-- I11b — ABOVE the nav, not inside the content region. A support session is a property of the
              whole window, not of the page being viewed, and a fluid page (the builder) owns its own scroll
              and would carry the banner out of view on the one screen where forgetting matters most. Renders
              nothing at all when nobody is impersonating, which is every ordinary request. -->
         <ImpersonationBanner />
-        <TopNav :scrolled="scrolled" @toggle-drawer="drawerOpen = !drawerOpen" />
+        <TopNav :scrolled="scrolled" :drawer-open="drawerOpen" @toggle-drawer="drawerOpen = !drawerOpen" />
         <div class="app-shell__body">
             <Sidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />
             <!-- tabindex=0 so the scroll region is keyboard-operable when content overflows

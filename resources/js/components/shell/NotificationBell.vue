@@ -305,7 +305,7 @@ function onFollow(id: string): void {
     position: absolute;
     top: calc(100% + var(--mds-space-1));
     right: 0;
-    z-index: 30;
+    z-index: var(--mds-z-index-menu, 30);
     display: flex;
     flex-direction: column;
     /* 360px, not the placeholder's 300px: a row carries a chip, two lines of text, a timestamp and a

@@ -2953,3 +2953,59 @@ files were converted to section citations — three already stale before this in
 anti-pattern turned up **five times in this increment's own new prose**, caught only by re-reading the
 diff. The author of a rule is not exempt from it, and a document that cites by line number is a citation
 with an expiry date nobody can see.
+
+## 2026-08-16 — LANE A · J4b1 (PR #158): MdsTooltip, MdsMenu, sidebar grouping, and a drawer that takes the page
+
+J4b was split in two by user decision, by subsystem: J4b1 is design-system + shell and touches **zero PHP**;
+J4b2 (the breadcrumb closure) follows. Merged `6f8f94b`, 6/6 with every job's `conclusion` and `steps` parsed.
+Vitest **114 files / 1,964 tests** (+4 / +81, reconciling exactly as 26 Tooltip + 23 Menu + 9 useInertBackground
++ 4 TopNav + 16 Sidebar + 3 AppLayout).
+
+**The row was wrong in five places — eleven-for-eleven now.** The drawer *did* have an Escape handler (bound on
+a non-focusable div, so it only fired while focus was inside the shell); `markRaw` is *not* absent from the repo,
+only from `resources/`; `FormRowActions` is a weak `MdsMenu` consumer because **five** of its nine buttons are
+e2e-pinned, not one; `MdsTooltip` did have a consumer all along (the rail the DSR mandates twice); and the
+breadcrumb closure is blocked twice rather than being wiring.
+
+**The Storybook axe gate runs on this host.** It has been recorded as impossible for several increments; it needs
+the package's own dependency tree (`npm --prefix packages/design-system install`) plus its own browser, and must
+be invoked through the root script or from inside the package — from the repo root the framework preset fails to
+resolve, which is the symptom that got written down as "cannot run". A merge-blocking gate believed unrunnable is
+a gate nobody runs, and it failed J4b1's first CI run. What it caught: a Vue SFC parse error while the app build,
+`vue-tsc`, Vitest and a direct `parse()` all passed. Trigger is tag-shaped literals in `<script>` comments,
+**file-dependent rather than per-literal** — three failed, two passed, two injected elsewhere passed; controls run
+in both directions (original restored and re-failed; line endings ruled out). No clean per-token rule, so the
+answer is the standing one: **name the thing, never quote it** — fourth gate, first Vue one.
+
+**The accent bar was a live 1.4.11 failure, not hygiene.** Planned as a `-bg`→`-fg` token change on principle;
+measured in the running app at **2.54:1 dark / 4.38:1 light** against the 3:1 owed, now 6.15 / 6.51. `-bg` resolves
+to the same `rgb(14,111,232)` in both themes, so one fill carried both grounds. axe checks no indicator contrast.
+
+**The adversarial pass found three more after 6/6 — fifth increment running.** (1) The drawer had **no reachable
+way out**, a regression the increment introduced: taking the page inerts the top nav and the hamburger with it, and
+the shipped reasoning ("Escape and the scrim, exactly as MdsModal treats its opener") was a false comparison —
+`MdsModal` ships a labelled close button *inside* its panel. The scrim is a bare div with no role, name or tab stop.
+**A surface that takes the page owes a dismiss control that survives its own inerting** is now a DSR rule.
+(2) A disabled menu item with an `href` still navigated — `preventDefault` cannot win a race against a link
+component whose own handler Vue merges first. (3) `placeTooltip` never clamped its main axis, contradicting its own
+docstring. The clamp test then failed and **the test was wrong, not the code**.
+
+**Two more things the suite caught that no gate would have.** The tooltip never appeared at all — a zero-area rect
+read as "offscreen", so it showed, measured and hid in one frame; every case that *seeded* visibility passed, and
+seeding visibility is what the axe stories do. And a menu inside a dialog would have closed the **dialog**: Escape
+must bind on the menu's own root, because `MdsModal` listens on its panel — an ancestor — so a document-level
+bubble listener is last to see the key. Only an ancestor spy distinguishes the two implementations.
+
+**Vitest lied about its own file count**: a chunk printed "29 passed (29)" against 30 files on disk and exited 1,
+skipping `token-references.test.ts` — the one gate validating the new tokens. `clipped-node-containment.test.ts`
+separately fails as a **timeout** under load (107s vs 30s) and passes in 6.1s alone.
+
+**Four findings left unfixed, deliberately, and two are masked by the first**: ⌘K is a dead key while the drawer is
+open (the palette `preventDefault()`s before its guard, and the drawer joining a *dialog* count is the real leak;
+the fix is in unclaimed `resources/js/composables/`); a stacked modal over the drawer strands focus on `<body>`,
+unreachable only because the ⌘K defect blocks the sole global opener; `useInertBackground` never re-pushes on a
+root identity change; and the tooltip's capture-phase Escape is page-global.
+
+Also shipped: a `tokens/z-index.json` scale naming five rungs that were literals in four files, with a Vitest case
+holding the modal rung equal to the inert stack's own constant; and DSR §3.4.1 amended, because it said the inert
+exemption "belongs to the toast host alone" while §3.4a — in the same file — instructed J4b to take a second one.

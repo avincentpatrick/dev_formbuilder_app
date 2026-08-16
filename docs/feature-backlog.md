@@ -329,6 +329,33 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
   asserts the design system has **zero** instances and that the app-tree list is **exactly** these seven,
   so an eighth fails at the moment it is written. ⚠️ The list may only ever shrink — do not add to it.
 
+### Design system — the Storybook axe gate runs locally *(corrected in J4b)*
+
+**It was recorded for several increments as impossible to run on this host. It is not.** The job needs the
+package's own dependency tree, which nothing in the root install provides, plus its own browser:
+
+```
+npm --prefix packages/design-system install
+npx --prefix packages/design-system playwright install chromium
+npm run ds:storybook:build      # 268 modules, preview built in ~7s
+npx test-storybook --url ...    # 39 suites / 278 tests
+```
+
+⚠️ **It must be invoked through the root script or from inside the package.** Run from the repo root,
+`@storybook/vue3-vite` fails to resolve and the build dies loading a preset — which is the symptom that got
+written down as "cannot run here at all". The two are easy to confuse and the difference matters: this gate
+is **merge-blocking**, and a gate believed unrunnable is a gate nobody runs. J4b found that out by shipping
+a PR that failed on it.
+
+⚠️ **AND IT CATCHES THINGS NOTHING ELSE DOES.** The failure that exposed this was a Vue SFC parse error —
+*"Element is missing end tag"*, at a position past the end of the file — raised by `plugin-vue` under the
+Storybook build while **the application's own build, `vue-tsc` and Vitest all compiled the same component
+without complaint**, and a direct `compiler-sfc` `parse()` reported zero errors. The trigger was
+tag-shaped literals in `<script>` comments, and it is **file-dependent rather than per-literal**: three such
+tokens failed, the same file with two removed passed, and two injected into a different component passed.
+There is no clean per-token rule — which is why the answer is the standing one, *name the thing, never
+quote it*, now on its fourth gate.
+
 ### Design system — deferred from J4a, each with its preconditions stated
 
 - ~~**`MdsTooltip`**~~ — **CLOSED IN J4b. All three preconditions discharged; the as-built notes are DSR

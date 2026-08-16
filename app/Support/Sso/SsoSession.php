@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Support\Sso;
 
+use App\Http\Controllers\Auth\GoogleRedirectController;
 use App\Http\Controllers\Tenant\Sso\SsoAcsController;
 use App\Http\Middleware\RequireRecentPassword;
+use App\Models\SsoAuthRequest;
+use App\Services\Sso\SsoAuthRequestService;
 use Illuminate\Contracts\Session\Session;
 
 /**
- * How THIS session was established (Phase 4, P1c — ADR-0016 §D23).
+ * What this browser knows about its own SSO flows (Phase 4, P1c and P1e — ADR-0016 §D23, §D27).
  *
- * One key, written by {@see SsoAcsController}'s login arm and read by {@see RequireRecentPassword} to decide
- * which step-up to offer. It exists as a class rather than a string literal in two files because the two
- * files must agree, and because the reasoning below has to live somewhere.
+ * Two keys, written at two different moments by two different requests, and read by two more. It exists as a
+ * class rather than string literals scattered across five files because those files must agree, and because
+ * the reasoning below has to live somewhere.
+ *
+ *   · {@see AUTHENTICATED_AT} — how this session was established. Written once a sign-in completes.
+ *   · {@see PENDING_LOGIN_IDS} — which sign-ins this browser has STARTED but not finished (P1e).
  *
  * ── ⚠️ WHY THE SESSION, AND NOT A COLUMN ON `users` ─────────────────────────────────────────────────
  * The obvious alternative is to mark the ACCOUNT as SSO-backed — a `sso_provisioned_at`, or an inference
@@ -59,5 +65,111 @@ final class SsoSession
     public static function isSsoSession(Session $session): bool
     {
         return $session->has(self::AUTHENTICATED_AT);
+    }
+
+    /**
+     * The `request_id`s of the sign-ins THIS browser has started (P1e).
+     *
+     * ── ⚠️ WHY THE MINT WRITES ANYTHING AT ALL, WHEN IT USED TO WRITE NOTHING ───────────────────────
+     * `request_id` and `InResponseTo` prove that THIS SP MINTED THIS FLOW. They prove nothing about who is
+     * HOLDING it. So an attacker with an account at the tenant's own directory could start a flow, obtain a
+     * real signed assertion for it, withhold the identity provider's auto-POST form, and induce a victim's
+     * browser to submit it — and the victim would be signed in as the attacker. Reading provenance as origin
+     * is the same error this repository already records against ADR-0009 §D3.
+     *
+     * The ACS cannot close it: it is a cross-site POST, `SameSite=Lax` sends it no cookie, and since P1e it
+     * has no session at all. So the comparison happens one hop later, on the same-site GET the ACS hands
+     * back — and this is the value it compares against.
+     *
+     * ── ⚠️ THE FLOW'S OWN ID, NEVER MERELY "SOME VALUE" ─────────────────────────────────────────────
+     * {@see hasPendingLogin()} asks whether THIS request id is one this browser minted, not whether the
+     * browser has minted anything. The weaker check is defeated by luring the victim through
+     * `/sso/saml/login` first to populate their session, which is the refinement
+     * {@see GoogleRedirectController::FLOW_SID} was written to make on the sibling flow.
+     *
+     * ── A LIST, WHICH DIVERGES FROM `google.flow_sid`'s SINGLE VALUE ON PURPOSE ─────────────────────
+     * The step-up arm is concurrent for free — its binding is `sso_auth_requests.user_id`, so any number of
+     * step-ups can be in flight at once. A single-valued key here would make the LOGIN arm strictly less
+     * concurrent than the step-up arm: a second tab would silently kill the first, and the member would meet
+     * a bare 404 AFTER their identity provider had already said yes — the one failure §D19 guarantees is
+     * never explained to them.
+     *
+     * ⚠️ CAPPED, BECAUSE THE MINT IS UNAUTHENTICATED. `GET /sso/saml/login` writes one entry per hit and
+     * anyone holding the hostname can hit it, so an unbounded list is the same unbounded-growth-on-an-
+     * anonymous-write-path problem {@see SsoAuthRequestService::trim()} exists for, one layer up. **Stated
+     * cost:** start six sign-ins in one browser without finishing any and the first stops being completable.
+     */
+    public const PENDING_LOGIN_IDS = 'sso.pending_login_ids';
+
+    /**
+     * Five is far above what anyone opens by accident and far below anything that matters: each entry is the
+     * 33 characters {@see SsoAuthRequest::mintRequestId()} produces.
+     */
+    private const PENDING_LIMIT = 5;
+
+    /** Record that this browser started the flow named by `$requestId`. */
+    public static function rememberPendingLogin(Session $session, string $requestId): void
+    {
+        // Filtered before appending so a repeated id moves to the newest position rather than occupying two
+        // slots — a browser that retries the same flow must not evict four of its own.
+        $pending = array_values(array_filter(
+            self::pendingLogins($session),
+            static fn (string $pending): bool => $pending !== $requestId,
+        ));
+
+        $pending[] = $requestId;
+
+        $session->put(self::PENDING_LOGIN_IDS, array_slice($pending, -self::PENDING_LIMIT));
+    }
+
+    /**
+     * Whether this browser started the flow named by `$requestId`.
+     *
+     * A plain `in_array` with strict comparison: reaching this comparison at all requires already holding the
+     * session, so there is no oracle here to grind against.
+     */
+    public static function hasPendingLogin(Session $session, string $requestId): bool
+    {
+        return in_array($requestId, self::pendingLogins($session), true);
+    }
+
+    /**
+     * Drop a flow once it has been spent, so a session cannot carry a binding it has already used.
+     *
+     * ⚠️ Call it AFTER `Auth::login()`, for {@see markAuthenticated()}'s reason: the login migrates the
+     * session id, and Laravel carrying the data across is a convenience rather than a contract.
+     */
+    public static function forgetPendingLogin(Session $session, string $requestId): void
+    {
+        $remaining = array_values(array_filter(
+            self::pendingLogins($session),
+            static fn (string $pending): bool => $pending !== $requestId,
+        ));
+
+        if ($remaining === []) {
+            $session->forget(self::PENDING_LOGIN_IDS);
+
+            return;
+        }
+
+        $session->put(self::PENDING_LOGIN_IDS, $remaining);
+    }
+
+    /**
+     * ⚠️ Everything that is not a string is discarded rather than trusted. The session is `json`-serialised
+     * (`config/session.php`) and survives deploys, so a value written by an older shape of this class — or by
+     * anything else that ever claims this key — must not reach a comparison as an array or a null.
+     *
+     * @return list<string>
+     */
+    private static function pendingLogins(Session $session): array
+    {
+        $pending = $session->get(self::PENDING_LOGIN_IDS, []);
+
+        if (! is_array($pending)) {
+            return [];
+        }
+
+        return array_values(array_filter($pending, 'is_string'));
     }
 }

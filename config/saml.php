@@ -109,6 +109,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Login completion window (P1e)
+    |--------------------------------------------------------------------------
+    |
+    | The same bound, on the other arm: how long a validated LOGIN stays redeemable between the ACS marking
+    | `verified_at` and the browser arriving at the same-site hop that actually calls `Auth::loginUsingId()`.
+    | Same default, same reasoning — it covers one 302 being followed, not a human authenticating.
+    |
+    | ⚠️ ITS OWN KEY RATHER THAN A REUSE OF THE STEP-UP'S, AND THAT IS NOT BOOKKEEPING. A knob named for one
+    | arm silently governing the other is how an operator's change stops meaning what they read it to mean —
+    | the shared-bucket mistake the rate limiters above already refuse by name. Renaming the existing key to
+    | cover both would have been worse still: a config rename is a production behaviour change with NO error,
+    | reverting to the default on any box that sets the old variable, and this bound is a security window.
+    |
+    | It is a SECOND bound, never the only one: redemption also requires the row to be unredeemed, to carry
+    | the subject its assertion resolved to, and to be named by a flow the arriving browser actually started.
+    |
+    */
+    'login_completion_ttl_seconds' => (int) env('SAML_LOGIN_COMPLETION_TTL_SECONDS', 90),
+
+    /*
+    |--------------------------------------------------------------------------
     | Sign-in failure log (P1c) — the two bounds that make it safe to keep at all
     |--------------------------------------------------------------------------
     |

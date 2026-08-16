@@ -168,11 +168,13 @@ it('records the address once a verified signature has vouched for it', function 
 it('records nothing at all for a successful sign-in', function (): void {
     $request = startFailureLogin($this->tenant, $this->admin);
 
+    // The subject here is the RECORDER, not the session, so the assertion follows the hand-off only far
+    // enough to prove the trip succeeded (P1e moved the sign-in one request later).
     $this->post(FAILURE_LOG_ACS, [
         'SAMLResponse' => (new FakeIdp(FAILURE_LOG_ACS, FAILURE_LOG_SP, $request->request_id))
             ->as($this->admin->email)
             ->response(),
-    ])->assertRedirect('/dashboard');
+    ])->assertRedirect(FAILURE_LOG_HOST.'/sso/saml/login/complete/'.$request->request_id);
 
     expect(recordedFailures($this->tenant, $this->admin))->toHaveCount(0);
 });

@@ -419,6 +419,14 @@ class AppServiceProvider extends ServiceProvider
         // anyone holding a hostname, and builds a DOM document per request. Same key and same ceiling as
         // its siblings — deliberately not tighter, because an identity provider legitimately re-fetches SP
         // metadata on a schedule and a bound that breaks a refresh is an outage wearing a control's name.
+        // The login completion hop (P1e). A SEPARATE bucket for the reason its siblings state — one completed
+        // sign-in costs exactly one hit of each, so sharing would halve whichever ceiling an operator thought
+        // they were setting. ⚠️ IP+host rather than user-keyed, unlike `saml-step-up-complete` below: nobody
+        // is signed in on this route, which is the whole point of it. 60/min matches `google-auth-complete`,
+        // the endpoint of the same shape, and is generous against a browser that retries a redirect.
+        RateLimiter::for('saml-login-complete', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($samlKey('samllogindone', $request)));
+
         RateLimiter::for('saml-metadata', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($samlKey('samlmetadata', $request)));
 

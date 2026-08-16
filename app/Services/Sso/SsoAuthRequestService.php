@@ -189,4 +189,32 @@ final class SsoAuthRequestService
 
         return $affected === 1;
     }
+
+    /**
+     * The ACS's mark: a signed assertion answering this row validated, and here is who it named.
+     *
+     * ⚠️ ONE STATEMENT, AND IT CANNOT BE SPLIT. `sso_auth_requests_login_resolution_check` refuses a verified
+     * login row that carries no subject, so writing `verified_at` first and `resolved_user_id` afterwards is
+     * not merely racy — PostgreSQL rejects the first half outright. The constraint and this statement were
+     * designed together, which is the `google_auth_requests_identity_check` posture: a half-written row fails
+     * at the database rather than surfacing three layers away as a sign-in with nobody to sign in.
+     *
+     * A one-column-family UPDATE rather than a model save, for the reason {@see consume()} is one: neither
+     * column is `$fillable`, and the only evidence that a signed assertion was ever presented against this
+     * row must not be reachable by a `fill()` somewhere else.
+     *
+     * `$subject` is null on the step-up arm, where the subject was named at MINT and lives on `user_id` — the
+     * fact this method records there is only "an assertion answered it". On the login arm the subject could
+     * not have been known at mint, so it arrives here.
+     */
+    public function markVerified(SsoAuthRequest $request, ?User $subject = null, ?Carbon $now = null): void
+    {
+        $columns = ['verified_at' => $now ?? Carbon::now()];
+
+        if ($subject !== null) {
+            $columns['resolved_user_id'] = (string) $subject->getKey();
+        }
+
+        SsoAuthRequest::query()->whereKey($request->getKey())->update($columns);
+    }
 }

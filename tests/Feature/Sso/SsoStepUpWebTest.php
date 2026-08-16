@@ -143,11 +143,18 @@ function asSsoSession(User $user): void
 it('marks the session as identity-provider established when a login round trip completes', function (): void {
     $login = driveSsoRedirect($this->tenant, $this->admin, '/sso/saml/login')['request'];
 
-    $this->post(STEP_UP_ACS, [
+    // ⚠️ THE MARKER MOVED TO THE COMPLETION HOP IN P1e, ALONG WITH THE SIGN-IN ITSELF. The ACS creates no
+    // session on either arm now, so the identity-source marker cannot be written there — it is written where
+    // `Auth::loginUsingId()` runs, after the migration that call performs.
+    $handOff = $this->post(STEP_UP_ACS, [
         'SAMLResponse' => (new FakeIdp(STEP_UP_ACS, STEP_UP_SP, $login->request_id))
             ->as($this->admin->email)
             ->response(),
-    ])->assertRedirect('/dashboard');
+    ])->assertRedirect(STEP_UP_HOST.'/sso/saml/login/complete/'.$login->request_id);
+
+    $this->assertGuest();
+
+    $this->get((string) $handOff->headers->get('Location'))->assertRedirect('/dashboard');
 
     $this->assertAuthenticatedAs($this->admin);
     $this->assertTrue(session()->has(SsoSession::AUTHENTICATED_AT));
@@ -299,11 +306,16 @@ it('refuses to stamp the clock from a plain login round trip', function (): void
     // re-prompting — would otherwise silently clear the fifteen-minute gate.
     $login = driveSsoRedirect($this->tenant, $this->admin, '/sso/saml/login')['request'];
 
-    $this->post(STEP_UP_ACS, [
+    $handOff = $this->post(STEP_UP_ACS, [
         'SAMLResponse' => (new FakeIdp(STEP_UP_ACS, STEP_UP_SP, $login->request_id))
             ->as($this->admin->email)
             ->response(),
-    ])->assertRedirect('/dashboard');
+    ])->assertRedirect(STEP_UP_HOST.'/sso/saml/login/complete/'.$login->request_id);
+
+    // ⚠️ AND SINCE P1e THE CASE IS STRONGER RATHER THAN MERELY RE-POINTED: the login row is followed all the
+    // way to a real session first, so what is then refused at the STEP-UP hop is a fully completed login
+    // rather than a half-finished one. A login's id is not a step-up's, however far it got.
+    $this->get((string) $handOff->headers->get('Location'))->assertRedirect('/dashboard');
 
     $this->assertFalse(session()->has('auth.password_confirmed_at'));
 

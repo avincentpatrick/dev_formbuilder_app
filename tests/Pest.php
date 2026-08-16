@@ -21,6 +21,7 @@ use App\Models\FormVersion;
 use App\Models\Plan;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
+use App\Models\SsoAuthRequest;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Subscription;
@@ -53,6 +54,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
@@ -1113,4 +1115,28 @@ function idpMetadataXml(?string $certificate = null, string $entityId = 'https:/
       </IDPSSODescriptor>
     </EntityDescriptor>
     XML;
+}
+
+/**
+ * Drive a SAML login's LAST TWO legs: post the assertion, then follow the same-site hop the ACS hands back.
+ *
+ * ⚠️ TWO REQUESTS, BECAUSE SINCE P1e THE FLOW IS TWO REQUESTS. The ACS is a cross-site POST that
+ * `SameSite=Lax` gives no cookie, so it can neither read the browser that started the flow nor create a
+ * session anyone should trust; it marks the row and hands back. Absorbed here rather than written out at
+ * seventeen call sites, so the SHAPE of the round trip lives in one place and moves in one place.
+ *
+ * ⚠️ THE HAND-OFF LOCATION IS ASSERTED, NOT MERELY FOLLOWED, which is why this is a helper and never a
+ * `followRedirects()`. Every caller pins the ACS's `Location` for free, so a hop that started pointing
+ * somewhere else would redden all of them rather than none of them.
+ *
+ * ⚠️ AND IT IS NOT USED EVERYWHERE ON PURPOSE. The cases whose SUBJECT is the two-hop shape — the happy
+ * path, the browser binding, the 2FA hand-over — write both requests out longhand, because a flow whose only
+ * description is a helper is a flow nobody reads.
+ */
+function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string $host = 'http://acme.meridian.test'): TestResponse
+{
+    $handOff = test()->post($host.'/sso/saml/acs', ['SAMLResponse' => $samlResponse])
+        ->assertRedirect($host.'/sso/saml/login/complete/'.$request->request_id);
+
+    return test()->get((string) $handOff->headers->get('Location'));
 }

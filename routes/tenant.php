@@ -41,6 +41,7 @@ use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
 use App\Http\Controllers\Tenant\SearchController;
 use App\Http\Controllers\Tenant\Sso\SsoAcsController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginCompletionController;
 use App\Http\Controllers\Tenant\Sso\SsoLoginController;
 use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
 use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
@@ -1038,11 +1039,67 @@ Route::middleware([
     Route::get('/sso/saml/login', SsoLoginController::class)
         ->middleware('throttle:saml-login')->name('sso.login');
 
-    // ⚠️ CSRF-EXEMPT, by exact path in bootstrap/app.php. A cross-origin form POST from an identity
-    // provider carries no token, and with SameSite=Lax no session cookie arrives either — which is not a
-    // gap, because this request CREATES the session rather than acting on one. What replaces the token is
-    // the `InResponseTo` binding to a row this SP minted, plus the assertion's signature. Without the
-    // exemption the entire feature is a 419.
+    // P1e — the same-site hop that finishes a sign-in. It belongs in THIS group rather than the authenticated
+    // one for the reason the whole group exists: it is how a person becomes authenticated, so `auth` here
+    // would be circular. It needs `web` (unlike the ACS beside it) because reading the browser's session is
+    // its entire job, and it needs `AppSecurityHeaders` most of all — `frame-ancestors 'none'` on the request
+    // that mints a session is what stops the flow being driven inside an attacker's iframe.
+    //
+    // ⚠️ THE SEGMENT IS PINNED AT THE ROUTER AND THROTTLED, the posture P1d gave the step-up hop and J3c2 gave
+    // the Google handoff. A value that cannot be one `SsoAuthRequest::mintRequestId()` produced 404s before
+    // `redeem()` performs a lookup at all. Neither the pattern nor the limiter is the security boundary — the
+    // session must still be one that minted the row — what they remove is a free, unbounded guessing surface
+    // on an unauthenticated route.
+    Route::get('/sso/saml/login/complete/{requestId}', SsoLoginCompletionController::class)
+        ->where('requestId', '_[0-9a-f]{32}')
+        ->middleware('throttle:saml-login-complete')
+        ->name('sso.login.complete');
+});
+
+/*
+| The Assertion Consumer Service — the SAME pipeline as the group above, MINUS `web` (Phase 4, P1e).
+|
+| ⚠️ THIS SPLIT IS A BUG FIX, NOT A TIDY-UP, AND THE BUG WAS MEASURED RATHER THAN REASONED. Inside `web`,
+| `StartSession` runs on this request. The request carries no session cookie — `SameSite=Lax` withholds it
+| from a cross-site POST, which is the premise the whole SSO seam is built on — so `Store::setId(null)`
+| generates a FRESH id, and `StartSession::addCookieToResponse()` emits it UNCONDITIONALLY (its only guard
+| is `! is_null(session.driver)`). Measured against a running stack: `POST /sso/saml/acs` with no cookie
+| answers with `Set-Cookie: <app>-session=<a new, empty session>; path=/` and a regenerated `XSRF-TOKEN`.
+|
+| Host-only, same name, same path as the member's real cookie — so a browser REPLACES it. The identity
+| provider's POST is a top-level navigation, so the response is first-party to us and the cookie is stored.
+| The browser then follows our 302 to the completion hop carrying the ACS's empty session instead of the one
+| that started the flow.
+|
+| ⚠️ THAT MEANS P1c's STEP-UP HOP HAS NEVER WORKED IN A REAL BROWSER: the member arrives with no session,
+| `auth` bounces them to the sign-in page, their original session is gone, and the regenerated `XSRF-TOKEN`
+| would 419 their next write. And it would have made P1e's login hop 404 for everybody — an outage wearing
+| the exact same 404 that the security refusal wears, which is why no acceptance test could have told them
+| apart. No test in this repository can see it at all: the Pest client never feeds `Set-Cookie` into the
+| next request, and `Store::loadSession()` merges onto a memoised store, so attributes survive an id change
+| in-process. The harness models the session as a process global; a browser models it as a cookie.
+|
+| The fix is to stop starting a session here, which is what this endpoint's docblock has claimed since P1b:
+| "there is no session to require". Removing `web` also drops `VerifyCsrfToken` — so the exemption in
+| `bootstrap/app.php` is now belt AND braces rather than the only thing standing between this route and a
+| 419, and it stays exactly where it is for the day somebody moves this route back.
+|
+| ⚠️ WHAT IT COSTS, STATED RATHER THAN DISCOVERED: nothing in this pipeline may touch `$request->session()`.
+| `EstablishTenantDatabaseContext` reads `$request->user()`, which resolves through the container's session
+| store rather than the request's and answers null here exactly as it did before. If a future ACS arm needs
+| the session, it needs the completion hop instead — that is the whole shape of P1c and P1e.
+*/
+Route::middleware([
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    // ⚠️ CSRF-EXEMPT by exact path in bootstrap/app.php, and now also CSRF-UNREACHABLE: a cross-origin form
+    // POST from an identity provider carries no token, and with SameSite=Lax no session cookie arrives
+    // either. That is not a gap — what replaces the token is the `InResponseTo` binding to a row this SP
+    // minted, plus the assertion's signature. Since P1e it creates no session either: it marks the row and
+    // hands the browser back to a same-site hop on this workspace's own host.
     Route::post('/sso/saml/acs', SsoAcsController::class)
         ->middleware('throttle:saml-acs')->name('sso.acs');
 });

@@ -6,6 +6,7 @@ namespace App\Services\Sso;
 
 use App\Enums\SsoAuthIntent;
 use App\Models\SsoAuthRequest;
+use App\Services\Auth\GoogleAuthRequestService;
 use App\Models\SsoConnection;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -110,9 +111,9 @@ final class SsoAuthRequestService
      * ⚠️⚠️ THE LIVENESS PREDICATE IS THE OUTER `AND`, AND IT IS THE WHOLE DESIGN RATHER THAN A REFINEMENT.
      * A rank-only cap of this shape was ported onto a table of LIVE rows in J3c2 and produced unauthenticated
      * denial of *authentication* — anybody could push a member's pending row past the cap while they sat on
-     * a consent screen. Only a consumed or expired row is eligible here, so no in-flight sign-in is evictable
-     * by anyone at any volume. The stated consequence: this table is capped at N *dead* rows plus whatever
-     * the rate limiter admits inside one TTL, which is the honest division of labour.
+     * a consent screen. Only a SPENT row is eligible here, so no in-flight sign-in is evictable by anyone at
+     * any volume — see {@see whereSpent()}, which is where "spent" is defined and where P1e had to correct
+     * it, because a consumed row is in flight until its browser comes back.
      *
      * Deleting a spent row cannot re-enable a replay — {@see findLive()} requires the row to EXIST and be
      * unconsumed and unexpired, so an absent row is refused exactly as a consumed one is; what is lost is
@@ -127,27 +128,79 @@ final class SsoAuthRequestService
     {
         $cap = (int) config('saml.authn_request_max_rows');
         $cutoff = $now->copy()->subDays((int) config('saml.authn_request_retention_days'));
+        $deadline = $now->copy()->subSeconds(max(
+            (int) config('saml.step_up_completion_ttl_seconds'),
+            (int) config('saml.login_completion_ttl_seconds'),
+        ));
 
         SsoAuthRequest::query()
-            ->where(function (Builder $dead) use ($now): void {
-                $dead->whereNotNull('consumed_at')->orWhere('expires_at', '<=', $now);
-            })
-            ->where(function (Builder $beyond) use ($cutoff, $cap, $now): void {
+            ->where(fn (Builder $dead) => $this->whereSpent($dead, $now, $deadline))
+            ->where(function (Builder $beyond) use ($cutoff, $cap, $now, $deadline): void {
                 $beyond->where('issued_at', '<', $cutoff)
-                    ->orWhereNotIn('id', function (QueryBuilder $newest) use ($cap, $now): void {
+                    ->orWhereNotIn('id', function (QueryBuilder $newest) use ($cap, $now, $deadline): void {
                         $newest->select('id')
                             ->from('sso_auth_requests')
-                            // The cap counts DEAD rows only, so a burst of live ones cannot consume the
-                            // allowance and make the retained history shorter than it says it is.
-                            ->where(function (QueryBuilder $dead) use ($now): void {
-                                $dead->whereNotNull('consumed_at')->orWhere('expires_at', '<=', $now);
-                            })
+                            // The cap counts SPENT rows only, so a burst of live ones cannot consume the
+                            // allowance and make the retained history shorter than it says it is. ⚠️ It must
+                            // use the SAME predicate as the outer WHERE, or the cap counts one population
+                            // and the DELETE removes another.
+                            ->where(fn (QueryBuilder $dead) => $this->whereSpent($dead, $now, $deadline))
                             ->orderByDesc('issued_at')
                             ->orderByDesc('id')
                             ->limit($cap);
                     });
             })
             ->delete();
+    }
+
+    /**
+     * When a row has stopped being needed by anybody.
+     *
+     * ⚠️⚠️ "CONSUMED" STOPPED MEANING "FINISHED" IN P1e, AND THIS PREDICATE WAS ONE STATE BEHIND IT.
+     * It used to read `consumed_at IS NOT NULL OR expires_at <= now`. But the ACS consumes a row and then
+     * hands the browser back to a same-site hop — so between those two requests a row is CONSUMED AND STILL
+     * IN FLIGHT, and this predicate called it dead. P1d's own docblock promised "no in-flight sign-in is
+     * evictable by anyone at any volume", and that promise was false the moment P1c introduced the hop.
+     *
+     * It was reachable rather than theoretical. `issued_at` is the MINT, up to `authn_request_ttl_seconds`
+     * (600) before the consume, so a member who spends three minutes at their identity provider owns a row
+     * ranked three minutes down an `issued_at DESC` ordering at the instant it became eligible. Enough
+     * newer spent rows — and `GET /sso/saml/login` is unauthenticated at 60/min per address — and the next
+     * mint's trim deletes it. The victim is answered 404 after successfully authenticating, and the log says
+     * "unknown request", pointing an operator at replay rather than at eviction.
+     *
+     * That is the identical misdiagnosis {@see GoogleAuthRequestService::trim()} records for J3c2, and the
+     * corrected three-armed shape is that method's — ported FORWARD to the sibling table when it was written
+     * and never back to the table it came from. Under P1e the same eviction lands on the LOGIN path, where
+     * it stops being "a step-up must be retried" and becomes unauthenticated denial of authentication for a
+     * whole workspace, so it is fixed here rather than inherited.
+     *
+     * Read it as: redeemed; or never reached a signed assertion and its request window has closed; or
+     * reached one and its completion window has closed. **A row is no longer spent merely by being
+     * consumed** — that fact says an assertion answered it, not that nobody needs it any more, which is
+     * §D24's distinction applied to the housekeeping side.
+     *
+     * ⚠️ THE HONEST BOUND, STATED RATHER THAN DISCOVERED. Two costs. A consumed row whose fork then refused
+     * — a subject mismatch, a suspended member, an exhausted seat — now survives to its own `expires_at`
+     * instead of being immediately evictable, which is minutes against a seven-day retention window. And
+     * the table's ceiling gains a third term: N spent rows, plus whatever the limiter admits inside one
+     * request TTL, plus whatever the tenant's own identity provider signs inside one completion window.
+     * The third term is bounded by the trust anchor and is ninety seconds wide.
+     *
+     * `$deadline` is the LATER of the two completion windows on purpose: a trim that read one arm's knob
+     * would turn an operator raising the other's into exactly the eviction described above.
+     *
+     * @param  Builder<SsoAuthRequest>|QueryBuilder  $query
+     */
+    private function whereSpent(Builder|QueryBuilder $query, Carbon $now, Carbon $deadline): void
+    {
+        $query->whereNotNull('completed_at')
+            ->orWhere(function (Builder|QueryBuilder $unanswered) use ($now): void {
+                $unanswered->whereNull('verified_at')->where('expires_at', '<=', $now);
+            })
+            ->orWhere(function (Builder|QueryBuilder $abandoned) use ($deadline): void {
+                $abandoned->whereNotNull('verified_at')->where('verified_at', '<', $deadline);
+            });
     }
 
     /**

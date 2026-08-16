@@ -6,9 +6,9 @@ namespace App\Services\Sso;
 
 use App\Enums\SsoAuthIntent;
 use App\Models\SsoAuthRequest;
-use App\Services\Auth\GoogleAuthRequestService;
 use App\Models\SsoConnection;
 use App\Models\User;
+use App\Services\Auth\GoogleAuthRequestService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;

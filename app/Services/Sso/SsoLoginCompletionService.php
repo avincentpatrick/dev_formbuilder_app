@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Sso;
 
 use App\Enums\SsoAuthIntent;
-use App\Http\Controllers\Tenant\Sso\SsoLoginCompletionController;
 use App\Models\SsoAuthRequest;
 use Illuminate\Support\Carbon;
 

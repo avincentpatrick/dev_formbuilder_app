@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Support\Sso;
 
 use App\Http\Controllers\Auth\GoogleRedirectController;
-use App\Http\Controllers\Tenant\Sso\SsoAcsController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginCompletionController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginController;
 use App\Http\Middleware\RequireRecentPassword;
 use App\Models\SsoAuthRequest;
 use App\Services\Sso\SsoAuthRequestService;
@@ -18,8 +19,13 @@ use Illuminate\Contracts\Session\Session;
  * class rather than string literals scattered across five files because those files must agree, and because
  * the reasoning below has to live somewhere.
  *
- *   · {@see AUTHENTICATED_AT} — how this session was established. Written once a sign-in completes.
- *   · {@see PENDING_LOGIN_IDS} — which sign-ins this browser has STARTED but not finished (P1e).
+ *   · {@see AUTHENTICATED_AT} — how this session was established. Written by
+ *     {@see SsoLoginCompletionController} once a sign-in completes, read by {@see RequireRecentPassword} to
+ *     decide which step-up to offer. ⚠️ Its writer MOVED in P1e: until then the ACS wrote it, which it can
+ *     no longer do because it creates no session at all.
+ *   · {@see PENDING_LOGIN_IDS} — which sign-ins this browser has STARTED but not finished (P1e). Written by
+ *     {@see SsoLoginController} at the mint and read by {@see SsoLoginCompletionController} one hop after the
+ *     ACS, which is the only pair of requests that can see the same cookie.
  *
  * ── ⚠️ WHY THE SESSION, AND NOT A COLUMN ON `users` ─────────────────────────────────────────────────
  * The obvious alternative is to mark the ACCOUNT as SSO-backed — a `sso_provisioned_at`, or an inference

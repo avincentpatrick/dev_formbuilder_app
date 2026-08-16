@@ -540,6 +540,30 @@ describe('Sidebar — the drawer takes the page', () => {
         expect(closed.emitted('close')).toBeUndefined();
     });
 
+    it('carries a labelled close control that survives its own inerting', async () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS, AND IT IS A REGRESSION THIS INCREMENT INTRODUCED. Taking the
+        // page marks the top nav inert and the hamburger with it — so the one control named "Close
+        // navigation" leaves the accessibility tree exactly when it is needed. The scrim is not a
+        // substitute: it is a bare div with no role, no accessible name and no tab stop, so screen-reader
+        // swipe navigation never lands on it and switch access cannot reach it at all. Without this
+        // button the only way out of an open drawer is to navigate somewhere else.
+        stubMatchMedia([MOBILE]);
+        background();
+        const wrapper = renderDrawer(true);
+        await flushPromises();
+
+        const close = wrapper.get('.sidebar__close');
+        expect(close.attributes('aria-label')).toBe('Close navigation');
+        expect(close.element.tagName).toBe('BUTTON');
+
+        // Inside the pushed root, so it is never marked by the walk that inerts the hamburger.
+        expect(close.element.closest('[inert]')).toBeNull();
+        expect(wrapper.get('#app-drawer').element.contains(close.element)).toBe(true);
+
+        await close.trigger('click');
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
     it('releases the page if it unmounts while open', async () => {
         // A drawer unmounted mid-navigation would otherwise strand the page it left behind.
         stubMatchMedia([MOBILE]);

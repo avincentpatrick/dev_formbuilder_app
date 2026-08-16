@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\PlanTier;
+use App\Enums\SsoAuthIntent;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
@@ -11,6 +12,7 @@ use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -266,6 +268,66 @@ it('refuses a step-up’s request id at the login hop', function (): void {
 
     enterTenant($this->tenant->id, $this->admin->id);
     expect(SsoAuthRequest::query()->where('request_id', $requestId)->value('completed_at'))->toBeNull();
+});
+
+it('refuses a step-up’s request id at the login hop even after its assertion has been verified', function (): void {
+    // ⚠️ THE MUTATION PASS IS WHY THIS CASE EXISTS. Removing the intent guard reddened NOTHING, because the
+    // sibling case above uses a step-up row no assertion ever answered — which dies on the `verified_at`
+    // guard long before intent is consulted. A step-up that HAS been verified is the only state in which the
+    // intent check is the thing standing there, and without this case that check was asserted by nobody.
+    $this->actingAs($this->member);
+    $this->withSession([SsoSession::AUTHENTICATED_AT => time()]);
+
+    $stepUp = $this->get(COMPLETE_HOST.'/sso/saml/step-up')->assertRedirect();
+
+    $query = [];
+    parse_str((string) parse_url((string) $stepUp->headers->get('Location'), PHP_URL_QUERY), $query);
+    $document = new DOMDocument;
+    $document->loadXML(SsoAuthnRequestBuilder::decodeTransport((string) ($query['SAMLRequest'] ?? '')));
+    $requestId = (string) $document->documentElement?->getAttribute('ID');
+
+    // A real round trip, so the ACS stamps `verified_at` on a genuine step-up row.
+    $this->post(COMPLETE_ACS, [
+        'SAMLResponse' => (new FakeIdp(COMPLETE_ACS, COMPLETE_SP, $requestId))->as($this->member->email)->response(),
+    ])->assertRedirect(COMPLETE_HOST.'/sso/saml/step-up/complete/'.$requestId);
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoAuthRequest::query()->where('request_id', $requestId)->value('verified_at'))->not->toBeNull();
+
+    $this->get(COMPLETE_HOST.'/sso/saml/login/complete/'.$requestId)->assertNotFound();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoAuthRequest::query()->where('request_id', $requestId)->value('completed_at'))->toBeNull();
+});
+
+it('refuses at the database to put a resolved subject on a step-up row', function (): void {
+    // ⚠️ ONE ASSERTION AND NOTHING AFTER IT, DELIBERATELY. A raised PostgreSQL error aborts the transaction
+    // `RefreshDatabase` wraps this test in, so anything reading afterwards would be pinning the harness
+    // rather than the product — the reason P1d left a deadlock case untested.
+    $this->actingAs($this->member);
+    $this->withSession([SsoSession::AUTHENTICATED_AT => time()]);
+    $this->get(COMPLETE_HOST.'/sso/saml/step-up')->assertRedirect();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $stepUp = SsoAuthRequest::query()->where('intent', SsoAuthIntent::StepUp)->firstOrFail();
+
+    expect(fn () => SsoAuthRequest::query()->whereKey($stepUp->getKey())->update([
+        'verified_at' => now(),
+        'resolved_user_id' => (string) $this->member->getKey(),
+    ]))->toThrow(QueryException::class);
+});
+
+it('refuses at the database to verify a login row that names nobody', function (): void {
+    // ⚠️ THIS IS WHY THE APPLICATION'S OWN `verified_at` GUARD IS UNREACHABLE, AND THE MUTATION PASS SAID SO
+    // BEFORE THIS CASE EXISTED. Removing that guard — and even removing its UPDATE predicate too — reddened
+    // nothing, because `sso_auth_requests_login_resolution_check` makes "verified login row carrying no
+    // subject" a state the database will not hold. The guard is belt and braces over a constraint; this case
+    // pins the constraint, which is the half that is actually load-bearing.
+    $request = beginLogin($this->tenant, $this->admin);
+
+    expect(fn () => SsoAuthRequest::query()->whereKey($request->getKey())->update([
+        'verified_at' => now(),
+    ]))->toThrow(QueryException::class);
 });
 
 it('refuses a completion hop for a request id that was never minted', function (): void {

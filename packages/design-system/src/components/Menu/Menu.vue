@@ -11,7 +11,7 @@
  * scan, which is precisely how the defect below survived.
  *
  * ⚠️ A MENU OWNS ONLY MENUITEMS, AND THE VERSION THIS REPLACED DID NOT. The account menu put a bare
- * <div> of name and email INSIDE role="menu", whose children must all be menuitem/-radio/-checkbox or
+ * name/email block INSIDE role="menu", whose children must all be menuitem/-radio/-checkbox or
  * group. So the header was not merely misplaced: a screen reader in application mode walks menuitems and
  * never announces a stray div, which means "who am I signed in as" was unreachable to the readers most
  * likely to need it. Here the panel is a plain box, the header is its first child, and role="menu" is a
@@ -41,7 +41,7 @@ export interface MenuItem {
     id: string;
     label: string;
     icon?: IconName;
-    /** Present ⇒ rendered through `linkComponent`. Absent ⇒ a real <button>. */
+    /** Present ⇒ rendered through `linkComponent`. Absent ⇒ a real button element. */
     href?: string;
     /**
      * Renders `aria-disabled`, never the native attribute. A natively disabled control is not focusable
@@ -81,7 +81,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
-    /** The trigger's CONTENT. The <button> and all of its ARIA belong to this component. */
+    /** The trigger's CONTENT. The button element and all of its ARIA belong to this component. */
     trigger(): unknown;
     /** Non-menuitem content — a name/email header. Rendered OUTSIDE role="menu". */
     header?(): unknown;

@@ -42,7 +42,7 @@ const props = withDefaults(
         /** Preferred side. Flips to the opposite only when that side is genuinely better. */
         placement?: TooltipPlacement;
         /**
-         * Teleport the bubble to `<body>` (default). `false` renders it in place, which is the seam
+         * Teleport the bubble to the document body (default). `false` renders it in place, which is the seam
          * the axe stories need: the story runner scans the story root, and a teleported bubble is
          * outside it. Same seam and same reason as MdsModal and MdsToastHost.
          *
@@ -75,7 +75,8 @@ defineSlots<{
     /**
      * The trigger. Bind `trigger` onto the REAL focusable element:
      *
-     *     <template #default="{ trigger }"><button v-bind="trigger">…</button></template>
+     * Give the default slot a template with a `trigger` slot prop and spread it, with v-bind, onto
+     * the focusable control itself — the button or the link, never a wrapper around it.
      *
      * ⚠️ A SCOPED SLOT IS THE ONLY CONSTRUCTION THAT PUTS `aria-describedby` WHERE IT COUNTS. The
      * anchor wrapper is not focusable, so an attribute on it is never announced; Vue cannot add one

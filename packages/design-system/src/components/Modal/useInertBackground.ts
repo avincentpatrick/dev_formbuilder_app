@@ -53,6 +53,19 @@ export function useInertBackground(options: InertBackgroundOptions): void {
     let ownedRoot: HTMLElement | null = null;
     let opener: HTMLElement | null = null;
 
+    /**
+     * Whether this run has ALREADY tried to capture an opener — which is a different question from
+     * whether it HAS one, and conflating the two is a bug the adversarial pass found in J6's own new code.
+     *
+     * `opener === null` means both *"not captured yet"* and *"captured, and the answer was legitimately
+     * nothing"* — the second being what happens when the surface opens with nothing focused, now that the
+     * body element is refused. A hand-over then re-ran the capture and grabbed whatever was focused
+     * **inside the outgoing root**, so closing the surface would have returned focus to a detached element
+     * in a root that no longer exists. That is precisely the drift the single-capture rule exists to stop,
+     * reintroduced by the guard added beside it.
+     */
+    let openerCaptured = false;
+
     function take(): void {
         // ⚠️ `??=`, NOT `=` (J6). A root that changes identity mid-run takes the page again, and the element
         // the surface was OPENED from must survive that — overwriting it here would make return-focus land
@@ -68,7 +81,8 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         // of it (⌘K), and the drawer releasing underneath — a resize past 480px does exactly that — would
         // yank focus out of the open dialog. Null instead, so `release()`'s optional call simply does nothing
         // and whatever holds focus keeps it.
-        if (opener === null) {
+        if (!openerCaptured) {
+            openerCaptured = true;
             const active = document.activeElement as HTMLElement | null;
             opener = active === null || active === document.body ? null : active;
         }
@@ -143,6 +157,9 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         releasePageOnly();
         opener?.focus?.();
         opener = null;
+        // Reset here and NOT in `releasePageOnly()` — a hand-over must keep the run's original capture,
+        // which is the whole point of the flag.
+        openerCaptured = false;
     }
 
     /**

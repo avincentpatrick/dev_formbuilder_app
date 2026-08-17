@@ -310,6 +310,37 @@ describe('useInertBackground — a root that changes identity while active (J6)'
         wrapper.unmount();
     });
 
+    it('does not re-capture an opener on a hand-over just because the first capture found nothing', async () => {
+        // ⭐ THE TWO GUARDS J6 ADDED INTERACT, AND THE ADVERSARIAL PASS FOUND IT BY READING THEM TOGETHER.
+        // `opener === null` means BOTH "not captured yet" AND "captured, and the answer was legitimately
+        // nothing" — the second being exactly what happens now that the body element is refused. So a
+        // hand-over re-ran the capture and took whatever was focused INSIDE THE OUTGOING ROOT, and closing
+        // the surface would have returned focus to a detached element in a root that no longer exists.
+        // That is the drift the single-capture rule exists to stop, reintroduced by the guard beside it.
+        const { active, second, wrapper } = swappable();
+
+        // Nothing focused, so the capture legitimately yields nothing.
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        active.value = true;
+        await flushPromises();
+
+        // Focus is now inside root A, which the hand-over is about to remove.
+        const inA = document.querySelector('.surface-a .first');
+        expect(document.activeElement).toBe(inA);
+
+        second.value = true;
+        await flushPromises();
+
+        active.value = false;
+        await flushPromises();
+
+        // The detached element from root A must NOT have been adopted as the opener.
+        expect(document.activeElement).not.toBe(inA);
+        expect(inA?.isConnected).toBe(false);
+
+        wrapper.unmount();
+    });
+
     it('treats a root that goes null while held as a close, and returns focus', async () => {
         const opener = document.createElement('button');
         document.body.appendChild(opener);
@@ -384,6 +415,7 @@ describe('useInertBackground — the body element is never an opener (J6 adversa
         dialog.remove();
         wrapper.unmount();
     });
+
 });
 
 describe('useInertBackground — cleanup', () => {

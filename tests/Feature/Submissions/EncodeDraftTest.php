@@ -464,3 +464,35 @@ it('still submits when no baseline is claimed, so a direct POST or an old cached
     expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
         ->toBe(SubmissionStatus::Submitted);
 });
+
+it('submits when the encode tab carries the CURRENT baseline, so the token is compared and not merely present', function (): void {
+    // ⚠️ THE MIRROR OF THE GUEST CASE, ADDED FOR THE SAME REASON: a mutation nulling the token in the
+    // controller still refused the stale tab, because `claimsBaseline()` reads the real request value -- so
+    // the refusal fired for the wrong reason and nothing could tell. Only a submit that must SUCCEED on a
+    // MOVED baseline discriminates "compared" from "merely non-null".
+    $uuid = Uuid::uuid7()->toString();
+
+    $seed = $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
+        ->assertCreated();
+
+    // Move the baseline, exactly as this tab's own autosave would.
+    $moved = $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada L'], $uuid, baseline: $seed->json('data.content_checksum')))
+        ->assertSuccessful();
+    expect($moved->json('data.content_checksum'))->not->toBe($seed->json('data.content_checksum'));
+
+    $this->actingAs($this->owner)
+        ->post("http://acme.meridian.test/forms/{$this->form->id}/submissions", [
+            'answers' => ['full_name' => 'Ada Lovelace'],
+            'client_submission_uuid' => $uuid,
+            'base_content_checksum' => $moved->json('data.content_checksum'),
+        ])
+        ->assertSessionMissing('errors');
+
+    reenter();
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($row->status)->toBe(SubmissionStatus::Submitted)
+        ->and(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
+        ->toBe('Ada Lovelace');
+});

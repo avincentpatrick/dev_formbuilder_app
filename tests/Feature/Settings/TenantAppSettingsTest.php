@@ -61,7 +61,10 @@ it('renders the four App Settings panels with resolved values', function (): voi
         ->where('appSettings.access.signup_host', 'acme.meridian.test')
         ->where('appSettings.maintenance.enabled', false)
         ->where('appSettings.maintenance.message', null)
-        ->has('appSettings.modules', 11)
+        // 11 → 12 in K1a: `gamification` joins ToggleableModules::KEYS. The count is pinned deliberately
+        // (a module silently appearing or vanishing from this card is a capability nobody decided to
+        // offer), so moving it is part of adding a key — this assertion is what caught the addition.
+        ->has('appSettings.modules', 12)
         ->where('appSettings.modules.0.key', 'ocr_single')
         ->where('appSettings.modules.0.enabled', true)
         ->has('appSettings.about.version')

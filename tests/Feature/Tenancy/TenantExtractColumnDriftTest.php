@@ -60,6 +60,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'notifications' => 'created_at data emailed_at id read_at tenant_id type updated_at user_id',
     'permissions' => 'created_at guard_name id name tenant_id updated_at',
     'personal_access_tokens' => 'abilities created_at expires_at id last_used_at name tenant_id token tokenable_id tokenable_type updated_at',
+    'point_awards' => 'awarded_at created_at id points rule subject_id subject_type tenant_id updated_at user_id',
     'probes' => 'created_at id note tenant_id updated_at',
     'resource_grants' => 'capacity created_at granted_by id includes_descendants scopeable_id scopeable_type tenant_id updated_at user_id',
     'roles' => 'created_at guard_name id name tenant_id updated_at',

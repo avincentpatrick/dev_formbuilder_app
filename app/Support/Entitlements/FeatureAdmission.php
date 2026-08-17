@@ -33,8 +33,15 @@ use App\Services\Entitlements\EntitlementService;
  * stricter hands out dead ends. Both are defects, and only a mirror avoids both.
  *
  * ── WHY IT LIVES HERE RATHER THAN STAYING PRIVATE TO ITS FIRST CALLER ──────────────────────────────────
- * J4b2 wrote it as a private static on {@see \App\Support\Navigation\CrumbTrail}. J5 needs the identical
- * question for the dashboard's first-run template choice, whose destination carries `feature:form_templates`.
+ * J4b2 wrote it as a private static on the breadcrumb builder in the `Support\Navigation` namespace.
+ * J5 needs the identical question for the dashboard's first-run template choice, whose destination carries
+ * `feature:form_templates`.
+ *
+ * ⚠️ **THAT CLASS IS NAMED IN PROSE RATHER THAN WITH A DOC REFERENCE, AND PINT IS THE REASON.** A
+ * fully-qualified reference in this docblock made the `fully_qualified_strict_types` fixer add a real
+ * `use` for it — so a formatter coupled the extracted helper back to the one class it was extracted
+ * FROM, for the sake of a comment. Harmless at runtime and wrong in direction: this predicate must not
+ * know who calls it.
  * Copying four lines would have created a second definition of "does the route admit this?", and two such
  * definitions drift — which is the failure this codebase has already paid for with two ADRs numbered 0017
  * and a duplicate migration prefix. One authority, referenced rather than copied.

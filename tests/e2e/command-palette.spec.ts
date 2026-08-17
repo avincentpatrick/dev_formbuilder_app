@@ -3,10 +3,12 @@ import { assertClean, forceTheme } from './support/axe';
 
 // The ⌘K command palette (Increment J1d, DSR §3.4.1).
 //
-// ⚠️ THIS FILE IS THE PALETTE'S ONLY AUTOMATED ACCESSIBILITY GATE, and that is recorded in the DSR and in
-// exceptions-log #9 rather than left to be assumed. Storybook globs
+// ⚠️ AS OF J4c THIS IS NO LONGER THE PALETTE'S ONLY AUTOMATED ACCESSIBILITY GATE, AND THE CHANGE IS WORTH
+// KNOWING BEFORE TRUSTING EITHER. The combobox half moved into `MdsCombobox`, which has stories and is
+// therefore scanned; what remains in this file — the modal wrapper, the shell around it, and the real
+// browser — is still scanned only here. DSR §4.6.1 states the general rule (Storybook globs
 // `packages/design-system/src/**/*.stories.@(ts|tsx)` only, so an app-tree component gets no story and no
-// `checkA11y` scan — the `design-system-a11y` job passing says nothing whatsoever about this component.
+// `checkA11y` scan at all); it replaced an exceptions-log entry that was retired with the deviation.
 //
 // The ARIA details axe structurally cannot see — an `aria-activedescendant` pointing at an id that is not
 // in the DOM, an `aria-controls` left dangling while the listbox is unrendered — are asserted in

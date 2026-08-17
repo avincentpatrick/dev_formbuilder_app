@@ -309,15 +309,23 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
   </details>
 
-- **Seven components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
-  nothing themselves**, so that node's containing block is established outside the component and no scroll
-  container in between can clip it. This is the defect G11 fixed on `MdsDataTable`, JR5 fixed on
-  `MdsSegmentedControl`, and J3b fixed on `MdsSpinner` and `MdsTimeSeriesChart` — found the fourth time by
-  scanning for the shape rather than by tripping over it. The remaining seven are all in the app trees and
-  all sr-only live regions: `Pages/scopes/Index.vue`, `components/builder/BuilderCanvas.vue`,
-  `components/shell/CommandPalette.vue`, `components/shell/FeedbackButton.vue`,
+- **SIX components hide a node with `position: absolute` + `clip: rect(0 0 0 0)` while positioning
+  nothing themselves** (was seven — see below), so that node's containing block is established outside the
+  component and no scroll container in between can clip it. This is the defect G11 fixed on `MdsDataTable`,
+  JR5 fixed on `MdsSegmentedControl`, and J3b fixed on `MdsSpinner` and `MdsTimeSeriesChart` — found the
+  fourth time by scanning for the shape rather than by tripping over it. The remaining six are all in the
+  app trees and all sr-only live regions: `Pages/scopes/Index.vue`,
+  `components/builder/BuilderCanvas.vue`, `components/shell/FeedbackButton.vue`,
   `components/submissions/GeoInput.vue`, `public-runtime/components/RuntimeShell.vue`,
   `public-runtime/components/SyncStatus.vue`.
+
+  ✅ **`components/shell/CommandPalette.vue` LEFT THE LIST IN J4c, AND IT IS THE FIRST ENTRY EVER REMOVED.**
+  Not fixed in place: its two clipped nodes — the combobox's label and its polite live region — **moved into
+  `MdsCombobox`**, which positions its own root, so their containing block now resolves inside the component
+  that owns them. The app-tree file no longer matches the clip idiom at all. That is the shape the note
+  below asks for: **the defect left, rather than the list being edited to stop noticing it.** ⚠️ The design
+  system's own count stayed at **zero**, which is the assertion that would have caught the lazy version of
+  this move — clipping without positioning, one directory to the left.
 
   **Not fixed here because the fix is one line and the VERIFICATION is not**: `position: relative` also
   makes the container the containing block for any other absolutely positioned descendant and establishes

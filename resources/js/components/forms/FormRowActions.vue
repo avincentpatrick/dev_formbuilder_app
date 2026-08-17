@@ -13,10 +13,23 @@
  *   - `'Rename form'` opens the only call site of `PATCH /forms/{form}` in the entire client, and
  *     `'Set form scope'` is the only mount of `AssignScopeModal`. Neither may be folded away.
  *
- * ⚠️ AND WHY NINE BUTTONS STAY VISIBLE ON A ~260px CARD, WRAPPING TO TWO ROWS. The obvious tidy is an
- * overflow "…" menu, and it is not available: the design system has no `MdsMenu`/`MdsPopover` at all
- * (exceptions-log #9 lists them among the ~15 primitives J4 builds), so it would have to be hand-rolled
- * — a THIRD hand-rolled menu beside `AccountMenu` and `NotificationBell`, which DSR §1.3 names as the
+ * ⚠️ AND WHY NINE BUTTONS STAY VISIBLE ON A ~260px CARD, WRAPPING TO TWO ROWS.
+ *
+ * ⚠️ THE ORIGINAL REASON HAS EXPIRED AND THE SECOND ONE HAS NOT — corrected in J4c rather than left to
+ * mislead. This used to say the design system "has no `MdsMenu`/`MdsPopover` at all", citing an
+ * exceptions-log entry that supposedly listed them "among the ~15 primitives J4 builds". Both halves are
+ * now wrong: **`MdsMenu` shipped in J4b** (DSR §3.4b), the entry cited was about the command palette's
+ * combobox and was retired in J4c, and **`~15` is a number J4a established nobody had ever itemised.**
+ *
+ * **What still blocks the tidy is the OTHER blocker, and it is a decision about the end-to-end specs
+ * rather than a missing component.** Five of the nine buttons are pinned by them — `templates-axe.spec.ts`
+ * clicks *Save as template* unscoped, so it must be in the accessibility tree with no menu open, and
+ * `responsive-axe.spec.ts` navigates by *Response statistics* and *New submission* from four call sites.
+ * Folding those behind a trigger is a spec change as much as a UI change, on a suite that cannot run on the
+ * development host, and `tests/e2e/support/navigate.ts` records that one change to how this row navigates
+ * once cost **81 failures across four spec files**. So it is its own increment, with an e2e run as the
+ * point rather than the risk. Hand-rolling one here would still be wrong — a THIRD hand-rolled menu
+ * beside `AccountMenu` and `NotificationBell`, which DSR §1.3 names as the
  * signal that a shared component is missing rather than an invitation to write another one. It would
  * also take `Save as template` out of the accessibility tree until opened, which breaks the e2e spec
  * above. Wrapping is the honest cost of keeping every affordance reachable in one tab order.

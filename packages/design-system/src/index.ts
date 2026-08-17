@@ -8,7 +8,7 @@ export { default as MdsNumberInput } from './components/NumberInput/NumberInput.
 export { default as MdsPasswordInput } from './components/PasswordInput/PasswordInput.vue';
 // The live password-requirement checklist (J3b). In the PACKAGE for the same coverage reason as
 // FilterBar and TabNav below: Storybook globs `packages/design-system/src/**` only, so an app-tree
-// component gets no story and no `checkA11y` scan at all (exceptions-log #9). A component whose entire
+// component gets no story and no `checkA11y` scan at all (DSR §4.6.1). A component whose entire
 // job is announcing state changes to somebody who cannot see them is the last one that should sit
 // outside the accessibility gate. It renders the SERVER's list — see its docblock, and note that the
 // `uncompromised` row's null pattern is deliberate and must never be given one.
@@ -115,7 +115,7 @@ export { default as MdsDataTable } from './components/DataTable/DataTable.vue';
 export type { DataTableColumn } from './components/DataTable/DataTable.vue';
 // The shared list-page filter surface (J1e). In the PACKAGE rather than the app tree on purpose: Storybook
 // globs `packages/design-system/src/**` only, so an app-tree component gets no story and no `checkA11y`
-// scan at all (exceptions-log #9). FilterBar's whole reason for existing is a heading-order contract that
+// scan at all (DSR §4.6.1). FilterBar's whole reason for existing is a heading-order contract that
 // only fails in the empty state, which is exactly the kind of thing a scan should be catching for us.
 export { default as MdsFilterBar } from './components/FilterBar/FilterBar.vue';
 export { default as MdsSearchField } from './components/SearchField/SearchField.vue';
@@ -141,6 +141,20 @@ export type { TabNavItem } from './components/TabNav/TabNav.vue';
 // radiogroup.
 export { default as MdsTabs } from './components/Tabs/Tabs.vue';
 export type { TabItem } from './components/Tabs/Tabs.vue';
+// The ARIA-1.2 combobox §3.4.1 and §4.5 have specified since Phase 0 (J4c). Extracted from
+// `CommandPalette.vue`, which was the only implementation of this pattern in the product and was a LOGGED
+// deviation for exactly that reason — the log said to wait for this increment, and its retirement deletes
+// the entry rather than amending it.
+// ⚠️ `aria-controls` and `aria-activedescendant` are absent whenever their target is, never dangling: axe
+// resolves neither id, so no accessibility gate can see the lazy version.
+// ⚠️ IT DOES NOT BIND ESCAPE, and that is a decision. Its consumer sits inside MdsModal, whose Escape is
+// the dismissal; swallowing the first press would make closing the dialog take two. That makes it the third
+// member of a family that must NOT be aligned — MdsTooltip captures on `document` because it never holds
+// focus, MdsMenu binds its own root because it always does, and this binds neither.
+// ⚠️ The listbox is IN FLOW, not an anchored popup. An anchored variant needs MdsTooltip's
+// teleport-plus-exemption construction and is owed by its first consumer, in that consumer's own PR.
+export { default as MdsCombobox } from './components/Combobox/Combobox.vue';
+export type { ComboboxOption } from './components/Combobox/Combobox.vue';
 export { default as MdsBreadcrumb } from './components/Breadcrumb/Breadcrumb.vue';
 export type { BreadcrumbItem } from './components/Breadcrumb/Breadcrumb.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';

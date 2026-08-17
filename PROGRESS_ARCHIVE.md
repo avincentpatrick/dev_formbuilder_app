@@ -3188,3 +3188,59 @@ after which the container's own install dies on `EIO … unlink … esbuild.exe`
 stops serving and every subsequent screenshot is of nothing at all. `rm -rf` that directory (gitignored)
 and restart. Recorded in `docs/feature-backlog.md` beside the "the Storybook gate runs locally" note, which
 had the how and not this.
+
+---
+
+## 2026-08-17 — LANE A · J4c2: `MdsCombobox`, and retiring an exceptions-log entry four things depended on
+
+**`MdsCombobox` is built and adopted into `CommandPalette.vue`, which was the product's only ARIA 1.2
+combobox and a logged deviation for exactly that reason.** J4c is closed. Vitest **117 files / 2,012
+tests**, exit 0 on all three chunks; `openapi.json` byte-identical, regenerated and diffed; zero PHP.
+
+**The palette's own test file passes BYTE-UNEDITED — all ten cases — which is the evidence this is an
+extraction rather than a change** (the `Modal.test.ts` precedent from `useInertBackground`). Six of the ten
+pin the ARIA contract that moved.
+
+**The extraction moved the root element and silently broke the modal's initial focus.** `MdsTextInput`'s
+root IS the input under Vue's default `inheritAttrs`, so `data-mds-initial-focus` had been landing on
+something focusable; `MdsCombobox` has a real wrapper, so the same attribute moved onto a div — and
+`.focus()` on a non-focusable element is a silent no-op. DSR §4.5 names that outcome exactly: a keyboard
+trap reached through the very prop meant to prevent one. It degraded rather than broke (MdsModal verifies
+and falls back) but the fallback is the close affordance, not the search field. **The general rule: an
+attribute that worked because a component had no wrapper is a dependency on that component's SHAPE, and
+wrapping is not a refactor-safe operation for it.**
+
+**And the visual sweep caught one that every other gate was green over: the component shipped UNSTYLED.**
+The first draft rendered a bare input carrying the shared input class, assuming it is global. It is not —
+`.mds-input` is declared inside `TextInput.vue`'s SCOPED style block and exists nowhere else — so the box
+arrived with no border, radius, min-height or fill. Every ARIA assertion passed, happy-dom computes no
+layout, and axe has no rule for "unstyled". Fixed by rendering `MdsTextInput`, whose root is the input, so
+the explicit role and the four ARIA attributes still land on the real control. **Reviewing the frame rather
+than only measuring it is the only thing that could have found this.**
+
+⚠️ **The sweep lied twice before it told the truth.** It waited for the first option — which the SYNTHETIC
+see-all row satisfies instantly, before the 250ms debounce starts — so the first run measured an empty
+result set and would have read as a passing grouped path; wait for a GROUP, which only a real response can
+produce. And its `role="group"` query was page-wide and caught the forms filter bar's group, reporting it
+as a palette group. **A measurement that can pass without the code under test having run is not a
+measurement.**
+
+⚠️ **One Escape closes the palette — checked in three states, because the first reading said otherwise.** An
+instantaneous `isHidden()` immediately after the keypress returned false in light and true in dark; waiting
+for the state shows true for an empty query, a rendered listbox and a moved highlight. That property is the
+whole justification for `MdsCombobox` not binding Escape, so it was worth re-checking rather than
+explaining away.
+
+**Retiring exceptions-log #9 was not a one-line delete, and the ORDER mattered.** It was cited five times
+and four were not about comboboxes at all — it had become the canonical citation for the Storybook coverage
+gap. Deleting first would have dangled every one: the ADR-0017 shape one level down. So the fact got a
+durable home at **DSR §4.6.1**, four citations were re-pointed, and the fifth (`FormRowActions.vue`, stale
+twice over — it claimed the system had no menu primitive, which `MdsMenu` disproved in J4b, and repeated the
+`~15 primitives` figure J4a established nobody had itemised) was corrected outright. The entry is replaced
+by a **tombstone** rather than a gap, because the log's own preamble warns that a log which miscounts its
+own entries is the failure mode it exists to prevent. **#9 is never reused.**
+
+✅ **`KNOWN_UNGUARDED` shrank for the first time ever.** `CommandPalette.vue` is off it — not fixed in
+place, but because its two clipped nodes moved into `MdsCombobox`, which positions its own root. The
+backlog row goes seven → six and the design system's own count stayed at zero, which is the assertion that
+would have caught the lazy version of this move.

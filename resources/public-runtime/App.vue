@@ -64,6 +64,8 @@ const resumeSeed = shallowRef<{
     stepKey: string | null;
     completeness: number | null;
     note: string | null;
+    /** Increment P3a — the server draft's lost-update baseline (see loadResume for why it is the server's). */
+    contentChecksum: string | null;
 } | null>(null);
 const RESUME_UNAVAILABLE_MESSAGE =
     'This saved form is no longer available — it may have already been submitted, or the link may have expired.';
@@ -234,6 +236,11 @@ async function loadResume(resumeToken: string): Promise<void> {
         stepKey: reconciled.currentStepKey,
         completeness: server.completenessPercent,
         note: reconciled.note,
+        // Increment P3a — always the SERVER's checksum, never derived from `reconciled`. The baseline answers
+        // "what does the server currently hold", which is what the next save overwrites; which tier won the
+        // ANSWERS is a separate question. Taking it from the local tier when local wins would hand the server
+        // a base it never issued and turn every local-wins resume into a false conflict.
+        contentChecksum: server.contentChecksum,
     };
     phase.value = 'ready';
 }

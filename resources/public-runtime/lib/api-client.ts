@@ -200,6 +200,7 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                     resume_token: string;
                     resume_url: string;
                     expires_at: string;
+                    content_checksum: string | null;
                 };
             }>((token) =>
                 doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/draft`, {
@@ -209,6 +210,11 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         answers: payload.answers,
                         client_submission_uuid: payload.clientSubmissionUuid,
                         locale: payload.locale,
+                        // Increment P3a — sent even when null, unlike the conditionally-spread fields below.
+                        // A first save genuinely HAS no base, and null is the value that says so; omitting
+                        // the key entirely would look identical to a client that forgot, and the server
+                        // cannot tell those apart.
+                        base_content_checksum: payload.baseContentChecksum ?? null,
                         ...(payload.draftCurrentStep ? { draft_current_step: payload.draftCurrentStep } : {}),
                         ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
                         ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
@@ -224,6 +230,7 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                 resumeToken: data.resume_token,
                 resumeUrl: data.resume_url,
                 expiresAt: data.expires_at,
+                contentChecksum: data.content_checksum,
             };
         },
     };
@@ -261,6 +268,7 @@ export async function resumeDraft(
                 locale: string | null;
                 share_token: string;
                 share_token_expires_at: string;
+                content_checksum: string | null;
             };
         }
     ).data;
@@ -275,6 +283,7 @@ export async function resumeDraft(
         locale: data.locale,
         shareToken: data.share_token,
         shareTokenExpiresAt: data.share_token_expires_at,
+        contentChecksum: data.content_checksum,
     };
 }
 

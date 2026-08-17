@@ -371,6 +371,12 @@ export interface SaveDraftPayload {
      * documented.
      */
     draftCurrentStep?: string | null;
+    /**
+     * The lost-update baseline (Increment P3a): the `answers_content_checksum` this device last saw, from the
+     * resume response or its own previous save. Omitting it is NOT the unguarded path — the server checks
+     * unconditionally on this channel, so a save with no base is refused against any draft that has one.
+     */
+    baseContentChecksum?: string | null;
     /** When set, "Save and finish later" also emails the resume link to this address. */
     guestContactEmail?: string | null;
     deviceId?: string | null;
@@ -386,6 +392,13 @@ export interface SaveDraftResult {
     resumeToken: string;
     resumeUrl: string;
     expiresAt: string;
+    /**
+     * The `answers_content_checksum` the server just wrote (Increment P3a) — this device's baseline for its
+     * NEXT save. Chaining it forward is what distinguishes a same-device autosave (silent) from a second
+     * device saving over answers it never saw (409 `draft_conflict`). Null only for a draft whose stored
+     * checksum predates the column.
+     */
+    contentChecksum: string | null;
 }
 
 /** Response of `GET /api/v1/public/drafts/{resumeToken}` — the saved state to restore (server tier). */
@@ -403,4 +416,10 @@ export interface ResumeDraftResult {
     /** A fresh short-lived SHARE token for the pinned version — the resumed session drives the ordinary endpoints. */
     shareToken: string;
     shareTokenExpiresAt: string;
+    /**
+     * The resuming device's opening lost-update baseline (Increment P3a) — read from the SAME row version as
+     * `answers`, so it describes exactly the state being restored. This is the value that makes a resumed
+     * session a first-class writer rather than one that clobbers whatever arrived while it was away.
+     */
+    contentChecksum: string | null;
 }

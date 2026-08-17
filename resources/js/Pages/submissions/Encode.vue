@@ -104,6 +104,12 @@ const props = defineProps<{
         completeness_percent: number | null;
         last_saved_at: string | null;
         expires_at: string | null;
+        /**
+         * Increment P3a — the optimistic-concurrency token this page was rendered from, the same one
+         * `editing.baseline` has carried since I9c. It rides back on every autosave tick so the server can
+         * tell a stale tab from a fresh one; without it two tabs on one draft silently overwrite each other.
+         */
+        baseline: string | null;
     } | null;
     /**
      * The FINALIZED submission being corrected, or null (Increment I9c). Mutually exclusive with `draft` by
@@ -517,6 +523,9 @@ const autosave = createServerAutosave({
     clientSubmissionUuid: runtime.clientSubmissionUuid,
     answers: runtime.answers,
     currentStepKey: runtime.currentStepKey,
+    // Increment P3a — the baseline this page was rendered from; null on the blank keying form, which has read
+    // nothing and so claims nothing. The composable advances it from each save response thereafter.
+    baseContentChecksum: props.draft?.baseline ?? null,
     // Also gated on the schedule: `saveDraft()` runs `assertCanStart()` on the CREATE branch, so on a closed
     // form the first tick would 403 while later ones (once a draft exists) succeed — one red flash, then
     // silence. Erring one case strict (`capacity_reached` would actually allow a draft create) is the right

@@ -248,6 +248,12 @@ final class EncodeFormPresenter
                 'completeness_percent' => $draft->completeness_percent,
                 'last_saved_at' => $draft->last_saved_at?->toIso8601String(),
                 'expires_at' => $draft->draft_expires_at?->toIso8601String(),
+                // Increment P3a — the SAME optimistic-concurrency token `editing` carries below, now on the
+                // resume arm too. It was missing here for the whole of I9b/I9c, which is precisely why two
+                // tabs on one draft overwrote each other while two editors on one submission could not.
+                // Read off the already-loaded relation, exactly as `$answers` above is, so the two cannot
+                // disagree about which row version they describe.
+                'baseline' => data_get($draft, 'answers.answers_content_checksum'),
             ],
             // The submission being CORRECTED (I9c), or null in create/resume mode. Parallel in shape to
             // `draft` above and mutually exclusive with it by construction — the two can never both be

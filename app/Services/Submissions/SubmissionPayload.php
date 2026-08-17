@@ -43,5 +43,18 @@ final readonly class SubmissionPayload
         // Both are consumed only by the draft substrate; the finalize pipeline ignores them.
         public ?string $draftCurrentStep = null,
         public ?int $ttlDays = null,
+        // ── Increment P3a — the DRAFT channel's lost-update token (offline-first-sync-design.md §8) ────────
+        // `baseContentChecksum` is the `answers_content_checksum` the SAVING DEVICE last saw for this draft —
+        // from the resume response or its own previous save — i.e. the state its edit is based on. The guard
+        // fires only when the stored checksum has moved since, which means another device wrote in between.
+        //
+        // ⚠️ THE FLAG IS SEPARATE FROM THE VALUE, and that is deliberate rather than defensive: a legacy
+        // draft's stored checksum is legitimately NULL (the column is nullable, added in
+        // 2026_07_16_000001), so `$baseContentChecksum !== null` cannot mean "the client made a claim".
+        // Only a caller that actually has a page/session behind it sets `checkBaseline`. This mirrors
+        // {@see SubmissionAnswerEditService::edit()}, whose docblock records the same reasoning for the same
+        // column on the sibling channel.
+        public bool $checkBaseline = false,
+        public ?string $baseContentChecksum = null,
     ) {}
 }

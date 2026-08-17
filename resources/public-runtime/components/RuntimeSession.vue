@@ -56,6 +56,10 @@ const props = defineProps<{
         stepKey: string | null;
         completeness: number | null;
         note: string | null;
+        /** Increment P3a — the SERVER draft's lost-update baseline, which is deliberately not affected by
+         *  which tier reconcileDraft chose: it describes the state on the server that the next save will
+         *  write over, not the answers being shown. Same rule reconcile.ts already records for the uuid. */
+        contentChecksum: string | null;
     } | null;
     /** Increment H7 — the raw `location.search` to prefill `url`-sourced hidden fields from. App.vue reads
      *  the DOM once and threads it here so the store itself stays DOM-free. */
@@ -312,6 +316,11 @@ provide(SubmitFlowKey, flow);
 const draftSaving = ref(false);
 const draftCompleteness = ref<number | null>(props.resume?.completeness ?? null);
 
+// Increment P3a — this device's lost-update baseline, seeded from the resume read and advanced by every
+// successful save. A fresh (non-resumed) session starts null, which is the honest claim: it has read nothing,
+// so its first save creates the draft rather than overwriting one.
+const draftBaseline = ref<string | null>(props.resume?.contentChecksum ?? null);
+
 async function saveDraftAction(options: { email?: string | null; finishLater: boolean }): Promise<DraftSaveResult | null> {
     draftSaving.value = true;
     try {
@@ -324,8 +333,12 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
             deviceId,
             appVersion: APP_VERSION,
             finishLater: options.finishLater,
+            baseContentChecksum: draftBaseline.value,
         });
         draftCompleteness.value = result.completenessPercent;
+        // Advance the baseline to what the server just wrote, so the NEXT save from this device is based on
+        // it. Skipping this would make every save after the first look like a second device.
+        draftBaseline.value = result.contentChecksum;
         const email = (options.email ?? '').trim();
         return { resumeUrl: result.resumeUrl, emailed: options.finishLater && email !== '' };
     } catch (error) {

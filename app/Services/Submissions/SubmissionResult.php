@@ -20,5 +20,11 @@ final readonly class SubmissionResult
         public Submission $submission,
         public bool $created,
         public ?SemanticResult $semantic = null,
+        // Increment P3a — the `answers_content_checksum` this call actually wrote, handed straight back so a
+        // draft channel can return the saving device's NEXT lost-update baseline without re-reading the row
+        // it just wrote (draft autosave fires repeatedly while someone types, so the spared query is the
+        // point). Null on every path that does not write an answer document, and on the pipeline's
+        // idempotent no-op replay.
+        public ?string $contentChecksum = null,
     ) {}
 }

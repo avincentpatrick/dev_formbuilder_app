@@ -39,6 +39,35 @@ final class SubmissionConflictException extends RuntimeException
         );
     }
 
+    /**
+     * A DRAFT lost update (Increment P3a): the draft's stored answers moved between the saving device
+     * reading them and this save arriving — i.e. another device wrote to the same draft in between.
+     *
+     * ⚠️ THIS IS NOT THE SUSPENDED 409, AND THE DISTINCTION IS THE WHOLE POINT.
+     * {@see contentConflict()} compares the INCOMING answers against the stored ones and is correctly
+     * suspended for drafts — a draft's content changes on every autosave, so that comparison would refuse
+     * every keystroke. This compares the BASE the device edited from against the stored state, so it is
+     * silent for the ordinary same-device save (the base always matches) and fires only when a second
+     * device has written. The suspension is therefore narrowed, not reversed.
+     *
+     * Why it must refuse rather than merge: the draft write is a whole-document replace, so accepting a
+     * stale base silently reverts every answer the other device saved. Merging the two documents is
+     * CRDT-shaped work, deferred on the record in five documents
+     * (`docs/offline-first-sync-design.md` §9). Refusing costs one device a reload; accepting costs the
+     * other device its answers, with nothing anywhere saying so.
+     *
+     * The message names the action, because a respondent told only "conflict" will press Save again into
+     * the same refusal — the copy they are looking at is stale, so re-reading the draft is the only move
+     * that helps.
+     */
+    public static function draftConcurrentlyModified(): self
+    {
+        return new self(
+            'This draft was updated on another device. Reload it to pick up the newer answers before saving again.',
+            'draft_conflict',
+        );
+    }
+
     public static function draftAlreadyFinalized(): self
     {
         return new self(
@@ -47,7 +76,7 @@ final class SubmissionConflictException extends RuntimeException
         );
     }
 
-    /** The stable API envelope code (bootstrap/app.php maps both causes to 409 with this code). */
+    /** The stable API envelope code (bootstrap/app.php maps every cause to 409 with this code). */
     public function code(): string
     {
         return $this->apiCode;

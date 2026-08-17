@@ -66,8 +66,15 @@ final class SubmissionDraftService
 
     /**
      * Create or update a draft submission from a partial answer set. Runs Stage-1 + integrity (Stage-2a
-     * version guard); skips Stage-3 and the 409 content-conflict rule. Idempotent under one
+     * version guard); skips Stage-3 and the 409 CONTENT-conflict rule. Idempotent under one
      * `client_submission_uuid`: the first save creates a `status=draft` row, every later save overwrites it.
+     *
+     * ⚠️ "SKIPS THE 409" IS TRUE OF THE *CONTENT* RULE ONLY, SINCE INCREMENT P3a. A save that carries a
+     * baseline (`$payload->checkBaseline`) is additionally checked for a LOST UPDATE — the stored answers
+     * having moved since the saving device read them, which since H9b/H10 means a second device wrote to the
+     * same draft. That is a different comparison (base-vs-stored, not incoming-vs-stored) and so does not
+     * reinstate what this line says is suspended: a same-device autosave loop always matches its own base and
+     * never sees it. A save with no baseline behaves exactly as it did before P3a.
      */
     public function saveDraft(SubmissionPayload $payload): SubmissionResult
     {
@@ -85,8 +92,9 @@ final class SubmissionDraftService
         // key / type mismatch; a draft rejects MALFORMED input, not INCOMPLETE input). Stage 3 is NOT run.
         $normalized = $this->normalizer->normalize($fields, $sections, $payload->answers);
 
-        // The content checksum is recomputed + stored on every save, but the 409 conflict rule is SUSPENDED
-        // for a draft (it re-arms automatically on promotion — see promote()).
+        // The content checksum is recomputed + stored on every save, but the 409 CONTENT rule is SUSPENDED
+        // for a draft (it re-arms automatically on promotion — see promote()). The same value doubles as
+        // P3a's lost-update token on the way back out, which is why nothing here needed a new column.
         $checksum = AnswersContentChecksum::of($normalized);
         $completeness = DraftCompleteness::of($fields, $sections, $normalized);
 
@@ -95,7 +103,14 @@ final class SubmissionDraftService
             if ($existing !== null) {
                 // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
                 // so a respondent mid-fill is never stranded — no start guard on this branch.
-                return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+                //
+                // Increment P3a — the ONE site that carries the lost-update baseline, because it is the only
+                // one where the caller genuinely read this draft before writing to it.
+                return $this->updateDraft(
+                    $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
+                    checkBaseline: $payload->checkBaseline,
+                    baseline: $payload->baseContentChecksum,
+                );
             }
         }
 
@@ -202,12 +217,47 @@ final class SubmissionDraftService
      *
      * @param  array<string, mixed>  $normalized
      */
-    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness, ?string $currentStep = null): SubmissionResult
+    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness, ?string $currentStep = null, bool $checkBaseline = false, ?string $baseline = null): SubmissionResult
     {
-        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness, $currentStep): SubmissionResult {
+        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness, $currentStep, $checkBaseline, $baseline): SubmissionResult {
             $row = Submission::query()->whereKey($existing->id)->lockForUpdate()->first();
             if ($row === null || $row->status !== SubmissionStatus::Draft) {
                 throw SubmissionConflictException::draftAlreadyFinalized();
+            }
+
+            // ── ⚠️ THE LOST-UPDATE GUARD (Increment P3a) — WITHOUT IT TWO DEVICES SILENTLY OVERWRITE ────────
+            // The write below is a WHOLE-DOCUMENT replace, so a save based on a state another device has since
+            // moved past reverts every answer that device saved, with no error to either of them. This was
+            // reproduced before it was fixed: seed {age}, device A adds {country}, device B saves from the
+            // pre-A state, and `country` is simply gone with `created: false` and no exception.
+            //
+            // ⚠️ THIS ONLY BECAME REACHABLE WHEN H9b/H10 SHIPPED CROSS-DEVICE RESUME. `saveDraft()`'s written
+            // suspension of the content 409 was authored for the same-device draft, where the only writer is
+            // the one autosave loop, and is still correct for it — a NO-BASELINE save behaves exactly as
+            // before. The resume link (`GuestDraftResumeController`) carries the SAME
+            // `client_submission_uuid` to a second device, which is what created a second writer.
+            //
+            // ⚠️ THE TOKEN COMES FROM THE CLIENT, AND A SERVER-SIDE RE-READ CANNOT SUBSTITUTE — the sibling
+            // channel already learned this and wrote it down ({@see SubmissionAnswerEditService::edit()},
+            // which notes its first attempt compared two reads inside ONE request and was therefore always
+            // equal). The lost update spans two REQUESTS, so only the base the device actually holds can
+            // detect it.
+            //
+            // ⚠️ ONE CHECK, NOT THE SIBLING'S TWO, AND THE DIFFERENCE IS LOAD-BEARING RATHER THAN AN
+            // OMISSION. `SubmissionAnswerEditService` reads its `$stored` BEFORE opening the transaction, so
+            // it needs a second check under the lock. Here the row lock is already held (line above) and the
+            // read below happens after it: under READ COMMITTED a query issued after the lock is granted sees
+            // the winner's committed write, so this single check is itself the authoritative one. Adding a
+            // second would be dead code, and a redundant partner is exactly what P1e's mutation pass found
+            // masking real gaps.
+            if ($checkBaseline) {
+                $storedChecksum = SubmissionAnswer::query()
+                    ->where('submission_id', $row->id)
+                    ->value('answers_content_checksum');
+
+                if ($storedChecksum !== $baseline) {
+                    throw SubmissionConflictException::draftConcurrentlyModified();
+                }
             }
 
             // The draft's answer document holds the NORMALIZED (un-pruned) answers; attachment_refs is left at
@@ -252,7 +302,7 @@ final class SubmissionDraftService
                 'draft_current_step' => $currentStep ?? $row->draft_current_step,
             ])->save();
 
-            return new SubmissionResult($row, created: false);
+            return new SubmissionResult($row, created: false, contentChecksum: $checksum);
         });
     }
 
@@ -313,7 +363,7 @@ final class SubmissionDraftService
                         'last_saved_at' => now(),
                     ]);
 
-                    return new SubmissionResult($submission, created: true);
+                    return new SubmissionResult($submission, created: true, contentChecksum: $checksum);
                 });
             } catch (QueryException $e) {
                 if ((string) $e->getCode() !== '23505') {
@@ -322,6 +372,14 @@ final class SubmissionDraftService
 
                 // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
                 // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
+                //
+                // ⚠️ P3a DELIBERATELY DOES NOT CARRY THE BASELINE THROUGH THIS FOLD, and the reason is
+                // retry idempotency rather than tidiness. A device reaching createDraft() is claiming
+                // "nothing exists here", so its baseline is null by construction — and the winner of the race
+                // has just written a non-null checksum. Checking would therefore 409 EVERY lost insert race,
+                // including the commonest one by far: a plain network retry of a device's own first save,
+                // where both requests carry identical content and nothing was lost at all. The documented
+                // last-writer-wins recovery is left exactly as it was.
                 if ($payload->clientSubmissionUuid !== null) {
                     $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
                     if ($existing !== null) {

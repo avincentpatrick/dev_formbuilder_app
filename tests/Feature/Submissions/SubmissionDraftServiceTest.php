@@ -386,3 +386,124 @@ it('re-points a media attachment from its form_field to the submission only on p
         ->and($attachment->attachable_id)->toBe($draft->id)
         ->and(SubmissionAnswer::query()->findOrFail($draft->id)->attachment_refs)->toBe([$attachment->id]);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment P3a — the DRAFT channel's lost-update guard. H9b/H10 shipped cross-device resume (the emailed
+| link carries the SAME client_submission_uuid to a second device), which gave one draft two writers for the
+| first time. The write is a whole-document replace, so a save based on a state the other device has already
+| moved past silently reverts its answers. The guard compares the BASE the saver read against what is stored
+| — not the incoming answers against what is stored, which is the comparison saveDraft() correctly suspends.
+|--------------------------------------------------------------------------
+*/
+
+/** A draft payload builder scoped to one uuid, so a test reads as a sequence of device saves. */
+function p3aPayload(FormVersion $version, string $uuid): Closure
+{
+    return fn (array $answers, bool $check = false, ?string $base = null): SubmissionPayload => new SubmissionPayload(
+        version: $version,
+        answers: $answers,
+        source: SubmissionSource::Guest,
+        clientSubmissionUuid: $uuid,
+        checkBaseline: $check,
+        baseContentChecksum: $base,
+    );
+}
+
+it('HEADLINE: refuses a second device saving from a base the first device has already replaced', function (): void {
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    // Both devices resumed this draft while it held {age: 30} — that checksum is their shared base.
+    $seed = $this->drafts->saveDraft($payload(['age' => '30']));
+    $id = $seed->submission->id;
+    $sharedBase = $seed->contentChecksum;
+    expect($sharedBase)->toBe(storedChecksum($id));
+
+    // Device A saves first and moves the stored checksum on.
+    $a = $this->drafts->saveDraft($payload(['age' => '30', 'country' => 'CA'], true, $sharedBase));
+    expect($a->contentChecksum)->not->toBe($sharedBase);
+
+    // Device B saves from the now-stale shared base. Before P3a this silently destroyed A's `country`.
+    expect(fn () => $this->drafts->saveDraft($payload(['age' => '30', 'state' => 'Alberta'], true, $sharedBase)))
+        ->toThrow(SubmissionConflictException::class);
+
+    // A's work survives intact and B wrote nothing at all.
+    $stored = SubmissionAnswer::query()->where('submission_id', $id)->value('answers');
+    expect(data_get($stored, 'country'))->toBe('CA')
+        ->and(data_get($stored, 'state'))->toBeNull()
+        ->and(storedChecksum($id))->toBe($a->contentChecksum)
+        ->and(Submission::query()->count())->toBe(1);
+});
+
+it('carries the distinct draft_conflict code, not the content or finalized one', function (): void {
+    expect(SubmissionConflictException::draftConcurrentlyModified()->code())->toBe('draft_conflict')
+        ->and(SubmissionConflictException::contentConflict()->code())->toBe('submission_conflict')
+        ->and(SubmissionConflictException::draftAlreadyFinalized()->code())->toBe('draft_already_finalized')
+        // The message must name the action; "conflict" alone leaves a respondent pressing Save into the
+        // same refusal forever, because the copy they hold is the stale thing.
+        ->and(SubmissionConflictException::draftConcurrentlyModified()->getMessage())->toContain('Reload');
+});
+
+it('never fires for a same-device autosave chain that carries its own base forward', function (): void {
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    // The ordinary case this guard must stay silent for: one device, many ticks, each based on the last.
+    $r = $this->drafts->saveDraft($payload(['age' => '30']));
+    foreach ([['age' => '31'], ['age' => '31', 'country' => 'CA'], ['applicant' => 'Ada', 'age' => '31']] as $next) {
+        $r = $this->drafts->saveDraft($payload($next, true, $r->contentChecksum));
+    }
+
+    expect($r->created)->toBeFalse()
+        ->and(Submission::query()->count())->toBe(1)
+        ->and(data_get(SubmissionAnswer::query()->where('submission_id', $r->submission->id)->value('answers'), 'applicant'))
+        ->toBe('Ada');
+});
+
+it('leaves a caller that makes no baseline claim behaving exactly as it did before P3a', function (): void {
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    // checkBaseline:false is the server-side caller with no page behind it. The suspension is untouched:
+    // materially different content under one uuid still overwrites in place rather than conflicting.
+    $first = $this->drafts->saveDraft($payload(['age' => '30']));
+    $second = $this->drafts->saveDraft($payload(['age' => '31', 'country' => 'CA']));
+
+    expect($second->created)->toBeFalse()
+        ->and($second->submission->id)->toBe($first->submission->id)
+        ->and(data_get(SubmissionAnswer::query()->where('submission_id', $first->submission->id)->value('answers'), 'country'))
+        ->toBe('CA');
+});
+
+it('admits a legacy draft whose stored checksum is null against a null base', function (): void {
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['age' => '30']));
+    // A draft written before 2026_07_16_000001 added the column: the value is legitimately absent.
+    SubmissionAnswer::query()->where('submission_id', $seed->submission->id)
+        ->update(['answers_content_checksum' => null]);
+
+    // null base === null stored, so the guard admits it rather than stranding a pre-existing draft.
+    $again = $this->drafts->saveDraft($payload(['age' => '31'], true, null));
+    expect($again->created)->toBeFalse()
+        ->and(storedChecksum($again->submission->id))->not->toBeNull();
+});
+
+it('refuses a stale client that omits the baseline once a checksum is stored', function (): void {
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $this->drafts->saveDraft($payload(['age' => '30']));
+
+    // The fail-CLOSED direction, asserted on purpose: a client that stopped sending the token is refused
+    // rather than silently degraded back to the lost update the guard exists to stop.
+    expect(fn () => $this->drafts->saveDraft($payload(['age' => '31'], true, null)))
+        ->toThrow(SubmissionConflictException::class);
+});

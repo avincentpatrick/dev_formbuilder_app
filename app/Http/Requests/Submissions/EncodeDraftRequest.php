@@ -41,6 +41,9 @@ final class EncodeDraftRequest extends FormRequest
             // single-page forms. Loosely bounded, mirroring the guest rule: an unknown key just resumes at
             // the first step client-side rather than erroring.
             'draft_current_step' => ['nullable', 'string', 'max:255'],
+            // Increment P3a — the lost-update token, mirroring the guest rule exactly. Nullable for a first
+            // save and for a draft written before the checksum column existed; 64 hex chars otherwise.
+            'base_content_checksum' => ['nullable', 'string', 'size:64'],
         ];
     }
 
@@ -64,5 +67,18 @@ final class EncodeDraftRequest extends FormRequest
         $step = $this->input('draft_current_step');
 
         return is_string($step) && $step !== '' ? $step : null;
+    }
+
+    /**
+     * The lost-update baseline (Increment P3a) — the twin of
+     * {@see \App\Http\Requests\Public\GuestDraftRequest::baseContentChecksum()}, including its posture: the
+     * controller sets `checkBaseline: true` unconditionally, so omitting the field is refused rather than
+     * silently unguarded.
+     */
+    public function baseContentChecksum(): ?string
+    {
+        $value = $this->input('base_content_checksum');
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

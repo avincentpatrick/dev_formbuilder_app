@@ -8,7 +8,6 @@ use App\Enums\PointRule;
 use App\Services\Entitlements\EntitlementService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /**
  * Replays a workspace's real history into the award ledger (ADR-0020 §D5/§D10) — Increment K1c.
@@ -88,8 +87,7 @@ final class GamificationBackfill
         FROM audits a
         LEFT JOIN submissions s ON a.auditable_type = 'submission' AND s.id = a.auditable_id
         WHERE a.tenant_id = ?
-          AND a.auditable_type = ANY(?)
-          AND a.event = ANY(?)
+          AND (a.auditable_type, a.event) IN (%s)
           AND a.id > ?::uuid
         ORDER BY a.id
         LIMIT ?
@@ -189,13 +187,24 @@ final class GamificationBackfill
      */
     public function replayAudits(string $tenantId, ?string $afterAuditId, int $limit = self::CHUNK): BackfillChunk
     {
-        $rows = DB::select(self::AUDITS_SQL, [
-            $tenantId,
-            self::pgArray(AuditReplayMap::SCORED_TYPES),
-            self::pgArray(AuditReplayMap::SCORED_EVENTS),
-            $afterAuditId ?? self::CURSOR_START,
-            $limit,
-        ]);
+        $pairs = AuditReplayMap::SCORED_PAIRS;
+
+        // A row-constructor IN list, one placeholder pair per scored tuple — so the tuples are BOUND rather
+        // than interpolated and the SQL text is still a single assertable constant. `(a, b) IN ((?,?),…)`
+        // is exact where `a = ANY(…) AND b = ANY(…)` would admit the cross product; see SCORED_PAIRS.
+        $sql = sprintf(self::AUDITS_SQL, implode(', ', array_fill(0, count($pairs), '(?, ?)')));
+
+        $bindings = [$tenantId];
+
+        foreach ($pairs as [$type, $event]) {
+            $bindings[] = $type;
+            $bindings[] = $event;
+        }
+
+        $bindings[] = $afterAuditId ?? self::CURSOR_START;
+        $bindings[] = $limit;
+
+        $rows = DB::select($sql, $bindings);
 
         $tally = new BackfillTally;
         $lastId = null;
@@ -299,25 +308,6 @@ final class GamificationBackfill
         $created = $this->points->award($rule, $userId, $subjectType, $subjectId, $at, announceBadges: false);
 
         return new BackfillTally(scanned: 1, created: $created ? 1 : 0, existing: $created ? 0 : 1);
-    }
-
-    /**
-     * `{a,b}` — a Postgres array literal for an `= ANY(?)` bind.
-     *
-     * The members are class constants of this codebase's own making, so there is nothing to escape; the
-     * guard is here anyway because a literal built by concatenation is exactly where that stops being true.
-     *
-     * @param  list<string>  $values
-     */
-    private static function pgArray(array $values): string
-    {
-        foreach ($values as $value) {
-            if (preg_match('/^[a-z_]+$/', $value) !== 1) {
-                throw new RuntimeException("K1c backfill: refusing to bind a non-identifier array member: {$value}.");
-            }
-        }
-
-        return '{'.implode(',', $values).'}';
     }
 
     /**

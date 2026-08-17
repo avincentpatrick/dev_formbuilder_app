@@ -35,6 +35,15 @@ use Illuminate\Support\Facades\Log;
  * ⚠️ Under `QUEUE_CONNECTION=sync` — which is every test — there is no such deferral and the chain runs
  * inline and recursively, one nested savepoint per chunk. That is why the chunk size is a parameter.
  *
+ * ⚠️ **AND THE DEPENDENCE ON THAT SETTING IS NAMED RATHER THAN ASSUMED.** On a connection whose
+ * `after_commit` is false — `redis`, `sqs`, `beanstalkd` all are — the follow-on job is pushed immediately,
+ * so a chunk that then rolled back would leave the chain to resume PAST work that never committed. The
+ * `database` connection's own config comment pins `after_commit => true` as a correctness invariant and
+ * deliberately makes it non-env-overridable, and ADR-0007 names that connection as the substrate. The
+ * residual risk is bounded rather than merely unlikely: **every write here is `ON CONFLICT DO NOTHING`
+ * against an append-only ledger, so re-running the command repairs a skipped chunk**, and each chunk logs
+ * its own `next_cursor` so the chain is legible after the fact.
+ *
  * ⚠️ **THE MEMBERSHIP RULES RUN ON THE FIRST CHUNK ONLY**, keyed on the cursor being absent. They come from
  * `tenant_users` rather than from `audits` (ADR-0020 §D10 — `invite()` writes no audit row at all and
  * `accept()` writes neither a row nor an event), so they are bounded by the member count and need no

@@ -175,24 +175,31 @@ it('ignores the membership row, because the membership rules do not come from au
         ->toBeNull();
 });
 
-it('narrows its query on exactly the tuples it can score', function (): void {
-    // The enumerator's WHERE clause is built from these constants, so a type that maps to a rule but is
-    // missing here would never be FETCHED — a whole rule silently absent from every backfill, with every
-    // unit test above still green.
-    $scored = [
+it('narrows its query on exactly the tuples it can score, and on no others', function (): void {
+    // The enumerator's WHERE clause is built from this constant, so BOTH directions matter. A tuple that
+    // maps to a rule but is missing here is never FETCHED — a whole rule silently absent from every
+    // backfill, with every unit test above still green. And a tuple that is listed but scores nothing is
+    // fetched, mapped to null, and counted as `unmapped` — the bucket the operator report describes as
+    // "audits has grown a writer nobody told this map about", which would then be noise.
+    expect(AuditReplayMap::SCORED_PAIRS)->toBe([
         ['form', 'created'],
         ['form_version', 'published'],
         ['submission', 'created'],
         ['submission', 'updated'],
-    ];
+    ]);
 
-    foreach ($scored as [$type, $event]) {
-        expect(AuditReplayMap::SCORED_TYPES)->toContain($type)
-            ->and(AuditReplayMap::SCORED_EVENTS)->toContain($event);
+    foreach (AuditReplayMap::SCORED_PAIRS as [$type, $event]) {
+        // ⚠️ EVERY listed tuple must be able to score. `('submission','updated')` is the one that needs a
+        // payload to do so, which is why it is probed with an edit marker rather than bare.
+        $keys = $type === 'submission' && $event === 'updated' ? ['answers.x'] : [];
+
+        expect(replayMap()->rule(replayRow($type, $event, newValueKeys: $keys)))->not->toBeNull();
     }
 
-    expect(AuditReplayMap::SCORED_TYPES)->toHaveCount(3)
-        ->and(AuditReplayMap::SCORED_EVENTS)->toHaveCount(3);
+    // The tuple that made this test worth writing: `FormService` writes it from three methods and it scores
+    // nothing, so a cross-product filter would have dragged every ordinary form edit into `unmapped`.
+    expect(replayMap()->rule(replayRow('form', 'updated')))->toBeNull()
+        ->and(collect(AuditReplayMap::SCORED_PAIRS)->contains(['form', 'updated']))->toBeFalse();
 });
 
 it('states its two markers literally, because they mirror another services private methods', function (): void {

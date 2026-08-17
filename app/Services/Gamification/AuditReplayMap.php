@@ -47,17 +47,28 @@ use App\Enums\PointRule;
 final class AuditReplayMap
 {
     /**
-     * The `auditable_type` values worth reading at all — the enumerator's WHERE clause is built from this,
-     * so the query and the map cannot drift into disagreeing about what is worth fetching.
+     * The `(auditable_type, event)` tuples worth reading at all. {@see GamificationBackfill} builds its
+     * WHERE clause from exactly this list, so the query and the map cannot drift about what is fetched.
+     *
+     * ⚠️ **PAIRS, NOT TWO SEPARATE LISTS, AND THE DIFFERENCE IS A REPORTING DEFECT RATHER THAN A TIDY-UP.**
+     * The first version filtered `type = ANY(...) AND event = ANY(...)`, whose cross product also admits
+     * `('form','updated')` — a tuple `FormService` writes from three separate methods and which scores
+     * nothing. Those rows reached the map, mapped to null, and landed in the `unmapped` bucket, which the
+     * operator report describes as *"audits has grown a writer this map has never been told about"*. On any
+     * real workspace that number would have been dominated by ordinary form edits, making the one signal it
+     * exists to carry unreadable. With pairs, `unmapped` means exactly one thing: a `('submission','updated')`
+     * carrying neither marker.
      *
      * `tenant_users` is absent on purpose: the membership rules come from the membership table.
      *
-     * @var list<string>
+     * @var list<array{0: string, 1: string}>
      */
-    public const array SCORED_TYPES = ['form', 'form_version', 'submission'];
-
-    /** @var list<string> */
-    public const array SCORED_EVENTS = ['created', 'published', 'updated'];
+    public const array SCORED_PAIRS = [
+        ['form', 'created'],
+        ['form_version', 'published'],
+        ['submission', 'created'],
+        ['submission', 'updated'],
+    ];
 
     /** An edit's marker: the flattened per-answer diff `SubmissionAnswerEditService::answerDiff()` writes. */
     public const string EDIT_MARKER_PREFIX = 'answers.';

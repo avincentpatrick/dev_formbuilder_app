@@ -7,15 +7,20 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
-use App\Services\Onboarding\GettingStartedChecklist;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 /**
  * "Stop showing me the getting-started checklist" (Increment J5b) — one write, on the caller's own
- * membership row. Everything about WHAT the checklist says lives in {@see GettingStartedChecklist}; this
- * is the thin adapter.
+ * membership row. Everything about WHAT the checklist says lives in `GettingStartedChecklist`; this is the
+ * thin adapter.
+ *
+ * ⚠️ **THAT CLASS IS NAMED IN PROSE RATHER THAN WITH A DOC REFERENCE, AND SO IS EVERY OTHER CLASS BELOW
+ * THIS CONTROLLER DOES NOT CALL.** A `{@see}` here made the import list carry a service this file never
+ * instantiates — a dependency created for the sake of a comment, which is the same defect Pint's
+ * `fully_qualified_strict_types` fixer produced twice elsewhere in J5. A thin adapter should not know the
+ * name of the class that renders what it writes.
  *
  * ⚠️ **NO `can:` GATE, AND THAT IS AN ARGUMENT RATHER THAN AN OMISSION.** There is no instance to
  * authorize and no permission that could sensibly guard it: the row being written is the caller's own

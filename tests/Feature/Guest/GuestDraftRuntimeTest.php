@@ -704,3 +704,38 @@ it('still replays an offline submit that makes no baseline claim, because strand
     expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
         ->toBe(SubmissionStatus::Submitted);
 });
+
+it('promotes a submit that carries the CURRENT baseline, so the token is used and not merely present', function (): void {
+    // ⚠️ THIS TEST EXISTS BECAUSE A MUTATION SURVIVED. Nulling the token in the controller still produced a
+    // 409 on the stale-submit case above -- `claimsBaseline()` reads the real request value, so the guard
+    // fired for the WRONG reason and the assertion could not tell. Only a submit that must SUCCEED on a
+    // correct baseline discriminates "the token is compared" from "the token is merely non-null".
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $draftUrl = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $seed = $this->postJson($draftUrl, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])
+        ->assertCreated();
+
+    // One more save, so the baseline has genuinely MOVED and a stale value would be caught.
+    $moved = $this->postJson($draftUrl, [
+        'answers' => ['age' => '31'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $seed->json('data.content_checksum'),
+    ])->assertOk();
+
+    expect($moved->json('data.content_checksum'))->not->toBe($seed->json('data.content_checksum'));
+
+    // The same device submits with the CURRENT base and is promoted.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '31', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $moved->json('data.content_checksum'),
+    ])->assertSuccessful();
+
+    enterTenant($f->tenant->id);
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($row->status)->toBe(SubmissionStatus::Submitted);
+    expect(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
+        ->toBe('Ada');
+});

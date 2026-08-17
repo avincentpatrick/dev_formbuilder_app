@@ -12,6 +12,7 @@ use App\Models\WebhookEndpoint;
 use App\Policies\FormPolicy;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Submissions\SubmissionInboxPresenter;
+use App\Support\Entitlements\FeatureAdmission;
 use App\Support\Forms\FormHubLink;
 use App\Support\Forms\FormTabSet;
 
@@ -250,10 +251,16 @@ final class CrumbTrail
      *
      * The reason this is a mirror rather than a judgement: a crumb must offer exactly what the route
      * accepts. Being more permissive hands out links that bounce; being stricter hands out dead ends.
+     *
+     * ⚠️ **EXTRACTED IN J5 — THE PREDICATE NOW LIVES IN {@see FeatureAdmission}, AND THIS IS A DELEGATION.**
+     * J5's dashboard needs the identical question for a destination carrying `feature:form_templates`, and a
+     * second copy of a four-line mirror is how two definitions of "does the route admit this?" come to
+     * disagree. This method is kept as the seam its two callers already use, so their behaviour — and this
+     * class's tests — are untouched by the move.
      */
     private static function featureAdmits(EntitlementService $entitlements, string $key): bool
     {
-        return $entitlements->currentPlan() === null || $entitlements->feature($key);
+        return FeatureAdmission::admits($entitlements, $key);
     }
 
     /**

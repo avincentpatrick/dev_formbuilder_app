@@ -10,6 +10,7 @@ use App\Enums\FormStatus;
 use App\Enums\FormVersionStatus;
 use App\Enums\ResourceCapacity;
 use App\Enums\UsageMetric;
+use App\Events\FormCreated;
 use App\Exceptions\Forms\FormException;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -56,7 +57,7 @@ final class FormService
 
     public function create(Tenant $tenant, User $creator, string $title, ?string $description = null): Form
     {
-        return DB::transaction(function () use ($tenant, $creator, $title, $description): Form {
+        $form = DB::transaction(function () use ($tenant, $creator, $title, $description): Form {
             // Hard-block the forms_count quota (H5b / ADR-0008 §D4) before anything is written. Inside the
             // transaction so a refusal rolls back cleanly; covers the template-instantiate caller too (its
             // outer transaction wraps this one). A live COUNT under RLS — archived forms free a slot.
@@ -113,6 +114,18 @@ final class FormService
 
             return $form->refresh();
         });
+
+        // K1a. Post-commit and OUTSIDE the transaction above, the `SubmissionCreated` posture rather than
+        // `MemberJoined`'s: this method runs in-request under session-scoped tenant context, which outlives
+        // the commit, so scoring can never roll back somebody's form. A plain event, deliberately not a
+        // `DomainEventType` case — see {@see FormCreated} for what that costs and why it is still right.
+        //
+        // ⚠️ Note this fires for the TemplateService caller too, whose outer transaction has not committed
+        // yet at this point. That is safe rather than merely tolerable: `PointsRecorder` writes with
+        // ON CONFLICT DO NOTHING, so it cannot raise, and a rolled-back instantiation takes its award with it.
+        event(FormCreated::for($form, $creator));
+
+        return $form;
     }
 
     /**

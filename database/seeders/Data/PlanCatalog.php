@@ -47,6 +47,10 @@ final class PlanCatalog
         'sso_saml',
         'dedicated_db',
         'data_residency',
+        // K1a. Appended last, like every key before it — `plans.feature_flags` is a jsonb map rather than a
+        // positional structure, so order is not a wire contract here (unlike NotificationType), but keeping
+        // additions at the tail makes the catalog's history readable in a diff.
+        'gamification',
     ];
 
     // Storage quotas in bytes (binary units). 500 MiB / 5 GiB / 50 GiB.
@@ -59,7 +63,15 @@ final class PlanCatalog
      */
     public static function all(): array
     {
-        $starter = ['api_access', 'webhooks', 'xlsform_export', 'offline_sync', 'save_and_resume', 'form_templates', 'field_library', 'native_connectors', 'branding'];
+        // ⚠️ THE ONE KEY EVERY TIER CARRIES, INCLUDING FREE (user decision 2026-08-17, Increment K1a).
+        // `gamification` is a plan feature key only so the Settings → Modules card can render its toggle
+        // and the admin console can show `tenant_disabled` — {@see ToggleableModules::KEYS} may contain
+        // nothing this catalog does not (`SettingsVocabularyTest`). It is NOT a commercial gate: it is one
+        // of the six standing product principles (PRD §3.7), and a tier ladder would make the principle
+        // invisible to exactly the tenants a first-run experience is for. Spread rather than repeated, so
+        // a future universal key cannot be added to four lists and missed on the fifth.
+        $everyTier = ['gamification'];
+        $starter = [...$everyTier, 'api_access', 'webhooks', 'xlsform_export', 'offline_sync', 'save_and_resume', 'form_templates', 'field_library', 'native_connectors', 'branding'];
         $professional = [...$starter, 'ocr_single', 'ocr_linelist', 'embedded_payments'];
         $business = [...$professional, 'custom_domain', 'advanced_analytics'];
         $enterprise = [...$business, 'sso_saml', 'dedicated_db', 'data_residency'];
@@ -71,7 +83,7 @@ final class PlanCatalog
                 'Get started with a few forms and light usage.',
                 sort: 0,
                 active: true,
-                enabled: [],
+                enabled: $everyTier,
                 quotas: [
                     'forms_count' => 3,
                     'submissions_count' => 100,

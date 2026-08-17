@@ -43,6 +43,14 @@ final class FeatureGateException extends RuntimeException
             // P1a / ADR-0016. Lowercase sentence fragment, not the console's title-case 'SSO (SAML)'
             // (TenantDetailPresenter:351) — this one has to read inside "Your plan doesn't include …".
             'sso_saml' => 'single sign-on (SAML)',
+            // K1a. The arm exists so a 402 body can never render the raw snake_case key (ADR-0011 §D9's
+            // rule), NOT because this gate is expected to fire on a plan refusal — `gamification` is granted
+            // on EVERY tier, so the only way to reach here is a tenant that switched the module off itself,
+            // and "Upgrade your plan to use it" is then the wrong sentence. ⚠️ That is why K1d must gate the
+            // gamification surfaces on the module toggle rather than mounting `feature:gamification` as a
+            // route middleware; see gamification-design.md §7. The wrong-copy-on-self-disable shape is
+            // pre-existing and shared with all eleven toggleable keys — it is recorded here, not fixed here.
+            'gamification' => 'points, badges and streaks',
             default => $key,
         };
 

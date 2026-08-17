@@ -3244,3 +3244,43 @@ own entries is the failure mode it exists to prevent. **#9 is never reused.**
 place, but because its two clipped nodes moved into `MdsCombobox`, which positions its own root. The
 backlog row goes seven → six and the design system's own count stayed at zero, which is the assertion that
 would have caught the lazy version of this move.
+
+---
+
+## 2026-08-17 — LANE A · J5a: the route-admits-this-feature predicate leaves CrumbTrail
+
+**J5 is part-built and unmerged on `j5-onboarding`** (`ad5669c`, `dea71f2`, both pushed). J5a is done and
+green; J5b (the onboarding service) and J5c (the dashboard's second first-run choice) remain. Recorded here
+on the J1e precedent — a built-but-unmerged branch should not be re-derived.
+
+**`App\Support\Entitlements\FeatureAdmission` is extracted out of `CrumbTrail`.** J4b2 wrote the predicate
+as a private static there, mirroring `RequireFeature`: `currentPlan() === null || feature($key)`. The
+mirror matters because the two disagree by a SIGN FLIP in one reachable state — the middleware ADMITS a
+request when there is no plan catalog at all, while `EntitlementService::feature()` returns false there,
+because `currentPlan()?->featureEnabled() ?? false` cannot tell *denied* from *nothing to ask*. A surface
+built on `feature()` alone is therefore stricter than the route it mirrors: request admitted, page 200,
+affordance withheld. J5c needs the identical question for the first-run template choice, and a second copy
+is how two definitions of "does the route admit this?" drift — already paid for with two ADRs numbered 0017
+and a duplicate migration prefix. **`CrumbTrail` keeps its private seam and delegates, and both of its
+suites pass BYTE-UNEDITED (49 passed / 148 assertions)** — the extraction evidence.
+
+⚠️ **Pint coupled the helper back to its own caller, for the sake of a comment.** A fully-qualified doc
+reference to the breadcrumb builder made the `fully_qualified_strict_types` fixer add a real `use` for it,
+so the extracted predicate imported the one class it was extracted FROM. Harmless at runtime and wrong in
+direction: a shared predicate must not know who calls it. The class is named in prose instead. **A formatter
+can introduce a dependency — read the diff it makes, not just its exit status.** (And read Pint's JSON
+`result`, never its exit code.)
+
+**Verifying the J5 row found three things before a line was written — sixteen-for-sixteen.** (1) "The
+first-run landing was never built" is FALSE: `Dashboard.vue:235` already renders a zero-forms empty state
+with a Create action; what is missing is that onboarding plan §2 specifies TWO equally-weighted choices and
+the built moment offers one, though the gallery exists. (2) That same section ARGUES AGAINST a scripted
+tour — *"no forced tour beyond this one choice point"* — so the user's getting-started checklist must be a
+passive dashboard affordance rather than a gate in front of the product. Not a wizard. (3) The template
+choice is a PAID feature (`feature:form_templates`), so §2's two equal choices are unbuildable as written
+for a free tenant, and offering it anyway is J4b2's *links that bounce*; ADR-0011 §D9's absent-not-locked
+doctrine governs the refusal.
+
+**J5 ships real PHP, unlike all of J4c**, so Pest, PHPStan, the four lint gates and `openapi.json` can all
+move and none may be asserted unchanged. Note `openapi.json` is regenerated with
+`php artisan scramble:export --path=…` — there is no `openapi:generate` command.

@@ -29,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $joined_at
  * @property Carbon|null $removed_at
  * @property string|null $removed_by
+ * @property Carbon|null $onboarding_dismissed_at
  */
 class TenantUser extends Model implements TenantScoped
 {
@@ -47,6 +48,10 @@ class TenantUser extends Model implements TenantScoped
         'joined_at',
         'removed_at',
         'removed_by',
+        // J5b — the getting-started checklist's per-membership dismissal. Fillable rather than
+        // force-filled because the only writer is the member's own dismiss endpoint, acting on their
+        // own row; there is no admin path that sets it for somebody else.
+        'onboarding_dismissed_at',
     ];
 
     /**
@@ -60,6 +65,7 @@ class TenantUser extends Model implements TenantScoped
             'invite_expires_at' => 'datetime',
             'joined_at' => 'datetime',
             'removed_at' => 'datetime',
+            'onboarding_dismissed_at' => 'datetime',
         ];
     }
 }

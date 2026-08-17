@@ -19,6 +19,7 @@ use App\Services\Entitlements\EntitlementService;
 use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Forms\FormHubLink;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The tenant dashboard's KPI aggregator (H11) — the single place the landing page's headline counts are
@@ -245,8 +246,41 @@ final class DashboardMetricsService
         );
     }
 
+    /**
+     * Has this user got a PUBLISHED form? — the one getting-started fact the KPI tiles do not already
+     * carry (Increment J5b).
+     *
+     * Deliberately the same base query as the Forms tile rather than a second idea of which forms count:
+     * a checklist row that disagreed with the number directly above it on the same screen is ADR-0011
+     * §D2's defect at one glance's distance. So an archived form does not satisfy this row even if it was
+     * once published — it is not in the tile's numerator either.
+     *
+     * `current_published_version_id` and not `status`: {@see FormStatus} carries a `Published` case, but
+     * the column is what `FormPublishController` actually writes and what the public runtime resolves
+     * against, so it is the fact rather than a label beside it.
+     */
+    public function publishedFormsCount(User $user): int
+    {
+        return $this->visibleFormsQuery($user, $user->can('dashboard.org.view'))
+            ->whereNotNull('current_published_version_id')
+            ->count();
+    }
+
     /** Active (non-archived) forms the user may reach — org-wide, or scoped to granted forms. */
     private function formsCount(User $user, bool $orgWide): int
+    {
+        return $this->visibleFormsQuery($user, $orgWide)->count();
+    }
+
+    /**
+     * The one definition of "forms this user's dashboard counts" — extracted in J5b when the checklist
+     * needed the identical set narrowed one step further. Copying the four lines would have put a second
+     * answer to that question in the same class, which is the drift this codebase has an ADR-numbering
+     * incident to show for.
+     *
+     * @return Builder<Form>
+     */
+    private function visibleFormsQuery(User $user, bool $orgWide): Builder
     {
         $query = Form::query()->where('status', '!=', FormStatus::Archived->value);
 
@@ -256,7 +290,7 @@ final class DashboardMetricsService
             $query->whereIn('id', $this->grants->grantedFormIdsQuery($user));
         }
 
-        return $query->count();
+        return $query;
     }
 
     /**

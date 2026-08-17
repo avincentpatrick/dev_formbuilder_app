@@ -75,7 +75,12 @@ const EXTRACTED_COLUMN_CENSUS = [
     'submission_geo_index' => 'captured_accuracy created_at field_key form_field_id form_version_id geom geometry_type id submission_id tenant_id updated_at',
     'submissions' => 'app_version client_submission_uuid completeness_percent created_at deleted_at device_id draft_current_step draft_expires_at finalized_at form_id form_version_id guest_contact_email guest_ip guest_token guest_user_agent id last_saved_at locale pii_erased_at reference remarks respondent_user_id returned_reason search_vector source source_batch_id status submitted_at tenant_id updated_at validated_at validated_by',
     'subscriptions' => 'billing_interval canceled_at cancels_at created_at current_period_ends_at current_period_starts_at ended_at id name plan_id quantity stripe_customer_id stripe_status stripe_subscription_id tenant_id trial_ends_at updated_at',
-    'tenant_users' => 'created_at id invite_expires_at invite_token invited_at invited_by invited_role_id joined_at removed_at removed_by status tenant_id updated_at user_id',
+    // `onboarding_dismissed_at` (J5b) is EXTRACTED rather than withheld, and the choice was made by looking
+    // at it as this file's preamble asks. It is a plain, non-derived fact about this tenant's own membership
+    // row — no credential, and no fact about a subject other than this tenant — so it fails all three
+    // WITHHELD tests. A member reading their own extract sees when they dismissed the getting-started card,
+    // which is exactly as informative as `joined_at` beside it.
+    'tenant_users' => 'created_at id invite_expires_at invite_token invited_at invited_by invited_role_id joined_at onboarding_dismissed_at removed_at removed_by status tenant_id updated_at user_id',
     'tenants' => 'brand_ramp created_at data default_locale draft_ttl_days id logo_attachment_id maintenance_message maintenance_mode name owner_user_id primary_color slug status supported_locales updated_at',
     'usage_counters' => 'created_at id last_incremented_at limit_snapshot metric period_end period_start subscription_id tenant_id updated_at value',
     'users' => 'created_at deleted_at email email_verified_at google_id id is_super_admin last_active_tenant_id name password privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',

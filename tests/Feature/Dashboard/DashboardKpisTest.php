@@ -5,6 +5,10 @@ declare(strict_types=1);
 use App\Enums\PlanTier;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
+use App\Services\Entitlements\EntitlementService;
+use App\Services\Forms\FormService;
+use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Entitlements\ToggleableModules;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -165,4 +169,153 @@ it('labels each top-forms row with its title, so a bar is never a bare uuid', fu
             ->where('trends.top_forms.rows.0.key', (string) $form->id)
             ->where('trends.top_forms.rows.0.label', 'Clinic Intake')
             ->where('trends.top_forms.rows.0.count', 1));
+});
+
+/*
+|--------------------------------------------------------------------------
+| J5c — onboarding §2's two first-run choices, resolved SERVER-side.
+|--------------------------------------------------------------------------
+| The template arm is a paid destination (`forms.templates.index` carries `feature:form_templates` on top
+| of `can:create,Form`), so which choices a reader may be offered is an entitlement question — and the
+| client cannot answer it correctly, which is the whole reason this prop exists. See the null-plan case.
+*/
+
+it('offers both first-run choices on a plan that includes templates', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Starter);
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('start.can_create', true)
+            ->where('start.can_use_templates', true));
+});
+
+it('withholds the template choice on Free, where the gallery is not included', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Free);
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('start.can_create', true)
+            ->where('start.can_use_templates', false));
+});
+
+it('offers the template choice when there is NO plan catalog, exactly as the route would', function (): void {
+    // ⭐ THE CASE THAT WOULD REGRESS SILENTLY, AND THE REASON `FeatureAdmission` WAS EXTRACTED IN J5a.
+    // `feature:` middleware ADMITS a request when there is no plan at all — its own docblock calls that a
+    // "dev/test has no plans" pass-through — while `EntitlementService::feature()` returns FALSE in the
+    // same state, because `currentPlan()?->featureEnabled() ?? false` cannot tell *denied* from *nothing to
+    // ask*. So a prop built on `feature()` would hide a card the server would happily have served: J4b2's
+    // stranded-reader defect, one surface over. Reachable on a deploy that migrates before it seeds, on a
+    // restored database, and in every feature test that seeds no plan.
+    //
+    // ⚠️ NOTE WHAT THIS TEST OMITS ON PURPOSE: no `assignPlanTier`. Adding one would make it pass against
+    // the broken implementation too.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('start.can_use_templates', true));
+
+    // And the mirror it is a mirror OF: the gallery really does answer on the same unseeded catalog.
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/forms/templates')
+        ->assertOk();
+});
+
+it('reads the form_templates key specifically, not merely "some Starter feature"', function (): void {
+    /*
+     * ⭐ THE COPY-PASTE CASE, AND THE MUTATION PASS IS WHY IT EXISTS. Swapping `form_templates` for
+     * `field_library` in the controller SURVIVED every other case in this file, because every seeded plan
+     * that grants one grants the other — so nothing here discriminated the key, only whether the tier was
+     * Starter. That is J4b2's recorded hole verbatim: it varied the OPERATOR and never the OPERANDS.
+     *
+     * The module toggle is the one seam in the product that separates two keys on one tier: it is ANDed
+     * with the plan flag inside `feature()` and can only ever subtract. `CrumbTrailGateTest` pins the same
+     * property for `webhooks` vs `native_connectors` the same way.
+     */
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Starter);
+
+    app(TenantSettingRegistry::class)->put($tenant, [
+        ToggleableModules::settingKey('form_templates') => false,
+    ]);
+    app(EntitlementService::class)->forget();
+
+    expect(app(EntitlementService::class)->feature('form_templates'))->toBeFalse()
+        ->and(app(EntitlementService::class)->feature('field_library'))->toBeTrue();
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('start.can_create', true)
+            ->where('start.can_use_templates', false));
+});
+
+it('offers neither choice to a role that cannot author, and still renders the page', function (): void {
+    // A Viewer lands on the dashboard like everyone else. The page must degrade to an explanation rather
+    // than a button that 403s — §3.10's extended governing rule, held at the prop layer here and at the
+    // markup layer in `dashboard.test.ts`.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Starter);
+
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+
+    $this->withoutVite()
+        ->actingAs($viewer)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('start.can_create', false)
+            // ⭐ ANDed with the policy, not read alone: an entitled plan does not make a Viewer an author,
+            // and `/forms/templates` carries BOTH gates.
+            ->where('start.can_use_templates', false));
+});
+
+it('serves the getting-started checklist to the page, and null once it is done', function (): void {
+    // The rows themselves are `GettingStartedChecklistTest`'s subject. What is pinned here is that they
+    // reach the page at all — the H24a lesson: a prop nothing renders yet is exactly the prop that gets
+    // dropped by a later controller edit with no test to notice.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    app(FormService::class)->create($tenant, $owner, 'Draft');
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('checklist', 4)
+            ->where('checklist.0.key', 'create_form')
+            ->where('checklist.0.done', true));
 });

@@ -52,11 +52,17 @@ const RULE = /([^{}]+)\{([^{}]*)\}/g;
  *
  * ⚠️ THIS LIST MAY ONLY EVER SHRINK. The test below asserts it exactly, so removing a file from the app
  * tree or fixing one without deleting its entry fails just as loudly as adding a new violation.
+ *
+ * ✅ IT SHRANK IN J4c: `resources/js/components/shell/CommandPalette.vue` is GONE, and not by being
+ * "fixed" in place. Its two clipped nodes — the combobox's label and its polite live region — moved into
+ * `MdsCombobox`, which positions its own root, so their containing block now resolves inside the component
+ * that owns them. The app-tree file no longer matches the clip idiom at all. This is the first entry ever
+ * removed, and the shape of the removal is the one the note above asks for: the defect left, rather than
+ * the list being edited to stop noticing it.
  */
 const KNOWN_UNGUARDED = [
     'resources/js/Pages/scopes/Index.vue',
     'resources/js/components/builder/BuilderCanvas.vue',
-    'resources/js/components/shell/CommandPalette.vue',
     'resources/js/components/shell/FeedbackButton.vue',
     'resources/js/components/submissions/GeoInput.vue',
     'resources/public-runtime/components/RuntimeShell.vue',

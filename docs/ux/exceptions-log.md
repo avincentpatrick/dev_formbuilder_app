@@ -294,64 +294,27 @@ specifically about `superadmin.mfa` needing a TOTP in CI, and `/` requires no au
 
 ---
 
-## #9 — Hand-rolled ARIA combobox in the command palette (`resources/js/components/shell/CommandPalette.vue`)
+## #9 — ~~Hand-rolled ARIA combobox in the command palette~~ ✅ **RETIRED IN J4c — ENTRY DELETED**
 
-**Introduced:** Phase 1 completion · Increment J1d (the ⌘K command palette).
+The deviation is gone: `resources/js/components/shell/CommandPalette.vue` is a consumer of
+`MdsCombobox` (DSR §3.4.1), and this entry was **deleted rather than amended**, which is what its own
+disposition instructed. Nothing about the palette is undocumented as a result — the combobox contract is
+the component’s, and the *Storybook coverage gap* this entry had become the canonical citation for is now
+**DSR §4.6.1**, a section rather than an exception, because it is a fact about the glob rather than about
+this one component.
 
-**What deviates:** DSR §4.3 says custom interactives are real semantic elements, and §1.3 says a widget
-needed in more than one place belongs in the design system. The palette's result rows are `<div
-role="option">` inside a `<div role="listbox">`, driven by `aria-activedescendant` — not buttons, not a
-shared `MdsCombobox`, and not a roving `tabindex`. It is the first modal in the product with **no action
-row**, which §3.6's "no modal ships without all four" would otherwise forbid.
-
-**Why:** Three separate reasons, each of which the DSR itself anticipates.
-
-The markup is not a choice. A `<button role="option">` trips axe's `nested-interactive` **and** breaks
-`aria-activedescendant`, and `<li>` inside a listbox fails `aria-required-children`. §4.5's named ARIA 1.2
-Combobox pattern requires DOM focus to stay on the input while the active option changes — which is the
-exact opposite of §4.3's roving-`tabindex` rule for composites. DSR §3.4.1 resolves that conflict in
-§4.5's favour *for this pattern*, and §4.3 keeps governing composites with no text entry. So the deviation
-is a spec decision already taken, recorded here because the code looks like a violation to a reader who
-has only read §4.3.
-
-The missing action row is the same shape of argument: §3.6 was written for the destructive confirmations
-this component was built for, where a primary and a cancel are the whole point. A palette has no decision
-to confirm — every option IS the action — and adding a disabled "OK" would be a control that never does
-anything.
-
-It is hand-rolled rather than a primitive because the increment that owns the ~15 missing primitives
-(`MdsCombobox`, `MdsTabs`, `MdsMenu`, an input-adornment wrapper) runs **after** this one. Generalising a
-palette whose options are heterogeneous — forms, submissions, members, destinations, and a synthetic "see
-all" row — into a reusable API from a single consumer would be inventing the API from one example. DSR
-§1.3's own consolidation trigger is three-plus undocumented deviations for the same need; this is the
-first, and it is documented.
-
-> **Amendment (J2a).** **None of the four primitives named in the list above has been built** — this entry
-> stands unchanged, and its retirement still waits on `MdsCombobox`.
+> ⚠️ **THE NUMBER IS NOT REUSED AND THIS STUB IS WHY.** Entry numbers are stable identifiers — the same
+> reason `docs/adr/` skips `0010` — and this file’s own preamble warns that *a log which miscounts its own
+> entries is the failure mode the log exists to prevent*. A bare gap between #8 and #10 reads as a lost
+> entry; a tombstone reads as a discharged one. **Do not renumber, and do not assign #9 to anything new.**
 >
-> J2a did ship two *different* package components, `MdsTabNav` and `MdsBreadcrumb`, and they are noted here
-> only so a reader who sees them does not mistake either for the list. ⚠️ **`MdsTabNav` is NOT the `MdsTabs`
-> named above**: that means the ARIA-1.2 in-page tablist, which remains J4's. `TabNav`'s items are links
-> that load a page, so it is a navigation landmark with `aria-current`; building it as a tablist would have
-> removed every non-active destination from the tab sequence. DSR §3.4 carries the split. *(The first draft
-> of this amendment said "two of the primitives named in that list have since been built" and then, one
-> sentence later, that neither was in the list — kept visible here rather than silently rewritten, because
-> a log that miscounts its own entries is the failure mode the log exists to prevent.)*
->
-> Both went in `packages/design-system/src/` **because of the coverage note below** rather than for taxonomy
-> reasons: an app-tree component gets no story and no `checkA11y` scan at all, and these two carry contracts
-> a page-level e2e scan would never isolate — `aria-current` exactly once, and list semantics surviving
-> `list-style: none`. **No new exceptions entry is owed by J2a.**
-
-**⚠️ Coverage note, recorded because a green gate will otherwise be misread.** Storybook globs
-`packages/design-system/src/**/*.stories.@(ts|tsx)` only, so this app-tree component gets **no story and
-no `checkA11y` scan**. The `design-system-a11y` job passing says nothing whatsoever about this file. Its
-only automated accessibility gate is `tests/e2e/command-palette.spec.ts`, and its ARIA contract — the
-things axe cannot see, such as an `aria-activedescendant` that points at a non-existent id — is asserted
-directly in `CommandPalette.test.ts`.
-
-**Retire when:** the primitives increment lands `MdsCombobox`. At that point this component should become
-a consumer of it, and this entry should be deleted rather than amended.
+> ⚠️ **RETIRING IT WAS NOT A ONE-LINE DELETE, AND THAT IS THE GENERALISABLE PART.** It was cited FIVE
+> times and **four of those were not about comboboxes at all** — two in the package index, one in §3.2 of the
+> DSR, one in `tests/e2e/command-palette.spec.ts`. Deleting first would have dangled every one of them:
+> the ADR-0017 collision shape, one level down. **Re-point first, delete second.** (The fifth, in
+> `FormRowActions.vue`, was stale twice over — it claimed the system had no menu primitive, which `MdsMenu`
+> disproved in J4b, and repeated the `~15 primitives` figure J4a established nobody had ever itemised. It
+> was corrected outright rather than re-pointed.)
 
 ## #10 — Success and the Teal personalization accent now share a hue (`packages/design-system/tokens/primitive.json`)
 

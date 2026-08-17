@@ -2,23 +2,29 @@
 /**
  * The ⌘K command palette (Increment J1d, DSR §3.4.1).
  *
- * ⚠️ A HAND-ROLLED ARIA 1.2 COMBOBOX, AND THAT IS A LOGGED EXCEPTION rather than an oversight — see
- * `docs/ux/exceptions-log.md`. The increment that owns `MdsCombobox` runs after this one, and generalising
- * a palette whose options are heterogeneous (forms, submissions, members, destinations, and a synthetic
- * "see all" row) into a primitive before there is a second consumer would be inventing an API from one
- * example.
+ * ── ⚠️ IT CONSUMES `MdsCombobox` AS OF J4c, AND IT USED TO HAND-ROLL THE WHOLE PATTERN ─────────────────
+ * This file was the product's only ARIA 1.2 combobox and was a LOGGED DEVIATION for that reason:
+ * generalising a palette whose options are heterogeneous — forms, submissions, members, destinations and a
+ * synthetic "see all" row — into a primitive before there was a second consumer would have been inventing
+ * an API from one example. The log said to wait for the increment that owns `MdsCombobox` and to DELETE
+ * the entry rather than amend it when that landed. That has happened; the entry is gone.
  *
- * ⚠️ ITS ONLY AUTOMATED a11y GATE IS `tests/e2e/command-palette.spec.ts`. Storybook globs
- * `packages/design-system/src/**` only, so an app-tree component gets no story and no `checkA11y` scan — a
- * green `design-system-a11y` job says nothing whatsoever about this file. Recorded so the gate is not
- * misread as coverage.
+ * **What moved:** the input's role and its four ARIA attributes, option id generation, the grouped
+ * rendering, the active-descendant model, the ↓↑/Home/End/Enter keyboard, and the polite live region.
+ * **What stayed here, because none of it is combobox behaviour:** the ⌘K chord, the debounce, the
+ * abort-plus-sequence fetch discipline, the synthetic see-all row, the single-string empty copy, and the
+ * modal that wraps all of it.
+ *
+ * ⚠️ THE COMPONENT NOW GETS A STORYBOOK STORY AND THEREFORE AN axe SCAN, WHICH THIS FILE NEVER HAD. The
+ * coverage gap this file used to record against itself is a general fact about the Storybook glob, and it
+ * now lives in DSR §4.6 where every component can cite it.
  *
  * ── WHAT MdsModal SUPPLIES, SO IT IS NOT REBUILT HERE ────────────────────────────────────────────────────
  * The inert stack and its paint-order handling, the scroll lock, Escape, the Tab trap, return-focus, and
- * the ≤480px full-sheet treatment. This component owns only the combobox: the input, the listbox, the
- * active-descendant model, and the fetch.
+ * the ≤480px full-sheet treatment. ⚠️ Escape in particular: `MdsCombobox` deliberately does NOT bind it,
+ * because the surface that owns it is this dialog. See that component's docblock before "fixing" it.
  */
-import { MdsModal, MdsTextInput } from '@meridian/design-system';
+import { MdsCombobox, MdsModal, type ComboboxOption } from '@meridian/design-system';
 import { router } from '@inertiajs/vue3';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { useCommandPalette } from '@/composables/useCommandPalette';
@@ -38,10 +44,9 @@ interface SuggestGroup {
 }
 
 /** A row the user can activate: either a real result or the synthetic "see all" tail. */
-interface Option {
-    key: string;
-    label: string;
+interface PaletteOption extends ComboboxOption {
     url: string;
+    subtitle: string;
 }
 
 const props = defineProps<{
@@ -51,7 +56,7 @@ const props = defineProps<{
      *
      * ⚠️ A LIST, NOT ONE SELECTOR, AND CI IS WHAT PROVED IT HAD TO BE. The first version took a single
      * selector (`#topnav-search`) and stranded focus at 375px: below the 480px breakpoint that field is
-     * `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured `<body>` and
+     * `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured the body and
      * closing the palette left focus nowhere. Every unit test passed — happy-dom has no layout, so nothing
      * there can distinguish a hidden element from a visible one. Only the browser at a real viewport could.
      */
@@ -79,14 +84,25 @@ const { open } = useCommandPalette(() => {
     return null;
 });
 
-const listboxId = useId();
-const optionIdPrefix = useId();
+/**
+ * The input's id, minted here and handed DOWN, so the modal's `initialFocus` selector can name the real
+ * control rather than a wrapper.
+ *
+ * ⚠️ THIS REPLACED A `data-mds-initial-focus` ATTRIBUTE ON THE COMPONENT, AND THE SWAP IS A CORRECTNESS FIX
+ * THAT THE UNIT SUITE CAUGHT. `MdsTextInput`'s root element IS the input under Vue's default
+ * `inheritAttrs`, so that attribute used to land on something focusable. `MdsCombobox` has a real wrapper,
+ * so the same attribute silently moved onto a DIV — and `.focus()` on a non-focusable element is a no-op,
+ * which strands focus on the body with Escape and the Tab trap both unreachable. DSR §4.5 names that
+ * outcome exactly: a keyboard trap (WCAG 2.1.2) reached through the very prop meant to prevent one.
+ * `MdsModal` does verify focus landed and falls back, so this degraded rather than broke — but the
+ * fallback is the close button, not the search field, which is not what a ⌘K user asked for.
+ */
+const inputId = `${useId()}-palette-input`;
 
 const query = ref('');
 const groups = ref<SuggestGroup[]>([]);
 const seeAllUrl = ref('/search');
 const busy = ref(false);
-const activeIndex = ref(0);
 
 /**
  * The flattened, activatable list — what ↓/↑ walk and what Enter activates.
@@ -94,38 +110,47 @@ const activeIndex = ref(0);
  * The "see all" row is a REAL OPTION rather than a link below the list, which is what lets Enter mean
  * exactly one thing ("activate the highlighted option") instead of branching on whether anything is
  * highlighted. DSR §3.4.1 makes that the rule.
+ *
+ * ⚠️ It carries NO `group`, and that is deliberate rather than incidental: `MdsCombobox` renders an
+ * ungrouped run as direct children of the listbox, so the synthetic row does not acquire a heading that is
+ * nowhere on the screen.
  */
-const options = computed<Option[]>(() => {
-    const flat: Option[] = [];
+const options = computed<PaletteOption[]>(() => {
+    const flat: PaletteOption[] = [];
 
     for (const group of groups.value) {
         for (const item of group.items) {
-            flat.push({ key: `${group.entity}:${item.id}`, label: item.title, url: item.url });
+            flat.push({
+                key: `${group.entity}:${item.id}`,
+                label: item.title,
+                subtitle: item.subtitle,
+                url: item.url,
+                group: group.label,
+            });
         }
     }
 
     if (query.value.trim() !== '') {
-        flat.push({ key: 'see-all', label: `See all results for “${query.value.trim()}”`, url: seeAllUrl.value });
+        flat.push({
+            key: 'see-all',
+            label: `See all results for “${query.value.trim()}”`,
+            subtitle: '',
+            url: seeAllUrl.value,
+        });
     }
 
     return flat;
 });
 
-const hasOptions = computed(() => options.value.length > 0);
-
 /**
- * ⚠️ OMITTED, NEVER DANGLING. `aria-activedescendant` pointing at an id that is not in the DOM is worse
- * than absent — a screen reader announces nothing and the user has no way to tell. Same for
- * `aria-controls` while the listbox is not rendered. DSR §3.4.1 records that the axe gate will NOT catch
- * this, so it is asserted directly in the Vitest spec instead.
+ * What the live region says. The CONSUMER owns this wording — `MdsCombobox` takes it as a prop and never
+ * counts for itself, because only this file knows the last row is synthetic and should not be counted.
  */
-const activeDescendantId = computed(() =>
-    hasOptions.value && options.value[activeIndex.value] !== undefined
-        ? `${optionIdPrefix}-${activeIndex.value}`
-        : undefined
-);
+const status = computed(() => {
+    if (busy.value) return 'Searching…';
 
-const controlsId = computed(() => (hasOptions.value ? listboxId : undefined));
+    return options.value.length > 0 ? `${options.value.length - 1} results` : '';
+});
 
 /**
  * The zero-result string, used for BOTH "nothing matched" and "everything that matched is invisible to
@@ -139,7 +164,6 @@ let debounce: ReturnType<typeof setTimeout> | null = null;
 
 function reset(): void {
     groups.value = [];
-    activeIndex.value = 0;
     busy.value = false;
 }
 
@@ -170,10 +194,6 @@ async function fetchSuggestions(term: string): Promise<void> {
 
         groups.value = payload.groups ?? [];
         seeAllUrl.value = payload.see_all_url ?? '/search';
-        // Auto-highlight the first row on every non-empty list: it keeps aria-activedescendant valid and
-        // makes Enter useful. DSR §3.4.1 records the consequence — a screen-reader user hears the first
-        // result on each debounce tick.
-        activeIndex.value = 0;
     } catch {
         // An abort or a network blip must leave the PREVIOUS list intact rather than blanking the panel
         // under the user mid-read.
@@ -208,65 +228,15 @@ watch(open, (isOpen) => {
     reset();
 });
 
-function move(delta: number): void {
-    if (!hasOptions.value) return;
-
-    const count = options.value.length;
-    activeIndex.value = (activeIndex.value + delta + count) % count;
-}
-
-function activate(): void {
-    const option = options.value[activeIndex.value];
-
-    if (option === undefined) {
-        // No list at all — Enter still means "search for what I typed", which is the behaviour a user who
-        // types faster than the debounce expects.
-        if (query.value.trim() !== '') router.visit(`/search?q=${encodeURIComponent(query.value.trim())}`);
-
-        return;
-    }
-
+function activate(option: ComboboxOption): void {
     open.value = false;
-    void nextTick(() => router.visit(option.url));
+    void nextTick(() => router.visit((option as PaletteOption).url));
 }
 
-function onKeydown(event: KeyboardEvent): void {
-    // preventDefault on the arrows, or the caret jumps to the ends of the input while the list moves.
-    switch (event.key) {
-        case 'ArrowDown':
-            event.preventDefault();
-            move(1);
-            break;
-        case 'ArrowUp':
-            event.preventDefault();
-            move(-1);
-            break;
-        case 'Home':
-            event.preventDefault();
-            activeIndex.value = 0;
-            break;
-        case 'End':
-            event.preventDefault();
-            activeIndex.value = Math.max(0, options.value.length - 1);
-            break;
-        case 'Enter':
-            event.preventDefault();
-            activate();
-            break;
-        default:
-            break;
-    }
-}
-
-/** Flat index of an item, so each rendered row can find its own option id. */
-function indexOf(groupIndex: number, itemIndex: number): number {
-    let flat = 0;
-
-    for (let g = 0; g < groupIndex; g++) {
-        flat += groups.value[g]?.items.length ?? 0;
-    }
-
-    return flat + itemIndex;
+function submitRawQuery(term: string): void {
+    // Enter with no list at all still means "search for what I typed", which is what a user who types
+    // faster than the debounce expects.
+    if (term.trim() !== '') router.visit(`/search?q=${encodeURIComponent(term.trim())}`);
 }
 </script>
 
@@ -275,133 +245,48 @@ function indexOf(groupIndex: number, itemIndex: number): number {
         :open="open"
         title="Search"
         close-label="Close search"
-        initial-focus="[data-mds-initial-focus]"
+        :initial-focus="`#${inputId}`"
         @close="open = false"
         @update:open="open = $event"
     >
-        <div class="palette">
-            <label class="palette__label" :for="`${listboxId}-input`">Search this workspace</label>
-            <MdsTextInput
-                :id="`${listboxId}-input`"
-                v-model="query"
-                type="search"
-                role="combobox"
-                autocomplete="off"
-                placeholder="Search forms, submissions, members and pages"
-                aria-autocomplete="list"
-                :aria-expanded="hasOptions"
-                :aria-controls="controlsId"
-                :aria-activedescendant="activeDescendantId"
-                data-mds-initial-focus
-                @keydown="onKeydown"
-            />
+        <MdsCombobox
+            v-model="query"
+            :options="options"
+            :input-id="inputId"
+            label="Search this workspace"
+            listbox-label="Search results"
+            placeholder="Search forms, submissions, members and pages"
+            :status="status"
+            @select="activate"
+            @submit="submitRawQuery"
+        >
+            <template #option="{ option }">
+                <span class="palette__option-title">{{ option.label }}</span>
+                <span v-if="(option as PaletteOption).subtitle" class="palette__option-sub">
+                    {{ (option as PaletteOption).subtitle }}
+                </span>
+            </template>
 
-            <div v-if="hasOptions" :id="listboxId" class="palette__list" role="listbox" aria-label="Search results">
-                <div
-                    v-for="(group, groupIndex) in groups"
-                    :key="group.entity"
-                    class="palette__group"
-                    role="group"
-                    :aria-label="group.label"
-                >
-                    <p class="palette__group-heading" aria-hidden="true">{{ group.label }}</p>
-                    <!--
-                        role="option" on a div, never a button: a button inside a listbox trips axe's
-                        nested-interactive AND breaks aria-activedescendant. Rows are not tabbable by
-                        design — DOM focus never leaves the input.
-                    -->
-                    <div
-                        v-for="(item, itemIndex) in group.items"
-                        :id="`${optionIdPrefix}-${indexOf(groupIndex, itemIndex)}`"
-                        :key="item.id"
-                        class="palette__option"
-                        :class="{ 'is-active': activeIndex === indexOf(groupIndex, itemIndex) }"
-                        role="option"
-                        :aria-selected="activeIndex === indexOf(groupIndex, itemIndex)"
-                        @click="activeIndex = indexOf(groupIndex, itemIndex); activate()"
-                    >
-                        <span class="palette__option-title">{{ item.title }}</span>
-                        <span class="palette__option-sub">{{ item.subtitle }}</span>
-                    </div>
-                </div>
-
-                <div
-                    :id="`${optionIdPrefix}-${options.length - 1}`"
-                    class="palette__option palette__option--all"
-                    :class="{ 'is-active': activeIndex === options.length - 1 }"
-                    role="option"
-                    :aria-selected="activeIndex === options.length - 1"
-                    @click="activeIndex = options.length - 1; activate()"
-                >
-                    {{ options[options.length - 1]?.label }}
-                </div>
-            </div>
-
-            <p v-else-if="query.trim() !== '' && !busy" class="palette__empty">{{ emptyCopy }}</p>
-
-            <!--
-                ⚠️ INSIDE the dialog. `inert` removes everything outside an open modal from the
-                accessibility tree, so a live region in the shell would stop announcing entirely and
-                nothing replays on close.
-            -->
-            <p class="palette__label" role="status">
-                <template v-if="busy">Searching…</template>
-                <template v-else-if="hasOptions">{{ options.length - 1 }} results</template>
-            </p>
-        </div>
+            <template #empty>
+                <p v-if="query.trim() !== '' && !busy" class="palette__empty">{{ emptyCopy }}</p>
+            </template>
+        </MdsCombobox>
     </MdsModal>
 </template>
 
 <style scoped>
-.palette {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mds-space-3);
-}
-
-.palette__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-
-.palette__list {
-    max-height: 22rem;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--mds-space-2);
-}
-
-.palette__group-heading {
-    margin: 0;
-    padding: var(--mds-space-1) var(--mds-space-2);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-secondary);
-}
-
-.palette__option {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--mds-space-2) var(--mds-space-3);
-    border-radius: var(--mds-radius-sm);
-    cursor: pointer;
-}
-
-.palette__option.is-active {
-    /*
-     * ⚠️ The same token Sidebar.vue uses for its current-section row, so "the highlighted thing" looks the
-     * same in both places. The first draft invented `--mds-color-surface-active`, which does not exist —
-     * a missing token resolves to nothing and the highlight silently disappears, which is J1b's
-     * `--mds-space-9` all over again. `token-references.test.ts` is the gate; check the token list first.
-     */
-    background-color: var(--mds-color-action-primary-tint);
-    color: var(--mds-color-text-heading);
+/*
+ * ⚠️ THE VISUALLY-HIDDEN CLIP IDIOM IS GONE FROM THIS FILE, AND THAT IS WHY THIS COMPONENT COULD LEAVE
+ * `KNOWN_UNGUARDED` IN `clipped-node-containment.test.ts`. Both clipped nodes — the input's label and the
+ * polite live region — moved into `MdsCombobox`, which positions its own root so their containing block
+ * resolves inside the component that owns them. That list may only ever SHRINK, and this is the shrink.
+ *
+ * `.palette__list`, `.palette__option`, `.palette__group-heading` and `.palette__label` are deleted with
+ * the markup they styled: dead rules for elements that are no longer on the page read to the next author
+ * as a component still in use. What remains is only what the scoped SLOT still renders.
+ */
+.palette__option-title {
+    font-weight: 500;
 }
 
 .palette__option-sub {
@@ -409,23 +294,9 @@ function indexOf(groupIndex: number, itemIndex: number): number {
     color: var(--mds-color-text-secondary);
 }
 
-.palette__option--all {
-    font-weight: 600;
-}
-
 .palette__empty {
     margin: 0;
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
 }
-
-/*
- * ⚠️ THE LIVE REGION IS VISUALLY HIDDEN, and that is a fix rather than the original design. Rendered
- * visibly it failed axe's `color-contrast` intermittently — the "Searching…" state flashes for one debounce
- * and axe measured it mid-transition — which made the palette's own a11y gate flaky, and a flaky gate is
- * worse than no gate. It reuses `.palette__label`'s clip-rect because it is exactly the same thing: text
- * that exists for assistive tech and duplicates what the list already shows visually. DSR §3.4.1 requires
- * the region to be INSIDE the dialog (inert silences anything outside an open modal); it does not require
- * it to be seen.
- */
 </style>

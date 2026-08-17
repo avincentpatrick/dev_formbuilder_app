@@ -48,7 +48,15 @@ final class GuestDraftResumeController extends Controller
             return ApiErrorResponse::make(404, 'draft_not_found', 'This draft is no longer available.');
         }
 
-        $answers = SubmissionAnswer::query()->where('submission_id', $draft->id)->value('answers');
+        // Increment P3a — the answers and the lost-update baseline are read in ONE query on purpose. Taking
+        // them separately would let another device's save land between the two reads, handing this device a
+        // baseline that matches answers it was never shown — a guard that certifies the exact state it failed
+        // to prevent. `first()` gives both from one row version.
+        $stored = SubmissionAnswer::query()
+            ->where('submission_id', $draft->id)
+            ->first(['answers', 'answers_content_checksum']);
+
+        $answers = $stored?->answers;
 
         $minted = $tokens->mint($token->tenantId, $token->formId, $token->formVersionId);
 
@@ -59,6 +67,11 @@ final class GuestDraftResumeController extends Controller
                 'client_submission_uuid' => $draft->client_submission_uuid,
                 'form_version_id' => $draft->form_version_id,
                 'answers' => is_array($answers) && $answers !== [] ? $answers : (object) [],
+                // Increment P3a — the resuming device's opening lost-update baseline, so its first save can
+                // be told apart from a save based on answers another device has since replaced. Legitimately
+                // null for a draft stored before the checksum column existed; a null base compares equal to a
+                // null stored value, so such a draft resumes and saves exactly as it did before.
+                'content_checksum' => $stored?->answers_content_checksum,
                 // H10 — the two-tier (Dexie↔server) reconciliation needs a server-side "last saved" to break
                 // newest-wins ties, and the SPA restores the exact step + locale so a resumed session comes back
                 // in the language and position the respondent left it.

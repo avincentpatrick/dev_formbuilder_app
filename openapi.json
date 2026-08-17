@@ -3345,7 +3345,13 @@
                                                 "form_version_id": {
                                                     "type": "string"
                                                 },
-                                                "answers": {},
+                                                "answers": {
+                                                    "type": "string"
+                                                },
+                                                "content_checksum": {
+                                                    "type": "string",
+                                                    "description": "Increment P3a \u2014 the resuming device's opening lost-update baseline, so its first save can\nbe told apart from a save based on answers another device has since replaced. Legitimately\nnull for a draft stored before the checksum column existed; a null base compares equal to a\nnull stored value, so such a draft resumes and saves exactly as it did before."
+                                                },
                                                 "last_saved_at": {
                                                     "type": "string",
                                                     "description": "H10 \u2014 the two-tier (Dexie\u2194server) reconciliation needs a server-side \"last saved\" to break\nnewest-wins ties, and the SPA restores the exact step + locale so a resumed session comes back\nin the language and position the respondent left it."
@@ -3375,6 +3381,7 @@
                                                 "client_submission_uuid",
                                                 "form_version_id",
                                                 "answers",
+                                                "content_checksum",
                                                 "last_saved_at",
                                                 "draft_current_step",
                                                 "locale",
@@ -5901,6 +5908,15 @@
                             "null"
                         ],
                         "description": "\"Save and finish later\" \u2014 email the resume link (if a contact email is present) rather than only\nreturning it in the response body."
+                    },
+                    "base_content_checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Increment P3a \u2014 the lost-update token: the `answers_content_checksum` this device last saw for\nthis draft (from the resume response, or its own previous save). NULLABLE on purpose and in two\ndistinct senses that happen to share a representation: a FIRST save has nothing to base itself\non, and a draft written before the checksum column existed legitimately stores null. Both\ncompare equal to a null stored value, so neither is refused. 64 hex chars \u2014 the same SHA-256\nwidth the column is declared at.",
+                        "minLength": 64,
+                        "maxLength": 64
                     }
                 },
                 "required": [
@@ -5954,6 +5970,15 @@
                             "null"
                         ],
                         "maxLength": 20
+                    },
+                    "base_content_checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Increment P3a \u2014 the lost-update baseline, carried on SUBMIT because a submit against an\nexisting draft performs a draft SAVE first (see GuestSubmissionController: capture final edits,\nthen promote). That save is a whole-document replace, so without this a stale device could\noverwrite another device's answers AND finalize the row in one request \u2014 the same defect as on\nthe draft channel, but terminal, since no later save can undo a promotion.",
+                        "minLength": 64,
+                        "maxLength": 64
                     }
                 },
                 "required": [

@@ -88,6 +88,11 @@ final class GuestDraftController extends Controller
             appVersion: $request->appVersion(),
             draftCurrentStep: $request->draftCurrentStep(),
             ttlDays: is_numeric($ttl) ? (int) $ttl : null,
+            // Increment P3a — every request on this channel makes a baseline claim, exactly as
+            // {@see SubmissionAnswerEditService::edit()} treats "every HTTP edit". The flag is true even when
+            // the value is null, because null IS the claim a first save makes.
+            checkBaseline: true,
+            baseContentChecksum: $request->baseContentChecksum(),
         ));
 
         $submission = $result->submission;
@@ -111,6 +116,10 @@ final class GuestDraftController extends Controller
                 'resume_token' => $minted->token,
                 'resume_url' => $resumeUrl,
                 'expires_at' => gmdate('c', $minted->expiresAt),
+                // Increment P3a — the baseline for this device's NEXT save, taken from what the service just
+                // wrote rather than re-read. A device that does not chain this forward will be refused on its
+                // following save, which is the intended direction for a guard to fail.
+                'content_checksum' => $result->contentChecksum,
             ],
         ], $result->created ? 201 : 200);
     }

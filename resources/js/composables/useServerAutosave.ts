@@ -42,6 +42,13 @@ export interface ServerAutosaveOptions {
      * carrying a 30-day TTL.
      */
     enabled: Ref<boolean>;
+    /**
+     * Increment P3a — the lost-update baseline this tab opened on: `props.draft?.baseline`, i.e. the
+     * `answers_content_checksum` the page was RENDERED from. Undefined on the blank keying form, which has
+     * read nothing and so claims nothing. The composable advances it itself after every successful save; the
+     * caller only supplies the starting value.
+     */
+    baseContentChecksum?: string | null;
     debounceMs?: number;
     backstopMs?: number;
     /** Injected for tests; defaults to the real `fetch` wrapper below. */
@@ -54,6 +61,12 @@ export interface ServerAutosave {
     completeness: Ref<number | null>;
     expiresAt: Ref<string | null>;
     message: Ref<string | null>;
+    /**
+     * Increment P3a — the CURRENT lost-update baseline, advanced by every successful tick. Exposed because
+     * **Submit** must send it: that endpoint also saves-then-promotes, and the page's render-time
+     * `props.draft.baseline` is stale the moment this loop ticks once.
+     */
+    baseline: Ref<string | null>;
     /** Force an immediate save if dirty. Awaits the in-flight request. */
     flush: () => Promise<void>;
     dispose: () => void;
@@ -105,12 +118,44 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
             });
         });
 
+    // Increment P3a — the lost-update baseline, advanced on every successful save. Held here rather than
+    // passed per call because the whole point is continuity ACROSS requests: the value proves this tab has
+    // seen everything the server holds.
+    //
+    // ⚠️ A REF, AND EXPOSED, BECAUSE **SUBMIT** NEEDS IT TOO. The encode page's Submit posts to a different
+    // endpoint that also saves-then-promotes, and it must send the CURRENT base — the page's render-time
+    // `props.draft.baseline` goes stale the moment this loop ticks once, so submitting that value would
+    // false-409 every response the keyer actually edited.
+    const baseline = ref<string | null>(options.baseContentChecksum ?? null);
+
     function body(): Record<string, unknown> {
         return {
             answers: JSON.parse(JSON.stringify(options.answers)),
             client_submission_uuid: options.clientSubmissionUuid,
             draft_current_step: options.currentStepKey.value === '' ? null : options.currentStepKey.value,
+            // Sent unconditionally, null included: null is the claim a first save makes, and the server
+            // cannot distinguish an absent key from a client that forgot to send one.
+            base_content_checksum: baseline.value,
         };
+    }
+
+    /**
+     * The `error.code` from a 409 envelope, or null if the body is unreadable (Increment P3a).
+     *
+     * Null deliberately falls through to the pre-P3a message rather than the new one: an unparseable body is
+     * not evidence of a lost update, and the older message is the one that was correct for the only cause
+     * that existed before. Never throws — a JSON parse failure inside error handling must not replace a
+     * typed refusal with an unhandled rejection.
+     */
+    async function conflictCode(response: Response): Promise<string | null> {
+        try {
+            const payload = (await response.json()) as { error?: { code?: unknown } };
+            const code = payload.error?.code;
+
+            return typeof code === 'string' ? code : null;
+        } catch {
+            return null;
+        }
     }
 
     /** Terminal: stop trying, permanently, and say why. */
@@ -139,16 +184,30 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 savedAt.value = typeof data.last_saved_at === 'string' ? data.last_saved_at : new Date().toISOString();
                 completeness.value = typeof data.completeness_percent === 'number' ? data.completeness_percent : null;
                 expiresAt.value = typeof data.expires_at === 'string' ? data.expires_at : null;
+                // Increment P3a — carry the server's new checksum forward. Without this every save after the
+                // first would present a stale base and read as a second tab.
+                baseline.value = typeof data.content_checksum === 'string' ? data.content_checksum : null;
                 state.value = 'saved';
                 message.value = null;
 
                 return;
             }
 
-            // 409 — the draft was submitted from another tab. Retrying can never succeed: the row will never
-            // be a draft again. Stopping is the only honest behaviour, and it must be visible.
+            // ⚠️ 409 HAS TWO CAUSES SINCE P3a AND THEY NEED DIFFERENT ANSWERS — reading them alike told a
+            // keyer whose colleague had merely saved that their work was "already submitted", which is both
+            // false and unrecoverable-sounding.
             if (response.status === 409) {
-                stop('This response has already been submitted, so it is no longer being saved as a draft.');
+                const code = await conflictCode(response);
+
+                // `draft_conflict` — another tab or device saved in between, so this tab's base is stale.
+                // Still terminal for the AUTOSAVE loop (retrying sends the same stale base forever, and
+                // silently re-sending would be the lost update this guard exists to stop), but the reason and
+                // the remedy are different, so the message names reloading rather than submission.
+                stop(
+                    code === 'draft_conflict'
+                        ? 'This draft was changed somewhere else, so saving has stopped to avoid overwriting it. Reload the page to pick up the newer answers.'
+                        : 'This response has already been submitted, so it is no longer being saved as a draft.',
+                );
 
                 return;
             }
@@ -379,5 +438,5 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
         onBeforeUnmount(dispose);
     }
 
-    return { state, savedAt, completeness, expiresAt, message, flush, dispose };
+    return { state, savedAt, completeness, expiresAt, message, baseline, flush, dispose };
 }

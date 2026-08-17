@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Submissions;
 
+use App\Http\Requests\Public\GuestSubmissionRequest;
 use App\Services\Submissions\SubmissionPipeline;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -33,7 +34,32 @@ final class EncodeSubmissionRequest extends FormRequest
             // to `promote()` instead of a second `submit()`, and it makes a double-clicked Submit resolve to
             // one submission via Stage 2b.
             'client_submission_uuid' => ['nullable', 'uuid'],
+            // Increment P3a — the lost-update baseline, for the same reason the guest submit carries one:
+            // the draft branch SAVES before it promotes, so a stale tab would overwrite another tab's answers
+            // and finalize them in one request. ⚠️ Without it the encode page contradicts itself — P3a stops
+            // the autosave loop with "saving has stopped to avoid overwriting it", and then Submit would
+            // overwrite it anyway.
+            'base_content_checksum' => ['nullable', 'string', 'size:64'],
         ];
+    }
+
+    /**
+     * The lost-update baseline, and whether one was CLAIMED — the same present-only posture as
+     * {@see GuestSubmissionRequest::claimsBaseline()}, and for the same reason as
+     * that class's `client_submission_uuid` note directly above: this endpoint must keep working for a direct
+     * POST or an old cached page, so an ABSENT claim submits exactly as it did before P3a. A present-but-stale
+     * claim is refused.
+     */
+    public function baseContentChecksum(): ?string
+    {
+        $value = $this->input('base_content_checksum');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    public function claimsBaseline(): bool
+    {
+        return $this->baseContentChecksum() !== null;
     }
 
     /**

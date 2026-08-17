@@ -74,6 +74,14 @@ final class GuestSubmissionController extends Controller
         if ($draft !== null) {
             // Capture any final edits (Stage-1), then finalize the SAME row via promote() (full Stage-3, in
             // place). No form_updated check: the draft is pinned to its own version and promote() re-asserts it.
+            //
+            // ⚠️ THIS SAVE IS THE SHARPEST INSTANCE OF THE P3a LOST UPDATE, WHICH IS WHY THE PAYLOAD CARRIES A
+            // BASELINE. It is a whole-document replace like any other draft save, but a promotion follows
+            // immediately — so a stale device would not merely overwrite another device's answers, it would
+            // FINALIZE the row with its own stale copy, and no later save can undo that. A mismatch throws
+            // SubmissionConflictException, which bootstrap/app.php renders as 409 `draft_conflict`, and the
+            // guest outbox parks the row for the existing review-and-resubmit UX exactly as it does for the
+            // content 409.
             $drafts->saveDraft($payload);
             $result = $drafts->promote($draft);
         } else {
@@ -132,6 +140,10 @@ final class GuestSubmissionController extends Controller
             guestContactEmail: $request->guestContactEmail(),
             deviceId: $request->deviceId(),
             appVersion: $request->appVersion(),
+            // Increment P3a — only consumed by the DRAFT branch below (saveDraft's update path); the
+            // pipeline's own submit() ignores both fields, so setting them here is safe for either branch.
+            checkBaseline: $request->claimsBaseline(),
+            baseContentChecksum: $request->baseContentChecksum(),
         );
     }
 }

@@ -33,7 +33,38 @@ final class GuestSubmissionRequest extends FormRequest
             // Increment G8b — offline device provenance (data-dictionary §7); bounded to the column widths.
             'device_id' => ['nullable', 'string', 'max:100'],
             'app_version' => ['nullable', 'string', 'max:20'],
+            // Increment P3a — the lost-update baseline, carried on SUBMIT because a submit against an
+            // existing draft performs a draft SAVE first (see GuestSubmissionController: capture final edits,
+            // then promote). That save is a whole-document replace, so without this a stale device could
+            // overwrite another device's answers AND finalize the row in one request — the same defect as on
+            // the draft channel, but terminal, since no later save can undo a promotion.
+            'base_content_checksum' => ['nullable', 'string', 'size:64'],
         ];
+    }
+
+    /**
+     * The lost-update baseline, and whether one was CLAIMED at all.
+     *
+     * ⚠️ THIS CHANNEL CHECKS ONLY WHEN THE CLIENT MAKES A CLAIM, WHICH IS THE OPPOSITE POSTURE TO THE DRAFT
+     * CHANNEL, AND THE ASYMMETRY IS DELIBERATE. A draft save is one tick of a live loop: refusing a client
+     * that omits the token costs a retype and is the safe direction. A SUBMIT can arrive from the offline
+     * OUTBOX, replayed hours later by a service worker from a row serialized by an earlier build — refusing
+     * that strands a real, finished response that nothing can resubmit, which is a direct breach of the
+     * offline-first promise this whole subsystem exists to keep. So an absent claim replays exactly as it did
+     * before P3a, and a present-but-stale claim is refused. Our own client always sends one, including from
+     * the outbox.
+     */
+    public function baseContentChecksum(): ?string
+    {
+        $value = $this->input('base_content_checksum');
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** True when the request actually carried a baseline — see the accessor above for why absence is not a claim. */
+    public function claimsBaseline(): bool
+    {
+        return $this->baseContentChecksum() !== null;
     }
 
     public function deviceId(): ?string

@@ -117,6 +117,10 @@ final class SubmissionController extends Controller
             source: SubmissionSource::Manual,
             respondentUserId: $user->id,
             clientSubmissionUuid: $uuid,
+            // Increment P3a — consumed only by the draft branch below (saveDraft's update path); the
+            // pipeline's submit() ignores both, so setting them here is safe for either branch.
+            checkBaseline: $request->claimsBaseline(),
+            baseContentChecksum: $request->baseContentChecksum(),
         );
 
         if ($draft !== null) {

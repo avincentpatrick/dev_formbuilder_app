@@ -31,6 +31,14 @@ export interface SubmitPayload {
     // Increment G8b — device provenance, threaded through for both live submits and offline outbox replay.
     deviceId?: string | null;
     appVersion?: string | null;
+    /**
+     * Increment P3a — the lost-update baseline, needed on SUBMIT because a submit against an existing server
+     * draft performs a draft save first and then promotes, so a stale device would overwrite another
+     * device's answers AND finalize them. Carried on the outbox row too, so an offline replay makes the same
+     * claim it would have made live. Null/absent when this session never created a server draft, which is
+     * the ordinary fill: the server has no draft to overwrite and the check does not run.
+     */
+    baseContentChecksum?: string | null;
 }
 
 export interface ApiClient {
@@ -154,6 +162,12 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
                         ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
                         ...(payload.appVersion ? { app_version: payload.appVersion } : {}),
+                        // Increment P3a — conditionally spread, UNLIKE the draft channel's, and the
+                        // difference is the server's posture rather than an inconsistency: submit checks
+                        // only when a claim is made, so that an outbox row serialized by an older build
+                        // replays instead of being refused. Sending an explicit null here would be a claim
+                        // of "the server holds nothing", which is a different and wrong assertion.
+                        ...(payload.baseContentChecksum ? { base_content_checksum: payload.baseContentChecksum } : {}),
                     }),
                 });
 
@@ -200,6 +214,7 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                     resume_token: string;
                     resume_url: string;
                     expires_at: string;
+                    content_checksum: string | null;
                 };
             }>((token) =>
                 doFetch(`/api/v1/public/f/${encodeURIComponent(token)}/draft`, {
@@ -209,6 +224,11 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         answers: payload.answers,
                         client_submission_uuid: payload.clientSubmissionUuid,
                         locale: payload.locale,
+                        // Increment P3a — sent even when null, unlike the conditionally-spread fields below.
+                        // A first save genuinely HAS no base, and null is the value that says so; omitting
+                        // the key entirely would look identical to a client that forgot, and the server
+                        // cannot tell those apart.
+                        base_content_checksum: payload.baseContentChecksum ?? null,
                         ...(payload.draftCurrentStep ? { draft_current_step: payload.draftCurrentStep } : {}),
                         ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
                         ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
@@ -224,6 +244,7 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                 resumeToken: data.resume_token,
                 resumeUrl: data.resume_url,
                 expiresAt: data.expires_at,
+                contentChecksum: data.content_checksum,
             };
         },
     };
@@ -261,6 +282,7 @@ export async function resumeDraft(
                 locale: string | null;
                 share_token: string;
                 share_token_expires_at: string;
+                content_checksum: string | null;
             };
         }
     ).data;
@@ -275,6 +297,7 @@ export async function resumeDraft(
         locale: data.locale,
         shareToken: data.share_token,
         shareTokenExpiresAt: data.share_token_expires_at,
+        contentChecksum: data.content_checksum,
     };
 }
 

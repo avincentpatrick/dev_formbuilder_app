@@ -98,11 +98,20 @@ final class SubmissionDraftController extends Controller
                 clientSubmissionUuid: $request->clientSubmissionUuid(),
                 draftCurrentStep: $request->draftCurrentStep(),
                 ttlDays: is_numeric($ttl) ? (int) $ttl : null,
+                // Increment P3a — the keyer's tab makes a baseline claim on every tick, the same posture the
+                // guest channel takes. Two tabs on one draft is the reachable case here (bootstrap/app.php
+                // names it), and it is a lost update rather than a promotion race.
+                checkBaseline: true,
+                baseContentChecksum: $request->baseContentChecksum(),
             ));
         } catch (SubmissionConflictException $e) {
-            // The two-tab case: this uuid's row was promoted between the last tick and this one, so
-            // updateDraft()'s lock re-assert refused. Terminal for the composable — it stops rather than
-            // retrying forever against a row that will never be a draft again.
+            // ⚠️ TWO CAUSES SINCE P3a, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE.
+            // `draft_already_finalized` — this uuid's row was promoted between the last tick and this one, so
+            // updateDraft()'s lock re-assert refused. TERMINAL: the composable stops rather than retrying
+            // forever against a row that will never be a draft again.
+            // `draft_conflict` — another tab/device saved in between, so this tick is based on answers the
+            // draft no longer holds. NOT terminal in the same way: the fix is to re-read the draft and carry
+            // on, which is why the two carry distinct codes rather than one shared 409.
             return ApiErrorResponse::make(409, $e->code(), $e->getMessage());
         } catch (SubmissionValidationException $e) {
             // Structural (Stage 1) only — saveDraft() skips Stage 3 by design, so a half-filled document
@@ -124,6 +133,9 @@ final class SubmissionDraftController extends Controller
                 'completeness_percent' => $submission->completeness_percent,
                 'last_saved_at' => $submission->last_saved_at?->toIso8601String(),
                 'expires_at' => $submission->draft_expires_at?->toIso8601String(),
+                // Increment P3a — the baseline for this tab's next tick (see the guest channel for why it is
+                // returned rather than re-read).
+                'content_checksum' => $result->contentChecksum,
             ],
         ], $result->created ? 201 : 200);
     }

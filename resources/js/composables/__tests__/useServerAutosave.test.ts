@@ -295,3 +295,103 @@ describe('useServerAutosave — lifecycle', () => {
         expect(post).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Increment P3a — the lost-update baseline on the encode channel.
+ *
+ * Two tabs on one draft is the reachable case here (bootstrap/app.php names it), and before P3a the second
+ * tab's tick silently replaced the first tab's answers: the write is a whole-document replace.
+ */
+describe('useServerAutosave — P3a lost-update baseline', () => {
+    /** A 409 carrying a typed error envelope, which the `{ data }` helper above cannot express. */
+    function conflict(code: string): Response {
+        return {
+            ok: false,
+            status: 409,
+            json: async () => ({ error: { code, message: 'nope' } }),
+        } as unknown as Response;
+    }
+
+    it('sends the seeded baseline, then advances it from each response', async () => {
+        const post = vi
+            .fn()
+            .mockResolvedValueOnce(jsonResponse(200, { last_saved_at: 't1', completeness_percent: 10, content_checksum: 'sum-2' }))
+            .mockResolvedValueOnce(jsonResponse(200, { last_saved_at: 't2', completeness_percent: 20, content_checksum: 'sum-3' }));
+        const { answers } = harness({ post, baseContentChecksum: 'sum-1' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        // The page's rendered baseline goes out first.
+        expect((post.mock.calls[0][0] as Record<string, unknown>).base_content_checksum).toBe('sum-1');
+
+        answers.a = '2';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        // ...and the SECOND tick carries what the server just wrote, not the stale page value. Without this
+        // every save after the first would present a stale base and read as a second tab.
+        expect((post.mock.calls[1][0] as Record<string, unknown>).base_content_checksum).toBe('sum-2');
+    });
+
+    it('sends an explicit null baseline on the blank keying form', async () => {
+        const post = vi.fn(async () => jsonResponse(200, { content_checksum: 'sum-1' }));
+        const { answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        const body = post.mock.calls[0][0] as Record<string, unknown>;
+        expect(body).toHaveProperty('base_content_checksum');
+        expect(body.base_content_checksum).toBeNull();
+    });
+
+    it('tells a lost update apart from an already-submitted draft, and says something different', async () => {
+        const post = vi.fn(async () => conflict('draft_conflict'));
+        const { autosave, answers } = harness({ post, baseContentChecksum: 'stale' });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        // Reading the two 409 causes alike told a keyer whose colleague had merely SAVED that their work was
+        // "already submitted" — false, and it names a remedy that does not exist.
+        expect(autosave.message.value).toContain('Reload');
+        expect(autosave.message.value).not.toContain('already been submitted');
+    });
+
+    it('keeps the pre-P3a message for the promotion race', async () => {
+        const post = vi.fn(async () => conflict('draft_already_finalized'));
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(autosave.state.value).toBe('stopped');
+        expect(autosave.message.value).toContain('already been submitted');
+    });
+
+    it('falls back to the pre-P3a message when a 409 body is unreadable', async () => {
+        const post = vi.fn(async () => ({
+            ok: false,
+            status: 409,
+            json: async () => {
+                throw new SyntaxError('not json');
+            },
+        }) as unknown as Response);
+        const { autosave, answers } = harness({ post });
+
+        answers.a = '1';
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(150);
+
+        // An unparseable body is not EVIDENCE of a lost update, so it must not claim one — and it must not
+        // turn a typed refusal into an unhandled rejection either.
+        expect(autosave.state.value).toBe('stopped');
+        expect(autosave.message.value).toContain('already been submitted');
+    });
+});

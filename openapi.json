@@ -5970,6 +5970,15 @@
                             "null"
                         ],
                         "maxLength": 20
+                    },
+                    "base_content_checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Increment P3a \u2014 the lost-update baseline, carried on SUBMIT because a submit against an\nexisting draft performs a draft SAVE first (see GuestSubmissionController: capture final edits,\nthen promote). That save is a whole-document replace, so without this a stale device could\noverwrite another device's answers AND finalize the row in one request \u2014 the same defect as on\nthe draft channel, but terminal, since no later save can undo a promotion.",
+                        "minLength": 64,
+                        "maxLength": 64
                     }
                 },
                 "required": [

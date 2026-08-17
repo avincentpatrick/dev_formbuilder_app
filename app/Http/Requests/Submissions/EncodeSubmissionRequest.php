@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Submissions;
 
+use App\Http\Requests\Public\GuestSubmissionRequest;
 use App\Services\Submissions\SubmissionPipeline;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -44,7 +45,7 @@ final class EncodeSubmissionRequest extends FormRequest
 
     /**
      * The lost-update baseline, and whether one was CLAIMED — the same present-only posture as
-     * {@see \App\Http\Requests\Public\GuestSubmissionRequest::claimsBaseline()}, and for the same reason as
+     * {@see GuestSubmissionRequest::claimsBaseline()}, and for the same reason as
      * that class's `client_submission_uuid` note directly above: this endpoint must keep working for a direct
      * POST or an old cached page, so an ABSENT claim submits exactly as it did before P3a. A present-but-stale
      * claim is refused.

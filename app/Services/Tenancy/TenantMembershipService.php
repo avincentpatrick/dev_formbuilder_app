@@ -141,6 +141,26 @@ final class TenantMembershipService
      * Accept an invitation as $user: activate the membership and — only now — materialize the reserved
      * role into a real model_has_roles row (§7: an unaccepted invite grants nothing). syncRoles keeps
      * the "one role per tenant" invariant; it and the RLS INSERT both key on the active tenant.
+     *
+     * ── 🔴 THIS RAISED NOTHING UNTIL K1c, AND THE OMISSION WAS LOAD-BEARING IN TWO PLACES ──────────────
+     * {@see MemberJoined} was raised only from {@see self::attachMember()}, which serves the three
+     * SELF-SERVE doors. So the commonest door of all — being invited and accepting — announced nothing to
+     * the Owner who sent the invitation, and earned the new member no `member.joined` points and **no
+     * `welcome` badge**: the one badge whose entire stated purpose is to keep a brand-new member's
+     * achievements surface from being blank (gamification-design.md §7).
+     *
+     * Found by K1c while verifying that its backfill could read the membership rules out of `audits`. It is
+     * fixed here rather than filed, because the alternative is a scoreboard that permanently disagrees with
+     * itself: the backfill grants every historical invited member their join points from
+     * `tenant_users.joined_at`, and without this line the very next acceptance would grant none.
+     *
+     * ⚠️ **POST-COMMIT, WHICH IS THE OPPOSITE OF `attachMember()`'s CHOICE, AND THE DIFFERENCE IS REAL.**
+     * That method must raise INSIDE its transaction because it is the one membership write with no ambient
+     * tenant context — it borrows one with `applyLocal()`, whose `SET LOCAL` GUC dies at commit, so a
+     * post-commit listener's strict-RLS INSERT would be refused outright. This method has no such problem:
+     * it runs in-request under session-scoped context that outlives the commit, which is precisely
+     * `FormService::create()`'s situation and gets `FormService::create()`'s answer. Emitting after the
+     * commit means neither a scoreboard write nor a notification can roll back somebody's acceptance.
      */
     public function accept(TenantUser $invite, User $user): TenantUser
     {
@@ -149,7 +169,7 @@ final class TenantMembershipService
             throw MembershipException::invitationMismatch();
         }
 
-        return DB::transaction(function () use ($invite, $user): TenantUser {
+        $accepted = DB::transaction(function () use ($invite, $user): TenantUser {
             $invite->fill([
                 'status' => TenantUserStatus::Active,
                 'joined_at' => now(),
@@ -163,6 +183,29 @@ final class TenantMembershipService
 
             return $invite;
         });
+
+        // The role name is read back from the row rather than carried out of the closure: `invited_role_id`
+        // is nullable, and a membership whose reserved role has since been deleted still accepted.
+        $role = Role::query()->whereKey($accepted->invited_role_id)->first();
+
+        if ($role !== null) {
+            event(MemberJoined::for($this->tenantOf($accepted), $user, (string) $role->name));
+        }
+
+        return $accepted;
+    }
+
+    /**
+     * The workspace a membership belongs to, for an event payload that wants the model.
+     *
+     * `tenant_id` is on the row and `tenants` is RLS-exempt, so this needs no context and cannot be
+     * mis-scoped. Read rather than taken from {@see TenantContext} for the same reason
+     * `PointsRecorder::emailSubject()` takes an explicit tenant: an ambient read would make the payload
+     * depend on when it was assembled.
+     */
+    private function tenantOf(TenantUser $membership): Tenant
+    {
+        return Tenant::query()->findOrFail($membership->tenant_id);
     }
 
     /**

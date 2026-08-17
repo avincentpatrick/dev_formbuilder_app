@@ -58,6 +58,7 @@ use App\Support\Audit\AuditRedactor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\DeterministicIds;
+use Database\Seeders\Concerns\SeedsGamificationLedger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +79,7 @@ use Spatie\Permission\PermissionRegistrar;
 class E2eSeeder extends Seeder
 {
     use DeterministicIds;
+    use SeedsGamificationLedger;
 
     private const OWNER_EMAIL = 'demo@meridian.test';
 
@@ -722,6 +724,11 @@ class E2eSeeder extends Seeder
 
             $this->seedScopingHierarchy($owner, $reviewer);
 
+            // K1c. After every submission block above, so the fixture's own collection and review history
+            // reaches the ledger — nothing here drives `SubmissionPipeline`, so no `SubmissionCreated` was
+            // ever raised for any of it. Announcements are suppressed, which is what keeps the notification
+            // counts several Playwright specs assert on exactly where they were.
+            $this->seedGamificationLedger();
             $this->seedNotifications($owner, $reviewer);
 
             $this->seedFeedback($owner, $reviewer);
@@ -1114,7 +1121,10 @@ class E2eSeeder extends Seeder
      * ⚠️ **ONE ROW BELONGS TO THE REVIEWER, ON PURPOSE.** Playwright only ever logs in as the Owner, so a
      * regression that dropped `Notification::scopeForUser()` would be INVISIBLE in a fixture where every
      * row is the Owner's — the badge would read the same either way. With the reviewer's row present the
-     * Owner's badge is 4 while the table holds 7.
+     * Owner's badge is 7 while the table holds 10. (It was 4 and 7 until K1b: the Owner genuinely earns
+     * three gamification badges here, because `seedForms()` drives the real services and each announces.
+     * K1c's own ledger seeding adds no further rows — it suppresses announcements deliberately, precisely
+     * so this fixture's counts stay where the Playwright specs expect them.)
      *
      * ⚠️ **THE ONE DIVERGING PREFERENCE IS ON THE ONE TYPE WITH NO NOTIFICATION.** `review_requested` is
      * silenced on both channels for the Owner and is the only type the Owner holds no row for, so the

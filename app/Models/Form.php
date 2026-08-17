@@ -290,4 +290,33 @@ class Form extends Model implements TenantScoped
 
         return $query->whereIn('forms.id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
     }
+
+    /**
+     * Forms that are live — collecting, or able to (Increment K1c).
+     *
+     * THE one definition of "a published form", extracted here because K1c's workspace-wide team progress
+     * needed the identical set that `DashboardMetricsService::publishedFormsCount()` had been spelling out
+     * inline. That method is now this scope's second caller rather than its rival — the argument its own
+     * sibling `visibleFormsQuery()` makes for itself in J5b, applied one level down: two copies of a
+     * predicate agree only by inspection, and this codebase has an ADR-numbering incident to show for what
+     * that costs.
+     *
+     * ⚠️ **`current_published_version_id`, NOT `status`.** {@see FormStatus} carries a `Published` case, but
+     * the column is what `FormPublishController` actually writes and what the public runtime resolves
+     * against, so it is the fact rather than a label beside it. And an ARCHIVED form is excluded even though
+     * it was once published: archiving takes it out of service, so counting it would report a workspace as
+     * more live than it is.
+     *
+     * Deliberately carries no visibility conjunct — "is this form published" and "may this reader see it"
+     * are different questions, and the caller composes {@see scopeVisibleTo()} when it wants both.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query
+            ->where('forms.status', '!=', FormStatus::Archived->value)
+            ->whereNotNull('forms.current_published_version_id');
+    }
 }

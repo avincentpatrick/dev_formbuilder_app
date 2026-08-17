@@ -73,7 +73,7 @@ final class BackfillGamificationCommand extends Command
     }
 
     /**
-     * @return list<Tenant>|null  null when a named tenant could not be resolved
+     * @return list<Tenant>|null null when a named tenant could not be resolved
      */
     private function targets(): ?array
     {
@@ -83,7 +83,15 @@ final class BackfillGamificationCommand extends Command
             // `tenants` is RLS-exempt — it is the discriminator table — so this needs no context, and
             // `scopeActive()` is routed through rather than re-spelled so this and `TenantAwareJob`'s own
             // per-job lifecycle guard cannot drift apart.
-            return Tenant::query()->active()->orderBy('slug')->get()->all();
+            //
+            // The narrowing is real rather than a cast to satisfy the analyser: `Tenant` extends stancl's
+            // model, so the builder is typed against the CONTRACT and `get()->all()` widens to
+            // `array<Model>` — the same reason `ExtractTenantCommand` checks `instanceof` on its own
+            // resolve.
+            return array_values(array_filter(
+                Tenant::query()->active()->orderBy('slug')->get()->all(),
+                static fn (object $tenant): bool => $tenant instanceof Tenant,
+            ));
         }
 
         $tenant = TenantLocator::find($named);

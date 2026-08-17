@@ -290,6 +290,18 @@ const startChoices = computed(() => {
         blank,
     ];
 });
+
+/**
+ * ⚠️ THE LEDE COUNTS THE CARDS RATHER THAN ASSUMING THEM, AND THE FIRST VERSION DID NOT. It read "Two ways
+ * in" unconditionally — which is false for every tenant whose plan does not include the template gallery,
+ * i.e. every Free one. A sentence that is wrong exactly where the degradation happens is worse than no
+ * sentence, because the degradation is the case nobody looks at.
+ */
+const startLede = computed(() =>
+    startChoices.value.length > 1
+        ? 'Two ways in. Both open the builder, so you can change everything afterwards.'
+        : 'The builder opens straight away, so you can change everything afterwards.',
+);
 </script>
 
 <template>
@@ -299,7 +311,21 @@ const startChoices = computed(() => {
                 <!-- Renders NOTHING unless the tenant is entitled AND the user may read analytics. §D9:
                      hidden, never a locked control with an upgrade CTA — Business cannot be bought. -->
                 <AnalyticsViewSwitcher current="overview" />
-                <MdsButton v-if="canCreate" variant="primary" icon-left="plus" @click="goToForms">
+                <!--
+                    ⚠️ NOT ON THE FIRST RUN, AND THE VISUAL SWEEP IS WHAT FOUND THIS. The moment below IS the
+                    call to action, so leaving this here put THREE create affordances on one screen — and the
+                    third was the worst of them: it goes to `/forms`, which for a workspace with no forms
+                    renders its own empty state offering the same two choices over again. A button that
+                    leads to a second copy of the screen you are already on is PRD §3.7's non-duplicative
+                    principle failing in the one place onboarding §2 asks for a single lightweight choice.
+                    It returns the moment a form exists, where it is the ordinary page action again.
+                -->
+                <MdsButton
+                    v-if="canCreate && !isFirstRun"
+                    variant="primary"
+                    icon-left="plus"
+                    @click="goToForms"
+                >
                     Create form
                 </MdsButton>
             </template>
@@ -315,13 +341,19 @@ const startChoices = computed(() => {
             literal empty dashboard it names.
         -->
         <template v-if="isFirstRun">
-            <section class="dash__start" aria-labelledby="dash-start-heading">
+            <!--
+                ⚠️ THE WHOLE PREAMBLE IS INSIDE THIS `v-if`, AND THE ADVERSARIAL PASS IS WHY. The first
+                version rendered the heading and the lede unconditionally and switched only the grid for an
+                empty state — so a reader who cannot author was shown "Create your first form" and "Two ways
+                in" directly above a card explaining that they cannot make one. It also left
+                `aria-labelledby` pointing at a heading that... was still there, but naming a section whose
+                content contradicted it. Two surfaces, not one surface with a hole in it.
+            -->
+            <section v-if="startChoices.length > 0" class="dash__start" aria-labelledby="dash-start-heading">
                 <h2 id="dash-start-heading" class="dash__section-title">Create your first form</h2>
-                <p class="dash__start-lede">
-                    Two ways in. Both open the builder, so you can change everything afterwards.
-                </p>
+                <p class="dash__start-lede">{{ startLede }}</p>
 
-                <div v-if="startChoices.length > 0" class="dash__start-grid">
+                <div class="dash__start-grid">
                     <component
                         :is="choice.href ? Link : 'button'"
                         v-for="choice in startChoices"
@@ -336,21 +368,24 @@ const startChoices = computed(() => {
                         <span class="dash__start-body">{{ choice.body }}</span>
                     </component>
                 </div>
-
-                <!--
-                    No CTA, and different copy — §3.10's extended governing rule: a surface that is empty
-                    because of a PERMISSION restriction explains why, rather than offering a button that
-                    would 403. This reader can see the workspace and cannot author in it.
-                -->
-                <MdsCard v-else class="dash__empty-card">
-                    <MdsEmptyState
-                        headline="No forms yet"
-                        description="Nobody has built a form in this workspace. When someone does, its responses appear here."
-                    />
-                </MdsCard>
             </section>
 
-            <CreateFormModal v-model:open="createOpen" />
+            <!--
+                No CTA, and different copy — §3.10's extended governing rule: a surface empty because of a
+                PERMISSION restriction explains why, rather than offering a button that would 403.
+                ⚠️ AND THE COPY MUST NOT CLAIM THE WORKSPACE IS EMPTY, which the first version did. The only
+                reader who reaches this branch is form-scoped (a Reviewer holding no grants): `kpis.forms` is
+                THEIR count, not the organisation's, so "nobody has built a form here" is a statement about
+                a workspace this page cannot see. What is true is that nothing is shared with them yet.
+            -->
+            <MdsCard v-else class="dash__empty-card">
+                <MdsEmptyState
+                    headline="No forms yet"
+                    description="No form has been shared with you. When one is, it and its responses appear here."
+                />
+            </MdsCard>
+
+            <CreateFormModal v-if="start.can_create" v-model:open="createOpen" />
         </template>
 
         <template v-else>

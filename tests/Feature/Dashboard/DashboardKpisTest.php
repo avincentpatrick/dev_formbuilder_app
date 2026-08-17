@@ -5,7 +5,10 @@ declare(strict_types=1);
 use App\Enums\PlanTier;
 use App\Enums\SubmissionStatus;
 use App\Models\User;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Forms\FormService;
+use App\Services\Settings\TenantSettingRegistry;
+use App\Support\Entitlements\ToggleableModules;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -236,6 +239,40 @@ it('offers the template choice when there is NO plan catalog, exactly as the rou
         ->actingAs($owner)
         ->get('http://acme.meridian.test/forms/templates')
         ->assertOk();
+});
+
+it('reads the form_templates key specifically, not merely "some Starter feature"', function (): void {
+    /*
+     * ⭐ THE COPY-PASTE CASE, AND THE MUTATION PASS IS WHY IT EXISTS. Swapping `form_templates` for
+     * `field_library` in the controller SURVIVED every other case in this file, because every seeded plan
+     * that grants one grants the other — so nothing here discriminated the key, only whether the tier was
+     * Starter. That is J4b2's recorded hole verbatim: it varied the OPERATOR and never the OPERANDS.
+     *
+     * The module toggle is the one seam in the product that separates two keys on one tier: it is ANDed
+     * with the plan flag inside `feature()` and can only ever subtract. `CrumbTrailGateTest` pins the same
+     * property for `webhooks` vs `native_connectors` the same way.
+     */
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    assignPlanTier(PlanTier::Starter);
+
+    app(TenantSettingRegistry::class)->put($tenant, [
+        ToggleableModules::settingKey('form_templates') => false,
+    ]);
+    app(EntitlementService::class)->forget();
+
+    expect(app(EntitlementService::class)->feature('form_templates'))->toBeFalse()
+        ->and(app(EntitlementService::class)->feature('field_library'))->toBeTrue();
+
+    $this->withoutVite()
+        ->actingAs($owner)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('start.can_create', true)
+            ->where('start.can_use_templates', false));
 });
 
 it('offers neither choice to a role that cannot author, and still renders the page', function (): void {

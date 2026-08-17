@@ -12,7 +12,7 @@ use App\Support\Authorization\ShellAbilities;
 /**
  * The dashboard's getting-started checklist (Increment J5b) — the "light gamification" half of the
  * 2026-08-09 decision of record, built here rather than in a client `computed` for the reason
- * {@see \App\Support\Navigation\CrumbTrail} and `FormTabSet` were: an href resolved in the browser sits
+ * `CrumbTrail` and `FormTabSet` were: an href resolved in the browser sits
  * somewhere no Pest test can reach, and that gap has already shipped a `/forms` crumb that 403'd for two
  * roles.
  *
@@ -177,7 +177,14 @@ final class GettingStartedChecklist
      * One row by construction — `tenant_users` carries `unique(tenant_id, user_id)`, *"at most one
      * membership record per tenant, ever"* — and RLS supplies the tenant half, which is why nothing here
      * mentions a tenant id. The same `where('user_id', …)` shape as
-     * {@see \App\Services\Tenancy\TenantMembershipService} and six other callers.
+     * `TenantMembershipService` and six other callers.
+     *
+     * ⚠️ **BOTH CLASSES ABOVE ARE NAMED IN PROSE RATHER THAN WITH A DOC REFERENCE, AND PINT IS THE REASON —
+     * SECOND OCCURRENCE IN THIS ONE INCREMENT.** J5a hit it on `FeatureAdmission`; this file hit it again on
+     * `CrumbTrail` and `TenantMembershipService`. A fully-qualified `{@see}` makes the
+     * `fully_qualified_strict_types` fixer add a REAL `use` for it, so a formatter couples a class to two
+     * others it never calls, for the sake of a comment. **Read the diff a formatter makes, not just its
+     * exit status.**
      *
      * `exists()` rather than reading the timestamp back: the question this class asks is a boolean, and a
      * method that returned `?Carbon` would invite a second reader to start meaning something by *when*.

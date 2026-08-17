@@ -92,13 +92,23 @@ it('opens the builder on the form it just created, and the creator can actually 
     enterTenant($tenant->id, $editor->id);
     makeActiveMember($editor, 'form_editor');
 
-    $this->actingAs($editor)
-        ->post('http://acme.meridian.test/forms', ['title' => 'Clinic Intake'])
-        ->assertRedirect();
+    $response = $this->actingAs($editor)
+        ->post('http://acme.meridian.test/forms', ['title' => 'Clinic Intake']);
 
     enterTenant($tenant->id, $editor->id);
     $form = Form::where('title', 'Clinic Intake')->firstOrFail();
 
+    // ⚠️ THE TARGET, NOT MERELY "A REDIRECT" — AND THE MUTATION PASS IS WHY THIS LINE EXISTS. The first
+    // version of this test asserted a bare `assertRedirect()` and then issued the GET below, so reverting
+    // `store()` to `back()` SURVIVED it: a `back()` is a redirect too, and the follow-up GET proves the
+    // builder is reachable rather than that anyone was sent there. The assertion has to name the
+    // destination, and the id is only knowable after the POST — hence the response is held rather than
+    // chained.
+    $response->assertRedirect("http://acme.meridian.test/forms/{$form->id}/builder");
+
+    // And then FOLLOW it, which is the half that matters: `forms.builder` carries `can:update,form`, so a
+    // redirect into a page the creator is refused would be the "links that bounce" defect shipped by the
+    // very commit that exists to remove a dead end.
     $this->actingAs($editor)
         ->get("http://acme.meridian.test/forms/{$form->id}/builder")
         ->assertOk();

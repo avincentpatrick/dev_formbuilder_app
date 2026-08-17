@@ -195,15 +195,29 @@ describe('MdsChecklist — the contracts that live in source text', () => {
      */
     const stylesheet = source.slice(source.indexOf('<style'));
 
+    /**
+     * ⚠️ THE STYLESHEET WITH ITS COMMENTS REMOVED, AND THIS EXISTS BECAUSE THE FIRST VERSION OF THIS SUITE
+     * FAILED AGAINST A CORRECT IMPLEMENTATION — SEVENTH OCCURRENCE OF *NAME THE THING, NEVER QUOTE IT* IN
+     * THIS REPOSITORY, AND THE THIRD WHERE THE NOTE EXPLAINING A RULE IS WHAT BROKE IT.
+     *
+     * The overflow guard below scans for a declaration this component must never carry. A CSS comment was
+     * then added telling the next author not to wrap the component in a box carrying that same
+     * declaration — and the guard matched the warning. Rewording the comment would "fix" it until the next
+     * person needed to write the words down again, so the fix is the one `token-references.test.ts` and
+     * J4c1 both landed on: **scope the scan to the region the contract actually lives in.** Declarations
+     * are the contract; prose about declarations is not.
+     */
+    const declarations = stylesheet.replace(/\/\*[\s\S]*?\*\//g, '');
+
     const block = (selector: string): string =>
-        stylesheet.match(new RegExp(`${selector.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+        declarations.match(new RegExp(`${selector.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
 
     it('colours a done row with an -fg token, never a -bg one', () => {
         // ⭐ DSR §3.4's standing rule for any coloured rule, edge or indicator. The project has paid for this
         // substitution three times (J2a's tab strip, J4a's accent bar, J4c1's underline at 2.41:1 in teal
         // dark). A "tidy" to the `-bg` half must redden here, because no gate in the repo can measure it.
         expect(block('.mds-checklist__row--done')).toMatch(/color:\s*var\(--mds-color-status-success-fg\)/);
-        expect(stylesheet).not.toContain('status-success-bg');
+        expect(declarations).not.toContain('status-success-bg');
     });
 
     it('establishes its own containing block for the clipped state words', () => {
@@ -213,7 +227,7 @@ describe('MdsChecklist — the contracts that live in source text', () => {
         // `clipped-node-containment.test.ts` holds the whole tree to it; this states the reason locally, so
         // it travels with the component.
         expect(block('.mds-checklist')).toMatch(/position:\s*relative/);
-        expect(stylesheet).toContain('clip: rect(0 0 0 0)');
+        expect(declarations).toContain('clip: rect(0 0 0 0)');
     });
 
     it('sizes the pending ring in pixels, to match the glyph that replaces it', () => {
@@ -236,6 +250,6 @@ describe('MdsChecklist — the contracts that live in source text', () => {
         // mints a scroll container nothing in this repository can see — happy-dom lays nothing out, the e2e
         // assertion reads a document box pinned flat by the app shell, and axe stays silent about a region
         // whose children are all focusable. A column of rows has no reason to want either axis.
-        expect(stylesheet).not.toMatch(/overflow(-x|-y)?:\s*(auto|scroll)/);
+        expect(declarations).not.toMatch(/overflow(-x|-y)?:\s*(auto|scroll)/);
     });
 });

@@ -626,6 +626,21 @@ describe('Dashboard — the first run', () => {
         wrapper.unmount();
     });
 
+    it('says "two ways in" only when there ARE two, which is where the degradation lands', () => {
+        // ⭐ THE ADVERSARIAL PASS FOUND THIS IN THIS INCREMENT'S OWN NEW CODE. The lede was unconditional,
+        // so every Free tenant — the exact readers who get one card — was told there were two. A sentence
+        // that is wrong precisely where the degradation happens is worse than no sentence, because the
+        // degraded path is the one nobody looks at.
+        const both = render({}, firstRun);
+        expect(both.text()).toContain('Two ways in');
+        both.unmount();
+
+        const one = render({}, { ...firstRun, start: { can_create: true, can_use_templates: false } });
+        expect(one.findAll('.dash__start-card')).toHaveLength(1);
+        expect(one.text()).not.toContain('Two ways in');
+        one.unmount();
+    });
+
     it('explains itself with no CTA at all for a reader who cannot author', () => {
         // ⭐ §3.10's extended rule: a surface empty because of a PERMISSION restriction says WHY, rather
         // than offering a button that would 403. A Reviewer lands on this page too.
@@ -635,7 +650,14 @@ describe('Dashboard — the first run', () => {
         );
 
         expect(wrapper.findAll('.dash__start-card')).toHaveLength(0);
-        expect(wrapper.text()).toContain('Nobody has built a form in this workspace');
+        // ⭐ AND THE WHOLE PREAMBLE GOES WITH THE GRID — the second half of the same finding. This reader
+        // was previously shown "Create your first form" and "Two ways in" directly above a card saying they
+        // could not make one.
+        expect(wrapper.text()).not.toContain('Create your first form');
+        expect(wrapper.text()).not.toContain('Two ways in');
+        // ⭐ AND THE COPY MUST NOT CLAIM THE WORKSPACE IS EMPTY. `kpis.forms` is THIS reader's count, not
+        // the organisation's, so "nobody has built a form here" is a claim about rows this page cannot see.
+        expect(wrapper.text()).toContain('No form has been shared with you');
         wrapper.unmount();
     });
 
@@ -662,11 +684,26 @@ describe('Dashboard — the first run', () => {
         wrapper.unmount();
     });
 
-    it('keeps the tiles and the trends the moment a form exists', () => {
+    it('withholds the header’s own Create button, which would lead back to this same choice', () => {
+        // ⭐ FOUND BY LOOKING AT THE RENDERED PAGE, NOT BY A GATE — the J4c2 lesson paying off again. The
+        // header action put a THIRD create affordance on a screen whose whole point is one lightweight
+        // choice, and it is the worst of the three: it goes to `/forms`, which for a workspace with no
+        // forms renders its own empty state offering the same two choices again. A button that leads to a
+        // second copy of the screen you are on is PRD §3.7's non-duplicative principle failing exactly
+        // where onboarding §2 asks for a single choice point.
+        const first = render({}, firstRun);
+        expect(first.findAll('button').filter((b) => b.text() === 'Create form')).toHaveLength(0);
+        first.unmount();
+    });
+
+    it('keeps the tiles, the trends and the header action the moment a form exists', () => {
         const wrapper = render();
 
         expect(wrapper.find('.dash__start-grid').exists()).toBe(false);
         expect(wrapper.find('.dash__trends').exists()).toBe(true);
+        // ⭐ The other half of the assertion above: the header action is ordinary once there is a list to
+        // go to, so this is a suppression scoped to one state rather than a deletion.
+        expect(wrapper.findAll('button').filter((b) => b.text() === 'Create form').length).toBeGreaterThan(0);
         wrapper.unmount();
     });
 });

@@ -55,12 +55,17 @@ function reenter(): void
     enterTenant(test()->tenant->id, test()->owner->id);
 }
 
-function draftBody(array $answers, string $uuid, ?string $step = null): array
+function draftBody(array $answers, string $uuid, ?string $step = null, ?string $baseline = null): array
 {
     return array_filter([
         'answers' => $answers,
         'client_submission_uuid' => $uuid,
         'draft_current_step' => $step,
+        // Increment P3a — the lost-update baseline. Filtered out when null exactly as the other optional keys
+        // are, which keeps every FIRST save in this file byte-identical to what it sent before: a first save
+        // genuinely has no base, so an absent key and a null key mean the same thing to the guard. A test
+        // doing repeated ticks under ONE uuid must chain it, because a real client does.
+        'base_content_checksum' => $baseline,
     ], static fn ($v): bool => $v !== null);
 }
 
@@ -88,10 +93,14 @@ it('overwrites one row across many autosave ticks instead of creating one per ti
     // `createDraft()` branch, so an hour of typing leaves a hundred draft rows each with a 30-day TTL.
     $uuid = Uuid::uuid7()->toString();
 
+    // Each tick carries the checksum the previous one returned, which is what a real tab does (P3a). The
+    // point of the test is unchanged: three ticks, ONE row.
+    $baseline = null;
     foreach (['A', 'B', 'C'] as $name) {
-        $this->actingAs($this->owner)
-            ->postJson(draftUrl($this->form), draftBody(['full_name' => $name], $uuid))
+        $response = $this->actingAs($this->owner)
+            ->postJson(draftUrl($this->form), draftBody(['full_name' => $name], $uuid, baseline: $baseline))
             ->assertSuccessful();
+        $baseline = $response->json('data.content_checksum');
     }
 
     reenter();
@@ -200,7 +209,7 @@ it('refuses a NEW draft on a closed form but keeps saving an existing one', func
     // branch only, so a keyer who started before the form closed is never stranded mid-transcription.
     $uuid = Uuid::uuid7()->toString();
 
-    $this->actingAs($this->owner)
+    $created = $this->actingAs($this->owner)
         ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
         ->assertCreated();
 
@@ -209,7 +218,7 @@ it('refuses a NEW draft on a closed form but keeps saving an existing one', func
 
     // The existing draft still saves...
     $this->actingAs($this->owner)
-        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada B'], $uuid))
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada B'], $uuid, baseline: $created->json('data.content_checksum')))
         ->assertSuccessful();
 
     // ...but a brand-new one is refused, with the typed code the client renders as a banner.
@@ -342,4 +351,60 @@ it('returns the draft expiry, which is the whole mitigation for keeping stamp-on
         ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], Uuid::uuid7()->toString()))
         ->assertCreated()
         ->assertJsonPath('data.expires_at', fn ($v): bool => is_string($v) && $v !== '');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment P3a — the lost-update guard on the ENCODE channel. bootstrap/app.php already named "two tabs on
+| one draft, different answers" as reachable here; before P3a the second tab's tick silently replaced the
+| first tab's answers, because the write is a whole-document replace.
+|--------------------------------------------------------------------------
+*/
+
+it('HEADLINE: refuses a second encode tab saving from a stale base, and keeps the first tab work', function (): void {
+    $uuid = Uuid::uuid7()->toString();
+
+    // Both tabs were opened against the same rendered state, so they hold the same base.
+    $seed = $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
+        ->assertCreated();
+    $sharedBase = $seed->json('data.content_checksum');
+    expect($sharedBase)->not->toBeNull();
+
+    // Tab one saves and moves the stored state on.
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada Lovelace'], $uuid, baseline: $sharedBase))
+        ->assertSuccessful();
+
+    // Tab two, still on the old base, is refused rather than overwriting.
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Bob'], $uuid, baseline: $sharedBase))
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict');
+
+    reenter();
+    $draft = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    $answers = SubmissionAnswer::query()->where('submission_id', $draft->id)->firstOrFail();
+    expect($answers->answers)->toBe(['full_name' => 'Ada Lovelace']);
+});
+
+it('renders the resume page with the baseline its autosave needs', function (): void {
+    // The presenter half. Without this the encode RESUME flow breaks outright: the page would send a null
+    // base against a row that has a checksum and autosave would stop on its very first tick.
+    $uuid = Uuid::uuid7()->toString();
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
+        ->assertCreated();
+
+    reenter();
+    $draft = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    $stored = SubmissionAnswer::query()->where('submission_id', $draft->id)->value('answers_content_checksum');
+
+    // `withoutVite()` because CI builds no assets — without it this passes locally and fails there as
+    // "Not a valid Inertia response".
+    $this->actingAs($this->owner)
+        ->withoutVite()
+        ->get("http://acme.meridian.test/submissions/{$draft->id}/resume")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('draft.baseline', $stored));
 });

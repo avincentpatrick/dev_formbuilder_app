@@ -54,6 +54,13 @@ export interface OutboxRow {
     locale: string;
     device_id: string;
     app_version: string;
+    /**
+     * Increment P3a — the server-draft baseline this submission was finalized against; null when no server
+     * draft existed. Un-indexed, so no Dexie version bump (`docs/offline-first-sync-design.md` §3). A row
+     * written by an older build simply has `undefined` here, which replays exactly as it did before P3a —
+     * which is why the SUBMIT channel checks only when a claim is present.
+     */
+    base_content_checksum: string | null;
     submitted_at: string;
     status: OutboxStatus;
     attempts: number;

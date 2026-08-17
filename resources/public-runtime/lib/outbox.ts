@@ -26,6 +26,13 @@ export interface EnqueueInput {
     locale: string;
     device_id: string;
     app_version: string;
+    /**
+     * Increment P3a — the server-draft baseline this submission was finalized against, or null when the
+     * session never created a server draft (the ordinary fill). Stored so a replay hours later makes the
+     * SAME claim the live submit would have. An un-indexed field on an existing row shape, so it needs no
+     * Dexie version bump — see `docs/offline-first-sync-design.md` §3.
+     */
+    base_content_checksum: string | null;
 }
 
 /** Append a finalized submission as a `pending` outbox row (the durable record of submit intent). */

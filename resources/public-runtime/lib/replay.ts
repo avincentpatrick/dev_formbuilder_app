@@ -268,6 +268,9 @@ async function replayRow(
             locale: row.locale,
             deviceId: row.device_id,
             appVersion: row.app_version,
+            // Increment P3a — replay the SAME baseline claim the live submit would have made. `?? null`
+            // rather than assuming the field exists: a row queued by a pre-P3a build has `undefined` here.
+            baseContentChecksum: row.base_content_checksum ?? null,
         });
         // I10d — the server id is recorded on the retained row, for support to resolve.
         //

@@ -255,6 +255,12 @@ final class SubmissionDraftService
                     ->where('submission_id', $row->id)
                     ->value('answers_content_checksum');
 
+                // Strict, though a LOOSE comparison survives the mutation pass (M11) and is provably
+                // equivalent over today's domain: the value is a 64-hex string or null, pinned by the
+                // requests' `size:64` rule and their accessors mapping '' to null, so no juggling case is
+                // reachable. It stays strict because that equivalence is a property of the DOMAIN, not of the
+                // comparison — widen the column or relax the rule and loose equality starts admitting pairs
+                // this must refuse.
                 if ($storedChecksum !== $baseline) {
                     throw SubmissionConflictException::draftConcurrentlyModified();
                 }
@@ -380,10 +386,19 @@ final class SubmissionDraftService
                 // including the commonest one by far: a plain network retry of a device's own first save,
                 // where both requests carry identical content and nothing was lost at all. The documented
                 // last-writer-wins recovery is left exactly as it was.
+                // ⚠️ `checkBaseline: false` IS PASSED EXPLICITLY RATHER THAN LEFT TO THE DEFAULT, and that is
+                // the mutation pass earning its keep: adding the check here survives every test in this
+                // repository (M12), because reaching this line needs a genuine insert race — findByClientUuid
+                // must return null and then non-null — which no deterministic test can stage. The omission is
+                // therefore enforced by this argument and the comment above it, not by a red test. Say so
+                // rather than let the next reader assume a gate exists.
                 if ($payload->clientSubmissionUuid !== null) {
                     $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
                     if ($existing !== null) {
-                        return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+                        return $this->updateDraft(
+                            $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
+                            checkBaseline: false,
+                        );
                     }
                 }
 

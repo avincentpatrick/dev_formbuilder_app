@@ -108,6 +108,8 @@ export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
         checksum: partial.checksum ?? 'checksum-abc',
         answers: partial.answers ?? {},
         locale: partial.locale ?? 'en',
+        // Increment P3a — defaults to null, the ordinary fill that never created a server draft.
+        base_content_checksum: partial.base_content_checksum ?? null,
         device_id: partial.device_id ?? 'device-1',
         app_version: partial.app_version ?? '1',
         submitted_at: partial.submitted_at ?? '2026-08-09T00:00:00.000Z',

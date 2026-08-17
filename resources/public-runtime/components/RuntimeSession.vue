@@ -241,6 +241,9 @@ async function submit(): Promise<SubmitOutcome> {
         locale: runtime.locale.value,
         device_id: deviceId,
         app_version: APP_VERSION,
+        // Increment P3a — freeze the baseline INTO the queued row, so a replay hours from now makes the same
+        // claim this submit would have made live. Null on an ordinary fill that never created a server draft.
+        base_content_checksum: draftBaseline.value,
     });
     void sync?.refresh();
 
@@ -260,6 +263,10 @@ async function submit(): Promise<SubmitOutcome> {
             locale: runtime.locale.value,
             deviceId,
             appVersion: APP_VERSION,
+            // Increment P3a — the same claim the queued row above carries. A submit against an existing
+            // server draft saves before it promotes, so without this a stale device finalizes over another
+            // device's answers.
+            baseContentChecksum: draftBaseline.value,
         });
         // I10d — discardRow, NOT markSynced. This is the path where the submission went straight out while
         // ONLINE, so the outbox row is only the crash-safe intent record and its job is done: outbox.ts's own

@@ -31,6 +31,14 @@ export interface SubmitPayload {
     // Increment G8b — device provenance, threaded through for both live submits and offline outbox replay.
     deviceId?: string | null;
     appVersion?: string | null;
+    /**
+     * Increment P3a — the lost-update baseline, needed on SUBMIT because a submit against an existing server
+     * draft performs a draft save first and then promotes, so a stale device would overwrite another
+     * device's answers AND finalize them. Carried on the outbox row too, so an offline replay makes the same
+     * claim it would have made live. Null/absent when this session never created a server draft, which is
+     * the ordinary fill: the server has no draft to overwrite and the check does not run.
+     */
+    baseContentChecksum?: string | null;
 }
 
 export interface ApiClient {
@@ -154,6 +162,12 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
                         ...(payload.guestContactEmail ? { guest_contact_email: payload.guestContactEmail } : {}),
                         ...(payload.deviceId ? { device_id: payload.deviceId } : {}),
                         ...(payload.appVersion ? { app_version: payload.appVersion } : {}),
+                        // Increment P3a — conditionally spread, UNLIKE the draft channel's, and the
+                        // difference is the server's posture rather than an inconsistency: submit checks
+                        // only when a claim is made, so that an outbox row serialized by an older build
+                        // replays instead of being refused. Sending an explicit null here would be a claim
+                        // of "the server holds nothing", which is a different and wrong assertion.
+                        ...(payload.baseContentChecksum ? { base_content_checksum: payload.baseContentChecksum } : {}),
                     }),
                 });
 

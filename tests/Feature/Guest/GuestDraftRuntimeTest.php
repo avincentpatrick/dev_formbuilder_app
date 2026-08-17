@@ -643,3 +643,64 @@ it('rejects a malformed baseline at validation rather than treating it as a conf
         'base_content_checksum' => 'not-a-sha256',
     ])->assertStatus(422);
 });
+
+it('HEADLINE: refuses a stale device SUBMITTING over a draft another device advanced', function (): void {
+    // ⚠️ THE SHARPEST INSTANCE, FOUND BY THE ADVERSARIAL PASS RATHER THAN BY THE ROW. A submit against an
+    // existing draft SAVES first and then PROMOTES, so before P3a a stale device did not merely overwrite the
+    // other device's answers -- it finalized the row with its own stale copy, and no later save could undo it.
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $draftUrl = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $seed = $this->postJson($draftUrl, [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+    $sharedBase = $seed->json('data.content_checksum');
+
+    // The tablet saves real work into the draft.
+    $this->postJson($draftUrl, [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])->assertOk();
+
+    // The phone, still on the pre-tablet base, presses Submit.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '31', 'full_name' => 'Bob'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict');
+
+    // Nothing was finalized and the tablet's answers are intact.
+    enterTenant($f->tenant->id);
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($row->status)->toBe(SubmissionStatus::Draft);
+    $answers = SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers');
+    expect(data_get($answers, 'full_name'))->toBe('Ada');
+});
+
+it('still replays an offline submit that makes no baseline claim, because stranding it breaks the promise', function (): void {
+    // ⚠️ THE DELIBERATE ASYMMETRY WITH THE DRAFT CHANNEL. An outbox row serialized by an earlier build has no
+    // baseline, and refusing it would strand a real, finished response that nothing can resubmit. The draft
+    // channel fails CLOSED because a refused tick costs a retype; this one fails OPEN because a refused
+    // replay costs the response.
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+    ])->assertSuccessful();
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
+        ->toBe(SubmissionStatus::Submitted);
+});

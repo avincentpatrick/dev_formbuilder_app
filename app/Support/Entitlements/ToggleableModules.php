@@ -31,6 +31,16 @@ use App\Services\Entitlements\EntitlementService;
  * the argument above alone, which is the durable half. `dedicated_db` and `data_residency` remain
  * unbuilt AND unprovisioned (ADR-0017 §D5); `embedded_payments` is held.
  *
+ * ── WHY `gamification` IS INCLUDED, WHICH IS THE INVERSE OF THE BRANDING ARGUMENT (K1a) ────────────────
+ * The exclusions above are all about not stranding live state. Gamification cannot strand any: `point_awards`
+ * is `append_only` under RLS, so switching the module off stops the listeners awarding and hides the
+ * surfaces, and there is no policy on the table that would let anything already earned be deleted — by this
+ * toggle or by anything else. That is why {@see self::hint()} can promise "nothing already earned is
+ * deleted" as a fact about the schema rather than as an intention. Switching it back on resumes awarding
+ * with the history intact; only the acts that happened while it was off are missing, which is what "off"
+ * should mean. ⚠️ Unlike every other key here it is granted on EVERY plan tier including Free (user
+ * decision 2026-08-17), so this toggle — not the plan — is the only control anyone has over it.
+ *
  * Adding a key here is a one-line change with no migration — `modules.<key>` is an open namespace in the
  * sparse `settings` table — but it MUST also exist in the plan catalog, which `ToggleableModulesTest` pins.
  */
@@ -51,6 +61,7 @@ final class ToggleableModules
         'form_templates',
         'field_library',
         'advanced_analytics',
+        'gamification',
     ];
 
     /** The settings key a module toggle is stored under. */
@@ -82,6 +93,7 @@ final class ToggleableModules
             'form_templates' => 'Form templates',
             'field_library' => 'Question library',
             'advanced_analytics' => 'Advanced analytics',
+            'gamification' => 'Points, badges and streaks',
             default => $module,
         };
     }
@@ -105,6 +117,7 @@ final class ToggleableModules
             'form_templates' => 'Hides the template gallery when creating a form.',
             'field_library' => 'Hides the saved-question library in the builder.',
             'advanced_analytics' => 'Hides the analytics workspace; the dashboard and per-form statistics are unaffected.',
+            'gamification' => 'Stops awarding points and badges, and hides the leaderboard. Nothing already earned is deleted.',
             default => '',
         };
     }

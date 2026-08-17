@@ -68,6 +68,10 @@ final class TenantScopedTables
         'notification_preferences',
         'notifications',
         'personal_access_tokens',
+        // K1a. Nothing withheld: the ledger carries no credential, no derived column and no fact about a
+        // subject outside this tenant — `subject_id` is a uuid of the tenant's own row, or a one-way digest
+        // of an address the tenant itself typed into an invite.
+        'point_awards',
         'probes',
         'resource_grants',
         'saved_report_views',

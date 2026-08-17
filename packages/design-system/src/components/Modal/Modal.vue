@@ -33,7 +33,7 @@ const props = withDefaults(
         open: boolean;
         title: string;
         closeLabel?: string;
-        // Teleport the overlay to <body> (default). Set false to render in place -- used by the axe
+        // Teleport the overlay to the document body (default). Set false to render in place -- used by the axe
         // stories so the scanner (scoped to #storybook-root) can see the dialog.
         teleport?: boolean;
         /**
@@ -76,7 +76,7 @@ const props = withDefaults(
          *
          * ⚠️ THIS IS THE MIRROR OF `initialFocus`, AND ITS ABSENCE WAS A LIVE DEFECT (J6). `takePage()`
          * verifies that focus actually landed and falls back, and explains at length why: the page is
-         * already inert by then, so every way the lookup can fail ends with the user on `<body>` with
+         * already inert by then, so every way the lookup can fail ends with the user on the document body with
          * Escape and the Tab trap unreachable. `closePage()` did none of that — it called
          * `opener?.focus?.()` and trusted it. But `.focus()` fails silently in three ways on the way OUT
          * too: the opener was removed while the dialog was open (an Inertia visit re-rendering the shell),
@@ -243,7 +243,7 @@ function closePage() {
     opener = null;
 
     // ⚠️ BUT THE VERIFICATION CANNOT BE, AND MEASURING IT IS WHAT ESTABLISHED THAT. The first version checked
-    // `activeElement` right here and the three fallback cases all failed against a stranded `<body>` -- the
+    // `activeElement` right here and the three fallback cases all failed against a stranded the document body -- the
     // watcher is PRE-FLUSH, so the panel is still mounted at this line and focus is still legitimately
     // inside it. The strand happens one tick later, when the `v-if` tears the panel out and the user agent
     // drops focus. Checking early does not measure the failure; it measures the moment before it. So the
@@ -261,7 +261,7 @@ function closePage() {
         if (!isStranded()) return;
 
         // Last resort, and it only fires where the reader would otherwise have nothing at all: focus is on
-        // `<body>` and a surface is still holding the page, so every other element in the document is inert.
+        // the document body and a surface is still holding the page, so every other element in the document is inert.
         const owner = pageOwningRoot();
         if (owner === null) return;
 
@@ -274,7 +274,7 @@ function closePage() {
  *
  * ⚠️ AN EARLIER VERSION OF THIS LINE SAID `document.body.focus()` IS ITSELF A NO-OP, AND THAT IS FALSE --
  * the body is the document's default focus target, so the call succeeds. It matters because it inverts the
- * consequence: a captured `<body>` opener does not fail to restore focus, it actively TAKES focus. That is
+ * consequence: a captured the document body opener does not fail to restore focus, it actively TAKES focus. That is
  * why `takePage()` refuses to capture one. Corrected rather than left flattering, because a docblock
  * asserting a safety that does not exist is how the next author builds on it.
  */
@@ -286,10 +286,10 @@ watch(
     () => props.open,
     (isOpen, was) => {
         if (isOpen && !was) {
-            // ⚠️ NEVER CAPTURE `<body>` AS AN OPENER, AND THIS IS A DEFECT J6's TESTS UNCOVERED RATHER THAN
+            // ⚠️ NEVER CAPTURE the document body AS AN OPENER, AND THIS IS A DEFECT J6's TESTS UNCOVERED RATHER THAN
             // INTRODUCED -- it predates the return-focus work. A modal MOUNTED already open with nothing
             // focused (two live call sites do exactly that, and every Storybook story) captured
-            // `document.activeElement`, which is `<body>`. `closePage()` then called `.focus()` on it, and
+            // `document.activeElement`, which is the document body. `closePage()` then called `.focus()` on it, and
             // `document.body.focus()` is NOT the no-op that comment assumed: the body IS the document's
             // default focus target, so the call SUCCEEDS and moves focus there. So closing such a modal did
             // not merely fail to restore focus -- it actively took it, including out of an upper dialog that
@@ -317,7 +317,7 @@ watch(
  *
  * It therefore has to run the full close, not just the release. Before I10a that did not matter, because a
  * mount-open modal never captured an opener in the first place; `immediate: true` now captures one, and
- * releasing `inert` without returning focus would strand the user on `<body>` -- the exact outcome DSR §4.5
+ * releasing `inert` without returning focus would strand the user on the document body -- the exact outcome DSR §4.5
  * says must never happen ("focus returns to the element that triggered the modal, never left stranded").
  * Focusing an already-detached opener (a full page teardown) is a harmless no-op.
  *

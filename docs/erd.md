@@ -78,9 +78,13 @@ erDiagram
     submissions ||--o{ audits : "polymorphic auditable (representative example)"
 
     tenants ||--o{ google_auth_requests : "in-flight Google sign-ins (J3c2)"
+
+    tenants ||--o{ point_awards : "gamification ledger (K1a)"
+    users ||--o{ point_awards : "who earned it (external, single-column FK)"
 ```
 
 **Reading notes:**
+- **`point_awards` has no line to the thing it is ABOUT, and that is the design** (K1a / ADR-0020 §D3). `subject_type`/`subject_id` name a form, a form version, a submission, a member — or, for `member.invited`, a SHA-256 of an email that references no row anywhere. A polymorphic pair with a non-row member cannot carry a database FK, so the only drawn relationships are the two that are real. `docs/data-dictionary.md` §31 has the full shape, including why the pair may never become nullable.
 - **`google_auth_requests` has no line to `users`, and its absence is the design** (J3c2 / ADR-0019 §D1). The person is the *outcome* of that flow, not a party to it: nobody is authenticated while any of its three rows-worth of writes happen. Where a Google account attaches to a local identity is `users.google_id` — a plain unique column, not a join table — so there is no relationship to draw. `docs/data-dictionary.md` §30 has the full shape, including why the central-host arm produces no row at all.
 - **The SAML tables (`sso_connections`, `sso_auth_requests`, `sso_auth_failures`) are not drawn here either.** That is pre-existing and stated rather than quietly inherited: they form a self-contained protocol subgraph hanging off `tenants`, and `docs/data-dictionary.md` §27–§29 specifies them. A future pass may add an auth-subgraph diagram; adding four disconnected boxes to the overview would cost more legibility than it buys.
 - `form_fields ||--o{ field_library` and `forms ||--o{ form_templates` (as *source*) are **intentionally not drawn** — both are copy-on-use blueprints (`docs/data-dictionary.md` §11–12's Design Notes: "instantiating a template clones this into a brand-new form... the new form never shares or references the template's own rows going forward"), not live foreign-key relationships. Only `form_templates.source_form_version_id` (a real, nullable FK for traceability) is drawn.

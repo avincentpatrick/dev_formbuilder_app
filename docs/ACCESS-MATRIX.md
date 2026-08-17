@@ -256,6 +256,13 @@ Two ability keys have no nav item of their own and gate in-page controls instead
 | `native_connectors` | — | ✅ | ✅ | ✅ | ✅ |
 | `advanced_analytics` | — | — | — | ✅ | ✅ |
 | `custom_domain` | — | — | — | ✅ | ✅ |
+| `gamification` | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+⚠️ **`gamification` (K1a) is the one row here that gates nothing, and it is listed precisely so nobody
+concludes it was forgotten.** It is granted on every tier by a product decision of record (ADR-0020 §D6);
+it exists as a plan key only because the Settings → Modules card may offer nothing the plan catalog does
+not know. The tenant's own module toggle is the only control over it — so a workspace where points are
+missing has switched them off, and no upgrade will bring them back.
 
 Current subscriptions: **`demo` = Business** · **`northwind` = Starter**.
 

@@ -1180,6 +1180,38 @@ One in-flight first-party Google sign-in (J3c2; ADR-0019 §D7). Its life is thre
 
 ---
 
+## 31. `point_awards`
+
+One earned gamification award (K1a; ADR-0020, `docs/gamification-design.md` §4). The engine's **only** stored history — badges (K1b) and streaks (K1c) are evaluated and derived from these rows, not maintained beside them.
+
+**Writer:** `App\Services\Gamification\PointsRecorder` — the only one, via raw `INSERT … ON CONFLICT DO NOTHING`. **Readers:** the achievements surface, the leaderboard, and K1b's badge evaluator.
+
+⚠️ **THE PK IS A BIGINT IDENTITY, NOT `uuidv7()`** — pure internal aggregation rows never addressed externally (the global PK-strategy note, `usage_counters` precedent), so `PointAward` does not use `HasUuidv7`.
+
+⚠️ **`points` IS COPIED AT AWARD TIME AND NEVER JOINED.** With the `append_only` policy set below, that is what makes re-weighting a rule move **future** awards only. A leaderboard that silently rewrites its own history when somebody edits a constant is not a record of anything (ADR-0020 §D4).
+
+| Column | Type | Nullable | Default | PII? | Description |
+|---|---|---|---|---|---|
+| `id` | `bigint` | No | identity | No | Primary key. See the note above on why this is not a uuid. |
+| `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. Auto-filled by `BelongsToTenant` on the model path; passed **explicitly** on the recorder's raw path, which is what satisfies the strict `WITH CHECK`. |
+| `user_id` | `uuid` | No | — | No | FK to `users.id`, `ON DELETE CASCADE`. **Single-column**, because `users` is a global (tenant-free) table — ADR-0002 §D5's composite `(tenant_id, id)` form applies to tenant-scoped parents, which this is not (the `notifications` / `saved_report_views` precedent). |
+| `rule` | `varchar(30)` | No | — | No | `App\Enums\PointRule`. CHECK-constrained from `PointRule::values()` so enum and constraint cannot drift. |
+| `points` | `integer` | No | — | No | The rule's weight **as it was at award time**. CHECK `> 0`: a zero-value row would still occupy the act's idempotency slot and silently block the real award if a weight were later corrected. |
+| `subject_type` | `varchar(20)` | No | — | No | `form` \| `form_version` \| `submission` \| `member` \| `invite`. |
+| `subject_id` | `varchar(64)` | No | — | **No (by construction)** | A uuid for every rule except `member.invited`, which stores a **SHA-256 of the lowercased, trimmed email** — `MemberInvited` carries an address and no user id, and an address has no business in a scoreboard table. The column is 64 wide for that digest alone. |
+| `awarded_at` | `timestamptz` | No | — | No | When the **act** happened. ⚠️ Deliberately distinct from `created_at`: K1c's backfill writes rows *today* for acts months old, and a streak computed off `created_at` would show every historical workspace with one enormous single-day streak on install day. |
+| `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | `updated_at` never moves — no UPDATE policy exists. |
+
+**Uniqueness**: `(tenant_id, user_id, rule, subject_type, subject_id)` — **the idempotency guard**, and the only thing standing between the four unbounded acts (review, edit, invite, publish) and an infinite score. ⚠️ **No part of it may become nullable**: PostgreSQL treats NULLs in a UNIQUE index as *distinct*, so a nullable subject would let the same act be awarded repeatedly while the index looked like it was preventing exactly that. Index on `(tenant_id, user_id, awarded_at)` — totals, the ladder and the streak walk all read (tenant, member) ordered by day.
+
+> **Design Notes**
+> - **RLS**: `append_only` (the `audits` shape) — SELECT + INSERT policies only, **no UPDATE and no DELETE policy at all**, so FORCE RLS denies mutation to every role including the table's owner. `PointAwardRlsTest` asserts the *absence* of those two, because their later appearance would not be a refinement; it would be the ledger becoming rewritable. It is also what lets the Settings → Modules card promise that switching gamification off deletes nothing, as a fact about the schema rather than an intention.
+> - **A mis-scoped INSERT RAISES rather than writing zero rows.** That asymmetry against a filtered UPDATE is what makes the recorder's raw-SQL path acceptable, and it is pinned by a test rather than assumed — the recorder swallows-and-logs, so if it ever inverted, every lost award would vanish silently.
+> - **A removed member keeps their `users` row**, so their awards survive and are visible to nobody — the accepted consequence `saved_report_views` documents for itself.
+> - **No rollup table.** Totals are a `SUM` over the index above. A rollup on the `usage_counters` precedent is additive if a real leaderboard ever needs one, and would stay reconcilable *from* this table — which is the property ADR-0020 §D1 chose the ledger to preserve.
+
+---
+
 ## Foreign Key Relationship Summary
 
 ```
@@ -1308,6 +1340,14 @@ sso_auth_failures.(tenant_id,
 google_auth_requests.tenant_id         -> tenants.id                        (CASCADE)
                                           (no user FK: the user is the OUTCOME of this flow, and the
                                            linkage lives on users.google_id — see §30 and ADR-0019 §D1)
+
+point_awards.tenant_id                 -> tenants.id                        (CASCADE)
+point_awards.user_id                   -> users.id                          (external, CASCADE)
+                                          (single-column: `users` is global, so ADR-0002 §D5's composite
+                                           form does not apply — see §31)
+                                          (subject_type/subject_id are polymorphic and deliberately carry
+                                           NO db-level FK: one of the five subjects is an email digest,
+                                           which references no row at all)
 ```
 
 **Cascade behavior summary** (stated once for brevity rather than repeated per row above): only `form_fields.form_section_id` → `SET NULL` (a field whose section row is deleted becomes ungrouped rather than deleted); every `form_version_id`- and `form_field_id`-family FK is `ON DELETE CASCADE` within its own version (deleting a draft version cleans up its own unpublished sections/fields/validations — published/superseded versions are never deleted, only superseded, so this path is only ever exercised on discarded drafts). `tenant_id` FKs are never cascade-deleted automatically; tenant offboarding is a deliberate, audited, application-orchestrated job, not an implicit `ON DELETE CASCADE` across 17 tables.

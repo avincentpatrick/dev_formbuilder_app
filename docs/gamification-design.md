@@ -2,7 +2,7 @@
 
 **Project:** Form-Builder SaaS (`dev_formbuilder_app`)
 **Doc #28.** The substrate decisions live in **ADR-0020** (`docs/adr/0020-gamification-awarding-substrate.md`); this document is the engine's specification and its as-built record.
-**Status:** Draft v1.1 — **K1a BUILT (2026-08-17)**: the `point_awards` ledger, the `PointRule` vocabulary, `PointsRecorder`, the eight listeners, the plain `FormCreated` event, and the every-tier `gamification` module toggle. **K1b BUILT (2026-08-17)**: the `BadgeKey` catalog, the `badge_awards` ledger, `BadgeAwarder`, and `NotificationType::BadgeEarned`. **Forward-spec below:** streaks + team progress + the `audits` backfill (K1c), the leaderboard and its API (K1d), the UI (K1e).
+**Status:** Draft v1.1 — **K1a BUILT (2026-08-17)**: the `point_awards` ledger, the `PointRule` vocabulary, `PointsRecorder`, the eight listeners, the plain `FormCreated` event, and the every-tier `gamification` module toggle. **K1b BUILT (2026-08-17)**: the `BadgeKey` catalog, the `badge_awards` ledger, `BadgeAwarder`, and `NotificationType::BadgeEarned`. **K1c BUILT (2026-08-18)**: the derived streak, workspace team progress, the two-source backfill and its operator command — plus the live `accept()` defect it uncovered and the seeded-ledger decision §10 had left open. **Forward-spec below:** the leaderboard and its API (K1d), the UI (K1e).
 
 > **Why this arrives last, on purpose.** The 2026-08-09 decision of record (`docs/PRD.md:128`) places the full achievements system as *the very last increment before production deployment*, so that it is **designed once against the finished feature set** rather than retrofitted per feature. Everything it scores already exists; nothing here asks another vertical to change.
 
@@ -82,7 +82,7 @@ The weights are a product statement, not a constant table: collection out-earns 
 
 ## 5. The writer (`App\Services\Gamification\PointsRecorder`) — BUILT
 
-One method, `award(PointRule, ?string $userId, string $subjectType, string $subjectId, ?Carbon $awardedAt)`, returning **true only when a row was genuinely created** — the distinction K1b's badge evaluation and K1c's backfill counter both depend on.
+One method, `award(PointRule, ?string $userId, string $subjectType, string $subjectId, ?Carbon $awardedAt, bool $announceBadges = true)`, returning **true only when a row was genuinely created** — the distinction K1b's badge evaluation and K1c's backfill counter both depend on.
 
 Three properties, each of which had to be argued:
 
@@ -145,7 +145,162 @@ Eight classes under `app/Listeners/Gamification/`, one per event, matching the s
 
 ---
 
-## 8. Gating
+## 8. Streaks, team progress, and the backfill — BUILT
+
+`App\Services\Gamification\{StreakCalculator,MemberStreak,TeamProgressService,TeamProgress}`, the replay
+(`AuditReplayMap`, `GamificationBackfill`, `ReplayTenantHistoryJob`, `BackfillGamificationCommand`), and
+`Form::scopePublished()`. ADR-0020 **§D10** records the two decisions this section had to take.
+
+### 8.1 The streak
+
+`DISTINCT (awarded_at AT TIME ZONE :zone)::date`, walked backwards, served by the
+`(tenant_id, user_id, awarded_at)` index K1a already built for it. Nothing is stored: §D5's argument holds
+unchanged, and Context §6's "the production box runs no scheduler" makes a maintained streak a thing that
+would silently never update.
+
+⚠️ **THE DAY BOUNDARY IS A STATED LITERAL, NOT `config('app.timezone')` — AND THE TWO AGREEING TODAY IS
+EXACTLY WHAT MAKES READING THE CONFIG THE TEMPTING MISTAKE.** `StreakCalculator::DAY_BOUNDARY = 'UTC'`.
+Reading the config would make the meaning of *a day* in every streak in the product depend on a setting
+nobody thinks of as a gamification setting, and moving it would re-cut every member's history at once —
+no migration, no announcement, nothing to notice. Nothing in the schema carries a per-tenant or per-user
+zone (the only `timezone` column anywhere is `forms.timezone`, whose own migration says it is
+authoring/display metadata never consulted server-side), so the boundary is a **parameter** with that
+constant as its default: the day tenants gain a zone, the caller supplies it and this class does not change.
+
+⚠️ **A STREAK SURVIVES "NOTHING YET TODAY" AND BREAKS AFTER A FULL MISSED DAY.** Requiring today's date
+would zero every member in the product between midnight and whenever they next act, so the number somebody
+sees at breakfast would not be the one they saw the night before.
+
+⚠️ **ADJACENCY IS `addDay()->isSameDay()`, NEVER `diffInDays() === 1`.** Carbon 3 returns a **signed float**
+there, so the strict comparison is false against `1.0` and every streak in the product would silently be
+one day long. It is also DST-proof, which the parameterised zone above will eventually need.
+
+`MemberStreak` carries `current`, `longest` and `lastActiveOn` from one walk. `current` decays and `longest`
+only ever rises; a surface that shows one and calls it the other tells a member they have lost an
+achievement they still hold.
+
+### 8.2 Team progress
+
+Workspace totals: points, responses, published forms, active members, badges, contributors.
+
+⚠️ **`responses` AND THE SUM OF MEMBERS' `submission.collected` AWARDS DELIBERATELY DISAGREE, AND THE
+DIFFERENCE IS EXACTLY THE GUEST SUBMISSIONS.** That is §D8's other half made concrete: the ladder credits
+only the member on `submissions.respondent_user_id`, because crediting a form's owner for a public link
+would decide "who collected the most data" by whoever published the busiest form — but a guest response is
+still a response the workspace collected. On a tenant collecting mainly through public links the gap is most
+of the total. **This is the single most likely thing here to be reported as a bug**, so it is stated on the
+type itself, and the test asserts the DIFFERENCE rather than the total (a total agrees by accident on any
+tenant with no guest rows).
+
+`Submission::scopeCountable()` is reused rather than re-derived — ADR-0011 §D2's one definition of "a
+response" — and `Form::scopePublished()` was **extracted** in this increment so that
+`DashboardMetricsService::publishedFormsCount()` and team progress cannot drift about what "published"
+means. There is no visibility conjunct: team progress is what the WORKSPACE did, and scoping it to grants
+would give two members on one screen two different totals for one workspace. Who may *see* it is K1d/K1e's
+gate, one layer up.
+
+### 8.3 The backfill — and the row's own premise was false
+
+⚠️⚠️ **THE ROW, §9 AND §D5 ALL SAID "REPLAY `audits` THROUGH THE SAME `PointRule` MAP". THERE IS NO SUCH
+MAP, AND THREE OF THE SEVEN RULES ARE NOT IN THAT LEDGER AT ALL.** Verified against the code before a line
+was written:
+
+| Rule | In `audits`? | |
+|---|---|---|
+| `form.created` | ✅ | `('form','created')` — `FormService::create()` |
+| `form.published` | ✅ | `('form_version','published')`; `auditable_id` **is** the version id the listener keys on |
+| `submission.collected` | ⚠️ | `('submission','created')`, but the credited member is read from `submissions.respondent_user_id`, not from the audit's actor |
+| `submission.reviewed` | 🔴 | `('submission','updated')` — **the same tuple as the next row** |
+| `submission.edited` | 🔴 | `('submission','updated')` — written by a *second* service |
+| `member.joined` | 🔴 | only the three self-serve doors; `accept()` writes no audit row |
+| `member.invited` | 🔴 | **`invite()` writes no audit row whatsoever** |
+
+So the backfill reads **`audits` for the five act rules and `tenant_users` for the two membership rules**
+(`invited_by` / `invited_at` / `joined_at` — the authority on membership, complete for every door).
+
+**Review versus edit is discriminated on the SHAPE of `new_values`.** `SubmissionReviewService::snapshot()`
+always emits `remarks` and `returned_reason` and never an answer key; `SubmissionAnswerEditService` emits
+four status keys plus one flattened `answers.<key>` per changed answer, and its own docblock records that
+the prefix sits at the top level so `AuditRedactor` can match it. The two key sets are disjoint on exactly
+those markers, and redaction cannot erase the signal — `AuditRedactor::apply()` replaces a sensitive value
+in place and never removes its key. ⚠️ **Anything matching neither marker is counted as UNMAPPED, not
+guessed**: an edit that changed no answers emits the status keys alone, and there is no honest way to read
+that as a review. That count is what makes a future third writer of the tuple visible instead of silently
+mis-scored.
+
+⚠️ **`member.joined`'s subject is the USER id; the audit row's `auditable_id` is the MEMBERSHIP uuid.**
+Keying on the wrong one does not collide with the live award — the subject is part of the idempotency index
+— so it writes a SECOND row. A doubled score, with no error anywhere.
+
+**Shape.** An operator command fanning out one `TenantAwareJob` per active tenant, per §D5. Each job takes
+one **chunk** and re-dispatches itself: `TenantAwareJob` wraps everything in one transaction with a 60-second
+timeout that an invariant holds below the queue's `retry_after`, so a single-shot replay of a large workspace
+would be killed and roll back everything it had done — the tenant would never advance however often it
+retried. `audits.id` is a **uuidv7**, so `ORDER BY id` is both chronological and covered by
+`audits_tenant_recent_idx`; no index was added.
+
+⚠️ **CHRONOLOGICAL WITHIN EACH RULE IS ALL THAT IS REQUIRED**, which is what makes two sources safe: every
+badge counts exactly one `PointRule`, so the crossing row is the chronologically-Nth award of that rule
+whatever order the rules ran in. Membership runs first, the audit walk second, with no merge and no sort
+across the two. **Do not "fix" this into a merge sort.**
+
+⚠️ **IT MUST NOT RUN IN A MIGRATION**, and the reason is sharper than "policy": a migration executes as
+`meridian_app` with no tenant GUC, where the strict predicate resolves to `tenant_id = NULL` and matches
+nothing — it would read zero rows, write zero rows, raise nothing and report success. The five backfills
+under `app/Support/Migrations/` get away with it on the BYPASSRLS connection, and that route is closed here
+on purpose: the whole safety argument for `PointsRecorder`'s raw INSERT is that the strict `WITH CHECK`
+proves it wrote where it thought it did.
+
+**`--dry-run` is the real replay inside a rolled-back transaction**, deliberately not a second counting
+query — that would be a second authority on the same question, agreeing with the writer only by inspection.
+
+**Every refusal is counted and reported**, because a silent zero is this feature's failure mode: `scanned`
+must equal `created + existing + unmapped + uncredited`, the module being off is named rather than reported
+as a long list of rows already held, and an invitation whose invitee this process may not read (the `users`
+policy admits only *you* or an **active** co-member, and a tenant job runs with `current_user_id` unset) is
+reported as uncredited rather than dropped by an inner join.
+
+### 8.4 🔴 A live defect this increment found and fixed
+
+**An invited member who accepted earned nothing.** `MemberJoined` was raised only from the private
+`attachMember()`, which serves self-registration, SAML and Google. `accept()` — the commonest door — raised
+no event, so an accepted invitation produced no `member.joined` points, **no `welcome` badge**, and no
+notification to the Owner who had sent the invitation. Fixed rather than filed, because the alternative is a
+scoreboard that permanently disagrees with itself: the backfill grants every historical invited member their
+join points from `joined_at`, and the very next acceptance would grant none.
+
+It emits **post-commit**, the opposite of `attachMember()`'s choice, and the difference is structural rather
+than stylistic: only that method runs with no ambient tenant context, so only it must raise inside its own
+transaction.
+
+### 8.5 The demo fixture — the decision §9 left to K1c
+
+Both seeders hand-roll their submissions and never raise `SubmissionCreated`, so every seeded workspace was
+**form-shaped**: a product owner opening the achievements page would have found the main surface empty.
+Of the three options on the record, **widening the audit tail to one row per submission is what §D1
+refuses** — it makes what gets audited a scoring decision, taken by somebody not thinking about scoring, in
+a compliance ledger. So the seeders award the acts they fabricate through `PointsRecorder` itself, which is
+the posture they already have toward `FormService`, and call the backfill's own `replayMemberships()` for
+the membership half rather than writing a third copy of those keys.
+
+⚠️ **This is NOT the hand-seeded badge K1b refused.** That refusal was about a `badge_awards` row with no
+ledger behind it. Every row here goes through the real writer and every badge is earned by the real
+evaluator crossing a real threshold.
+
+⚠️ **`announceBadges: false`, which diverges from the form badges in the same fixture — deliberately.**
+These are back-dated acts, and the product's rule for back-dated acts is the one the backfill follows.
+Announcing would also move the E2E fixture's `unread_count`, which several Playwright specs assert on and
+which has nothing to do with gamification.
+
+**Measured on a real `migrate:fresh --seed`, not predicted** (the K1b lesson applied): demo — 6
+`form.created`, 5 `form.published`, 6 `member.joined`, 145 `submission.collected`, 152
+`submission.reviewed`, **15 badges**; northwind — 6 badges. Badge notifications **unchanged** at 7 and 2.
+Not one seeder fixture assertion moved, which was the point. `member.invited` is absent from both because
+neither seeder records who invited whom, and `submission.edited` because no seeded submission is edited.
+
+---
+
+## 9. Gating
 
 **One gate, `EntitlementService::feature('gamification')`**, which composes plan grant AND the tenant's module toggle. Because §D6 grants the key on every tier, the plan half can never be what switches it off — only `modules.gamification` can. A tenant with no subscription at all resolves to the seeded `free` plan, which carries the key, so gamification is on by default everywhere.
 
@@ -153,9 +308,9 @@ Eight classes under `app/Listeners/Gamification/`, one per event, matching the s
 
 ---
 
-## 9. Forward spec — the remaining increments
+## 10. Forward spec — the remaining increments
 
-**K1c — streaks, team progress, and the backfill.** Streak = `DISTINCT awarded_at::date` walked backwards; the day boundary must be stated explicitly rather than inherited from the server's timezone. Team progress = workspace totals, which *do* count guest submissions (§D8's other half). The backfill is an operator command fanning out one `TenantAwareJob` per tenant, replaying `audits` through the same `PointRule` map. ⚠️ **It must not run inside a migration** — a migration executes with FORCE RLS and no tenant GUC, so `INSERT…SELECT` there writes zero rows silently.
+~~**K1c — streaks, team progress, and the backfill.**~~ **BUILT — see §8, which records where this specification turned out to be wrong.** Streak = `DISTINCT awarded_at::date` walked backwards; the day boundary must be stated explicitly rather than inherited from the server's timezone. Team progress = workspace totals, which *do* count guest submissions (§D8's other half). The backfill is an operator command fanning out one `TenantAwareJob` per tenant, replaying `audits` through the same `PointRule` map. ⚠️ **It must not run inside a migration** — a migration executes with FORCE RLS and no tenant GUC, so `INSERT…SELECT` there writes zero rows silently.
 
   ⚠️⚠️ **AND K1b HAS ALREADY BUILT THE HALF OF THIS THAT WOULD OTHERWISE BITE, SO USE IT.** The backfill writes through `PointsRecorder::award()`, which returns true on a genuinely-new award — and badge evaluation hangs off exactly that. **A replay therefore earns badges for real, which is wanted, and would announce every one of them, which is not:** a long-standing member would be told about most of the catalog at once for things they did last year. `award()` takes **`announceBadges: false`** for this, and K1b's tests pin both the suppression and the default. ⚠️ Replay in **chronological order**: `awarded_at` is copied from the triggering award, so an out-of-order replay stamps a badge with whichever qualifying act happened to arrive first. It self-heals in membership but not in date.
 
@@ -167,7 +322,7 @@ Eight classes under `app/Listeners/Gamification/`, one per event, matching the s
 
 ---
 
-## 10. Open items and things found along the way
+## 11. Open items and things found along the way
 
 - **`exceptions-log` #16 is NOT spent.** K1a–K1d ship no design-system deviation. K1e may need it.
 - **The media-resumability narrowing is still unfiled.** `docs/architecture/technical-architecture.md` §4.2 promises *resumable* media sync; G8b shipped whole-file upload with per-file retry. It belongs in `docs/feature-backlog.md`, which Lane A has held since J4b and still holds for J5 — P3a could not file it and neither can this increment. The first Lane B row after that file is released should.

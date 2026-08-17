@@ -45,6 +45,7 @@ use App\Support\Entitlements\ToggleableModules;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\DeterministicIds;
+use Database\Seeders\Concerns\SeedsGamificationLedger;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +64,8 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * ── IT NEVER TOUCHES `acme` ─────────────────────────────────────────────────────────────────────────────
  * {@see E2eSeeder} owns `acme`, and `E2eSeederIdempotencyTest` pins its row counts exactly (7 published
- * forms, 33 submissions, 7 notifications, Owner unread 4). Writing so much as one row into that tenant
+ * forms, 33 submissions, 10 notifications, Owner unread 7 — three of those rows are badges the Owner
+ * genuinely EARNS during seeding, which is why the numbers moved in K1b). Writing so much as one row in
  * would couple this convenience fixture to a merge-blocking gate. The two seeders share only the deterministic
  * key helper ({@see DeterministicIds}) and are otherwise disjoint.
  *
@@ -85,6 +87,7 @@ use Spatie\Permission\PermissionRegistrar;
 class DemoSeeder extends Seeder
 {
     use DeterministicIds;
+    use SeedsGamificationLedger;
 
     /**
      * One password for every seeded demo account — low-entropy on purpose, `gitleaks` scans this repo.
@@ -268,6 +271,11 @@ class DemoSeeder extends Seeder
             ] as $title => $count) {
                 $this->seedSubmissionHistory($owner, $reviewer, self::secondaryFormSpec($this->scaled($count)), $title);
             }
+            // K1c. After every submission exists, and before the hand-authored garnish below: these are
+            // the acts the hand-rolled rows imply, awarded through the real writer because no
+            // `SubmissionCreated` was ever raised for them. See the trait for why the alternative — one
+            // audit row per submission — is what ADR-0020 §D1 refuses.
+            $this->seedGamificationLedger();
             $this->seedDemoAudits($owner, $editor);
             $this->seedDemoNotifications($owner, $reviewer);
             $this->seedFeedback($people);
@@ -337,6 +345,7 @@ class DemoSeeder extends Seeder
             ]);
 
             $this->seedSubmissionHistory($owner, $owner, self::secondWorkspaceSpec($this->scaled(14)), 'Referral Log');
+            $this->seedGamificationLedger(); // K1c — the second workspace earns its own ledger too.
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->getKey()])->save();

@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\TenantUserStatus;
+use App\Models\BadgeAward;
 use App\Models\Domain;
 use App\Models\Form;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
+use App\Models\PointAward;
 use App\Models\SavedReportView;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
@@ -74,6 +76,10 @@ function seededShape(Tenant $tenant, User $owner): array
             'answers' => SubmissionAnswer::count(),
             'index' => SubmissionAnswerIndex::count(),
             'views' => SavedReportView::count(),
+            // K1c — the seeded gamification ledger, projected for the same reason as everything above it:
+            // it is written through the real recorder, so what has to converge is `ON CONFLICT DO NOTHING`.
+            'awards' => PointAward::count(),
+            'badges' => BadgeAward::count(),
             'intake_statuses' => Submission::query()
                 ->where('form_id', $intake->id)
                 ->pluck('status')->map->value->sort()->values()->all(),

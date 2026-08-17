@@ -6,11 +6,13 @@ use App\Enums\AuditEvent;
 use App\Enums\NotificationType;
 use App\Enums\TenantUserStatus;
 use App\Models\Audit;
+use App\Models\BadgeAward;
 use App\Models\Domain;
 use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
+use App\Models\PointAward;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
@@ -100,6 +102,11 @@ function demoShape(Tenant $tenant): array
             'answers' => SubmissionAnswer::count(),
             'index' => SubmissionAnswerIndex::count(),
             'audits' => Audit::count(),
+            // K1c. Projected so the seeded LEDGER converges on a re-seed like everything else here — it is
+            // written through `PointsRecorder::award()`, so `ON CONFLICT DO NOTHING` is what has to hold,
+            // and a doubling would show up nowhere else in this file.
+            'awards' => PointAward::count(),
+            'badges' => BadgeAward::count(),
             'notifications' => Notification::count(),
             'preferences' => NotificationPreference::count(),
             'feedback' => FeedbackReport::count(),
@@ -283,6 +290,41 @@ it('isolates the second workspace, and keeps it thin', function (): void {
     expect($secondShape['notifications'])->toBe(2)
         ->and($secondTypes)->toBe(['badge_earned'])
         ->and($secondShape['feedback'])->toBe(0);
+});
+
+it('gives the demo workspace a ledger that is not merely form-shaped', function (): void {
+    // ⚠️ THE WHOLE POINT OF K1c's DEMO-FIXTURE DECISION, ASSERTED RATHER THAN OBSERVED. Until K1c the
+    // seeded ledger was form-shaped ONLY — publishing badges appeared, collection and review badges did
+    // not, because the seeder hand-rolls its submissions and never raises `SubmissionCreated`. A product
+    // owner opening the achievements page would have found the feature's main surface empty.
+    demoSeeder()->run();
+
+    $tenant = Tenant::query()->where('slug', 'demo')->firstOrFail();
+
+    DB::transaction(function () use ($tenant): void {
+        TenantContext::applyLocal((string) $tenant->getKey());
+
+        $rules = PointAward::query()->distinct()->orderBy('rule')->pluck('rule')->map->value->all();
+        $badges = BadgeAward::query()->distinct()->orderBy('badge')->pluck('badge')->map->value->all();
+
+        // Five of the seven rules. The two that are absent are absent for stated reasons: nobody is
+        // recorded as having invited anybody (both seeders create memberships directly, so `invited_by` is
+        // never set), and no seeded submission is ever edited after the fact.
+        expect($rules)->toBe([
+            'form.created', 'form.published', 'member.joined', 'submission.collected', 'submission.reviewed',
+        ])
+            ->and($badges)->toContain('first_response')
+            ->and($badges)->toContain('first_review')
+            // `welcome` is the row that proves the MEMBERSHIP half ran: it needs no audit row and no
+            // submission, so it can only have come from `tenant_users`.
+            ->and($badges)->toContain('welcome');
+
+        // ⚠️ AND EVERY ROW IS DATED IN THE PAST. A ledger stamped `now()` would satisfy every assertion
+        // above and would render as one enormous single-day streak on install day — the exact failure
+        // `awarded_at` exists to prevent, invisible to anything but a comparison of the two columns.
+        expect(PointAward::query()->where('rule', 'submission.collected')
+            ->whereColumn('awarded_at', '>=', 'created_at')->count())->toBe(0);
+    });
 });
 
 it('seeds every notification type, and writes both preference booleans explicitly', function (): void {

@@ -1184,9 +1184,11 @@ One in-flight first-party Google sign-in (J3c2; ADR-0019 §D7). Its life is thre
 
 ## 31. `point_awards`
 
-One earned gamification award (K1a; ADR-0020, `docs/gamification-design.md` §4). The engine's **only** stored history — badges (K1b) and streaks (K1c) are evaluated and derived from these rows, not maintained beside them.
+One earned gamification award (K1a; ADR-0020, `docs/gamification-design.md` §4). The engine's **only** stored history — badges (K1b) and streaks (K1c, BUILT) are evaluated and derived from these rows, not maintained beside them.
 
-**Writer:** `App\Services\Gamification\PointsRecorder` — the only one, via raw `INSERT … ON CONFLICT DO NOTHING`. **Readers:** the achievements surface, the leaderboard, and K1b's badge evaluator.
+**Writer:** `App\Services\Gamification\PointsRecorder` — the only one, via raw `INSERT … ON CONFLICT DO NOTHING`. **Readers:** K1b's badge evaluator, K1c's `StreakCalculator` and `TeamProgressService`, and the leaderboard.
+
+⚠️ **THE K1c BACKFILL DOES NOT COME FROM `audits` ALONE, AND ADR-0020 §D10 RECORDS WHY.** Three of the seven rules are not in that ledger: `invite()` writes no audit row at all, `accept()` writes neither a row nor an event, and `('submission','updated')` is written by two different services. So the replay reads `audits` for the five act rules and **`tenant_users`** (`invited_by` / `invited_at` / `joined_at`) for the two membership ones. ⚠️ `member.joined`'s `subject_id` is the **user** id, not the membership uuid the audit row carries — keying on the latter would not collide with the live award, it would write a second row, because the subject is part of the uniqueness below.
 
 ⚠️ **THE PK IS A BIGINT IDENTITY, NOT `uuidv7()`** — pure internal aggregation rows never addressed externally (the global PK-strategy note, `usage_counters` precedent), so `PointAward` does not use `HasUuidv7`.
 
@@ -1201,7 +1203,7 @@ One earned gamification award (K1a; ADR-0020, `docs/gamification-design.md` §4)
 | `points` | `integer` | No | — | No | The rule's weight **as it was at award time**. CHECK `> 0`: a zero-value row would still occupy the act's idempotency slot and silently block the real award if a weight were later corrected. |
 | `subject_type` | `varchar(20)` | No | — | No | `form` \| `form_version` \| `submission` \| `member` \| `invite`. |
 | `subject_id` | `varchar(64)` | No | — | **No (by construction)** | A uuid for every rule except `member.invited`, which stores a **SHA-256 of the lowercased, trimmed email** — `MemberInvited` carries an address and no user id, and an address has no business in a scoreboard table. The column is 64 wide for that digest alone. |
-| `awarded_at` | `timestamptz` | No | — | No | When the **act** happened. ⚠️ Deliberately distinct from `created_at`: K1c's backfill writes rows *today* for acts months old, and a streak computed off `created_at` would show every historical workspace with one enormous single-day streak on install day. |
+| `awarded_at` | `timestamptz` | No | — | No | When the **act** happened. ⚠️ Deliberately distinct from `created_at`: K1c's backfill writes rows *today* for acts months old, and a streak computed off `created_at` would show every historical workspace with one enormous single-day streak on install day. **`StreakCalculator` reads this column and buckets it at a STATED zone** (`DAY_BOUNDARY = 'UTC'`), never at `config('app.timezone')` — see ADR-0020 §D10(b). |
 | `created_at` / `updated_at` | `timestamptz` | No | `now()` | No | `updated_at` never moves — no UPDATE policy exists. |
 
 **Uniqueness**: `(tenant_id, user_id, rule, subject_type, subject_id)` — **the idempotency guard**, and the only thing standing between the four unbounded acts (review, edit, invite, publish) and an infinite score. ⚠️ **No part of it may become nullable**: PostgreSQL treats NULLs in a UNIQUE index as *distinct*, so a nullable subject would let the same act be awarded repeatedly while the index looked like it was preventing exactly that. Index on `(tenant_id, user_id, awarded_at)` — totals, the ladder and the streak walk all read (tenant, member) ordered by day.
@@ -1218,7 +1220,9 @@ One earned gamification award (K1a; ADR-0020, `docs/gamification-design.md` §4)
 
 One earned badge (K1b; ADR-0020 §D9, `docs/gamification-design.md` §7). Persisted rather than derived **because the earned-on date is unrecoverable once a threshold changes** — the J5 lesson stated as a table. "Has this member collected 25 responses?" is answerable from §31 at any moment; "when did they earn it?" is not, and a lowered threshold would retroactively invent a date that never happened.
 
-**Writer:** `App\Services\Gamification\BadgeAwarder` — the only one, via raw `INSERT … ON CONFLICT DO NOTHING`, invoked from `PointsRecorder::award()` on a genuinely-new award only. **Readers:** the achievements surface and the leaderboard's badge count, both K1d/K1e.
+**Writer:** `App\Services\Gamification\BadgeAwarder` — the only one, via raw `INSERT … ON CONFLICT DO NOTHING`, invoked from `PointsRecorder::award()` on a genuinely-new award only. **Readers:** K1c's `TeamProgressService` (the workspace badge count), plus the achievements surface and the leaderboard's per-member count in K1d/K1e.
+
+⚠️ **K1c's REPLAY EARNS THESE FOR REAL AND ANNOUNCES NONE OF THEM** — `award()`'s `announceBadges: false`. A long-standing member would otherwise be told about most of the catalog at once for things they did last year. The rows are indistinguishable either way, so **only a notification count can discriminate**; the tests assert on `notifications` for that reason.
 
 ⚠️ **THE PK IS A BIGINT IDENTITY, NOT `uuidv7()`** — the same argument as §31.
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\BadgeKey;
 use App\Enums\PlanTier;
 use App\Enums\PointRule;
 use App\Enums\SubmissionSource;
@@ -10,6 +11,7 @@ use App\Events\SubmissionApproved;
 use App\Events\SubmissionCreated;
 use App\Events\SubmissionReturned;
 use App\Events\SubmissionUpdated;
+use App\Models\BadgeAward;
 use App\Models\FormTemplate;
 use App\Models\PointAward;
 use App\Models\User;
@@ -247,6 +249,48 @@ it('keys an invite on a hash of the email, never the address, and re-inviting ca
         ->and($awards->first()->subject_id)->toBe(PointsRecorder::emailSubject($this->tenant->id, $email))
         ->and($awards->first()->subject_id)->not->toContain('@')
         ->and($awards->first()->subject_id)->toHaveLength(64);
+});
+
+it('credits an invited member for joining once they accept, which earned them nothing until K1c', function (): void {
+    // 🔴 A LIVE DEFECT K1a SHIPPED, FOUND BY K1c WHILE VERIFYING WHETHER THE BACKFILL COULD READ THE
+    // MEMBERSHIP RULES OUT OF `audits`. `MemberJoined` was raised only by the three SELF-SERVE doors, so
+    // the commonest door of all — being invited and accepting — earned no `member.joined` points and no
+    // `welcome` badge, the one badge whose whole job is to keep a new member's page from being blank.
+    //
+    // It is fixed rather than filed because the backfill grants every HISTORICAL invited member their join
+    // points from `tenant_users.joined_at`: without this, the very next acceptance would grant none, and
+    // the scoreboard would permanently disagree with itself.
+    $email = 'joiner-'.Str::lower(Str::random(10)).'@identity.test';
+    $invitee = committedTenantIdentity('Jo', email: $email);
+
+    $invite = app(TenantMembershipService::class)->invite($this->tenant, $email, 'viewer', $this->owner);
+    app(TenantMembershipService::class)->accept($invite->refresh(), $invitee);
+
+    $joined = awardsFor($invitee, PointRule::MemberJoined);
+
+    expect($joined)->toHaveCount(1)
+        ->and($joined->first()->subject_type)->toBe('member')
+        // The USER id, matching the listener — NOT the membership uuid the audit row for a self-serve join
+        // carries. Keying on that instead would not collide with this award; it would write a second one.
+        ->and($joined->first()->subject_id)->toBe((string) $invitee->getKey())
+        ->and($joined->first()->points)->toBe(10)
+        // And the badge, which is the half a member actually sees.
+        ->and(BadgeAward::query()->where('user_id', $invitee->id)->where('badge', BadgeKey::Welcome->value)->count())
+        ->toBe(1);
+});
+
+it('scores an acceptance once, however many times the invitation flow is re-entered', function (): void {
+    // `member.joined` keys on the member, so the unique index bounds it at one — but the emission is now
+    // raised from TWO methods, and a member who self-registered into one workspace and accepted an
+    // invitation to it could otherwise be scored twice.
+    $email = 'twice-'.Str::lower(Str::random(10)).'@identity.test';
+    $invitee = committedTenantIdentity('Twice', email: $email);
+
+    $invite = app(TenantMembershipService::class)->invite($this->tenant, $email, 'viewer', $this->owner);
+    app(TenantMembershipService::class)->accept($invite->refresh(), $invitee);
+    app(TenantMembershipService::class)->joinOpenTenant($this->tenant, $invitee);
+
+    expect(awardsFor($invitee, PointRule::MemberJoined))->toHaveCount(1);
 });
 
 it('normalizes case and surrounding space before hashing an invite subject', function (): void {

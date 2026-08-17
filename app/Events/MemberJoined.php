@@ -12,8 +12,19 @@ use App\Services\Tenancy\TenantMembershipService;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * Someone self-registered on a tenant's subdomain and became a member (Increment J3a). Raised by
- * {@see TenantMembershipService::joinOpenTenant()}.
+ * Someone became a member of a workspace (Increment J3a; widened in K1c).
+ *
+ * ⚠️ **FOUR DOORS, NOT ONE — AND THIS DOCBLOCK SAID "SELF-REGISTERED" UNTIL K1c, WHICH WAS TRUE AND
+ * INCOMPLETE.** `TenantMembershipService::attachMember()` raises it for self-registration, SAML and Google;
+ * `accept()` raises it for an accepted invitation, **which it did not until K1c**. The omission was not
+ * cosmetic: the commonest door of all announced nothing to the Owner who sent the invitation, earned the
+ * new member no `member.joined` points, and left them without the `welcome` badge whose whole job is to
+ * keep a brand-new achievements surface from being blank. Found while verifying whether K1c's backfill
+ * could read the membership rules out of `audits`; it cannot, and this is why.
+ *
+ * The two raise sites differ in POSITION for a structural reason, and `accept()`'s own docblock explains
+ * it: only `attachMember()` runs with no ambient tenant context, so only it must raise inside its
+ * transaction.
  *
  * ── ⚠️ A PLAIN EVENT, NOT A {@see DomainEvent}, AND THAT IS THE SCOPE DECISION RATHER THAN AN OVERSIGHT ──
  * {@see DomainEventType} is not merely a catalog: it is the webhook and connector SUBSCRIPTION vocabulary,

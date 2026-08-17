@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Domain;
 use App\Models\Tenant;
 use App\Services\Tenancy\Extraction\ExtractManifest;
 use App\Services\Tenancy\Extraction\ExtractWriter;
 use App\Services\Tenancy\Extraction\TenantExtractService;
+use App\Support\Tenancy\TenantLocator;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 
 /**
  * The operator surface for a per-tenant extract (Phase 4, P2b — ADR-0018 §D1).
@@ -36,7 +35,9 @@ final class ExtractTenantCommand extends Command
 
     public function handle(TenantExtractService $extractor): int
     {
-        $tenant = $this->resolveTenant((string) $this->argument('tenant'));
+        // The three-way lookup moved to `TenantLocator` in K1c, when a second operator command needed the
+        // identical one — including its uuid guard, which is the part a second copy would have lost.
+        $tenant = TenantLocator::find((string) $this->argument('tenant'));
 
         if ($tenant === null) {
             $this->error('No tenant matches that id, slug or domain.');
@@ -53,28 +54,6 @@ final class ExtractTenantCommand extends Command
         $this->report($manifest, $writer);
 
         return self::SUCCESS;
-    }
-
-    private function resolveTenant(string $needle): ?Tenant
-    {
-        // `tenants` and `domains` are the RLS-exempt central tables, so this runs with no context and needs
-        // none — the same property ActivateCustomDomainCommand relies on.
-        //
-        // ⚠️ THE UUID CHECK IS NOT DEFENSIVE TIDINESS. `tenants.id` is a uuid column, so handing `find()`
-        // a slug makes PostgreSQL raise 22P02 `invalid input syntax for type uuid` — a stack trace instead
-        // of "no tenant matches that", for the input an operator is most likely to type.
-        $tenant = Str::isUuid($needle) ? Tenant::query()->find($needle) : null;
-
-        // Domain::unscopedQuery(), never $tenant->domains() or whereHas(): the Domain model carries a
-        // tenant-scoping global scope, and this command deliberately runs before any context exists, so the
-        // scoped query would match nothing and report the domain as unknown.
-        $resolved = $tenant
-            ?? Tenant::query()->where('slug', $needle)->first()
-            ?? Domain::unscopedQuery()->where('domain', mb_strtolower($needle))->first()?->tenant;
-
-        // The `tenant` relation is typed against stancl's Tenant CONTRACT, not this application's model, so
-        // the narrowing is real rather than a cast to satisfy the analyser.
-        return $resolved instanceof Tenant ? $resolved : null;
     }
 
     private function destination(Tenant $tenant): string

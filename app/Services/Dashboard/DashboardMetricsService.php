@@ -258,11 +258,16 @@ final class DashboardMetricsService
      * `current_published_version_id` and not `status`: {@see FormStatus} carries a `Published` case, but
      * the column is what `FormPublishController` actually writes and what the public runtime resolves
      * against, so it is the fact rather than a label beside it.
+     *
+     * ⚠️ **THAT PREDICATE MOVED TO {@see Form::scopePublished()} IN K1c AND IS NO LONGER SPELLED OUT HERE.**
+     * Workspace-wide team progress needed the identical set, and the paragraph above is precisely the
+     * argument against writing it twice — so the scope is now the one definition and this method composes
+     * it with the visibility half, which stays this class's own concern.
      */
     public function publishedFormsCount(User $user): int
     {
         return $this->visibleFormsQuery($user, $user->can('dashboard.org.view'))
-            ->whereNotNull('current_published_version_id')
+            ->published()
             ->count();
     }
 

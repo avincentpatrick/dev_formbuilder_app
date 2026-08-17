@@ -643,20 +643,31 @@ describe('MdsModal — returnFocus, because an opener can die while the dialog i
         popModalRoot(drawer);
     });
 
-    it('does NOT steal focus out of a dialog that is still open beneath', async () => {
+    it('does NOT steal focus out of a dialog that is still open beneath, or even MOVE it inside one', async () => {
         // ⭐ popModalRoot's own contract, preserved for free — and this is why the check asks "is focus
         // stranded?" rather than "did the opener take it". When a LOWER dialog closes under an open upper
         // one, the opener's no-op is CORRECT: focus must not jump to a control behind an open dialog. A
         // verification written as "did the opener get focus" would have broken exactly this.
+        //
+        // ⚠️ THE UPPER DIALOG TAKES AN `initialFocus` DELIBERATELY, AND THE MUTATION PASS IS WHY. The first
+        // version of this case let the upper modal focus its own default target — the CLOSE button, which is
+        // also the first focusable in the panel — so "always consider focus stranded" moved focus from that
+        // button to that same button and the case SURVIVED. Pinning a focused element that the fallback
+        // would also have chosen is not pinning anything.
         appNode();
         const lower = openModal({ returnFocus: ['#app button'] });
         await flushPromises();
 
-        const upper = openModal({ title: 'On top' });
+        const upper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'On top', initialFocus: '#deep' },
+            slots: { default: '<button type="button">First</button><button id="deep" type="button">Deep</button>' },
+        });
+        mounted.push(upper);
         await flushPromises();
 
         const insideUpper = document.activeElement;
-        expect(insideUpper?.closest('.mds-modal__panel')).not.toBeNull();
+        expect((insideUpper as HTMLElement).id).toBe('deep');
 
         await lower.setProps({ open: false });
         await flushPromises();
@@ -665,5 +676,71 @@ describe('MdsModal — returnFocus, because an opener can die while the dialog i
 
         await upper.setProps({ open: false });
         await flushPromises();
+    });
+
+    it('never captures <body> as an opener, because focusing the body SUCCEEDS and takes focus', async () => {
+        // ⭐ A PRE-EXISTING DEFECT J6's TESTS UNCOVERED RATHER THAN INTRODUCED. A modal mounted already open
+        // with nothing focused — two live call sites do exactly that, as does every Storybook story —
+        // captured `document.activeElement`, which is `<body>`. On close it called `.focus()` on that, and
+        // `document.body.focus()` is not the no-op the code assumed: the body is the document's default focus
+        // target, so the call succeeds. Closing such a modal did not merely fail to restore focus, it TOOK
+        // focus — here, out of a dialog that was still open above it.
+        const upper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Upper', initialFocus: '#stay' },
+            slots: { default: '<button type="button">First</button><button id="stay" type="button">Stay</button>' },
+        });
+        mounted.push(upper);
+        await flushPromises();
+
+        // Mounted already open with nothing focused, so its captured opener would have been <body>.
+        const lower = openModal({ title: 'Lower' });
+        await flushPromises();
+
+        // Put focus back where the reader had it, then close the body-opener modal.
+        (document.querySelector('#stay') as HTMLElement).focus();
+        await lower.setProps({ open: false });
+        await flushPromises();
+
+        expect((document.activeElement as HTMLElement).id).toBe('stay');
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+    });
+
+    it('hands focus to the TOPMOST holder, not the bottom of the stack', async () => {
+        // ⭐ ALSO FOUND BY THE MUTATION PASS, WHICH IS THE POINT OF RUNNING ONE. Reversing `pageOwningRoot`
+        // to answer `stack[0]` survived every case above, because in all of them the stack had exactly ONE
+        // entry left and first == last. With a surface beneath a dialog it is a real defect: focus would be
+        // handed to a drawer sitting BEHIND an open dialog — the precise thing popModalRoot's contract
+        // forbids — and because that drawer is inert by then, `.focus()` is a no-op and the reader is left
+        // on `<body>` with nothing reachable at all.
+        const drawer = document.createElement('div');
+        drawer.innerHTML = '<a id="drawer-item" href="/x">Item</a>';
+        document.body.appendChild(drawer);
+        pushModalRoot(drawer, 'surface');
+
+        const lower = openModal({ title: 'Lower' });
+        await flushPromises();
+
+        const opener = openerButton('doomed');
+        opener.focus();
+        const upper = openModal({ title: 'Upper' });
+        await flushPromises();
+
+        opener.remove();
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+
+        // The lower DIALOG is the topmost holder now, so focus belongs inside it — never in the drawer
+        // underneath, and never on the body.
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.id).not.toBe('drawer-item');
+
+        await lower.setProps({ open: false });
+        await flushPromises();
+        popModalRoot(drawer);
     });
 });

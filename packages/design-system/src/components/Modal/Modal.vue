@@ -269,7 +269,15 @@ function closePage() {
     });
 }
 
-/** Focus has ended up nowhere. `document.body.focus()` is itself a no-op, so this is not recoverable by retrying. */
+/**
+ * Focus has ended up nowhere.
+ *
+ * ⚠️ AN EARLIER VERSION OF THIS LINE SAID `document.body.focus()` IS ITSELF A NO-OP, AND THAT IS FALSE --
+ * the body is the document's default focus target, so the call succeeds. It matters because it inverts the
+ * consequence: a captured `<body>` opener does not fail to restore focus, it actively TAKES focus. That is
+ * why `takePage()` refuses to capture one. Corrected rather than left flattering, because a docblock
+ * asserting a safety that does not exist is how the next author builds on it.
+ */
 function isStranded(): boolean {
     return document.activeElement === null || document.activeElement === document.body;
 }
@@ -278,7 +286,17 @@ watch(
     () => props.open,
     (isOpen, was) => {
         if (isOpen && !was) {
-            opener = document.activeElement as HTMLElement | null;
+            // ⚠️ NEVER CAPTURE `<body>` AS AN OPENER, AND THIS IS A DEFECT J6's TESTS UNCOVERED RATHER THAN
+            // INTRODUCED -- it predates the return-focus work. A modal MOUNTED already open with nothing
+            // focused (two live call sites do exactly that, and every Storybook story) captured
+            // `document.activeElement`, which is `<body>`. `closePage()` then called `.focus()` on it, and
+            // `document.body.focus()` is NOT the no-op that comment assumed: the body IS the document's
+            // default focus target, so the call SUCCEEDS and moves focus there. So closing such a modal did
+            // not merely fail to restore focus -- it actively took it, including out of an upper dialog that
+            // was still open. Found by strengthening the stacked case to focus something other than the
+            // panel's first focusable, which is what a surviving mutation pointed at.
+            const active = document.activeElement as HTMLElement | null;
+            opener = active === null || active === document.body ? null : active;
             takePage();
         } else if (!isOpen && was) {
             closePage();

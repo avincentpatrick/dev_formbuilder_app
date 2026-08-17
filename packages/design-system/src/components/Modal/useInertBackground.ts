@@ -100,7 +100,20 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         });
     }
 
-    /** Give the page back without touching focus — the half a hand-over needs and a close does not. */
+    /**
+     * Give the page back without touching focus — the half a hand-over needs and a close does not.
+     *
+     * ⚠️ IT IS NOT UNIT-DISTINGUISHABLE FROM CALLING `release()` HERE, AND THE MUTATION PASS PROVED THAT
+     * RATHER THAN THE OPPOSITE. Swapping this for the full `release()` in the hand-over arm survives every
+     * case in this file, and the reasoning holds: `release()` restores focus to the opener and nulls it,
+     * then `take()`'s `??=` re-reads `document.activeElement` — which is the element `release()` just
+     * focused. The captured opener comes out the same, so the round trip is a no-op in the DOM.
+     *
+     * It stays because of something happy-dom cannot represent: in a browser that round trip **paints**. The
+     * focus ring lands on the opener and jumps away again within one frame, which is a flash on a control the
+     * user is not interacting with. Recorded as a deliberate mutation survivor rather than left looking like
+     * a gap — a surviving mutant is only a defect if the difference is one somebody can observe.
+     */
     function releasePageOnly(): void {
         if (ownedRoot === null) return;
 

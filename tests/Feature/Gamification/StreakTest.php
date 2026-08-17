@@ -136,9 +136,16 @@ it('treats several awards on one day as one day', function (): void {
 });
 
 it('reports the longest run anywhere in the ledger, not the current one', function (): void {
-    // A five-day run months ago, then a two-day run ending today. `current` must not drag `longest` down.
-    streakDays($this->owner, [60, 61, 62, 63, 64]);
-    streakDays($this->owner, [0, 1]);
+    // ⚠️ THREE RUNS, WITH THE LONGEST IN THE MIDDLE, AND THAT ARRANGEMENT IS THE WHOLE TEST.
+    // Found by the mutation pass: with only two runs — a long one months ago and a short one ending today
+    // — replacing `max($longest, …)` with a bare assignment SURVIVES, because the last run the descending
+    // walk visits is the oldest one, which was also the longest. The answer agreed by accident.
+    //
+    // Here the walk sees 2, then 5, then 3. `max` gives 5; keeping the FIRST gives 2; keeping the LAST
+    // gives 3. No arrangement of two runs can separate all three.
+    streakDays($this->owner, [0, 1]);                 // 2 days, ending today
+    streakDays($this->owner, [30, 31, 32, 33, 34]);   // 5 days, a month ago
+    streakDays($this->owner, [80, 81, 82]);           // 3 days, oldest
 
     $streak = streakOf($this->owner);
 

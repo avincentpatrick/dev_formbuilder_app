@@ -19,6 +19,7 @@ use App\Services\Gamification\TeamProgressService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -71,9 +72,20 @@ it('returns an explicit empty reading off-tenant rather than six quiet zeroes', 
     // command starts in, and every query behind this service would return no rows there without raising.
     TenantContext::applyLocal(null);
 
+    // ⚠️ THE ASSERTION IS ON THE QUERY COUNT, NOT ON THE ZEROES, AND THE MUTATION PASS IS WHY. Deleting the
+    // guard SURVIVES an assertion on the returned numbers: every read behind this service is RLS-filtered,
+    // so off-tenant they all return nothing and the answer is six zeroes either way. That is precisely the
+    // failure mode the guard exists for — "this workspace has done nothing" and "you forgot to establish
+    // tenant context" are the same output — so the only thing that can discriminate is whether the service
+    // asked the database at all.
+    DB::flushQueryLog();
+    DB::enableQueryLog();
     $progress = teamProgress();
+    $queries = count(DB::getRawQueryLog());
+    DB::disableQueryLog();
 
-    expect($progress->points)->toBe(0)
+    expect($queries)->toBe(0)
+        ->and($progress->points)->toBe(0)
         ->and($progress->responses)->toBe(0)
         ->and($progress->contributors)->toBe(0);
 });

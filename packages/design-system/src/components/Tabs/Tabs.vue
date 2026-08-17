@@ -152,6 +152,10 @@ function onKeydown(event: KeyboardEvent, index: number): void {
          tablist with no tabs is not a control. The consumer owns its own empty state — the same rule
          MdsTabNav follows. -->
     <div v-if="items.length > 0" ref="root" class="mds-tabs">
+        <!-- The rule under the strip is on THIS element, and the scrolling is on its child. They must not
+             be the same element — see the stylesheet, where the measurement is recorded. MdsTabNav has the
+             same two-element split for the same reason. -->
+        <div class="mds-tabs__bar">
         <div class="mds-tabs__list" role="tablist" :aria-label="ariaLabel">
             <button
                 v-for="(item, index) in items"
@@ -170,6 +174,7 @@ function onKeydown(event: KeyboardEvent, index: number): void {
             >
                 {{ item.label }}
             </button>
+        </div>
         </div>
 
         <!-- No tabindex. The APG puts a panel in the tab sequence only when it holds nothing focusable;
@@ -196,6 +201,37 @@ function onKeydown(event: KeyboardEvent, index: number): void {
 }
 
 /*
+ * ⚠️ THE RULE AND THE SCROLLING ARE ON TWO DIFFERENT ELEMENTS, AND THE FIRST VERSION PUT THEM ON ONE — WHICH
+ * THE ADVERSARIAL PASS MEASURED AS A 1px VERTICAL SCROLL CONTAINER, THE FIFTH INSTANCE OF A CLASS THIS
+ * REPOSITORY HAS ALREADY PAID FOR FOUR TIMES.
+ *
+ * The mechanism, because it is not obvious from either declaration alone. `overflow-x: auto` with
+ * `overflow-y` unset COERCES the other axis to `auto` (CSS Overflow 3) — the same rule that forces
+ * MdsTooltip to teleport out of the sidebar rail. Give a flex ITEM in that box a negative bottom margin (to
+ * pull its 2px underline over the container's own 1px rule) and the container's height shrinks by one pixel
+ * while the item's border box does not: `scrollHeight` 35 against `clientHeight` 34, measured in the
+ * running builder at both 1440 and 375.
+ *
+ * ⚠️ THIS PARAGRAPH DELIBERATELY DESCRIBES THAT DECLARATION INSTEAD OF SPELLING IT. The first draft wrote
+ * it out and the test below — which scans this stylesheet for exactly that shape — failed against its own
+ * explanation. Sixth occurrence in this project of *name the thing, never quote it*, and the second to
+ * booby-trap the very note explaining it.
+ *
+ * ⚠️ NOTHING WE RUN COULD HAVE CAUGHT IT. happy-dom lays nothing out. The end-to-end overflow assertion
+ * reads the DOCUMENT's scroll box, which `.app-shell { overflow-x: clip }` pins flat. And axe's
+ * `scrollable-region-focusable` fires only on a scroll region with NO focusable descendants — every child
+ * here is a button, so axe is correctly silent about a region that should not have been scrollable at all.
+ *
+ * `MdsTabNav` never had this: its rule is on the outer landmark and its scrolling is on a separate child,
+ * with no negative margin anywhere. This component now has the same two-element split, for the same reason.
+ * The 2px underline sits directly above the 1px rule rather than over it, which is what that component
+ * already looks like.
+ */
+.mds-tabs__bar {
+    border-bottom: 1px solid var(--mds-color-border-default);
+}
+
+/*
  * `overflow-x: auto` with no breakpoint: the item count and their widths both depend on the consumer and on
  * the §2.9 type scale, so a media query would have to know both.
  *
@@ -211,7 +247,6 @@ function onKeydown(event: KeyboardEvent, index: number): void {
     gap: var(--mds-space-1);
     max-width: 100%;
     overflow-x: auto;
-    border-bottom: 1px solid var(--mds-color-border-default);
     scrollbar-width: thin;
 }
 
@@ -220,9 +255,9 @@ function onKeydown(event: KeyboardEvent, index: number): void {
     padding: var(--mds-space-2) var(--mds-space-3);
     border: 0;
     /* Drawn as a transparent border on every tab, so selecting one does not shift its neighbours by 2px.
-       The -1px pulls it over the list's own rule rather than stacking two lines. */
+       ⚠️ NO NEGATIVE MARGIN — see the bar rule above. A tab is a flex item of a scroll container, and a
+       negative bottom margin there buys a 1px overlap at the cost of 1px of real vertical scroll. */
     border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
     background: transparent;
     font-family: var(--mds-font-family-body);
     font-size: var(--mds-type-label-font-size);

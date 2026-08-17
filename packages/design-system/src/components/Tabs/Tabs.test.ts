@@ -212,6 +212,36 @@ describe('MdsTabs — the selected indicator is a non-text UI component', () => 
         expect(block).not.toContain('--mds-color-action-primary-bg');
     });
 
+    it('keeps the rule and the scrolling on two different elements, with no negative margin anywhere', () => {
+        // ⭐ THE DEFECT THE ADVERSARIAL PASS MEASURED, pinned as source text because that is the only place
+        // it can be held. `overflow-x: auto` with `overflow-y` unset coerces the other axis to `auto` (CSS
+        // Overflow 3), so a `margin-bottom: -1px` on a flex item inside shrinks the container by 1px while
+        // the item's border box does not — 1px of real vertical scroll, measured at 35 against 34.
+        //
+        // Nothing we run catches it: happy-dom lays nothing out, the e2e overflow check reads the DOCUMENT
+        // (pinned flat by the app shell's clip), and axe's scrollable-region rule is correctly silent
+        // because every child here is focusable. MdsTabNav never had it — its rule is on the outer element.
+        const scroller = /\.mds-tabs__list\s*\{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
+        const bar = /\.mds-tabs__bar\s*\{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
+
+        expect(scroller).toContain('overflow-x');
+        expect(bar).toContain('border-bottom');
+        expect(scroller, 'the scroll container must not also draw the rule').not.toContain('border-bottom');
+
+        // ⚠️ SCOPED TO THE DECLARATION BLOCKS, NEVER THE WHOLE FILE — the first version scanned the whole
+        // source and failed against the COMMENT explaining this very rule. That is `token-references`'s own
+        // lesson ("a whole-file guard must be scoped to the region the contract lives in, or documenting
+        // the contract violates it") and the sixth "name the thing, never quote it" in this project.
+        const declarations = [...SOURCE.matchAll(/\.mds-tabs[^{}]*\{([^}]*)\}/g)].map(([, body]) => body);
+        expect(declarations.length, 'the block scan must actually find rules').toBeGreaterThan(4);
+
+        for (const body of declarations) {
+            expect(body, 'a negative margin on a flex item inside the scroller buys 1px of scroll').not.toMatch(
+                /margin[a-z-]*:\s*-/,
+            );
+        }
+    });
+
     it('carries a second, non-colour channel', () => {
         // WCAG 1.4.1: the selected state must not be conveyed by colour alone. The weight change is what
         // survives greyscale, and aria-selected is what survives having no sight at all.

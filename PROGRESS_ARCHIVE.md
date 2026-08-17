@@ -3150,6 +3150,26 @@ in place. ⚠️ **The harness itself had a bug worth keeping: `grep -F -c` coun
 occurrences**, so every multi-line needle reported a false count — it refused to mutate rather than
 mis-applying, which is the safe direction, but a mis-counting guard silently skips coverage.
 
+**The adversarial pass found a defect this increment itself introduced — seventh increment running it,
+third time it has caught the increment's own new code.** `.mds-tabs__list` was `overflow-x: auto` AND
+carried the 1px rule AND its tabs carried a negative bottom margin to overlap it. `overflow-x: auto` with
+the other axis unset coerces `overflow-y` to `auto` (CSS Overflow 3 — the rule that forces `MdsTooltip` to
+teleport out of the sidebar rail), and a negative bottom margin on a flex item in that box shrinks the
+container by 1px while the item's border box does not. Measured in the running builder: `scrollHeight` 35
+against `clientHeight` 34, at 1440 and at 375. **Fifth instance of the class** after `MdsDataTable`,
+`MdsSegmentedControl`, `MdsSpinner` and `MdsTimeSeriesChart`. ⚠️ **Nothing we run could have caught it** —
+happy-dom lays nothing out, the e2e assertion reads the DOCUMENT's scroll box (pinned flat by the shell's
+`overflow-x: clip`), and axe's `scrollable-region-focusable` fires only where the region has NO focusable
+descendants, so axe was correctly silent about a region that should never have scrolled. `MdsTabNav` never
+had it: its rule is on the outer landmark, its scrolling on a separate child. `MdsTabs` now matches.
+
+⚠️ **The guard written for it then failed against its own explanation.** It scanned the whole file for the
+offending declaration and matched the CSS comment describing it — "name the thing, never quote it", sixth
+occurrence in this project and the second to booby-trap the note explaining it. Fixed both ways, and the
+scoping is the durable half: the guard walks DECLARATION BLOCKS only, which is `token-references.test.ts`'s
+own recorded lesson — a whole-file guard must be scoped to the region the contract lives in, or documenting
+the contract violates it.
+
 **The builder prohibition survived the component's arrival rather than expiring with it.** DSR §3.4 forbids
 retrofitting a tablist onto the pane switcher; that note was written when `MdsTabs` did not exist and reads
 as if it were waiting for one. J4c1 adopted the primitive into `ConfigPanel` on that same page and touched

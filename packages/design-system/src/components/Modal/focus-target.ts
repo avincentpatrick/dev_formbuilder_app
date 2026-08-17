@@ -57,18 +57,28 @@ export function canTakeFocus(element: HTMLElement): boolean {
  * An invalid selector is skipped rather than thrown: `querySelector('[')` raises a DOMException, and both
  * call sites run where an escaping throw would abandon focus management entirely on a page that is already
  * inert.
+ *
+ * ⚠️ IT WALKS ALL MATCHES OF EACH SELECTOR, NOT JUST THE FIRST, AND THE FIRST VERSION DID NOT — CAUGHT BY
+ * THE ADVERSARIAL PASS READING THIS DOCSTRING AGAINST THE CODE. With `querySelector` the behaviour was
+ * really *"the first selector whose FIRST match can take focus"*, so a selector matching several elements
+ * where the leading one happened to be inert returned null and skipped reachable siblings the caller had
+ * plainly asked for. The two shipped call sites pass selectors that match one element each, so nothing was
+ * broken — but a docstring that overstates what a helper does is how the next author builds on a promise it
+ * does not keep, which is the class this project has corrected twice before in its own docblocks.
  */
 export function firstFocusable(selectors: readonly string[], scope: ParentNode = document): HTMLElement | null {
     for (const selector of selectors) {
-        let candidate: HTMLElement | null = null;
+        let matches: HTMLElement[] = [];
 
         try {
-            candidate = scope.querySelector<HTMLElement>(selector);
+            matches = Array.from(scope.querySelectorAll<HTMLElement>(selector));
         } catch {
             continue;
         }
 
-        if (candidate !== null && canTakeFocus(candidate)) return candidate;
+        for (const candidate of matches) {
+            if (canTakeFocus(candidate)) return candidate;
+        }
     }
 
     return null;

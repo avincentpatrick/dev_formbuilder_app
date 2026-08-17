@@ -243,7 +243,7 @@ function closePage() {
     opener = null;
 
     // ⚠️ BUT THE VERIFICATION CANNOT BE, AND MEASURING IT IS WHAT ESTABLISHED THAT. The first version checked
-    // `activeElement` right here and the three fallback cases all failed against a stranded the document body -- the
+    // `activeElement` right here and the three fallback cases all failed, stranded on the body element -- the
     // watcher is PRE-FLUSH, so the panel is still mounted at this line and focus is still legitimately
     // inside it. The strand happens one tick later, when the `v-if` tears the panel out and the user agent
     // drops focus. Checking early does not measure the failure; it measures the moment before it. So the
@@ -261,7 +261,7 @@ function closePage() {
         if (!isStranded()) return;
 
         // Last resort, and it only fires where the reader would otherwise have nothing at all: focus is on
-        // the document body and a surface is still holding the page, so every other element in the document is inert.
+        // the body element and a surface is still holding the page, so every other element in the document is inert.
         const owner = pageOwningRoot();
         if (owner === null) return;
 
@@ -274,7 +274,7 @@ function closePage() {
  *
  * ⚠️ AN EARLIER VERSION OF THIS LINE SAID `document.body.focus()` IS ITSELF A NO-OP, AND THAT IS FALSE --
  * the body is the document's default focus target, so the call succeeds. It matters because it inverts the
- * consequence: a captured the document body opener does not fail to restore focus, it actively TAKES focus. That is
+ * consequence: an opener that IS the body element does not fail to restore focus, it actively TAKES focus. That is
  * why `takePage()` refuses to capture one. Corrected rather than left flattering, because a docblock
  * asserting a safety that does not exist is how the next author builds on it.
  */
@@ -286,10 +286,10 @@ watch(
     () => props.open,
     (isOpen, was) => {
         if (isOpen && !was) {
-            // ⚠️ NEVER CAPTURE the document body AS AN OPENER, AND THIS IS A DEFECT J6's TESTS UNCOVERED RATHER THAN
+            // ⚠️ NEVER CAPTURE THE BODY ELEMENT AS AN OPENER, AND THIS IS A DEFECT J6's TESTS UNCOVERED RATHER THAN
             // INTRODUCED -- it predates the return-focus work. A modal MOUNTED already open with nothing
             // focused (two live call sites do exactly that, and every Storybook story) captured
-            // `document.activeElement`, which is the document body. `closePage()` then called `.focus()` on it, and
+            // `document.activeElement`, which is the body element. `closePage()` then called `.focus()` on it, and
             // `document.body.focus()` is NOT the no-op that comment assumed: the body IS the document's
             // default focus target, so the call SUCCEEDS and moves focus there. So closing such a modal did
             // not merely fail to restore focus -- it actively took it, including out of an upper dialog that

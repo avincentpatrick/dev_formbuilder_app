@@ -86,6 +86,25 @@ describe('firstFocusable', () => {
         expect(firstFocusable([])).toBeNull();
     });
 
+    it('walks ALL matches of a selector, not just its first', () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS READING THE DOCSTRING AGAINST THE CODE. With `querySelector` the
+        // behaviour was really "the first SELECTOR whose FIRST match can take focus", so one inert leading
+        // element made the whole selector answer null and skipped reachable siblings the caller had asked
+        // for. Both shipped call sites pass selectors matching a single element, so nothing was broken —
+        // but the docstring promised more than the code did.
+        build('<div><span inert><b class="c" id="first"></b></span><b class="c" id="second"></b></div>');
+
+        expect(firstFocusable(['.c'])?.id).toBe('second');
+    });
+
+    it('still prefers an earlier SELECTOR over a later one, even when both have reachable matches', () => {
+        // The guard against "fix the walk, lose the preference order" — the two properties are independent
+        // and a loop over matches inside a loop over selectors has to keep both.
+        build('<b class="late" id="late"></b><b class="early" id="early"></b>');
+
+        expect(firstFocusable(['.early', '.late'])?.id).toBe('early');
+    });
+
     it('can be scoped to a subtree, and then ignores a match outside it', () => {
         build('<div id="scope"><button id="inside">In</button></div><button id="outside">Out</button>');
         const scope = document.querySelector('#scope') as HTMLElement;

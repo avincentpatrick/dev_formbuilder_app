@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, ref, type Ref } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useInertBackground } from './useInertBackground';
-import { openModalCount } from './inert-stack';
+import { openModalCount, popModalRoot, pushModalRoot } from './inert-stack';
 
 /**
  * `useInertBackground` (J4b) — the sequence `MdsModal` has owned since I10a, extracted for surfaces that
@@ -346,6 +346,43 @@ describe('useInertBackground — a root that changes identity while active (J6)'
 
         wrapper.unmount();
         opener.remove();
+    });
+});
+
+describe('useInertBackground — the body element is never an opener (J6 adversarial pass)', () => {
+    it('does not yank focus out of a dialog when a surface with no opener releases underneath it', async () => {
+        // ⭐ FOUND BY THE ADVERSARIAL PASS, AND J6's OWN FIRST FIX IS WHAT MADE IT REACHABLE. Focusing the
+        // body element is not a no-op — the body is the document's default focus target, so the call
+        // SUCCEEDS. A surface opened with nothing focused (a tap, or a programmatic toggle) captured it as
+        // its opener, and `release()` then moved focus TO the body. Harmless while nothing else held the
+        // page. Not harmless now: the drawer is a `surface`, so as of J6 a dialog can be open on top of it,
+        // and the drawer releasing underneath — which a resize past 480px does — would take focus off the
+        // dialog the reader is using.
+        const { active, wrapper } = harness();
+
+        // Nothing focused when the surface takes the page, so the captured opener would have been the body.
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        active.value = true;
+        await flushPromises();
+
+        // Something else takes the page on top and holds focus, standing in for the ⌘K palette.
+        const dialog = document.createElement('div');
+        dialog.innerHTML = '<button id="in-dialog">In dialog</button>';
+        document.body.appendChild(dialog);
+        pushModalRoot(dialog);
+        const inDialog = document.querySelector('#in-dialog') as HTMLElement;
+        inDialog.focus();
+        expect(document.activeElement).toBe(inDialog);
+
+        // The surface releases from underneath.
+        active.value = false;
+        await flushPromises();
+
+        expect(document.activeElement).toBe(inDialog);
+
+        popModalRoot(dialog);
+        dialog.remove();
+        wrapper.unmount();
     });
 });
 

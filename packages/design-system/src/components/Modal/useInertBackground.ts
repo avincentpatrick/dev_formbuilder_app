@@ -58,7 +58,20 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         // the surface was OPENED from must survive that — overwriting it here would make return-focus land
         // on whatever happened to be focused inside the previous root, which is the surface returning the
         // user to itself.
-        opener ??= document.activeElement as HTMLElement | null;
+        //
+        // ⚠️ AND THE BODY ELEMENT IS NEVER AN OPENER, WHICH J6's ADVERSARIAL PASS FOUND HERE AFTER FIXING THE
+        // SAME THING IN `Modal.vue` — AND THIS SEAM'S VERSION WAS MADE REACHABLE BY J6's OWN FIRST FIX.
+        // Focusing the body element is not a no-op: the body is the document's default focus target, so the
+        // call SUCCEEDS. A surface opened by touch or by a programmatic toggle, with nothing focused, would
+        // capture it — and `release()` would then move focus TO the body. Harmless while nothing else holds
+        // the page, and not harmless now: the drawer is a `surface`, so as of J6 a dialog can be open ON TOP
+        // of it (⌘K), and the drawer releasing underneath — a resize past 480px does exactly that — would
+        // yank focus out of the open dialog. Null instead, so `release()`'s optional call simply does nothing
+        // and whatever holds focus keeps it.
+        if (opener === null) {
+            const active = document.activeElement as HTMLElement | null;
+            opener = active === null || active === document.body ? null : active;
+        }
 
         // nextTick, because the surface may not have rendered yet — and on the immediate run below we are
         // still inside setup(). `active` is re-read inside the callback because an open immediately

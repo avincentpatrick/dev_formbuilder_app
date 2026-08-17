@@ -222,15 +222,29 @@ it('converges the notification fixture, and keeps one row on the reviewer on pur
         $seeder->seedNotifications($owner, $reviewer);
     });
 
+    // ⚠️ TEN, NOT SEVEN, AND THE THREE EXTRA ROWS ARE NOT SEEDED — THEY ARE EARNED (K1b). This fixture is
+    // seven hand-authored rows, and it stayed seven for three increments. It moved when badges shipped,
+    // because `seedForms()` drives `FormService::create()` and `PublishService::publish()` FOR REAL: the
+    // Owner genuinely creates and publishes forms here, so the engine genuinely awards `first_form`,
+    // `first_publish` and `publisher`, and each announces. **Measured, not predicted** — the run that
+    // reddened this said 10, and the three rows are all the Owner's and all unread.
+    //
+    // Read that as the fixture becoming MORE faithful rather than as drift: a workspace that has published
+    // three forms really does hold those badges, and a bell that hid them would be the lie.
     expect($shape())->toBe($first)
-        ->and($first['rows'])->toHaveCount(7);
+        ->and($first['rows'])->toHaveCount(10);
 
-    // ⚠️ THE LOAD-BEARING ASSERTION, and the reason the fixture is not seven Owner rows. Playwright only
+    // ⚠️ THE LOAD-BEARING ASSERTION, and the reason the fixture is not ten Owner rows. Playwright only
     // ever logs in as the Owner, so a regression that dropped `Notification::scopeForUser()` from the feed
     // would be INVISIBLE in an all-Owner fixture — the badge would read the same either way. With the
-    // reviewer's row present, the bell must say 4 while the table holds 7.
-    expect($first['owner_unread'])->toBe(4)
-        ->and(collect($first['rows'])->where('user', (string) $owner->getKey())->count())->toBe(6);
+    // reviewer's row present, the bell must say 7 while the table holds 10.
+    expect($first['owner_unread'])->toBe(7)
+        ->and(collect($first['rows'])->where('user', (string) $owner->getKey())->count())->toBe(9);
+
+    // The reviewer's single row is what the assertion above is actually protecting, so it is pinned
+    // directly rather than inferred from the arithmetic — badges are Owner-only here, so a future badge
+    // earned by the reviewer would otherwise silently restore the arithmetic while breaking the intent.
+    expect(collect($first['rows'])->where('user', '!=', (string) $owner->getKey())->count())->toBe(1);
 
     // The one diverging preference, so the /settings card renders a non-default state for the axe scan.
     // On `review_requested` deliberately — the one type the Owner holds no notification for, so the

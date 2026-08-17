@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Notifications;
 
+use App\Enums\BadgeKey;
 use App\Enums\NotificationType;
 use App\Enums\SubmissionPdfOutcome;
 use App\Jobs\Submissions\GeneratePdfJob;
@@ -117,6 +118,17 @@ final class NotificationCopy
                         : ' and joined as '.str_replace('_', ' ', (string) self::string($data, 'role')))
                     .'. Open the members page to change what they can do, or to remove them.',
             ],
+            // K1b — the ONE case in this catalog written to the person it is about, so it says "you" where
+            // every other arm says who did what to whom. The badge's own `description()` supplies the second
+            // sentence rather than a copy of it living here: the catalog owns those words, and a duplicate
+            // would go stale the day somebody re-labels a badge.
+            NotificationType::BadgeEarned => [
+                'headline' => self::badge($data) === null
+                    ? 'You earned a badge.'
+                    : 'You earned the '.self::badge($data)->label().' badge.',
+                'body' => (self::badge($data)?->description() ?? 'A new achievement was added to your record.')
+                    .' It was added to your achievements in '.$tenantName.'.',
+            ],
         };
     }
 
@@ -183,7 +195,32 @@ final class NotificationCopy
             // J3a — no tenant name (this row is read inside the workspace) and no email address, for the
             // reason the email arm gives.
             NotificationType::MemberJoined => self::joinedDescription($data),
+            // K1b — the badge NAME rather than its `description()`, which the email arm uses. The bell row
+            // is read three seconds after the act, by the person who just performed it: they know what they
+            // did, and the only new fact is which badge it earned. The email is read weeks later by someone
+            // who does not, which is why that arm spends a whole sentence on the criterion.
+            NotificationType::BadgeEarned => self::badge($data) === null
+                ? 'You earned a badge.'
+                : 'You earned the '.self::badge($data)->label().' badge.',
         };
+    }
+
+    /**
+     * The badge a `badge_earned` payload names, or null if it names none this build understands.
+     *
+     * The {@see self::exportOutcome()} idiom, and it exists for the same reason: an unknown or missing key
+     * must degrade to a sentence rather than to a fatal. That is not defensive habit here — the `data` blob
+     * is durable and this enum is not, so a badge retired in a later release leaves rows behind that this
+     * method still has to render. Deriving the words from {@see BadgeKey} rather than storing them is what
+     * keeps a re-label from being invisible; this null arm is the price of that choice, paid deliberately.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private static function badge(array $data): ?BadgeKey
+    {
+        $value = self::string($data, 'badge');
+
+        return $value === null ? null : BadgeKey::tryFrom($value);
     }
 
     /**

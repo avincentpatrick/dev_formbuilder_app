@@ -39,6 +39,7 @@ uses(RefreshDatabase::class);
 const EXTRACTED_COLUMN_CENSUS = [
     'attachments' => 'attachable_id attachable_type checksum_sha256 created_at deleted_at disk duration_seconds height id is_encrypted_at_rest is_pii kind mime_type ocr_confidence_avg original_filename path size_bytes tenant_id updated_at uploaded_by virus_scan_status width',
     'audits' => 'acting_as_user_id auditable_id auditable_type created_at event id ip_address is_system_action new_values old_values redacted_fields tenant_id user_agent user_id',
+    'badge_awards' => 'awarded_at badge created_at id tenant_id updated_at user_id',
     'connection_subscriptions' => 'config connection_id consecutive_failure_count created_at created_by deleted_at event_types form_id id last_failure_at last_success_at name status tenant_id updated_at',
     'connections' => 'access_token connected_by created_at deleted_at external_account_id external_account_label id last_error last_error_at last_refreshed_at provider refresh_token scopes status tenant_id token_expires_at updated_at',
     'domains' => 'activated_at created_at domain id is_primary tenant_id token_issued_at updated_at verification_checked_at verification_failure_reason verification_token verified_at',

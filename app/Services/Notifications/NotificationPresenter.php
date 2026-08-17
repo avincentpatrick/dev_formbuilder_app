@@ -235,6 +235,17 @@ final class NotificationPresenter
             // recipient ROLE is a decision that can be widened later (the enum's `recipientRoles()` says
             // so), and a link that 403s is a worse bell row than one that is not a link.
             NotificationType::ImpersonationStarted => Gate::forUser($user)->allows('viewAny', Audit::class),
+            // K1b — ⚠️ UNREACHABLE TODAY, AND ADDED ANYWAY BECAUSE THAT IS EXACTLY WHY IT IS DANGEROUS.
+            // `NotificationType::BadgeEarned::pathFor()` returns null until K1e builds the achievements
+            // surface, and the caller above short-circuits on `$path === null || …`, so this arm is never
+            // evaluated. Omitting it would therefore be SILENT now and an `UnhandledMatchError` on every
+            // bell poll the day K1e returns a path — a fatal in a component mounted on every page, landing
+            // in an increment that changed one string and would have no reason to look here.
+            //
+            // `true` rather than `false`: this method answers "may this reader open the destination", and
+            // the reader is the earner looking at their own record. There is no gate to apply — which is
+            // the same answer K1e will need, so the arm is correct then as well as inert now.
+            NotificationType::BadgeEarned => true,
         };
     }
 

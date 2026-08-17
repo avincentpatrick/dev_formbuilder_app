@@ -52,6 +52,10 @@ final class TenantScopedTables
     public const array STRICT = [
         'attachments',
         'audits',
+        // K1b. Nothing withheld, and it holds even less than its `point_awards` sibling: the row is a member
+        // id, a catalog key from a closed PHP enum, and a date. There is no subject column at all, so not
+        // even the one-way digest that ledger carries appears here.
+        'badge_awards',
         'connection_subscriptions',
         'connections',
         'feedback_reports',

@@ -156,6 +156,27 @@ No AI appears anywhere in the committed docs; the versioned draft/publish model 
 
 ## ⚠️ Discovered defects (found while building)
 
+- **The architecture doc promises RESUMABLE media upload; what shipped is whole-file with per-file retry
+  (found by P3a, filed by K1c).** `docs/architecture/technical-architecture.md` says it three times —
+  `:306` ("upload queued media attachments *(resumable, per-file retry)*"), `:314` ("resumable multipart
+  upload with per-chunk retry"), and `:521`, where R4's mitigation for *"partial media upload"* is "media
+  uploads are independent of the submission record with their own resumable retry". G8b built the
+  independence and the retry; it did not build **resumption**, so a 40 MB video that fails at 90% on a
+  field connection restarts from zero, which is the case the promise exists for.
+
+  **Not a bug in what was built** — the per-file retry works, and an enumerator on a good connection never
+  notices. It is a documented capability the as-built does not have, which is the fourth of that shape this
+  project has recorded (P2a's `Dedicated db | In effect: Yes`, P2b's `0700`, P2c's Consequences, P3a's §8).
+  The honest remedies are opposite in cost and both acceptable: **narrow the three sentences** to what G8b
+  ships, or **build chunked upload** (a chunk endpoint, an upload-session row, and a client that tracks
+  offsets — genuinely large, and it wants a real measurement of field failure rates first, which is an
+  input nobody here can supply). ⚠️ **The narrowing is NOT free**: R4's risk register entry names resumable
+  retry as its mitigation, so narrowing the promise re-opens the risk and R4 has to say so.
+
+  **Why it took three increments to land here.** P3a found it and could not file it — `docs/feature-backlog.md`
+  was Lane A's live J4c2 claim — and K1a/K1b could not either, for J5. Filed by the first Lane B row that
+  could reach the file, which is the protocol working rather than a delay.
+
 - **26 foreign keys can reference across a tenant boundary, and the database will act on them
   (ADR-0002 §D5, measured by P2c).** Not a latent bug — no cross-tenant reference exists in the data,
   because every write path resolves its parent under RLS before writing the child and reaching a

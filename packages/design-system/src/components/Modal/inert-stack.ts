@@ -74,8 +74,36 @@ const BASE_Z_INDEX = 1000;
 /** Nothing rendered, nothing focusable — marking these would only clutter the DOM for an inspector. */
 const NON_RENDERED = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'NOSCRIPT', 'TEMPLATE', 'TITLE', 'BASE']);
 
-/** Open modal roots (backdrop elements), oldest first. The last entry owns the page. */
-const stack: HTMLElement[] = [];
+/**
+ * What a pushed root IS, which is a different question from whether it owns the page (J6).
+ *
+ * ⚠️ THE STACK STAYS ONE STACK, AND SPLITTING IT WOULD BE THE BUG. `inert`, paint order and the scroll
+ * lock are correctly driven by EVERY surface that takes the page — a drawer over the shell must inert the
+ * shell exactly as a dialog does, or the WCAG 2.4.3 hole this module closed reopens for the non-dialog
+ * case. What was conflated is the *reporting*: `openModalCount()` has always documented itself as
+ * counting BLOCKING DIALOGS, and since J4b it has also been counting the mobile nav drawer, whose own
+ * seam argues at length that making it a dialog would be a regression. A global affordance asking "may I
+ * open a dialog here?" was getting "no" from a navigation flyout.
+ *
+ *  - `dialog` — a blocking dialog. Something else must not open a second one on top without deciding to.
+ *  - `surface` — takes the page without being a dialog (the mobile nav drawer, via `useInertBackground`).
+ *
+ * `dialog` is the DEFAULT so that all 29 `MdsModal` consumers are byte-unchanged by this split, which is
+ * the evidence it is a narrowing rather than a behaviour change.
+ */
+export type SurfaceKind = 'dialog' | 'surface';
+
+interface Entry {
+    root: HTMLElement;
+    kind: SurfaceKind;
+}
+
+/** Open page-taking roots (backdrop elements), oldest first. The last entry owns the page. */
+const stack: Entry[] = [];
+
+function indexOfRoot(root: HTMLElement): number {
+    return stack.findIndex((entry) => entry.root === root);
+}
 
 /** Exactly what WE set `inert` on, so cleanup can never strip a consumer's own pre-existing `inert`. */
 let marked = new Set<Element>();
@@ -117,7 +145,7 @@ function apply(): void {
     const top = stack[stack.length - 1];
     if (top === undefined) return;
 
-    for (const el of backgroundOf(top)) {
+    for (const el of backgroundOf(top.root)) {
         if (el.hasAttribute('inert')) continue; // the consumer's own; leave it, and do not claim it
         // `setAttribute`, not the `el.inert` IDL property, because axe-core reads the ATTRIBUTE
         // (`vNode.hasAttr('inert')`) — and the attribute is what every engine agrees on.
@@ -128,8 +156,8 @@ function apply(): void {
 
 /** Make the visually topmost dialog the one the stack calls top. See `BASE_Z_INDEX` — load-bearing. */
 function applyPaintOrder(): void {
-    stack.forEach((root, depth) => {
-        root.style.zIndex = String(BASE_Z_INDEX + depth);
+    stack.forEach((entry, depth) => {
+        entry.root.style.zIndex = String(BASE_Z_INDEX + depth);
     });
 }
 
@@ -137,10 +165,16 @@ function syncScrollLock(): void {
     document.body.style.overflow = stack.length > 0 ? 'hidden' : '';
 }
 
-/** An opening modal takes the page. Idempotent — a re-push of the same root is a no-op. */
-export function pushModalRoot(root: HTMLElement): void {
-    if (stack.includes(root)) return;
-    stack.push(root);
+/**
+ * An opening surface takes the page. Idempotent — a re-push of the same root is a no-op, and that
+ * includes a re-push under a different `kind`: the first push wins, because the alternative is a caller
+ * silently reclassifying a surface something else is already reasoning about.
+ *
+ * `kind` defaults to `dialog`, which is what every `MdsModal` is. See `SurfaceKind`.
+ */
+export function pushModalRoot(root: HTMLElement, kind: SurfaceKind = 'dialog'): void {
+    if (indexOfRoot(root) !== -1) return;
+    stack.push({ root, kind });
     applyPaintOrder();
     apply();
     syncScrollLock();
@@ -162,7 +196,7 @@ export function pushModalRoot(root: HTMLElement): void {
  * without it a stray pop would silently release the TOPMOST modal instead of doing nothing.
  */
 export function popModalRoot(root: HTMLElement): void {
-    const at = stack.indexOf(root);
+    const at = indexOfRoot(root);
     if (at === -1) return;
     stack.splice(at, 1);
     root.style.zIndex = '';
@@ -176,7 +210,35 @@ export function popModalRoot(root: HTMLElement): void {
  * index): a consumer that opens a dialog from a GLOBAL affordance — a keyboard chord, a toast action —
  * has no other way to know it would be stacking onto an unfinished one. Also the test seam, since the
  * depth is otherwise observable only through its side effects.
+ *
+ * ⚠️ IT COUNTS `dialog` ENTRIES ONLY, AND UNTIL J6 IT COUNTED THE WHOLE STACK — WHICH MADE THIS DOCBLOCK
+ * FALSE THE MOMENT J4b GAVE THE MOBILE NAV DRAWER THE SAME SEAM. The drawer is a `surface`: it takes the
+ * page, so it belongs on this stack for `inert`, paint order and the scroll lock, and it is emphatically
+ * not a dialog — `useInertBackground` argues that at length, because making it one would make the primary
+ * navigation landmark's identity depend on the viewport (DSR §6). The observable cost of the conflation
+ * was that ⌘K became a **dead key** whenever the drawer was open: `useCommandPalette` reads this to decide
+ * whether it would be stacking onto an unfinished dialog, got `1` from a navigation flyout, and declined
+ * — having already called `preventDefault()`, so the browser did not act either.
+ *
+ * **A count is an answer to a question, and this one has to keep answering the question it documents.**
+ * If a future consumer needs "is anything at all holding the page?" — for a scroll or animation decision,
+ * say — that is a different function, and it should be added with its own consumer rather than by
+ * widening this one back.
  */
+/**
+ * The root currently holding the page, whatever kind it is — or null when nothing is.
+ *
+ * ⚠️ PACKAGE-INTERNAL ON PURPOSE: it is NOT re-exported from the index, because the only legitimate
+ * consumer is the last resort in `Modal.vue`'s return-focus chain (J6). When a dialog closes and focus has
+ * demonstrably ended up on `<body>` while a surface is still holding the page, every other element in the
+ * document is inert and the reader has nothing to reach — this is the handle that lets focus be given back
+ * to the surface that is still there. An application consumer reaching for this is almost certainly asking
+ * the wrong question; `openModalCount()` is the public predicate.
+ */
+export function pageOwningRoot(): HTMLElement | null {
+    return stack[stack.length - 1]?.root ?? null;
+}
+
 export function openModalCount(): number {
-    return stack.length;
+    return stack.reduce((total, entry) => total + (entry.kind === 'dialog' ? 1 : 0), 0);
 }

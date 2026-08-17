@@ -24,7 +24,7 @@
  * the ≤480px full-sheet treatment. ⚠️ Escape in particular: `MdsCombobox` deliberately does NOT bind it,
  * because the surface that owns it is this dialog. See that component's docblock before "fixing" it.
  */
-import { MdsCombobox, MdsModal, type ComboboxOption } from '@meridian/design-system';
+import { MdsCombobox, MdsModal, firstFocusable, type ComboboxOption } from '@meridian/design-system';
 import { router } from '@inertiajs/vue3';
 import { computed, nextTick, ref, useId, watch } from 'vue';
 import { useCommandPalette } from '@/composables/useCommandPalette';
@@ -59,30 +59,29 @@ const props = defineProps<{
      * `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured the body and
      * closing the palette left focus nowhere. Every unit test passed — happy-dom has no layout, so nothing
      * there can distinguish a hidden element from a visible one. Only the browser at a real viewport could.
+     *
+     * ⚠️ AND AS OF J6 THE SAME LIST IS ALSO PASSED AS `MdsModal`'s `returnFocus`, WHICH IS ONE LIST FOR ONE
+     * QUESTION RATHER THAN TWO LISTS THAT WOULD DRIFT. Focusing a candidate before opening only *usually*
+     * fixes return-focus — it fails whenever the captured element does not survive to close time, which the
+     * palette makes routine: activating a result navigates, the shell re-renders, and an opener captured
+     * inside a since-closed mobile drawer no longer exists. Handing the same preference order to the modal
+     * lets it re-resolve against the document as it stands *then*, rather than trusting a handle it took
+     * before the page changed underneath it.
      */
     openerSelectors?: string[];
 }>();
 
 /**
- * `checkVisibility()` is the honest question and Chromium answers it. happy-dom implements neither it nor
- * a real `offsetParent` — J1a MEASURED that as `undefined` rather than `null`, which is why the fallback is
- * written to treat every candidate as visible under Vitest. The real guard for this is the e2e spec.
+ * ⚠️ THE PREDICATE MOVED INTO THE DESIGN SYSTEM IN J6, AND IT WAS INCOMPLETE HERE. This file used to carry
+ * a private `isVisible()` asking `checkVisibility()`, which is the honest question about RENDERING and
+ * knows nothing about `inert` — an inert element renders normally, so it answered `true` for a control
+ * `.focus()` cannot move to. With the mobile nav drawer holding the page, every candidate below lives in
+ * the inert top nav: the resolver handed one back, the focus call was a silent no-op, and `MdsModal`
+ * captured whatever the drawer happened to have. **That is the same defect the LIST below was created to
+ * fix**, blind to `inert` instead of blind to layout. `firstFocusable` now answers both, in one place, and
+ * `MdsModal` reads the same definition on the way out.
  */
-function isVisible(element: HTMLElement): boolean {
-    if (typeof element.checkVisibility === 'function') return element.checkVisibility();
-
-    return element.offsetParent !== null;
-}
-
-const { open } = useCommandPalette(() => {
-    for (const selector of props.openerSelectors ?? []) {
-        const candidate = document.querySelector<HTMLElement>(selector);
-
-        if (candidate !== null && isVisible(candidate)) return candidate;
-    }
-
-    return null;
-});
+const { open } = useCommandPalette(() => firstFocusable(props.openerSelectors ?? []));
 
 /**
  * The input's id, minted here and handed DOWN, so the modal's `initialFocus` selector can name the real
@@ -246,6 +245,7 @@ function submitRawQuery(term: string): void {
         title="Search"
         close-label="Close search"
         :initial-focus="`#${inputId}`"
+        :return-focus="openerSelectors"
         @close="open = false"
         @update:open="open = $event"
     >

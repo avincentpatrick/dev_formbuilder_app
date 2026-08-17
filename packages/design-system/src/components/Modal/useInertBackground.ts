@@ -53,8 +53,39 @@ export function useInertBackground(options: InertBackgroundOptions): void {
     let ownedRoot: HTMLElement | null = null;
     let opener: HTMLElement | null = null;
 
+    /**
+     * Whether this run has ALREADY tried to capture an opener — which is a different question from
+     * whether it HAS one, and conflating the two is a bug the adversarial pass found in J6's own new code.
+     *
+     * `opener === null` means both *"not captured yet"* and *"captured, and the answer was legitimately
+     * nothing"* — the second being what happens when the surface opens with nothing focused, now that the
+     * body element is refused. A hand-over then re-ran the capture and grabbed whatever was focused
+     * **inside the outgoing root**, so closing the surface would have returned focus to a detached element
+     * in a root that no longer exists. That is precisely the drift the single-capture rule exists to stop,
+     * reintroduced by the guard added beside it.
+     */
+    let openerCaptured = false;
+
     function take(): void {
-        opener = document.activeElement as HTMLElement | null;
+        // ⚠️ `??=`, NOT `=` (J6). A root that changes identity mid-run takes the page again, and the element
+        // the surface was OPENED from must survive that — overwriting it here would make return-focus land
+        // on whatever happened to be focused inside the previous root, which is the surface returning the
+        // user to itself.
+        //
+        // ⚠️ AND THE BODY ELEMENT IS NEVER AN OPENER, WHICH J6's ADVERSARIAL PASS FOUND HERE AFTER FIXING THE
+        // SAME THING IN `Modal.vue` — AND THIS SEAM'S VERSION WAS MADE REACHABLE BY J6's OWN FIRST FIX.
+        // Focusing the body element is not a no-op: the body is the document's default focus target, so the
+        // call SUCCEEDS. A surface opened by touch or by a programmatic toggle, with nothing focused, would
+        // capture it — and `release()` would then move focus TO the body. Harmless while nothing else holds
+        // the page, and not harmless now: the drawer is a `surface`, so as of J6 a dialog can be open ON TOP
+        // of it (⌘K), and the drawer releasing underneath — a resize past 480px does exactly that — would
+        // yank focus out of the open dialog. Null instead, so `release()`'s optional call simply does nothing
+        // and whatever holds focus keeps it.
+        if (!openerCaptured) {
+            openerCaptured = true;
+            const active = document.activeElement as HTMLElement | null;
+            opener = active === null || active === document.body ? null : active;
+        }
 
         // nextTick, because the surface may not have rendered yet — and on the immediate run below we are
         // still inside setup(). `active` is re-read inside the callback because an open immediately
@@ -65,7 +96,12 @@ export function useInertBackground(options: InertBackgroundOptions): void {
             if (!active.value || root.value === null || ownedRoot !== null) return;
 
             ownedRoot = root.value;
-            pushModalRoot(ownedRoot);
+            // ⚠️ `surface`, NOT the default `dialog` (J6). This seam exists precisely because its consumers
+            // take the page WITHOUT being dialogs — see the docblock above — and `openModalCount()`
+            // documents itself as counting blocking dialogs. Pushing as a dialog made ⌘K a dead key
+            // whenever the drawer was open: a global affordance asked "would I be stacking onto an
+            // unfinished dialog?" and a navigation flyout answered yes.
+            pushModalRoot(ownedRoot, 'surface');
 
             let designated: HTMLElement | null = null;
             if (initialFocus !== undefined) {
@@ -91,21 +127,80 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         });
     }
 
+    /**
+     * Give the page back without touching focus — the half a hand-over needs and a close does not.
+     *
+     * ⚠️ IT IS NOT UNIT-DISTINGUISHABLE FROM CALLING `release()` HERE, AND THE MUTATION PASS PROVED THAT
+     * RATHER THAN THE OPPOSITE. Swapping this for the full `release()` in the hand-over arm survives every
+     * case in this file, and the reasoning holds: `release()` restores focus to the opener and nulls it,
+     * then `take()`'s `??=` re-reads `document.activeElement` — which is the element `release()` just
+     * focused. The captured opener comes out the same, so the round trip is a no-op in the DOM.
+     *
+     * It stays because of something happy-dom cannot represent: in a browser that round trip **paints**. The
+     * focus ring lands on the opener and jumps away again within one frame, which is a flash on a control the
+     * user is not interacting with. Recorded as a deliberate mutation survivor rather than left looking like
+     * a gap — a surviving mutant is only a defect if the difference is one somebody can observe.
+     */
+    function releasePageOnly(): void {
+        if (ownedRoot === null) return;
+
+        popModalRoot(ownedRoot);
+        ownedRoot = null;
+    }
+
     function release(): void {
         if (ownedRoot === null) return;
 
         // ⚠️ ORDER IS THE CONTRACT: release the page BEFORE restoring focus. Calling `.focus()` on an
         // element that is still inside an inert subtree is a silent no-op, and the user is left with focus
         // on the body and no way back.
-        popModalRoot(ownedRoot);
-        ownedRoot = null;
+        releasePageOnly();
         opener?.focus?.();
         opener = null;
+        // Reset here and NOT in `releasePageOnly()` — a hand-over must keep the run's original capture,
+        // which is the whole point of the flag.
+        openerCaptured = false;
     }
 
-    watch(active, (isActive) => {
-        if (isActive) take();
-        else release();
+    /**
+     * ⚠️ IT WATCHES `root` AS WELL AS `active`, AND WATCHING ONLY `active` WAS A LATENT DEFECT (J6, J4b1's
+     * third finding). `ownedRoot` is captured once and the `ownedRoot !== null` guard inside `take()` makes
+     * every later take a no-op, so a `root` that changed identity while active left the stack holding the
+     * OLD element: the inert walk is then computed from a root that may not even be in the document, and the
+     * new surface — being an off-path sibling of the stale one — can be marked inert by its own seam.
+     *
+     * The shipped consumer's root is stable, so nothing was broken. But this is exported API, and the next
+     * consumer is where a `v-if`-swapped root or a `<component :is>` would find it.
+     *
+     * Three transitions, and the middle one is the new one:
+     *  - active goes false → full release, focus back to the opener.
+     *  - root is replaced while active → hand the page over WITHOUT going through the opener. A full release
+     *    would restore focus to the opener and then immediately steal it back, and would discard the opener
+     *    the run started with.
+     *  - root goes null while we hold one → the surface is gone, so this is a close, not a hand-over.
+     *
+     * ⚠️ AND `root === null` WHILE WE HOLD NOTHING IS NOT ANY OF THEM — it is simply "not rendered yet",
+     * which is the state the `immediate` run always sees from inside `setup()`. Treating it as a teardown
+     * would break the mount-already-active path that two call sites in this repo depend on.
+     */
+    watch([active, root], ([isActive, current]) => {
+        if (!isActive) {
+            release();
+
+            return;
+        }
+
+        if (ownedRoot !== null && ownedRoot !== current) {
+            if (current === null) {
+                release();
+
+                return;
+            }
+
+            releasePageOnly();
+        }
+
+        take();
     }, { immediate: true });
 
     // Non-negotiable: a leaked `inert` in a shared test document silently blanks the NEXT spec file's

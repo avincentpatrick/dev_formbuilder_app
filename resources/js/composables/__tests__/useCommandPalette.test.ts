@@ -11,6 +11,13 @@ import { __resetCommandPaletteBindings, useCommandPalette } from '../useCommandP
  * palette shut — it would see its own dialog as "someone else's". These cases pin the order that resolves
  * it without an `await`, which matters because awaiting would surrender `preventDefault()`'s synchronous
  * window and hand the keystroke to the browser.
+ *
+ * ⚠️ WHAT THIS FILE STRUCTURALLY CANNOT SEE, STATED SO NOBODY READS IT AS COVERAGE IT DOES NOT HAVE: it
+ * MOCKS `openModalCount`, so J6's dialog-vs-surface split is invisible here — a case asserting "the chord
+ * works while a drawer holds the page" would pass with the split reverted, because the mock answers
+ * whatever it is told. That behaviour is pinned against the REAL implementation in
+ * `packages/design-system/src/components/Modal/inert-stack.test.ts` and `useInertBackground.test.ts`.
+ * What does belong here is the guard ORDER and the `preventDefault()` POSITION, which are this file's own.
  */
 
 const openModalCount = vi.hoisted(() => vi.fn(() => 0));
@@ -82,6 +89,22 @@ describe('useCommandPalette', () => {
         chord();
 
         expect(host.vm.open).toBe(false);
+        host.unmount();
+    });
+
+    it('still swallows the chord when it declines over a real dialog, rather than handing it back', () => {
+        // ⭐ The other half of J6, and the reason `preventDefault()` stays ABOVE the guards. The naive fix
+        // for the dead key was to move it below them — which would open the BROWSER's find bar on top of an
+        // open modal. Declining silently is the correct outcome there; the defect was only ever that a
+        // drawer was being counted as a dialog.
+        const host = mountHost();
+
+        openModalCount.mockReturnValue(1);
+        const event = chord();
+
+        expect(host.vm.open).toBe(false);
+        expect(event.defaultPrevented).toBe(true);
+
         host.unmount();
     });
 

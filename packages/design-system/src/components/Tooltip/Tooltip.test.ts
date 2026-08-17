@@ -69,6 +69,85 @@ describe('MdsTooltip — WCAG 1.4.13: dismissible, hoverable, persistent', () =>
         document.removeEventListener('keydown', outer);
     });
 
+    it('lets Escape THROUGH when it is only hovered and focus is somewhere else entirely', async () => {
+        // ⭐ J4b1's FOURTH FINDING, as its measured reproduction. The listener is capture-phase on
+        // `document`, so it ran before every other Escape claimant on the page whichever mechanism they
+        // chose — including a `document` BUBBLE-phase listener, which never ran at all. At 481–1024px: rest
+        // the pointer on a collapsed rail item with a shell popover open, press Escape, and the tooltip
+        // vanished while the POPOVER STAYED OPEN. Confirmed in the browser against both shell mechanisms.
+        //
+        // `outer` is bubble-phase on `document` precisely because that is what `useDismissable` is — whose
+        // consumers are the notification bell and the feedback button. (The account menu is NOT one: it
+        // moved to `MdsMenu`, which binds its own root, and loses the key just the same.)
+        const outer = vi.fn();
+        document.addEventListener('keydown', outer);
+
+        const elsewhere = document.createElement('button');
+        document.body.appendChild(elsewhere);
+
+        const wrapper = mountTooltip();
+        await wrapper.get('.mds-tooltip-anchor').trigger('pointerenter', { pointerType: 'mouse' });
+        expect(wrapper.find('[role="tooltip"]').exists()).toBe(true);
+
+        // The menu holds focus; the tooltip is merely under the pointer.
+        elsewhere.focus();
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flushPromises();
+
+        // Dismissal is unconditional (1.4.13) — only the CONSUMPTION is scoped, so both things happen.
+        expect(wrapper.find('[role="tooltip"]').exists()).toBe(false);
+        expect(outer).toHaveBeenCalledTimes(1);
+        // And dismissing a description still must not relocate the reader.
+        expect(document.activeElement).toBe(elsewhere);
+
+        document.removeEventListener('keydown', outer);
+        elsewhere.remove();
+    });
+
+    it('still consumes Escape when nothing at all holds focus, so a lone bubble is not a no-op', async () => {
+        // ⭐ THE CONTROL FOR THE FIX. With focus on the document body element, nothing else can be claiming
+        // the key (the tag name is named rather than written as a literal -- see Modal.vue's docblock: a
+        // tag-shaped literal in a comment breaks the Storybook SFC parse, file-dependently, and this file
+        // sits beside one that carries the hazard), so the
+        // §3.4a sequence stands and the tooltip takes it. A fix that scoped consumption to "the anchor holds
+        // focus" ALONE would break the pointer-only case, which is the commonest way a tooltip is seen.
+        const outer = vi.fn();
+        document.addEventListener('keydown', outer);
+
+        const wrapper = mountTooltip();
+        await wrapper.get('.mds-tooltip-anchor').trigger('pointerenter', { pointerType: 'mouse' });
+        expect(wrapper.find('[role="tooltip"]').exists()).toBe(true);
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flushPromises();
+
+        expect(wrapper.find('[role="tooltip"]').exists()).toBe(false);
+        expect(outer).not.toHaveBeenCalled();
+
+        document.removeEventListener('keydown', outer);
+    });
+
+    it('consumes Escape for a control inside the anchor, not merely for the trigger itself', async () => {
+        // The anchor wraps the consumer's trigger, and a consumer may bind `trigger` onto something with its
+        // own focusable descendants. `contains` rather than identity, so the rail's link-inside-a-wrapper
+        // shape keeps §3.4a's sequence.
+        const outer = vi.fn();
+        document.addEventListener('keydown', outer);
+
+        const wrapper = mountTooltip();
+        const button = wrapper.get('button').element as HTMLButtonElement;
+        button.focus();
+        await wrapper.get('.mds-tooltip-anchor').trigger('focusin');
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await flushPromises();
+
+        expect(outer).not.toHaveBeenCalled();
+
+        document.removeEventListener('keydown', outer);
+    });
+
     it('stays dismissed while the pointer rests on the trigger, and shows again once it has left and returned', async () => {
         // Without the latch, Escape is a no-op the user watches fail: the bubble vanishes and the pointer
         // that never moved re-shows it on the next enter event.

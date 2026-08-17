@@ -24,6 +24,10 @@
  * consume the first Escape and the dialog receive the second, which is the sequence 1.4.13 asks for.
  * Focus never moves — dismissing a description must not relocate the reader.
  *
+ * ⚠️ BUT CONSUMPTION IS SCOPED TO THIS TOOLTIP'S OWN INTERACTION CONTEXT AS OF J6, BECAUSE A CAPTURE
+ * LISTENER ON `document` RUNS BEFORE EVERY OTHER ESCAPE CLAIMANT ON THE PAGE — including ones this
+ * component has no relationship with. See `ownsEscape`, which carries the measured reproduction.
+ *
  * The contract is DSR §3.4a's, decided before the component existed: dismissible, hoverable,
  * persistent, and `aria-describedby` — NEVER the accessible name.
  */
@@ -163,9 +167,49 @@ function onFocusOut(event: FocusEvent): void {
     hideNow();
 }
 
+/**
+ * Is this tooltip in the interaction context the key was aimed at? (J6, J4b1's fourth finding.)
+ *
+ * ⚠️ THE ANSWER USED TO BE "ALWAYS", AND THAT MADE ONE HOVERED BUBBLE A PAGE-GLOBAL ESCAPE SINK. The
+ * listener is on `document` in the CAPTURE phase, so it runs before EVERY other Escape claimant on the
+ * page, whichever mechanism they chose — before `MdsModal`'s panel handler, before `MdsMenu`'s root
+ * handler, and before a `document` BUBBLE-phase listener, which never runs at all. That last one is the
+ * application's shared dismissal composable, and **note it is not the account menu that uses it** — that
+ * moved to `MdsMenu`; its remaining consumers are the notification bell and the feedback button.
+ * Reproduced at 481–1024px against BOTH mechanisms: rest the pointer on a collapsed sidebar rail item
+ * with either popover open, press Escape — the tooltip vanished and the POPOVER STAYED OPEN.
+ *
+ * The docblock's sequencing argument is right about the case it names — a tooltip on a control inside a
+ * dialog, where the tooltip should take the first press and the dialog the second — but it is written
+ * as though this component were always in the user's context, and a hover bubble on the far side of the
+ * page is not. So the test is where the key is AIMED: at whatever holds focus.
+ *
+ *  - the anchor holds focus → this tooltip is what the reader is on. Consume it; §3.4a's sequence stands.
+ *  - nothing holds focus → nothing else can be claiming the key. Consume it.
+ *  - focus is elsewhere → hide, and LET IT THROUGH.
+ *
+ * ⚠️ THE TRADE IS DELIBERATE AND WORTH STATING: a HOVERED tooltip inside a dialog, with focus on some
+ * other control in that dialog, now dismisses AND lets the dialog close, where before it ate the press.
+ * That is the right way round. WCAG 1.4.13 requires the bubble be dismissible, not that it be
+ * dismissible EXCLUSIVELY, and a pointer user resting on a description while pressing Escape means
+ * "close the dialog". Eating the key there loses the whole task to hide a label.
+ *
+ * ⚠️ AND THIS DOES NOT RETIRE THE SIDEBAR'S RAIL-BAND GATE, WHICH READS AS THOUGH IT MIGHT. Below 480px
+ * the drawer moves focus programmatically onto a rail item, so the anchor WOULD hold focus and the
+ * tooltip WOULD still take the drawer's first Escape. The gate is still the fix for that, unchanged.
+ */
+function ownsEscape(): boolean {
+    const focused = document.activeElement;
+
+    if (focused === null || focused === document.body) return true;
+
+    return anchorEl.value?.contains(focused) === true;
+}
+
 function onDocumentKeydown(event: KeyboardEvent): void {
     if (event.key !== 'Escape' || !visible.value) return;
-    event.stopPropagation();
+    // Dismissal is unconditional (1.4.13); only the CONSUMPTION is scoped.
+    if (ownsEscape()) event.stopPropagation();
     dismissed.value = true;
     hideNow();
 }

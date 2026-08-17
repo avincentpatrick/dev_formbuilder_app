@@ -225,6 +225,20 @@ export function popModalRoot(root: HTMLElement): void {
  * say — that is a different function, and it should be added with its own consumer rather than by
  * widening this one back.
  */
+/**
+ * The root currently holding the page, whatever kind it is — or null when nothing is.
+ *
+ * ⚠️ PACKAGE-INTERNAL ON PURPOSE: it is NOT re-exported from the index, because the only legitimate
+ * consumer is the last resort in `Modal.vue`'s return-focus chain (J6). When a dialog closes and focus has
+ * demonstrably ended up on `<body>` while a surface is still holding the page, every other element in the
+ * document is inert and the reader has nothing to reach — this is the handle that lets focus be given back
+ * to the surface that is still there. An application consumer reaching for this is almost certainly asking
+ * the wrong question; `openModalCount()` is the public predicate.
+ */
+export function pageOwningRoot(): HTMLElement | null {
+    return stack[stack.length - 1]?.root ?? null;
+}
+
 export function openModalCount(): number {
     return stack.reduce((total, entry) => total + (entry.kind === 'dialog' ? 1 : 0), 0);
 }

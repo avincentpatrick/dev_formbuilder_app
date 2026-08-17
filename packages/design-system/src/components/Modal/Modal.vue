@@ -25,7 +25,8 @@
  */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
 import Icon from '../Icon/Icon.vue';
-import { popModalRoot, pushModalRoot } from './inert-stack';
+import { pageOwningRoot, popModalRoot, pushModalRoot } from './inert-stack';
+import { firstFocusable } from './focus-target';
 
 const props = withDefaults(
     defineProps<{
@@ -69,6 +70,28 @@ const props = withDefaults(
          * silent failure here a keyboard trap rather than a cosmetic slip.
          */
         initialFocus?: string;
+        /**
+         * Selectors, in PREFERENCE order, for where focus should go on close when the captured opener
+         * cannot take it. Resolved against the DOCUMENT rather than the panel — by then the panel is gone.
+         *
+         * ⚠️ THIS IS THE MIRROR OF `initialFocus`, AND ITS ABSENCE WAS A LIVE DEFECT (J6). `takePage()`
+         * verifies that focus actually landed and falls back, and explains at length why: the page is
+         * already inert by then, so every way the lookup can fail ends with the user on `<body>` with
+         * Escape and the Tab trap unreachable. `closePage()` did none of that — it called
+         * `opener?.focus?.()` and trusted it. But `.focus()` fails silently in three ways on the way OUT
+         * too: the opener was removed while the dialog was open (an Inertia visit re-rendering the shell),
+         * it became `display: none` (a control that only exists above a breakpoint), or it is inside a
+         * subtree that is STILL inert because a non-dialog surface is holding the page underneath.
+         *
+         * That last one is the reachable case J4b1 filed: a palette opened over the mobile nav drawer
+         * captures an opener inside the drawer, the user activates a result, the shell re-renders and the
+         * drawer closes — and the element focus was promised to no longer exists.
+         *
+         * Omitted keeps the pre-J6 behaviour for every existing consumer, except that the failure is now
+         * VERIFIED rather than assumed: with no candidates and a dead opener, focus is handed to whichever
+         * surface still owns the page, and only if none does is it left alone.
+         */
+        returnFocus?: readonly string[];
     }>(),
     { closeLabel: 'Close', teleport: true },
 );
@@ -192,13 +215,63 @@ function releasePage() {
     ownedRoot = null;
 }
 
-/** Release the page, then return focus. Order matters -- see popModalRoot's contract. */
+/**
+ * Release the page, then return focus. Order matters -- see popModalRoot's contract.
+ *
+ * ⚠️ TRIED-THEN-VERIFIED, EXACTLY LIKE `takePage()`, AND UNTIL J6 THIS HALF WAS TRUSTED (J4b1 finding 2).
+ * `.focus()` on an element that cannot take it is a silent no-op, and on the way OUT there are three ways
+ * for that to happen to a captured opener: it was removed while the dialog was open, it stopped being
+ * rendered, or it is still inside an inert subtree because a non-dialog SURFACE is holding the page
+ * underneath. All three land in the same place -- focus on `document.body`, with no dialog left to bind
+ * Escape or trap Tab, which is the stranding DSR 4.5 forbids in the same sentence that asks for
+ * return-focus at all.
+ *
+ * The verification is `activeElement` being body/null rather than "is the opener focused", and that
+ * distinction preserves popModalRoot's own contract for free: when a LOWER dialog closes under an open
+ * upper one, focus is legitimately inside the upper panel and the opener's no-op there is CORRECT -- focus
+ * must not jump to a control sitting behind an open dialog. Testing for stranding rather than for success
+ * leaves that case untouched.
+ */
 function closePage() {
     const wasOpen = ownedRoot !== null;
     releasePage();
     if (!wasOpen) return;
+
+    // The release-then-focus order stays SYNCHRONOUS -- that is popModalRoot's contract and the reason this
+    // function exists in this shape.
     opener?.focus?.();
     opener = null;
+
+    // ⚠️ BUT THE VERIFICATION CANNOT BE, AND MEASURING IT IS WHAT ESTABLISHED THAT. The first version checked
+    // `activeElement` right here and the three fallback cases all failed against a stranded `<body>` -- the
+    // watcher is PRE-FLUSH, so the panel is still mounted at this line and focus is still legitimately
+    // inside it. The strand happens one tick later, when the `v-if` tears the panel out and the user agent
+    // drops focus. Checking early does not measure the failure; it measures the moment before it. So the
+    // verification runs in `nextTick`, exactly as `takePage()`'s does and for the mirror-image reason.
+    //
+    // `returnFocus` is read NOW rather than in the callback: this also runs from `onBeforeUnmount`, and a
+    // prop read on a torn-down instance is not something to rely on a tick later.
+    const candidates = props.returnFocus;
+
+    void nextTick(() => {
+        if (!isStranded()) return;
+
+        firstFocusable(candidates ?? [])?.focus();
+
+        if (!isStranded()) return;
+
+        // Last resort, and it only fires where the reader would otherwise have nothing at all: focus is on
+        // `<body>` and a surface is still holding the page, so every other element in the document is inert.
+        const owner = pageOwningRoot();
+        if (owner === null) return;
+
+        (owner.querySelector<HTMLElement>(FOCUSABLE) ?? owner).focus();
+    });
+}
+
+/** Focus has ended up nowhere. `document.body.focus()` is itself a no-op, so this is not recoverable by retrying. */
+function isStranded(): boolean {
+    return document.activeElement === null || document.activeElement === document.body;
 }
 
 watch(

@@ -126,6 +126,24 @@ export { default as MdsModal } from './components/Modal/Modal.vue';
  * the very same frame.
  */
 export { openModalCount } from './components/Modal/inert-stack';
+/**
+ * The first of several candidate selectors whose match can ACTUALLY take focus (J6).
+ *
+ * Public for the same reason `openModalCount` is: the app has a genuine need for a predicate the package
+ * owns. A global affordance that focuses a control before opening a dialog — so the dialog captures a real
+ * return-focus target instead of `<body>` — has to know whether `.focus()` will do anything, and there are
+ * two silent ways for it not to. Not rendered is the obvious one. **Inside an `inert` subtree is the one
+ * that was missed**, because `checkVisibility()` answers about rendering and an inert element renders
+ * normally; `inert-stack` puts whole regions of the page in that state, so this package is where the
+ * question belongs. The palette had its own half-answer, and one predicate with two definitions is the
+ * drift that costs a per-occurrence sweep later.
+ *
+ * ⚠️ ONLY THIS ONE IS PUBLIC. `canTakeFocus` and `isInert` are the pieces it is built from and have no app
+ * consumer, so exporting them would be API nobody asked for — the mistake DSR §3.4a records against itself
+ * and J4c2 deleted an unconsumed `defineExpose` for. `pushModalRoot` / `popModalRoot` / `pageOwningRoot`
+ * stay internal for a stronger reason: stack membership is the package's own business.
+ */
+export { firstFocusable } from './components/Modal/focus-target';
 export { default as MdsToast } from './components/Toast/Toast.vue';
 export { default as MdsToastHost } from './components/Toast/ToastHost.vue';
 export { default as MdsDataTable } from './components/DataTable/DataTable.vue';

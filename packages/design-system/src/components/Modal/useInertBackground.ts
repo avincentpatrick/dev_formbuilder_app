@@ -54,7 +54,11 @@ export function useInertBackground(options: InertBackgroundOptions): void {
     let opener: HTMLElement | null = null;
 
     function take(): void {
-        opener = document.activeElement as HTMLElement | null;
+        // ⚠️ `??=`, NOT `=` (J6). A root that changes identity mid-run takes the page again, and the element
+        // the surface was OPENED from must survive that — overwriting it here would make return-focus land
+        // on whatever happened to be focused inside the previous root, which is the surface returning the
+        // user to itself.
+        opener ??= document.activeElement as HTMLElement | null;
 
         // nextTick, because the surface may not have rendered yet — and on the immediate run below we are
         // still inside setup(). `active` is re-read inside the callback because an open immediately
@@ -96,21 +100,64 @@ export function useInertBackground(options: InertBackgroundOptions): void {
         });
     }
 
+    /** Give the page back without touching focus — the half a hand-over needs and a close does not. */
+    function releasePageOnly(): void {
+        if (ownedRoot === null) return;
+
+        popModalRoot(ownedRoot);
+        ownedRoot = null;
+    }
+
     function release(): void {
         if (ownedRoot === null) return;
 
         // ⚠️ ORDER IS THE CONTRACT: release the page BEFORE restoring focus. Calling `.focus()` on an
         // element that is still inside an inert subtree is a silent no-op, and the user is left with focus
         // on the body and no way back.
-        popModalRoot(ownedRoot);
-        ownedRoot = null;
+        releasePageOnly();
         opener?.focus?.();
         opener = null;
     }
 
-    watch(active, (isActive) => {
-        if (isActive) take();
-        else release();
+    /**
+     * ⚠️ IT WATCHES `root` AS WELL AS `active`, AND WATCHING ONLY `active` WAS A LATENT DEFECT (J6, J4b1's
+     * third finding). `ownedRoot` is captured once and the `ownedRoot !== null` guard inside `take()` makes
+     * every later take a no-op, so a `root` that changed identity while active left the stack holding the
+     * OLD element: the inert walk is then computed from a root that may not even be in the document, and the
+     * new surface — being an off-path sibling of the stale one — can be marked inert by its own seam.
+     *
+     * The shipped consumer's root is stable, so nothing was broken. But this is exported API, and the next
+     * consumer is where a `v-if`-swapped root or a `<component :is>` would find it.
+     *
+     * Three transitions, and the middle one is the new one:
+     *  - active goes false → full release, focus back to the opener.
+     *  - root is replaced while active → hand the page over WITHOUT going through the opener. A full release
+     *    would restore focus to the opener and then immediately steal it back, and would discard the opener
+     *    the run started with.
+     *  - root goes null while we hold one → the surface is gone, so this is a close, not a hand-over.
+     *
+     * ⚠️ AND `root === null` WHILE WE HOLD NOTHING IS NOT ANY OF THEM — it is simply "not rendered yet",
+     * which is the state the `immediate` run always sees from inside `setup()`. Treating it as a teardown
+     * would break the mount-already-active path that two call sites in this repo depend on.
+     */
+    watch([active, root], ([isActive, current]) => {
+        if (!isActive) {
+            release();
+
+            return;
+        }
+
+        if (ownedRoot !== null && ownedRoot !== current) {
+            if (current === null) {
+                release();
+
+                return;
+            }
+
+            releasePageOnly();
+        }
+
+        take();
     }, { immediate: true });
 
     // Non-negotiable: a leaked `inert` in a shared test document silently blanks the NEXT spec file's

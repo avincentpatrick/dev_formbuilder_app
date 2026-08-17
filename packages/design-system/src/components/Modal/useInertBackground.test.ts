@@ -194,6 +194,161 @@ describe('useInertBackground — focus management, which is not a trap', () => {
     });
 });
 
+describe('useInertBackground — a root that changes identity while active (J6)', () => {
+    /** Two candidate roots, swapped by a flag, which is the `v-if` shape a real consumer would reach for. */
+    function swappable() {
+        const active = ref(false);
+        const second = ref(false);
+
+        const Host = defineComponent({
+            setup() {
+                const root = ref<HTMLElement | null>(null);
+                useInertBackground({ active, root, initialFocus: '.first' });
+
+                return () =>
+                    h('div', { class: 'shell' }, [
+                        h('main', { class: 'background' }, [h('button', { class: 'behind' }, 'Behind')]),
+                        second.value
+                            ? h('div', { ref: root, key: 'b', class: 'surface surface-b', tabindex: '-1' }, [
+                                h('a', { class: 'first', href: '#b' }, 'B'),
+                            ])
+                            : h('div', { ref: root, key: 'a', class: 'surface surface-a', tabindex: '-1' }, [
+                                h('a', { class: 'first', href: '#a' }, 'A'),
+                            ]),
+                    ]);
+            },
+        });
+
+        return { active, second, wrapper: mount(Host, { attachTo: document.body }) };
+    }
+
+    it('hands the page to the new root rather than holding the stale one', async () => {
+        // ⭐ THE FINDING. Watching only `active` left the stack pointing at the element that had been
+        // replaced, so the inert walk was computed from a detached node — and the LIVE surface, an off-path
+        // sibling of the stale one, went inert. Asserting the new surface is reachable is the half that
+        // catches it; asserting the background is still inert is what stops the fix from being "release and
+        // never re-take".
+        const { active, second, wrapper } = swappable();
+
+        active.value = true;
+        await flushPromises();
+        expect(document.querySelector('.surface-a')?.closest('[inert]')).toBeNull();
+
+        second.value = true;
+        await flushPromises();
+
+        const live = document.querySelector('.surface-b') as HTMLElement;
+        expect(live).not.toBeNull();
+        expect(live.closest('[inert]')).toBeNull();
+        expect((document.querySelector('.background') as HTMLElement).hasAttribute('inert')).toBe(true);
+
+        active.value = false;
+        await flushPromises();
+        expect((document.querySelector('.background') as HTMLElement).hasAttribute('inert')).toBe(false);
+
+        wrapper.unmount();
+    });
+
+    it('moves focus into the new root, since the old one is no longer on the page', async () => {
+        const { active, second, wrapper } = swappable();
+
+        active.value = true;
+        await flushPromises();
+        expect(document.activeElement).toBe(document.querySelector('.surface-a .first'));
+
+        second.value = true;
+        await flushPromises();
+        expect(document.activeElement).toBe(document.querySelector('.surface-b .first'));
+
+        active.value = false;
+        await flushPromises();
+        wrapper.unmount();
+    });
+
+    it('keeps the ORIGINAL opener across the hand-over, not whatever the old root had focused', async () => {
+        // ⭐ Why the capture is `??=` rather than `=`. Re-capturing on the second take would make the opener
+        // an element INSIDE the previous root, so closing the surface would return the user to the surface.
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+
+        const { active, second, wrapper } = swappable();
+
+        active.value = true;
+        await flushPromises();
+
+        second.value = true;
+        await flushPromises();
+
+        active.value = false;
+        await flushPromises();
+
+        expect(document.activeElement).toBe(opener);
+
+        wrapper.unmount();
+        opener.remove();
+    });
+
+    it('does not re-take, or steal focus, when a re-render keeps the SAME element', async () => {
+        // ⭐ The adversarial case for the fix itself: `[active, root]` fires more often than `active` alone,
+        // and a naive implementation would re-run initial focus on every patch — yanking the caret out of
+        // whatever the user had focused inside the surface.
+        const { active, wrapper } = harness();
+
+        active.value = true;
+        await flushPromises();
+
+        (document.querySelector('.second') as HTMLElement).focus();
+        await wrapper.vm.$forceUpdate();
+        await flushPromises();
+
+        expect(document.activeElement).toBe(document.querySelector('.second'));
+        expect(openModalCount()).toBe(0);
+
+        active.value = false;
+        await flushPromises();
+        wrapper.unmount();
+    });
+
+    it('treats a root that goes null while held as a close, and returns focus', async () => {
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+
+        const active = ref(true);
+        const present = ref(true);
+        const Host = defineComponent({
+            setup() {
+                const root = ref<HTMLElement | null>(null);
+                useInertBackground({ active: active as Ref<boolean>, root });
+
+                return () =>
+                    h('div', {}, [
+                        h('main', { class: 'background' }, 'Behind'),
+                        present.value
+                            ? h('div', { ref: root, class: 'surface', tabindex: '-1' }, [h('a', { href: '#one' }, 'One')])
+                            : null,
+                    ]);
+            },
+        });
+
+        const wrapper = mount(Host, { attachTo: document.body });
+        await flushPromises();
+        expect((document.querySelector('.background') as HTMLElement).hasAttribute('inert')).toBe(true);
+
+        present.value = false;
+        await flushPromises();
+
+        // Nothing left to move focus into, so this is a close rather than a hand-over — the page comes back
+        // and the opener gets focus, instead of the document sitting inert around a surface that is gone.
+        expect((document.querySelector('.background') as HTMLElement).hasAttribute('inert')).toBe(false);
+        expect(document.activeElement).toBe(opener);
+
+        wrapper.unmount();
+        opener.remove();
+    });
+});
+
 describe('useInertBackground — cleanup', () => {
     it('releases the page when the component unmounts while active', async () => {
         // A leaked `inert` in the shared test document blanks the NEXT spec file's assertions, and in the

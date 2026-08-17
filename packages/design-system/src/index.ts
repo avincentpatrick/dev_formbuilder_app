@@ -33,6 +33,15 @@ export { default as MdsSpinner } from './components/Spinner/Spinner.vue';
 // which is its reference implementation and its first refactor target.
 export { default as MdsProgress } from './components/Progress/Progress.vue';
 export { type ProgressTone, type ProgressSize } from './components/Progress/Progress.vue';
+// The getting-started checklist (J5b, DSR §3.13) — placed beside MdsProgress because it COMPOSES it, and
+// because the neighbouring note is the one a future author will misread: a checklist is not §3.9's unbuilt
+// step-count variant. That variant is multi-step form NAVIGATION, with a visited-set rule and a current
+// position; a checklist has neither, so generalising the meter for it would have widened a component
+// against a shape it does not have. ⚠️ Its visual grammar is deliberately `MdsPasswordStrength`'s — check
+// glyph, CSS ring, visually-hidden state word — because both are "a list of conditions, each met or not".
+// The difference that earns a second component is that a checklist row can be ACTIONABLE.
+export { default as MdsChecklist } from './components/Checklist/Checklist.vue';
+export { type ChecklistItem } from './components/Checklist/Checklist.vue';
 // The initials chip (J4a). ALWAYS `aria-hidden`, and no prop changes that: an avatar in this system is
 // always beside the person's visible name, and one that must CARRY a name is not an avatar but a link whose
 // accessible name is the person. The reconsideration trigger is a CONSUMER — a stacked group, or an avatar

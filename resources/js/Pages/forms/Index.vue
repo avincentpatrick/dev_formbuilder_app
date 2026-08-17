@@ -32,6 +32,7 @@ import {
     type DataTableColumn,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import CreateFormModal from '@/components/forms/CreateFormModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import AssignScopeModal from '@/components/forms/AssignScopeModal.vue';
 import FormCard from '@/components/forms/FormCard.vue';
@@ -184,22 +185,14 @@ function formatDate(iso: string | null): string {
 }
 
 // ── Create ──────────────────────────────────────────────────────────────
+// J5c — the dialog, its form state and its reset moved into `CreateFormModal`, because the dashboard's
+// first-run moment is now a second caller. Nothing about the behaviour changed: this page still owns the
+// open flag, and the reset that used to live in `openCreate()` is now on the component's opening edge,
+// where neither call site can forget it.
 const createOpen = ref(false);
-const createForm = useForm({ title: '', description: '' });
 
 function openCreate(): void {
-    createForm.reset();
-    createForm.clearErrors();
     createOpen.value = true;
-}
-
-function submitCreate(): void {
-    createForm.post('/forms', {
-        preserveScroll: true,
-        onSuccess: () => {
-            createOpen.value = false;
-        },
-    });
 }
 
 // ── Rename / edit metadata ───────────────────────────────────────────────
@@ -509,35 +502,8 @@ function submitRestore(): void {
         </MdsDataTable>
 
 
-        <!-- Create -->
-        <MdsModal v-model:open="createOpen" title="New form">
-            <form class="forms__form" @submit.prevent="submitCreate">
-                <MdsFormField label="Title" required :error="createForm.errors.title" v-slot="{ id, describedby, invalid }">
-                    <MdsTextInput
-                        :id="id"
-                        v-model="createForm.title"
-                        :describedby="describedby"
-                        :invalid="invalid"
-                        placeholder="Household survey"
-                    />
-                </MdsFormField>
-                <MdsFormField label="Description" :error="createForm.errors.description" v-slot="{ id, describedby, invalid }">
-                    <MdsTextarea
-                        :id="id"
-                        v-model="createForm.description"
-                        :describedby="describedby"
-                        :invalid="invalid"
-                        placeholder="What is this form for?"
-                    />
-                </MdsFormField>
-            </form>
-            <template #actions>
-                <MdsButton variant="tertiary" @click="createOpen = false">Cancel</MdsButton>
-                <MdsButton variant="primary" icon-left="plus" :loading="createForm.processing" @click="submitCreate">
-                    Create form
-                </MdsButton>
-            </template>
-        </MdsModal>
+        <!-- Create — shared with the dashboard's first-run moment (J5c). -->
+        <CreateFormModal v-model:open="createOpen" />
 
         <!-- Rename -->
         <MdsModal :open="editTarget !== null" title="Rename form" @close="editTarget = null">

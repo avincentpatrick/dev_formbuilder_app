@@ -76,6 +76,34 @@ it('lets an Admin list and create forms through the gated routes', function (): 
     expect(Form::where('title', 'Household Survey')->count())->toBe(1);
 });
 
+it('opens the builder on the form it just created, and the creator can actually load it', function (): void {
+    // ⭐ J5c CHANGED THIS REDIRECT, AND THE SECOND HALF IS THE ASSERTION THAT MATTERS. `store()` used to
+    // return `back()` — you named a form and landed where you started — while its sibling
+    // `FormTemplateController::instantiate()` has always opened the builder. Onboarding §2 offers the two
+    // as equally-weighted choices, and one of them stopping short of the product is not equal.
+    //
+    // The risk this pins is not the URL: `forms.builder` carries `can:update,form`, so a redirect into a
+    // page the creator is refused would be the "links that bounce" defect shipped by the very commit that
+    // exists to remove a dead end. It is safe because `FormService::create()` writes the creator an
+    // explicit Editor `ResourceGrant` — so the FOLLOWED request is the real check, not the Location header.
+    $this->withoutVite();
+    $tenant = formsTenant();
+    $editor = User::factory()->create();
+    enterTenant($tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+
+    $this->actingAs($editor)
+        ->post('http://acme.meridian.test/forms', ['title' => 'Clinic Intake'])
+        ->assertRedirect();
+
+    enterTenant($tenant->id, $editor->id);
+    $form = Form::where('title', 'Clinic Intake')->firstOrFail();
+
+    $this->actingAs($editor)
+        ->get("http://acme.meridian.test/forms/{$form->id}/builder")
+        ->assertOk();
+});
+
 it('publishes and archives a form through the gated routes', function (): void {
     $tenant = formsTenant();
     $admin = User::factory()->create();

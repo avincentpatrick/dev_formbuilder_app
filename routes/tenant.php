@@ -36,6 +36,7 @@ use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
 use App\Http\Controllers\Tenant\NotificationController;
+use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
@@ -144,6 +145,19 @@ Route::middleware([
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    // ── The onboarding block (Increment J5b) — LANE A's, claimed in PROGRESS.md before it was written ──
+    //
+    // "Stop showing me the getting-started checklist", on the caller's OWN membership row. No `can:` gate
+    // and no `feature:` gate, and neither is an omission: there is no instance to authorize (the WHERE
+    // clause is the authorization — the /notifications/read-all posture below), and the checklist is not a
+    // paid capability, it is how a brand-new workspace finds its feet.
+    //
+    // ⚠️ NOT under /settings, though it is a per-user preference and `user_ui_preferences` lives there.
+    // The flag is per MEMBERSHIP, not per person (a dismissal in one workspace must not silence the card in
+    // another), so it belongs beside the surface that owns it rather than beside the cross-tenant
+    // preferences a settings route implies.
+    Route::post('/onboarding/dismiss', OnboardingController::class)->name('onboarding.dismiss');
 
     /*
     | The notification centre (Increment I4, PRD Feature #13b) — a BELL, not a page. There is deliberately

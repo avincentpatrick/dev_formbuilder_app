@@ -34,13 +34,26 @@ const mocks = vi.hoisted(() => ({
         entitlements: { features: { advanced_analytics: false } },
     },
     visit: vi.fn(),
+    post: vi.fn(),
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
     Head: { name: 'Head', render: () => null },
-    Link: { name: 'Link', template: '<a><slot /></a>' },
-    router: { visit: mocks.visit },
+    // J5c gave this an href, because the first-run template card renders through it and the assertion that
+    // matters is where it points. The previous stub swallowed every attribute.
+    Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
+    router: { visit: mocks.visit, post: mocks.post },
     usePage: () => ({ props: mocks.pageProps }),
+    // J5c — `CreateFormModal` is a real child of this page now, and it calls `useForm` on mount.
+    useForm: () => ({
+        title: '',
+        description: '',
+        errors: {},
+        processing: false,
+        reset: vi.fn(),
+        clearErrors: vi.fn(),
+        post: vi.fn(),
+    }),
 }));
 
 vi.mock('@/components/shell/PageHeader.vue', () => ({
@@ -86,9 +99,22 @@ function trends(overrides: Record<string, unknown> = {}) {
     };
 }
 
-function render(overrides: Record<string, unknown> = {}): VueWrapper {
+/**
+ * `overrides` reaches the TRENDS bag, which is what every pre-J5 case in this file varies. Page-level props
+ * (kpis, the checklist, the first-run choices) go in the second argument — kept separate rather than merged
+ * so the twenty existing calls stay byte-unchanged.
+ */
+function render(overrides: Record<string, unknown> = {}, page: Record<string, unknown> = {}): VueWrapper {
     return mount(Dashboard, {
-        props: { kpis: { forms: 14, submissions: 9, members: 2 }, trends: trends(overrides) },
+        props: {
+            kpis: { forms: 14, submissions: 9, members: 2 },
+            trends: trends(overrides),
+            // J5b — null is the ordinary state: the server returns rows only while the card should show.
+            checklist: null,
+            // J5c — the server's mirror of what `/forms/templates` and `POST /forms` would admit.
+            start: { can_create: true, can_use_templates: true },
+            ...page,
+        },
     });
 }
 
@@ -553,6 +579,148 @@ describe('Dashboard — the range', () => {
 
         // 30 zero-filled buckets, not just the populated ones.
         expect(wrapper.findAll('.mds-tsc__table tbody tr')).toHaveLength(30);
+        wrapper.unmount();
+    });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+ * THE FIRST-RUN MOMENT (Increment J5c — onboarding plan §2)
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+ * §2 asks for TWO EQUALLY-WEIGHTED CHOICES — start from a template, start from blank — and until J5c this
+ * page offered one. The interesting half is not the second card: it is that the template arm is a PAID
+ * destination (`forms.templates.index` carries `feature:form_templates`), so "equally weighted" has to
+ * survive a free tenant, and the server is the only thing that can say which arm a reader may be offered.
+ */
+describe('Dashboard — the first run', () => {
+    const firstRun = { kpis: { forms: 0, submissions: 0, members: 1 } };
+
+    it('offers both choices as a grid of cards, not as an empty state with two buttons', () => {
+        // ⭐ DSR §3.10's governing rule is EXACTLY ONE primary CTA on an empty state — which is why the
+        // forms list renders one primary and one tertiary and is right to. §2 names the pattern it wants
+        // in the same sentence it asks for equal weight: "presented as the standard card-grid pattern".
+        const wrapper = render({}, firstRun);
+        const cards = wrapper.findAll('.dash__start-card');
+
+        expect(cards).toHaveLength(2);
+        expect(cards[0].text()).toContain('Start from a template');
+        expect(cards[1].text()).toContain('Start from blank');
+        // Equal weight is the GRID's job, so neither card may be a button variant that outranks the other.
+        expect(wrapper.find('.dash__start-grid').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('drops the template card when the plan does not admit it, and never locks it', () => {
+        // ⭐ ADR-0011 §D9: absent, never a disabled control with an upgrade CTA — Business is held from
+        // sale, so an upsell would point at a plan nobody can buy. The moment still works with one card.
+        const wrapper = render(
+            {},
+            { ...firstRun, start: { can_create: true, can_use_templates: false } },
+        );
+
+        const cards = wrapper.findAll('.dash__start-card');
+        expect(cards).toHaveLength(1);
+        expect(cards[0].text()).toContain('Start from blank');
+        expect(wrapper.text()).not.toContain('Start from a template');
+        expect(wrapper.text().toLowerCase()).not.toContain('upgrade');
+        wrapper.unmount();
+    });
+
+    it('explains itself with no CTA at all for a reader who cannot author', () => {
+        // ⭐ §3.10's extended rule: a surface empty because of a PERMISSION restriction says WHY, rather
+        // than offering a button that would 403. A Reviewer lands on this page too.
+        const wrapper = render(
+            {},
+            { ...firstRun, start: { can_create: false, can_use_templates: false } },
+        );
+
+        expect(wrapper.findAll('.dash__start-card')).toHaveLength(0);
+        expect(wrapper.text()).toContain('Nobody has built a form in this workspace');
+        wrapper.unmount();
+    });
+
+    it('suppresses the four zero tiles and the trend section entirely', () => {
+        // ⭐ §2's own words: "rather than dropping a brand-new tenant onto a literal empty dashboard".
+        // Four zeroes and an empty chart above the moment ARE that literal empty dashboard. This is the
+        // assertion that fails if a later edit "helpfully" restores the tiles for consistency.
+        const wrapper = render({}, firstRun);
+
+        expect(wrapper.findAll('.mds-stat-tile')).toHaveLength(0);
+        expect(wrapper.find('.dash__trends').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('opens the shared dialog in place rather than sending an empty workspace to an empty list', async () => {
+        const wrapper = render({}, firstRun);
+        const modal = wrapper.findComponent({ name: 'CreateFormModal' });
+
+        expect(modal.props('open')).toBe(false);
+        await wrapper.findAll('.dash__start-card')[1].trigger('click');
+        expect(modal.props('open')).toBe(true);
+        // ⭐ And it must NOT navigate: a trip to `/forms` here is the duplicated moment J5c removes.
+        expect(mocks.visit).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+
+    it('keeps the tiles and the trends the moment a form exists', () => {
+        const wrapper = render();
+
+        expect(wrapper.find('.dash__start-grid').exists()).toBe(false);
+        expect(wrapper.find('.dash__trends').exists()).toBe(true);
+        wrapper.unmount();
+    });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+ * THE GETTING-STARTED CHECKLIST (Increment J5b)
+ * ══════════════════════════════════════════════════════════════════════════════════════════════════════
+ * A PASSIVE card, never a gate: onboarding §2 argues against a scripted tour in its own words, and §6 lists
+ * a multi-step product tour as deliberately out of scope. Everything about WHICH rows appear is decided in
+ * `GettingStartedChecklist` and pinned by Pest; what is pinned here is that this page renders what it is
+ * given, says nothing twice, and does not hide the card by itself.
+ */
+describe('Dashboard — the getting-started checklist', () => {
+    const items = [
+        { key: 'create_form', label: 'Create your first form', done: true },
+        { key: 'publish_form', label: 'Publish it', done: false, href: '/forms' },
+    ];
+
+    it('renders nothing when the server sends null', () => {
+        const wrapper = render();
+
+        expect(wrapper.find('.mds-checklist').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('renders the server’s rows, with its own progress reading', () => {
+        const wrapper = render({}, { checklist: items });
+
+        expect(wrapper.findAll('.mds-checklist__row')).toHaveLength(2);
+        expect(wrapper.find('[role="progressbar"]').attributes('aria-valuetext')).toBe('1 of 2');
+        wrapper.unmount();
+    });
+
+    it('posts the dismissal instead of hiding the card locally', async () => {
+        // ⭐ An optimistic local hide would make the card vanish even when the write failed, and the user
+        // would find it back tomorrow with no idea why. `MdsChecklist` never hides itself (the MdsAlert
+        // contract), so the disappearance is the server's answer on the next render.
+        const wrapper = render({}, { checklist: items });
+
+        await wrapper.find('.mds-checklist__dismiss').trigger('click');
+
+        expect(mocks.post).toHaveBeenCalledWith('/onboarding/dismiss', {}, { preserveScroll: true });
+        expect(wrapper.find('.mds-checklist').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('never appears beside the first-run moment, which already says the same sentence', () => {
+        // ⭐ Both surfaces open with "create your first form". PRD §3.7's non-duplicative principle, and
+        // the reason `GettingStartedChecklist`'s first row is always a tick rather than a task.
+        const wrapper = render({}, { kpis: { forms: 0, submissions: 0, members: 1 }, checklist: items });
+
+        expect(wrapper.find('.dash__start-grid').exists()).toBe(true);
+        expect(wrapper.find('.mds-checklist').exists()).toBe(false);
         wrapper.unmount();
     });
 });

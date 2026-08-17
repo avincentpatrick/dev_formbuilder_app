@@ -24,21 +24,25 @@
 // pair from the same prop shape, and a second copy over there would be the one that regresses, silently,
 // exactly as the fourth trap above did the first time. Nothing about what this page RENDERS changed, which
 // is why `dashboard.test.ts` still passes byte-unchanged.
-import { computed } from 'vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     MdsBarChart,
     MdsButton,
     MdsCard,
+    MdsChecklist,
     MdsDataTable,
     MdsEmptyState,
+    MdsIcon,
     MdsStatTile,
     MdsTimeSeriesChart,
     type ChartSeries,
+    type ChecklistItem,
     type DataTableColumn,
     type IconName,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import CreateFormModal from '@/components/forms/CreateFormModal.vue';
 import AnalyticsViewSwitcher from '@/components/analytics/AnalyticsViewSwitcher.vue';
 import { bucketFormatter, rangeLabel as formatRange } from '@/components/analytics/bucket-label';
 import { breakdownBars, breakdownTableRows } from '@/components/analytics/breakdown-bars';
@@ -68,6 +72,16 @@ const props = defineProps<{
     // `members` is null when the user lacks org-wide visibility → the Members tile is omitted.
     kpis: { forms: number; submissions: number; members: number | null };
     trends: Trends;
+    // J5b — null when the card should not appear at all: dismissed, or every step done. The server decides
+    // that; this page reads the null rather than re-deriving the condition, for the same reason
+    // `empty_reason` is server-computed on the forms list — the client cannot see what the server knows.
+    checklist: ChecklistItem[] | null;
+    // J5c — onboarding §2's two first-run choices, each resolved against the gates its own route carries.
+    // NOT read from the `entitlements` prop: that snapshot is built from `EntitlementService::feature()`,
+    // which fails CLOSED on an unseeded plan catalog while the route's middleware fails OPEN, so a
+    // client-side gate would withhold the template card on a request the server would have served. See
+    // DashboardController::firstRunChoices().
+    start: { can_create: boolean; can_use_templates: boolean };
 }>();
 
 const page = usePage();
@@ -201,8 +215,81 @@ const channelNote = computed<string | null>(() => {
 const conversion = computed(() => conversionTile(props.trends.drafts));
 const median = computed(() => medianTile(props.trends.drafts));
 
-// The create-form flow is the "New form" modal on the Forms page; land there rather than duplicate it.
+// The header action stays a trip to the Forms page: it is the *ordinary* create affordance, and the list
+// is where somebody with forms expects to manage them. The first-run moment below is the exception — it
+// opens the shared dialog in place, because sending a workspace with nothing in it to an empty list to be
+// offered the same two choices a second time is one click of pure ceremony.
 const goToForms = () => router.visit('/forms');
+
+/**
+ * Hide the getting-started card for this person, in this workspace, for good (J5b).
+ *
+ * `MdsChecklist` emits and never hides itself — the `MdsAlert`/`MdsToast` contract — so the disappearance
+ * is the server's answer on the next render rather than a local flag. That is what makes the dismissal
+ * survive a reload, and it is why there is no optimistic hide here: a local `v-if` would make the card
+ * vanish even when the write failed, and the user would find it back tomorrow with no idea why.
+ *
+ * `preserveScroll` because the card sits mid-page and the read below it is what the reader was doing.
+ */
+const dismissChecklist = () => router.post('/onboarding/dismiss', {}, { preserveScroll: true });
+
+// ── The first-run moment (J5c — onboarding plan §2) ──────────────────────────────────────────────────
+// Zero forms is the whole condition. A brand-new workspace lands here and gets ONE screen with two
+// choices on it, not a wizard: §2 argues against a scripted tour in its own words, because a walkthrough
+// delays the thing that demonstrates the product's value.
+const isFirstRun = computed(() => props.kpis.forms === 0);
+
+const createOpen = ref(false);
+
+/**
+ * The blank card is a real `<button>` and the template card a real `<Link>` — never a div with a click
+ * handler, the rule `MdsCard`'s own `interactive` variant exists to enforce. So this fires on both, and
+ * does nothing on the one whose element already navigates.
+ */
+function chooseStart(choice: { href: string | null }): void {
+    if (choice.href === null) {
+        createOpen.value = true;
+    }
+}
+
+// ⚠️ TWO CARDS, NOT AN EMPTY STATE WITH TWO BUTTONS, AND THE TWO DOCUMENTS DO NOT ACTUALLY DISAGREE.
+// DSR §3.10's governing rule is that an empty state carries EXACTLY ONE primary CTA — which is why the
+// forms list renders one primary and one tertiary here, correctly. §2 asks for two EQUALLY-WEIGHTED
+// choices and names the pattern in the same sentence: "presented as the standard card-grid pattern"
+// (§3.5). So the first-run moment is a card grid; equal weight is what the grid is for.
+//
+// ⚠️ AND A REFUSED TEMPLATE CARD IS ABSENT, NEVER LOCKED WITH AN UPGRADE PROMPT. ADR-0011 §D9's posture
+// for every plan-gated surface in this product, and it is not a style preference: Business is held from
+// sale, so an upsell would point at a plan nobody can buy. The blank card then stands alone and the moment
+// still works — which is the test §2's "equally weighted" has to survive on a free tenant.
+const startChoices = computed(() => {
+    if (!props.start.can_create) {
+        return [];
+    }
+
+    const blank = {
+        key: 'blank',
+        href: null,
+        icon: 'plus' as IconName,
+        title: 'Start from blank',
+        body: 'Name your form and open the builder with an empty canvas.',
+    };
+
+    if (!props.start.can_use_templates) {
+        return [blank];
+    }
+
+    return [
+        {
+            key: 'template',
+            href: '/forms/templates',
+            icon: 'layout' as IconName,
+            title: 'Start from a template',
+            body: 'Pick a ready-made form — a survey, a registration, a feedback questionnaire — and change what you like.',
+        },
+        blank,
+    ];
+});
 </script>
 
 <template>
@@ -220,30 +307,82 @@ const goToForms = () => router.visit('/forms');
 
         <p class="dash__welcome">Welcome back, {{ user?.name }}.</p>
 
-        <div class="dash__stats">
-            <MdsStatTile
-                v-for="tile in tiles"
-                :key="tile.label"
-                :label="tile.label"
-                :value="tile.value"
-                :icon="tile.icon"
-                :caption="tile.caption"
-                :href="tile.href"
-            />
-        </div>
+        <!--
+            ⚠️ THE FOUR KPI TILES AND THE TREND SECTION ARE BOTH SUPPRESSED ON THE FIRST RUN, WHICH IS THE
+            POINT OF ONBOARDING §2 RATHER THAN A TIDY-UP. Its words: "rather than dropping a brand-new
+            tenant onto a literal empty dashboard, the first authenticated screen is a lightweight 'Create
+            your first form' moment". Four zeroes and an empty chart above that moment are exactly the
+            literal empty dashboard it names.
+        -->
+        <template v-if="isFirstRun">
+            <section class="dash__start" aria-labelledby="dash-start-heading">
+                <h2 id="dash-start-heading" class="dash__section-title">Create your first form</h2>
+                <p class="dash__start-lede">
+                    Two ways in. Both open the builder, so you can change everything afterwards.
+                </p>
 
-        <MdsCard v-if="kpis.forms === 0" class="dash__empty-card">
-            <MdsEmptyState
-                headline="No forms yet"
-                description="Create your first form to start collecting responses."
-            >
-                <template v-if="canCreate" #action>
-                    <MdsButton variant="primary" icon-left="plus" @click="goToForms">Create form</MdsButton>
-                </template>
-            </MdsEmptyState>
-        </MdsCard>
+                <div v-if="startChoices.length > 0" class="dash__start-grid">
+                    <component
+                        :is="choice.href ? Link : 'button'"
+                        v-for="choice in startChoices"
+                        :key="choice.key"
+                        :href="choice.href ?? undefined"
+                        :type="choice.href ? undefined : 'button'"
+                        class="dash__start-card"
+                        @click="chooseStart(choice)"
+                    >
+                        <span class="dash__start-icon"><MdsIcon :name="choice.icon" size="md" /></span>
+                        <span class="dash__start-title">{{ choice.title }}</span>
+                        <span class="dash__start-body">{{ choice.body }}</span>
+                    </component>
+                </div>
 
-        <section v-else class="dash__trends" aria-labelledby="dash-trends-heading">
+                <!--
+                    No CTA, and different copy — §3.10's extended governing rule: a surface that is empty
+                    because of a PERMISSION restriction explains why, rather than offering a button that
+                    would 403. This reader can see the workspace and cannot author in it.
+                -->
+                <MdsCard v-else class="dash__empty-card">
+                    <MdsEmptyState
+                        headline="No forms yet"
+                        description="Nobody has built a form in this workspace. When someone does, its responses appear here."
+                    />
+                </MdsCard>
+            </section>
+
+            <CreateFormModal v-model:open="createOpen" />
+        </template>
+
+        <template v-else>
+            <div class="dash__stats">
+                <MdsStatTile
+                    v-for="tile in tiles"
+                    :key="tile.label"
+                    :label="tile.label"
+                    :value="tile.value"
+                    :icon="tile.icon"
+                    :caption="tile.caption"
+                    :href="tile.href"
+                />
+            </div>
+
+            <!--
+                J5b — passive, and BELOW the numbers on purpose: onboarding §2 rules out anything the user
+                must click through before reaching the product, and a card that sits under the tiles is
+                read by someone who chose to keep reading. It renders only once a form exists, because the
+                first-run moment above already says "create your first form" and one screen must not say
+                it twice.
+            -->
+            <MdsCard v-if="checklist" class="dash__checklist">
+                <MdsChecklist
+                    :items="checklist"
+                    :link-component="Link"
+                    dismissible
+                    @dismiss="dismissChecklist"
+                />
+            </MdsCard>
+
+            <section class="dash__trends" aria-labelledby="dash-trends-heading">
             <div class="dash__section-head">
                 <h2 id="dash-trends-heading" class="dash__section-title">Last 30 days</h2>
                 <p class="dash__section-range">{{ rangeLabel }}</p>
@@ -332,7 +471,8 @@ const goToForms = () => router.visit('/forms');
                     />
                 </MdsCard>
             </div>
-        </section>
+            </section>
+        </template>
     </div>
 </template>
 
@@ -352,6 +492,103 @@ const goToForms = () => router.visit('/forms');
 
 .dash__empty-card {
     padding: 0;
+}
+
+/* ── The first-run moment (J5c) ─────────────────────────────────────────────────────────────────────── */
+.dash__start {
+    margin-bottom: var(--mds-space-6);
+}
+
+.dash__start-lede {
+    margin: var(--mds-space-1) 0 var(--mds-space-4);
+    color: var(--mds-color-text-secondary);
+}
+
+/* ⚠️ `minmax(min(100%, 260px), 1fr)`, and the `min()` is load-bearing rather than decorative — the JR3
+   finding, stated again because it is invisible when it breaks: `.app-shell` is `overflow-x: clip`, so a
+   track that overruns its container is CLIPPED rather than scrolled, and the e2e overflow assertion reads
+   `documentElement.scrollWidth`, which that clip pins flat. An overrunning grid is therefore structurally
+   invisible to CI. Never simplify this to a bare `minmax(260px, 1fr)`. */
+.dash__start-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: var(--mds-space-4);
+}
+
+/* The two choices are ONE grid of equal tracks, which is what makes them equally weighted in the sense
+   onboarding §2 means — not two buttons of different variants. Card chrome is repeated here rather than
+   composed from `MdsCard`, because `MdsCard`'s interactive variant takes a single href and one of these
+   two opens a dialog instead. */
+.dash__start-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    width: 100%;
+    padding: var(--mds-space-5);
+    text-align: left;
+    font: inherit;
+    color: var(--mds-color-text-body);
+    text-decoration: none;
+    background-color: var(--mds-color-bg-surface);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-xl);
+    box-shadow: var(--mds-shadow-1);
+    cursor: pointer;
+    transition:
+        box-shadow var(--mds-duration-base) var(--mds-ease-standard),
+        border-color var(--mds-duration-base) var(--mds-ease-standard);
+}
+
+/* `-fg`, never `-bg`: a border is a coloured edge, and the `-bg` half guarantees contrast only for text
+   printed ON it. `MdsCard`'s interactive variant measures the identical pair — 7.01:1 / 6.54:1 light and
+   8.29:1 / 9.56:1 dark — and this hover is deliberately the same one, so the two surfaces cannot drift. */
+.dash__start-card:hover {
+    box-shadow: var(--mds-shadow-2);
+    border-color: var(--mds-color-action-primary-fg);
+}
+
+.dash__start-card:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dash__start-card {
+        transition: none;
+    }
+}
+
+/* The tinted medallion §3.10 specifies for an empty state's illustration, reused deliberately: this is the
+   same first-run family, and `--mds-color-action-primary-tint` is the ONE accent fill that is redeclared
+   for dark rather than riding the primary ramp — `primary-50` here would put a near-white slab on a dark
+   card, which is the trap §3.10's own note records. */
+.dash__start-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--mds-radius-lg);
+    background-color: var(--mds-color-action-primary-tint);
+    color: var(--mds-color-action-primary-fg);
+}
+
+.dash__start-title {
+    font-size: var(--mds-type-body-lg-font-size);
+    line-height: var(--mds-type-body-lg-line-height);
+    font-weight: var(--mds-type-heading-4-font-weight);
+    color: var(--mds-color-text-heading);
+}
+
+.dash__start-body {
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+}
+
+.dash__checklist {
+    margin-bottom: var(--mds-space-6);
 }
 
 .dash__card-note {

@@ -76,18 +76,35 @@ final class FormController extends Controller
         ]);
     }
 
+    /**
+     * Create a blank form and open it in the builder.
+     *
+     * ⚠️ **THE REDIRECT IS THE POINT, AND IT CHANGED IN J5c (user decision 2026-08-17).** This returned
+     * `back()` — you named a form and landed exactly where you started, holding a toast. Its sibling
+     * {@see FormTemplateController::instantiate()} has always redirected into the builder, so the product's
+     * two ways of making a form ended in two different places. Onboarding plan §2 offers them as *two
+     * equally-weighted choices*, and no amount of card layout makes them equal while one of them stops
+     * short of the product.
+     *
+     * ⚠️ **`forms.builder` CARRIES `can:update,form`, AND THIS IS SAFE BY CONSTRUCTION RATHER THAN BY
+     * INSPECTION.** {@see FormService::create()} writes the creator an explicit **Editor** `ResourceGrant`
+     * in the same transaction, precisely so `forms.edit.own` resolves for them — so anyone who could reach
+     * this method at all (`can:create,Form`) passes the builder's gate on the row they just made.
+     * `FormRoutesTest` pins that chain end to end rather than trusting this paragraph.
+     */
     public function store(FormMetadataRequest $request): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
-        $this->forms->create(
+        $form = $this->forms->create(
             $this->currentTenant(),
             $user,
             (string) $request->string('title'),
             $request->input('description'),
         );
 
-        return back()->with('toast', ['type' => 'success', 'message' => 'Form created.']);
+        return redirect()->route('forms.builder', $form)
+            ->with('toast', ['type' => 'success', 'message' => 'Form created.']);
     }
 
     public function update(FormMetadataRequest $request, Form $form): RedirectResponse

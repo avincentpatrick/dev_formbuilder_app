@@ -61,6 +61,12 @@ export interface ServerAutosave {
     completeness: Ref<number | null>;
     expiresAt: Ref<string | null>;
     message: Ref<string | null>;
+    /**
+     * Increment P3a — the CURRENT lost-update baseline, advanced by every successful tick. Exposed because
+     * **Submit** must send it: that endpoint also saves-then-promotes, and the page's render-time
+     * `props.draft.baseline` is stale the moment this loop ticks once.
+     */
+    baseline: Ref<string | null>;
     /** Force an immediate save if dirty. Awaits the in-flight request. */
     flush: () => Promise<void>;
     dispose: () => void;
@@ -115,7 +121,12 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
     // Increment P3a — the lost-update baseline, advanced on every successful save. Held here rather than
     // passed per call because the whole point is continuity ACROSS requests: the value proves this tab has
     // seen everything the server holds.
-    let baseContentChecksum: string | null = options.baseContentChecksum ?? null;
+    //
+    // ⚠️ A REF, AND EXPOSED, BECAUSE **SUBMIT** NEEDS IT TOO. The encode page's Submit posts to a different
+    // endpoint that also saves-then-promotes, and it must send the CURRENT base — the page's render-time
+    // `props.draft.baseline` goes stale the moment this loop ticks once, so submitting that value would
+    // false-409 every response the keyer actually edited.
+    const baseline = ref<string | null>(options.baseContentChecksum ?? null);
 
     function body(): Record<string, unknown> {
         return {
@@ -124,7 +135,7 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
             draft_current_step: options.currentStepKey.value === '' ? null : options.currentStepKey.value,
             // Sent unconditionally, null included: null is the claim a first save makes, and the server
             // cannot distinguish an absent key from a client that forgot to send one.
-            base_content_checksum: baseContentChecksum,
+            base_content_checksum: baseline.value,
         };
     }
 
@@ -175,7 +186,7 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
                 expiresAt.value = typeof data.expires_at === 'string' ? data.expires_at : null;
                 // Increment P3a — carry the server's new checksum forward. Without this every save after the
                 // first would present a stale base and read as a second tab.
-                baseContentChecksum = typeof data.content_checksum === 'string' ? data.content_checksum : null;
+                baseline.value = typeof data.content_checksum === 'string' ? data.content_checksum : null;
                 state.value = 'saved';
                 message.value = null;
 
@@ -427,5 +438,5 @@ export function createServerAutosave(options: ServerAutosaveOptions): ServerAuto
         onBeforeUnmount(dispose);
     }
 
-    return { state, savedAt, completeness, expiresAt, message, flush, dispose };
+    return { state, savedAt, completeness, expiresAt, message, baseline, flush, dispose };
 }

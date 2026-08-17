@@ -641,7 +641,11 @@ function submit(): void {
         `/forms/${props.form.id}/submissions`,
         // The uuid routes a resumed draft to `promote()` (flipping the SAME row) instead of `submit()`
         // (creating a second one), and makes a double-clicked Submit resolve to one submission via Stage 2b.
-        { answers, client_submission_uuid: runtime.clientSubmissionUuid },
+        // Increment P3a — the CURRENT baseline from the autosave loop, not `props.draft?.baseline`, which is
+        // stale the moment this tab has saved once. Submit saves-then-promotes, so without it a tab whose
+        // base went stale would finalize over another tab's answers — and the autosave banner would have
+        // just told the keyer that saving stopped precisely to avoid that.
+        { answers, client_submission_uuid: runtime.clientSubmissionUuid, base_content_checksum: autosave.baseline.value },
         {
             preserveScroll: true,
             onStart: () => {

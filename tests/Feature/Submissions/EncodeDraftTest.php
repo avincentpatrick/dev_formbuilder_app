@@ -408,3 +408,59 @@ it('renders the resume page with the baseline its autosave needs', function (): 
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('draft.baseline', $stored));
 });
+
+it('refuses an encode SUBMIT from a stale tab instead of finalizing over the other tab work', function (): void {
+    // ⚠️ THE CONTRADICTION THIS CLOSES. P3a stops the autosave loop with "saving has stopped to avoid
+    // overwriting it" -- and before this, Submit would have overwritten it anyway, then PROMOTED, which no
+    // later save can undo. Same save-then-promote shape as the guest channel.
+    $uuid = Uuid::uuid7()->toString();
+
+    $seed = $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
+        ->assertCreated();
+    $sharedBase = $seed->json('data.content_checksum');
+
+    // Tab one saves real work.
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada Lovelace'], $uuid, baseline: $sharedBase))
+        ->assertSuccessful();
+
+    // Tab two submits from the stale base. The web arm renders the refusal as an error toast, not JSON.
+    $this->actingAs($this->owner)
+        ->post("http://acme.meridian.test/forms/{$this->form->id}/submissions", [
+            'answers' => ['full_name' => 'Bob'],
+            'client_submission_uuid' => $uuid,
+            'base_content_checksum' => $sharedBase,
+        ])
+        ->assertSessionHas('toast.type', 'error');
+
+    reenter();
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    // NOT finalized, and tab one's answers intact.
+    expect($row->status)->toBe(SubmissionStatus::Draft)
+        ->and(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
+        ->toBe('Ada Lovelace');
+});
+
+it('still submits when no baseline is claimed, so a direct POST or an old cached page keeps working', function (): void {
+    // The same present-only posture as the guest submit, and the reason the request class already gives for
+    // `client_submission_uuid` being nullable here: this endpoint must not break for a caller that never
+    // opened a draft page.
+    $uuid = Uuid::uuid7()->toString();
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Ada'], $uuid))
+        ->assertCreated();
+
+    $this->actingAs($this->owner)
+        ->post("http://acme.meridian.test/forms/{$this->form->id}/submissions", [
+            'answers' => ['full_name' => 'Ada'],
+            'client_submission_uuid' => $uuid,
+        ])
+        // A SUCCESS toast is set on this path, so "no toast" would be the wrong assertion — the claim is that
+        // it is not an ERROR one, and that the row actually finalized.
+        ->assertSessionMissing('errors');
+
+    reenter();
+    expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
+        ->toBe(SubmissionStatus::Submitted);
+});

@@ -65,7 +65,12 @@ export function useInertBackground(options: InertBackgroundOptions): void {
             if (!active.value || root.value === null || ownedRoot !== null) return;
 
             ownedRoot = root.value;
-            pushModalRoot(ownedRoot);
+            // ⚠️ `surface`, NOT the default `dialog` (J6). This seam exists precisely because its consumers
+            // take the page WITHOUT being dialogs — see the docblock above — and `openModalCount()`
+            // documents itself as counting blocking dialogs. Pushing as a dialog made ⌘K a dead key
+            // whenever the drawer was open: a global affordance asked "would I be stacking onto an
+            // unfinished dialog?" and a navigation flyout answered yes.
+            pushModalRoot(ownedRoot, 'surface');
 
             let designated: HTMLElement | null = null;
             if (initialFocus !== undefined) {

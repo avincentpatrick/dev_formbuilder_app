@@ -30,6 +30,14 @@ export function useCommandPalette(opener?: () => HTMLElement | null) {
 
         // Before anything else: browsers bind ⌘K/Ctrl+K to their own address bar or search field, so
         // without this the palette and the browser both act on the same keystroke.
+        //
+        // ⚠️ IT STAYS ABOVE THE GUARDS, AND MOVING IT BELOW THEM IS THE NAIVE FIX THAT TRADES ONE DEFECT
+        // FOR ANOTHER (J6). Declining the chord because a real dialog owns the page is CORRECT, and so is
+        // swallowing it there: handing ⌘K back to the browser at that moment opens its find bar on top of
+        // a modal, which is worse than nothing happening. The dead-key defect this line was blamed for was
+        // never about its position — it was that the mobile nav DRAWER counted as a dialog, so the guard
+        // below declined a case it should always have admitted. Fixed in `inert-stack.ts`, where the
+        // question is asked, rather than here, where it is only read.
         event.preventDefault();
 
         // ⚠️ GUARD ORDER IS THE WHOLE DESIGN, AND IT IS WHY THERE IS NO `await nextTick()` HERE.
@@ -53,6 +61,10 @@ export function useCommandPalette(opener?: () => HTMLElement | null) {
             return;
         }
 
+        // Only BLOCKING DIALOGS count here, which is what `openModalCount()` documents and — since J6 —
+        // what it actually returns. A non-dialog surface that has taken the page (the mobile nav drawer)
+        // is not a reason to refuse: the palette is a global affordance and stacking over a navigation
+        // flyout is exactly what a user pressing ⌘K from an open drawer is asking for.
         if (openModalCount() > 0) return;
 
         // ⚠️ FOCUS A REAL ELEMENT BEFORE OPENING. MdsModal captures the active element to return focus to

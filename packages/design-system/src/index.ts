@@ -102,9 +102,17 @@ export { default as MdsModal } from './components/Modal/Modal.vue';
  * How many blocking dialogs currently own the page (Increment J1a).
  *
  * Promoted from `inert-stack.ts`'s test seam to the public surface because the app genuinely needs the
- * predicate: J1d's ⌘K palette must REFUSE to open over an existing modal. `inert-stack` would happily
- * stack it -- and `popModalRoot`'s contract then correctly declines to return focus to a dialog that is
- * no longer topmost, so the user lands on a page with an unfinished blocking task behind a palette.
+ * predicate: J1d's ⌘K palette must REFUSE to open over an existing DIALOG. `inert-stack` would happily
+ * stack it -- and the pop contract then correctly declines to return focus to a dialog that is no longer
+ * topmost, so the user lands on a page with an unfinished blocking task behind a palette.
+ *
+ * ⚠️ "DIALOG" IS LOAD-BEARING IN THAT SENTENCE AS OF J6, AND IT USED TO READ "MODAL". A non-dialog surface
+ * that has taken the page -- the mobile nav drawer, via `useInertBackground` -- is on the same stack (it
+ * must be, or `inert` and paint order break for it) but is deliberately NOT counted here. Counting it made
+ * ⌘K a dead key whenever the drawer was open: the chord asked whether it would be stacking onto an
+ * unfinished dialog, a navigation flyout answered yes, and the handler declined having already swallowed
+ * the keystroke. **If a consumer ever needs "is anything at all holding the page?", that is a different
+ * predicate and wants its own export, not a widening of this one.**
  *
  * The package's `exports` map has no wildcard subpath, so `@meridian/design-system/components/Modal/
  * inert-stack` is not resolvable by a consumer and this re-export is the only way to reach it. (The map

@@ -49,8 +49,13 @@ describe('useInertBackground — taking and releasing the page', () => {
 
         active.value = true;
         await flushPromises();
+        // ⭐ THESE TWO LINES ARE ONE ASSERTION, AND THE PAIR IS THE POINT (J6). The `inert` mark proves the
+        // root IS on the stack; the zero proves it is not counted as a DIALOG. Either alone is vacuous —
+        // `toBe(0)` would also hold if nothing had been pushed at all, which is the version of this test
+        // that would have let the regression back in. Until J6 this read `toBe(1)`, and that number is what
+        // made ⌘K a dead key whenever the drawer was open.
         expect(background.hasAttribute('inert')).toBe(true);
-        expect(openModalCount()).toBe(1);
+        expect(openModalCount()).toBe(0);
 
         active.value = false;
         await flushPromises();

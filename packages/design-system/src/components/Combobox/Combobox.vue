@@ -44,7 +44,7 @@
  * owed by its first real consumer, in that consumer's own PR, the way the `MdsIconButton` title
  * suppression prop is.
  */
-import { computed, ref, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import TextInput from '../TextInput/TextInput.vue';
 
 export interface ComboboxOption {
@@ -134,13 +134,25 @@ const runs = computed(() => {
 });
 
 /**
- * Reset the highlight whenever the list changes identity. Without it a shrinking list leaves the index
- * past the end, `aria-activedescendant` goes absent (correctly), and Enter silently does nothing — the
- * palette solved this by resetting on every fetch, which is the consumer doing the component's job.
+ * Keep the highlight inside the list.
+ *
+ * ⚠️ IT RUNS ON EVERY CHANGE TO `options`, NOT ONLY ON ACTIVATION, AND THE ADVERSARIAL PASS IS WHAT FOUND
+ * THAT. The first version clamped only inside `activate()`, which left a real window with NOTHING
+ * highlighted: a consumer whose list arrives asynchronously — the palette's does, 250ms behind the
+ * keystroke — can have the reader arrow down the OLD list while a shorter new one is in flight. The index
+ * then points past the end, `aria-activedescendant` correctly goes absent, and the listbox sits there with
+ * no highlight at all until the reader moves again.
+ *
+ * Nothing was *broken* by that: the relationship stayed honest rather than dangling, and Enter still
+ * worked because `activate()` clamped first. But DSR §3.4.1 records the behaviour as *auto-highlight the
+ * first row on every non-empty list*, and this is the component's job now — the palette used to do it by
+ * resetting on every fetch, and that is precisely the consumer-side workaround this extraction removes.
  */
 function clampActive(): void {
     if (activeIndex.value > props.options.length - 1) activeIndex.value = 0;
 }
+
+watch(() => props.options, clampActive);
 
 function move(delta: number): void {
     if (!hasOptions.value) return;
@@ -197,8 +209,12 @@ function onOptionClick(index: number): void {
     activate();
 }
 
-/** Exposed so a consumer can re-highlight after replacing the list asynchronously. */
-defineExpose({ resetActive: () => (activeIndex.value = 0) });
+/*
+ * ⚠️ NO `defineExpose`. The first version exported a `resetActive()` so a consumer could re-highlight after
+ * replacing the list — and NOTHING CALLS IT, because the watch above makes it unnecessary. An unconsumed
+ * export on a shared component is the exact mistake DSR §3.4a records against itself, and it is worse than
+ * an unused function: it is a promise the next author will build on. Removed by the adversarial pass.
+ */
 </script>
 
 <template>

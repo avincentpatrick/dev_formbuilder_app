@@ -70,6 +70,28 @@ describe('MdsCombobox — omitted, never dangling', () => {
         expect(target?.getAttribute('role')).toBe('option');
     });
 
+    it('re-highlights a valid row when a SHORTER list replaces a longer one', async () => {
+        // ⭐ THE ADVERSARIAL FINDING. A consumer whose list arrives asynchronously — the palette's does,
+        // 250ms behind the keystroke — can have the reader arrow down the OLD list while a shorter new one
+        // is in flight. Clamping only on activation left the index past the end, so the relationship went
+        // absent (honestly) and the listbox sat there with NOTHING highlighted until the reader moved.
+        // DSR §3.4.1 records the behaviour as auto-highlight the first row on every non-empty list.
+        const wrapper = mountCombobox();
+        const input = wrapper.get('[role="combobox"]');
+
+        await input.trigger('keydown', { key: 'End' });
+        expect(wrapper.findAll('[role="option"]')[3]?.attributes('aria-selected')).toBe('true');
+
+        await wrapper.setProps({ options: OPTIONS.slice(0, 2) });
+
+        const rows = wrapper.findAll('[role="option"]');
+        expect(rows).toHaveLength(2);
+        expect(rows[0]?.attributes('aria-selected'), 'something must be highlighted').toBe('true');
+        expect(wrapper.get('[role="combobox"]').attributes('aria-activedescendant')).toBe(
+            rows[0]?.attributes('id'),
+        );
+    });
+
     it('drops the active descendant rather than dangling it when the list empties', async () => {
         const wrapper = mountCombobox();
         expect(wrapper.get('[role="combobox"]').attributes('aria-activedescendant')).toBeTruthy();

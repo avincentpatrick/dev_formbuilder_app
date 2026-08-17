@@ -71,7 +71,7 @@ final class EncodeDraftRequest extends FormRequest
 
     /**
      * The lost-update baseline (Increment P3a) — the twin of
-     * {@see \App\Http\Requests\Public\GuestDraftRequest::baseContentChecksum()}, including its posture: the
+     * {@see GuestDraftRequest::baseContentChecksum()}, including its posture: the
      * controller sets `checkBaseline: true` unconditionally, so omitting the field is refused rather than
      * silently unguarded.
      */

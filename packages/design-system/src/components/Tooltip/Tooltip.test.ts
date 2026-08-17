@@ -71,12 +71,14 @@ describe('MdsTooltip — WCAG 1.4.13: dismissible, hoverable, persistent', () =>
 
     it('lets Escape THROUGH when it is only hovered and focus is somewhere else entirely', async () => {
         // ⭐ J4b1's FOURTH FINDING, as its measured reproduction. The listener is capture-phase on
-        // `document`, so it ran before every other Escape claimant on the page — including the application's
-        // shared dismissal composable, which binds Escape in the BUBBLE phase and so never ran at all. At
-        // 481–1024px: rest the pointer on a collapsed rail item while the account menu is open, press
-        // Escape, and the tooltip vanished while the MENU STAYED OPEN.
+        // `document`, so it ran before every other Escape claimant on the page whichever mechanism they
+        // chose — including a `document` BUBBLE-phase listener, which never ran at all. At 481–1024px: rest
+        // the pointer on a collapsed rail item with a shell popover open, press Escape, and the tooltip
+        // vanished while the POPOVER STAYED OPEN. Confirmed in the browser against both shell mechanisms.
         //
-        // `outer` is bubble-phase on `document` precisely because that is what `useDismissable` is.
+        // `outer` is bubble-phase on `document` precisely because that is what `useDismissable` is — whose
+        // consumers are the notification bell and the feedback button. (The account menu is NOT one: it
+        // moved to `MdsMenu`, which binds its own root, and loses the key just the same.)
         const outer = vi.fn();
         document.addEventListener('keydown', outer);
 
@@ -104,7 +106,10 @@ describe('MdsTooltip — WCAG 1.4.13: dismissible, hoverable, persistent', () =>
     });
 
     it('still consumes Escape when nothing at all holds focus, so a lone bubble is not a no-op', async () => {
-        // ⭐ THE CONTROL FOR THE FIX. With focus on `<body>` nothing else can be claiming the key, so the
+        // ⭐ THE CONTROL FOR THE FIX. With focus on the document body element, nothing else can be claiming
+        // the key (the tag name is named rather than written as a literal -- see Modal.vue's docblock: a
+        // tag-shaped literal in a comment breaks the Storybook SFC parse, file-dependently, and this file
+        // sits beside one that carries the hazard), so the
         // §3.4a sequence stands and the tooltip takes it. A fix that scoped consumption to "the anchor holds
         // focus" ALONE would break the pointer-only case, which is the commonest way a tooltip is seen.
         const outer = vi.fn();

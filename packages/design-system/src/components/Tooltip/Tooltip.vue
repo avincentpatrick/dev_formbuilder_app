@@ -171,11 +171,13 @@ function onFocusOut(event: FocusEvent): void {
  * Is this tooltip in the interaction context the key was aimed at? (J6, J4b1's fourth finding.)
  *
  * ⚠️ THE ANSWER USED TO BE "ALWAYS", AND THAT MADE ONE HOVERED BUBBLE A PAGE-GLOBAL ESCAPE SINK. The
- * listener is on `document` in the CAPTURE phase, so it runs before everything: before `MdsModal`'s
- * panel handler, before `MdsMenu`'s root handler, and before the application's shared dismissal
- * composable, which binds Escape on `document` in the BUBBLE phase and therefore never ran at all.
- * Reproduced at 481–1024px: rest the pointer on a collapsed sidebar rail item while the account menu
- * is open, press Escape — the tooltip vanished and the MENU STAYED OPEN.
+ * listener is on `document` in the CAPTURE phase, so it runs before EVERY other Escape claimant on the
+ * page, whichever mechanism they chose — before `MdsModal`'s panel handler, before `MdsMenu`'s root
+ * handler, and before a `document` BUBBLE-phase listener, which never runs at all. That last one is the
+ * application's shared dismissal composable, and **note it is not the account menu that uses it** — that
+ * moved to `MdsMenu`; its remaining consumers are the notification bell and the feedback button.
+ * Reproduced at 481–1024px against BOTH mechanisms: rest the pointer on a collapsed sidebar rail item
+ * with either popover open, press Escape — the tooltip vanished and the POPOVER STAYED OPEN.
  *
  * The docblock's sequencing argument is right about the case it names — a tooltip on a control inside a
  * dialog, where the tooltip should take the first press and the dialog the second — but it is written

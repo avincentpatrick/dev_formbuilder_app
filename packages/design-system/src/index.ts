@@ -123,9 +123,24 @@ export { default as MdsSearchField } from './components/SearchField/SearchField.
 // reason as FilterBar above. `TabNav` is NOT the ARIA tabs widget DSR §3.4 also specifies — its items are
 // links that load a page, so it is a navigation landmark with `aria-current`, and dressing it in tab roles
 // would strip every non-active destination out of the tab sequence. Read its docblock before "upgrading"
-// it; the in-page tablist remains J4's, under the name `Tabs`.
+// it. The in-page tablist is `MdsTabs`, exported directly below since J4c — a sibling, not an upgrade.
 export { default as MdsTabNav } from './components/TabNav/TabNav.vue';
 export type { TabNavItem } from './components/TabNav/TabNav.vue';
+// The ARIA-1.2 in-page tablist §3.4 has specified since Phase 0 (J4c), and `MdsTabNav`'s sibling rather
+// than its upgrade — read that component's docblock before assuming the two can merge. Extracted from
+// `ConfigPanel.vue`, the product's only in-page tablist, and the extraction bought SCRUTINY rather than
+// reuse: an app-tree component gets no story and therefore no accessibility scan, which is how a tablist
+// with no aria-controls, a panel sitting in the tab sequence, and a suppressed focus ring on that panel
+// all survived every increment since it was written.
+// ⚠️ aria-controls is on the SELECTED tab only, because only the selected panel is in the document — the
+// palette's omitted-never-dangling rule, and axe downgrades a dangling one to `incomplete` rather than
+// flagging it.
+// ⛔ IT MUST NEVER BE RETROFITTED ONTO THE BUILDER'S PANE SWITCHER (DSR §3.4 carries the measurement):
+// thirteen end-to-end locators walk the tab role on that page, four of them loops that click every match,
+// and the panes are the switcher's siblings rather than its tabpanel children. That control stays a
+// radiogroup.
+export { default as MdsTabs } from './components/Tabs/Tabs.vue';
+export type { TabItem } from './components/Tabs/Tabs.vue';
 export { default as MdsBreadcrumb } from './components/Breadcrumb/Breadcrumb.vue';
 export type { BreadcrumbItem } from './components/Breadcrumb/Breadcrumb.vue';
 export { default as MdsPagination } from './components/Pagination/Pagination.vue';

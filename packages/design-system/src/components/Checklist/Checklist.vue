@@ -220,7 +220,19 @@ function stateLabel(done: boolean): string {
 }
 
 /* WCAG 2.5.8 — the visual box is 24px, so the HIT AREA is expanded rather than the glyph inflated (§4.4).
-   `MdsAlert`'s and `MdsToast`'s dismiss controls use the identical construction. */
+   `MdsAlert`'s and `MdsToast`'s dismiss controls use the identical construction.
+
+   ⚠️ MEASURED CONSEQUENCE, RECORDED BECAUSE THE NUMBER LOOKS LIKE THE J4c1 DEFECT AND IS NOT IT. This
+   button sits flush with the section's right edge, so the 44px target overhangs it by (44 − 24) / 2 = 10px
+   on each side — and `.mds-checklist` therefore reports `scrollWidth` 1104 against `clientWidth` 1094 in
+   the running app. That is the hit area, not content: nothing is drawn there, no axis is given an
+   `overflow` of its own so no scroll container is minted, and the consuming card's own padding absorbs it
+   (the card measures `scrollWidth === clientWidth`, and the document's horizontal scroll is 0 at 1440, 834
+   and 375). The difference from `MdsAlert` is worth knowing: that component has padding of its own, so it
+   absorbs its overhang internally, while this one relies on its container's. **Do not wrap this component
+   in an unpadded `overflow-x: auto` box** — there the same 10px would become a real scroll. And do not
+   "fix" it with `overflow: clip` on the section: clipping the pseudo-element shrinks the tap target back
+   to 24px, which is the accessibility rule this block exists to satisfy. */
 .mds-checklist__dismiss::before {
     content: '';
     position: absolute;

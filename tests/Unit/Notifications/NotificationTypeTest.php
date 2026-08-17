@@ -28,6 +28,9 @@ it('pins the case order, because the DB CHECKs are generated from it', function 
         'impersonation_started',
         // J3a — appended for the same reason, and NOT beside `member_invited` where it thematically belongs.
         'member_joined',
+        // K1b — the third append in a row. This one had no thematic sibling to be tempted by, which makes
+        // it the easy case; the rule is the same either way.
+        'badge_earned',
     ]);
 });
 
@@ -40,16 +43,24 @@ it('defaults every type to the bell', function (NotificationType $type): void {
     expect($type->defaultInApp())->toBeTrue();
 })->with(NotificationType::cases());
 
-it('defaults email ON everywhere except the high-volume type', function (): void {
-    // The PRD's own rule: actionable events default to both channels, "a submission on a busy public form"
-    // defaults to in-app only "so a lead-gen owner isn't emailed per response unless they opt in".
-    expect(NotificationType::SubmissionReceived->defaultEmail())->toBeFalse();
+it('defaults email OFF for exactly two types, each for its own stated reason', function (): void {
+    // Phrased as an EXACT LIST rather than as "everything except X", which is what it used to be, so that a
+    // third departure has to be argued rather than slipped in — the `honorsEmailPreference()` idiom below.
+    //
+    // `submission_received` is the PRD's own rule: actionable events default to both channels, "a submission
+    // on a busy public form" defaults to in-app only "so a lead-gen owner isn't emailed per response unless
+    // they opt in". `badge_earned` (K1b) is a DIFFERENT argument and not the same one again: you cannot earn
+    // a badge without being in the app at that moment, so the email is structurally redundant rather than
+    // merely high-volume.
+    $quiet = array_values(array_filter(
+        NotificationType::cases(),
+        static fn (NotificationType $t): bool => ! $t->defaultEmail(),
+    ));
 
-    foreach (NotificationType::cases() as $type) {
-        if ($type !== NotificationType::SubmissionReceived) {
-            expect($type->defaultEmail())->toBeTrue();
-        }
-    }
+    expect($quiet)->toBe([NotificationType::SubmissionReceived, NotificationType::BadgeEarned]);
+
+    // Both are defaults, not locks: the recipient can still switch the email on.
+    expect(NotificationType::BadgeEarned->honorsEmailPreference())->toBeTrue();
 });
 
 it('honours the email preference for every type except the two the emitting site owns', function (): void {
@@ -92,12 +103,16 @@ it('names only real roles, and only for the types that address a role', function
         ->toBe(NotificationType::MemberInvited->recipientRoles())
         ->toBe(['owner', 'admin']);
 
-    // The four types whose recipient is a specific person the emitting site already knows.
+    // The five types whose recipient is a specific person the emitting site already knows. K1b's
+    // `badge_earned` is the strongest member of the set: the other four are addressed because of a
+    // relationship to a RECORD, while an achievement is about the recipient themselves, so no role set
+    // could express it even in principle.
     foreach ([
         NotificationType::SubmissionReturned,
         NotificationType::SubmissionApproved,
         NotificationType::ExportReady,
         NotificationType::WebhookFailed,
+        NotificationType::BadgeEarned,
     ] as $addressed) {
         expect($addressed->recipientRoles())->toBe([]);
     }
@@ -138,4 +153,18 @@ it('returns no path rather than a broken one when the payload lacks its identifi
         ->and(NotificationType::WebhookFailed->pathFor([]))->toBeNull()
         // A non-string id (a malformed row, a hand-edited payload) is treated as absent, not cast.
         ->and(NotificationType::SubmissionReceived->pathFor(['submission_id' => 42]))->toBeNull();
+});
+
+it('points a badge nowhere until K1e builds somewhere for it to point', function (): void {
+    // ⚠️ A DIFFERENT KIND OF NULL FROM THE TEST ABOVE, AND PINNED SEPARATELY FOR THAT REASON. Every null up
+    // there is a payload that lacked its identifier; this one is UNCONDITIONAL — a complete payload with
+    // nowhere to go, because the achievements surface is K1e's and K1e cannot start until Lane A's J5
+    // releases the files it needs. Asserted with a FULL payload so it cannot be mistaken for the thin-data
+    // case, and it exists so that K1e re-pointing this arm is a deliberate edit against a failing test
+    // rather than a silent behaviour change nobody prompted.
+    expect(NotificationType::BadgeEarned->pathFor(['badge' => 'collector']))->toBeNull();
+
+    // The action label is still required and still non-empty: the match is exhaustive, and the words are
+    // written to survive K1e giving them a destination.
+    expect(NotificationType::BadgeEarned->actionLabel())->not->toBe('');
 });

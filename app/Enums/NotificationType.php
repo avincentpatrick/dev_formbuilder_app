@@ -10,6 +10,7 @@ use App\Models\Submission;
 use App\Notifications\Submissions\SubmissionPdfReadyNotification;
 use App\Notifications\Webhooks\WebhookAutoDisabledNotification;
 use App\Policies\SubmissionPolicy;
+use App\Services\Gamification\BadgeAwarder;
 use App\Services\Notifications\NotificationRecipientResolver;
 
 /**
@@ -90,6 +91,32 @@ enum NotificationType: string
     case MemberJoined = 'member_joined';
 
     /**
+     * The recipient earned a gamification badge (K1b).
+     *
+     * ⚠️ APPENDED LAST, third in a row and for the same reason as {@see self::ImpersonationStarted} and
+     * {@see self::MemberJoined}: the case ORDER is load-bearing (see the class docblock) and
+     * `tests/Unit/Notifications/NotificationTypeTest.php` pins it. There is no thematic sibling to sit
+     * beside here, which makes appending easy — but the discipline is the same either way.
+     *
+     * ── THE ONLY TYPE IN THE CATALOG WHOSE AUDIENCE IS ONE PERSON BY DEFINITION ────────────────────────
+     * Every other explicitly-addressed case ({@see self::SubmissionApproved}, {@see self::ExportReady}) is
+     * addressed to someone because of a relationship to a *record* — the respondent, the requester. An
+     * achievement is about the recipient themselves, so `recipientRoles()` is empty not as a fallback but
+     * because a role-derived set could not express it. {@see BadgeAwarder} names
+     * the earner.
+     *
+     * ── ⚠️ IT DEFAULTS EMAIL **OFF**, THE SECOND CASE EVER TO DEPART FROM THE COLUMNS' `default true` ───
+     * {@see self::defaultEmail()} carries the argument. Recorded here too because the departure is the kind
+     * of thing a later reader "corrects" for consistency.
+     *
+     * ── AND IT POINTS NOWHERE, ON PURPOSE, UNTIL K1e ───────────────────────────────────────────────────
+     * {@see self::pathFor()} returns null: the achievements surface is K1e's, and K1e cannot start until
+     * Lane A's J5 releases the files it needs. A bell row with no destination renders as plain text, which
+     * is the behaviour this enum already prefers to a link that 404s.
+     */
+    case BadgeEarned = 'badge_earned';
+
+    /**
      * Human label for the notification center, the preferences card, and any email subject built from the
      * type alone — one string, three surfaces. Mirrors {@see AuditEvent::label()}, and like it carries no
      * companion `badgeVariant()`: colour is presentation, owned by the TS side (I4).
@@ -108,6 +135,10 @@ enum NotificationType: string
             // because the bell row and the ledger row describe the same event to the same reader.
             self::ImpersonationStarted => 'Platform access',
             self::MemberJoined => 'Member joined',
+            // K1b — the BADGE is named in the description, not here. This string is also the /settings
+            // preferences row and the email subject, both of which describe a KIND of notification rather
+            // than one instance of it.
+            self::BadgeEarned => 'Badge earned',
         };
     }
 
@@ -124,13 +155,24 @@ enum NotificationType: string
     /**
      * Whether an email copy goes out when the recipient has expressed no preference.
      *
-     * Only {@see self::SubmissionReceived} departs from the columns' `default true`, and it departs exactly
-     * where the PRD says to: a submission on a busy public form is the high-volume case, so
-     * "a lead-gen owner isn't emailed per response unless they opt in" (PRD Feature #13, §23 design note).
+     * {@see self::SubmissionReceived} departs from the columns' `default true` exactly where the PRD says
+     * to: a submission on a busy public form is the high-volume case, so "a lead-gen owner isn't emailed per
+     * response unless they opt in" (PRD Feature #13, §23 design note).
+     *
+     * ── ⚠️ K1b ADDS THE SECOND DEPARTURE, AND IT IS A DIFFERENT ARGUMENT, NOT THE SAME ONE AGAIN ───────
+     * {@see self::BadgeEarned} is off by default because the email is **structurally redundant rather than
+     * merely noisy**: a badge is earned by doing something in the product, so the recipient is looking at
+     * the screen at the moment it happens. Every other type in this catalog tells somebody about something
+     * that happened while they were *elsewhere* — which is what an email is for. Volume is the secondary
+     * reason and only becomes real with K1c: replaying `audits` earns a long-standing member most of the
+     * catalog at once, and a default-on email would mail them each one.
+     *
+     * The recipient can still turn it on — this is a default, not a lock, so `honorsEmailPreference()`
+     * stays true and the /settings switch is live.
      */
     public function defaultEmail(): bool
     {
-        return $this !== self::SubmissionReceived;
+        return $this !== self::SubmissionReceived && $this !== self::BadgeEarned;
     }
 
     /**
@@ -173,7 +215,11 @@ enum NotificationType: string
             self::ImpersonationStarted => ['owner'],
             // The twin of `member_invited` above, and scoped identically on purpose — see the case's docblock.
             self::MemberJoined => ['owner', 'admin'],
-            self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed => [],
+            // K1b joins the explicitly-addressed set, and for the strongest reason in it: an achievement is
+            // about the recipient rather than about a record they relate to, so there is no role that could
+            // express "gets told about this" — see the case's own docblock.
+            self::SubmissionReturned, self::SubmissionApproved, self::ExportReady, self::WebhookFailed,
+            self::BadgeEarned => [],
         };
     }
 
@@ -227,6 +273,15 @@ enum NotificationType: string
             // Unconditional, and the same destination `member_invited` points at: the members page is where a
             // new arrival is acted on (promote, or remove).
             self::MemberJoined => 'members',
+            // K1b — UNCONDITIONALLY NULL, which is new: every other null above is a payload that lacked its
+            // id. This one has nowhere to point at all, because the achievements surface is K1e's and K1e
+            // cannot begin until Lane A's J5 releases `Dashboard.vue` and the design system. The two
+            // alternatives were both worse: `'achievements'` would ship a bell row and an email button
+            // linking to a 404 for a whole increment, and `'dashboard'` would be the "consolation link"
+            // `NotificationPresenter::resolveDestinations()` explicitly argues against. K1e replaces this
+            // arm; until then the row renders as plain text and the email carries no button, which is
+            // exactly what this method's `?string` is for.
+            self::BadgeEarned => null,
         };
     }
 
@@ -243,6 +298,11 @@ enum NotificationType: string
             self::WebhookFailed => 'View webhook',
             self::ImpersonationStarted => 'View audit log',
             self::MemberJoined => 'View members',
+            // K1b — names the THING rather than the page, so it still reads correctly when K1e re-points
+            // `pathFor()` at the achievements surface. Unrendered today (both consumers omit the button on a
+            // null path) but required: this match is exhaustive, and an empty string would fail the
+            // catalog's own "every case has an action label" assertion.
+            self::BadgeEarned => 'View your progress',
         };
     }
 

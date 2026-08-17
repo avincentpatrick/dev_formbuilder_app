@@ -148,12 +148,21 @@ it('converges every table on a re-seed rather than doubling it', function (): vo
     // Structure that holds at ANY scale — the volume-dependent numbers live in the full-scale test below.
     expect($first['forms'])->toBe(6)
         ->and($first['published'])->toBe(5)          // one is a deliberate never-published draft
-        // 9 types × 2 recipients. Was 7 × 2 until I11b appended `impersonation_started`, and 8 × 2 until
-        // J3a appended `member_joined` — a literal here rather than `count(NotificationType::cases()) * 2`
-        // on purpose: a hard-coded number is what makes adding a case a decision someone has to confirm,
-        // instead of a total that silently follows the enum wherever it goes. It worked exactly as intended
-        // both times.
-        ->and($first['notifications'])->toBe(18)
+        // 10 types × 2 recipients. Was 7 × 2 until I11b appended `impersonation_started`, 8 × 2 until J3a
+        // appended `member_joined`, and 9 × 2 until K1b appended `badge_earned` — a literal here rather than
+        // `count(NotificationType::cases()) * 2` on purpose: a hard-coded number is what makes adding a case
+        // a decision someone has to confirm, instead of a total that silently follows the enum wherever it
+        // goes. It has now worked exactly as intended three times.
+        //
+        // ⚠️ 25, NOT 20, AND THE GAP IS THE INTERESTING PART. Twenty are the enum loop (10 × 2). The other
+        // FIVE are not seeded at all — they are EARNED: the seeder drives `FormService::create()` and
+        // `PublishService::publish()` for real, so the owner genuinely earns `first_form`, `first_publish`
+        // and `publisher`, the editor earns the first two, and each announces. **Measured, not predicted**:
+        // K1b forecast that this file's only movement would be the enum loop, and the run said otherwise.
+        //
+        // K1b still seeds no badge rows and edits no seeder — which is the point. A fixture asserting a
+        // badge the engine would not produce is the failure mode `E2eSeeder` already records for itself.
+        ->and($first['notifications'])->toBe(25)
         ->and($first['feedback'])->toBe(4)           // one per FeedbackStatus case
         ->and($first['index'])->toBeGreaterThan(0)   // the question explorer has real values to summarise
         ->and($first['answers'])->toBe($first['submissions']); // exactly one answer row per submission
@@ -256,7 +265,23 @@ it('isolates the second workspace, and keeps it thin', function (): void {
 
     // This is also the only assertion that would catch the seeder failing to close its tenant context
     // between the two workspaces — a real hazard, with two transactions in one run().
-    expect($secondShape['notifications'])->toBe(0)
+    //
+    // ⚠️ IT WAS `toBe(0)` AND K1b MOVED IT TO 2, WHICH WEAKENS IT UNLESS THE KIND IS PINNED TOO — SO IT IS.
+    // Northwind gets no seeded notifications (the enum loop is demo-only), but it DOES create and publish a
+    // form for real, so its owner earns `first_form` and `first_publish` and each announces. Those two rows
+    // are northwind's OWN, which is exactly what this assertion wants to prove. Asserting the count alone
+    // would now pass on a small leak; asserting that every row is `badge_earned` keeps the original intent,
+    // because a leaked demo notification is one of the other nine types.
+    // Inside the second tenant's own context, like demoShape() — an unscoped read here would hit
+    // BelongsToTenant's no-context sentinel and return an empty list, which would pass vacuously.
+    $secondTypes = DB::transaction(function () use ($second): array {
+        TenantContext::applyLocal((string) $second->getKey());
+
+        return Notification::query()->distinct()->pluck('type')->map->value->sort()->values()->all();
+    });
+
+    expect($secondShape['notifications'])->toBe(2)
+        ->and($secondTypes)->toBe(['badge_earned'])
         ->and($secondShape['feedback'])->toBe(0);
 });
 

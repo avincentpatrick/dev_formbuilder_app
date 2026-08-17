@@ -59,6 +59,13 @@ export const NOTIFICATION_VISUAL: Record<NotificationTypeKey, NotificationVisual
     // which `member_invited` holds: the two events are a pair and must stay distinguishable at a glance,
     // and the test below asserts no two types share a glyph precisely so this cannot be "tidied".
     member_joined: { icon: 'users', variant: 'info' },
+    // K1b — ⚠️ `trend-up` IS A SUBSTITUTE, AND SAYING SO IS THE POINT. The honest glyph for an achievement
+    // is an award, trophy, medal or star, and the shared registry has none of the four — adding one means
+    // editing `packages/design-system/`, which is Lane A's live J5 claim, for a mark no other surface needs
+    // until K1e builds the achievements page. `trend-up` is unclaimed by any other type here and reads as
+    // progress, which is what a badge records. K1e re-points this one entry once that claim releases;
+    // exceptions-log #16 was NOT spent on it, because a borrowed glyph is not a deviation from the spec.
+    badge_earned: { icon: 'trend-up', variant: 'success' },
     submission_approved: { icon: 'check', variant: 'success' },
     export_ready: { icon: 'download', variant: 'success' },
     review_requested: { icon: 'search', variant: 'warning' },

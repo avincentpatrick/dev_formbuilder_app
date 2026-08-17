@@ -62,7 +62,9 @@ describe('notificationVisual', () => {
         // warning is now THREE: the two "you owe an action" types plus `impersonation_started`, which is a
         // disclosure the Owner is meant to notice rather than a routine happening.
         expect(byVariant('warning')).toEqual(['impersonation_started', 'review_requested', 'submission_returned']);
-        expect(byVariant('success')).toEqual(['export_ready', 'submission_approved']);
+        // K1b adds `badge_earned` here rather than to `info`: a badge is not news about the workspace, it is
+        // a thing the reader wanted and now has — which is what this band means.
+        expect(byVariant('success')).toEqual(['badge_earned', 'export_ready', 'submission_approved']);
         expect(byVariant('info')).toEqual(['member_invited', 'member_joined', 'submission_received']);
     });
 

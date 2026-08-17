@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\BadgeKey;
 use App\Enums\NotificationType;
 use App\Enums\SubmissionPdfOutcome;
 use App\Support\Notifications\NotificationCopy;
@@ -50,6 +51,32 @@ it('never names the tenant in the in-app copy', function (NotificationType $type
 
     expect($copy['title'].' '.$copy['description'])->not->toContain('Acme Research');
 })->with(NotificationType::cases());
+
+it('names the badge in words and never its database key', function (): void {
+    // K1b. The payload stores the KEY alone and the copy derives the words from BadgeKey, so that a
+    // re-label reaches every row that already exists. The failure that buys is the one asserted here: an
+    // arm that interpolated `$data['badge']` directly would render "You earned the field_veteran badge",
+    // which is a column value, not a thing anybody says out loud.
+    $row = NotificationCopy::inApp(NotificationType::BadgeEarned, ['badge' => BadgeKey::FieldVeteran->value]);
+    $email = NotificationCopy::for(NotificationType::BadgeEarned, 'Acme Research', ['badge' => BadgeKey::FieldVeteran->value]);
+
+    expect($row['description'])->toContain(BadgeKey::FieldVeteran->label())
+        ->and($row['description'])->not->toContain('field_veteran')
+        // The email spends its second sentence on the criterion, because it is read weeks later by someone
+        // who no longer remembers what they did; the bell row does not, because they just did it.
+        ->and($email['body'])->toContain(BadgeKey::FieldVeteran->description())
+        ->and($email['body'])->toContain('Acme Research')
+        ->and($email['headline'])->toContain(BadgeKey::FieldVeteran->label());
+});
+
+it('still writes a sentence for a badge this build has never heard of', function (): void {
+    // `notifications.data` is durable and BadgeKey is not. A badge retired in a later release leaves rows
+    // behind that this method still has to render, and the generic-payload rows DemoSeeder writes take the
+    // same path — so the null arm is a real code path, not a defensive flourish.
+    $unknown = NotificationCopy::inApp(NotificationType::BadgeEarned, ['badge' => 'a_badge_from_2029']);
+
+    expect($unknown['description'])->toBe('You earned a badge.');
+});
 
 it('falls back when form_title is null on the two review outcomes', function (NotificationType $type): void {
     $copy = NotificationCopy::inApp($type, ['submission_id' => 'x', 'form_title' => null]);

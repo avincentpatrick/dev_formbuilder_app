@@ -50,14 +50,23 @@ use Throwable;
  * {@see self::award()} returns `false` for three different facts — the module is off, the act was already
  * awarded, and the write failed — and no caller currently distinguishes them, because no caller acts on the
  * answer. It is returned rather than voided so the K1c backfill can COUNT what it actually created, and so
- * K1b's badge evaluation can run only on a genuinely new award rather than on every replay.
+ * badge evaluation runs only on a genuinely new award rather than on every replay.
+ *
+ * ⚠️ **AS OF K1b THAT SENTENCE IS LOAD-BEARING RATHER THAN ASPIRATIONAL, AND IT CONSTRAINS THIS FILE.**
+ * {@see BadgeAwarder} is called below on the true path only, which is what stops a member's thousandth
+ * response from re-offering every badge in the catalog. The call sits **outside** the `try`, after the
+ * return value is settled — a badge failure must not be able to turn a successful award into `false`,
+ * because the backfill counts that boolean and would then under-report against a ledger that is correct.
  */
 final class PointsRecorder
 {
     /** The plan/module key gating the whole engine. Granted on every tier; see {@see ToggleableModules}. */
     public const string FEATURE = 'gamification';
 
-    public function __construct(private readonly EntitlementService $entitlements) {}
+    public function __construct(
+        private readonly EntitlementService $entitlements,
+        private readonly BadgeAwarder $badges,
+    ) {}
 
     /**
      * Award `$rule` to `$userId` for `$subjectType`/`$subjectId`, exactly once.
@@ -68,6 +77,9 @@ final class PointsRecorder
      * `$awardedAt` defaults to now and is passed explicitly by the backfill, which is replaying acts that
      * happened months ago; a streak computed from `created_at` would read every historical workspace as one
      * enormous one-day streak on install day.
+     *
+     * `$announceBadges` is forwarded to {@see BadgeAwarder} untouched — see that class for whose decision it
+     * is. It does not affect points, which are never notified at all.
      */
     public function award(
         PointRule $rule,
@@ -75,6 +87,7 @@ final class PointsRecorder
         string $subjectType,
         string $subjectId,
         ?Carbon $awardedAt = null,
+        bool $announceBadges = true,
     ): bool {
         $tenantId = TenantContext::currentTenantId();
 
@@ -85,6 +98,8 @@ final class PointsRecorder
         if (! $this->entitlements->feature(self::FEATURE)) {
             return false;
         }
+
+        $at = $awardedAt ?? Carbon::now();
 
         try {
             $affected = DB::affectingStatement(
@@ -99,11 +114,9 @@ final class PointsRecorder
                     $rule->points(),
                     $subjectType,
                     $subjectId,
-                    ($awardedAt ?? Carbon::now())->toIso8601String(),
+                    $at->toIso8601String(),
                 ],
             );
-
-            return $affected === 1;
         } catch (Throwable $e) {
             // Scoring must never surface into the caller. Logged rather than rethrown — and logged at
             // WARNING rather than DEBUG precisely because the RLS refusal described above arrives here.
@@ -117,6 +130,25 @@ final class PointsRecorder
 
             return false;
         }
+
+        if ($affected !== 1) {
+            return false;
+        }
+
+        // ⚠️ DELIBERATELY OUTSIDE THE `try` ABOVE, AND THE PLACEMENT IS THE POINT (K1b). The answer this
+        // method returns is already settled here, so nothing badges do can change it — which matters because
+        // that answer is COUNTED by K1c's backfill, and a badge failure folding into the recorder's
+        // swallow-and-log would make a correct ledger report itself as incomplete. BadgeAwarder is total by
+        // contract and holds its own SAVEPOINT, so this can neither throw nor poison the caller.
+        //
+        // ⚠️ AND IT MUST STAY HERE RATHER THAN MOVING POST-COMMIT OR ONTO A QUEUE. TenantContext is a PHP
+        // static mirror, not the GUC — `applyLocal()`'s SET LOCAL dies at commit while the mirror survives —
+        // and badge evaluation opens with an RLS-FILTERED READ, which returns zero rows silently when the
+        // GUC is unset. A successful INSERT under the strict WITH CHECK policy above is machine-proof that
+        // the GUC still equals $tenantId; that proof expires the moment this call moves off this connection.
+        $this->badges->evaluate($tenantId, $userId, $rule, $at, $announceBadges);
+
+        return true;
     }
 
     /**

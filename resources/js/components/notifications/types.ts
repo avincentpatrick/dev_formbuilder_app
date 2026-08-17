@@ -29,7 +29,8 @@ export type NotificationTypeKey =
     | 'member_invited'
     | 'webhook_failed'
     | 'impersonation_started'
-    | 'member_joined';
+    | 'member_joined'
+    | 'badge_earned';
 
 /** One row of `GET /notifications`. Every string here is SERVER-authored — see NotificationPresenter. */
 export type NotificationRow = {

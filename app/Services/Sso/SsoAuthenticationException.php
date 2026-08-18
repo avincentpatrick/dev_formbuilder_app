@@ -112,6 +112,30 @@ final class SsoAuthenticationException extends RuntimeException
 
     /*
     |--------------------------------------------------------------------------
+    | Trust anchor (M2) — refused before the document is read at all
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * No stored signing certificate is inside its validity window, so nothing can vouch for an assertion.
+     *
+     * ⚠️ THIS IS THE ONE REFUSAL THAT IS ABOUT THE CONNECTION RATHER THAN ABOUT THE DOCUMENT, which is why
+     * it fires before a single byte of the response is parsed and why {@see $subject} stays null: no
+     * signature has verified, so there is no address anyone may be shown.
+     *
+     * `$state` is the roll-up — `expired`, `not_yet_valid` or `unreadable` — and it exists so the operator's
+     * log line says which, while the admin's panel row says the one thing they can act on.
+     */
+    public static function idpCertificateUnusable(string $state): self
+    {
+        return new self(
+            SsoFailureReason::IdpCertificateUnusable,
+            "No stored signing certificate is currently usable (roll-up state: {$state}); the assertion was not read.",
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Validation
     |--------------------------------------------------------------------------
     */

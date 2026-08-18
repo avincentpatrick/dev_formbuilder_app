@@ -9,6 +9,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
+use App\Services\Sso\SsoMetadataParser;
 use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -344,6 +345,31 @@ it('refuses a step-up whose request never carried ForceAuthn', function (): void
     ])->assertNotFound();
 
     $this->assertFalse(session()->has('auth.password_confirmed_at'));
+});
+
+it('refuses a step-up against a trust anchor whose certificates have all expired', function (): void {
+    // M2's refusal lives in `SsoLoginService::consumeAssertion()`, which BOTH intents run through, so the
+    // step-up arm inherits it. Asserted rather than inferred: an assertion signed by an anchor nobody can
+    // vouch for is no more trustworthy for a re-authentication than for a login, and if the check ever
+    // moves to the login fork this case is what notices.
+    asSsoSession($this->admin);
+    $request = beginStepUp($this->tenant, $this->admin)['request'];
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $expired = FakeIdp::certificate('expired');
+    SsoConnection::query()->firstOrFail()->forceFill([
+        'idp_certificates' => [$expired],
+        'idp_certificates_fingerprint' => SsoMetadataParser::fingerprint([$expired]),
+    ])->save();
+
+    $this->post(STEP_UP_ACS, [
+        'SAMLResponse' => answeringStepUp($request)->signedByAnExpiredCertificate()->as($this->admin->email)->response(),
+    ])->assertNotFound();
+
+    $this->assertFalse(session()->has('auth.password_confirmed_at'));
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoAuthRequest::query()->where('request_id', $request->request_id)->value('verified_at'))->toBeNull();
 });
 
 /*

@@ -144,3 +144,87 @@ it('renders a stored NameID format the picker cannot represent as read-only', fu
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('data.name_id_format_known', false));
 });
+
+/*
+|--------------------------------------------------------------------------
+| signingState() — the login path's half of the same question (M2, ADR-0016 §D31)
+|--------------------------------------------------------------------------
+|
+| Until M2 every case in this file measured a SCREEN. `SsoLoginService` now decides with the same class, so
+| these say what it decides — and the pairing is the point: the settings page and the ACS cannot disagree
+| about whether an anchor is usable, because there is one implementation and one list of usable states.
+|--------------------------------------------------------------------------
+*/
+
+it('calls a live certificate usable, which is what lets a sign-in proceed', function (): void {
+    $state = $this->inspector->signingState([SsoConnectionFactory::certificate(365)]);
+
+    expect($state)->toBe('ok')
+        ->and(in_array($state, SsoCertificateInspector::USABLE_STATES, true))->toBeTrue();
+});
+
+it('keeps a certificate inside the warning window usable, because a warning is not a refusal', function (): void {
+    $this->travel(340)->days();
+
+    $state = $this->inspector->signingState([SsoConnectionFactory::certificate(365)]);
+
+    expect($state)->toBe('expiring_soon')
+        ->and(in_array($state, SsoCertificateInspector::USABLE_STATES, true))->toBeTrue();
+});
+
+it('calls an expired, not-yet-valid or unreadable anchor unusable', function (array $certificates, callable $clock, string $expected): void {
+    $clock($this);
+
+    $state = $this->inspector->signingState($certificates);
+
+    expect($state)->toBe($expected)
+        ->and(in_array($state, SsoCertificateInspector::USABLE_STATES, true))->toBeFalse();
+})->with([
+    // Each arm reaches its state the way the file header describes: the app's clock moves, OpenSSL's does not.
+    'expired' => fn (): array => [
+        [SsoConnectionFactory::certificate(365)],
+        fn ($test) => $test->travel(400)->days(),
+        'expired',
+    ],
+    'not yet valid' => fn (): array => [
+        [SsoConnectionFactory::certificate(365)],
+        fn ($test) => $test->travelTo(now()->subDays(2)),
+        'not_yet_valid',
+    ],
+    'unreadable' => fn (): array => [
+        [base64_encode('this is not a certificate')],
+        fn ($test) => null,
+        'unreadable',
+    ],
+]);
+
+it('keeps a rollover pair usable, so an unfinished rotation is never a workspace outage', function (): void {
+    // The §D11 rule at the login path: ANY currently-valid certificate means the connection works. The
+    // ACS-level twin of this case lives in SsoAcsWebTest and drives a real assertion through it.
+    $this->travel(400)->days();
+
+    expect($this->inspector->signingState([
+        SsoConnectionFactory::certificate(365),   // dead by now
+        SsoConnectionFactory::certificate(3650),  // still live
+    ]))->toBe('ok');
+});
+
+it('says sign-in is refused in the warning copy, rather than describing an errand', function (): void {
+    // Until M2 this warning read as "re-import to pick up the replacement", which was true and incomplete:
+    // sign-in kept working, so it was an errand. It no longer does, and a warning that understates an outage
+    // sends an admin to the bottom of their queue with their members locked out.
+    $this->travel(400)->days();
+
+    $rollup = $this->inspector->rollup($this->inspector->inspect([SsoConnectionFactory::certificate(365)]));
+
+    expect($rollup['warning'])->toStartWith('Sign-in is refused')
+        ->and($rollup['warning'])->toContain('expired on');
+});
+
+it('leaves the expiring-soon copy alone, because that tenant can still sign in', function (): void {
+    $this->travel(340)->days();
+
+    $rollup = $this->inspector->rollup($this->inspector->inspect([SsoConnectionFactory::certificate(365)]));
+
+    expect($rollup['warning'])->not->toContain('Sign-in is refused');
+});

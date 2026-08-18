@@ -25,6 +25,12 @@ use App\Services\Sso\SsoAuthenticationException;
  * colleague not sign in?" — and answering it discloses nothing an attacker could not already determine by
  * having the credentials of an admin of the workspace they are attacking.
  *
+ * ── ⚠️ AND ONE HINT WAS NARROWED IN M2, BECAUSE IT HAD BEEN COVERING FOR AN ABSENT CONTROL ──────────
+ * `invalid_assertion`'s hint used to read "this is what an expired or rotated signing certificate looks
+ * like". The expired half was never true: nothing checked validity dates at sign-in, so an expired
+ * anchor produced a SESSION rather than this row. M2 gives expiry its own refusal and its own token, and
+ * this hint keeps only the half it can still honestly claim.
+ *
  * {@see hint()} is deliberately an INSTRUCTION rather than a restatement. "The identity provider's clock is
  * more than a minute out" tells an admin what to do; "assertion outside conditions" sends them hunting
  * through a certificate they never touched.
@@ -49,6 +55,20 @@ enum SsoFailureReason: string
     case UnknownRequest = 'unknown_request';
     case RequestReplayed = 'request_replayed';
     case AssertionReplayed = 'assertion_replayed';
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trust anchor (M2) — refused before the document is read at all
+    |--------------------------------------------------------------------------
+    |
+    | ONE TOKEN FOR ALL THREE UNUSABLE STATES — expired, not-yet-valid and unreadable — because the
+    | admin's action is identical in every one of them (re-import the metadata) and the settings page
+    | already shows the per-certificate detail beside this row. The specific state goes to the log line,
+    | which is the operator's surface; splitting it here would put three rows on an admin's screen that
+    | all say "do the same thing".
+    |
+    */
+    case IdpCertificateUnusable = 'idp_certificate_unusable';
 
     /*
     |--------------------------------------------------------------------------
@@ -95,6 +115,7 @@ enum SsoFailureReason: string
             self::UnknownRequest => 'Sign-in request expired or already used',
             self::RequestReplayed => 'Sign-in request used twice',
             self::AssertionReplayed => 'Response presented twice',
+            self::IdpCertificateUnusable => 'No usable signing certificate',
             self::InvalidAssertion => 'Response failed validation',
             self::AssertionOutsideConditions => 'Response was outside its validity window',
             self::NoEmail => 'No email address in the response',
@@ -125,7 +146,8 @@ enum SsoFailureReason: string
             self::UnsolicitedAssertion => 'Sign-in must start from the sign-in URL on the details card. Identity-provider-initiated sign-in is not supported.',
             self::UnknownRequest => 'Usually a sign-in page left open too long, or a second tab. Ask them to start again from the sign-in URL.',
             self::RequestReplayed, self::AssertionReplayed => 'The same response arrived twice. Harmless if it was a refreshed browser tab; worth investigating if it repeats.',
-            self::InvalidAssertion => 'The signature, audience or destination did not check out. Re-import the identity provider metadata — this is what an expired or rotated signing certificate looks like.',
+            self::IdpCertificateUnusable => 'Every signing certificate stored for this connection is outside its validity dates, so sign-in is refused until one is current. Re-import your identity provider’s metadata — the certificate card above shows which key expired and when.',
+            self::InvalidAssertion => 'The signature, audience or destination did not check out. Re-import the identity provider metadata — this is what a ROTATED signing certificate looks like, where the provider has moved to a key this connection has never been given.',
             self::AssertionOutsideConditions => 'The identity provider’s clock is out by more than the allowance. Check time synchronisation on that server.',
             self::NoEmail => 'The response carried no usable email address. Map an email attribute on the policy card, or set the NameID format to emailAddress.',
             self::JitDisabled => 'Nobody here matches that address and automatic provisioning is off. Invite them, or turn on just-in-time provisioning.',

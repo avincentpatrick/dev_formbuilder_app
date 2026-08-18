@@ -10,6 +10,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
+use App\Services\Sso\SsoMetadataParser;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -191,6 +192,41 @@ it('records the adoption refusal under its own reason, which the CHECK must acce
         // A verified signature vouched for the address, so the admin gets to see WHO tried — which on this
         // reason is the whole point: it is the one row that can mean somebody is probing for an account.
         ->and($failures[0]->subject_email)->toBe($stranger->email)
+        ->and($failures[0]->reason->label())->not->toBe('')
+        ->and($failures[0]->reason->hint())->not->toBe('');
+});
+
+it('records the trust-anchor refusal under its own reason, which the CHECK must accept', function (): void {
+    // ⚠️ THIS TEST IS ALSO THE MIGRATION'S TEST — the third time this file has carried one, after M1's
+    // `2026_08_17_000104` and K1b's `2026_08_17_000103`. `sso_auth_failures.reason` is CHECK-constrained to
+    // `SsoFailureReason::values()`, so M2's new case needs `2026_08_17_000105` to widen it; without that
+    // migration the guard would raise a 23514 *while being recorded*, turning the uniform 404 into a 500 on
+    // the one endpoint anyone on the internet can post to — which is itself the §D4 disclosure the uniform
+    // response exists to prevent. Asserting the row exists asserts the constraint accepts the value, which
+    // no unit test over the enum could do.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $expired = FakeIdp::certificate('expired');
+    SsoConnection::query()->firstOrFail()->forceFill([
+        'idp_certificates' => [$expired],
+        'idp_certificates_fingerprint' => SsoMetadataParser::fingerprint([$expired]),
+    ])->save();
+
+    $request = startFailureLogin($this->tenant, $this->admin);
+
+    $this->post(FAILURE_LOG_ACS, [
+        'SAMLResponse' => (new FakeIdp(FAILURE_LOG_ACS, FAILURE_LOG_SP, $request->request_id))
+            ->signedByAnExpiredCertificate()
+            ->as('grace@acme.test')
+            ->response(),
+    ])->assertNotFound();
+
+    $failures = recordedFailures($this->tenant, $this->admin);
+
+    expect($failures[0]->reason)->toBe(SsoFailureReason::IdpCertificateUnusable)
+        // ⚠️ NULL, AND THE ASSERTION IS THE POINT RATHER THAN A DETAIL. The assertion DID carry a valid
+        // signature and DID name an address — but this refusal fires before any of it is read, so nothing
+        // has vouched for that address and it must not reach a tenant's database or an admin's screen.
+        ->and($failures[0]->subject_email)->toBeNull()
         ->and($failures[0]->reason->label())->not->toBe('')
         ->and($failures[0]->reason->hint())->not->toBe('');
 });

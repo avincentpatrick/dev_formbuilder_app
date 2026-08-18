@@ -67,6 +67,19 @@ const options: { value: ThemeMode; label: string; icon: IconName }[] = [
  * leave three unnamed radios. The glyph and the filled chip remain the WCAG 1.4.1 non-colour signifiers
  * without the word, which is why the collapse is legitimate here at all.
  *
+ * ⚠️ BOTH COLLAPSE THRESHOLDS CARRY DELIBERATE HEADROOM, BECAUSE THE WIDEST FACE THIS PRODUCT
+ * RENDERS COULD NOT BE MEASURED HERE. `data-dyslexia-font` re-points `--mds-font-family-body` to
+ * OpenDyslexic, which is substantially wider than the system stack — but in DEV the face never loads:
+ * Vite serves the stylesheet from :5173 while the document is on :8080, so the `/fonts/*.woff2` fetch
+ * is cross-origin and `artisan serve` sends no CORS header. Measured, not guessed: the computed
+ * `font-family` does change, `document.fonts` reports the face as `error`, and the label width is
+ * identical to the fallback's. Built assets are same-origin, so it very likely DOES load in CI and in
+ * production. The numbers above were therefore measured against the FALLBACK face and then widened —
+ * 959 to 1024, 859 to 899 — rather than pinned to what this machine could see. The cost of being wrong
+ * in the safe direction is a glyph instead of a word; the cost in the other direction is the overlap
+ * this file exists to remove. Note the collapsed state is face-INDEPENDENT (the labels are gone and
+ * the glyphs are SVG), so widening is close to free.
+ *
  * `html[data-font-size]` is precisely "an enlarged scale": `FontSizeScale::attributeValue()` emits NO
  * attribute for Standard, so the bare-attribute selector matches `large` and `extra_large` and nothing
  * else. Do not rewrite it as an `:is()` list of the two values — it would drift the day a fourth step is
@@ -74,8 +87,10 @@ const options: { value: ThemeMode; label: string; icon: IconName }[] = [
  */
 
 /* ── 2. ICON-ONLY ─────────────────────────────────────────────────────────────────────────────────────
-   The enlarged scales lose their labels first: measured, they still fit at 960 and spill at 900. */
-@media (max-width: 959px) {
+   The enlarged scales lose their labels first: measured, they still fit at 960 and spill at 900 —
+   and 1024 rather than 959 is the §6 tablet boundary, taken deliberately for the headroom the note
+   below is about. */
+@media (max-width: 1024px) {
     html[data-font-size] .theme-quick :deep(.mds-segmented__seg > span) {
         position: absolute;
         width: 1px;
@@ -89,15 +104,25 @@ const options: { value: ThemeMode; label: string; icon: IconName }[] = [
     }
 
     /* §4.4's 44×44, the way `.topnav__search-compact` already does it in this same bar. The glyph stays
-       16px; only the hit area grows. */
+       16px; only the hit area grows.
+
+       ⚠️ `position: relative` IS THE CONTAINING-BLOCK GUARANTEE FOR THE CLIPPED LABEL ABOVE, and it is
+       stated HERE rather than inherited. `MdsSegmentedControl` does already position this element, so
+       at runtime this declaration changes nothing — which is exactly why it is the safe form of the
+       fix. What it removes is the DEPENDENCY: without it, this file's 1px clipped span is correct only
+       for as long as another component keeps a line this file cannot see, and that is the latent shape
+       `clipped-node-containment.test.ts` exists to refuse. Fifth instance of that class, and the first
+       caught while it was being written rather than increments later. */
     html[data-font-size] .theme-quick :deep(.mds-segmented__seg) {
+        position: relative;
         min-width: 44px;
         min-height: 44px;
     }
 }
 
-/* The default scale holds its labels ~100px longer — it fits at 860 and spills at 834. */
-@media (max-width: 859px) {
+/* The default scale holds its labels ~100px longer — it fits at 860 and spills at 834, and 899
+   carries the same headroom. */
+@media (max-width: 899px) {
     .theme-quick :deep(.mds-segmented__seg > span) {
         position: absolute;
         width: 1px;
@@ -110,7 +135,9 @@ const options: { value: ThemeMode; label: string; icon: IconName }[] = [
         border: 0;
     }
 
+    /* The containing-block guarantee again — see the note in the block above. */
     .theme-quick :deep(.mds-segmented__seg) {
+        position: relative;
         min-width: 44px;
         min-height: 44px;
     }

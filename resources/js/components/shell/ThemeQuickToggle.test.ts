@@ -117,15 +117,28 @@ describe('ThemeQuickToggle — the three states of the top bar toggle', () => {
         expect(css).not.toMatch(/data-font-size\s*=\s*['"]/);
     });
 
-    it('leaves the labelled state alone at desktop widths', () => {
-        // The control that must survive: "fixed by hiding it everywhere" would satisfy every assertion
-        // above. Nothing may suppress the toggle while the labels still fit, which they do from 960 up.
-        for (const block of blocks) {
-            if (block.max >= 960) {
-                expect(block.body, `@media max-width ${block.max}`).not.toMatch(/display:\s*none/);
-            }
-        }
+    it('collapses before it hides, on each type scale separately', () => {
+        // Hiding a control whose labels still fit would be a regression dressed as a fix, and the two
+        // scales cross over — the enlarged hide (899) and the default collapse (899) coincide — so this
+        // has to be compared WITHIN a scale. Comparing the raw maxima across all four blocks would fail
+        // on a correct file, which is how an over-strong assertion becomes the next defect.
+        const of = (list: typeof blocks, enlarged: boolean) =>
+            list.find((b) => b.body.includes('html[data-font-size]') === enlarged)!.max;
 
-        expect(blocks.some((b) => b.max >= 960)).toBe(false);
+        expect(of(hiding, true), 'enlarged: hide must be narrower than collapse').toBeLessThan(
+            of(collapsing, true),
+        );
+        expect(of(hiding, false), 'default: hide must be narrower than collapse').toBeLessThan(
+            of(collapsing, false),
+        );
+    });
+
+    it('never touches the control at a desktop width', () => {
+        // The control that must survive: "fixed by collapsing it everywhere" would satisfy every assertion
+        // above. 1024 is §6's tablet boundary and the widest threshold this file may carry — past it the
+        // labelled state is the only state.
+        for (const block of blocks) {
+            expect(block.max, `@media max-width ${block.max} reaches into desktop`).toBeLessThanOrEqual(1024);
+        }
     });
 });

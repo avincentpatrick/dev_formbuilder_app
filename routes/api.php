@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\FormApiController;
 use App\Http\Controllers\Api\V1\FormTemplateApiController;
 use App\Http\Controllers\Api\V1\FormVersionApiController;
 use App\Http\Controllers\Api\V1\FormXlsformApiController;
+use App\Http\Controllers\Api\V1\GamificationController;
 use App\Http\Controllers\Api\V1\ResourceGrantApiController;
 use App\Http\Controllers\Api\V1\SavedReportViewController;
 use App\Http\Controllers\Api\V1\ScopeNodeApiController;
@@ -41,6 +42,7 @@ use App\Http\Middleware\VerifyGuestBotChallenge;
 use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
+use App\Models\PointAward;
 use App\Models\ResourceGrant;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -415,6 +417,32 @@ Route::prefix('api/v1')
             ->where('domain', '[A-Za-z0-9.-]+')
             ->middleware(['ability:'.ApiAbilities::MANAGE_DOMAINS, 'can:tenant.settings.manage'])
             ->name('domains.destroy');
+
+        // Gamification (K1d / ADR-0020). `read:gamification` is a NEW ability — folding the ladder into
+        // `read:analytics` would retroactively hand every already-minted analytics token a NAMED,
+        // per-person ranking of the tenant's staff, which no issuer of those tokens agreed to — mapped onto
+        // the EXISTING dashboard permissions, so no thirtieth RBAC key is coined (§D7).
+        //
+        // ⚠️ THE TWO ROUTES ARE GATED DIFFERENTLY AND THAT IS §D7's SPLIT, NOT AN OVERSIGHT. `me` carries no
+        // `can:` gate because every member may see their OWN points, streak and standing — it names nobody
+        // else. `leaderboard` carries `can:viewAny,PointAward` (= `dashboard.org.view`), because it is the
+        // one payload here that puts a colleague's name beside a number. The ability maps to EITHER
+        // dashboard permission so all five roles can mint a token for `me`; the policy is what withholds
+        // the named list from a Form Editor or Reviewer. See GamificationController's docblock for why the
+        // `manage:scopes` "every Group-B route needs a can: gate" rule does not reach `me`.
+        //
+        // ⛔ AND NEITHER ROUTE MOUNTS `feature:gamification`, WHICH IS A REQUIREMENT RATHER THAN A CHOICE.
+        // §D6 grants that key on every plan tier, so RequireFeature could only ever fire on a tenant that
+        // switched the module off itself — and it would answer with "Upgrade your plan to use it", which is
+        // the wrong sentence and points at a purchase that would change nothing. `module:gamification`
+        // refuses the same case with copy naming something somebody inside the workspace can undo. See
+        // gamification-design.md §9 and RequireModule.
+        Route::get('gamification/me', [GamificationController::class, 'me'])
+            ->middleware(['ability:'.ApiAbilities::READ_GAMIFICATION, 'module:gamification'])
+            ->name('gamification.me');
+        Route::get('gamification/leaderboard', [GamificationController::class, 'leaderboard'])
+            ->middleware(['ability:'.ApiAbilities::READ_GAMIFICATION, 'can:viewAny,'.PointAward::class, 'module:gamification'])
+            ->name('gamification.leaderboard');
     });
 
 // ── Group C: public guest runtime (Increment F5) — UNAUTHENTICATED; tenant resolved from the signed ──────

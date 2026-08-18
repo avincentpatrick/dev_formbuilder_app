@@ -109,6 +109,31 @@ final class ApiAbilities
     public const MANAGE_DOMAINS = 'manage:domains';
 
     /**
+     * Reading the gamification surfaces — a member's own standing, and the workspace ladder (K1d /
+     * ADR-0020 §D7).
+     *
+     * A NEW ability, never a widening of `read:analytics`, for the fifth time and with the sharpest subject
+     * matter yet: folding the ladder into the analytics ability would retroactively hand every
+     * already-minted analytics token the power to read a **named, per-person productivity ranking of the
+     * tenant's staff**. No issuer of those tokens agreed to that — they agreed to aggregates — and a new
+     * ability cannot be held retroactively, because no token was ever minted with it.
+     *
+     * Like `read:analytics` and `manage:domains` it needs **NO new RBAC permission**. ADR-0020 §D7 is a
+     * product decision of record on exactly this point: the 29-permission catalog is closed, and *"who may
+     * see workspace-wide numbers about other people"* is a question `dashboard.org.view` already answers
+     * for the dashboard and for submissions. Minting a thirtieth key would also mean re-deciding which of
+     * five roles hold it — re-litigating a matrix that already encodes the answer.
+     *
+     * ⚠️ **THE ANY-OF SEMANTICS ARE LOAD-BEARING HERE IN A WAY THEY ARE NOWHERE ELSE, AND IT IS
+     * DELIBERATE.** Mapping to BOTH dashboard keys makes this ability mintable by all five roles, because
+     * §D7's split is not "who may read gamification" — everyone may read their OWN standing, with no
+     * permission at all. What `dashboard.org.view` gates is the NAMED list, and that is enforced one layer
+     * up by `PointAwardPolicy::viewAny()` on the leaderboard route. So the ability scopes the token to the
+     * gamification surfaces, and the policy decides which half of them the caller actually sees.
+     */
+    public const READ_GAMIFICATION = 'read:gamification';
+
+    /**
      * ability => the RBAC permissions that entitle a user to hold it (holding ANY one grants the ability).
      * `read:forms` mirrors FormPolicy::viewAny exactly, so a token's ability and the route policy agree.
      *
@@ -128,6 +153,7 @@ final class ApiAbilities
         self::MANAGE_INTEGRATIONS => ['integrations.manage'],
         self::READ_ANALYTICS => ['dashboard.org.view', 'dashboard.form.view'],
         self::MANAGE_DOMAINS => ['tenant.settings.manage'],
+        self::READ_GAMIFICATION => ['dashboard.org.view', 'dashboard.form.view'],
     ];
 
     /**

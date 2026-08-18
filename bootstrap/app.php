@@ -6,6 +6,7 @@ use App\Exceptions\Authorization\GrantException;
 use App\Exceptions\Connectors\InvalidConnectorStateException;
 use App\Exceptions\Connectors\UnknownConnectorProviderException;
 use App\Exceptions\Entitlements\FeatureGateException;
+use App\Exceptions\Entitlements\ModuleDisabledException;
 use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Entitlements\RateLimitExceededException;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
@@ -31,6 +32,7 @@ use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
+use App\Http\Middleware\RequireModule;
 use App\Http\Middleware\RequireRecentPassword;
 use App\Support\Api\ApiErrorResponse;
 use App\Support\Auth\InvalidGoogleAuthStateException;
@@ -156,6 +158,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // gated routes have it); passes through a null (unseeded/dev) plan, blocks a resolved plan that
             // denies the feature. See RequireFeature.
             'feature' => RequireFeature::class,
+            // module:<key> (K1d) — the TENANT'S OWN toggle, which is a different question from the plan's.
+            // Never a replacement for feature:<key>; a capability a plan can withhold wants both. It exists
+            // because gamification is granted on every tier (ADR-0020 §D6), so a feature: gate on that key
+            // could only ever fire on a self-disable and would answer it with "upgrade your plan". See
+            // RequireModule / ModuleDisabledException.
+            'module' => RequireModule::class,
         ]);
 
         // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session
@@ -305,6 +313,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // detail; a web request bounces back with an upgrade-prompt toast. A grandfathered tenant's override
         // resolves the feature to true and never reaches here. See FeatureGateException / RequireFeature.
         $exceptions->render(function (FeatureGateException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
+        // A tenant reached a capability IT switched off for itself (K1d) — raised by RequireModule. Beside
+        // the arm above because they are neighbours in shape and NOT in meaning: this one is a 403 with
+        // `module_disabled`, never a 402, because there is nothing to buy and the refusal is undoable from
+        // inside the tenant. The two codes stay distinct so an integration can tell a plan limit it cannot
+        // fix from a workspace setting somebody there can. See ModuleDisabledException.
+        $exceptions->render(function (ModuleDisabledException $e, Request $request) use ($isApi) {
             if ($isApi($request)) {
                 return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
             }

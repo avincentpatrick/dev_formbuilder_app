@@ -304,7 +304,84 @@ neither seeder records who invited whom, and `submission.edited` because no seed
 
 **One gate, `EntitlementService::feature('gamification')`**, which composes plan grant AND the tenant's module toggle. Because §D6 grants the key on every tier, the plan half can never be what switches it off — only `modules.gamification` can. A tenant with no subscription at all resolves to the seeded `free` plan, which carries the key, so gamification is on by default everywhere.
 
-⚠️ **K1d must NOT mount `feature:gamification` as route middleware.** `RequireFeature` raises `FeatureGateException`, whose copy is *"Your plan doesn't include X. Upgrade your plan to use it."* — and since no plan withholds this key, the only way that gate can fire is a tenant that switched the module off itself, for whom the sentence is simply wrong. Gate the surfaces on the module toggle and give the refusal its own copy. K1a adds the `FeatureGateException::forKey()` label arm anyway, so that no 402 can ever render a raw snake_case key (ADR-0011 §D9's rule); the wrong-copy-on-self-disable shape is pre-existing and shared with all eleven toggleable keys.
+✅ **K1d did NOT mount `feature:gamification` as route middleware, and §9A.3 records what it mounted instead.** `RequireFeature` raises `FeatureGateException`, whose copy is *"Your plan doesn't include X. Upgrade your plan to use it."* — and since no plan withholds this key, the only way that gate can fire is a tenant that switched the module off itself, for whom the sentence is simply wrong. Gate the surfaces on the module toggle and give the refusal its own copy. K1a adds the `FeatureGateException::forKey()` label arm anyway, so that no 402 can ever render a raw snake_case key (ADR-0011 §D9's rule); the wrong-copy-on-self-disable shape is pre-existing and shared with all eleven toggleable keys.
+
+---
+
+## 9A. The leaderboard and its API — BUILT (K1d)
+
+Two `/api/v1` routes, one read service, and no new table. `openapi.json` moved for the first time in this
+engine (K1a–K1c added no route), regenerated with `scramble:export`, diffed, and verified byte-identical on
+a **second** export.
+
+```
+GET /api/v1/gamification/me           ability:read:gamification                            module:gamification
+GET /api/v1/gamification/leaderboard  ability:read:gamification  can:viewAny,PointAward     module:gamification
+```
+
+### 9A.1 The split, which is §D7 made structural rather than a matter of controller discipline
+
+`me` carries **no `can:` gate** — every member sees their own points, badges, streak and standing, and the
+payload names nobody but the caller. `leaderboard` carries `can:viewAny,PointAward`, a new
+`PointAwardPolicy` whose single arm is the existing `dashboard.org.view`. **No thirtieth permission key is
+minted** (§D7, a product decision of record).
+
+The types enforce it rather than the controller remembering to: `MemberProgress` cannot hold a colleague's
+name and `Scoreboard` is the only thing that can, so the ungated route has nothing to leak. `GamificationApiTest`
+asserts the negative directly — a Form Editor's `me` body contains neither the owner's name nor their id.
+
+⚠️ **`ApiAbilities::MANAGE_SCOPES` records a standing rule that a Group-B route without a `can:` gate breaks
+the token-scope argument, so `me` is an argued exception rather than an unnoticed one.** That rule exists
+because an any-of ability can be minted by a principal the route's real authorization would refuse — the
+`can:` gate is what re-checks the acting user. There is no such gap here: the resource *is* the caller, a
+token can never exceed its issuer, and no permission in the catalog would let one member read another's
+standing on this route anyway.
+
+### 9A.2 A fourteenth ability, and no new permission
+
+`read:gamification` is **new**, never a widening of `read:analytics` — the fifth instance of the rule
+`ApiAbilities` states four times already: folding the ladder in would retroactively hand every
+already-minted analytics token a **named, per-person productivity ranking of the tenant's staff**, which no
+issuer of those tokens agreed to. Like `read:analytics` it needs no RBAC key: it maps to
+`dashboard.org.view ∨ dashboard.form.view`, so all five roles can mint it and read their own card, while the
+policy withholds the named list from a Form Editor or Reviewer.
+
+### 9A.3 The gate, and the sentence it must not say
+
+`RequireModule` (alias `module:`) reads **only** `TenantSettingRegistry::moduleEnabled()`, never
+`EntitlementService::feature()`. Refusal is `ModuleDisabledException` → **403 `module_disabled`**, not the
+entitlement family's 402: nothing is owed, and the state is undoable from inside the workspace. It throws on
+a key outside `ToggleableModules::KEYS`, because such a gate would pass forever while looking like it
+guarded something. Off-tenant it passes, matching `RequireFeature`'s "no context to enforce against ⇒ no
+enforcement" stance — every route it can be mounted on already sits behind tenant context.
+
+⚠️ **THE ONLY TEST THAT CAN CATCH A WRONGLY-MOUNTED `feature:gamification` IS THE SELF-DISABLE CASE, AND
+THAT IS A PROPERTY OF THE PLAN CATALOG RATHER THAN OF THE TESTS.** Every tier granting `api_access` also
+grants `gamification` (Starter upward spreads the every-tier list), so **no plan fixture separates the two
+keys**. The one state where the wrong gate fires is a tenant that switched the module off — and it fires
+with the wrong sentence. `GamificationApiTest` therefore asserts on the string that must be **absent**.
+
+⚠️ **AND A FREE TENANT HAS GAMIFICATION AND CANNOT REACH IT OVER THE API AT ALL**, because the whole
+`/api/v1` group sits behind `feature:api_access`, which Free does not carry. Measured, not assumed — every
+request 402s with `api_access` before any gamification code runs. That is a pre-existing property of the API
+group rather than anything this row chose, and it means **K1e's web surface is the only door a Free tenant
+has to this feature** — exactly the audience §D6 refused to put a tier ladder in front of.
+
+### 9A.4 Who is on the ladder, and the three numbers that do not reconcile
+
+The roster is `tenant_users` at `status = 'active'`, **not** the ledger — full reasoning in ADR-0020 §D11.
+Members who have earned nothing appear, ranked last; members who have left do not appear and keep their
+history. Rank is competition ranking, so a tie for 2nd is followed by 4th, and `of` counts the team rather
+than the scorers.
+
+⚠️ Points and badges are read as **two grouped statements, never joined**. One joined read multiplies a
+member's award rows by their badge rows: with two awards and three badges, `SUM(points)` triples, silently
+and plausibly. The test that pins it needs at least two of each — one of each returns the same number under
+both shapes and would let the bug through.
+
+The three deliberate disagreements between `team` and `entries` — guest submissions, and departed members in
+two forms — are tabulated in §D11(c) and repeated in the endpoint's own OpenAPI description, because the
+reader who most needs them is an integrator who will never open this file.
 
 ---
 
@@ -316,7 +393,7 @@ neither seeder records who invited whom, and `submission.edited` because no seed
 
   ⚠️ **The demo fixture is a K1c decision, recorded here so it is not rediscovered.** `DemoSeeder` hand-rolls its ~518 submissions rather than firing `SubmissionCreated`, and its audit tail is a hand-authored garnish rather than one row per submission — so replaying `audits` will **not** by itself give the demo tenant collection or review badges. Widen the audit tail, seed the ledger, or accept that the demo's badges stay form-shaped; all three are defensible, and none of them is K1b's to choose.
 
-**K1d — the leaderboard and its API.** Own standing for everyone; the named ranked list gated on `dashboard.org.view` (§D7). `/api/v1` endpoint with a **PHPDoc summary first line** (Redocly `operation-summary`), `openapi.json` regenerated via `scramble:export`, diffed, and re-verified stable on a second run.
+~~**K1d — the leaderboard and its API.**~~ **BUILT — see §9A**, which records the two things this specification did not settle: who is ON the ladder (§D11(a)) and what the twelve in "4th of 12" counts (§D11(b)). Both routes carry a PHPDoc summary first line for Redocly `operation-summary`; `openapi.json` was regenerated via `scramble:export`, diffed, and verified byte-identical on a second export.
 
 **K1e — the UI.** An achievements surface, a dashboard tile and a nav affordance. ⚠️ **Runs LAST, after J5 merges** — `Dashboard.vue`, `DashboardController`, `DashboardMetricsService` and `packages/design-system/` are all Lane A's live J5 claim. The count badge must be a **JSON sidecar route + composable**, never a shared Inertia prop: `routes/tenant.php:157-166` records that an Inertia partial reload re-runs the current page's controller, so a shared prop pays a query on every page in the app.
 

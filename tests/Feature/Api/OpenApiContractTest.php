@@ -73,7 +73,22 @@ it('ships a valid OpenAPI 3.1 contract covering the /api/v1 surface', function (
         '/domains/{domain}',
         '/domains/{domain}/verify',
         '/domains/{domain}/primary',
+        // K1d — gamification: a member's own standing (ungated) and the NAMED ladder
+        // (`dashboard.org.view`). ADR-0020 §D7 mints no permission for the split; the two paths differ
+        // only in that the second carries a `can:` gate, so both are listed to make the pair visible.
+        '/gamification/me',
+        '/gamification/leaderboard',
     );
+
+    // K1d — THE GAMIFICATION SURFACE IS READ-ONLY, AND THE ABSENCE IS THE ARCHITECTURE RATHER THAN AN
+    // UNFINISHED CRUD SET. ADR-0020 §D2 consumes signals that already exist and mints no subscribable
+    // vocabulary; §D4 makes `point_awards` append-only under RLS, with no UPDATE or DELETE policy at
+    // all. A write endpoint here would be a way to award points by hand — the one thing a ledger
+    // nobody can rewrite exists to prevent — so assert it is not there, since a resource-route reflex
+    // would add it without anyone noticing what it meant.
+    expect($spec['paths']['/gamification/me'])->not->toHaveKey('post')
+        ->and($spec['paths']['/gamification/leaderboard'])->not->toHaveKey('post')
+        ->and($spec['paths']['/gamification/leaderboard'])->not->toHaveKey('delete');
 
     // The connector surface deliberately exposes no create/update for a grant: a credential may only arrive
     // through the OAuth flow, and an API that accepted one would be a path to writing a token we then act

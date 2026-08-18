@@ -668,22 +668,44 @@ are still in place.
 
 ### SSO, auth & session
 
-- **`major` · AN EXPIRED IdP SIGNING CERTIFICATE KEEPS AUTHENTICATING ASSERTIONS FOREVER, WHILE THE
-  SETTINGS PAGE RENDERS IT AS EXPIRED.** `app/Services/Sso/SsoCertificateInspector.php:17-28` states it
-  outright; the behaviour lives at `app/Services/Sso/SsoSamlSettings.php:136` (passes
-  `x509certMulti.signing` with no validity constraint) and `SsoAssertionValidator.php:113` (the only
-  signature call, which adds none). A tenant's IdP rotates, nobody re-imports metadata — and nothing
-  prompts them to, because sign-in keeps working — then the retired private key is recovered from an HSM
-  backup, a key-escrow archive or a departed administrator's copy, and its holder mints an assertion for
-  any address and completes a login. The one surface an admin would consult **says the control is failing
-  while the control is in fact absent**. **Live.**
-  ⚠️ **THIS IS A RECORDED RESIDUAL, NOT A DISCOVERY** — `docs/security-threat-model.md` §8 and §9 item 18,
-  with the correct future shape already named (§D11's roll-up rule: refuse only when NO certificate in the
-  set is currently valid, applied on the login path). It is filed here because **this merge is where the
-  residual first ships to `main`**, and because the machinery already exists in the same file:
-  `SsoCertificateInspector::rollup()` (`:79-135`). The gap is one call from `SsoLoginService`, not an
-  increment of design. (`SsoMetadataParser::assertParsable()` correctly declines to check dates at
-  *import* — a rollover legitimately ships a not-yet-valid successor. Do not "fix" that half.)
+- ✅ **CLOSED BY `M2` (2026-08-18) — `major` · ~~AN EXPIRED IdP SIGNING CERTIFICATE KEEPS AUTHENTICATING
+  ASSERTIONS FOREVER, WHILE THE SETTINGS PAGE RENDERS IT AS EXPIRED.~~** The first row taken from this
+  section, and the first increment cut from `main` as trunk. `SsoLoginService::consumeAssertion()` now calls
+  `SsoCertificateInspector::signingState()` as **step 0**, ahead of the whole sequence, and refuses with a new
+  `SsoFailureReason::IdpCertificateUnusable` when no stored certificate is currently usable — ADR-0016 §D11's
+  roll-up rule applied on the login path, exactly the shape `docs/security-threat-model.md` §9 item 18 had
+  named and deferred. Both intents inherit it, since `consumeAssertion()` is shared. §8's row and §9 item 18
+  move from **Residual** to **Mitigated**, and ADR-0016 gains **§D31**.
+  ⚠️ **REPRODUCED BEFORE IT WAS FIXED, AND THE REPRODUCTION IS WHY THE FIX IS TRUSTED.** A throwaway case
+  drove the real `GET /sso/saml/login` → `POST /sso/saml/acs` round trip against an anchor whose only
+  certificate had expired, with the assertion signed by **that certificate's own private key** — it produced
+  a session on `/dashboard`. The same case now answers 404. `FakeIdp` gained a third keypair to make it
+  possible; ⚠️ **`openssl_csr_sign($csr, null, $key, 0)` is the only way to mint an already-dead certificate
+  here** (a negative day count returns `false`, and PHP's OpenSSL API cannot set `notBefore`), and **not**
+  `travelTo()` — php-saml validates timestamps against `time()`, which Carbon does not move.
+  ⛔ **THE ROW WAS RIGHT THAT THIS IS "one call from `SsoLoginService`", AND THE CALL DRAGGED A MIGRATION
+  BEHIND IT.** `2026_08_15_000002` CHECK-constrains `sso_auth_failures.reason` to `SsoFailureReason::values()`,
+  so the new reason needed `2026_08_17_000105` — without it the guard raises a **23514 while being recorded**,
+  turning the uniform 404 into a 500 on the one endpoint anyone on the internet can post to. Third instance of
+  that shape, after M1's `…000104` and K1b's `…000103`.
+  ⚠️ **WHAT IS NARROWED RATHER THAN CLOSED, STATED SO NOBODY READS THE ROW AS FULLY DISCHARGED:** while at
+  least one certificate in the set is valid, an **expired sibling can still verify a signature** — php-saml
+  receives the whole set, and §D31 records why filtering it was rejected (a successor is legitimately
+  not-yet-valid by minutes during a rotation, so filtering on our clock would make skew into an availability
+  control). §D10's atomic whole-half import is what stops a set accumulating dead keys. **The residual is
+  asserted as a passing sign-in in `SsoAcsWebTest`**, so narrowing it later shows up as a failing test rather
+  than as a surprise. Revisit trigger: the first tenant observed holding a mixed set.
+  ➕ **THREE THINGS THE ROW DID NOT NAME, ALL FIXED WITH IT.** (1) The `invalid_assertion` hint told admins
+  *"this is what an expired or rotated signing certificate looks like"* — half false, because an expired
+  anchor produced a **session**, not that row; narrowed to the rotated case. (2) The settings card's warnings
+  for the three unusable states read as an errand (*"re-import to pick up the replacement"*) and now open with
+  **"Sign-in is refused"**; `expiring_soon` is deliberately untouched, because that tenant can still sign in.
+  (3) `docs/data-dictionary.md`'s `subject_email` "populated only by" list had been **stale since M1** —
+  `existing_account_not_member` populates it and was not listed.
+  **Gates:** SSO suite **180 → 193 (1,090 assertions)**, PHPStan delta **zero** (all 18 are pre-existing
+  `property.notFound` phantoms, none in a file M2 touches), four lint gates green (migrations 107 → 108),
+  `openapi.json` byte-identical, zero `.vue` / `.ts` / e2e-selector movement.
+
 - **`major` · The "Log out" control on the email-verification page has no CSRF token, so it 419s.**
   `resources/js/Pages/auth/VerifyEmail.vue:97-99` is a raw `<form method="POST" action="/logout">`; a
   native submission carries no `_token` and no XSRF header (only Inertia's axios layer supplies them), and

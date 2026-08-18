@@ -1549,6 +1549,20 @@ The rationale is also captured in `exceptions-log.md` #2.
   adjacent controls that do different things is the defect. `qr` is deliberately **not** a literal
   code — at 24×24 real modules alias into grey mush, so it draws the part of a QR a person actually
   recognises.
+- **Glyph added in K1e** (the achievements surface, gamification-design.md §10): **`award`** — a medal,
+  drawn as a disc on a ribbon: one circle plus the two straps folding to a V. Added under the *Registry
+  growth* rule above rather than as an exception, on the I1 precedent — the registry held **no** award,
+  trophy, medal or star, which is why K1b had to borrow `trend-up` for the badge-earned notification and
+  left a note asking K1e to come back for it. That entry is now re-pointed, which also gives `trend-up`
+  back its single meaning: `MdsStatTile` spends it on every positive delta, so a nav item wearing it read
+  as a chart.
+  Why it is its own glyph rather than any of the four near-misses, and each refusal matters below 1024px
+  where the sidebar is icons-only and the mark is the **sole** signifier: `trend-up` means a rising metric;
+  `check` means done, which is a checklist rather than an achievement; `shield` is the audit ledger's, and
+  §3.4 already records that reusing a learned mark makes a reader misread the destination; `activity` is
+  Webhooks'. The **ribbon V is the part that survives 16px** — the disc alone reads as `user` with its
+  shoulders cropped, which is the same "does it still say what it means at 16px" test `qr` was drawn
+  against.
 
 **Components added in C2** (implementing existing sections, with stories + this doc updated per §7.3):
 `MdsCard` (§3.5), `MdsEmptyState` (§3.10), `MdsSpinner` (§3.9 indeterminate; determinate bar still

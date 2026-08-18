@@ -113,6 +113,11 @@ function render(overrides: Record<string, unknown> = {}, page: Record<string, un
             checklist: null,
             // J5c — the server's mirror of what `/forms/templates` and `POST /forms` would admit.
             start: { can_create: true, can_use_templates: true },
+            // K1e — null is the ordinary state for a workspace with gamification switched off, and it is
+            // the DEFAULT here on purpose: every case written before K1e existed asserts against a
+            // dashboard with no achievements card, and defaulting to a populated one would silently change
+            // what twenty existing assertions are looking at. The cases that want the card pass it.
+            progress: null,
             ...page,
         },
     });

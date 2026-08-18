@@ -106,6 +106,21 @@ export const icons = {
     // A QR code reduced to its three finder patterns plus one data module — the part of a QR a person
     // actually recognises. Not a literal code: at 24×24 real modules would alias into grey mush.
     qr: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M14 20h2 M20 14h.01',
+    // ── Achievements (K1e) ───────────────────────────────────────────────────
+    // A medal: a disc on a ribbon, drawn as a circle plus the two straps folding to a V. Added because the
+    // registry had NO award, trophy, medal or star and K1b had to borrow `trend-up` for the badge-earned
+    // notification, leaving a note that K1e should come back for this. Registry growth is what DSR
+    // Appendix B asks for ("add glyphs to icons.ts as features need them"), so this is conformance rather
+    // than a deviation and spends no exceptions-log entry -- the I1 precedent, which added share/link/qr
+    // the same way.
+    //
+    // Its own glyph rather than any of the four near-misses, and each refusal matters below 1024px where
+    // the sidebar is icons-only and the mark is the SOLE signifier: `trend-up` means a rising metric (and
+    // MdsStatTile spends it on every positive delta, so a nav item wearing it would read as a chart);
+    // `check` means done, which is a checklist rather than an achievement; `shield` is the audit ledger's;
+    // `activity` is Webhooks'. The ribbon V is the part that survives 16px -- the disc alone would read as
+    // `user` with its shoulders cropped.
+    award: 'M7 9a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M9.4 13.3L8.5 21l3.5-2.1 3.5 2.1-.9-7.7',
 } as const;
 
 export type IconName = keyof typeof icons;

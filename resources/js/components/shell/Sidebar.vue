@@ -25,6 +25,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { MdsIcon, MdsTooltip, useInertBackground } from '@meridian/design-system';
 import { navGroups, type NavItem } from './nav-model';
+import { useMemberStreak } from '@/composables/useMemberStreak';
+
+/** The one destination that carries a count badge. See `badgeFor()` for why this is a literal. */
+const ACHIEVEMENTS_KEY = 'achievements';
 
 const props = defineProps<{ drawerOpen: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -53,6 +57,61 @@ const visibleGroups = computed(() =>
         .map((group) => ({ ...group, items: group.items.filter(isVisible) }))
         .filter((group) => group.items.length > 0),
 );
+
+/**
+ * The Achievements count badge (K1e) — this member's current activity streak.
+ *
+ * ⚠️ CALLED ONCE, HERE, AND THIS IS THE ONLY PLACE IT MAY BE. `useMemberStreak` registers a router
+ * subscription; that is safe exclusively because `AppLayout` is a PERSISTENT Inertia layout, so the sidebar
+ * mounts once per session and survives every visit. The `useNotificationFeed` contract one file over.
+ *
+ * ⚠️ AND IT IS HANDED THE DESTINATION'S OWN VISIBILITY RATHER THAN FETCHING UNCONDITIONALLY. The sidecar
+ * route is `module:gamification`-gated, and a refusal on a web path is a `back()` WITH A SESSION FLASH —
+ * so a tenant that switched the module off would collect a "switched off" toast on a random page once per
+ * navigation, provoked by nothing they did. Passing the same predicate the item is rendered under means
+ * this never asks. The composable re-reads it per attempt, so switching the module back on recovers at the
+ * next navigation.
+ */
+const showsAchievements = computed(() =>
+    visibleGroups.value.some((group) => group.items.some((item) => item.key === ACHIEVEMENTS_KEY)),
+);
+
+const { current: streakDays } = useMemberStreak(() => showsAchievements.value);
+
+/**
+ * The number to paint on an item, or null for no badge at all.
+ *
+ * ⚠️ A LITERAL KEY RATHER THAN A NEW `badge?:` FIELD ON `NavItem`, DELIBERATELY. There is exactly one
+ * badged destination and no second candidate; a generic field would be an unconsumed API on a shared model
+ * two other files parse — including `ShellAbilityParityTest`, which reads this file's array literal as
+ * text. DSR §3.4's own rule: add the prop in the same PR as the second consumer, not before.
+ *
+ * Null at zero as well as at unknown, and the two are different facts kept deliberately apart upstream:
+ * `null` means the sidecar has not answered yet (or its last attempt failed, in which case the last known
+ * value stands), while `0` means the streak is genuinely broken. Neither earns a bubble — "0" beside a nav
+ * item reads as a defect, and a badge that appears the instant a page loads and then vanishes is worse
+ * than one that arrives late.
+ */
+function badgeFor(item: NavItem): number | null {
+    if (item.key !== ACHIEVEMENTS_KEY) return null;
+
+    return streakDays.value !== null && streakDays.value > 0 ? streakDays.value : null;
+}
+
+/**
+ * The accessible name, when there is a badge (WCAG 1.4.1 — a visual-only count is the same defect as a
+ * colour-only status). `undefined` otherwise, so the link keeps the name its own visible text gives it
+ * rather than carrying a redundant duplicate.
+ *
+ * The visible label survives verbatim at the front, which is what keeps speech input working: somebody
+ * saying "Achievements" still matches (WCAG 2.5.3, label in name). The bell resolves the identical
+ * question the identical way.
+ */
+function accessibleName(item: NavItem): string | undefined {
+    const days = badgeFor(item);
+
+    return days === null ? undefined : `${item.label}, ${days}-day streak`;
+}
 
 function labelId(key: string): string {
     return `nav-group-${key}`;
@@ -190,10 +249,19 @@ function onKeydown(event: KeyboardEvent): void {
                                     class="sidebar__item"
                                     :class="{ 'is-active': isActive(item.href) }"
                                     :aria-current="isActive(item.href) ? 'page' : undefined"
+                                    :aria-label="accessibleName(item)"
                                     @click="emit('close')"
                                 >
                                     <MdsIcon :name="item.icon" size="md" />
                                     <span class="sidebar__label">{{ item.label }}</span>
+                                    <!-- aria-hidden: the count is already in the link's accessible name
+                                         above, and announcing it twice is worse than not at all. The bell's
+                                         bubble carries the same attribute for the same reason. -->
+                                    <span
+                                        v-if="badgeFor(item) !== null"
+                                        class="sidebar__badge"
+                                        aria-hidden="true"
+                                    >{{ badgeFor(item) }}</span>
                                 </Link>
                             </template>
                         </MdsTooltip>
@@ -303,6 +371,34 @@ a.sidebar__item:focus-visible {
     flex: 1;
 }
 
+/* The Achievements streak count (K1e). No positioning in the FULL sidebar: `.sidebar__label` is `flex: 1`,
+   so this lands at the trailing edge on its own — which is also why it must be re-positioned in the rail
+   below, where that label is clipped out of the flow. */
+.sidebar__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* ⚠️ MIN-size, never a fixed one, and the bell's badge carries this note for the same measured reason:
+       `--mds-type-caption-font-size` is 12px at `standard` and 15px under `[data-font-size="extra_large"]`
+       (§2.9 scales the whole type scale ×1.25), and theme-overrides.css records what a pinned box costs
+       there — text clipped at the descenders, a WCAG 1.4.12 failure. A badge that grows is a slightly
+       larger badge; a badge that clips is a number nobody can read. `--mds-radius-full` keeps it a pill if
+       it does grow, which a three-digit streak eventually will. */
+    min-inline-size: 18px;
+    min-block-size: 18px;
+    padding: 0 var(--mds-space-1);
+    border-radius: var(--mds-radius-full);
+    /* The ratified on-primary pair, as the bell uses — `-bg` with `text-on-primary` is contrast-checked in
+       both themes and for every tenant brand ramp. Never a `-fg` token on a filled surface. */
+    background-color: var(--mds-color-action-primary-bg);
+    color: var(--mds-color-text-on-primary);
+    font-size: var(--mds-type-caption-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    line-height: 1;
+    /* The number changes daily in place; proportional digits make it jitter as the width changes. */
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── Tablet (≤1024): icon-only, labels to AT via the clip idiom and to sight via MdsTooltip ─────────── */
 @media (max-width: 1024px) {
     .sidebar {
@@ -322,6 +418,15 @@ a.sidebar__item:focus-visible {
         overflow: hidden;
         clip: rect(0 0 0 0);
         white-space: nowrap;
+    }
+    /* The label is out of the flow here, so the badge would otherwise sit beside the glyph and push the
+       centred icon off-centre. Over the glyph's trailing corner instead — `.sidebar__item` is already
+       `position: relative` for the active accent bar, so this needs no new containing block (the
+       containment defect class this repo has now paid for five times). */
+    .sidebar__badge {
+        position: absolute;
+        top: var(--mds-space-1);
+        right: var(--mds-space-1);
     }
     /* ⚠️ `display: none`, NOT the clip idiom, and the reason is JR4's rule rather than convenience: a
        clipped control is still a focus stop the user cannot see. There is no information loss either way —
@@ -388,6 +493,12 @@ a.sidebar__item:focus-visible {
         height: auto;
         margin: 0;
         clip: auto;
+    }
+    /* Labels are back in the flow, so `flex: 1` puts the badge at the trailing edge again — the overlay
+       above has to be undone explicitly, or the open drawer would paint the pill on top of the icon in a
+       row that has plenty of room for it. */
+    .sidebar__badge {
+        position: static;
     }
     /* The drawer's own dismiss control — see the template comment. 44px to satisfy the touch-target
        minimum §4.4 applies at every breakpoint, not only this one. */

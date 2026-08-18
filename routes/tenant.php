@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
+use App\Http\Controllers\Tenant\AchievementsController;
 use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
@@ -210,6 +211,54 @@ Route::middleware([
         ->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])
         ->middleware('can:markRead,notification')->name('notifications.read');
+
+    /*
+    | The achievements surface (Increment K1e, gamification-design.md §10) — the gamification engine's web
+    | half, and the ONLY half a Free tenant can reach: the whole /api/v1 group sits behind
+    | `feature:api_access`, which Free does not carry, while ADR-0020 §D6 grants `gamification` on every
+    | tier (§D11(e), measured rather than assumed).
+    |
+    | ⛔ `module:gamification`, NEVER `feature:gamification`, AND THE DIFFERENCE IS THE SENTENCE THE REFUSAL
+    | SAYS. RequireFeature raises "Your plan doesn't include X. Upgrade your plan to use it." — but §D6
+    | grants this key on every tier, so the plan half can NEVER be what refuses it, and the only thing that
+    | can is a tenant that switched the module off in Settings. For that reader "upgrade your plan" points
+    | at a purchase which would change nothing. RequireModule reads the toggle directly and refuses 403
+    | `module_disabled` with copy naming something somebody inside the workspace can undo. doc #28 §9
+    | forbids the other gate by name; K1d built this one.
+    |
+    | ⚠️ THESE ARE THE FIRST `module:` GATES ON A WEB ROUTE — K1d mounted the middleware on /api/v1 only, so
+    | bootstrap/app.php's WEB arm for ModuleDisabledException (a `back()` with a toast) had never run until
+    | now. It is the same shape the five `feature:`-gated web GETs already use (see /analytics below, whose
+    | own note records that a direct visit "still bounces off `feature:` with a toast").
+    |
+    | NO `can:` GATE ON EITHER ROUTE, and that is ADR-0020 §D7 rather than an omission: every member may see
+    | their OWN points, badges, streak and standing with no permission at all. The one payload that needs a
+    | permission — the NAMED ladder, plus the workspace totals that travel with it — is resolved INSIDE the
+    | controller against `viewAny,PointAward` (= dashboard.org.view) and arrives as a null prop. Gating the
+    | door instead would 403 a Form Editor out of their own achievements, which is the opposite of the
+    | decision. The `kpis.members` posture on /dashboard, one surface over.
+    |
+    | NO `feature:` GATE EITHER, for the reason above: no plan withholds this key, so a plan gate here could
+    | only ever fire with the wrong message. AchievementsRouteGuardsTest pins all four absences so none of
+    | them can be "tidied" into symmetry with the neighbours.
+    |
+    | ⚠️ /achievements/streak IS A JSON SIDECAR, NOT A SHARED INERTIA PROP, and it is the /notifications
+    | block above's mechanism for the same reason: an Inertia partial reload RE-DISPATCHES the current
+    | page's controller — Inertia filters what it SERIALIZES, not what it COMPUTES — so putting the count in
+    | HandleInertiaRequests::share() would pay for this read on every page in the application, including
+    | /audit-log and /submissions, which already carry a paginate plus a count(*) per navigation. doc #28
+    | §10 states the requirement; this is it. The composable that reads it refetches on NAVIGATION ONLY and
+    | holds no interval — useNotificationFeed's idle-stop records why a second poller would be a security
+    | regression, not merely a cost: every poll touches the session, and config/session.php expires on 120
+    | minutes of INACTIVITY.
+    |
+    | Static segment before any binding (the H14 rule) — there is no binding here today, but /achievements
+    | is a collection root and the next route added under it would be the one that breaks it.
+    */
+    Route::get('/achievements', AchievementsController::class)
+        ->middleware('module:gamification')->name('achievements');
+    Route::get('/achievements/streak', [AchievementsController::class, 'streak'])
+        ->middleware('module:gamification')->name('achievements.streak');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to

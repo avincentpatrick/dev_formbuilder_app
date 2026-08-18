@@ -82,6 +82,13 @@ const props = defineProps<{
     // client-side gate would withhold the template card on a request the server would have served. See
     // DashboardController::firstRunChoices().
     start: { can_create: boolean; can_use_templates: boolean };
+    /**
+     * K1e — this member's own gamification numbers, or `null` when the workspace has switched the module
+     * off. The page reads the null and omits the card; it does NOT re-derive the condition, which is the
+     * `checklist` and `kpis.members` contract on this same page. `rank` is null in turn when the reader
+     * holds no active membership here — never 0, which would render as a place.
+     */
+    progress: { points: number; badges: number; streak: number; rank: number | null; of: number } | null;
 }>();
 
 const page = usePage();
@@ -417,6 +424,47 @@ const startLede = computed(() =>
                 />
             </MdsCard>
 
+            <!--
+                K1e — the achievements nudge.
+
+                ⚠️ DELIBERATELY OUTSIDE `.dash__stats`, AND NOT AS A FIFTH `MdsStatTile`. Two reasons, and
+                the first is the load-bearing one: those tiles are the workspace's KPIs — what has been
+                collected — while this is about the reader personally, and merging the two would put "your
+                streak" in a row a Viewer reads as organisational reporting. The second is mechanical:
+                `dashboard.test.ts` pins `.dash__stats a` at three links, because which KPI tiles are
+                LINKED is itself a J2d decision about where a reader may go.
+
+                Passive, like the checklist above it: onboarding §2 rules out anything a user must click
+                through, so this reports and offers a way in, and never interrupts.
+            -->
+            <MdsCard v-if="progress" class="dash__progress">
+                <div class="dash__progress-body">
+                    <span class="dash__progress-mark" aria-hidden="true">
+                        <MdsIcon name="award" size="md" />
+                    </span>
+                    <div class="dash__progress-text">
+                        <h2 class="dash__progress-title">Your progress</h2>
+                        <p class="dash__progress-figures">
+                            <!-- Each figure names its own unit, because "12 · 3 · 5" beside an award glyph
+                                 is a puzzle rather than a report. -->
+                            <span>{{ number(progress.points) }} points</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{{ number(progress.badges) }} badges</span>
+                            <template v-if="progress.streak > 0">
+                                <span aria-hidden="true">·</span>
+                                <!-- Only when there IS one: "0 day streak" is a report of failure nobody
+                                     asked for, on the landing page, every day until they return. -->
+                                <span>{{ number(progress.streak) }}-day streak</span>
+                            </template>
+                        </p>
+                    </div>
+                    <Link href="/achievements" class="dash__progress-link">
+                        See your achievements
+                        <MdsIcon name="chevron-right" size="sm" aria-hidden="true" />
+                    </Link>
+                </div>
+            </MdsCard>
+
             <section class="dash__trends" aria-labelledby="dash-trends-heading">
             <div class="dash__section-head">
                 <h2 id="dash-trends-heading" class="dash__section-title">Last 30 days</h2>
@@ -624,6 +672,74 @@ const startLede = computed(() =>
 
 .dash__checklist {
     margin-bottom: var(--mds-space-6);
+}
+
+/* K1e — the achievements nudge. Sits in the checklist's rhythm because it plays the same role: a passive
+   card below the numbers, read by somebody who chose to keep reading. */
+.dash__progress {
+    margin-bottom: var(--mds-space-6);
+}
+
+.dash__progress-body {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-3);
+    /* Wraps rather than compressing: at 375px with `[data-font-size="extra_large"]` the figures line and
+       the link cannot share a row, and a flex row that refuses to wrap pushes the card past the viewport
+       — the topnav defect J8 spent an increment on, one container over. */
+    flex-wrap: wrap;
+}
+
+.dash__progress-mark {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--mds-radius-full);
+    background-color: var(--mds-color-action-primary-bg);
+    color: var(--mds-color-text-on-primary);
+}
+
+.dash__progress-text {
+    /* `min-width: 0` so the figures line may shrink instead of setting the row's floor at its content
+       width — a flex item's automatic minimum size is what pushes a bar wider than its container. */
+    flex: 1;
+    min-width: 0;
+}
+
+.dash__progress-title {
+    margin: 0;
+    font-family: var(--mds-font-family-display);
+    font-size: var(--mds-type-heading-4-font-size);
+    font-weight: var(--mds-font-weight-semibold);
+    color: var(--mds-color-text-heading);
+}
+
+.dash__progress-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin: var(--mds-space-1) 0 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    color: var(--mds-color-text-secondary);
+}
+
+.dash__progress-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
+    font-weight: var(--mds-font-weight-medium);
+    /* `-fg`, never `-bg`: DSR §2 records that the fill colour measures 4.27:1 on the canvas and fails
+       WCAG 1.4.3 for brand-coloured body text. The darker text role is the one that carries the guarantee
+       on every tenant brand ramp, in both themes. */
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.dash__progress-link:hover {
+    text-decoration: underline;
 }
 
 .dash__card-note {

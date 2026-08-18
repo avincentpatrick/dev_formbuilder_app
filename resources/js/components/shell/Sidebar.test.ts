@@ -1,4 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -18,11 +19,33 @@ const mocks = vi.hoisted(() => ({
         url: '/dashboard',
         props: {} as Record<string, unknown>,
     },
+    /** What the streak composable reports. `null` is "not answered yet", which must paint no bubble. */
+    streak: null as number | null,
+    /** Captured so a case can assert the sidebar hands the composable the item's own visibility. */
+    streakEnabled: (() => false) as () => boolean,
+}));
+
+vi.mock('@/composables/useMemberStreak', () => ({
+    // Returns the ref the sidebar renders from. Mocked rather than driven through the real composable
+    // because what is under test here is the MARKUP contract — when a bubble exists, what it says, and
+    // what the link is called — while the fetch/subscribe/teardown behaviour has its own unit file.
+    useMemberStreak: (enabled: () => boolean) => {
+        mocks.streakEnabled = enabled;
+
+        return { current: ref(mocks.streak) };
+    },
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
     usePage: () => mocks.pageProps,
+    // ⚠️ A FACTORY MOCK REPLACES THE MODULE ENTIRELY, so anything the component imports and this object
+    // omits arrives as `undefined` — and a call on it throws inside `setup()`, which Vue reports as
+    // "Invalid vnode type", naming neither the module nor the symbol. K1e's streak badge subscribes to
+    // navigations through `useMemberStreak`, so `router` has to exist here. It returns an unsubscribe
+    // because the composable keeps one: an un-unsubscribed listener would accumulate a fetch per past
+    // visit on a sidebar that never unmounts.
+    router: { on: () => () => {} },
 }));
 
 const Sidebar = (await import('./Sidebar.vue')).default;
@@ -262,7 +285,7 @@ describe('Sidebar — grouping', () => {
         const { navGroups, navItems } = await import('./nav-model');
 
         expect(navItems.map((i) => i.key)).toEqual([
-            'forms', 'submissions', 'dashboard', 'analytics',
+            'forms', 'submissions', 'dashboard', 'achievements', 'analytics',
             'members', 'scopes', 'audit', 'feedback',
             'webhooks', 'integrations', 'domains',
             'settings',
@@ -574,5 +597,81 @@ describe('Sidebar — the drawer takes the page', () => {
 
         wrapper.unmount();
         expect(bg.hasAttribute('inert')).toBe(false);
+    });
+});
+
+describe('Sidebar — the Achievements streak badge (K1e)', () => {
+    afterEach(() => {
+        mocks.streak = null;
+    });
+
+    function withGamification(streak: number | null): VueWrapper {
+        mocks.streak = streak;
+
+        return render(allAbilities(), { gamification: true });
+    }
+
+    it('paints the streak as a bubble and puts the count in the links accessible name', () => {
+        const wrapper = withGamification(7);
+        const link = wrapper.findAll('a').find((a) => a.text().includes('Achievements'))!;
+
+        expect(wrapper.find('.sidebar__badge').text()).toBe('7');
+        // ⚠️ THE COUNT IS IN THE NAME, NOT ONLY IN THE BUBBLE (WCAG 1.4.1) — a visual-only count is the
+        // same defect as a colour-only status. The visible label survives verbatim at the front, which is
+        // what keeps speech input working (WCAG 2.5.3, label in name). The bell answers this identically.
+        expect(link.attributes('aria-label')).toBe('Achievements, 7-day streak');
+        // ...and the bubble itself is hidden, because announcing the number twice is worse than not at all.
+        expect(wrapper.find('.sidebar__badge').attributes('aria-hidden')).toBe('true');
+        wrapper.unmount();
+    });
+
+    it('paints nothing at zero, which is a report of failure nobody asked for', () => {
+        const wrapper = withGamification(0);
+
+        expect(wrapper.find('.sidebar__badge').exists()).toBe(false);
+        expect(wrapper.findAll('a').find((a) => a.text().includes('Achievements'))!.attributes('aria-label'))
+            .toBeUndefined();
+        wrapper.unmount();
+    });
+
+    it('paints nothing before the sidecar has answered', () => {
+        // `null` and `0` are deliberately different facts upstream: null is "we do not know yet". A badge
+        // that appears on load and then vanishes is worse than one that arrives late.
+        const wrapper = withGamification(null);
+
+        expect(wrapper.find('.sidebar__badge').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('badges only the Achievements item, never every destination', () => {
+        const wrapper = withGamification(5);
+
+        expect(wrapper.findAll('.sidebar__badge')).toHaveLength(1);
+        wrapper.unmount();
+    });
+
+    it('hides the destination entirely when the workspace has gamification off', () => {
+        mocks.streak = 7;
+        const wrapper = render(allAbilities(), {});
+
+        expect(labels(wrapper).join(' ')).not.toContain('Achievements');
+        expect(wrapper.find('.sidebar__badge').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('tells the composable not to fetch while the destination is hidden', () => {
+        // ⚠️ THE PHANTOM-TOAST GUARD, ASSERTED AT THE WIRING RATHER THAN INSIDE THE COMPOSABLE. The sidecar
+        // is `module:gamification`-gated and a web refusal is a `back()` WITH A SESSION FLASH, so a fetch
+        // by a workspace that switched gamification off leaves a "switched off" toast to surface on a
+        // random page, once per navigation. The composable honours the predicate; this proves the sidebar
+        // hands it the right one.
+        mocks.streak = 7;
+        const off = render(allAbilities(), {});
+        expect(mocks.streakEnabled()).toBe(false);
+        off.unmount();
+
+        const on = render(allAbilities(), { gamification: true });
+        expect(mocks.streakEnabled()).toBe(true);
+        on.unmount();
     });
 });

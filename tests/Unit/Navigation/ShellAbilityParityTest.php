@@ -297,8 +297,8 @@ describe('the parsers themselves', function (): void {
         // file; this catches a RENAMED symbol.
         $items = shellNavItems();
 
-        expect($items)->toHaveCount(12);
-        expect(array_unique(array_column($items, 'key')))->toHaveCount(12);
+        expect($items)->toHaveCount(13);
+        expect(array_unique(array_column($items, 'key')))->toHaveCount(13);
     });
 
     it('parses gate and feature as genuinely optional rather than uniformly absent', function (): void {
@@ -313,10 +313,17 @@ describe('the parsers themselves', function (): void {
         $withGateOnly = array_filter($items, static fn (array $i): bool => $i['gate'] !== null && $i['feature'] === null);
         $withBoth = array_filter($items, static fn (array $i): bool => $i['gate'] !== null && $i['feature'] !== null);
         $withNeither = array_filter($items, static fn (array $i): bool => $i['gate'] === null && $i['feature'] === null);
+        // ⚠️ THE FOURTH COMBINATION, ASSERTABLE ONLY SINCE K1e. Until Achievements arrived, every nav item
+        // carrying a `feature` carried a `gate` too, so a parser that only ever read `feature` when it had
+        // already found a `gate` would have satisfied all three cases above. Achievements is deliberately
+        // gate-less (ADR-0020 §D7 gives every member their own numbers) and feature-gated (the gamification
+        // module toggle), which is what makes the two fields provably independent here.
+        $withFeatureOnly = array_filter($items, static fn (array $i): bool => $i['gate'] === null && $i['feature'] !== null);
 
         expect($withGateOnly)->not->toBeEmpty('the parser never read a gate without a feature');
         expect($withBoth)->not->toBeEmpty('the parser never read a gate and a feature together');
         expect($withNeither)->not->toBeEmpty('the parser never read an item with neither');
+        expect($withFeatureOnly)->not->toBeEmpty('the parser never read a feature without a gate');
     });
 
     it('keeps navItems DERIVED from navGroups, which is what makes the order case honest', function (): void {

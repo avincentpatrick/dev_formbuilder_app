@@ -21,6 +21,17 @@ const pages = [
     // at 375px is the failure this gate has already caught three times on other pages. The filter rail's
     // eight controls and three checkbox groups are the other half of that risk.
     { name: 'Analytics', path: '/analytics' },
+    // The achievements surface (K1e). ⚠️ THIS IS THE ONLY GATE THAT CAN SEE MOST OF THIS PAGE, and it has
+    // more to catch here than the neighbours: two `auto-fit` tile grids, a badge grid whose cards carry a
+    // meter, and a leaderboard row of four flex children with a name that must ellipsis rather than push
+    // the row wide. The horizontal-overflow assertion at 375px is the one that bites — the same failure
+    // this gate has already caught three times on other pages.
+    //
+    // ⚠️ AND IT ONLY LOADS BECAUSE `gamification` IS GRANTED ON EVERY TIER (ADR-0020 §D6) and the module
+    // toggle defaults ON, so no seeder obligation attaches the way ADR-0011 §D9 puts one on /analytics.
+    // The seeded acme owner holds `dashboard.org.view`, so the scan covers the GATED half — the ladder and
+    // the workspace totals — which is the half with the more complicated markup.
+    { name: 'Achievements', path: '/achievements' },
     { name: 'Forms', path: '/forms' },
     // The forms list's SECOND view (JR3). Without this entry the enriched seven-column table, the
     // single-line action cluster, the two `align: 'end'` columns and `MdsDataTable`'s own scroll region

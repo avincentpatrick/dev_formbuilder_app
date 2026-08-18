@@ -58,6 +58,22 @@ export const navGroups: NavGroup[] = [
             { key: 'forms', label: 'Forms', icon: 'forms', href: '/forms', gate: 'manageForms' },
             { key: 'submissions', label: 'Submissions', icon: 'submissions', href: '/submissions', gate: 'viewSubmissions' },
             { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard' },
+            // Achievements (K1e) — beside Dashboard because it answers the other half of "how is this
+            // workspace doing": the dashboard counts the work, this counts the people doing it.
+            //
+            // ⚠️ NO `gate`, AND THE ABSENCE IS ADR-0020 §D7 RATHER THAN AN OVERSIGHT: every member may see
+            // their OWN points, badges, streak and standing with no permission at all, so there is no
+            // ability to name and none was minted. The named ladder inside the page IS gated, on the
+            // existing `dashboard.org.view`, and the controller resolves that into a null prop — gating the
+            // destination instead would hide a member's own achievements from them.
+            //
+            // ⚠️ `feature: 'gamification'` LOOKS LIKE A PLAN GATE AND IS ACTUALLY THE MODULE TOGGLE, which
+            // is the only reason it is safe to reuse this field. ADR-0020 §D6 grants the key on EVERY tier
+            // including Free, so `EntitlementService::feature()`'s plan half can never be what refuses it
+            // and what remains is `modules.gamification` — the same thing the route's `module:gamification`
+            // middleware reads. A second `module` axis was considered and refused: it would be a parallel
+            // gating vocabulary for a field that already computes the right answer here.
+            { key: 'achievements', label: 'Achievements', icon: 'award', href: '/achievements', feature: 'gamification' },
             // Cross-form analytics (H24b2) — a permission (gate) AND a Business+ plan feature (feature). ADR-0011
             // §D9 makes the hiding load-bearing rather than tidy: Business is seeded is_active:false, so a locked
             // item with an upgrade CTA would point at a plan that cannot be bought. Its own glyph, not `activity`

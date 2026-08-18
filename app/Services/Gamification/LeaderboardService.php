@@ -142,8 +142,13 @@ final class LeaderboardService
      * the column name as an argument. That is not only tidier: a dynamic `$row->{$column}` is unresolvable
      * to static analysis, and it turns a typo in a caller into a runtime null instead of a red gate.
      *
-     * `(int)` on the value because PostgreSQL returns `SUM`/`COUNT` as a string through PDO, and an
-     * unconverted total would compare and sort as text — where '9' outranks '10'.
+     * `(int)` on the value is DEFENSIVE rather than load-bearing, and K1e corrected this note after
+     * measuring it: this line used to assert flatly that PostgreSQL returns `SUM`/`COUNT` as a string
+     * through PDO. **On this stack it does not** — `get_debug_type()` on both returns `int`, because
+     * pdo_pgsql fetches native types here — so deleting the cast changes nothing today and a mutant that
+     * does so survives. It stays because it is free and it is right where a string WOULD arrive (`SUM()`
+     * over a `numeric` column returns `numeric`, which PDO does stringify), and because an unconverted
+     * total would compare and sort as text, where '9' outranks '10'.
      *
      * @return array<string, int>
      */

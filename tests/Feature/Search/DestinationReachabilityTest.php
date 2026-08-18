@@ -83,7 +83,7 @@ it('offers an entitled Owner every destination in the catalog, and no more', fun
     $keys = array_column(app(DestinationCatalog::class)->visibleTo($this->owner), 'key');
 
     expect($keys)->toBe([
-        'forms', 'submissions', 'dashboard', 'analytics', 'members', 'scopes',
+        'forms', 'submissions', 'dashboard', 'achievements', 'analytics', 'members', 'scopes',
         'audit', 'feedback', 'webhooks', 'integrations', 'domains', 'settings',
     ]);
 });
@@ -117,6 +117,7 @@ it('lands an offered destination on a real Inertia page', function (string $key,
     'forms' => ['forms', 'forms/Index'],
     'submissions' => ['submissions', 'submissions/Inbox'],
     'dashboard' => ['dashboard', 'Dashboard'],
+    'achievements' => ['achievements', 'achievements/Index'],
     'analytics' => ['analytics', 'analytics/Index'],
     'members' => ['members', 'members/Index'],
     'scopes' => ['scopes', 'scopes/Index'],
@@ -134,7 +135,13 @@ it('offers a Viewer only the destinations a Viewer can open', function (): void 
     // supplies its feature; every management row drops out.
     $keys = array_column(app(DestinationCatalog::class)->visibleTo($this->viewer), 'key');
 
-    expect($keys)->toBe(['submissions', 'dashboard', 'analytics', 'settings']);
+    // ⚠️ `achievements` IS HERE AND EVERY MANAGEMENT ROW IS NOT, WHICH IS THE POINT OF INCLUDING IT.
+    // K1e's row carries no `ability` at all — ADR-0020 §D7 gives every member their own points, badges,
+    // streak and standing with no permission — so it is the first destination in this catalog offered to
+    // the narrowest reader on the strength of a plan feature alone. The NAMED ladder inside that page is
+    // still gated on `dashboard.org.view`, which a Viewer happens to hold; a Form Editor would reach the
+    // same page and be served a null `scoreboard`.
+    expect($keys)->toBe(['submissions', 'dashboard', 'achievements', 'analytics', 'settings']);
 });
 
 it('lands a Viewer on a real Inertia page too', function (string $key, string $component): void {
@@ -152,6 +159,7 @@ it('lands a Viewer on a real Inertia page too', function (string $key, string $c
 })->with([
     'submissions' => ['submissions', 'submissions/Inbox'],
     'dashboard' => ['dashboard', 'Dashboard'],
+    'achievements' => ['achievements', 'achievements/Index'],
     'analytics' => ['analytics', 'analytics/Index'],
     'settings' => ['settings', 'Settings/Index'],
 ]);

@@ -42,6 +42,12 @@ final readonly class DestinationCatalog
         ['key' => 'forms', 'label' => 'Forms', 'url' => '/forms', 'keywords' => 'build questionnaire survey templates', 'ability' => 'manageForms', 'feature' => null],
         ['key' => 'submissions', 'label' => 'Submissions', 'url' => '/submissions', 'keywords' => 'inbox responses replies answers review', 'ability' => 'viewSubmissions', 'feature' => null],
         ['key' => 'dashboard', 'label' => 'Dashboard', 'url' => '/dashboard', 'keywords' => 'home overview summary', 'ability' => null, 'feature' => null],
+        // K1e. ⚠️ NOT OPTIONAL AND NOT A COURTESY: `ShellAbilityParityTest` asserts this list and
+        // `nav-model.ts` agree on keys, ORDER and the (ability, feature) tuple, so a sidebar item without a
+        // row here reddens three cases by name. `ability` is null because ADR-0020 §D7 gives every member
+        // their own numbers with no permission; `feature` is the gamification MODULE toggle wearing the
+        // plan field, which is exact for this one key because §D6 grants it on every tier (see nav-model).
+        ['key' => 'achievements', 'label' => 'Achievements', 'url' => '/achievements', 'keywords' => 'badges points streak leaderboard progress rewards gamification', 'ability' => null, 'feature' => 'gamification'],
         ['key' => 'analytics', 'label' => 'Analytics', 'url' => '/analytics', 'keywords' => 'reports charts trends insights', 'ability' => 'viewAnalytics', 'feature' => 'advanced_analytics'],
         ['key' => 'members', 'label' => 'Members', 'url' => '/members', 'keywords' => 'people team invite roles permissions staff', 'ability' => 'manageMembers', 'feature' => null],
         ['key' => 'scopes', 'label' => 'Scopes', 'url' => '/scopes', 'keywords' => 'hierarchy regions offices areas branches', 'ability' => 'manageScopes', 'feature' => null],

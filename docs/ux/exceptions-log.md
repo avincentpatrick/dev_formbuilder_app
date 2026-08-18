@@ -552,6 +552,20 @@ full-screen sheet — and none of those moved.
    changes saved"* at the moment the write failed — at every width, on `phase1-completion` today. Filed to
    `docs/feature-backlog.md` rather than folded in, because inferring success from "nothing in flight" is a
    store defect, not a layout one.
+
+   ✅ **CLOSED BY J7 (2026-08-18), AND THE DIAGNOSIS ABOVE WAS RIGHT: IT WAS A STORE DEFECT.** `useBuilderStore`
+   now carries an explicit `SaveState` and the toolbar reads it, so success is never inferred from an idle
+   queue. ⚠️ **Fixing it uncovered the same lie twice more, neither of them visible from the layout side.**
+   (a) Two `saveError` clears sat on the SUCCESS path of `persistField`/`persistSection`, so a later write
+   succeeding erased an EARLIER row's real failure — an indicator-only fix would have shipped it untouched.
+   (b) A **409 conflict** also read as saved, because it sets `conflict` without setting `saveError`, so the
+   burst drained clean while the ConflictDialog said the opposite. (c) And `ConfigPanel`'s `role="alert"`
+   — the very element the watcher in cost 3 exists to bring on screen — lived INSIDE that panel's `v-else`,
+   so it rendered only when something was SELECTED, and selection goes null on exactly the failure-adjacent
+   paths. A failed write with nothing selected was reported **nowhere in the client at all**, which is why
+   the toolbar's failed state renders *Not saved* rather than going silent. Three backlog rows record what
+   J7 deliberately did not take: the verdict is batch-scoped rather than per-row, an identical repeated
+   failure does not re-announce, and the failed indicator is not tonally distinct.
 4. **At `extra_large` the threshold is 1200px of container, so a 1440px desktop is compact.** That is the
    `em` choice working as designed — the 260/340 pane columns are px literals that do not grow with the type
    — but it means any test helper keyed on `info.project.name` rather than on what is actually on screen

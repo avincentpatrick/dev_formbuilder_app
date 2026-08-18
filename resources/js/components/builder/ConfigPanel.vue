@@ -238,16 +238,23 @@ watch(librarySaved, (value) => {
 
 <template>
     <div class="config">
+        <!-- ⚠️ A SIBLING OF BOTH BRANCHES, NOT A CHILD OF THE EDITOR ONE (J7). This alert used to live inside
+             the `v-else` below, so it rendered ONLY when a field or section was selected — and selection goes
+             null on exactly the paths most likely to fail: a delete that succeeds clears it, and a form with
+             no fields starts with nothing selected. A failed write in that state was reported NOWHERE in the
+             client. Hoisted, it is the assertive half of the pair whose polite half is the toolbar's status
+             line; both now read one source of truth in the store.
+
+             Above the strip, not between the strip and its own panel. A save failure is about the pane
+             rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
+             place it could not belong. -->
+        <p v-if="saveError" class="config__error" role="alert">{{ saveError }}</p>
+
         <div v-if="!field && !section" class="config__empty">
             <p>Select a field or section to configure it.</p>
         </div>
 
         <template v-else>
-            <!-- Above the strip, not between the strip and its own panel. A save failure is about the pane
-                 rather than about the selected tab, and wedging it into the tab-to-panel gap was the one
-                 place it could not belong. -->
-            <p v-if="saveError" class="config__error" role="alert">{{ saveError }}</p>
-
             <MdsTabs
                 :items="tabs"
                 :model-value="activeTab"

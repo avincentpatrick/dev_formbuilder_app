@@ -23,7 +23,11 @@ use App\Models\User;
  *
  * ⚠️ THE KEYS ARE A PUBLIC CONTRACT. `resources/js/types/inertia.d.ts` declares them as `AppAbilities` and
  * `nav-model.ts` references them by name in its `gate` field, so renaming one silently hides a nav item
- * rather than failing loudly. `ShellAbilityParityTest` is what holds the two ends together.
+ * rather than failing loudly. `ShellAbilityParityTest` is what holds the two ends together: it reads
+ * `AppAbilities` off disk and asserts the two key SETS are equal -- not their ORDER, which nothing
+ * consumes -- and it refuses any nav `gate` or catalog `ability` naming a key this map does not define.
+ * That last direction is a SUBSET check on purpose: `transferOwnership` and `assignRoles` are spent by a
+ * page rather than by the nav, so an ability with no nav item is ordinary and equality would be wrong.
  *
  * Computed FAIL-CLOSED: on tenant routes `EstablishTenantDatabaseContext` has set the Spatie permissions
  * team by the time this is called (and resets it in `terminate()`), so `can()` resolves against the active

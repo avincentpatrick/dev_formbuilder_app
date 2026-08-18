@@ -178,3 +178,17 @@ export interface CanvasGroup {
 }
 
 export type Selection = { kind: 'field'; uid: Uid } | { kind: 'section'; uid: Uid } | null;
+
+/**
+ * The builder's EXPLICIT save verdict (`useBuilderStore`).
+ *
+ * Lives here rather than in the store so the toolbar's label module can read it without importing the
+ * 850-line store and its whole module graph.
+ *
+ * `idle` and `saved` are distinct FACTS even though the toolbar renders them identically today: `idle` is
+ * "this session has written nothing", `saved` is "everything this session wrote, landed". `failed` is
+ * reached by a rejected write OR by an open 409 conflict -- in both, the server does not hold what is on
+ * screen. Mirrors `AutosaveState` in `@/composables/useServerAutosave`, minus the two states the builder
+ * has no path to (there is no lost-update baseline here and no session-expiry stop).
+ */
+export type SaveState = 'idle' | 'saving' | 'saved' | 'failed';

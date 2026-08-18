@@ -30,12 +30,17 @@ import ScheduleModal from '@/components/builder/ScheduleModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
 import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
+import { saveLabel } from '@/components/builder/save-label';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { selection, saving, canUndo, canRedo, conflict, library, saveError } = store;
+const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError } = store;
+
+// The toolbar's polite live region. Reads the store's EXPLICIT verdict rather than inferring success
+// from an idle queue -- see `save-label.ts` for why the failed state renders a string at all.
+const saveStatusLabel = computed(() => saveLabel(saveState.value));
 
 
 // Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
@@ -96,10 +101,10 @@ function onPaneChange(value: string): void {
 // the threshold all three panes are on screen and `pane` is inert, so this is a no-op on desktop rather
 // than a layout surprise.
 //
-// Not fixed here, because it is NOT this increment's and predates it: `.builder__save` is driven by
-// `pending.count`, which returns to zero on the failure path too, so the toolbar's polite live region
-// still announces "All changes saved" after a failed write — at every width, including 1440px today.
-// Filed to docs/feature-backlog.md.
+// ✅ FIXED IN J7, and this watcher is why the fix had to reach the store rather than the template. The
+// toolbar's status line now reads `saveState`, and `saveError` is a COMPUTED mirror of the same field the
+// verdict tests — so the polite region cannot say "All changes saved" while this watcher is dragging the
+// assertive alert on screen. The two channels are one source of truth by construction. (WCAG 4.1.3.)
 watch(saveError, (message) => {
     if (message) pane.value = 'settings';
 });
@@ -280,9 +285,9 @@ function submitImport(): void {
                 three spellings equal — keep these one attribute per line or its regex stops matching.
             -->
             <div class="builder__actions">
-                <span class="builder__save" role="status" aria-live="polite">
-                    {{ saving ? 'Saving…' : 'All changes saved' }}
-                </span>
+                <!-- Always PRESENT and never empty: a live region inserted with its content already in it is
+                     not reliably announced, and an empty span collapses a row that already wraps at 375px. -->
+                <span class="builder__save" role="status" aria-live="polite">{{ saveStatusLabel }}</span>
                 <MdsButton
                     variant="tertiary"
                     icon-left="undo"

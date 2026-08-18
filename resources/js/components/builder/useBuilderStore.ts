@@ -19,6 +19,7 @@ import type {
     LocalSection,
     Selection,
     ServerField,
+    SaveState,
     ServerSection,
     Uid,
 } from './types';
@@ -59,7 +60,6 @@ export function useBuilderStore(props: BuilderPageProps) {
     const fields = ref<LocalField[]>(props.fields.map(toLocalField));
     const sections = ref<LocalSection[]>(props.sections.map(toLocalSection));
     const selection = ref<Selection>(null);
-    const saveError = ref<string | null>(null);
     const conflict = ref<ConflictState | null>(null);
     const undoStack = ref<HistoryEntry[]>([]);
     const redoStack = ref<HistoryEntry[]>([]);
@@ -76,18 +76,79 @@ export function useBuilderStore(props: BuilderPageProps) {
     fields.value.forEach((f) => baselines.set(f.uid, fieldSnapshot(f)));
     sections.value.forEach((s) => baselines.set(s.uid, sectionSnapshot(s)));
 
-    // ── Serialized persistence queue ──────────────────────────────────────────
-    const pending = reactive({ count: 0 });
+    // ── Serialized persistence queue + the EXPLICIT save verdict ──────────────
+    // ⚠️ THE VERDICT IS NEVER INFERRED FROM "NOTHING IN FLIGHT", AND THAT INFERENCE WAS THE DEFECT. This used
+    // to be an in-flight COUNTER read as a verdict, decremented in a `.finally()`. Because `guard()` catches
+    // the throw, a FAILED write returned that counter to zero exactly as a successful one did, so the
+    // toolbar's polite live region announced "All changes saved" at the instant a write failed, beside an
+    // alert saying the opposite. Live at every width including 1440px, and older than the increment that
+    // documented it. (WCAG 4.1.3 Status Messages; exceptions-log #13 §3.)
+    const save = reactive<{ inFlight: number; error: string | null; wrote: boolean }>({
+        inFlight: 0,
+        error: null,
+        wrote: false,
+    });
+
+    // Per-BURST bookkeeping, deliberately plain closure variables rather than reactive state: nothing renders
+    // from them, and a reactive flag flipping mid-burst would make the indicator flicker between two verdicts
+    // on a single drain.
+    let burstAttempted = false;
+    let burstFailed = false;
+
     let queue: Promise<unknown> = Promise.resolve();
 
     function enqueue<T>(task: () => Promise<T>): Promise<T> {
-        pending.count++;
-        const run = queue.then(task, task).finally(() => pending.count--);
+        // A burst is the run of work from the queue going non-empty to draining. `queue.then(task, task)`
+        // serializes, so tasks in one burst are strictly ordered ─ which makes the burst the smallest unit a
+        // verdict can honestly cover. "Concurrent" here means "queued", never "overlapping".
+        if (save.inFlight === 0) {
+            burstAttempted = false;
+            burstFailed = false;
+        }
+        save.inFlight++;
+
+        const run = queue.then(task, task).finally(() => {
+            save.inFlight--;
+            if (save.inFlight > 0) return;
+
+            // ⚠️ A BURST THAT WROTE NOTHING REACHES NO VERDICT. `commitFieldEdit` returns early when the
+            // snapshots are equal and `commitReorder` when the order did not move ─ both still enqueue. Letting
+            // those clear an error would mean dragging a field back where it started erased a real failure.
+            // (`builderClient.test.ts` already pins that a no-op edit records no PATCH.)
+            if (!burstAttempted) return;
+
+            save.wrote = true;
+
+            // Cleared only on POSITIVE evidence: everything this burst attempted, landed. This replaces the two
+            // `saveError` clears that used to sit on the success path of persistField and persistSection, which
+            // let a LATER success in the same burst erase an EARLIER row's failure.
+            if (!burstFailed) save.error = null;
+        });
+
         queue = run.catch(() => undefined);
         return run;
     }
 
-    const saving = computed(() => pending.count > 0);
+    /**
+     * The builder's explicit save verdict.
+     *
+     * ⚠️ ONE SOURCE OF TRUTH. `saveError` below is a COMPUTED mirror of `save.error`, and this expression
+     * tests `save.error` and `conflict` before it can reach 'saved' ─ so `saveState === 'saved'` implies the
+     * alert is absent BY CONSTRUCTION, rather than by two writers agreeing to stay in step. A 409 counts as
+     * 'failed' for the same reason: the server does not hold what is on screen, whatever the dialog says.
+     */
+    const saveState = computed<SaveState>(() => {
+        if (save.inFlight > 0) return 'saving';
+        if (save.error !== null || conflict.value !== null) return 'failed';
+
+        return save.wrote ? 'saved' : 'idle';
+    });
+
+    // Read-only by design: the only writers are `guard()` and the burst verdict above. The narrowing from Ref
+    // to ComputedRef is itself the guarantee that nothing else can ever set it.
+    const saveError = computed(() => save.error);
+
+    const saving = computed(() => saveState.value === 'saving');
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
 
@@ -125,10 +186,15 @@ export function useBuilderStore(props: BuilderPageProps) {
 
     // ── Error-guarded request wrapper ───────────────────────────────────────────
     async function guard<T>(fn: () => Promise<BuilderResult<T>>): Promise<BuilderResult<T> | null> {
+        // Set BEFORE the await: this is what separates "the burst tried and everything landed" from "the burst
+        // was a no-op", and a request that throws immediately must still count as an attempt.
+        burstAttempted = true;
+
         try {
             return await fn();
         } catch (error) {
-            saveError.value =
+            burstFailed = true;
+            save.error =
                 error instanceof BuilderRequestError ? error.message : 'Something went wrong saving your change.';
             return null;
         }
@@ -151,7 +217,6 @@ export function useBuilderStore(props: BuilderPageProps) {
             conflict.value = { kind: 'field', uid, mine: clone(field), theirs: result.current };
             return;
         }
-        saveError.value = null;
         field.version = result.data.version;
     }
 
@@ -196,7 +261,6 @@ export function useBuilderStore(props: BuilderPageProps) {
             conflict.value = { kind: 'section', uid, mine: clone(section), theirs: result.current };
             return;
         }
-        saveError.value = null;
         section.version = result.data.version;
     }
 
@@ -742,6 +806,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         selectedField,
         selectedSection,
         saving,
+        saveState,
         saveError,
         conflict,
         canUndo,

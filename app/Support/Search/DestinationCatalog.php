@@ -19,7 +19,9 @@ use App\Support\Authorization\ShellAbilities;
  *
  * ⚠️ THE GATES COME FROM {@see ShellAbilities}, THE SAME MAP THE SIDEBAR READS. Re-deriving them here is
  * how the sidebar and the palette start disagreeing about what a Viewer can reach — within about two
- * increments, on this codebase's own track record. `ShellAbilityParityTest` holds the two ends together.
+ * increments, on this codebase's own track record. `ShellAbilityParityTest` holds the two ends together:
+ * same destinations, same flat order, and the same `ability` and `feature` on both sides. It reads ROWS by
+ * reflection, because `visibleTo()` drops the very two fields the comparison is about.
  *
  * ⚠️ FEATURE GATES ARE THE NAV'S, NOT THE ROUTE'S, AND FOR ONE ROW THEY DELIBERATELY DIFFER. `/domains`
  * carries no `feature:` middleware on its read path (ADR-0012 §D9 — a tenant downgraded off Business keeps

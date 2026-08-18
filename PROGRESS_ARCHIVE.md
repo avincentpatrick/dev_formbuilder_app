@@ -3552,3 +3552,91 @@ files `tsconfig.json` does not cover type-checked by hand. Four host linters **9
 controller, not this row's. PHPStan **18 = baseline, delta 0**. Pint `result: "passed"`. `openapi.json`
 untouched (zero PHP). Storybook axe **42 suites / 299** asserted unchanged on the structural ground that
 Storybook globs `packages/design-system/src/**` only and this increment touched no file under it.
+
+---
+
+## 2026-08-18 — 🅱️ LANE B · `K1e` — the gamification UI, and the last row in either queue
+
+An achievements surface (`/achievements`), a dashboard card and a sidebar affordance whose count badge is a
+JSON sidecar (`GET /achievements/streak`) read by `useMemberStreak` — the shape doc #28 §10 required by name.
+`BadgeShelfService` + `BadgeShelf` + `BadgeStanding` are the one thing K1e had to BUILD rather than consume:
+`BadgeAwarder` only writes and `LeaderboardService` only counts, so nothing in the engine could answer
+*"which badges do I hold, when did I earn them, and how close am I to the rest"*.
+
+**VERIFYING THE ROW AGAINST THE CODE MOVED IT IN FIVE PLACES — 22-for-22 — and two of the five contradicted
+the hand-off that named them.**
+
+1. **The "nav affordance" is a four-file coupling, mechanically enforced.** J7's `ShellAbilityParityTest`
+   asserts `nav-model.ts` and `app/Support/Search/DestinationCatalog.php` agree on destination keys, **order**
+   and the `(ability, feature)` tuple — three cases, each failing by name. J8 had recorded that catalog as
+   belonging to **neither lane**, so the claim had to cover a file nobody owns, and global search reaches the
+   new page by construction rather than by anyone remembering. The item is also the **first** nav entry
+   carrying a `feature` and no `gate`, which made a fourth combination assertable in that parser's
+   anti-vacuity case for the first time.
+2. ⛔ **`#16` stays free; the instruction to spend it was wrong on the spec.** DSR **Appendix B → Registry
+   growth**: *"add glyphs to `icons.ts` as features need them… a MINOR change"*; `exceptions-log.md` #2's
+   Disposition: *"extend it as features require"*; and I1 added `share`/`link`/`qr` with no entry. Adding a
+   glyph is **conformance, not deviation** — `award` is documented in Appendix B instead, and `badge_earned`
+   is re-pointed off K1b's `trend-up` placeholder, which also gives `trend-up` back its single meaning.
+3. **First `module:` gates on a web route.** K1d mounted the middleware on `/api/v1` only, so
+   `bootstrap/app.php`'s `back()` arm had never executed. Verified it does not redirect to `/achievements`.
+4. **`feature: 'gamification'` is the correct nav axis** and reduces exactly to the module toggle (§D6 grants
+   the key on every tier). A second client-side `module` axis was considered and refused. The dashboard card
+   deliberately reads the **other** axis — `moduleEnabled()`, the middleware's exact mirror — because a card
+   must not be withheld from a reader whose link works.
+5. 🔴 **`team` belongs BEHIND the ladder gate, not beside it** — the one gating call the spec left open.
+   `TeamProgress` names nobody, so it reads as ungated; serving it that way hands a Form Editor the
+   workspace-wide totals `DashboardMetricsService` withholds on exactly `dashboard.org.view` — **a widening of
+   an existing permission performed by a new page**.
+
+🔴 **THE ADVERSARIAL PASS RAN BEFORE THE TESTS AND FOUND EIGHT DEFECTS IN K1e's OWN NEW CODE.** Writing tests
+first would have codified all eight. **(a) A phantom toast**: `bootstrap/app.php` keys its API branch on the
+request PATH, not `Accept`, so a `module:`-gated refusal to a `fetch` is a **302 with a session flash** — an
+unguarded sidecar in a module-disabled workspace degrades harmlessly *in the client* while leaving *"switched
+off for this workspace"* to pop on a random page, once per navigation, forever. `useMemberStreak` therefore
+takes the destination's own visibility. **(b) An unreachable empty state**: the page guarded "no badges" on
+both shelf halves being empty, which `assemble()` makes impossible on-tenant (it walks the whole catalog, so
+the halves always sum to ten) — dead code carrying copy for a state it could not reach, while the state that
+matters fell through to a bare heading. Also: a docblock asserting an off-tenant guard the class does not
+have; **two fully-qualified `{@see \App\…}` Pint would have turned into real imports** — the K1d trap, one of
+them written two lines above my own warning about it; an `<ol>` whose positional semantics contradict
+competition ranking (ranks skip, so the ladder is a `<ul>` with the rank as text); an unlabelled badge count;
+a duplicated tile label; and six invented design tokens.
+
+**MUTATION: 12 + 1 CONTROL. 9 killed, control survived — and the three survivors were the valuable part, all
+the same shape: a guard that reads as load-bearing and changes nothing if deleted.** `BadgeKey::tryFrom()` in
+`earnedOn()` was **removed** rather than documented — `assemble()` indexes that map by catalog key and never
+iterates it, so an unknown key was already dropped structurally. `mostRecentFirst()`'s catalog fallback is
+redundant because `assemble()` emits catalog order and PHP's sort has been stable since 8.0; kept on the
+`roster()` belt-and-braces precedent, but its docblock no longer claims to be the mechanism. And the `(int)`
+casts carried a **false** note: **measured**, `get_debug_type()` on `COUNT(*)` and `SUM()` both return `int`
+here, because pdo_pgsql fetches native types — corrected in `BadgeShelfService` **and in `LeaderboardService`,
+which has carried the wrong claim since K1d**. ⚠️ **A predicted killer is a hypothesis too**: three of mine
+were wrong, and only running them said so.
+
+⚠️ **A STALE TODO ALMOST PRODUCED A DUPLICATE.** doc #28 §11 said the media-resumability narrowing was *"still
+unfiled"*; `docs/feature-backlog.md` already carried it, signed *"found by P3a, filed by K1c"*. Caught only by
+opening the file the TODO pointed at before writing to it. That file was claimed and is **released untouched**.
+
+⛔ **WHAT WAS NOT DONE: THE VISUAL SWEEP.** No Playwright pass touched `/achievements` in the running app. In
+its place: 12 component cases, 15 feature cases, the Storybook axe run, and `/achievements` added to
+`tests/e2e/responsive-axe.spec.ts`, which scans it whole-page at three widths in CI and owns the
+horizontal-overflow assertion. **Two `auto-fit` grids, a badge card carrying a meter and a four-child ladder
+row have never been seen rendered at 375px outside CI.** Named rather than left to be discovered.
+
+**GATES.** Pest per leaf dir: Gamification **129** (+21) · Unit/Gamification **70** (+12) · Unit/Navigation
+**17** (+1) · Search **123** (+2) · Api 111 · Dashboard+Onboarding 31 · Tenancy 284 · Seeders 16 · Queue 50 ·
+Forms 390 · Submissions 399 · Analytics 107 — **local delta +36**. Vitest **125 files / 2,143** (35/545 ·
+32/720 · 58/878). **Storybook axe 42 / 299, unchanged and MEASURED rather than argued structurally** — the
+design-system package ships without Storybook installed, so `npm install` there was a prerequisite and this is
+the first increment in four to actually run that gate. PHPStan **18 = baseline, delta 0**. Four host linters
+**97 · 106 · 30 · 106/119/0** (+1 controller = `AchievementsController`). `vue-tsc` clean on both projects.
+`openapi.json` **byte-identical** — both new routes are tenant web routes. Pint `result: "passed"`, and its
+one fix was read: a real import for a real type usage in a test.
+
+**NAMESPACES: NOTHING SPENT.** No ADR (`0021` free, `0010` reserved for H1d), no migration prefix
+(`2026_08_17_000104` still free — every number is derived, and the streak badge persists no "seen" state),
+no exceptions-log entry.
+
+⚠️ **`LANE B QUEUE EMPTY — 2026-08-18`. BOTH QUEUES ARE NOW EMPTY**, so Rule 7(f) checkpoint 2 applies to Lane
+B as the lane that emptied last: the final integration PR to `main` is **recommended, not performed**.

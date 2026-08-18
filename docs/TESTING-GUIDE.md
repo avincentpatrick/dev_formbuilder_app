@@ -26,9 +26,15 @@ Everything runs inside Docker. The Windows host cannot run the PHP or Node toolc
 ### 0.1 Start the stack
 
 ```bash
+cp .env.example .env      # ⚠️ keep CENTRAL_DOMAIN=localhost — see below
 docker compose up -d
 docker compose exec app php artisan migrate:fresh --seed
 ```
+
+⚠️ **`CENTRAL_DOMAIN` must equal `APP_URL`'s host, without the port.** It is what makes `localhost:8080` the
+*central* host rather than a workspace, and `config/tenancy.php` defaults it to `meridian.test` — so if it is
+missing from your `.env`, chapter 20's `/admin/*` console 404s **after** a successful sign-in and reads as a
+broken build. Tenants are its subdomains (`demo.localhost`, `northwind.localhost`).
 
 `migrate:fresh --seed` **drops and rebuilds the database**, then seeds the demo fixture. It takes about 30
 seconds. Re-running it is always safe, and re-running `php artisan db:seed --class="Database\Seeders\DemoSeeder"`
@@ -83,8 +89,11 @@ a pending row to show. That is intended.
 
 ## 1. The shell and your preferences — Features #6, #9, #5
 
-1. `/dashboard` · owner. Look at the left sidebar. **Expect:** Forms, Submissions, Dashboard, Analytics,
-   Members, Scopes, Audit log, Webhooks, Integrations, Domains, Settings. Every one of them is a real page.
+1. `/dashboard` · owner. Look at the left sidebar. **Expect:** Forms, Submissions, Dashboard, Achievements,
+   Analytics, then under *Administration* Members, Scopes, Audit log, Feedback, then under *Connections*
+   Webhooks, Integrations, Domains, then Settings — thirteen destinations, every one a real page. (This list
+   is asserted mechanically: `ShellAbilityParityTest` pins it against `DestinationCatalog` in the same order,
+   so global search and the sidebar cannot drift apart.)
 2. Look at the **centre of the top bar**. **Expect:** a search field labelled "Search this workspace".
    Type `health` and press **Enter without touching the mouse**. **Expect:** the results page at
    `/search?q=health`, listing *Community Health Survey 2026*. This is an ordinary HTML form, so it works
@@ -420,8 +429,14 @@ rewriting its answers are different powers.
 7. Test **password reset**: sign out, use "forgot password", and collect the mail from
    <http://localhost:8025>. **Expect:** the reset link works and the new password signs you in.
 
-> **Not built yet:** step-up re-authentication before sensitive actions (transferring ownership, changing
-> roles, assigning plans) and organisation-wide enforced 2FA are increment **I8**. Their absence is expected.
+> **Both of these ARE built — increment I8 shipped them.** ⚠️ This box used to say they were not, which
+> made a tester who hit the step-up prompt think they had found a bug. Test them:
+>
+> 8. As owner, transfer ownership / change a role / assign a plan. **Expect:** a re-authentication prompt
+>    before the action completes, and no prompt again for the next few minutes.
+> 9. `/settings` → Security → turn on **Require two-factor authentication for all members**. Sign in as a
+>    member who has not enrolled. **Expect:** every page redirects to an enrolment interstitial that offers
+>    exactly two doors — enrol, or sign out.
 
 ---
 

@@ -120,7 +120,7 @@ Every account below uses the same password: **`meridian-demo-2026`**
 | `owner@northwind.test` | Owner | northwind | The second workspace |
 | `admin@meridian.test` | Platform super-admin | — (central host only) | Needs a TOTP app — see §6 |
 | `invited@demo.test` | — | demo (`invited`) | **Cannot sign in.** A pending invitation, so the Members roster has a pending row. Intended, not a bug. |
-| `avincentpatrick@gmail.com` | — | none | Your own registration. Email unverified and **no `tenant_users` row**, so it reaches no workspace. |
+| *(your own sign-up address)* | — | none | Whatever address you registered with yourself. Email unverified and **no `tenant_users` row**, so it reaches no workspace. ⚠️ **Deliberately not written out: this repository is PUBLIC, and a real address in a table headed "every account below uses the same password" is an exposure, not a fixture.** Look it up in your own dev database if you need it. |
 
 ## 2b. Accounts — Stack B (`E2eSeeder`, port 8081)
 
@@ -444,7 +444,10 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/auth/google/redir
 ```
 
 4. Sign in at <http://localhost:8080/login> as `viewer@demo.test`. The sidebar must show exactly
-   Submissions, Dashboard, Analytics and Settings — no Forms, Members, Scopes, Audit log, Feedback,
-   Webhooks, Integrations or Domains (§5).
+   Submissions, Dashboard, **Achievements**, Analytics and Settings — no Forms, Members, Scopes, Audit log,
+   Feedback, Webhooks, Integrations or Domains (§5). ⚠️ **Achievements is on this list because it is the one
+   destination with no permission gate at all** — it is keyed on the `gamification` module switch only, by
+   design (every member sees their own points and standing; only the NAMED ranked list is gated, on
+   `dashboard.org.view`, and it is withheld inside the page rather than by hiding the page).
 5. Sign in as `owner@northwind.test` at <http://northwind.localhost:8080>. Analytics and Domains must
    be **absent** despite the Owner role — that is §5.1 proving itself.

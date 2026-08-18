@@ -104,7 +104,21 @@ No integration beyond this list is committed to a phase — consistent with the 
 - **Per-endpoint delivery log**: status, latency, response code/body excerpt, attempt count — already specified in `docs/architecture/technical-architecture.md` §7.4; this document adds the `dns_rebinding_blocked` status (§2.2) as a new distinguishable outcome alongside the existing success/failure/timeout states.
 - **Manual redeliver** (`POST /api/v1/webhooks/deliveries/{delivery}/redeliver`, per `docs/api-specification.md`'s resource inventory) re-enters the same delivery pipeline as a fresh attempt — including re-running the SSRF re-validation (§2.2), since the redeliver could happen long after the original attempt.
 - **Endpoint testing**: a "Send test event" action (a synthetic `test.ping` event type, not counted against the real event catalog's semantics) lets a tenant verify their endpoint receives and correctly verifies the signature before relying on it for real events.
-- **Secret rotation**: dual-secret grace period (already named in `docs/architecture/technical-architecture.md` §7.2) — during rotation, deliveries are signed with the new secret but the old secret remains valid for signature verification on the receiving end for a bounded window, so a receiver's own rotation isn't a hard cutover.
+- **Secret rotation**: dual-secret grace period (already named in `docs/architecture/technical-architecture.md` §7.2) — during rotation the old secret stays valid for a bounded window, so a receiver's own rotation isn't a hard cutover.
+
+  ⚠️ **AND THE HEADER CARRIES BOTH SIGNATURES WHILE THAT WINDOW IS OPEN. THIS IS THE ONE THING AN INTEGRATOR MUST IMPLEMENT AND IT WAS DOCUMENTED NOWHERE** (found by the pre-merge review of the integration PR, 2026-08-18). `X-Webhook-Signature` is normally a single value:
+
+  ```
+  X-Webhook-Signature: sha256=<hex>
+  ```
+
+  but while a rotation grace window is open it is **two comma-joined values, current secret first** (`WebhookSigner::signatureHeaderFor()`, the Stripe-style form):
+
+  ```
+  X-Webhook-Signature: sha256=<hex-current>,sha256=<hex-previous>
+  ```
+
+  **A receiver must therefore split on `,` and accept the delivery if ANY value matches** — comparing the whole header against one computed digest works perfectly until the first rotation and then silently rejects every delivery, which is the worst possible failure shape: it appears only in production, only after an unrelated admin action, and looks like an attack. Compare in constant time, and verify against the raw body plus the `X-Webhook-Timestamp` value exactly as signed.
 
 ---
 

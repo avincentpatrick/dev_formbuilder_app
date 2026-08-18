@@ -273,15 +273,14 @@ enum NotificationType: string
             // Unconditional, and the same destination `member_invited` points at: the members page is where a
             // new arrival is acted on (promote, or remove).
             self::MemberJoined => 'members',
-            // K1b — UNCONDITIONALLY NULL, which is new: every other null above is a payload that lacked its
-            // id. This one has nowhere to point at all, because the achievements surface is K1e's and K1e
-            // cannot begin until Lane A's J5 releases `Dashboard.vue` and the design system. The two
-            // alternatives were both worse: `'achievements'` would ship a bell row and an email button
-            // linking to a 404 for a whole increment, and `'dashboard'` would be the "consolation link"
-            // `NotificationPresenter::resolveDestinations()` explicitly argues against. K1e replaces this
-            // arm; until then the row renders as plain text and the email carries no button, which is
-            // exactly what this method's `?string` is for.
-            self::BadgeEarned => null,
+            // M1 — K1b left this UNCONDITIONALLY NULL and wrote "K1e replaces this arm" into the comment,
+            // because the achievements surface did not exist yet and a bell row linking to a 404 is worse
+            // than a bell row that does not link. K1e then shipped `/achievements` (routes/tenant.php) and
+            // never came back for the arm, so every badge-earned row stayed unclickable and every badge
+            // email shipped without its action button — a hand-off the code documented and nobody
+            // discharged, found by the final integration review. Unconditional like `members` above: the
+            // destination is a surface, not a row, so there is no payload id that could be missing.
+            self::BadgeEarned => 'achievements',
         };
     }
 

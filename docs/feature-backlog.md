@@ -476,3 +476,438 @@ quote it*, now on its fourth gate.
 
 - Free-tier / trial mechanics, self-serve signup + email verification, plan upgrade/downgrade/proration, dunning, invoices/receipts, seat-management UX, and account deletion/offboarding export are **partly covered** by the Onboarding (#25), Pricing (#24), and GDPR (#12) docs — audit those three for concrete gaps before Phase-1 billing/onboarding code, rather than treating them as wholly-missing here.
 - Items that competitor products treat as table-stakes but this product deliberately declines (self-hosting, SMS/IVR channels, general app-builder scope, real-time co-editing) are **non-goals** in `docs/PRD.md` §7 and are intentionally *not* listed here.
+
+## ⚠️ Merge-gate review of `main` → `phase1-completion` (2026-08-18)
+
+**Provenance, so nobody re-derives these.** A full-coverage review of the integration diff on branch
+`m1-merge-gate`, run as **18 shards over 1,073 of 1,073 changed files** — every test file, every service,
+every migration, the design system, both front-end trees, and the whole doc corpus — with **adversarial
+verification on every blocker** (each claim's links re-walked against the code with the goal of falsifying
+it; three blockers were downgraded that way and are filed below at their downgraded severity, with the
+reason attached). Rows already **fixed on this branch** before filing are deliberately absent: the
+`ACCESS-MATRIX` personal-email row, `SsoUserProvisioner`'s adoption of an existing central account
+(`SsoFailureReason::ExistingAccountNotMember` + migration `2026_08_17_000104`), `Settings/Sso.vue`'s
+`#footer`→`#actions` slot, `NotificationType::BadgeEarned->pathFor()`, and six stale doc blocks
+(README's front page and "what's next", the RBAC design's impersonation line, TESTING-GUIDE's step-up box
+and sidebar list, ACCESS-MATRIX's viewer sidebar list, `.env.example`'s `CENTRAL_DOMAIN`).
+
+Each row carries its severity as graded, the `file:line`, the concrete failure, and whether it is **live**
+(reachable today) or **latent** (needs a stated precondition). Nothing here is a re-statement of a row
+already in this document; the one overlap — resumable media upload — is the existing *"architecture doc
+promises RESUMABLE media upload"* row above, whose three cited architecture sentences the review confirms
+are still in place.
+
+### ⚠️ The gate that is not measuring what three files say it measures
+
+- **`major` · THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS STRUCTURALLY INERT ON EVERY `AppLayout`
+  PAGE — IT CANNOT FAIL, AND HAS NOT BEEN ABLE TO SINCE THE CLIP LANDED.** `tests/e2e/support/axe.ts:41-44`
+  (twin at `tests/e2e/builder-axe.spec.ts:88-91`) measures
+  `document.documentElement.scrollWidth > clientWidth + 1`, while `resources/js/Layouts/AppLayout.vue:147`
+  sets `.app-shell { overflow-x: clip }` and `.app-shell__content` is `overflow-y: auto`, so its
+  `overflow-x` computes to `auto`. **Any overrun clips or scrolls inside the content region and the
+  document width never moves.** Delete `min-width: 0` from the leaderboard name cell
+  (`resources/js/Pages/achievements/Index.vue:452-459` — the exact idiom `responsive-axe.spec.ts:24-28`
+  says the scan protects) and every scan still passes.
+  ⚠️ **Three files in the suite present it as working** — `support/axe.ts`, `builder-axe.spec.ts`, and
+  `responsive-axe.spec.ts`, whose ~40 comment lines name this assertion as the reason those pages are
+  scanned at all (`/domains`' 64-hex tokens, `/analytics`' legends, the audit-diff cells, `/feedback`'s
+  long URLs). **The repo already knows better everywhere else**: `docs/ux/exceptions-log.md:646-651`,
+  `tests/e2e/list-layout.spec.ts:10-17` and `search-nav.spec.ts:6-10` all record that the clip pins it
+  flat. Only three element-level replacements exist (`list-layout.spec.ts:45-56`,
+  `search-nav.spec.ts:89-100`, `personalization-axe.spec.ts:95-101`), covering three surfaces.
+  ⚠️ **`AuthLayout`, `AdminLayout`, the guest runtime and `Welcome.vue` carry no clip**, so
+  `auth-axe`, `admin-console-axe` and `public-runtime-*` are unaffected — do not "fix" them. **Live**, and
+  the correction owed with it is the ~40 misleading comment lines, in the same row. Filing this is the
+  single most valuable output of the review: it invalidates a gate this project has been trusting.
+
+### Connectors & webhooks
+
+- **`major` · The `webhook_deliveries` fan-out picks its endpoints by ambient RLS alone.**
+  `app/Services/Webhooks/WebhookEventDispatcher.php:49-59` computes `$tenantId` from `$event->tenantId()`
+  and uses it only to stamp the delivery row at `:68`; the query deciding *which endpoints receive the
+  event* is a bare `WebhookEndpoint::query()->where('status', …)` resolved by the global scope. The class
+  docblock (`:28-30`) names the precondition — *"Runs with tenant context established in BOTH call
+  contexts"* — and nothing enforces it. **Latent**: the four `App\Listeners\Webhooks` listeners are
+  synchronous today. Add `ShouldQueue` (one line — the delivery job already is queued), or call `fanOut()`
+  from a console sweep that tears the GUC down between tenants, and this repo's own read-side RLS trap
+  returns **zero endpoints with no exception and no log line**: every tenant's webhooks *and* every Slack /
+  Sheets / Airtable delivery stop firing, silently and totally, with the suite green.
+  The test cannot see it — `tests/Feature/Webhooks/WebhookFanOutTest.php:38-61` seeds one tenant and all
+  ten cases pass `$this->tenant->id` under an `enterTenant()` for that same tenant, so the event's id and
+  the ambient id are indistinguishable in every case.
+- ✅ **FIXED ON THIS BRANCH, recorded because it was the review's only surviving non-documentation-hygiene
+  `blocker` and because it is the contract an integrator builds against.** The docs described a single
+  `sha256=<hex>` in `X-Webhook-Signature` while `WebhookSigner::signatureHeaderFor()` comma-joins the new
+  and previous signatures for the whole rotation grace window — so an integrator who implemented
+  `hash_equals` straight from the docs would have had **every delivery silently rejected** from the moment
+  a tenant first used `POST /api/v1/webhooks/{webhookEndpoint}/rotate-secret`, appearing only in
+  production, only after an unrelated admin action, and looking like an attack. Both
+  `docs/webhook-integration-design.md` §5 and `docs/architecture/technical-architecture.md` §7.2 now state
+  the two-value form, that the current secret is first, and that a receiver must split on `,` and accept if
+  any element matches.
+- **`major` · A successful Airtable delivery writes the respondent's answers into the delivery ledger.**
+  `app/Support/Connectors/Providers/AirtableConnector.php:353` passes 2000 characters of the create-record
+  response — which echoes the `fields` object just written — as the success excerpt, landing in
+  `webhook_deliveries.response_body_excerpt` (`app/Jobs/Connectors/DeliverConnectorMessageJob.php:176`).
+  The sibling adapter deliberately sends `'ok'` (`GoogleSheetsConnector.php:270-272`) and says why. There
+  is **no `webhook_deliveries` retention job**, and deleting the submission does not touch the row, so an
+  erasure request leaves answers behind — falsifying `docs/data-privacy-gdpr-compliance.md:83`
+  (*"the delivery ledger is not a second copy"*). **Live**, Owner/Admin-visible only, not cross-tenant.
+  One line: `delivered($response->status(), 'ok')`.
+- **`major` · Both tabular adapters do a non-idempotent write and the retry ladder re-drives it.**
+  `GoogleSheetsConnector.php:252` / `AirtableConnector.php:338` send no idempotency token; a response lost
+  *after* the provider committed becomes `ConnectorDeliveryResult::failed()` (`:327-331`), and
+  `SweepWebhookRetriesJob` re-appends the same submission. With `max_attempts` = 10
+  (`config/webhooks.php:39`) the ceiling is ten identical rows in the tenant's own sheet, nothing marking
+  either as a retry. **Live.** Not a blocker: `insertDataOption=INSERT_ROWS` means it is additive, so the
+  shape of their data is corrupted, not its content.
+- **`major` · An irreversible provider-side token rotation is committed inside a rollback-able
+  transaction.** `app/Services/Connectors/ConnectionTokenRefresher.php:127` writes each refreshed grant
+  inside the transaction `app/Jobs/TenantAwareJob.php:132-136` opens, and `sweep()` (`:53-72`) batches
+  every due connection for a tenant into it with no partial-commit seam. Airtable invalidates the previous
+  refresh token on every renewal (`AirtableConnector.php:54-61`), so a 60s job timeout or any later throw
+  rolls back the writes while the tokens stay rotated — the next sweep gets `invalid_grant`, which is
+  terminal, and `markDead()` clears both tokens, pauses every rule and emails the owner. **Live** and
+  Airtable-specific (Google returns no new refresh token; Slack never refreshes). ADR-0009 §D6 named the
+  hazard in two halves; the H16a amendment answered only the stampede half.
+- **`major` · `ensureFresh()` takes no lock, so two concurrent deliveries destroy a healthy Airtable
+  grant.** `app/Services/Connectors/ConnectionTokenRefresher.php:86` is a plain read-check-then-refresh —
+  no `Cache::lock`, no `FOR UPDATE`, no `WithoutOverlapping` — so two workers exchange the same rotating
+  refresh token, the loser gets `invalid_grant`, and `markFailed()` runs. **Latent, and the precondition is
+  undeclared**: `docker-compose.yml:39` and `docs/deployment-infrastructure.md:120` run exactly **one**
+  `queue:work`, and that same line names adding worker processes as the scaling path. The scheduled sweep
+  *is* protected by `WithoutOverlapping`; the lazy guard H16a added beside it inherited none of it.
+- **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
+  tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
+  the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise).
+- **`minor` · `ConnectorRulePausedNotification` is the only tenant-facing connector email with no brand.**
+  `app/Jobs/Connectors/DeliverConnectorMessageJob.php:330` sends it without `->withBrand(...)`, so a
+  branded tenant gets one branded and one product-default email from the same job. **Live**, one argument.
+
+### Submissions, drafts & the guest runtime
+
+- **`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
+  terminally lost.** `app/Services/Submissions/SubmissionDraftService.php:163` reads outside any
+  transaction, Stage-3 semantic validation and the DB attachment check run for tens of milliseconds
+  (`:167-175`), the lock is taken only at `:182-183`, and `:200` finalizes with the *pre-lock* values —
+  `SubmissionFinalizer.php:90` being a whole-document replace. A two-device resume (the flow the resume
+  link invites) drops the second device's field, and the row is then `submitted`, so no later save can
+  restore it. **Live.** The only in-lock guard is a status re-assert, which a concurrent autosave does not
+  move — the sibling `SubmissionAnswerEditService.php:186-203` already carries the two-check shape this
+  needs, verbatim. P3a closed the cross-request case and did not touch this path.
+- **`major` · Two unscoped copies of `findByClientUuid()` survive the branch that declared the unscoped
+  form an authorization defect.** `app/Services/Submissions/SubmissionDraftService.php:414-427` documents
+  the invariant and `:429` implements it (uuid + form + respondent), while
+  `app/Http/Controllers/Public/GuestSubmissionController.php:112-122` filters on uuid + status only and
+  `app/Services/Submissions/SubmissionPipeline.php:216-219` on uuid alone. A guest holding form A's share
+  token and supplying a uuid from form B in the same tenant gets either a **repeatable unauthenticated
+  500** (the tenant-wide partial unique index raises 23505 that the recovery arm cannot classify) or, for a
+  finalized row, **form B's id, reference and status serialized back to them** with their own answers
+  silently discarded as an idempotent 200. RLS bounds it to the tenant and no further. **Live.**
+- **`major` · The guest runtime folds P3a's `409 draft_conflict` into the generic `refresh` kind, so the
+  refusal becomes a second submission.** `resources/public-runtime/lib/error-normalizer.ts:93` returns
+  `'refresh'` for every 409; `components/RuntimeSession.vue:275-282` discards the outbox row and calls
+  `handleDrift()`, which re-fetches the **schema** rather than the draft, and `App.vue:284-296` remounts
+  with a fresh uuid and `draftBaseline = null`. The respondent is told *"This form was updated"* — false,
+  nothing was republished — and the resubmit it invites travels with **no baseline at all**. **Live.**
+  ⛔ **DOWNGRADED FROM `blocker` TO `major` ON VERIFICATION, AND THE REASON MATTERS**: the P3a guard is
+  **not** undone — the service throws before the write — and "fresh uuid after a 409 → a second row" is the
+  pre-existing, documented G8c recovery shape rather than a new failure. The residual harm is a factually
+  false cause shown to the respondent and a remedy (*reload the draft*) that the server names and the
+  client discards. The authenticated twin already branches correctly
+  (`resources/js/composables/useServerAutosave.ts:198-212`). Smallest fix: give `draft_conflict` its own
+  `ErrorKind`, as I8b did for `challenge`, and route it to a draft re-read that keeps the uuid.
+- **`major` · On the draft-save channel the same 409 is swallowed with no message at all.**
+  `resources/public-runtime/components/RuntimeSession.vue:352-358` returns `null` into
+  `components/SaveForLater.vue:38-43`, which just closes the panel — so a deliberate "Save and finish
+  later" produces **no save, no resume link, no error**, and the remount then mints a *second* server draft
+  with a *second* resume link emailed to the same respondent. `GuestDraftRequest.php:113-115` records that
+  this channel checks the baseline **unconditionally**, so the 409 is reachable on every save. **Live.**
+- **`major` · The device-wide outbox is mounted above the phase machine on an unauthenticated page.**
+  `resources/public-runtime/App.vue:382-386` · `components/SyncStatus.vue:104-113` ·
+  `components/SubmissionOutbox.vue:96-186`. On the shared-kiosk hardware `lib/outbox.ts:9-18` names as the
+  threat, the next respondent sees the previous one's failed row — queue tag, server reference, creation
+  time — and, because `lib/outbox-status.ts:123-130` sets `canDiscard` on `needs_attention`, a **Discard**
+  button that permanently deletes their unsent response and media. The list is cross-form by design
+  (`outbox.ts:180-186`), so `SubmissionOutbox.vue:158-166` also discloses which other forms were answered
+  on that device. **Live.** The conflict-Review path into another respondent's answers is pre-existing; the
+  always-visible list and the per-row Discard are new here.
+- **`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`.**
+  `resources/js/composables/useServerAutosave.ts:425-431` sends a `keepalive` POST carrying a **stale**
+  `base_content_checksum` on an Inertia navigation during a save, so the server refuses it as
+  `draft_conflict` and the edits made during that request are silently dropped. **Live.**
+- **`minor` · The encode page's conflict refusal remounts and discards the editor's corrections.**
+  `resources/js/Pages/submissions/Encode.vue:709` returns the optimistic-concurrency refusal as a flash
+  toast rather than a validation error, so `preserveState` evaluates false and the page reloads from the
+  stored document. The docblock reasons only about the 422 path and gets the conflict path — the one the
+  machinery exists for — backwards. **Live.**
+
+### Gamification
+
+- **`major` · The backfill awards review points for two verbs the live engine never scores.**
+  `app/Services/Gamification/AuditReplayMap.php:160` maps every `('submission','updated')` audit row
+  carrying a `remarks` key to `PointRule::SubmissionReviewed`, but
+  `app/Services/Submissions/SubmissionReviewService.php:156-162` writes that row from **four** verbs and
+  `snapshot()` (`:189-200`) emits `remarks` unconditionally — so `markUnderReview` and `archive` score too.
+  One retention sweep of 400 archived rows hands the actor 1,200 points and the `reviewer` badge for
+  archiving. `point_awards` is append-only with **no DELETE policy** (ADR-0020 §D4), so the inflation is
+  permanent and feeds `TeamProgress` and the leaderboard for the life of the workspace. **Latent** until
+  `gamification:backfill` is run — which is a one-shot operator action nobody repeats. Not a double-award:
+  the unique index refuses the later real approval.
+- **`major` · `standing.of` discloses the workspace headcount with no permission at all.**
+  `app/Services/Gamification/MemberStanding.php:33`, emitted unconditionally at
+  `app/Http/Controllers/Tenant/AchievementsController.php:103` and
+  `app/Http/Resources/Api/V1/MemberProgressResource.php:41` (route `routes/api.php:440-442`, no `can:`
+  gate). The identical integer is `null`ed out of `/dashboard` for readers without `dashboard.org.view`
+  (`DashboardMetricsService.php:55,60`) and correctly withheld two fields away in the same payload
+  (`AchievementsController.php:115-120`). A Form Editor reads it on the page or via a mintable
+  `read:gamification` token. **Live.** ⚠️ **The fix may be a ratification rather than a patch** — ADR-0020
+  §D7 approves *"4th of 12"* for every member — but no document reconciles that with the dashboard's
+  deliberate withholding, and this increment's own controller argues the opposite principle three fields
+  earlier. One of the two has to move, explicitly.
+
+### SSO, auth & session
+
+- **`major` · AN EXPIRED IdP SIGNING CERTIFICATE KEEPS AUTHENTICATING ASSERTIONS FOREVER, WHILE THE
+  SETTINGS PAGE RENDERS IT AS EXPIRED.** `app/Services/Sso/SsoCertificateInspector.php:17-28` states it
+  outright; the behaviour lives at `app/Services/Sso/SsoSamlSettings.php:136` (passes
+  `x509certMulti.signing` with no validity constraint) and `SsoAssertionValidator.php:113` (the only
+  signature call, which adds none). A tenant's IdP rotates, nobody re-imports metadata — and nothing
+  prompts them to, because sign-in keeps working — then the retired private key is recovered from an HSM
+  backup, a key-escrow archive or a departed administrator's copy, and its holder mints an assertion for
+  any address and completes a login. The one surface an admin would consult **says the control is failing
+  while the control is in fact absent**. **Live.**
+  ⚠️ **THIS IS A RECORDED RESIDUAL, NOT A DISCOVERY** — `docs/security-threat-model.md` §8 and §9 item 18,
+  with the correct future shape already named (§D11's roll-up rule: refuse only when NO certificate in the
+  set is currently valid, applied on the login path). It is filed here because **this merge is where the
+  residual first ships to `main`**, and because the machinery already exists in the same file:
+  `SsoCertificateInspector::rollup()` (`:79-135`). The gap is one call from `SsoLoginService`, not an
+  increment of design. (`SsoMetadataParser::assertParsable()` correctly declines to check dates at
+  *import* — a rollover legitimately ships a not-yet-valid successor. Do not "fix" that half.)
+- **`major` · The "Log out" control on the email-verification page has no CSRF token, so it 419s.**
+  `resources/js/Pages/auth/VerifyEmail.vue:97-99` is a raw `<form method="POST" action="/logout">`; a
+  native submission carries no `_token` and no XSRF header (only Inertia's axios layer supplies them), and
+  `bootstrap/app.php:122` does not except `/logout`. Every newly registered account — and, since J3a
+  mounted `verified`, anyone who changes their email — is stranded on an interstitial whose only exit is
+  broken. **Live.** ⚠️ **Pre-existing since PR #6 and present on `main`**, but the correct twin ships one
+  file over (`auth/TwoFactorRequired.vue:42`, `<Link method="post" as="button">`) and this diff rewrites
+  the page immediately above it, explicitly to remove a lockout.
+- **`major` · ADR-0019 §D11 attributes a SAML 2FA decision to ADR-0016 §D22, which decides the opposite
+  polarity — and the as-built behaviour is recorded in no ADR at all.**
+  `docs/adr/0019-first-party-google-sign-in.md:247` (also `:28`, `:86`, `:320`, `:334`) quotes a sentence
+  that lives at `0016:168` under a different control; `0016:101` §D22 is about step-up and says it *"is
+  never exempted"*. The as-built bypass is real: `SsoLoginCompletionController.php:134` calls
+  `Auth::login($user)` with no `hasEnabledTwoFactorAuthentication()` fork, where
+  `app/Services/Auth/GoogleSessionStarter.php:57-68` does fork — and
+  `app/Http/Middleware/EnforceTenantTwoFactor.php:20-22` asserts *"Fortify already challenges an enrolled
+  user at login"*, which is **untrue for the SSO door**. **Live** as a documentation defect; the SAML
+  behaviour may well be the intended design, but it is currently recorded nowhere and mis-cited into code
+  at `SsoLoginCompletionController.php:52-54`.
+- **`minor` · `EnforceTenantTwoFactor` is absent from the `/api/v1` token-mint group.**
+  `routes/api.php:73-89` — an unenrolled member under `security.require_two_factor`, bounced from every
+  page, can still `POST /api/v1/auth/tokens` from the same session and use the bearer against Group B,
+  which carries no 2FA gate either. **Live.** ⛔ **DOWNGRADED FROM `blocker` TO `minor` ON VERIFICATION,
+  AND THE REASON IS THE ROW**: all six links hold, but the middleware is an **enrolment nudge by its own
+  docblock** (`app/Http/Middleware/EnforceTenantTwoFactor.php:33-52`), Fortify's own 2FA-enrolment routes
+  sit outside the same gate behind `password.confirm` — so the attacker already had a better path — and
+  the token's abilities are capped at the issuer's own RBAC. It is a defence-in-depth and consistency gap.
+  The code edit and the test edit are the same edit: mount it on Group A, and add a
+  `StepUpReauthenticationTest:115`-shaped route manifest so it cannot silently come off again. Group B
+  needs no gate — `routes/api.php:80-88`'s "gate the mint, not the bearer" argument applies verbatim.
+- **`minor` · Three admin POSTs bind `{tenant}` with no `whereUuid`.** `routes/admin.php:56-63` —
+  `suspend`, `reactivate` and `assign-plan`, while the two routes added around them pin the pattern and the
+  docblock justifying the omission is now stale. A malformed uuid 500s instead of 404ing. **Live.**
+
+### Design system
+
+- **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
+  brought back.** `packages/design-system/src/components/Combobox/Combobox.vue:353-358` —
+  `max-height: 22rem` + `overflow-y: auto`, with the highlight moved by `aria-activedescendant` only:
+  nothing calls `scrollIntoView`, the rows deliberately carry no `tabindex` (`:267-271`), and arrow keys are
+  `preventDefault`ed (`:176-192`) so they cannot scroll the region either. The command palette — the
+  component's primary consumer — renders up to 21 two-line options (`SearchService::PER_ENTITY_PREVIEW = 5`
+  × four arms + "See all"), and 22rem shows five or six. A sighted keyboard user then presses Enter blind.
+  **Live**, WCAG 2.4.7. No gate sees it: the stories seed four options, so axe's
+  `scrollable-region-focusable` never fires and happy-dom computes no layout.
+- **`major` · The stacked sort chip ships a 32px touch target in the one layout that exists only on the
+  touch band.** `packages/design-system/src/components/DataTable/DataTable.vue:488-495`, rendered only
+  below `@container (max-width: 56em)` (`:657-659`) where `thead` is `display: none`, so it is the *only*
+  sort affordance on an 834px tablet — 32px tall, 8px apart, wrapping. DSR §4.4 binds 44×44 with ≥8px
+  between hit areas, and four siblings in this same package already satisfy it with the prescribed
+  `::before` idiom (`Button.vue:102-114`, `Alert.vue:178-190`, `Checklist.vue:222-246`, `Toast.vue`).
+  **Live.** ⚠️ It does **not** fail WCAG 2.2 AA (SC 2.5.8's floor is 24×24), so axe stays green — what is
+  breached is the DSR's own stricter rule, and `docs/ux/exceptions-log.md` carries no entry for it.
+- **`minor` · The pending-state ring measures 2.33:1 (light) / 2.96:1 (dark) against its own ground** —
+  below WCAG 1.4.11's 3:1 for a non-text indicator — at
+  `packages/design-system/src/components/PasswordStrength/PasswordStrength.vue:212-218` and
+  `Checklist/Checklist.vue:289-295`, while both docblocks assert the glyph is the signifier. **Live.**
+
+### App UI
+
+- **`major` · Double-clicking "Create" provisions two spreadsheets in the tenant's Drive.**
+  `resources/js/components/integrations/SheetsRuleFields.vue:168,276-278` — `create()` has no `inFlight`
+  guard and `:disabled` is `destination !== null`, which stays false for the whole request, so `MdsButton`
+  renders no native `disabled`. **`Button.vue`'s own click guard does not cover this**: it calls
+  `stopPropagation()`, not `stopImmediatePropagation()`, and the consumer's `@click` falls through onto the
+  same element, so Vue runs both handlers. The second file is an orphan Meridian will never write to and
+  only the tenant can delete. **Live**, and the only `:loading` button in the tree that reaches a raw
+  `fetch` with an irreversible external side effect — every other one is Inertia, whose stream is
+  `maxConcurrent: 1, interruptible: true`.
+- **`minor` · The unearned-badge medallion disappears in dark mode.**
+  `resources/js/Pages/achievements/Index.vue:391` paints it with the *primitive* `--mds-neutral-100`, which
+  resolves to the card's own colour in dark — the only primitive-token reference in the whole of
+  `resources/js/Pages/`. **Live**, one token.
+- **`minor` · The top-nav search field never shows the active query on an Inertia arrival.**
+  `resources/js/components/shell/TopNav.vue:39` — `initialQuery` is a `computed` with no reactive
+  dependencies, so inside the persistent layout it evaluates once per full page load. **Live.**
+- **`minor` · The rule modal filters the rendered checkboxes but submits the unfiltered set.**
+  `resources/js/components/integrations/RuleFormModal.vue:114,194` — `availableEvents` narrows to
+  `submission.*` for a tabular grant while `submit()` sends `form.event_types` whole, so a pre-existing
+  non-submission event is unremovable from the UI and still sent. **Live.**
+
+### Test suite & CI gates
+
+- **`major` · The 16-page responsive scan asserts nothing about which page it landed on.**
+  `tests/e2e/responsive-axe.spec.ts:124-132` is `goto` → `forceTheme` → `assertClean` with no
+  `waitForURL`, `toHaveURL` or heading check — and every plan/module refusal in this app answers a web
+  request with `back()->with('toast')` (`bootstrap/app.php:315-334`), i.e. a 302 the goto follows
+  silently. `/achievements` is gated by `module:gamification` and `E2eSeeder` never enables the module —
+  it relies entirely on `ToggleableModules`' default — so flipping that default gives **six green scans of
+  the dashboard**. **Latent**, and the idiom is present everywhere else in the shard, including the
+  `filteredToZero` loop twenty lines below (`:154-163`) and `support/console.ts:34`. One line per test.
+- **`major` · The login and 2FA-challenge rate limiters are asserted by no test in the repository.**
+  `config/fortify.php:169-172` maps them by string and `FortifyServiceProvider.php:159,165` registers the
+  closures; Fortify `array_filter`s the middleware, so nulling either config value or renaming either
+  registration produces a route with **no throttle at all** — an exhaustible 6-digit TOTP and unmetered
+  credential stuffing, with nothing red. **Latent.** The project already guards exactly this elsewhere:
+  `SsoLoginWebTest.php:285` asserts every SAML limiter it names actually exists, precisely because a
+  `throttle:` alias naming an unregistered limiter *"resolves to an UNLIMITED PASSTHROUGH"*.
+- **`major` · Every accepted write in the answer-edit concurrency suite compares `null === null`.**
+  `tests/Feature/Submissions/SubmissionEditRoutesTest.php:62` ·
+  `tests/Feature/Submissions/SubmissionAnswerEditTest.php:579` — `SubmissionAnswerFactory` never stamps
+  `answers_content_checksum` while `SubmissionFinalizer.php:96` stamps it on every real submission, so
+  `baselineOf()` yields `''` → `null`. Drop the client token from the guard at
+  `SubmissionAnswerEditService.php:135` — the single most natural simplification of an optimistic-
+  concurrency check — and the suite stays fully green while post-submission editing is **permanently broken
+  for every submission that exists in production**. **Latent.** The file's own `submitForEdit()` helper
+  (`:750`) already produces production-shaped rows and is used by none of the concurrency cases.
+- **`major` · `GET /feedback/{report}/screenshot` serves PII and has no DENY test at all.**
+  `tests/Feature/Tenant/FeedbackTest.php:230` drives it as Owner only (200 with an image, 404 without);
+  `:154` establishes the sensitivity in the file's own words and asserts `is_pii => true`. The gate is real
+  today (`routes/tenant.php:429-430`, `can:feedback.view`) but it is a **separate** `Route::get` from the
+  index, whose refusal is the only one asserted. Drop or mistype that one middleware call and every member
+  can enumerate colleagues' screen captures. **Latent.** One `assertForbidden()` as a Viewer plus one
+  cross-tenant `assertNotFound` closes it.
+- **`major` · The queued half of `gamification:backfill` is asserted by job count alone.**
+  `tests/Feature/Gamification/BackfillCommandTest.php:80-92` — `Queue::assertPushed(…, 2)` inspects no
+  payload, and the queued loop (`BackfillGamificationCommand.php:119`) is the production default while only
+  the `--sync` loop (`:142`) is proven to pass a usable id. Dispatch the slug instead of the key, or hoist
+  the loop variable, and every workspace's historical points and badges are permanently absent — the
+  backfill is a one-shot operator action nobody re-runs — while the operator is told "2 workspace(s)
+  queued". **Latent.** Fix is a closure on `assertPushed`.
+- **`minor` · Neither structural lint gate fails on an empty scan.**
+  `scripts/constraint-boundary-lint.php:296-304` and `scripts/migration-lint.php:140` print the file count
+  and `exit(0)` regardless, so a discovery regression — a moved directory, a mistyped iterator root — is
+  indistinguishable from a clean run. **Live**, and it belongs with this project's standing lesson that a
+  gate nobody can tell is blind is a gate nobody is running.
+
+### Documentation & specs
+
+- **`major` · ADR-0001 claims `citext` and `pgcrypto` are enabled by default, covering case-insensitive
+  uniqueness for share slugs and user email.** `docs/adr/0001-postgresql-over-mysql.md:56` (restated `:83`,
+  `:127`). Only PostGIS is enabled, and `0001_01_01_000000_create_users_table.php:26` is a plain
+  case-sensitive unique with no lowercasing anywhere on the register/login path — so an engineer writing
+  auth, invite-dedupe or account-merge builds on a guarantee the database does not give. **Live.** This
+  branch corrected the adjacent `pg_trgm` bullet at `:128` and left `:56` asserting the opposite.
+- **`major` · Two of the ten rows in ADR-0002 §D3's isolation-control inventory describe unbuilt
+  mechanisms.** `docs/adr/0002-multi-tenancy-shared-db-rls.md:129` credits Reverb channel-authorization
+  callbacks that *"re-verify the requesting user's tenant membership"* — there is no broadcasting config,
+  no `routes/channels.php` and no dependency — and `:132` claims `tenant:{id}:…` Redis cache prefixing,
+  where `CACHE_STORE=database`, no KPI caching exists and the only `tenant:{…}` key in the tree is a queue
+  rate limiter. **Live.** Sharpened because the adjacent Jobs row *was* rewritten to as-built, training a
+  reader to treat uncorrected rows as verified.
+- **`major` · The audit spec's exhaustive `users` scope row omits the impersonation boundary events.**
+  `docs/audit-compliance-logging-spec.md` §1 (~`:28`) names `updated` and `permission_changed` only, while
+  `app/Services/Admin/ImpersonationService.php:389-406` records `impersonation_started` /
+  `impersonation_ended` against that same alias. A SIEM forwarder or retention rule built from the section
+  that exists to be exhaustive drops the highest-privilege events in the ledger. **Live.**
+- **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
+  in no document".** `docs/security-threat-model.md:100` (repeated `:216`; duplicated into
+  `docs/adr/0009:31,:83,:168,:290`). It is present on this branch at `.env.example:207-209` with an
+  ADR-0009 §D9 warning attached, and discussed in two more documents — so the register is wrong at the
+  moment it is ratified, and an operator planning an `APP_KEY` rotation is told not to look for the seam
+  that exists. **Live.** ⚠️ **Narrow it, do not close it**: the documented rotation *procedure* genuinely
+  is still absent.
+- **`major` · ACCESS-MATRIX's verification step 4 sends the reader to the platform host, which the same
+  document proves is a dead end.** `docs/ACCESS-MATRIX.md:446` says sign in at
+  `http://localhost:8080/login` as `viewer@demo.test` and inspect the sidebar; `:70-92` records the
+  measured finding that Fortify lands on `/dashboard` on the central host, `PreventAccessFromCentralDomains`
+  302s it to `/`, and walking to the subdomain afterwards does not rescue it. Step 5 two lines below
+  correctly uses a workspace host, so the inconsistency reads as intentional. **Live.**
+- **`major` · The README's frontend and design-system command blocks are host commands that cannot run on
+  the host.** `README.md:51-59` — `npm run build`, `type-check`, `ds:tokens`, `ds:storybook:build`, `ds:test`.
+  Only `npm run dev` carries the "(or use the `node` compose service)" parenthetical, and `:19` calls host
+  Node optional, so the rest read as host commands; `docs/TESTING-GUIDE.md:22-23` states the opposite (no
+  `pdo_pgsql`, no rolldown win32 binding). **Live**, on the platform the README explicitly documents.
+- **`major` · ADR-0017 says the threat model carries no SSO and no isolation-topology rows; it carries
+  both.** `docs/adr/0017-tenant-isolation-tiering.md:73`, refuted by
+  `docs/security-threat-model.md:170-178` (the SAML table) and `:49-52` (four isolation/extraction rows
+  that cite this very ADR). A reviewer using the ADRs as the map of what has been threat-modelled blocks
+  the merge on, or duplicates, work that already shipped. **Live** — the file was edited after P2b, so this
+  bullet was left behind rather than never revisited.
+- **`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
+  none.** `docs/piping-output-encoding-design.md:151` asserts *"zero `{!!` exists in application code
+  today"*, status "(holds)", and `:180` makes any second sink a contract change. The new
+  `resources/views/vendor/mail/html/header.blade.php:31,33` carries two — `:31` interpolating blind into an
+  HTML **attribute** (`alt="{!! trim($slot) !!}"`). Its premise that the slot arrived escaped does not hold:
+  `Markdown::withSecuredEncoding()` replaces the echo encoder with a three-character map that does not
+  include `"`, and the value is `$tenant->name`. **Latent** — no user-facing write route for `tenants.name`
+  was found — but the asserted invariant is false either way, and `BrandedMailRenderTest.php:122` only
+  pins the unquoted case.
+- **`major` · The data dictionary states "No CHECK pairs the two" for `audits.user_id` /
+  `acting_as_user_id`.** `docs/data-dictionary.md:630`, refuted by
+  `2026_08_09_000001_add_acting_as_user_id_to_audits.php:98-101`
+  (`audits_acting_as_not_self_check`). The doc recorded the migration's reasoning for the **rejected**
+  constraint (`:34`) rather than the one that shipped (`:40`), so a backfill or fixture setting
+  `acting_as_user_id = user_id` gets a 23514 from a constraint the canonical schema reference denies.
+  **Live**, and the section enumerates CHECKs exhaustively elsewhere, so the negative reads as complete.
+- **`major` · The corpus names a real third-party client and publishes an audit of its weaknesses.**
+  `docs/PRD.md:35`, `:39`; `docs/architecture/technical-architecture.md:376`; two hits each in
+  `docs/adr/0001` and `0002`; three in `PROGRESS_ARCHIVE.md` — naming `dev_pk_new` / "Purok Kalusugan",
+  built for the Philippine Department of Health, and describing its missing form versioning and its
+  `users.id === 1` god-mode. **Live** on a public repo. ⚠️ **Pre-existing on `main` and not introduced by
+  this diff — this merge does not change its exposure, which is why it is not a blocker.** Filed because
+  the merge is the natural last moment to make redaction a conscious decision rather than a default.
+- **`minor` · `/gamification/me` documents only `200`.** `openapi.json` — the route carries
+  `module:gamification` (`routes/api.php:440`), whose `ModuleDisabledException` answers **403** on a
+  supported user action (an owner switching the module off), and nothing inferred it because the endpoint
+  deliberately has no `can:` gate. Its sibling `/gamification/leaderboard` documents both. **Live.**
+- **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
+  `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
+  (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,
+  enforced by `EnforceTenantTwoFactor.php:91`). Anyone inventorying tenant configuration from the
+  dictionary omits a tenant-scoped security policy. **Live.**
+- **`minor` · ADR-0019 is the sole `Proposed` ADR in the directory, for a decision that is ratified and
+  fully built.** `docs/adr/0019-first-party-google-sign-in.md:23` against its own `:271`/`:282` and the
+  merged routes at `routes/google-auth.php:64,68`. 0014–0018 and 0020 are all `Accepted`, and both
+  `0018:49` and `0016:133` already treat 0019 as settled precedent. **Live**, one word.
+- **`minor` · A cluster of by-line citations went stale, several of them inside this branch.** Cheap
+  individually, listed together so one pass closes them: `docs/adr/0007:88,:106,:112` (six citations into
+  `TenantIsolation.php`, `Tenant.php`, `migration-lint.php`, `config/queue.php` — every one lands on
+  unrelated code, and they are the *only* evidence offered for §D3's load-bearing non-expressibility
+  claim); `docs/adr/0007:124,:29,:86,:190` (ADR-0002 §D6 moved to `:248` when this branch inserted +119
+  lines above it); `docs/adr/0009:21,:286` (a defect the code already fixed, and the code now points back
+  at the ADR as the remaining carrier); `docs/adr/0009:168` + `security-threat-model.md:100`
+  (`config/app.php:120-124`, not `:99-106`); `docs/adr/0009:168` again (the "stock `slack` block" pointer
+  now lands on the **Google sign-in** block this branch added — the exact conflation the sentence forbids);
+  `docs/adr/0016:133,:135,:147` (ADR-0019 §D6b, not §D7); `docs/adr/0020:43`; `docs/adr/0011:8,:111`
+  (`MdsTabs` exists as of J4c1); `docs/audit-compliance-logging-spec.md:54`;
+  `docs/piping-output-encoding-design.md:180`; `docs/offline-first-sync-design.md:128`;
+  `docs/data-dictionary.md:62` (§28, not §31 — the pointer currently lands on a note arguing the opposite
+  case); `docs/api-specification.md:179` (`read:audit_log` is orphaned four blockquotes below its table
+  and renders outside it); `docs/ux/design-system-reference.md:812,:843`;
+  `docs/pricing-feature-gating-matrix.md:56` (Business is seeded `unlimited`, not 25 endpoints);
+  `docs/PRD.md:13` (the ADR index stops at 0014; 0015–0020 exist); `docs/TESTING-GUIDE.md:57,:639` (three
+  forms and five forms, against four and six as seeded); `README.md:85-86` (contract and e2e are real
+  merge-blocking gates, not stubs; there is no `deploy` stage in `ci.yml` at all); and this file's own
+  `:105` and `:459`. **Live**, all documentary.

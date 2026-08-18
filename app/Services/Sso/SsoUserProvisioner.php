@@ -77,6 +77,17 @@ final class SsoUserProvisioner
                 throw SsoAuthenticationException::membershipSuspended($identity->email);
             }
 
+            // ⚠️ JIT MAY CREATE AN ACCOUNT; IT MAY NEVER ADOPT ONE. `resolveUserByEmail()` runs on
+            // `pgsql_auth` and sees every account in the deployment, and nothing requires that the address
+            // an IdP asserts belongs to a domain this workspace controls — so without this line an admin of
+            // any SSO-entitled workspace could assert a stranger's address and be signed in as them. See
+            // SsoAuthenticationException::existingAccountNotMember() for the full chain and for why the
+            // refusal is this narrow: a membership row of ANY status means this workspace has already made a
+            // decision about that person, and a brand-new address is unaffected.
+            if ($user !== null && $membership === null) {
+                throw SsoAuthenticationException::existingAccountNotMember($identity->email);
+            }
+
             $roleName = $this->roleFor($connection, $membership);
 
             // The JIT gate covers everything except completing an invitation: an invited person was

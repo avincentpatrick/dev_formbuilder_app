@@ -165,6 +165,36 @@ it('records the address once a verified signature has vouched for it', function 
     expect($failures[0]->subject_email)->toBe($stranger);
 });
 
+it('records the adoption refusal under its own reason, which the CHECK must accept', function (): void {
+    // ⚠️ THIS TEST IS ALSO THE MIGRATION'S TEST. `sso_auth_failures.reason` is CHECK-constrained to
+    // `SsoFailureReason::values()`, so M1's new case needs `2026_08_17_000104` to widen it; without that
+    // migration the guard would raise a 23514 *while being recorded* — the refusal would throw on the one
+    // endpoint anyone on the internet can post to. Asserting the row exists asserts the constraint accepts
+    // the value, which no unit test over the enum could do.
+    //
+    // JIT stays ON: this refusal outranks the JIT toggle, because it is about whose address it is rather
+    // than about whether this workspace provisions automatically.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $stranger = committedTenantIdentity('Ada Lovelace');
+
+    $request = startFailureLogin($this->tenant, $this->admin);
+
+    $this->post(FAILURE_LOG_ACS, [
+        'SAMLResponse' => (new FakeIdp(FAILURE_LOG_ACS, FAILURE_LOG_SP, $request->request_id))
+            ->as($stranger->email)
+            ->response(),
+    ])->assertNotFound();
+
+    $failures = recordedFailures($this->tenant, $this->admin);
+
+    expect($failures[0]->reason)->toBe(SsoFailureReason::ExistingAccountNotMember)
+        // A verified signature vouched for the address, so the admin gets to see WHO tried — which on this
+        // reason is the whole point: it is the one row that can mean somebody is probing for an account.
+        ->and($failures[0]->subject_email)->toBe($stranger->email)
+        ->and($failures[0]->reason->label())->not->toBe('')
+        ->and($failures[0]->reason->hint())->not->toBe('');
+});
+
 it('records nothing at all for a successful sign-in', function (): void {
     $request = startFailureLogin($this->tenant, $this->admin);
 

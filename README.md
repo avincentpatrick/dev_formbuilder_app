@@ -1,9 +1,13 @@
 # Meridian
 
 A multi-tenant SaaS form-builder / data-collection platform (a hybrid of Kobo-style research
-rigor and Fillout-style polish). This repository currently holds the **Phase 0 walking skeleton** —
-the CI-green foundation every later feature sits inside. The full architecture and design set lives
-in [`docs/`](docs/); current status and handoff notes live in [`PROGRESS.md`](PROGRESS.md).
+rigor and Fillout-style polish). Phases 0–3 have shipped: multi-tenancy on PostgreSQL row-level security,
+RBAC, the custom form engine (builder, publish/versioning, conditional logic and branching), the public
+offline-capable respondent runtime, manual encoding and review, webhooks and native connectors, analytics,
+custom domains, tenant branding, SAML SSO and first-party Google sign-in, and a points/badges/streaks
+engine. The full architecture and design set lives in [`docs/`](docs/); current status and handoff notes
+live in [`PROGRESS.md`](PROGRESS.md), and [`docs/TESTING-GUIDE.md`](docs/TESTING-GUIDE.md) walks the whole
+product by hand.
 
 ## Stack
 
@@ -21,7 +25,7 @@ public form runtime arrives in Phase 1–2.
 ## Quick start
 
 ```bash
-cp .env.example .env
+cp .env.example .env                    # ships CENTRAL_DOMAIN=localhost — see below, do not drop it
 docker compose up -d --build            # app, web (nginx), postgres, redis, mailpit, node (vite)
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
@@ -29,6 +33,11 @@ docker compose exec app php artisan migrate:fresh --seed
 ```
 
 - App: <http://localhost:8080>  ·  Mailpit UI: <http://localhost:8025>  ·  Vite/HMR: <http://localhost:5173>
+
+`CENTRAL_DOMAIN` must match `APP_URL`'s **host** (no port). It is what makes `localhost:8080` the *central*
+host — the super-admin console at `/admin/*`, the sign-in that is not a workspace, and the OAuth callbacks —
+while workspaces are its subdomains. Point it somewhere else and every `/admin/*` URL 404s *after* a
+successful sign-in, which looks like a broken build and is not.
 
 `migrate:fresh --seed` builds the **demo fixture** — two workspaces at <http://demo.localhost:8080> and
 <http://northwind.localhost:8080>, every role, six forms and ~90 days of submissions. Sign in as
@@ -48,15 +57,16 @@ docker compose exec app php artisan test
 docker compose exec app composer run quality      # Pint + Larastan L8 + thin-controller gate
 docker compose exec app composer run lint:fix     # auto-fix code style
 
-# Frontend
-npm run dev            # Vite dev server (or use the "node" compose service)
-npm run build          # production assets
-npm run type-check     # vue-tsc
+# Frontend — inside the container, like everything else. The Windows host has no `rolldown` win32
+# binding, so these fail on the host with a missing-native-module error rather than a useful one.
+# (The "node" service already runs `npm run dev` for you; the rest are on demand.)
+docker compose exec node npm run build          # production assets
+docker compose exec node npm run type-check     # vue-tsc
 
 # Design system
-npm run ds:tokens              # regenerate design tokens (dist/tokens.css + tokens.ts)
-npm run ds:storybook:build     # build the component library docs
-npm run ds:test                # axe every story (WCAG 2.2 AA)
+docker compose exec node npm run ds:tokens              # regenerate tokens (dist/tokens.css + tokens.ts)
+docker compose exec node npm run ds:storybook:build     # build the component library docs
+docker compose exec node npm run ds:test                # axe every story (WCAG 2.2 AA)
 ```
 
 ## Windows / Laragon gotchas
@@ -80,13 +90,18 @@ npm run ds:test                # axe every story (WCAG 2.2 AA)
 
 ## CI
 
-`.github/workflows/ci.yml` runs, per push/PR: static analysis + style + security (Pint, Larastan L8,
-thin-controller gate, `composer audit` / `npm audit` / gitleaks) → Pest on real PostgreSQL → frontend
-build & type-check → design-system axe (merge-blocking) → contract/e2e/deploy stages (present as stubs,
-filled in by later Phase-0 increments).
+`.github/workflows/ci.yml` runs six merge-blocking jobs per push/PR: static analysis + style + security
+(Pint, Larastan L8, thin-controller gate, `composer audit` / `npm audit` / gitleaks) → Pest on real
+PostgreSQL → frontend build & type-check → design-system axe → the OpenAPI contract check → Playwright
+end-to-end. All six are real; none is a stub.
 
-## What's next (Phase 0 increments)
+`deploy.yml` is a self-hosted Windows Server job that stays dormant until the repository variable
+`DEPLOY_ENABLED` is set to `true` (ADR-0005). Nothing deploys on merge until somebody turns it on.
 
-Tenancy + Row-Level Security → Auth + RBAC (Spatie teams, 5 roles) → design-system app shell →
-`form_versions` draft/publish → OpenAPI scaffold. Then the deferred form-engine spike (ADR-0004).
+## What's next
+
+The remaining work needs inputs this repository cannot supply itself: OCR (sample filled forms plus ground
+truth), file uploads and bulk import, payments (a Stripe account), the production Windows Server host, and
+the GDPR/legal/pricing decisions. Live third-party credentials — Google OAuth, Sheets, Airtable — are
+deployment inputs rather than scope; every path behind them is already built and tested against a fake.
 See [`PROGRESS.md`](PROGRESS.md).

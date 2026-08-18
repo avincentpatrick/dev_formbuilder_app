@@ -104,11 +104,19 @@ final class BadgeShelfService
     /**
      * `badge value => when it was earned`.
      *
-     * ⚠️ **A ROW WHOSE `badge` IS NOT A CATALOG CASE IS DROPPED RATHER THAN CRASHING THE PAGE.**
-     * `BadgeKey::tryFrom()`, not `from()`. The column is constrained by `badge_awards_badge_check`, which is
-     * generated from the enum, so today this cannot happen — but the one edit that would make it happen is
-     * REMOVING a case, which is a one-line change that leaves every historical row behind it. Losing a
-     * retired badge from the shelf is the right failure; a 500 on the achievements page is not.
+     * ⚠️ **A ROW WHOSE `badge` IS NOT A CATALOG CASE IS DROPPED STRUCTURALLY, AND THE GUARD THAT USED TO SAY
+     * SO HAS BEEN REMOVED FOR BEING DEAD.** The first draft filtered with `BadgeKey::tryFrom()` and read as
+     * though it were what kept a retired key off the shelf. It was not: {@see BadgeShelf::assemble()} walks
+     * `BadgeKey::cases()` and INDEXES this map by catalog key — it never iterates it — so a key the catalog
+     * no longer knows is simply never looked up. The mutation pass is what proved it: deleting the filter
+     * left `BadgeShelfServiceTest`'s retired-badge case green, because the map lookup was doing the work all
+     * along. A guard whose removal changes nothing is not defence, it is a claim about the code that is
+     * false — the K1d dead-`ORDER BY` shape. The behaviour is unchanged and is now pinned as a property of
+     * the assembly rather than of a filter that can be deleted without notice.
+     *
+     * Values are read as-is because the state is unreachable today anyway: `badge_awards_badge_check` is
+     * generated from the enum, so the only edit that could produce such a row is REMOVING a case — which
+     * leaves every historical row behind it, and which this reading survives.
      *
      * @return array<string, CarbonImmutable>
      */
@@ -118,10 +126,6 @@ final class BadgeShelfService
 
         foreach (DB::select(self::EARNED_SQL, [$tenantId, $userId]) as $row) {
             /** @var object{badge: string, awarded_at: string} $row */
-            if (BadgeKey::tryFrom((string) $row->badge) === null) {
-                continue;
-            }
-
             $map[(string) $row->badge] = CarbonImmutable::parse((string) $row->awarded_at);
         }
 
@@ -131,10 +135,14 @@ final class BadgeShelfService
     /**
      * `rule value => how many awards`.
      *
-     * `(int)` on the total because PostgreSQL returns `COUNT` as a string through PDO, and an unconverted
-     * count would compare and sort as text — where '9' outranks '10'. {@see LeaderboardService::totals()}
-     * carries the same conversion for the same reason, and this is the second place it bites: an unconverted
-     * total would put a member on 9 responses ahead of one on 10 in {@see BadgeShelf}'s nearest-first list.
+     * ⚠️ **THE `(int)` IS DEFENSIVE, NOT LOAD-BEARING, AND THE MEASUREMENT SAYS SO.** The received wisdom —
+     * repeated by {@see LeaderboardService::totals()} — is that PostgreSQL hands aggregates back as strings
+     * through PDO. **On this stack it does not**: `get_debug_type()` on both `COUNT(*)` and `SUM()` returns
+     * `int`, because pdo_pgsql fetches native types here. So a mutant deleting this cast SURVIVES, and it is
+     * recorded as an expected survivor rather than left to look like a coverage hole. The cast stays because
+     * it is free and it is right in the cases that would produce a string — `SUM()` over a `numeric` column
+     * returns `numeric`, which PDO does stringify — and because an unconverted total would sort as text,
+     * where '9' outranks '10', silently reordering {@see BadgeShelf}'s nearest-first list.
      *
      * ⚠️ Rules are NOT filtered to those a badge counts. {@see PointRule::SubmissionEdited} deliberately
      * earns no badge, so its group is read and then never looked up — which costs one row and keeps this

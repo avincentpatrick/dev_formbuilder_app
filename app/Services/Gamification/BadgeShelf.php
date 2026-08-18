@@ -92,8 +92,16 @@ final readonly class BadgeShelf
      * ⚠️ **TIES ARE REAL HERE AND ARE NOT A THEORETICAL CONCERN.** {@see BadgeAwarder} stamps every badge it
      * creates in one call with the **triggering award's** timestamp, so a single act crossing two tiers
      * writes two rows sharing an instant to the microsecond. `BadgeKey::forRule()` already orders those
-     * cheapest-first when awarding them; falling through to declaration order here reproduces that, so the
-     * pair reads in the order they were earned rather than in whichever order the rows came back.
+     * cheapest-first when awarding them, and declaration order reproduces that — so the pair reads in the
+     * order they were earned rather than in whichever order the rows came back.
+     *
+     * ⚠️ **BUT THE EXPLICIT FALLBACK BELOW IS REDUNDANT AS BUILT, AND THE MUTATION PASS IS WHAT ESTABLISHED
+     * IT — SO IT IS DOCUMENTED RATHER THAN LEFT TO READ AS THE THING PRODUCING THIS ORDER.** {@see assemble()}
+     * builds `$badges` by walking `BadgeKey::cases()`, so the input is ALREADY in catalog order, and PHP's
+     * sort has been stable since 8.0 — a comparator returning 0 therefore preserves it anyway. Replacing the
+     * fallback with `0` leaves every case green. It is kept, on the `LeaderboardService::roster()`
+     * belt-and-braces precedent, because it makes the ordering a property of THIS rule rather than of how
+     * its caller happens to build the list — but the next reader should know it is defence, not mechanism.
      *
      * @param  list<BadgeStanding>  $badges  in catalog order
      * @return list<BadgeStanding>

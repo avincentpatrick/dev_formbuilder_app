@@ -5,6 +5,9 @@ declare(strict_types=1);
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('serves the public welcome page through Inertia', function (): void {
+    // The `phase` prop this used to assert was the walking skeleton's ("Phase 0 — Foundations"); I6 replaced
+    // the stub with a real landing page, so the props are now `appName`, `registrationOpen` and
+    // `centralHost`. Host-by-host behaviour lives in `PlatformLandingTest`; this stays a bare route smoke.
     $this->withoutVite()
         ->get('/')
         ->assertOk()
@@ -13,5 +16,6 @@ it('serves the public welcome page through Inertia', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Welcome', false)
             ->has('appName')
-            ->has('phase'));
+            ->has('registrationOpen')
+            ->has('centralHost'));
 });

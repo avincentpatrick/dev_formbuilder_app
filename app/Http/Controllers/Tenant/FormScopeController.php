@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\AssignFormScopeRequest;
 use App\Models\Form;
+use App\Models\User;
 use App\Services\Forms\FormService;
 use Illuminate\Http\RedirectResponse;
 
@@ -29,7 +30,10 @@ final class FormScopeController extends Controller
     {
         $nodeId = $request->validated('scope_node_id');
 
-        $this->forms->assignScope($form, $nodeId === null ? null : (string) $nodeId);
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->forms->assignScope($form, $nodeId === null ? null : (string) $nodeId, $user);
 
         return back()->with('toast', [
             'type' => 'success',

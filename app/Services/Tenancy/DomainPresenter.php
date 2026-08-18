@@ -75,9 +75,19 @@ final class DomainPresenter
      * One domain row. `status`, `verification` and `awaiting_operator` are the resource's own vocabulary,
      * reproduced rather than reinvented (ADR-0012 turned the derivation into a word exactly once).
      *
+     * **Public since I7b, and the visibility boundary is exactly the point.** The super-admin console's
+     * tenant-detail page needs these rows for a tenant it is not "inside", and it calls `row()` DIRECTLY
+     * rather than {@see index()}. That is not a shortcut — `index()` is TENANT-REQUEST-ONLY. It calls
+     * `EntitlementService::feature()` and `$user->can()`, and BOTH resolve false on the central host where
+     * there is no tenant context, so reusing it there would silently report every workspace as un-entitled
+     * and un-manageable. `row()` touches only the {@see Domain} model, {@see TenantUrl::publicHost()} and
+     * two pure {@see CustomDomainService} helpers, so it is safe from anywhere the caller already holds the
+     * right rows — and `CustomDomainService::forTenant()` is itself context-free (`domains` is RLS-exempt;
+     * its explicit `where('tenant_id')` IS the isolation).
+     *
      * @return array<string, mixed>
      */
-    private function row(Domain $domain, string $publicHost): array
+    public function row(Domain $domain, string $publicHost): array
     {
         $token = (string) $domain->verification_token;
 

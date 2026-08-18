@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme } from './support/axe';
+import { forceTheme, settlePaint } from './support/axe';
 
 /*
  * The cross-form analytics page (Increment H24b2) — the app's first surface where a filter rail, four
@@ -37,6 +37,11 @@ const themes = ['light', 'dark'] as const;
 
 async function scanPane(page: Page, selector: string, label: string): Promise<void> {
     await page.mouse.move(0, 0);
+
+    // Wait for the un-hover to PAINT — see `support/axe.ts`'s `assertClean`: parking the pointer starts a
+    // transition on the control it left, and a scan issued on the same frame can read an intermediate
+    // foreground against a settled background. J2b's CI flaked on exactly that in `builder-axe`.
+    await settlePaint(page);
     const results = await new AxeBuilder({ page })
         .include(selector)
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -169,12 +174,50 @@ test('every chart on the page exposes an equivalent data table', async ({ page }
 
     for (let i = 0; i < (await bars.count()); i++) {
         const chart = bars.nth(i);
-        const rows = await chart.locator('.mds-bar__table tbody tr').count();
         const plotted = await chart.locator('.mds-bar__track').count();
+        const links = await chart.locator('.mds-bar__label--link').count();
 
-        // Equal, not merely non-zero: a table that lost a row is exactly the silent loss axe cannot see.
-        expect(rows, `bar chart ${i} tabulates every plotted category`).toBe(plotted);
+        if (links === 0) {
+            // A NON-interactive plot is `role="img"` — a LEAF, so nothing inside it reaches the
+            // accessibility tree and the sr-only table is its only text alternative.
+            // Equal, not merely non-zero: a table that lost a row is exactly the silent loss axe cannot see.
+            const rows = await chart.locator('.mds-bar__table tbody tr').count();
+            expect(rows, `bar chart ${i} tabulates every plotted category`).toBe(plotted);
+            continue;
+        }
+
+        /*
+         * ⚠️ AN INTERACTIVE PLOT PROVES MORE, NOT LESS — AND THIS BRANCH EXISTS BECAUSE J2d MADE THE FORM
+         * AXIS LINKABLE AND CI CAUGHT THE OLD ASSERTION. It would have been easy to relax the check into
+         * "a table OR some links" and move on; that would have retired a §D12 gate to make a change pass.
+         *
+         * The contract is unchanged — every chart exposes an equivalent in text — but the MECHANISM differs.
+         * One linked datum takes the plot out of `role="img"` (a link inside a leaf role would be
+         * unreachable, not merely unlabelled), which un-prunes every label and value into the accessibility
+         * tree and makes the sr-only table a DUPLICATE: leaving it in announces the whole dataset twice.
+         * So the alternative becomes the plot itself plus `.mds-bar__summary`, and this page additionally
+         * renders an unconditional paired `MdsDataTable`.
+         *
+         * All four are asserted, so the interactive path cannot silently lose its equivalent either.
+         */
+        expect(links, `bar chart ${i} links every plotted category it can`).toBeGreaterThan(0);
+        expect(
+            await chart.locator('.mds-bar__table').count(),
+            `bar chart ${i} drops its sr-only table when the plot is readable`,
+        ).toBe(0);
+        expect(
+            await chart.locator('.mds-bar__summary').count(),
+            `bar chart ${i} keeps a text summary once role="img" is gone`,
+        ).toBe(1);
+        expect(
+            await chart.locator('.mds-bar__label').count(),
+            `bar chart ${i} names every plotted category in the tree`,
+        ).toBe(plotted);
     }
+
+    // §D11/§D12's "nothing is hidden, only un-plotted" — the page's own table, which is what carries the
+    // full category list once an interactive chart stops shipping its own.
+    await expect(page.locator('.mds-table').first()).toHaveCount(1);
 });
 
 test('the filter rail keeps every grouped control inside a NAMED group', async ({ page }) => {

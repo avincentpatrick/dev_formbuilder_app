@@ -1,0 +1,174 @@
+<script setup lang="ts">
+/**
+ * Path context for a nested page (Increment J2a, DSR §3.4).
+ *
+ * §3.4's rule: used on any screen nested more than one level below a primary sidebar section — Forms →
+ * *[Form Name]* → Submissions → *[Response]*. Every crumb is a real link except the last, which is plain
+ * text carrying `aria-current="page"`. It mounts through `PageHeader`'s `breadcrumbs` slot.
+ *
+ * That slot has TWO consumers already — `Pages/forms/Analytics.vue` and `Pages/submissions/Encode.vue` —
+ * each rendering a single hand-rolled back link inside it. (An earlier draft of this docblock said "zero",
+ * which was wrong and materially so: those two need only their link swapped, while the four below sit
+ * outside `PageHeader` entirely and need the slot adopting first.)
+ *
+ * ⚠️ NO HTML TAG IS SPELLED WITH ANGLE BRACKETS ANYWHERE IN THIS COMMENT, AND THAT IS DELIBERATE — see
+ * `FilterBar.vue`'s docblock for the Storybook build failure that rule exists to prevent.
+ *
+ * ── Why this is a component and not six more scoped-CSS back links ─────────────────────────────────────
+ * Six pages hand-roll a single back link with its own class and its own rule set: the form analytics page
+ * and the encode screen (both inside the slot), plus the builder, the submission detail, the webhook detail
+ * and the connector rule detail (all four outside `PageHeader`). The exceptions log's own threshold —
+ * "three-plus undocumented deviations for the same need signal a missing shared component" — was crossed
+ * twice over before this existed.
+ *
+ * ── The last crumb is NOT a link, and that is the substantive contract ─────────────────────────────────
+ * A self-link is a WCAG 2.4.4 nuisance (a destination that goes nowhere) and, more practically, it makes
+ * the trail's tail indistinguishable from its body for anyone navigating by links. `aria-current="page"` is
+ * what tells a screen-reader user where in the trail they are; a trailing link with no `aria-current` reads
+ * as one more place to go. The component decides this from the item's POSITION rather than from an
+ * `href`-is-absent test, so a caller who passes an href for every crumb still gets a correct trail.
+ *
+ * ── The separator is decorative and must never be read out ─────────────────────────────────────────────
+ * It is `aria-hidden` and generated in CSS-free markup (a span, so it can carry the attribute — a `::after`
+ * would be announced by some screen readers as content). Left as a literal chevron glyph rather than an
+ * `MdsIcon`: at caption size an SVG stroke renders heavier than the surrounding text and the trail stops
+ * reading as one line.
+ *
+ * ── `linkComponent` — an SPA visit without this package importing a router (J2b) ────────────────────────
+ * A crumb renders as a bare anchor by default, which in an Inertia application is a full document load: the
+ * persistent app shell is rebuilt and every piece of long-lived client state re-initialises. This package
+ * imports nothing from Inertia and must not start, because Storybook renders it with no router present — so
+ * the consumer passes its own link element and the crumb renders through a dynamic component instead. The
+ * default is the string `'a'`, which is what keeps every existing story and the whole of `Breadcrumb.test.ts`
+ * correct unedited; those files passing untouched is the evidence this added a capability rather than
+ * changed a behaviour.
+ *
+ * ⚠️ It applies to the LINK crumbs only. The last crumb is not a link and must not become one — see the
+ * paragraph above; routing it through `linkComponent` would reintroduce exactly the self-link this component
+ * exists to refuse.
+ */
+import type { Component } from 'vue';
+
+export interface BreadcrumbItem {
+    label: string;
+    /**
+     * Omitted on any crumb that should render as text. The LAST item is always rendered as text whether or
+     * not it carries one — see the docblock.
+     */
+    href?: string;
+}
+
+withDefaults(
+    defineProps<{
+        items: BreadcrumbItem[];
+        /**
+         * Names the landmark. Defaults to "Breadcrumb", the conventional name; override only when a page
+         * renders two trails, because axe's `landmark-unique` distinguishes navigation landmarks by name.
+         */
+        ariaLabel?: string;
+        /**
+         * What a LINK crumb renders as. Defaults to a plain anchor; an Inertia application passes its own
+         * Link so a crumb is a client visit rather than a document load. The last crumb is unaffected — it
+         * is never a link. See the docblock: the default is load-bearing.
+         */
+        linkComponent?: Component | string;
+    }>(),
+    { linkComponent: 'a' },
+);
+
+function isLast(index: number, length: number): boolean {
+    return index === length - 1;
+}
+</script>
+
+<template>
+    <nav v-if="items.length > 0" class="mds-breadcrumb" :aria-label="ariaLabel ?? 'Breadcrumb'">
+        <!-- `role="list"` survives `list-style: none`, which Safari/VoiceOver otherwise strips list
+             semantics for. Load-bearing here: the separators are `aria-hidden` precisely BECAUSE the list
+             structure is what conveys the relationship, so losing that structure would leave a screen
+             reader with an unpunctuated run of words. -->
+        <ol class="mds-breadcrumb__list" role="list">
+            <li v-for="(item, index) in items" :key="`${index}-${item.label}`" class="mds-breadcrumb__item">
+                <component
+                    :is="linkComponent"
+                    v-if="item.href && !isLast(index, items.length)"
+                    class="mds-breadcrumb__link"
+                    :href="item.href"
+                >{{ item.label }}</component>
+                <span
+                    v-else
+                    class="mds-breadcrumb__current"
+                    :aria-current="isLast(index, items.length) ? 'page' : undefined"
+                >{{ item.label }}</span>
+
+                <span v-if="!isLast(index, items.length)" class="mds-breadcrumb__sep" aria-hidden="true">
+                    /
+                </span>
+            </li>
+        </ol>
+    </nav>
+</template>
+
+<style scoped>
+.mds-breadcrumb__list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--mds-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+}
+
+/*
+ * Wraps rather than scrolls, unlike MdsTabNav. A trail is read once and is rarely more than four crumbs, so
+ * a second line at 375px is cheaper than a scroll container the reader has to discover — and `flex-wrap`
+ * keeps the whole trail out of the document's horizontal scroll width, which `assertClean` fails on.
+ */
+.mds-breadcrumb__item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+/*
+ * `overflow-wrap: anywhere` on the LINK too, not only on the current crumb (J2b).
+ *
+ * J2a gave it to `__current` alone, on the reasonable assumption that the long, arbitrary, user-authored
+ * string in a trail is the page you are standing on. J2b is what made that false: a form's sub-pages read
+ * `Forms / {form title} / Builder`, so the tenant-authored text is now a middle crumb — and it is a LINK.
+ * `flex-wrap` breaks the trail between crumbs but cannot break inside one, so a long unspaced title would
+ * push past the viewport and fail `assertClean`'s horizontal-overflow check at 375px on the builder, the
+ * one screen with no room to give.
+ */
+.mds-breadcrumb__link {
+    color: var(--mds-color-text-secondary);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.mds-breadcrumb__link:hover {
+    color: var(--mds-color-text-body);
+    text-decoration: underline;
+}
+
+.mds-breadcrumb__link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
+}
+
+.mds-breadcrumb__current {
+    color: var(--mds-color-text-body);
+    font-weight: var(--mds-font-weight-medium);
+    overflow-wrap: anywhere;
+}
+
+.mds-breadcrumb__sep {
+    color: var(--mds-color-text-secondary);
+}
+</style>

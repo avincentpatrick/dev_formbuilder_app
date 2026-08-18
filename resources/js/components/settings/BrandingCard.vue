@@ -60,7 +60,7 @@ const props = defineProps<{
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
-const colorForm = useForm({ primary_color: props.branding.input_color ?? '#1C4B72' });
+const colorForm = useForm({ primary_color: props.branding.input_color ?? '#0E6FE8' });
 const logoInput = ref<HTMLInputElement | null>(null);
 
 /**
@@ -92,7 +92,7 @@ const previewMeasurements = computed(() =>
 watch(
     () => props.branding.input_color,
     (value) => {
-        colorForm.primary_color = value ?? '#1C4B72';
+        colorForm.primary_color = value ?? '#0E6FE8';
     },
 );
 
@@ -303,6 +303,31 @@ function removeLogo(): void {
 </template>
 
 <style scoped>
+/* Re-declared, not inherited (fixed in I5). Vue applies a parent's scope id to a child component's ROOT
+   node only, so `Settings/Index.vue`'s `<style scoped>` reaches `.settings-card` here and nothing inside
+   it — which is why this card's header rendered unstyled beside five identically-marked-up siblings from
+   H23a2 until now. `NotificationPreferencesCard.vue` carried the same block from the start and named this
+   file as the counter-example; every card on the page now declares it. */
+.settings-card {
+    max-width: 640px;
+}
+
+.settings-card__head {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    color: var(--mds-color-text-secondary);
+}
+
+.settings-card__title {
+    margin: 0;
+    font-family: var(--mds-font-family-display);
+    font-size: var(--mds-type-heading-3-font-size);
+    line-height: var(--mds-type-heading-3-line-height);
+    font-weight: var(--mds-type-heading-3-font-weight);
+    color: var(--mds-color-text-heading);
+}
+
 .branding__lede {
     margin: 0 0 var(--mds-space-4);
     color: var(--mds-color-text-secondary);
@@ -431,13 +456,13 @@ function removeLogo(): void {
    values are the real --mds-color-bg-surface in each theme (design-system-reference.md §2.2). */
 .branding__theme--light {
     background: #ffffff;
-    color: #0e1620;
+    color: #121a2a;
     border: 1px solid var(--mds-color-border-default);
 }
 
 .branding__theme--dark {
-    background: #123350;
-    color: #eaf1f6;
+    background: #1a2130;
+    color: #eff4fd;
 }
 
 .branding__theme-label {

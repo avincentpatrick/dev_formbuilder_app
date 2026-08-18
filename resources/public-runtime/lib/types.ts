@@ -132,6 +132,13 @@ export interface SchemaResponse {
         // so no cache-version bump is owed.
         confirmation_message?: string | null;
         confirmation_message_translations?: Record<string, string> | null;
+        // Increment I8b — whether this form requires a proof-of-work spam check before it accepts a
+        // submission. A HINT ONLY: `ApiClient.submit()` retries once on a 403 `challenge_required`, so
+        // correctness never depends on this reaching the client. That matters because `replay.ts` caches
+        // one SchemaResponse per slug per pass, so rows 2..n of a drain construct a client that never
+        // called fetchSchema(). Optional for the usual reason — the service worker can serve a manifest
+        // cached before I8b shipped, and absent must mean "off", which is what every form defaults to.
+        bot_challenge?: 'off' | 'proof_of_work';
     };
     version: {
         id: string;
@@ -307,6 +314,10 @@ export type ErrorKind =
     | 'refresh' // version superseded — re-mint + re-fetch schema
     | 'rate_limited' // 429 — back off
     | 'schedule' // 403 form_not_open/form_closed/max_responses_reached — show the schedule state (H12b)
+    // I8b — 403 challenge_required/challenge_failed. ⚠️ ITS OWN KIND ON PURPOSE: without it these fall to
+    // `terminal`, and replay.ts maps terminal to markNeedsAttention — PARKING THE ROW FOR A HUMAN, which
+    // is exactly wrong for a spam check that just needs re-solving. api-client re-solves and retries once.
+    | 'challenge'
     | 'terminal' // 401 invalid / 403 disabled / 404 — unrecoverable
     | 'unknown';
 
@@ -331,6 +342,13 @@ export interface DraftBlob {
 
 export interface SubmitResult {
     id: string;
+    /**
+     * The server-issued short handle, already grouped (`7K4M-2QXB`) — Increment J2e.
+     *
+     * The confirmation screen prints THIS rather than a code derived on the device, because a derived one is
+     * stored nowhere and so is unfindable by the tenant the respondent would quote it to.
+     */
+    reference: string;
     status: string;
     created: boolean;
 }
@@ -353,6 +371,12 @@ export interface SaveDraftPayload {
      * documented.
      */
     draftCurrentStep?: string | null;
+    /**
+     * The lost-update baseline (Increment P3a): the `answers_content_checksum` this device last saw, from the
+     * resume response or its own previous save. Omitting it is NOT the unguarded path — the server checks
+     * unconditionally on this channel, so a save with no base is refused against any draft that has one.
+     */
+    baseContentChecksum?: string | null;
     /** When set, "Save and finish later" also emails the resume link to this address. */
     guestContactEmail?: string | null;
     deviceId?: string | null;
@@ -368,6 +392,13 @@ export interface SaveDraftResult {
     resumeToken: string;
     resumeUrl: string;
     expiresAt: string;
+    /**
+     * The `answers_content_checksum` the server just wrote (Increment P3a) — this device's baseline for its
+     * NEXT save. Chaining it forward is what distinguishes a same-device autosave (silent) from a second
+     * device saving over answers it never saw (409 `draft_conflict`). Null only for a draft whose stored
+     * checksum predates the column.
+     */
+    contentChecksum: string | null;
 }
 
 /** Response of `GET /api/v1/public/drafts/{resumeToken}` — the saved state to restore (server tier). */
@@ -385,4 +416,10 @@ export interface ResumeDraftResult {
     /** A fresh short-lived SHARE token for the pinned version — the resumed session drives the ordinary endpoints. */
     shareToken: string;
     shareTokenExpiresAt: string;
+    /**
+     * The resuming device's opening lost-update baseline (Increment P3a) — read from the SAME row version as
+     * `answers`, so it describes exactly the state being restored. This is the value that makes a resumed
+     * session a first-class writer rather than one that clobbers whatever arrived while it was away.
+     */
+    contentChecksum: string | null;
 }

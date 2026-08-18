@@ -1,10 +1,19 @@
 {
     "shadow": {
         "0": { "value": "none" },
-        "1": { "value": "0 1px 3px 0 rgba(22, 33, 43, 0.05), 0 1px 2px -1px rgba(22, 33, 43, 0.04)" },
-        "2": { "value": "0 8px 22px -8px rgba(22, 33, 43, 0.12), 0 2px 6px -3px rgba(22, 33, 43, 0.06)" },
-        "3": { "value": "0 14px 30px -10px rgba(22, 33, 43, 0.14), 0 4px 10px -5px rgba(22, 33, 43, 0.08)" },
-        "4": { "value": "0 22px 44px -14px rgba(22, 33, 43, 0.18), 0 8px 16px -8px rgba(22, 33, 43, 0.10)" },
-        "5": { "value": "0 30px 60px -18px rgba(22, 33, 43, 0.22), 0 12px 24px -10px rgba(22, 33, 43, 0.12)" }
+        "1": { "value": "0 2px 4px 0 rgba(14, 111, 232, 0.06), 0 10px 26px -12px rgba(14, 111, 232, 0.22)" },
+        "2": { "value": "0 10px 20px -6px rgba(14, 111, 232, 0.20), 0 24px 48px -20px rgba(14, 111, 232, 0.26)" },
+        "3": { "value": "0 14px 30px -10px rgba(14, 111, 232, 0.24), 0 4px 10px -5px rgba(14, 111, 232, 0.14)" },
+        "4": { "value": "0 22px 44px -14px rgba(14, 111, 232, 0.28), 0 8px 16px -8px rgba(14, 111, 232, 0.18)" },
+        "5": { "value": "0 30px 60px -18px rgba(14, 111, 232, 0.32), 0 12px 24px -10px rgba(14, 111, 232, 0.20)" },
+
+        "accent": {
+            "value": "0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-primary-bg) 55%, transparent)",
+            "comment": "JR2 — the glow under a FILLED button. NOT a rung of the 0-5 ladder (DSR §2.5's strict ordering describes distance from the page; this describes a fill bleeding into its surroundings), so never substitute one for the other. Mixed off the live fill rather than a literal so a brand-themed tenant's button glows in THEIR accent, not a hard-coded blue. An engine without color-mix invalidates the whole declaration and the button renders flat — i.e. exactly as it did before JR2 — which is why no @supports guard is needed."
+        },
+        "danger": {
+            "value": "0 4px 12px -4px color-mix(in srgb, var(--mds-color-action-danger-bg) 55%, transparent)",
+            "comment": "JR2 — the same glow for the destructive fill. Two tokens rather than one parameterised by a local custom property, because two named tokens say what they are at the point of use and a parameterised one needs the reader to find where the parameter was set. (An earlier note here claimed the parameterised form would fail token-references.test.ts. It would not: that test is scoped to the `--mds-` prefix precisely so component-local properties are ignored, so an unprefixed `--glow-fill` would have been invisible to it. The decision stands; the reason given for it did not.)"
+        }
     }
 }

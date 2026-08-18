@@ -39,8 +39,16 @@ export interface ScopeNodeOption extends Option {
     is_active: boolean;
 }
 
+/**
+ * A form the report can be filtered to. Extends `Option` with the form's own page (J2d) — null when the
+ * reader cannot open it or it has been archived, so a chip degrades to plain text rather than a 404.
+ */
+export interface FormOption extends Option {
+    url: string | null;
+}
+
 export interface FilterOptions {
-    forms: Option[];
+    forms: FormOption[];
     scope_nodes: ScopeNodeOption[];
     locales: Option[];
     axes: Option[];
@@ -67,6 +75,12 @@ export interface BreakdownRow {
     key: string | null;
     label: string;
     count: number;
+    /**
+     * The bucket's own page, server-resolved (J2d). Non-null only on the `form` axis, and only for a form
+     * this reader can actually open — a soft-deleted form still gets a LABEL (the plot must name it) and
+     * never a url, because `/forms/{form}` would 404 on it.
+     */
+    url: string | null;
 }
 
 export interface Breakdown {
@@ -109,6 +123,24 @@ export interface Report {
     forms_accepting: number;
     week_starts_on: 'monday';
 }
+
+/**
+ * `AnalyticsReportBuilder::build()` verbatim — the Report MINUS the workspace-wide accepting count
+ * (Increment I10c). Derived from `Report` rather than declared separately so the two cannot drift.
+ *
+ * `forms_accepting` is absent because it answers "how many forms across your WHOLE visible set are accepting
+ * responses right now" — no range, no form selection. On `/forms/{form}/analytics` that would be a
+ * confidently wrong number sitting beside three correct ones.
+ */
+export type FormReport = Omit<Report, 'forms_accepting'>;
+
+/**
+ * Exactly what `AnalyticsChartsCard` reads (Increment I10c), so a surface with no accepting-count can reuse
+ * it. Narrowing the card's prop to this is type-only and changes nothing at runtime — `/analytics` passes a
+ * full `Report`, which is structurally assignable — and it makes the card's contract honest: it already read
+ * only these three keys.
+ */
+export type ChartsReport = Pick<Report, 'range' | 'series' | 'breakdown'>;
 
 /** AnswerValueAggregator::questions() verbatim. The picker ENCODES these refusals rather than deriving them. */
 export interface QuestionRow {

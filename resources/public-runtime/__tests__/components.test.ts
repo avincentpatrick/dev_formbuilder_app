@@ -6,13 +6,16 @@ import type { Bootstrap } from '../lib/types';
 import { field, schemaResponse, section } from './fixtures';
 
 const SUBMISSION_ID = '0192f1a2-b3c4-7d5e-8f90-1a2b3c4d5e6f';
+// Increment J2e — the server-issued handle now rides on the submit result and on the `submitted` emit, so a
+// fixture that omits it makes `reference` undefined on the confirmation screen rather than failing loudly.
+const SUBMISSION_REFERENCE = '7K4M-2QXB';
 
 function fakeClient(overrides: Partial<ApiClient> = {}): ApiClient {
     return {
         fetchSchema: vi.fn(async () => {
             throw new Error('unused in these tests');
         }),
-        submit: vi.fn(async () => ({ id: SUBMISSION_ID, status: 'submitted', created: true })),
+        submit: vi.fn(async () => ({ id: SUBMISSION_ID, reference: SUBMISSION_REFERENCE, status: 'submitted', created: true })),
         saveDraft: vi.fn(async () => ({
             id: SUBMISSION_ID,
             completenessPercent: 64,
@@ -85,7 +88,7 @@ describe('RuntimeSession (component wiring)', () => {
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
         // The second payload is Increment H6b's rendered confirmation copy — null here because this form
         // sets no `confirmation_message`, which is what keeps App.vue's hardcoded default in place.
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
 
         wrapper.unmount();
     });
@@ -595,7 +598,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, 'Thanks, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!']);
         wrapper.unmount();
     });
 
@@ -612,7 +615,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, 'Salamat, Ada!']);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!']);
         wrapper.unmount();
     });
 
@@ -623,7 +626,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
         wrapper.unmount();
     });
 
@@ -637,7 +640,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null]);
         wrapper.unmount();
     });
 

@@ -119,3 +119,97 @@ it('leaves the test.ping headline unchanged', function (): void {
     expect(slackSectionText($message))
         ->toBe('*Test message* — your form-builder workspace is connected to this channel.');
 });
+
+it('gives each I3 event its own headline instead of the generic Update arm', function (DomainEventType $type, string $expected): void {
+    $message = (new SlackMessageFormatter)->build(
+        ['event_type' => $type->value, 'occurred_at' => '2026-08-06T09:00:00Z', 'data' => ['form_id' => '0198-abc']],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/1'),
+    );
+
+    expect(slackSectionText($message))->toStartWith($expected);
+})->with([
+    [DomainEventType::SubmissionApproved, '*Submission approved*'],
+    [DomainEventType::SubmissionReturned, '*Submission returned to the respondent*'],
+    // I9c. Added to this hand-maintained dataset rather than left to the generic arm: without it the one
+    // event that means the recorded DATA changed would read '*Update* - a form' in the channel.
+    [DomainEventType::SubmissionUpdated, '*Submission answers edited*'],
+]);
+
+it('names the withdrawn approval on submission.updated, and only when it actually happened', function (): void {
+    $build = static fn (array $data): array => (new SlackMessageFormatter)->build(
+        ['event_type' => DomainEventType::SubmissionUpdated->value, 'occurred_at' => '2026-08-08T09:00:00Z', 'data' => $data],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    $withdrawn = $build(['form_id' => '0198-abc', 'submission_id' => 's-1', 'approval_withdrawn' => true]);
+    expect(json_encode($withdrawn))->toContain('approval withdrawn');
+
+    // A channel that saw '*Submission approved*' earlier has to be told that stopped being true; a channel
+    // watching an ordinary correction must NOT be told an approval was withdrawn.
+    $plain = $build(['form_id' => '0198-abc', 'submission_id' => 's-1', 'approval_withdrawn' => false]);
+    expect(json_encode($plain))->not->toContain('approval withdrawn');
+
+    // The `=== true` guard: on every OTHER event type the key is absent, and `null` must not read as
+    // 'no, it was not withdrawn' for an event that never had an opinion.
+    $absent = $build(['form_id' => '0198-abc', 'submission_id' => 's-1']);
+    expect(json_encode($absent))->not->toContain('approval withdrawn');
+});
+
+it('labels the submission.updated button View submission, not Open form', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::SubmissionUpdated->value,
+            'occurred_at' => '2026-08-08T09:00:00Z',
+            'data' => ['form_id' => '0198-abc', 'submission_id' => 's-1'],
+        ],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    expect($message['blocks'][2]['elements'][0]['text']['text'])->toBe('View submission');
+});
+
+it('labels the button by what it opens, not by whether it is submission.created', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::SubmissionApproved->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['form_id' => '0198-abc', 'submission_id' => 's-1'],
+        ],
+        new ConnectorEventContext('Intake', 'https://acme.test/submissions/s-1'),
+    );
+
+    // Before I3 this read `=== SubmissionCreated ? 'View submission' : 'Open form'`, so the new submission
+    // events would have shipped a button saying "Open form" that opened a submission.
+    expect($message['blocks'][2]['elements'][0]['text']['text'])->toBe('View submission');
+});
+
+it('escapes the invitee email in a member.invited headline', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::MemberInvited->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['email' => '<script>@evil.test', 'role' => 'form_editor'],
+        ],
+        new ConnectorEventContext(null, null),
+    );
+
+    // The first untrusted value this class has ever put in a headline. Doc #26 §5's three characters.
+    expect(slackSectionText($message))->toContain('&lt;script&gt;@evil.test')
+        ->and(slackSectionText($message))->not->toContain('<script>')
+        ->and(slackContextText($message))->toContain('as form editor');
+});
+
+it('omits the action block entirely for an event with no deep link', function (): void {
+    $message = (new SlackMessageFormatter)->build(
+        [
+            'event_type' => DomainEventType::MemberInvited->value,
+            'occurred_at' => '2026-08-06T09:00:00Z',
+            'data' => ['email' => 'newcomer@example.test', 'role' => 'reviewer'],
+        ],
+        new ConnectorEventContext(null, null),
+    );
+
+    foreach ($message['blocks'] as $block) {
+        expect($block['type'])->not->toBe('actions');
+    }
+});

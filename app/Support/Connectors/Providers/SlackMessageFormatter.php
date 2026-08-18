@@ -59,9 +59,20 @@ final class SlackMessageFormatter
             ? '*Test message* — your form-builder workspace is connected to this channel.'
             : match ($eventType) {
                 DomainEventType::SubmissionCreated => "*New submission* — {$formLabel}",
+                DomainEventType::SubmissionApproved => "*Submission approved* — {$formLabel}",
+                DomainEventType::SubmissionReturned => "*Submission returned to the respondent* — {$formLabel}",
+                // I9c. The headline says "answers", not "updated", because a channel reader seeing
+                // "*Submission updated*" cannot tell it apart from a status transition — and this is the one
+                // event that means the recorded DATA changed after the fact, which is the part worth
+                // interrupting someone for. The withdrawn-approval half rides in facts() below.
+                DomainEventType::SubmissionUpdated => "*Submission answers edited* — {$formLabel}",
                 DomainEventType::FormPublished => "*Form published* — {$formLabel}",
                 DomainEventType::FormOpened => "*Form opened for responses* — {$formLabel}",
                 DomainEventType::FormClosed => "*Form closed* — {$formLabel}",
+                // `member.invited` carries no form at all, so the shared $formLabel would read "a form".
+                DomainEventType::MemberInvited => '*Member invited* — '.self::mrkdwn(
+                    is_string($data['email'] ?? null) ? $data['email'] : 'a new member'
+                ).' was invited to your workspace.',
                 default => "*Update* — {$formLabel}",
             };
 
@@ -121,12 +132,36 @@ final class SlackMessageFormatter
             $facts[] = 'version '.$data['version_number'];
         }
 
+        if ($eventType === DomainEventType::MemberInvited && is_string($data['role'] ?? null)) {
+            $facts[] = 'as '.self::mrkdwn(str_replace('_', ' ', $data['role']));
+        }
+
+        // I9c — an edit to an APPROVED submission withdraws the approval and returns it to the queue. A
+        // channel that saw "*Submission approved*" earlier needs to be told that stopped being true, and a
+        // headline reading only "answers edited" does not say it. Guarded on `=== true` rather than a truthy
+        // check because the key is absent on every other event type, and `null` must not read as "no, it was
+        // not withdrawn" for an event that never had an opinion.
+        if ($eventType === DomainEventType::SubmissionUpdated && ($data['approval_withdrawn'] ?? null) === true) {
+            $facts[] = 'approval withdrawn — back to review';
+        }
+
         return $facts;
     }
 
+    /**
+     * The action button's words. Submission events open the submission; form-lifecycle events open the
+     * form. `member.invited` has no deep link at all ({@see ConnectorEventContextResolver}), so this is
+     * never reached for it — the button block is omitted entirely rather than pointed somewhere wrong.
+     */
     private function linkLabel(?DomainEventType $eventType): string
     {
-        return $eventType === DomainEventType::SubmissionCreated ? 'View submission' : 'Open form';
+        return match ($eventType) {
+            DomainEventType::SubmissionCreated,
+            DomainEventType::SubmissionApproved,
+            DomainEventType::SubmissionReturned,
+            DomainEventType::SubmissionUpdated => 'View submission',
+            default => 'Open form',
+        };
     }
 
     /**

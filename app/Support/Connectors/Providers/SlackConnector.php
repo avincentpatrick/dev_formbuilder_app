@@ -66,7 +66,8 @@ final class SlackConnector implements ConnectorProvider
         return ConnectorProviderKey::Slack;
     }
 
-    public function authorizeUrl(string $state, string $redirectUri): string
+    /** `$codeVerifier` is unused: Slack's OAuth v2 does not offer PKCE for a confidential client. */
+    public function authorizeUrl(string $state, string $redirectUri, string $codeVerifier): string
     {
         return self::AUTHORIZE_URL.'?'.http_build_query([
             'client_id' => (string) config('connectors.providers.slack.client_id'),
@@ -76,14 +77,15 @@ final class SlackConnector implements ConnectorProvider
         ]);
     }
 
-    public function exchangeCode(string $code, string $redirectUri): ConnectorGrant
+    /** `$codeVerifier` is unused — see {@see authorizeUrl()}; nothing was sent, so nothing is proved. */
+    public function exchangeCode(string $code, string $redirectUri, string $codeVerifier): ConnectorGrant
     {
         $body = $this->postForm(self::TOKEN_URL, [
             'client_id' => (string) config('connectors.providers.slack.client_id'),
             'client_secret' => (string) config('connectors.providers.slack.client_secret'),
             'code' => $code,
             'redirect_uri' => $redirectUri,
-        ], fn (string $error): ConnectorOAuthException => ConnectorOAuthException::exchangeFailed($error));
+        ], fn (string $error, bool $terminal = true): ConnectorOAuthException => ConnectorOAuthException::exchangeFailed($error, $terminal));
 
         return $this->grantFrom($body);
     }
@@ -95,7 +97,7 @@ final class SlackConnector implements ConnectorProvider
             'client_secret' => (string) config('connectors.providers.slack.client_secret'),
             'grant_type' => 'refresh_token',
             'refresh_token' => $refreshToken,
-        ], fn (string $error): ConnectorOAuthException => ConnectorOAuthException::refreshFailed($error));
+        ], fn (string $error, bool $terminal = true): ConnectorOAuthException => ConnectorOAuthException::refreshFailed($error, $terminal));
 
         return $this->grantFrom($body);
     }
@@ -163,7 +165,7 @@ final class SlackConnector implements ConnectorProvider
      * JSON), and converts a transport error or an `ok:false` body into the caller's exception.
      *
      * @param  array<string, string>  $form
-     * @param  callable(string): ConnectorOAuthException  $failure
+     * @param  callable(string, bool=): ConnectorOAuthException  $failure
      * @return array<string, mixed>
      */
     private function postForm(string $url, array $form, callable $failure): array
@@ -181,7 +183,11 @@ final class SlackConnector implements ConnectorProvider
                 ->asForm()
                 ->post($url, $form);
         } catch (ConnectionException) {
-            throw $failure('transport_error');
+            // NON-TERMINAL (H16a): a timeout says nothing about the credential, and the refresh sweep would
+            // otherwise mark the grant dead — clearing both tokens and pausing every rule — because Slack was
+            // briefly unreachable. See ConnectorOAuthException's `$terminal` docblock; every other Slack error
+            // code keeps the default, because they are all genuine refusals.
+            throw $failure('transport_error', false);
         }
 
         $body = $response->json();

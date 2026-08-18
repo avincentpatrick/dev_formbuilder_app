@@ -6,12 +6,19 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\UpdateAppearanceRequest;
+use App\Http\Requests\Tenant\UpdateNotificationPreferenceRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Branding\BrandingPresenter;
+use App\Services\Notifications\NotificationPreferenceResolver;
+use App\Services\Notifications\NotificationPresenter;
+use App\Services\Settings\AppSettingsPresenter;
+use App\Services\Sso\SsoConnectionPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Tenancy\CustomDomainService;
+use App\Support\Auth\PasswordConfirmation;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,12 +35,23 @@ use Stancl\Tenancy\Contracts\Tenant as TenantContract;
  * The current appearance is NOT passed as a page prop — it reaches the panel through the shared
  * `ui.theme` prop (HandleInertiaRequests), which the top-nav quick toggle reads too, so both surfaces
  * cannot disagree.
+ *
+ * ⚠️ THIS CONTROLLER RENDERS THE PAGE; IT DOES NOT OWN EVERY WRITE ON IT. The per-USER writes (appearance,
+ * notifications) are here because a user edits only their own account. The org-wide ones (drafts, branding,
+ * and I5's access/maintenance/modules) live on {@see TenantSettingsController} and {@see BrandingController}
+ * behind `can:tenant.settings.manage`. Reads are assembled here from one presenter per surface so this
+ * method stays a list of props rather than a page-assembly routine — `scripts/controller-gate.php` caps it
+ * at 250 lines and complexity 10, and a fifth surface built inline is what would breach that.
  */
 final class PreferencesController extends Controller
 {
     public function __construct(
         private readonly CustomDomainService $domains,
         private readonly BrandingPresenter $branding,
+        private readonly NotificationPresenter $notifications,
+        private readonly NotificationPreferenceResolver $notificationPreferences,
+        private readonly AppSettingsPresenter $appSettings,
+        private readonly SsoConnectionPresenter $sso,
     ) {}
 
     public function show(Request $request): Response
@@ -45,10 +63,20 @@ final class PreferencesController extends Controller
         $tenant = app(TenantContract::class);
 
         return Inertia::render('Settings/Index', [
+            // ⚠️ `needs_password_confirmation` IS NOT DECORATION — WITHOUT IT THE ENROLMENT PANEL RENDERS A
+            // BLANK QR CODE. Fortify's 2FA-management routes carry `password.confirm`, and TwoFactorSetup.vue
+            // reads the QR and the recovery codes as JSON sidecars — which RequirePassword answers with a
+            // bare 423 rather than the redirect a navigation would get. See {@see PasswordConfirmation}.
             'twoFactor' => [
                 'enabled' => $user->two_factor_secret !== null,
                 'confirmed' => $user->two_factor_confirmed_at !== null,
+                'needs_password_confirmation' => PasswordConfirmation::isStale($request),
             ],
+            // J3b: the password card on this page changes a password through the same
+            // `Password::defaults()` chain registration and reset use, so it renders the same checklist.
+            // Standing Rule 2 — a live checklist on the sign-up form but not on the change-password form
+            // is exactly the per-page divergence "one shared design system" exists to prevent.
+            'passwordPolicy' => PasswordPolicy::requirements(),
             // Tenant-level draft settings (H10). Only Owner/Admin (tenant.settings.manage) may edit; the page
             // hides the card otherwise. The effective value falls back to the 30-day default when unset.
             'draftSettings' => [
@@ -74,6 +102,26 @@ final class PreferencesController extends Controller
             // the per-row domain lifecycle did. `can_manage` hides the card for non-admins; `is_active`
             // vs `has_brand_color` is what lets it explain a downgraded tenant's stored-but-dormant brand.
             'branding' => $this->branding->forSettings($tenant, $user->can('tenant.settings.manage')),
+            // Per-type notification preferences (I4, §23). RESOLVED, never read raw: the table is sparse —
+            // a row exists only where someone diverged — so the card renders
+            // NotificationPreferenceResolver's answer, which fills every gap from NotificationType's
+            // defaults. `email_locked` is what lets the two site-owned types render their email control as
+            // unavailable instead of as a switch wired to nothing.
+            'notificationPreferences' => $this->notifications->preferences($user),
+            // App Settings (I5, PRD Feature #10) — Access / Maintenance / Modules / About in ONE prop from
+            // ONE presenter, rather than four more assembled here. Every value is RESOLVED (the `settings`
+            // table is sparse), and `can_manage` gates the first three cards; About renders for everyone.
+            'appSettings' => $this->appSettings->forSettings($tenant, $user),
+            // Single sign-on (P1a, ADR-0016) — a LINK, like customDomains above and for a related reason,
+            // but with a WIDER condition and the difference matters. That card can wait for `count > 0`
+            // because /domains also has a sidebar entry covering the entitled-but-empty case; SSO has no nav
+            // entry at all (§D6, an Enterprise-gated row would be invisible everywhere), so this card is the
+            // ONLY way in and must render for an entitled tenant that has configured nothing yet. The
+            // `configured` half is then the same downgrade escape hatch the domains card provides.
+            //
+            // One query, on this page only, and skipped entirely for a non-manager — the presenter returns
+            // early rather than reading `sso_connections` for someone who could not act on it anyway.
+            'sso' => $this->sso->settingsCard($user, $tenant),
         ]);
     }
 
@@ -92,5 +140,26 @@ final class PreferencesController extends Controller
         UserUiPreference::updateOrCreate(['user_id' => $user->id], $request->toColumns());
 
         return back()->with('status', 'appearance-updated');
+    }
+
+    /**
+     * One notification type's channels for the acting user — ALWAYS BOTH BOOLEANS.
+     *
+     * Note the deliberate divergence from {@see self::updateAppearance()} directly above, whose every field
+     * is `sometimes`: there the four axes are independent, here the pair is a single §23 row and a partial
+     * write would lean on the columns' `default true`, silently opting the user into the one type the PRD
+     * says to keep quiet. That guarantee lives in {@see UpdateNotificationPreferenceRequest} and in
+     * {@see NotificationPreferenceResolver::set()}, not here.
+     */
+    public function updateNotifications(UpdateNotificationPreferenceRequest $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $channels = $request->toChannels();
+
+        $this->notificationPreferences->set($user, $request->type(), $channels['in_app'], $channels['email']);
+
+        return back()->with('status', 'notifications-updated');
     }
 }

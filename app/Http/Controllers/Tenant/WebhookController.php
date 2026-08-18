@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Enums\WebhookEndpointStatus;
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\StoreWebhookRequest;
 use App\Http\Requests\Tenant\UpdateWebhookRequest;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
+use App\Services\Entitlements\EntitlementService;
 use App\Services\Webhooks\WebhookEndpointPresenter;
 use App\Services\Webhooks\WebhookEndpointService;
 use App\Services\Webhooks\WebhookTester;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -34,6 +37,8 @@ use Inertia\Response;
  */
 final class WebhookController extends Controller
 {
+    use ReadsKeywordFilter;
+
     public function __construct(private readonly WebhookEndpointService $service) {}
 
     /** The endpoints list, plan cap/quota summary, and create-modal option catalogs. */
@@ -42,16 +47,23 @@ final class WebhookController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('webhooks/Index', $presenter->index($user));
+        return Inertia::render('webhooks/Index', $presenter->index($user, $this->keyword($request)));
     }
 
     /** One endpoint's detail + its paginated delivery log + the edit-modal catalogs. */
-    public function show(Request $request, WebhookEndpoint $webhookEndpoint, WebhookEndpointPresenter $presenter): Response
-    {
+    public function show(
+        Request $request,
+        WebhookEndpoint $webhookEndpoint,
+        WebhookEndpointPresenter $presenter,
+        EntitlementService $entitlements,
+    ): Response {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('webhooks/Show', $presenter->show($user, $webhookEndpoint));
+        return Inertia::render('webhooks/Show', [
+            ...$presenter->show($user, $webhookEndpoint),
+            'crumbs' => CrumbTrail::webhooks($user, $entitlements)->current($webhookEndpoint->name),
+        ]);
     }
 
     /** Create an endpoint, then land on its Show page with the plaintext secret flashed for a one-time reveal. */

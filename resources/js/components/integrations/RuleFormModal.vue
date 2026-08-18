@@ -23,7 +23,9 @@ import {
 } from '@meridian/design-system';
 import { fetchChannels } from './integrationsClient';
 import { CHANNEL_PLACEHOLDER, channelWarning, toChannelOptions } from './channel-options';
-import type { Channel, Option, RuleRow } from './types';
+import SheetsRuleFields from './SheetsRuleFields.vue';
+import AirtableRuleFields from './AirtableRuleFields.vue';
+import type { Channel, DestinationKind, Option, RuleRow } from './types';
 
 const props = defineProps<{
     open: boolean;
@@ -31,6 +33,17 @@ const props = defineProps<{
     forms: Option[];
     eventTypes: Option[];
     rule?: RuleRow | null;
+    /** The grant's provider key (H16b). Absent behaves as Slack, which is the pre-H16b shape. */
+    provider?: string | null;
+    /**
+     * The shape of this grant's destination (H16c), resolved server-side.
+     *
+     * ⚠️ EVERY BEHAVIOURAL BRANCH BELOW READS THIS, NOT `provider`. Until H16c the modal asked
+     * `provider === 'google_sheets'` — the front end's only provider literal — which would have handed an
+     * Airtable grant Slack's channel picker, Slack's event list and Slack's `config` shape. Absent behaves as
+     * `channel`, which is the pre-H16b shape.
+     */
+    destinationKind?: DestinationKind | null;
 }>();
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -69,6 +82,48 @@ const channelError = computed<string | undefined>(
     () => (form.errors as Record<string, string | undefined>)['config.channel_id'],
 );
 
+/** H16b — a tabular provider swaps the channel picker for a destination + column map. */
+const isTabular = computed<boolean>(() => props.destinationKind === 'tabular');
+
+/**
+ * WHICH tabular editor. This is the one thing capabilities cannot answer, and saying so is more useful than
+ * pretending otherwise: two providers whose destinations are shaped differently need two components, and only
+ * the provider identifies which. It is ONE map in ONE place rather than a branch per behaviour, and a fourth
+ * provider that reuses an existing destination shape needs no entry at all.
+ */
+const tabularEditor = computed(() => (props.provider === 'airtable' ? AirtableRuleFields : SheetsRuleFields));
+
+type TabularDraft = {
+    spreadsheet_id: string;
+    spreadsheet_title: string;
+    sheet_name: string;
+    /** Airtable's stable table id. Sheets sends none, and the server stores null. */
+    sheet_id?: string | null;
+    columns: { header: string; field_key: string | null }[];
+};
+
+const sheetsDraft = ref<TabularDraft | null>(null);
+
+/**
+ * ⚠️ THE EVENT LIST IS NARROWED, NOT JUST STYLED — and the server enforces the same rule in `after()`.
+ * Only `submission.*` events carry a submission id, and a spreadsheet row IS a submission's answers, so a
+ * `form.published` rule on a sheet is undeliverable by construction. Offering the checkbox and rejecting the
+ * save would be worse than either: `SubscriptionConfigRules::eventTypeGuard()` exists so a rule that cannot
+ * work never reaches the ledger, and this exists so the tenant never ticks the box in the first place.
+ */
+const availableEvents = computed<Option[]>(() =>
+    isTabular.value ? props.eventTypes.filter((opt) => opt.value.startsWith('submission.')) : props.eventTypes,
+);
+
+const selectedFormTitle = computed<string | null>(
+    () => props.forms.find((f) => f.value === form.form_id)?.label ?? null,
+);
+
+/** Dotted server errors, passed down so the sheet fields can render them against the right control. */
+const dottedErrors = computed<Record<string, string | undefined>>(
+    () => form.errors as Record<string, string | undefined>,
+);
+
 const channelOptions = computed<Option[]>(() => toChannelOptions(channels.value, form.channel_id));
 const warning = computed<string | null>(() => channelWarning(channels.value, form.channel_id));
 /** No usable list — fall back to a raw id field rather than an empty select nobody can satisfy. */
@@ -76,6 +131,10 @@ const manualChannel = computed<boolean>(() => channelsLoaded.value && !channelsL
 
 async function loadChannels(force = false): Promise<void> {
     if (!props.connectionId) return;
+    // This picker serves CHANNEL destinations only. A tabular editor fetches its own destination list — the
+    // Airtable one calls the very same sidecar for bases — so firing here as well would double the request
+    // and leave the result somewhere nothing renders it.
+    if (isTabular.value) return;
     if (channelsLoaded.value && !force) return;
 
     channelsLoading.value = true;
@@ -134,13 +193,26 @@ function submit(): void {
         name: data.name,
         event_types: data.event_types,
         form_id: data.form_id === '' ? null : data.form_id,
-        config: {
-            channel_id: data.channel_id,
-            // The label the tenant picked, so the list can read "#general" without re-querying the provider.
-            // Null when it was typed by hand — there is no name to know.
-            channel_name:
-                channels.value.find((c) => c.id === data.channel_id)?.label.replace(/^#/, '') ?? null,
-        },
+        config: isTabular.value
+            ? {
+                  spreadsheet_id: sheetsDraft.value?.spreadsheet_id ?? '',
+                  spreadsheet_title: sheetsDraft.value?.spreadsheet_title ?? null,
+                  sheet_name: sheetsDraft.value?.sheet_name ?? null,
+                  // Null rather than absent for a provider without one, so a PATCH cannot leave a stale id
+                  // behind: `config` is replaced WHOLESALE, and an omitted key would simply vanish.
+                  sheet_id: sheetsDraft.value?.sheet_id ?? null,
+                  // No `fingerprint` — the server derives it from these headers through
+                  // `ColumnMapping::author()`. Sending one from here would be a second implementation of
+                  // `ColumnFingerprint`'s normalisation, kept in step by nothing.
+                  mapping: sheetsDraft.value ? { columns: sheetsDraft.value.columns } : null,
+              }
+            : {
+                  channel_id: data.channel_id,
+                  // The label the tenant picked, so the list can read "#general" without re-querying the
+                  // provider. Null when it was typed by hand — there is no name to know.
+                  channel_name:
+                      channels.value.find((c) => c.id === data.channel_id)?.label.replace(/^#/, '') ?? null,
+              },
     }));
 
     const options = { preserveScroll: true, onSuccess: () => close() };
@@ -169,10 +241,16 @@ function submit(): void {
             <!-- A checkbox GROUP → fieldset/legend (not FormField, which owns a single label→control). -->
             <fieldset class="rule-form__group">
                 <legend class="rule-form__legend">Events</legend>
-                <p class="rule-form__help">Which events get posted to the channel.</p>
+                <p class="rule-form__help">
+                    {{
+                        isTabular
+                            ? 'Which submissions get a row. Only submission events carry answers, so only those can be written to a spreadsheet.'
+                            : 'Which events get posted to the channel.'
+                    }}
+                </p>
                 <div class="rule-form__events">
                     <MdsCheckbox
-                        v-for="opt in eventTypes"
+                        v-for="opt in availableEvents"
                         :key="opt.value"
                         :model-value="form.event_types.includes(opt.value)"
                         :label="opt.label"
@@ -184,7 +262,22 @@ function submit(): void {
                 </p>
             </fieldset>
 
+            <!-- The destination editor for this grant. `:is` rather than a v-if chain (H16c): the two editors
+                 take an identical prop set and emit an identical `change`, so a chain would repeat six
+                 bindings per provider and be the thing that drifts when a seventh is added. -->
+            <component
+                :is="tabularEditor"
+                v-if="isTabular"
+                :connection-id="connectionId"
+                :form-id="form.form_id"
+                :form-title="selectedFormTitle"
+                :rule="rule"
+                :errors="dottedErrors"
+                @change="sheetsDraft = $event"
+            />
+
             <MdsFormField
+                v-else
                 v-slot="{ id, describedby, invalid }"
                 label="Channel"
                 :help="manualChannel ? 'Paste the channel id from Slack (Channel details → the ID at the bottom).' : 'Only public channels are listed.'"
@@ -227,7 +320,11 @@ function submit(): void {
                 </div>
             </MdsFormField>
 
-            <p class="rule-form__status" role="status" aria-live="polite">
+            <!-- Not rendered for a tabular provider: the destination editor owns its own always-present live
+                 region, and two competing `aria-live` regions on one form is worse than one — this one would
+                 be permanently empty, which is exactly the "region with nothing to say" the H15b note warns
+                 about, doubled. -->
+            <p v-if="!isTabular" class="rule-form__status" role="status" aria-live="polite">
                 <template v-if="channelsLoading">
                     <MdsSpinner size="sm" label="Loading channels" />
                     Loading channels…

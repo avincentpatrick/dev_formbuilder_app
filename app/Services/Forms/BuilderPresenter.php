@@ -27,6 +27,13 @@ use Illuminate\Support\Collection;
 final class BuilderPresenter
 {
     /**
+     * The share block moved to {@see FormSharePresenter} in J2b, unchanged, because the form hub needs the
+     * same payload and two encodings of "what is this form's public link" is J1e's audit-export defect over
+     * again. `BuilderRoutesTest` and `ShareModal.test.ts` pass unedited, which is the proof it moved nothing.
+     */
+    public function __construct(private readonly FormSharePresenter $share) {}
+
+    /**
      * @return array<string, mixed>
      */
     public function present(Form $form): array
@@ -75,6 +82,7 @@ final class BuilderPresenter
                 'default_locale' => $form->default_locale,
                 'supported_locales' => $form->supported_locales === [] ? [$form->default_locale] : array_values($form->supported_locales),
             ],
+            'share' => $this->share->present($form),
             'draft' => $draft ? [
                 'id' => $draft->id,
                 'version_number' => $draft->version_number,

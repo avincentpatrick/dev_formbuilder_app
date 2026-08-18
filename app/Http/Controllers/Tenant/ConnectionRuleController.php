@@ -15,6 +15,8 @@ use App\Policies\ConnectionSubscriptionPolicy;
 use App\Services\Connectors\ConnectionPresenter;
 use App\Services\Connectors\ConnectionSubscriptionService;
 use App\Services\Connectors\ConnectorTester;
+use App\Services\Entitlements\EntitlementService;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -37,12 +39,19 @@ final class ConnectionRuleController extends Controller
     public function __construct(private readonly ConnectionSubscriptionService $service) {}
 
     /** One rule's detail + its paginated delivery log from the shared ledger + the edit-modal catalogs. */
-    public function show(Request $request, ConnectionSubscription $connectionSubscription, ConnectionPresenter $presenter): Response
-    {
+    public function show(
+        Request $request,
+        ConnectionSubscription $connectionSubscription,
+        ConnectionPresenter $presenter,
+        EntitlementService $entitlements,
+    ): Response {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('integrations/RuleShow', $presenter->ruleShow($user, $connectionSubscription));
+        return Inertia::render('integrations/RuleShow', [
+            ...$presenter->ruleShow($user, $connectionSubscription),
+            'crumbs' => CrumbTrail::integrations($user, $entitlements)->current($connectionSubscription->name),
+        ]);
     }
 
     /** Create a rule on a grant, then land on its detail page. */

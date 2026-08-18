@@ -95,10 +95,23 @@ const EXEMPT_JOBS = [
     'App\Notifications\ResumeLinkNotification',
     'App\Notifications\Webhooks\WebhookAutoDisabledNotification',
     'App\Notifications\Connectors\ConnectionRevokedNotification',
+    // H16a. The sibling of the line above for the case where the GRANT is healthy and one rule's DESTINATION
+    // is not (column drift, an unreachable spreadsheet). Same shape, same rules: two scalars, on-demand
+    // notifiable, QueueName::Mail. Separate from ConnectionRevokedNotification because its advice differs —
+    // "re-map the columns", not "reconnect your account".
+    'App\Notifications\Connectors\ConnectorRulePausedNotification',
     // H17. Same shape as its six siblings above, with one payload difference worth noting: it also
     // carries a BACKED ENUM (SubmissionPdfOutcome), which R3 admits explicitly. It is the first of
     // these to report a SUCCESS rather than a failure, which changes nothing about the payload rules.
     'App\Notifications\Submissions\SubmissionPdfReadyNotification',
+    // I3. The notification substrate's email arm — ONE class for the whole NotificationType catalog rather
+    // than one per case, so the copy lives in a pure support class and this carries only scalars plus the
+    // backed enum R3 admits. Same on-demand-notifiable, resolved-in-request shape as every sibling above.
+    'App\Notifications\EventNotification',
+    // J3a. The one email in this application that asks for nothing — sent on `Verified`, not `Registered`,
+    // so it does not land beside the verification link it is the reward for. Three builtin scalars, product
+    // palette (the QueuedVerifyEmail argument verbatim), on-demand notifiable. Same shape as every sibling.
+    'App\Notifications\Auth\WelcomeNotification',
 ];
 
 $root = dirname(__DIR__);

@@ -22,6 +22,7 @@ use App\Services\Forms\BuilderPresenter;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\StepGraphInspector;
 use App\Support\Forms\GraphNotice;
+use App\Support\Navigation\CrumbTrail;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,9 +43,25 @@ final class FormBuilderController extends Controller
         private readonly BuilderPresenter $presenter,
     ) {}
 
-    public function show(Form $form): Response
+    /**
+     * ⚠️ `Request` IS HERE ONLY FOR THE TRAIL, and only `show()` gained it — the JSON mutation methods below
+     * read nothing about who is asking (`can:update,form` on the route is the whole authorization story).
+     *
+     * The builder takes the BREADCRUMB and not the tab strip (user decision, J2b): it is a three-pane
+     * workspace on a `height: 100%` grid, and a second ~44px header row costs the one screen that cannot
+     * spare it. So this trail is the builder's only way back, which is why its hub crumb being hard-coded
+     * mattered — `can:update,form` does not imply `viewOverview`, it merely coincides with it for all five
+     * shipped roles.
+     */
+    public function show(Request $request, Form $form): Response
     {
-        return Inertia::render('forms/Builder', $this->presenter->present($form));
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('forms/Builder', [
+            ...$this->presenter->present($form),
+            'crumbs' => CrumbTrail::forms($user)->form($form)->current('Builder'),
+        ]);
     }
 
     // ── Sections ─────────────────────────────────────────────────────────────────

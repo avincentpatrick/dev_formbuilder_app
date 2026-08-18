@@ -21,7 +21,17 @@ withDefaults(
 </template>
 
 <style scoped>
+/* ⚠️ `position: relative` IS LOAD-BEARING. The visually-hidden node below is `position: absolute` +
+   `clip: rect(0 0 0 0)`, and absolute positioning resolves against the nearest POSITIONED ancestor —
+   so without this line its containing block is whatever happens to be positioned further up, no
+   scroll container in between can clip it, and a 1px hidden node parked past a viewport edge extends
+   the DOCUMENT's scrollable box. G11 found it on `MdsDataTable`, JR5 on `MdsSegmentedControl`, and
+   J3b found it still latent HERE while building `MdsPasswordStrength` against the same hazard.
+   Nothing in this repository can execute the check (happy-dom lays nothing out; the e2e assertion
+   reads a `scrollWidth` that `.app-shell { overflow-x: clip }` pins flat; axe has no rule), which is
+   why it stayed latent through four increments and why the guard is a source-text test. */
 .mds-spinner {
+    position: relative;
     display: inline-flex;
     align-items: center;
 }

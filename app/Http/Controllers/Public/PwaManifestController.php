@@ -38,7 +38,7 @@ use Illuminate\Support\Str;
  */
 final class PwaManifestController extends Controller
 {
-    private const BACKGROUND_COLOR = '#F3F4F1'; // --mds-neutral-50
+    private const BACKGROUND_COLOR = '#F5F7FC'; // --mds-neutral-50 (JR1: was the warm #F3F4F1)
 
     public function __invoke(EntitlementService $entitlements, GuestBrandingPresenter $branding, string $slug): JsonResponse
     {

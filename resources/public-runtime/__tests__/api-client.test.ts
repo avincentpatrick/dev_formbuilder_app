@@ -181,3 +181,83 @@ describe('createApiClient', () => {
         ).rejects.toMatchObject({ normalized: { kind: 'terminal' } });
     });
 });
+
+// ── Increment P3a — the lost-update baseline on the wire ──────────────────────────────────────────
+// The resume link hands a SECOND device the same client_submission_uuid, so a draft has two writers. The
+// baseline is what lets the server tell "this device has seen everything" from "this device is about to
+// overwrite answers it never saw".
+describe('P3a draft lost-update baseline', () => {
+    const saveBody = (checksum: string | null) => ({
+        data: {
+            id: 's',
+            completeness_percent: 10,
+            resume_token: 'r',
+            resume_url: 'u',
+            expires_at: 'e',
+            content_checksum: checksum,
+        },
+    });
+
+    it('sends base_content_checksum and maps the server checksum back out', async () => {
+        const fetchImpl = vi.fn(async () => res(200, saveBody('bbb')));
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl });
+
+        const result = await client.saveDraft({
+            answers: {},
+            clientSubmissionUuid: 'u',
+            locale: 'en',
+            baseContentChecksum: 'aaa',
+        });
+
+        expect(JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string).base_content_checksum).toBe('aaa');
+        // The NEXT save's base. Dropping this on the floor would make every save after the first look like a
+        // second device to the server.
+        expect(result.contentChecksum).toBe('bbb');
+    });
+
+    it('sends base_content_checksum as an explicit null on a first save, never omits the key', async () => {
+        const fetchImpl = vi.fn(async () => res(201, saveBody('bbb')));
+        const client = createApiClient({ token: 't', slug: 's', fetch: fetchImpl });
+
+        await client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en' });
+
+        const body = JSON.parse((fetchImpl.mock.calls[0][1] as RequestInit).body as string);
+        // Unlike draft_current_step/finish_later above, this key is NOT conditionally spread: an absent key
+        // is indistinguishable from a client that forgot, and null is the honest claim a first save makes.
+        expect(body).toHaveProperty('base_content_checksum');
+        expect(body.base_content_checksum).toBeNull();
+    });
+
+    it('resumeDraft carries the opening baseline through to the caller', async () => {
+        const fetchImpl = async () =>
+            res(200, {
+                data: {
+                    id: 'd',
+                    completeness_percent: 40,
+                    client_submission_uuid: 'uuid-1',
+                    form_version_id: 'fv',
+                    answers: { a: 1 },
+                    last_saved_at: null,
+                    draft_current_step: null,
+                    locale: null,
+                    share_token: 'st',
+                    share_token_expires_at: 'x',
+                    content_checksum: 'server-sum',
+                },
+            });
+
+        const result = await resumeDraft('rt', { fetch: fetchImpl });
+        expect(result.contentChecksum).toBe('server-sum');
+    });
+
+    it('maps a 409 draft_conflict as a distinct code the caller can branch on', async () => {
+        const client = createApiClient({
+            token: 't',
+            slug: 's',
+            fetch: async () => res(409, { error: { code: 'draft_conflict', message: 'Reload it.' } }),
+        });
+
+        await expect(client.saveDraft({ answers: {}, clientSubmissionUuid: 'u', locale: 'en', baseContentChecksum: 'stale' }))
+            .rejects.toMatchObject({ normalized: { code: 'draft_conflict' } });
+    });
+});

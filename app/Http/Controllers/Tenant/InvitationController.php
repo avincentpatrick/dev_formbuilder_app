@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Actions\Fortify\PasswordValidationRules;
 use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Tenancy\TenantMembershipService;
+use App\Support\Auth\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,6 +27,7 @@ use Inertia\Response;
  */
 final class InvitationController extends Controller
 {
+    use PasswordValidationRules;
     use ResolvesTenant;
 
     public function __construct(private readonly TenantMembershipService $memberships) {}
@@ -40,6 +42,11 @@ final class InvitationController extends Controller
             'email' => $user?->email,
             'needsRegistration' => $user !== null && $user->email_verified_at === null,
             'token' => $token,
+            // J3b: this page sets a password when `needsRegistration`, through the same
+            // `Password::defaults()` every other surface validates against — so it gets the same
+            // checklist. Standing Rule 2: a live checklist on Register but not here would be the drift
+            // "one shared design system, no exceptions" exists to prevent.
+            'passwordPolicy' => PasswordPolicy::requirements(),
         ]);
     }
 
@@ -97,9 +104,11 @@ final class InvitationController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            // Single-field on the minimal accept page (styled confirm-password UX is Increment C);
-            // Password::default() still carries B1's min-length + breached-password (uncompromised) checks.
-            'password' => ['required', 'string', Password::default()],
+            // Single-field on the minimal accept page, so `'confirmed'` cannot be inherited — which is the
+            // WHOLE of this surface's divergence, and J3a moved it from an inline copy of the rules into a
+            // named method on the shared trait. Everything else (min length, the four character classes, the
+            // breached-password check) now arrives here by construction rather than by being remembered.
+            'password' => $this->passwordRulesUnconfirmed(),
         ]);
 
         $user->forceFill([

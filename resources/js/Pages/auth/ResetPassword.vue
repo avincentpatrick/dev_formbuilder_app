@@ -1,10 +1,18 @@
 <script setup lang="ts">
 // Design-system-styled new-password page (Increment C1).
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
+import {
+  MdsButton,
+  MdsFormField,
+  MdsTextInput,
+  MdsPasswordInput,
+  MdsPasswordStrength,
+  describedByWithStrength,
+  type PasswordRequirement,
+} from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 
-const props = defineProps<{ email: string; token: string }>();
+const props = defineProps<{ email: string; token: string; passwordPolicy: PasswordRequirement[] }>();
 const form = useForm({ token: props.token, email: props.email, password: '', password_confirmation: '' });
 
 function submit(): void {
@@ -35,8 +43,13 @@ function submit(): void {
           :id="id"
           v-model="form.password"
           autocomplete="new-password"
-          :describedby="describedby"
+          :describedby="describedByWithStrength(id, describedby)"
           :invalid="invalid"
+        />
+        <MdsPasswordStrength
+          :input-id="id"
+          :password="form.password"
+          :requirements="props.passwordPolicy"
         />
       </MdsFormField>
 

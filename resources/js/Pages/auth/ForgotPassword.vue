@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Design-system-styled password-reset request page (Increment C1).
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
+import { MdsBanner, MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
 
 defineProps<{ status?: string }>();
@@ -14,7 +14,7 @@ function submit(): void {
 
 <template>
   <AuthLayout title="Reset your password">
-    <p v-if="status" class="auth-alert">{{ status }}</p>
+    <MdsBanner v-if="status" icon="mail" :message="status" />
 
     <form class="auth-form" @submit.prevent="submit">
       <MdsFormField

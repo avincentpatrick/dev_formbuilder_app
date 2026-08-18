@@ -41,6 +41,11 @@ export const icons = {
     // ── People & places ──────────────────────────────────────────────────────
     users: 'M8 9a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0 M2.5 20c.8-3.2 2.9-4.8 5.7-4.8s4.9 1.6 5.7 4.8 M17 5.4a3.2 3.2 0 0 1 0 6.2 M18.5 20c-.4-2.1-1.3-3.6-2.7-4.5',
     'user-plus': 'M9 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M3 20c.9-3.4 3.3-5.3 6-5.3 M18 13.5v5 M15.5 16h5',
+    // I8a — "change this person's role". Same person + badge construction as user-plus above, so the two
+    // read as one family in the Members row actions; the badge is a gear rather than a plus because the
+    // action re-grades an existing member instead of adding one.
+    'user-cog':
+        'M9 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M3 20c.9-3.4 3.3-5.3 6-5.3 M16.2 16a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0-3.6 0 M18 12.9v1.3 M18 17.8v1.3 M14.9 16h1.3 M19.8 16h1.3',
     building: 'M4 21h16 M6 21V4h8v17 M14 21V9h4v12 M9 8h2 M9 12h2 M9 16h2',
 
     // ── Metrics & data ───────────────────────────────────────────────────────
@@ -89,6 +94,33 @@ export const icons = {
     // borrowed `external-link` or `building`, because below 1024px the sidebar is icons only and there the
     // mark is the only thing telling this destination apart from Integrations and Scopes.
     globe: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M3 12h18 M12 3c2.5 2.4 3.8 5.4 3.8 9s-1.3 6.6-3.8 9 M12 3c-2.5 2.4-3.8 5.4-3.8 9s1.3 6.6 3.8 9',
+
+    // ── Share surface (I1) ────────────────────────────────────────────────────
+    // Three nodes joined by two edges — the conventional share mark, drawn as a graph so it reads at 16px
+    // where a filled arrow would blot. Its own glyph rather than `external-link`: that one means "this
+    // navigates away", and the Share toolbar button opens a modal that goes nowhere.
+    share: 'M18 8a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M6 15a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M18 21a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M8.2 11.3l7.6-3.8 M8.2 13.2l7.6 3.8',
+    // Two chain links at 45°, the standard "copy link" mark. Distinct from `copy` (two stacked sheets),
+    // because the share panel puts both on screen at once and they must not read as the same control.
+    link: 'M10.5 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.4 1.4 M13.5 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.4-1.4',
+    // A QR code reduced to its three finder patterns plus one data module — the part of a QR a person
+    // actually recognises. Not a literal code: at 24×24 real modules would alias into grey mush.
+    qr: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 18h2v2h-2z M14 20h2 M20 14h.01',
+    // ── Achievements (K1e) ───────────────────────────────────────────────────
+    // A medal: a disc on a ribbon, drawn as a circle plus the two straps folding to a V. Added because the
+    // registry had NO award, trophy, medal or star and K1b had to borrow `trend-up` for the badge-earned
+    // notification, leaving a note that K1e should come back for this. Registry growth is what DSR
+    // Appendix B asks for ("add glyphs to icons.ts as features need them"), so this is conformance rather
+    // than a deviation and spends no exceptions-log entry -- the I1 precedent, which added share/link/qr
+    // the same way.
+    //
+    // Its own glyph rather than any of the four near-misses, and each refusal matters below 1024px where
+    // the sidebar is icons-only and the mark is the SOLE signifier: `trend-up` means a rising metric (and
+    // MdsStatTile spends it on every positive delta, so a nav item wearing it would read as a chart);
+    // `check` means done, which is a checklist rather than an achievement; `shield` is the audit ledger's;
+    // `activity` is Webhooks'. The ribbon V is the part that survives 16px -- the disc alone would read as
+    // `user` with its shoulders cropped.
+    award: 'M7 9a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M9.4 13.3L8.5 21l3.5-2.1 3.5 2.1-.9-7.7',
 } as const;
 
 export type IconName = keyof typeof icons;

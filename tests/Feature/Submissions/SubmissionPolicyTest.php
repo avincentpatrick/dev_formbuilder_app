@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\ResourceCapacity;
+use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -187,4 +189,142 @@ it('requires EDITOR capacity to manually encode, not merely any grant', function
     makeCollaborator($form, $editor, ResourceCapacity::Editor);
 
     expect($editor->can('create', [Submission::class, $form]))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| The respondent clause (Increment I8a) — filed by I4 as `docs/feature-backlog.md` §4, decided with the
+| user 2026-08-07 and built here rather than in I9.
+|--------------------------------------------------------------------------
+| Before this, `view()` was `submissions.view && (org-wide || collaborates)` with NOTHING about having
+| authored the row — yet `submission_approved`/`submission_returned` are addressed to `respondent_user_id`
+| and tell that person to open it. A Form Editor whose grant was later revoked kept a notification
+| pointing at a bare 403 outside the Inertia shell. I4 made that honest (NotificationPresenter runs the
+| real Gate and ships `url: null`); this makes it work.
+*/
+
+it('lets a respondent read back their own submission after their grant is revoked', function (): void {
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+
+    $editor = User::factory()->create();
+    enterTenant($tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+    makeCollaborator($form, $editor, ResourceCapacity::Editor);
+
+    $submission = seedInboxSubmission($form, $editor, SubmissionStatus::Submitted, ['full_name' => 'Mine']);
+
+    expect($editor->can('view', $submission))->toBeTrue();
+
+    // Revoke every grant — the exact scenario NotificationPresenter's docblock describes.
+    DB::table('resource_grants')->where('user_id', $editor->id)->delete();
+    app(ResourceGrantResolver::class)->forget($editor->id);
+
+    expect($editor->can('view', $submission))->toBeTrue()
+        // ...and the list agrees, which is the invariant SubmissionPolicy's class docblock pins.
+        ->and(Submission::query()->visibleTo($editor)->pluck('id')->contains($submission->id))->toBeTrue();
+});
+
+it('does not let a respondent read OTHER submissions on the same form', function (): void {
+    // The clause is per-ROW, not per-form. Authoring one response is not a reason to read a colleague's.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+    $someoneElses = seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Theirs']);
+
+    $respondent = User::factory()->create();
+    enterTenant($tenant->id, $respondent->id);
+    makeActiveMember($respondent, 'form_editor');
+    $mine = seedInboxSubmission($form, $respondent, SubmissionStatus::Submitted, ['full_name' => 'Mine']);
+
+    expect($respondent->can('view', $mine))->toBeTrue()
+        ->and($respondent->can('view', $someoneElses))->toBeFalse();
+
+    $visible = Submission::query()->visibleTo($respondent)->pluck('id');
+    expect($visible->contains($mine->id))->toBeTrue()
+        ->and($visible->contains($someoneElses->id))->toBeFalse();
+});
+
+it('does not widen review or export for a respondent', function (): void {
+    // view() ONLY. Reading back what you typed is not a privilege; deciding your own submission's outcome
+    // is a different question with a different answer. Post-submission EDITING is I9's vertical.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+
+    $respondent = User::factory()->create();
+    enterTenant($tenant->id, $respondent->id);
+    makeActiveMember($respondent, 'form_editor');
+    $mine = seedInboxSubmission($form, $respondent, SubmissionStatus::Submitted, ['full_name' => 'Mine']);
+
+    expect($respondent->can('view', $mine))->toBeTrue()
+        ->and($respondent->can('review', $mine))->toBeFalse()
+        ->and($respondent->can('export', [Submission::class, $form]))->toBeFalse();
+});
+
+it('grants nothing to a role that holds no submissions.view at all', function (): void {
+    // The permission check still leads. Without it this clause would hand a read to anyone with a row,
+    // regardless of the catalog.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+
+    $respondent = User::factory()->create();
+    enterTenant($tenant->id, $respondent->id);
+    makeActiveMember($respondent, 'form_editor');
+    $mine = seedInboxSubmission($form, $respondent, SubmissionStatus::Submitted, []);
+
+    $respondent->syncRoles([]);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    expect($respondent->can('view', $mine))->toBeFalse();
+});
+
+it('leaves an ANONYMOUS guest submission unreadable', function (): void {
+    // respondent_user_id is NULL for every guest row. The explicit null guard in isRespondent() is what
+    // keeps "belongs to nobody" from collapsing into "belongs to whoever asks".
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+    $guestRow = seedInboxSubmission($form, null, SubmissionStatus::Submitted, [], SubmissionSource::Guest);
+
+    $editor = User::factory()->create();
+    enterTenant($tenant->id, $editor->id);
+    makeActiveMember($editor, 'form_editor');
+
+    expect($guestRow->respondent_user_id)->toBeNull()
+        ->and($editor->can('view', $guestRow))->toBeFalse();
+});
+
+it('keeps other inbox filters intact alongside the respondent arm', function (): void {
+    // Pins the COMPOSED inbox behaviour: adding a respondent arm to the visibility scope must not widen
+    // what a status/date/form filter returns. Honest note, established by mutation while writing this:
+    // flattening the closure in scopeVisibleTo() does NOT redden this test, because Builder::callScope()
+    // already nests whatever a local scope adds. The closure survives for the case the framework does not
+    // cover — a direct scopeVisibleTo() call — and this test covers the composition, not the closure.
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = publishedInboxForm($tenant, $owner);
+
+    $respondent = User::factory()->create();
+    enterTenant($tenant->id, $respondent->id);
+    makeActiveMember($respondent, 'form_editor');
+
+    $submitted = seedInboxSubmission($form, $respondent, SubmissionStatus::Submitted, []);
+    $approved = seedInboxSubmission($form, $respondent, SubmissionStatus::Approved, []);
+
+    $filtered = Submission::query()
+        ->where('status', SubmissionStatus::Approved->value)
+        ->visibleTo($respondent)
+        ->pluck('id');
+
+    expect($filtered->contains($approved->id))->toBeTrue()
+        ->and($filtered->contains($submitted->id))->toBeFalse();
 });

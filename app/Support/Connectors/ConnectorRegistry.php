@@ -76,4 +76,46 @@ final class ConnectorRegistry
 
         return $lister instanceof ListsChannels ? $lister : null;
     }
+
+    /**
+     * The provider's OPTIONAL tabular-destination capability (H16b), or null when its destinations are not
+     * documents it can create and read.
+     *
+     * The exact twin of {@see channelListerFor()}, and separate from it because the two are not alternatives:
+     * a provider could have both (enumerate bases AND create one), and Sheets has only this one precisely
+     * because `drive.file` forbids enumeration. Null rather than throwing, for the same reason — a provider
+     * without the capability is not misconfigured, and the CONNECTION is still valid.
+     *
+     * ⚠️ H16c: THE RETURN TYPE IS THE READING HALF. Airtable predicted the "a provider could have both"
+     * sentence above and then went one better — it registers a `channel_lister` (bases enumerate under
+     * `schema.bases:read`) AND a `tabular_directory` that reads but deliberately cannot create, because
+     * `schema.bases:write` was refused. Use {@see provisioningDirectoryFor()} when the CREATE half is what is
+     * actually needed; asking for it here would make a read-only provider look unconfigured.
+     */
+    public function tabularDirectoryFor(ConnectorProviderKey $provider): ?InspectsTabularDestinations
+    {
+        $class = config("connectors.providers.{$provider->value}.tabular_directory");
+
+        if (! is_string($class) || ! is_a($class, InspectsTabularDestinations::class, true)) {
+            return null;
+        }
+
+        $directory = $this->container->make($class);
+
+        return $directory instanceof InspectsTabularDestinations ? $directory : null;
+    }
+
+    /**
+     * The same directory, but only when it can also CREATE a destination (H16c).
+     *
+     * Narrowed by `instanceof` rather than by a second config key on purpose: whether a provider can create is
+     * a property of its adapter's capabilities, not a deployment choice, and a config flag that disagreed with
+     * the class would be a way to configure a 500.
+     */
+    public function provisioningDirectoryFor(ConnectorProviderKey $provider): ?ProvisionsTabularDestinations
+    {
+        $directory = $this->tabularDirectoryFor($provider);
+
+        return $directory instanceof ProvisionsTabularDestinations ? $directory : null;
+    }
 }

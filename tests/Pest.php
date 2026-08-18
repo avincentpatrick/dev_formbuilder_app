@@ -1,8 +1,10 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
+use App\Enums\IndexedDataType;
 use App\Enums\PlanTier;
 use App\Enums\RequiredMode;
 use App\Enums\ResourceCapacity;
@@ -19,6 +21,7 @@ use App\Models\FormVersion;
 use App\Models\Plan;
 use App\Models\ResourceGrant;
 use App\Models\ScopeNode;
+use App\Models\SsoAuthRequest;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Subscription;
@@ -37,15 +40,26 @@ use App\Services\Forms\PublishService;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Validation\SemanticValidator;
 use App\Services\Validation\StructuredRuleEvaluator;
+use App\Support\Auth\GoogleIdentityProvider;
+use App\Support\Guest\GuestShareTokenService;
+use App\Support\Sso\SsoSession;
 use App\Support\Tenancy\DnsTxtResolver;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Database\Factories\SsoConnectionFactory;
 use Database\Seeders\PlanSeeder;
+use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
+use Ramsey\Uuid\Uuid;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\Console\Output\NullOutput;
+use Tests\Support\Auth\FakeGoogleIdentityProvider;
 use Tests\Support\FakeDnsTxtResolver;
 use Tests\TestCase;
 
@@ -99,6 +113,56 @@ function apiMember(string $roleName): User
     $tenantId = TenantContext::currentTenantId();
     enterTenant((string) $tenantId, $user->id);
     makeActiveMember($user, $roleName);
+
+    return $user;
+}
+
+/**
+ * A COMMITTED identity, visible to the separate `pgsql_auth` session (Increment J2d).
+ *
+ * ⚠️ ANY TEST THAT RENDERS `/members` NEEDS THIS, and the failure without it looks like a product bug rather
+ * than a fixture one. `TenantMembershipService::listMembers()` resolves identities on the `pgsql_auth`
+ * connection and indexes the result with `$users[$m->user_id]`, its comment noting that "the FK then
+ * guarantees the keyed map contains every id". That guarantee is real in production and false inside a test:
+ * `pgsql_auth` is a separate SESSION and cannot see `RefreshDatabase`'s uncommitted rows, so a
+ * `User::factory()` member has a `tenant_users` row and no visible identity — and the page 500s on an
+ * undefined array key.
+ *
+ * ⚠️ PROMOTED HERE ON THE FOURTH COPY. `MembersIndexTest::committedMemberUser()`,
+ * `MembersRosterFilterTest::committedIdentity()` and two J2d reachability suites each needed the identical
+ * six lines; the three existing copies stay where they are because each file's docblock makes its local one
+ * load-bearing, but nothing new should add a fifth. This file's own header records the rule (a fixture
+ * defined inside one test file resolves only when THAT file is loaded, so a single-file run of any other
+ * suite dies with "call to undefined function").
+ *
+ * ⚠️ RANDOM EMAIL, AND NEVER DELETED IN AN `afterEach`. These rows outlive the transaction and are cleaned
+ * only by `migrate:fresh`; a fixed address collides on the second run and pollutes every later file, and a
+ * DELETE deadlocks against the open locks.
+ *
+ * ⚠️ `$verified` GAINED A PARAMETER IN J3c2 RATHER THAN A FIFTH COPY OF THE HELPER. Google sign-in links
+ * onto an existing account ONLY when that account has already proved it owns its address (ADR-0019 §D4), so
+ * the refusal arm needs an UNVERIFIED committed identity — and until now every committed helper here
+ * (`committedSuperAdmin`, `committedPlainUser`, this one) hard-set the column. Defaulting to `true` means no
+ * existing caller moves. ⚠️ Pest helpers are GLOBAL and a duplicate name passes every per-file run while
+ * fatalling only on the full suite, which is why this is a parameter and not a `committedUnverifiedIdentity`.
+ *
+ * @param  bool  $verified  false produces an account that exists and has NOT confirmed its address — the
+ *                          §D4 refusal case, and the only shape in which linking would be a takeover.
+ */
+function committedTenantIdentity(string $name = 'Committed Member', bool $verified = true, ?string $email = null): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => $email ?? Str::lower(Str::random(12)).'@identity.test',
+        'password' => Hash::make('secret-password-123'),
+        // J3a — `routes/tenant.php`'s authenticated group carries `verified`, so an identity handed to
+        // `actingAs()` without this is bounced to `/email/verify` and every assertion about the page under
+        // test reads as a product failure. `UserFactory` already defaults it; the hand-rolled committed
+        // identities did not, because before J3a nothing consumed the column.
+        'email_verified_at' => $verified ? now() : null,
+    ]);
+    $user->setConnection((string) config('database.default'));
 
     return $user;
 }
@@ -331,6 +395,23 @@ function inboxTenant(string $slug = 'acme'): Tenant
 }
 
 /**
+ * The per-form statistics URL (Increment I10c).
+ *
+ * HERE rather than in a test file, and for the reason the docblock immediately below records about
+ * `apiMember()`: FormAnalyticsPageTest and FormAnalyticsGateTest both need it, and a top-level function in
+ * one of them dies with "Call to undefined function" on a single-file run of the OTHER. It cost one run to
+ * rediscover that.
+ *
+ * ⚠️ Pest helpers are GLOBAL: `gateUrl`, `analyticsPageUrl`, `analyticsRange`, `analyticsUrl`,
+ * `trendFixture` and `analyticsIndexDef` are already taken in this tree, and a duplicate name passes every
+ * per-file run and fatals only on the full suite.
+ */
+function formAnalyticsUrl(string $formId, string $slug = 'acme'): string
+{
+    return 'http://'.$slug.'.meridian.test/forms/'.$formId.'/analytics';
+}
+
+/**
  * A tenant brand logo attachment (H23a2), owned by the TENANT rather than by a form field.
  *
  * Lives here and not in a test file on the H22a lesson: `apiMember()` once sat as a top-level function
@@ -373,6 +454,71 @@ function fakeDns(array $records = []): FakeDnsTxtResolver
     app()->instance(DnsTxtResolver::class, $fake);
 
     return $fake;
+}
+
+/**
+ * Bind a recording, in-memory Google for the sign-in tests (J3c2).
+ *
+ * Live Google credentials are an input only the product owner can supply, so this is what every case
+ * downstream of the seam runs against — the `fakeDns()` shape, for the same reason. The returned object
+ * RECORDS: `->authorizeCalls` proves which state crossed the hop and with which redirect URI, and
+ * `->exchangeCalls` proves a replayed callback never reached Google a second time. Neither is visible
+ * from the resulting session.
+ *
+ * Knobs for the refusals, which is what makes it worth having: `->unverifiedEmail()` (this flow's analogue
+ * of an invalid signature), `->refusingExchange()`, and `->as($sub, $email)` to drive linkage and the
+ * subject-mismatch takeover case.
+ */
+function fakeGoogle(): FakeGoogleIdentityProvider
+{
+    $fake = new FakeGoogleIdentityProvider;
+    app()->instance(GoogleIdentityProvider::class, $fake);
+
+    return $fake;
+}
+
+/**
+ * Stub Have I Been Pwned's k-anonymity range endpoint.
+ *
+ * ⚠️ ANY TEST THAT VALIDATES A NEW PASSWORD REACHES THE PUBLIC INTERNET WITHOUT THIS, AND STAYS GREEN WHILE
+ * IT DOES — WHICH IS WHY IT WENT UNNOTICED FOR TWO INCREMENTS. `Password::uncompromised()` is a shipped
+ * default (`FortifyServiceProvider::boot()`) and `NotPwnedVerifier` performs the lookup through the `Http`
+ * facade, so a merge-blocking gate silently depended on api.pwnedpasswords.com being reachable from the
+ * runner. It never announced itself because the verifier CATCHES the failure, `report()`s it and returns an
+ * empty collection — i.e. it FAILS OPEN to "uncompromised". The suite therefore passes with or without
+ * egress, and the only difference is whether CI is quietly making an outbound HTTPS request per registration
+ * test.
+ *
+ * I8a fixed this in `AuthenticationTest` alone, as a file-local function. J3a found two more files doing it
+ * (`Feature/Settings/OpenTenantRegistrationTest`, `Feature/Tenancy/MembershipRoutesTest`) and promoted the
+ * helper HERE — which is also the only place it can live, because Pest loads every test file into one
+ * process and a second top-level `fakeHibp` would be a fatal.
+ *
+ * The stub answers with a real `SUFFIX:COUNT` line for each nominated password whose hash prefix matches the
+ * request, and an EMPTY body otherwise, which the verifier reads as "no match", i.e. uncompromised. Suffixes
+ * are DERIVED with `sha1()` rather than pasted as constants, so the fixture cannot drift from what the
+ * validator actually asks for. Note the array form: only this one host is stubbed, so an unrelated stray
+ * request stays visible rather than being absorbed by a catch-all.
+ *
+ * @param  list<string>  $breachedPasswords
+ */
+function fakeHibp(array $breachedPasswords = []): void
+{
+    Http::fake([
+        'api.pwnedpasswords.com/range/*' => function (HttpClientRequest $request) use ($breachedPasswords) {
+            $lines = [];
+
+            foreach ($breachedPasswords as $candidate) {
+                $hash = strtoupper(sha1($candidate));
+
+                if (str_ends_with($request->url(), substr($hash, 0, 5))) {
+                    $lines[] = substr($hash, 5).':9659365';
+                }
+            }
+
+            return Http::response(implode("\r\n", $lines));
+        },
+    ]);
 }
 
 function customDomain(Tenant $tenant, string $host, bool $verified = true, bool $activated = true): Domain
@@ -590,4 +736,417 @@ function seedCountableAt(
     ])->saveQuietly();
 
     return $submission->refresh();
+}
+
+/*
+|--------------------------------------------------------------------------
+| Committed cross-connection fixtures (Increment I7a)
+|--------------------------------------------------------------------------
+| The elevated `pgsql_superadmin` connection cannot see rows written inside
+| RefreshDatabase's uncommitted transaction, so any test of a cross-tenant
+| console read must seed COMMITTED rows on `pgsql_privileged`.
+|
+| `SuperAdminBypassTest` (B2c) established that idiom and deliberately did NOT
+| clean up, on the reasoning that a privileged DELETE would deadlock against a
+| test's own open transaction. **That reasoning held only because it committed
+| `users` and nothing else.** I7a committed TENANTS, and tenants are global
+| state that other suites legitimately assert over: `DemoSeederIdempotencyTest`
+| pins the exact slug list, and the three sweep-command tests iterate every
+| tenant. Nine unrelated tests went red in CI on a locally-green tree — the
+| textbook shape of a convenience fixture coupling itself to a merge-blocking
+| gate, which the I6 notes warn about in as many words.
+|
+| So the rows ARE cleaned up, and the deadlock objection is answered by WHEN
+| rather than by giving up: {@see purgeCommittedFeedbackFixtures()} is meant to
+| be registered through `$this->beforeApplicationDestroyed(...)` from a test's
+| `beforeEach`. RefreshDatabase registers its rollback the same way during
+| `setUp` — i.e. EARLIER — and Laravel runs those callbacks in registration
+| order, so this one executes after the test transaction is already gone and
+| there are no locks left to block on.
+*/
+
+/** Delete every committed I7a fixture row, in FK-safe order, on the privileged connection. */
+function purgeCommittedFeedbackFixtures(): void
+{
+    $connection = DB::connection('pgsql_privileged');
+
+    // Markers, not ids: a test that dies mid-way still gets cleaned by the next one.
+    $tenantIds = $connection->table('tenants')
+        ->where('slug', 'like', 'console-%')
+        ->orWhere('slug', 'like', 'rls-%')
+        ->pluck('id')
+        ->all();
+
+    $userIds = $connection->table('users')
+        ->where('email', 'like', '%@feedbackconsoletest.local')
+        ->orWhere('email', 'like', '%@feedbackrlstest.local')
+        ->pluck('id')
+        ->all();
+
+    if ($tenantIds !== []) {
+        $connection->table('feedback_reports')->whereIn('tenant_id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        // Any report authored by a fixture user in a tenant that is NOT ours (there should be none —
+        // belt and braces, since `users.id` is an FK target and the delete below would otherwise fail).
+        $connection->table('feedback_reports')->whereIn('user_id', $userIds)->delete();
+        $connection->table('feedback_reports')->whereIn('resolved_by', $userIds)->update(['resolved_by' => null]);
+    }
+
+    if ($tenantIds !== []) {
+        $connection->table('tenants')->whereIn('id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('users')->whereIn('id', $userIds)->delete();
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Committed platform fixtures (Increment I7b)
+|--------------------------------------------------------------------------
+| Same harness constraint as the I7a block above — the elevated
+| `pgsql_superadmin` connection cannot see RefreshDatabase's uncommitted
+| transaction — applied to the PLATFORM slice: `audits` rows with
+| `tenant_id IS NULL`, and the super-admins who authored them.
+|
+| `clearPlatformRows()` and `committedSuperAdmin()` were file-scope functions in
+| `PlatformSettingsWriteTest.php` until I7b. They live here now because Pest
+| loads every test file into ONE process, so a second declaration in a second
+| file is a fatal redeclare — and relying on load order to reuse them across
+| files is fragile in a way that fails at collection time, not at assert time.
+*/
+
+/** Every NULL-tenant row, gone. Safe on the privileged connection: the default connection's open test
+ *  transaction never touches platform rows. */
+function clearPlatformRows(): void
+{
+    DB::connection('pgsql_privileged')->table('settings')->whereNull('tenant_id')->delete();
+    DB::connection('pgsql_privileged')->table('audits')->whereNull('tenant_id')->delete();
+}
+
+/**
+ * A COMMITTED super-admin, visible from the separate `pgsql_superadmin` connection.
+ *
+ * `User::factory()->create()` writes inside RefreshDatabase's uncommitted transaction on the DEFAULT
+ * connection, so an elevated read cannot see it — and `settings.updated_by` is a real FK to `users`, which
+ * turns that invisibility into a 23503 rather than into a null.
+ */
+function committedSuperAdmin(string $email, string $name = 'Platform Operator'): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => $email,
+        'password' => Hash::make(Str::random(40)),
+        'email_verified_at' => now(),
+        'is_super_admin' => true,
+    ]);
+
+    return $user;
+}
+
+/** A COMMITTED ordinary (non-super-admin) user, for proving the actor catalog excludes them. */
+function committedPlainUser(string $email, string $name = 'Ordinary User'): User
+{
+    /** @var User $user */
+    $user = User::on('pgsql_privileged')->forceCreate([
+        'name' => $name,
+        'email' => $email,
+        'password' => Hash::make(Str::random(40)),
+        'email_verified_at' => now(),
+        'is_super_admin' => false,
+    ]);
+
+    return $user;
+}
+
+/**
+ * A COMMITTED tenant row, returned hydrated.
+ *
+ * ⚠️ `Tenant::on('pgsql_privileged')` DOES NOT WORK and fails silently — stancl's `CentralConnection`
+ * trait makes `getConnectionName()` return the central connection unconditionally, discarding the
+ * override, so the row lands inside the test transaction and the failure surfaces later and elsewhere as
+ * an FK violation. The raw query builder is the only way to commit one.
+ *
+ * ⚠️ THE SLUG PREFIX IS ENFORCED, AND THE ENFORCEMENT IS THE POINT. `platform-audit-` is the marker
+ * {@see purgeCommittedPlatformAuditFixtures()} cleans by, so a slug outside it mints a tenant that NOTHING
+ * deletes: RefreshDatabase's rollback cannot reach a committed row, and `migrate:fresh` runs once per
+ * process. I11a proved the cost — one fixture named `impersonated-slice` survived into every later file and
+ * took twelve tests down in seven suites that had nothing to do with it. The two shapes it breaks are the
+ * ones the I7a block above already names: suites that pin the exact `tenants.slug` list
+ * (`DemoSeederIdempotencyTest`, `DatabaseSeederSmokeTest`) and the sweep-command suites, which drain a FIXED
+ * number of queued children on the documented assumption that their own tenant is the only active one — a
+ * second tenant means the drain consumes the STRANGER's job and the test's own tenant is never swept, which
+ * reads as "the sweep did nothing" hundreds of files from the actual cause.
+ *
+ * Throwing here turns that into an immediate failure at the call site. It is the only guard available: the
+ * purge cannot clean what it cannot recognise.
+ */
+function committedPlatformTenant(string $slug, string $name = 'Platform Fixture'): Tenant
+{
+    if (! str_starts_with($slug, 'platform-audit-')) {
+        throw new InvalidArgumentException(
+            "committedPlatformTenant() slug must begin with 'platform-audit-', got '{$slug}'. That prefix is "
+            .'the marker purgeCommittedPlatformAuditFixtures() deletes by; a tenant outside it survives '
+            .'RefreshDatabase for the rest of the process and reddens unrelated sweep and seeder suites.'
+        );
+    }
+
+    $id = Uuid::uuid7()->toString();
+
+    DB::connection('pgsql_privileged')->table('tenants')->insert([
+        'id' => $id,
+        'name' => $name,
+        'slug' => $slug,
+        'status' => 'active',
+        'default_locale' => 'en',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    /** @var Tenant $tenant */
+    $tenant = Tenant::query()->findOrFail($id);
+
+    return $tenant;
+}
+
+/**
+ * A COMMITTED audit row. Pass `$tenantId = null` for a PLATFORM row (the slice `/admin/audit-log` reads),
+ * or a tenant id for the row that must NEVER appear there.
+ *
+ * @param  array<string, mixed>|null  $new
+ */
+function committedAudit(
+    ?string $tenantId,
+    ?string $actorId,
+    string $auditableType = 'settings',
+    string $event = 'updated',
+    ?array $new = null,
+    ?string $auditableId = null,
+    // I11a — the real operator behind an impersonated action. Last and optional, so every existing caller
+    // keeps writing the ordinary shape (this column NULL) without being touched.
+    ?string $actingAsUserId = null,
+): string {
+    $id = Uuid::uuid7()->toString();
+
+    DB::connection('pgsql_privileged')->table('audits')->insert([
+        'id' => $id,
+        'tenant_id' => $tenantId,
+        'user_id' => $actorId,
+        'acting_as_user_id' => $actingAsUserId,
+        'event' => $event,
+        'auditable_type' => $auditableType,
+        'auditable_id' => $auditableId ?? $actorId ?? Uuid::uuid7()->toString(),
+        'old_values' => null,
+        'new_values' => $new === null ? null : json_encode($new),
+        'redacted_fields' => null,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'pest',
+        'is_system_action' => false,
+        'created_at' => now(),
+    ]);
+
+    return $id;
+}
+
+/**
+ * Delete every committed I7b fixture, IN THIS ORDER. **The order is load-bearing.**
+ *
+ * ⚠️ `audits.tenant_id` is `nullOnDelete` (create_audits_table.php). Deleting a fixture TENANT before its
+ * audit rows does not delete those rows — it sets their `tenant_id` to NULL, **PROMOTING a tenant-scoped
+ * fixture into a permanent PLATFORM row** that the very viewer under test would then display, in this run
+ * and every run afterwards. Audits first, then tenants, then users.
+ *
+ * Registered via `$this->beforeApplicationDestroyed(...)` from a `beforeEach`, the I7a device: Laravel runs
+ * those callbacks in registration order, and RefreshDatabase registers its rollback earlier during setUp,
+ * so this executes once the test transaction is gone and there is nothing left to deadlock against.
+ */
+function purgeCommittedPlatformAuditFixtures(): void
+{
+    $connection = DB::connection('pgsql_privileged');
+
+    // Markers, not ids: a test that dies mid-way is still cleaned up by the next one. ⚠️ The tenant marker
+    // is a CONTRACT, not a convention — {@see committedPlatformTenant()} throws on a slug outside it,
+    // because a fixture this predicate does not match is a fixture nothing ever deletes.
+    $tenantIds = $connection->table('tenants')->where('slug', 'like', 'platform-audit-%')->pluck('id')->all();
+    $userIds = $connection->table('users')->where('email', 'like', '%@platformaudittest.local')->pluck('id')->all();
+
+    if ($tenantIds !== []) {
+        $connection->table('audits')->whereIn('tenant_id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('audits')->whereIn('user_id', $userIds)->delete();
+    }
+
+    // Whatever this suite left in the platform slice, including rows authored by a system actor.
+    $connection->table('audits')->whereNull('tenant_id')->where('user_agent', 'pest')->delete();
+
+    if ($tenantIds !== []) {
+        $connection->table('tenants')->whereIn('id', $tenantIds)->delete();
+    }
+
+    if ($userIds !== []) {
+        $connection->table('users')->whereIn('id', $userIds)->delete();
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Step-up re-authentication (Increment I8a) — PRD Feature #14.
+|--------------------------------------------------------------------------
+| `App\Http\Middleware\RequireRecentPassword` (aliased `step-up`) guards the tenant-side
+| high-blast-radius mutations and EVERY page of the super-admin console. A live session is no
+| longer enough there: the session must also carry a password confirmation from the last
+| `auth.step_up_timeout` seconds.
+|
+| ⚠️ EVERY CONSOLE TEST WRITTEN BEFORE I8a NEEDS THIS, AND THE FAILURE IS NOT SUBTLE — the request
+| 302s to `/user/confirm-password` instead of rendering, so an `assertOk()` reports "expected 200,
+| got 302" and an `assertRedirect(...)` reports the wrong target. 43 pre-existing tests across four
+| console suites hit it the first time step-up landed. That is the cost of the gate rather than a
+| defect in it, and it is paid here once instead of forty-three times.
+|
+| Lives in this file for the reason stated at the top of it: Pest loads every test file into ONE
+| process, so the same helper declared in two suites is a fatal, not a duplicate.
+*/
+
+/**
+ * Mark the current test session's password as confirmed `$secondsAgo` seconds ago.
+ *
+ * Writes exactly the key Fortify's own `ConfirmablePasswordController` writes on success, so a test
+ * that calls this is indistinguishable — to the middleware — from one that walked the real
+ * confirm-password flow. Pass a value larger than `auth.step_up_timeout` (900) to assert the
+ * REFUSAL side; the default of 0 asserts the allowed side.
+ */
+function confirmPasswordNow(int $secondsAgo = 0): void
+{
+    session()->put('auth.password_confirmed_at', now()->unix() - $secondsAgo);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Guest-runtime fixtures (Increment F5, moved here in I8b).
+|--------------------------------------------------------------------------
+| These four lived as top-level functions in tests/Feature/Guest/GuestRuntimeTest.php, which meant they
+| resolved only when THAT file happened to be loaded into the process — so a single-file run of any other
+| guest suite died with "Call to undefined function guestTenant()". That is precisely the failure H22a
+| already paid for with apiMember(), and this file's header exists to prevent. Moved on the second
+| occurrence rather than the third.
+|
+| GuestRuntimeTest's call sites are unchanged, which keeps it the regression gate for these fixtures.
+*/
+
+/** A tenant reachable at {slug}.meridian.test. */
+function guestTenant(string $slug = 'acme'): Tenant
+{
+    $tenant = Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'default_locale' => 'en']);
+    $tenant->domains()->create(['domain' => $slug]);
+
+    return $tenant;
+}
+
+/** A published form (required full_name + optional age). Requires enterTenant already called. */
+function publishedGuestForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Intake');
+    addFormField($form->draftVersion, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    addFormField($form->draftVersion, $owner, 'age', FieldType::Integer, 1, [
+        'is_queryable' => true,
+        'indexed_data_type' => IndexedDataType::Number, // so the pipeline projects a typed index row for `age`
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+/** The same, with guest access enabled at a public slug. */
+function guestForm(Tenant $tenant, User $owner, string $slug = 'intake'): Form
+{
+    $form = publishedGuestForm($tenant, $owner);
+    $form->update(['public_slug' => $slug, 'allow_guest_submissions' => true]);
+
+    return $form->refresh();
+}
+
+/** Mint a share token for a form's current published version (optionally at a forged clock, for expiry tests). */
+function shareTokenFor(Form $form, ?int $now = null): string
+{
+    return app(GuestShareTokenService::class)->mint(
+        $form->tenant_id,
+        $form->id,
+        (string) $form->current_published_version_id,
+        $now,
+    )->token;
+}
+
+/*
+|--------------------------------------------------------------------------
+| SSO/SAML fixtures (P1a).
+|--------------------------------------------------------------------------
+| Here rather than in a test file for the reason this file's header already records: a top-level function
+| declared inside a spec resolves only when THAT spec happens to be loaded into the process, so a
+| single-file run of any other SSO suite dies with "Call to undefined function". Three suites use this one.
+*/
+
+/**
+ * A minimal, valid identity-provider metadata document.
+ *
+ * `$certificate` defaults to `SsoConnectionFactory::certificate()`, which is a real self-signed key
+ * memoized per process — generated rather than hard-coded, because a fixed base64 blob would expire and
+ * turn every green test red on some future date with no code change to blame.
+ */
+function idpMetadataXml(?string $certificate = null, string $entityId = 'https://idp.example.com/saml2'): string
+{
+    $certificate ??= SsoConnectionFactory::certificate();
+
+    return <<<XML
+    <?xml version="1.0"?>
+    <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="{$entityId}">
+      <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+        <KeyDescriptor use="signing">
+          <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+            <X509Data><X509Certificate>{$certificate}</X509Certificate></X509Data>
+          </KeyInfo>
+        </KeyDescriptor>
+        <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
+        <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://idp.example.com/saml2/sso"/>
+      </IDPSSODescriptor>
+    </EntityDescriptor>
+    XML;
+}
+
+/**
+ * Drive a SAML login's LAST TWO legs: post the assertion, then follow the same-site hop the ACS hands back.
+ *
+ * ⚠️ TWO REQUESTS, BECAUSE SINCE P1e THE FLOW IS TWO REQUESTS. The ACS is a cross-site POST that
+ * `SameSite=Lax` gives no cookie, so it can neither read the browser that started the flow nor create a
+ * session anyone should trust; it marks the row and hands back. Absorbed here rather than written out at
+ * seventeen call sites, so the SHAPE of the round trip lives in one place and moves in one place.
+ *
+ * ⚠️ THE HAND-OFF LOCATION IS ASSERTED, NOT MERELY FOLLOWED, which is why this is a helper and never a
+ * `followRedirects()`. Every caller pins the ACS's `Location` for free, so a hop that started pointing
+ * somewhere else would redden all of them rather than none of them.
+ *
+ * ⚠️ AND IT IS NOT USED EVERYWHERE ON PURPOSE. The cases whose SUBJECT is the two-hop shape — the happy
+ * path, the browser binding, the 2FA hand-over — write both requests out longhand, because a flow whose only
+ * description is a helper is a flow nobody reads.
+ */
+function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string $host = 'http://acme.meridian.test'): TestResponse
+{
+    // ⚠️ THE PRECONDITION IS ASSERTED RATHER THAN ASSUMED, AND THE FAILURE MODE IT GUARDS IS ASYMMETRIC.
+    // This helper does not establish the browser binding — the real mint does, and every caller reaches it
+    // through one. A future case that fabricated a row, or called `SsoAuthRequestService::mint()` directly
+    // (which touches no session), and then asserted a REFUSAL would pass while measuring "no binding"
+    // rather than the condition it names. That is the "green for a different reason than its name claims"
+    // shape, and one expectation converts it into a failure nobody can misread.
+    expect(SsoSession::hasPendingLogin(session()->driver(), $request->request_id))
+        ->toBeTrue('completeSamlLogin() requires the binding the real mint writes — drive GET /sso/saml/login');
+
+    $handOff = test()->post($host.'/sso/saml/acs', ['SAMLResponse' => $samlResponse])
+        ->assertRedirect($host.'/sso/saml/login/complete/'.$request->request_id);
+
+    return test()->get((string) $handOff->headers->get('Location'));
 }

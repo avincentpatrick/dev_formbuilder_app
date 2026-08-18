@@ -24,6 +24,25 @@ describe('statusVariant — webhook tokens (H14)', () => {
     });
 });
 
+describe('statusVariant — feedback triage tokens (I7a)', () => {
+    it('mirrors the submission review lifecycle, because it is the same shape', () => {
+        expect(statusVariant('new')).toEqual({ variant: 'info', label: 'New' });
+        expect(statusVariant('reviewed')).toEqual({ variant: 'warning', label: 'Reviewed' });
+        expect(statusVariant('resolved')).toEqual({ variant: 'success', label: 'Resolved' });
+    });
+
+    it("colours wont_fix neutral, not danger — a settled decision is not a failure", () => {
+        expect(statusVariant('wont_fix')).toEqual({ variant: 'neutral', label: "Won't fix" });
+    });
+
+    it('does not disturb any status the four feedback words could have collided with', () => {
+        // `new`/`resolved`/`reviewed`/`wont_fix` are all first uses. If a later increment adds a status
+        // that shares one of these words, this is where the shared-descriptor decision gets made.
+        expect(statusVariant('submitted')).toEqual({ variant: 'info', label: 'Submitted' });
+        expect(statusVariant('approved')).toEqual({ variant: 'success', label: 'Approved' });
+    });
+});
+
 describe('statusVariant — native-connector tokens (H15b)', () => {
     it('labels a connection by what the tenant must do, not by the enum word', () => {
         expect(statusVariant('refresh_failed')).toEqual({ variant: 'danger', label: 'Reconnect needed' });
@@ -54,5 +73,25 @@ describe('statusVariant — custom-domain tokens (H22b)', () => {
         // The domain lifecycle's first state shares its word with webhook deliveries, exactly as
         // draft/archived are shared across the form and submission lifecycles.
         expect(statusVariant('pending')).toEqual({ variant: 'neutral', label: 'Pending' });
+    });
+});
+
+describe('statusVariant — submission screen-out (I9a)', () => {
+    it('colours screened_out neutral, not danger — nothing went wrong', () => {
+        // Same rule as `wont_fix`/`disabled`/`revoked`: a settled non-failure is neutral. The respondent
+        // finalized a form that had no questions left to show them; red would read as "this response errored".
+        expect(statusVariant('screened_out')).toEqual({ variant: 'neutral', label: 'Screened out' });
+    });
+
+    it('would otherwise have rendered a pill labelled with the raw enum value', () => {
+        // Why the entry is not optional. `statusVariant` never throws — it falls back to the raw string — so a
+        // missing map entry is a SILENT defect: a neutral badge reading literally "screened_out" in front of a
+        // customer. This asserts the fallback is what the map is standing in front of.
+        expect(statusVariant('screened_out_typo')).toEqual({ variant: 'neutral', label: 'screened_out_typo' });
+    });
+
+    it('leaves the statuses screened_out sits between untouched', () => {
+        expect(statusVariant('submitted')).toEqual({ variant: 'info', label: 'Submitted' });
+        expect(statusVariant('under_review')).toEqual({ variant: 'warning', label: 'Under review' });
     });
 });

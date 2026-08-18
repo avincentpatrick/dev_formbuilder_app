@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DomainEventType;
 use App\Enums\WebhookDeliveryStatus;
 use App\Models\Tenant;
 use App\Models\User;
@@ -45,13 +46,13 @@ it('shapes the index list, the entitlement summary, and the catalogs', function 
     $props = app(WebhookEndpointPresenter::class)->index($this->admin);
 
     expect($props['data'])->toHaveCount(2)
-        ->and($props['data'][0])->toHaveKeys(['id', 'name', 'url', 'status', 'event_types', 'form_title', 'secret_masked'])
+        ->and($props['data'][0])->toHaveKeys(['id', 'name', 'url', 'status', 'event_types', 'form_title', 'form_url', 'secret_masked'])
         ->and($props['data'][0])->not->toHaveKey('secret')
         // Endpoints is a live gauge → used reflects the two just created; no plan → unlimited (null).
         ->and($props['summary']['endpoints']['used'])->toBe(2)
         ->and($props['summary']['endpoints']['limit'])->toBeNull()
         ->and($props['summary']['deliveries'])->toHaveKeys(['used', 'limit'])
-        ->and($props['eventTypes'])->toHaveCount(4)
+        ->and($props['eventTypes'])->toHaveCount(count(DomainEventType::cases()))
         ->and($props['eventTypes'][0])->toHaveKeys(['value', 'label'])
         ->and($props['can']['create'])->toBeTrue();
 });

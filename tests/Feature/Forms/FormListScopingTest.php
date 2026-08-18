@@ -120,3 +120,41 @@ it('still returns every form to an admin token', function (): void {
         ->assertOk()
         ->assertJsonCount(2, 'data');
 });
+
+// ── I10c: the per-form statistics row action ─────────────────────────────────────────────────────────
+
+it('exposes can.analytics on each row, matching the route gate exactly', function (): void {
+    // The row action and `GET /forms/{form}/analytics` must agree, or the button either 403s on click or is
+    // hidden from someone who may use it. Both resolve to FormPolicy::view.
+    //
+    // ⚠️ THERE IS NO FALSE CASE TO ASSERT, AND THAT IS THE FINDING RATHER THAN A GAP. FormPresenter::list()
+    // already restricts rows to `forms.edit.any` holders or to grantedFormIdsQuery(..., Editor), and
+    // can('view', $form) is FormPolicy::view -> canEdit -> that same predicate — so on every row that
+    // REACHES this list the flag is structurally true. What this pins is that the key exists and tracks the
+    // policy; the REFUSALS are pinned where they are observable, against the route itself, in
+    // FormAnalyticsGateTest.
+    //
+    // Named separately from `can.template` rather than reusing it: FormPolicy::view and ::update resolve to
+    // the same predicate TODAY, and a row action riding on that coincidence would follow the wrong one the
+    // day they diverge.
+    app(FormService::class)->create($this->tenant, $this->admin, 'Admin Form');
+    $mine = app(FormService::class)->create($this->tenant, $this->editor, 'Editor Form');
+    app(ResourceGrantResolver::class)->forget();
+
+    $adminRows = app(FormPresenter::class)->list($this->admin);
+    expect($adminRows)->not->toBeEmpty();
+
+    foreach ($adminRows as $row) {
+        expect($row['can'])->toHaveKey('analytics')
+            ->and($row['can']['analytics'])->toBeTrue();
+    }
+
+    // A grant-less editor does not see the other form AT ALL, so there is no row to gate; the row they do
+    // see carries the action.
+    app(ResourceGrantResolver::class)->forget();
+    $editorRows = app(FormPresenter::class)->list($this->editor);
+
+    expect(array_column($editorRows, 'title'))->toBe(['Editor Form'])
+        ->and($editorRows[0]['can']['analytics'])->toBeTrue()
+        ->and($editorRows[0]['id'])->toBe($mine->id);
+});

@@ -55,6 +55,48 @@ Single-box Windows self-hosting has **no managed zero-downtime deploy**. `deploy
 - **Per-tenant secrets** (webhook signing secrets) are application data — encrypted in the database (Laravel encrypted cast, `docs/data-dictionary.md` §14), a distinct concern from the server `.env`.
 - **Rotation**: server secrets rotated annually at minimum and immediately on suspected compromise (a manual runbook step; no automated rotation in Phase 1).
 
+### 4.1 Third-party OAuth clients that must be registered by hand
+
+Two Google clients exist and they are **not** interchangeable. Registering one set of credentials in both
+places is the mistake this section exists to prevent — they have different consent screens, different
+scopes and very different blast radii.
+
+| Purpose | `.env` keys | Redirect URI to register | If unset |
+|---|---|---|---|
+| **First-party sign-in** (J3c2 / ADR-0019) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/auth/google/callback` | "Continue with Google" does not render and the flow cannot be started — a **supported** state, see the note below |
+| **Google Sheets connector** (H16a / ADR-0009) | `GOOGLE_CONNECTOR_CLIENT_ID`, `GOOGLE_CONNECTOR_CLIENT_SECRET` | `https://<CENTRAL_DOMAIN>/oauth/google_sheets/callback` | the connector cannot be connected; the consent screen refuses |
+
+⚠️ **"Unconfigured" closes the DOOR, not all three routes, and an earlier draft of this table said
+otherwise.** Only `GET /auth/google/redirect` consults `GoogleSignInGate` and 404s. The callback and the
+completion hop stay **registered and reachable**, and answer the same closed `?google=failed` bounce every
+other refusal produces — the callback because its `state` cannot verify, the completion hop because its
+handoff matches no row. That is harmless (neither can mint a session without a row this deployment never
+wrote) but it is not absence, and an operator auditing the surface deserves the true statement rather than
+the reassuring one. The distinction was found by an adversarial review after CI was green.
+
+**Sign-in client — the console settings this app cannot detect the absence of.**
+
+- Publish exactly `openid`, `email` and `profile`. Nothing else is requested: a sign-in asking for Drive
+  scopes would *be* a connector and would fall under ADR-0009's token-custody rules in full.
+- Set the user type to **External** unless every expected user is inside your own Workspace organisation.
+- ⚠️ **ONE redirect URI serves every workspace.** Google rejects wildcard redirect URIs for an identity
+  client exactly as it does for an API one, which is why the callback lands on the central host and
+  carries the workspace inside a signed `state` rather than in a session. Do not attempt to register
+  per-tenant subdomains.
+- ⚠️ **The URI is DERIVED from `APP_URL`, not configured separately.** Google matches it byte for byte
+  between the authorize step and the token exchange, so a third environment variable would be a third
+  chance to get it wrong — and wrong only in production, where the host differs from a developer's. If
+  `APP_URL` is not the central host with the correct scheme and port, sign-in fails with
+  `redirect_uri_mismatch` and nothing else.
+
+**Key rotation, and the one difference from the connector lane.** The sign-in `state` is signed with a key
+derived from `APP_KEY` with a domain separator, so an `APP_KEY` rotation invalidates every consent screen
+currently open — a **~10-minute** window, and the person simply presses the button again. That is a far
+milder consequence than the connector lane's, where §4's `APP_PREVIOUS_KEYS` gap means a rotation would
+make stored connector tokens undecryptable (still open, recorded in the threat model §9.8). Nothing about
+Google sign-in is stored encrypted, because nothing about it is retained: the flow reads an identity once
+and discards the token. `GOOGLE_SIGNIN_STATE_KEY` exists only to rotate that one family independently.
+
 ---
 
 ## 5. PostgreSQL Backup & Disaster-Recovery Runbook (self-managed)
@@ -156,6 +198,52 @@ no matter what nginx is configured to do, because tenant resolution will not mat
 **When Track B automates issuance**, this section is what gets deleted, and ADR-0012's *When to Revisit*
 records what else changes with it (the operator gate can become an API action, and an
 N-consecutive-failures demotion becomes worth building).
+
+---
+
+## 8b. Per-Tenant Extract Runbook (P2b — ADR-0018)
+
+`php artisan tenants:extract <id|slug|hostname> [--path=…]` writes one workspace's record as one NDJSON
+file per table plus a `manifest.json`, into `storage/app/tenant-extracts/<slug>-<timestamp>/` by default.
+Used for offboarding, an isolation-clause customer, or answering "what exactly do you hold for us".
+
+**Before you run it**
+
+1. **Run as the application role.** The command refuses a SUPERUSER/BYPASSRLS connection and writes nothing
+   — that refusal is the guard working, *not* a misconfiguration to route around by pointing `DB_USERNAME`
+   at `meridian`. On that role every RLS policy is ignored and the artefact would be **every** tenant's rows
+   in a directory bearing one tenant's name.
+2. **Pick an empty destination.** It refuses a directory that already has files in it; merging two
+   point-in-time artefacts produces a manifest that describes neither.
+3. **Expect it to hold a read transaction** for the duration (REPEATABLE READ, for a consistent snapshot
+   across all 43 tables). On a large tenant, run it in the maintenance window you would use for a backup.
+
+**After it finishes — read the manifest, not just the row count**
+
+- `snapshot.isolation_level` and `snapshot.role` are **read back from the session**, so they say what
+  actually happened. `repeatable read` + the app role is the expected pair.
+- `unresolved_user_references` lists ids that extracted rows point at and the extract does not contain.
+  **This is normal**, and the command warns about it on the console: the `users` policy admits only the
+  workspace's ACTIVE members, so an outstanding invitation, a removed or suspended member whose forms
+  remain, and the platform operator on an `impersonation_tokens` row all land here. Read it before handing
+  the artefact over — it is the list you will be asked about.
+- `not_extracted` states, in the file itself, what was deliberately left out and why.
+
+**⚠️ Choose the destination for its ACL, because the command's own permissions do nothing on this host.**
+The writer asks for `0700`, which is a POSIX control: **on this Windows Server box PHP ignores `mkdir()`'s
+mode and `chmod()` only toggles the read-only attribute**, so the extract directory simply inherits the ACL
+of whatever it is created under. Pass `--path` pointing inside a directory you have already restricted —
+the same location §5 puts database dumps in — rather than accepting the `storage/app/tenant-extracts/`
+default, which inherits the web application's own tree. Confirm with `icacls <path>` before you run it, not
+after.
+
+**⚠️ What the artefact is, for retention purposes.** One workspace's entire record in plaintext — every
+submission answer, every respondent email the forms collected. It carries **no credentials** (ADR-0018 §D3
+withholds them), but nothing in the command encrypts, transfers or expires it. Treat it as you would a
+database dump under §5: move it to the same protected location, and delete the working copy when the
+transfer is confirmed. **It is NOT a GDPR subject-access response** — see
+`docs/data-privacy-gdpr-compliance.md` §3, which explains why using it as one would over- and
+under-disclose at the same time.
 
 ---
 

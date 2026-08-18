@@ -41,8 +41,12 @@ final class GuestBrandingPresenter
      *
      * A literal rather than a token read: PHP has no access to the CSS custom properties, and the file
      * that does ({@see BrandRampGenerator}) hard-codes its grounds the same way.
+     *
+     * JR1 moved it with the Vivid re-skin's primary. It is pinned to the token source by
+     * `PwaManifestTest`, not by this comment — the third copy of a design-system value in the branding
+     * stack, and the third to get a test after the first one shipped a defect.
      */
-    private const string DEFAULT_THEME_COLOR = '#1C4B72';
+    private const string DEFAULT_THEME_COLOR = '#0E6FE8';
 
     /** What {@see self::forGuest()} reports as `version` when nothing renders branded. */
     private const string UNBRANDED_VERSION = 'none';

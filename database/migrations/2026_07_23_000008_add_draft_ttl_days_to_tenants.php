@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Schema;
  * `tenants` is the central, RLS-exempt discriminator table (ADR-0002 §D1), so no `withTenantIsolation()` is
  * needed and the migration linter skips this alter-only migration. NOTE: a real column here MUST be added to
  * {@see Tenant::getCustomColumns()} or stancl/tenancy silently relocates its value into the `data`
- * json virtual-column store and reads it back as null (TenantCustomColumnsTest pins that list).
+ * json virtual-column store and reads it back as null (`TenantColumnWhitelistTest` pins that list by set
+ * equality — it cited `TenantCustomColumnsTest` until P2a, which is a file that has never existed).
  */
 return new class extends Migration
 {

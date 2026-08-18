@@ -68,7 +68,9 @@ defineProps<{ title: string; icon?: IconName }>();
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
-    letter-spacing: -0.01em;
+    /* JR1: was a hard-coded -0.01em. The tracking is part of the type ROLE, so it moved into the
+       token beside the size it belongs to — three copies of a magic number could drift, a token cannot. */
+    letter-spacing: var(--mds-type-heading-1-letter-spacing);
     color: var(--mds-color-text-heading);
 }
 

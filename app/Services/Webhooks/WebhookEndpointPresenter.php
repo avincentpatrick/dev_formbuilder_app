@@ -13,6 +13,11 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Forms\FormHubLink;
+use App\Support\Search\KeywordFilter;
+use App\Support\Search\ListEmptyReason;
+use App\Support\Search\SearchTerms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -38,17 +43,40 @@ final class WebhookEndpointPresenter
     /**
      * The endpoints list, the plan cap/quota summary, and the create-modal option catalogs.
      *
+     * ⚠️ `$terms` MATCHES `name` AND `url`, AND DELIBERATELY NOT THE FORM COLUMN. Both matched columns are
+     * already rendered in the table, so the filter can only ever hide rows the viewer could see. The Form
+     * column is a SCOPE rather than a description — "which form does this endpoint listen to" — and the
+     * right control for it is a form `<select>` beside the keyword box, not a substring match that would
+     * make `?q=clinic` mean two unrelated things at once. Filed rather than smuggled in; recorded in
+     * TESTING-GUIDE §17's per-list table so it reads as a decision and not an oversight.
+     *
+     * `applyLike` rather than a tsvector: `webhook_endpoints` has no generated column and would not benefit
+     * from one — J1b measured `~~*` at `proleakproof = f`, so an index would be unreachable under RLS
+     * anyway, and a tenant's endpoint list is tens of rows bounded by a plan cap.
+     *
      * @return array<string, mixed>
      */
-    public function index(User $user): array
+    public function index(User $user, ?SearchTerms $terms = null): array
     {
+        $terms ??= SearchTerms::parse(null);
+
         $endpoints = WebhookEndpoint::query()
             ->with('form:id,title')
+            ->tap(fn (Builder $q) => KeywordFilter::applyLike($q, $terms, [
+                'webhook_endpoints.name',
+                'webhook_endpoints.url',
+            ]))
             ->latest('created_at')
             ->get();
 
+        // The reachable subset for THIS reader, resolved ONCE for the page — one query over the form ids
+        // actually on screen, never a policy call per row.
+        $formUrls = FormHubLink::pathsFor($user, $endpoints->pluck('form_id')->filter()->values()->all());
+
         return [
-            'data' => $endpoints->map(fn (WebhookEndpoint $e): array => $this->row($e))->all(),
+            'data' => $endpoints->map(fn (WebhookEndpoint $e): array => $this->row($e, $formUrls))->all(),
+            'filters' => ['applied' => ['q' => $terms->raw()]],
+            'empty_reason' => ListEmptyReason::for($endpoints->isNotEmpty(), ! $terms->isEmpty()),
             'summary' => [
                 'endpoints' => [
                     'used' => $this->entitlements->usage(UsageMetric::WebhookEndpointsCount),
@@ -84,7 +112,7 @@ final class WebhookEndpointPresenter
         $items = collect($paginator->items());
 
         return [
-            'endpoint' => $this->detail($endpoint),
+            'endpoint' => $this->detail($endpoint, FormHubLink::pathsFor($user, array_filter([$endpoint->form_id]))),
             'deliveries' => [
                 'data' => $items->map(fn (WebhookDelivery $d): array => $this->deliveryRow($d))->all(),
                 'meta' => [
@@ -106,9 +134,10 @@ final class WebhookEndpointPresenter
     /**
      * A list-row projection of an endpoint (never carries the secret).
      *
+     * @param  array<string, string>  $formUrls  id => hub path, for the ids this reader may open
      * @return array<string, mixed>
      */
-    private function row(WebhookEndpoint $endpoint): array
+    private function row(WebhookEndpoint $endpoint, array $formUrls = []): array
     {
         return [
             'id' => $endpoint->id,
@@ -118,6 +147,12 @@ final class WebhookEndpointPresenter
             'event_types' => $endpoint->event_types,
             'form_id' => $endpoint->form_id,
             'form_title' => $this->formTitle($endpoint),
+            // ⚠️ SERVER-RESOLVED, NOT DERIVED ON THE CLIENT FROM `form_title === null` (Increment J2d).
+            // That inference reads as equivalent and is a coincidence: it holds only because the eager load
+            // above omits `withTrashed()`, which is ALSO why a deleted form's endpoint currently mislabels
+            // its scope as "All forms". Add `withTrashed()` for a better label — a fix this seam now makes
+            // safe — and a client-derived link would start 404ing silently. Absent key => no link.
+            'form_url' => $endpoint->form_id === null ? null : ($formUrls[$endpoint->form_id] ?? null),
             'secret_masked' => $endpoint->maskedSecret(),
             'disabled_reason' => $endpoint->disabled_reason,
             'consecutive_failure_count' => $endpoint->consecutive_failure_count,
@@ -130,12 +165,13 @@ final class WebhookEndpointPresenter
     /**
      * The row projection plus the detail-only fields the Show page renders.
      *
+     * @param  array<string, string>  $formUrls
      * @return array<string, mixed>
      */
-    private function detail(WebhookEndpoint $endpoint): array
+    private function detail(WebhookEndpoint $endpoint, array $formUrls = []): array
     {
         return [
-            ...$this->row($endpoint),
+            ...$this->row($endpoint, $formUrls),
             'signing_algorithm' => $endpoint->signing_algorithm,
             'secret_previous_expires_at' => $this->iso($endpoint->secret_previous_expires_at),
             'updated_at' => $this->iso($endpoint->updated_at),
@@ -191,19 +227,9 @@ final class WebhookEndpointPresenter
     private function eventTypeOptions(): array
     {
         return array_map(
-            fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $this->eventTypeLabel($t)],
+            static fn (DomainEventType $t): array => ['value' => $t->value, 'label' => $t->label()],
             DomainEventType::cases(),
         );
-    }
-
-    private function eventTypeLabel(DomainEventType $type): string
-    {
-        return match ($type) {
-            DomainEventType::SubmissionCreated => 'Submission created',
-            DomainEventType::FormPublished => 'Form published',
-            DomainEventType::FormOpened => 'Form opened',
-            DomainEventType::FormClosed => 'Form closed',
-        };
     }
 
     private function formTitle(WebhookEndpoint $endpoint): ?string

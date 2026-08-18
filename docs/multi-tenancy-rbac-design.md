@@ -95,8 +95,8 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `forms.delete` | ✓ | ✓ | | | |
 | `forms.collaborators.manage` | ✓ | ✓ | | | |
 | `submissions.create` | ✓ | ✓ | ✓ (own forms) | ✓ (own forms) | |
-| `submissions.edit.any` *(post-submission answer editing — fast-follow)* | ✓ | ✓ | | | |
-| `submissions.edit.own` *(fast-follow)* | | | ✓ (own forms) | | |
+| `submissions.edit.any` *(I9c — post-submission answer editing; `SubmissionPolicy::update()`)* | ✓ | ✓ | | | |
+| `submissions.edit.own` *(I9c — per-form, and requires **editor** capacity: editing answers is an authoring act, the same tightening G10a applied to `submissions.create`)* | | | ✓ (own forms) | | |
 | `submissions.review.any` | ✓ | ✓ | | | |
 | `submissions.review.own` | | | | ✓ | |
 | `submissions.export` | ✓ | ✓ | ✓ (own forms) | ✓ (own forms) | |
@@ -109,6 +109,143 @@ The `.any` / `.own` suffix pattern is how tenant-wide administrative access (Own
 | `feedback.submit` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `feedback.view` | ✓ | ✓ | | | |
 | `scopes.manage` *(G10a — author the tenant's `scope_nodes` hierarchy)* | ✓ | ✓ | | | |
+
+> **Design Note (I8a, 2026-08-07) — `tenant.roles.assign` finally has code behind it, and the respondent
+> clause is the matrix's one row-level exception.** Two corrections to how this table should be read.
+>
+> **First**, `tenant.roles.assign` has been seeded to Owner/Admin and listed here since Phase 0 with *no
+> consumer anywhere in the codebase* — there was no role-change route, no controller method and no service
+> method, so PRD Feature #14's "step-up gates role changes" criterion was vacuously satisfiable while
+> `TenantMembershipService::joinOpenTenant()`'s docblock told invitees an Owner "can promote them on the
+> Members page in two clicks". I8a built `PATCH /members/{user}/role` against **this** key rather than
+> minting a `tenant.members.role`: the catalog is closed by design, and a second key for one capability is
+> how a matrix comes to disagree with itself. The route also carries `step-up`. Four refusals live in the
+> service, not the request, because no FormRequest can know them: the Owner's role is immutable here
+> (ownership moves only by transfer, §7), `owner` is not assignable, nobody may re-grade themselves, and a
+> no-op is refused rather than written to the ledger.
+>
+> **Second**, `submissions.view` now carries a **row-level** clause this table cannot express. Since I8a,
+> {@see SubmissionPolicy::view()} additionally allows a user to read a submission whose
+> `respondent_user_id` is their own — regardless of org-wide visibility or per-form grant. The permission
+> is still required, so this grants nothing to a role holding no read at all, and guest rows carry a NULL
+> respondent so it is inert on the public runtime. It is `view()` **only**: reading back what you yourself
+> submitted is not a privilege, whereas deciding your own submission's outcome (`review()`) or editing it
+> after review (`submissions.edit.*`, I9) are different questions with different answers. Mirrored in
+> `Submission::scopeVisibleTo()` so the single-row check and the inbox query still express one rule.
+
+> **Design Note (J2b, 2026-08-11) — `FormPolicy::viewOverview()` composes two rows of this table and coins
+> no key; the catalog stays closed at 29.** The form hub (`GET /forms/{form}`) is the first surface that
+> needed "may this person *read about* a form", as distinct from "may they change it". `FormPolicy::view()`
+> could not answer it: it delegates to `canEdit()`, so `can:view,form` and `can:update,form` admit the
+> identical set and refuse the **Reviewer and the Viewer** — precisely the two roles the hub exists to give a
+> destination to, since they are the ones who meet a form's title in the inbox, the audit ledger and global
+> search with nowhere to click. Widening `view()` would have silently widened the analytics page with it.
+>
+> The new ability is, verbatim:
+>
+> ```php
+> $user->can('dashboard.form.view')
+>     && ($user->can('dashboard.org.view') || $this->grants->holdsAny($user, $form));
+> ```
+>
+> That is byte-for-byte the split `Submission::scopeVisibleTo()` and `AnalyticsFormSet::visible()` already
+> apply, and the one this table has documented against `dashboard.form.view` since Phase 0 — "✓ (own forms)"
+> for Editor and Reviewer is exactly the grant arm. It discloses nothing new either: a Viewer already reads
+> every submission in the tenant and every org-wide KPI on the dashboard. What they gain is a destination,
+> not a fact. `holdsAny()`, never `holds(Editor)` — a Reviewer's grant is reviewer capacity, so an
+> editor-capacity check would refuse the single role the ability was widened for.
+>
+> ⚠️ **THE `dashboard.form.view` CONJUNCT IS A FAIL-CLOSED GUARD AND NO SHIPPED ROLE CAN OBSERVE IT.** Stated
+> precisely because the first draft of the policy's own docblock claimed the test suite "mutates it out and
+> requires that case to redden", and when the mutation was actually run **all twelve cases stayed green**.
+> All five seeded roles hold the key, and the only product path that changes a member's authority
+> (`PATCH /members/{user}/role`) assigns one of those five — so nothing a user can do today distinguishes
+> the two implementations. It stays because `resource_grants` is a **capacity** store and not a permission
+> store: a grant says "editor capacity on this form", never "may read this tenant's forms". Drop it and the
+> day a custom permission set becomes reachable, the hub becomes readable on the strength of a grant alone.
+> `FormHubGateTest` pins it with a synthetic member built on `ResourceGrantServiceTest`'s `actorWith()`
+> idiom, labelled there as unreachable-today rather than presented as a live rule.
+>
+> **The same composition appears once more, on the client.** The hub links a recent response to
+> `/submissions/{id}` only when the reader was offered the Responses tab, and that is provable rather than a
+> proxy: `viewAny` is `submissions.view` alone, `view(row)` is that key AND the disjunction above, and the
+> rows were already filtered through `scopeVisibleTo()` — which is that same disjunction **minus the key**.
+> So `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`. It is unobservable for the same reason: all five roles hold
+> `submissions.view`.
+
+> **Design Note (J2c, 2026-08-11) — `Form::scopeReadableBy()` is the LIST twin of `viewOverview`, and it
+> also coins no key. The catalog stays closed at 29.** J2b added the ability; J2c needed the set. Two
+> surfaces ask "which forms may this reader open" — `GET /forms/{form}/submissions`, and the submissions
+> inbox's form dropdown — and the scope is byte-for-byte the policy's second conjunct:
+> `dashboard.org.view` OR a grant of **any** capacity on the form.
+>
+> ⚠️ **`Form::scopeVisibleTo()` IS NOT INTERCHANGEABLE WITH IT, AND SUBSTITUTING ONE IS SILENT.** That scope
+> is the **authoring** rule — it keys on `forms.edit.any` / `forms.edit.own` and requires **Editor**
+> capacity — so a **Reviewer and a Viewer hold neither** and it returns them the empty set. Building the
+> inbox's dropdown on it blanks the control for exactly the two roles that live in that inbox, while every
+> test written with an Owner stays green. `SubmissionInboxTest` now pins the Reviewer-with-a-grant case
+> specifically so the substitution reddens.
+>
+> ⚠️ **THE ONE HONEST WIDENING, STATED RATHER THAN GLOSSED.** A **Viewer** holds `dashboard.org.view` and is
+> 403'd from `/forms` (that route gates on `viewAny,Form` = the `forms.*` keys), so before J2c they could
+> not enumerate the tenant's forms. The fixed dropdown lists every form they may open, including ones with
+> no responses — so they gain **discoverability of form titles they could not previously enumerate**. They
+> gain no authority: `viewOverview` already let them open any of those hubs, and they already read every
+> submission in the tenant. The trade was accepted deliberately (a dropdown that cannot offer a form with no
+> responses cannot answer "has anything arrived yet?", which is the question it is most often asked). Note
+> the boundary that did **not** move: soft-deleted forms stay out, because `readableBy` adds no
+> `withTrashed()` — unlike `AnalyticsFormSet::visible()`, which answers a different question.
+>
+> **And one NARROWING in the same change, recorded because a widening alone would be a half-truth.**
+> `Submission::scopeVisibleTo()` admits a row on `respondent_user_id = me` — a **respondent arm** that
+> `viewOverview` has no counterpart for. The old submissions-derived dropdown therefore offered a form a
+> reader could reach *only* by having answered it; `readableBy` does not. That reader still sees those rows
+> and can no longer filter to them by form. Accepted: the alternative is a dropdown whose entries do not all
+> correspond to forms the reader may open, which is the defect below.
+>
+> ⚠️ **THE SAME ASYMMETRY IS WHY AN INBOX ROW'S FORM TITLE IS NOT UNCONDITIONALLY A LINK.** The row set is
+> strictly wider than form readability, so *"this row is listed"* does not imply *"its form opens"*. Two live
+> paths: a keyer whose grant was revoked keeps seeing rows they encoded (the respondent arm) while
+> `/forms/{id}` 403s them; and a **soft-deleted** form renders its title as an em dash while binding to
+> nothing, so an unguarded link shipped `—` as a hyperlink to a 404. The row payload carries
+> `can.open_form`, resolved once per page against `readableBy` rather than per row against the policy.
+>
+> ⚠️ **AND `/forms` ITSELF IS NOT REACHABLE BY EVERY ROLE THAT CAN REACH THE PAGES LINKING TO IT** — the
+> defect J2c's adversarial review found in its own new breadcrumbs. That route gates on `viewAny,Form` =
+> `forms.create | forms.edit.any | forms.edit.own`, which a **Reviewer and a Viewer hold none of**, while
+> both can reach the form hub, a form's responses, a submission and the encode screen. A hard `href:
+> '/forms'` hands them a bare 403 with no way back. `formsCrumb()` (`resources/js/composables/`) drops the
+> href — keeping the crumb as text — off `ShellAbilities`' existing `manageForms`, which is computed from
+> the identical ability the route's middleware evaluates. **The tab strip already had this property and the
+> trail did not:** `FormTabSet` resolves each tab's gate server-side and `FormTabSetReachabilityTest` issues
+> a real request per href, so a tab cannot be offered to a reader the route refuses. Breadcrumbs had no
+> equivalent, and nothing structural yet enforced one.
+>
+> **✅ CLOSED BY J2d, and it found two live defects on the way.** `formsCrumb()` is **deleted**; every trail
+> is now built server-side by `App\Support\Navigation\CrumbTrail`, which asks each destination's own gate per
+> crumb, and `CrumbTrailReachabilityTest` reads the trail back off the real Inertia response and navigates
+> every href. Both defects it exposed were on `submissions/Show.vue`, whose route gates on
+> `can:view,submission` ALONE: (1) `SubmissionPolicy::view()`'s **respondent arm** has no counterpart in
+> `FormPolicy::viewOverview()`, so a keyer whose grant was revoked opened the page and got a 403 from both
+> middle crumbs; (2) a **soft-deleted form** made those same crumbs render an em dash as a live hyperlink to
+> a 404, since `/forms/{form}` binds through the default scope. A refused CRUMB keeps its label and loses its
+> href — deliberately unlike a refused TAB, which is absent, because dropping a crumb renumbers the trail and
+> makes one page render a different depth per role.
+>
+> **The idiom now covers three surfaces**, and each application found something a string assertion could not:
+> the tab strip (J2b), the trail (J2d), and search — `DestinationReachabilityTest` drives every
+> `DestinationCatalog` URL and requires an **Inertia** response, which is what caught `/notifications` being
+> a JSON endpoint offered as a page, while `SearchResultReachabilityTest` navigates the URL each search arm
+> emits as the narrowest role that receives it.
+>
+> **The route composes both halves, and neither alone is sufficient.** `can:viewAny,Submission` says nothing
+> about *which* form — with it alone, any member holding `submissions.view` (all five roles) could open any
+> form's responses page and read its **title** above an empty list, because an empty list is not a refusal.
+> `can:viewOverview,form` bounds the binding but says nothing about submissions. `FormSubmissionsGateTest`
+> drives each half out on its own; `FormTabSet` carries the same conjunction so that "the strip offered it"
+> implies "the reader can reach it", which `FormTabSetReachabilityTest` turns from a hope into a theorem.
+> Both conjuncts are **fail-closed structural guards** — no shipped role can observe either, and each is
+> pinned with a synthetic member rather than presented as a live rule.
 
 > **Design Note (ADR-0011 / H1e, 2026-08-03) — advanced analytics coins no permission.** The Phase-3
 > analytics surface (H24a/H24b) authorizes on `dashboard.org.view` and `dashboard.form.view` exactly as
@@ -210,6 +347,70 @@ Unique constraint: `(tenant_id, user_id)` — a person has at most one membershi
 3. **Decline**: `status → declined`. No `model_has_roles` row is ever created.
 4. **Remove** (by an Admin/Owner): a single transaction — `status → removed`, `removed_at`/`removed_by` set, the corresponding tenant-scoped `model_has_roles` row deleted, and every tenant-scoped Sanctum token for that user revoked. Called out as one atomic operation explicitly because Spatie has no awareness of `tenant_users`'s lifecycle on its own — nothing in the package automatically cleans up role/token state when this application-level table changes; the application must own that transaction.
 5. **Ownership transfer** (Owner-only capability, `tenant.ownership.transfer`): updates `tenants.owner_user_id` to the new Owner, changes the outgoing Owner's `model_has_roles` row to `Admin` (never leaves them roleless), and grants the incoming member the `Owner` role — all inside one transaction, logged via `audits` (`event = 'permission_changed'`).
+
+### 7.1 The four doors into a workspace
+
+Membership can be created by four different flows, and **three of the four share one method** —
+`TenantMembershipService::attachMember()`. (The fourth, invitation acceptance, transitions a row that
+already exists rather than attaching a new member; see the table and the note at the end of this section.) That sharing is the design rather than a refactoring
+convenience: the RLS context borrow, the `SET LOCAL` transaction, the seat-quota reservation, the reuse
+of a prior `declined`/`removed` row, the `suspended` refusal and the one-role-per-tenant `syncRoles()`
+are the same problem every time, and a second implementation would be correct until the day one of them
+changed. What differs between the doors is **one string**, recorded in the audit payload as `via`,
+because "how did this person get in" is the only question they answer differently and the ledger is the
+only place the answer survives.
+
+| Door | `via` | Entry point | Gate on a NEW membership |
+|---|---|---|---|
+| Invitation | *(no `attachMember()` call — see step 2 above)* | `InvitationController` | The invite itself; an admin named this person |
+| Self-registration on a workspace subdomain | `self_registration` | `JoinTenantOnRegistration` (a `Registered` listener) | `RegistrationGate` (via the `GateRegistration` middleware on `/register`) |
+| SAML JIT provisioning (P1b) | `sso_jit` | `SsoUserProvisioner` | `sso_connections.jit_provisioning_enabled` |
+| **First-party Google sign-in (J3c2)** | **`google_sign_in`** | `GoogleSignInProvisioner` | **`RegistrationGate`** |
+
+**Why Google's gate is `RegistrationGate` and not a new toggle.** SSO asks a per-connection flag because a
+workspace administrator configured that trust anchor and can reason about it. Google sign-in has **no
+tenant-side configuration at all**, so the question it needs answered — "may somebody who is not yet a
+member become one here?" — is exactly the question `/register` already answers. Reusing it means the
+button's visibility and the flow's outcome cannot disagree, which is that class's stated reason for
+existing. **Stated consequence:** `registration.invite_only` is fail-closed TRUE, so on a default
+workspace Google works for existing members and invited people only, and a stranger is refused. That is
+correct behaviour, not a defect report.
+
+**Three refusals that are shared, and one that is not.**
+
+- **`suspended` → refused, at every door.** An administrative sanction that a new door quietly reversed
+  would be unenforceable in exactly the workspaces most likely to rely on it. Both `attachMember()` and
+  each provisioner check it; the duplication is deliberate, so the guarantee holds for future callers.
+- **A full seat quota → refused.** ⚠️ But the two provisioners translate the refusal differently and both
+  are right. `attachMember()` returns `null`; `JoinTenantOnRegistration` **discards** it (the person keeps
+  an account with no workspace, which is what central-host registration already produces), while
+  `SsoUserProvisioner` and `GoogleSignInProvisioner` **raise** it, because they are about to establish a
+  session and a session with no membership sees an empty product through RLS and reads as data loss. The
+  raise happens inside their transaction, so a freshly created account is discarded with it.
+- **`invited` → activated at the INVITED role, never at the door's default.** ⚠️ This lives in each
+  provisioner and **cannot** live in `attachMember()`, which overwrites `invited_role_id` with whatever
+  role it is handed. An admin who invited somebody as an Admin expressed an intent about that person, and
+  letting a sign-in door silently demote them would make the invitation surface untrustworthy.
+- **Not shared: what a brand-new member's role is.** SSO uses the connection's `default_role_name`
+  (CHECK-constrained to the catalog minus `owner`, because §5 establishes Owner only by ownership
+  transfer). Google has no per-workspace setting and uses `viewer`, `joinOpenTenant()`'s reasoning
+  unchanged: somebody who arrived holding a consumer account has proved nothing about what they should be
+  able to do, and an Owner can promote them from the Members page.
+
+`MemberJoined` fires from inside `attachMember()`'s transaction for every `via`, so the Owner's
+notification is identical across the three doors that go through it — the distinction belongs in the audit
+ledger, where it is, and not in a bell.
+
+⚠️ **BUT THAT IS THREE DOORS, NOT FOUR, AND THE GAP IS THE INVITATION ONE.** `attachMember()` is the only
+dispatch site for `MemberJoined` in the codebase, and `InvitationController` never calls it — an invitee
+accepting is a status transition on a row that already exists (§7 step 2), not an attach. So an Owner is
+told when somebody self-registers, is JIT-provisioned by their IdP, or signs in with Google, and is told
+**nothing** when the person they personally invited accepts — the one door where they had already
+expressed interest in that individual by name. Pre-existing rather than introduced by the fourth door, and
+recorded here because §7.1's first sentence read as though parity existed: a reader planning notification
+work would not discover the gap until testing invite acceptance by hand. Whether to close it is a product
+decision (an acceptance is arguably an answer to the Owner's own action rather than news), not an
+oversight to be quietly patched.
 
 ---
 
@@ -390,9 +591,72 @@ Elaborates ADR-0002 §D3's isolation-focused mention of the super-admin carve-ou
 
 **Implementation status (Increment B2c, 2026-07-05).** The mechanism is now built. The elevated role is a dedicated **non-superuser / NOBYPASSRLS `meridian_superadmin`** login role on its own `pgsql_superadmin` connection (mirroring B1's `meridian_auth`) — deliberately *not* the superuser seeding role, so RLS still applies to it and defense-in-depth holds. `App\Support\Tenancy\TenantIsolation::superAdminBypass*` emits an **additive, role-scoped, GUC-gated permissive policy** (`TO meridian_superadmin USING (current_setting('app.is_superadmin_context', true) = 'true')`) layered on a table that already has its base RLS+FORCE; it is applied to `users` now (`GRANT SELECT` + the policy — plus a `GRANT SELECT ON tenant_users` so the `users` visibility policy's membership-join subquery is evaluable for the role). `App\Support\Tenancy\SuperAdminContext` opens the GUC **transaction-locally** (`is_local = true`) on the elevated connection, and `App\Services\Admin\SuperAdminService` is the single place it is ever opened (tenant list/suspend/reactivate run on the ordinary connection — `tenants` is RLS-exempt — while cross-tenant user reads go through the elevated path). **Mandatory MFA** (below, security-threat-model §8) is enforced by the `superadmin` + `superadmin.mfa` middleware on the central-domain `/admin` console. **`Auditable` logging of super-admin actions is deferred to Phase 1** (no `audits` table exists until then) — carried as an explicit `TODO(audits, Phase 1)` in `SuperAdminService`, per the Q2 decision below.
 
+**Implementation status (Increment I7a, 2026-08-07) — the `feedback_reports` review queue is built, and it is the first console surface whose READ and WRITE take different routes.** `/admin/feedback` lists every tenant's reports through a **SELECT-only** carve-out (`applySuperAdminBypass('feedback_reports', ['SELECT'])` + the matching `GRANT`), while the New → Reviewed → Resolved transitions deliberately do **not** elevate: the console already knows the report's tenant, so `SuperAdminService::transitionFeedback()` adopts that tenant's context on the ordinary connection (the H4 pattern `changeStatus()`/`assignPlan()` established). That is what makes §9's own rule concrete — the requirement is *route through the one service*, not *elevate every operation* — and it is also what delivers decision 2 below: because the write is unelevated, **its audit row lands in the reporting workspace's own ledger**, where that workspace can read it. An UPDATE bypass would have written `tenant_id = NULL` and made the operator's handling of a tenant's report invisible to that tenant, which is the transparency posture inverted.
+
+Two implementation notes that generalise to every future console surface over a tenant-scoped table:
+
+- **The RLS carve-out is only half the job.** `BelongsToTenant` independently adds `where tenant_id = <context ?? sentinel>` to every Eloquent query, and the console runs on the central host with no context — so a cross-tenant read must ALSO call `withoutGlobalScope($tenantScope)`. Omitting it returns an empty list with no error. `listAllUsers()` never needed it only because `users` has no tenant column.
+- **Route-model binding cannot be used.** Binding resolves on the app connection, which likewise has no tenant context there, so every valid id 404s. Console routes over RLS-protected tables take a raw uuid and resolve through the service.
+
+**Implementation status (Increment I7b, 2026-08-08) — the workspace detail page and the PLATFORM audit view are built; cross-tenant audit SEARCH is not, and that is a decision rather than a gap.** `GET /admin/tenants/{tenant}` finally surfaces the plan-assign route that had existed since H5a with no UI, alongside usage and custom domains, all read by adopting the affected tenant's context rather than by elevating (eight RLS-scoped tables reached with one `SET LOCAL` instead of eight new GRANTs). `GET /admin/audit-log` reads the `tenant_id IS NULL` slice that I5 had been writing since 2026-08-06 with no reader.
+
+**The console-scope bullet above promises "cross-tenant Audit Log search for support investigations". I7b deliberately does NOT deliver it.** It was available in a single line — `applySuperAdminBypass('audits', ['SELECT'])` — and was rejected: that helper's gate is unrestricted, so it would have handed the platform operator every tenant's complete history (every form title, every reviewer's `returned_reason`, every membership change in the deployment) in order to display a handful of platform-settings rows. It also inverts this section's own posture, which assumes a tenant-affecting action is readable *by the affected tenant*, not accumulated in a platform console. The narrowed policy `audits_platform_select` (`… AND tenant_id IS NULL`) is what shipped instead, and `PlatformAuditRlsTest` asserts in both directions: a tenant cannot read a platform row, and the operator cannot read a tenant row.
+
+A third note joins the two above, and it is the one this increment adds:
+
+- **A console read over a table whose base policy is NOT nullable-global needs a carve-out narrowed to the slice it actually serves, not the generic bypass.** The unrestricted gate is a sensible default only where the platform slice is already public; on a strict or append-only table it is a silent, enormous widening. Use `TenantIsolation::platformRowsBypass()` (ADR-0002 §D3's I7b amendment), and name the policy outside the `*_superadmin_*` prefix so a `pg_policies` sweep for unrestricted reads stays honest.
+
+**Per-entity search visibility (Increment J1b, PRD §3.7).** Global search coins **no new permission key** — the catalog stays closed at 29. Each entity is one arm behind an interface, and each arm reuses the gate its own list page already uses, so "what may I find" can never drift from "what may I open". Three rules govern the table:
+
+1. **The arm gate runs first.** A refused arm is **ABSENT from the response**, never rendered as a group with zero results — a `0` is a claim about how much exists, an absent key is the truth. This is binding on every search surface (`docs/ux/design-system-reference.md` §3.4.1).
+2. **Counts are computed after permission filtering**, from the same builder as the rows (`SearchCountLeakTest`). A badge reading "3" over a list of 1 discloses that two invisible rows exist, which is a leak with no row leaving the database.
+3. **The row rule is the policy's, never analytics'.** `Form::scopeVisibleTo()` is the list twin of `FormPolicy::view()` and is pinned to it in both directions by `FormVisibilityScopeTest`.
+
+| Entity | Arm gate | Row rule | Owner / Admin | Form Editor | Reviewer | Viewer |
+|---|---|---|---|---|---|---|
+| Forms | `viewAny` on `Form` (`forms.create` \| `.edit.any` \| `.edit.own`) | `Form::scopeVisibleTo()`, Editor capacity, non-archived | ✓ every non-archived form | ✓ editor-granted only | ✗ **arm refused** | ✗ **arm refused** |
+| Submissions | `viewAny` on `Submission` | `Submission::scopeVisibleTo()` + `countable()`; matches own vector, the FORM's title, its 8-char `reference` (exact), or its full id (exact) | ✓ every non-draft | ✓ granted forms | ✓ granted forms | ✓ per `submissions.view` |
+| Members *(J1c)* | `tenant.members.invite` — the key `/members` itself uses | `whereExists` over `tenant_users (tenant_id, status='active')` on the **default** connection; `ILIKE` over name + email | ✓ active roster | ✗ **arm refused** | ✗ **arm refused** | ✗ **arm refused** |
+| Settings & pages *(J1c)* | — (never refused) | a static catalog, filtered per row by `ShellAbilities` + the plan feature — the same pair `Sidebar.vue` reads | ✓ every reachable page | ✓ theirs | ✓ theirs | ✓ theirs |
+| Audit rows | — | — | ✗ **not an entity** | ✗ | ✗ | ✗ |
+
+⚠️ **Pending invitations are NOT searchable, and that is a decision with a measurement behind it.** The join-shape policy admits only `tu.status = 'active'`, and RLS applies at *every* reference to `users` — so a `tenant_users`-first join does not rescue an invited row either. Verified against the seeded corpus: joining `tenant_users` to `users` under one tenant's context returns its six active members and drops the invited one, whose `tenant_users` row is perfectly visible. Pending invites stay visible on `/members`, which already holds their identities. **If that ever needs to change, the fix is a policy decision about `users_visibility` — never a connection hop**, because widening the policy would change every `users` read in the product (feedback reporter names, audit actors, ownership transfer) in order to serve one search surface.
+
+⚠️ **Audit rows are not on this list, and adding them would be a widening rather than a completion** — see the refusal recorded immediately above. The same reasoning that rejected `applySuperAdminBypass('audits', ['SELECT'])` for the console applies to a tenant-side search arm: a keyword search over `old_values`/`new_values` is a channel over precisely the data `AuditRedactor` exists to remove, and `AuditableTypes::label()` fails open, so a newly-registered alias is un-redacted until someone remembers to add it. `App\Enums\SearchEntity`'s docblock carries the same warning at the code.
+
+⚠️ **THE STANDING RULE, ADDED BY J1c AND BROADER THAN SEARCH: no user-supplied predicate may ever run on `pgsql_auth`.** `users_auth_select … USING (true)` (§6's fourth RLS shape) exists to let the pre-auth login path resolve an identity with no tenant context, and on that connection there is no tenant boundary of any kind — `users` has no `tenant_id` column at all. `TenantMembershipService::listMembers()` is safe there only because its id set is derived from an RLS-bounded `tenant_users` read *before* the connection hop; it adds no predicate of its own. A search does the opposite. Measured on the seeded corpus rather than argued — one tenant's admin running `email ILIKE '%o%'`:
+
+| Connection | Rows | Includes |
+|---|---|---|
+| `pgsql_auth` | 8 | **`owner@northwind.test` — another tenant's user** |
+| default (app) | 6 | that tenant's active members only |
+
+`MemberSearchArm` therefore runs on the default connection, where the join-shape policy *is* the boundary, and carries its own `whereExists` over `tenant_users` as well — not redundancy: `meridian_auth` is granted `SELECT, UPDATE` on `users` **and nothing else**, so that predicate cannot execute on the pre-auth connection at all, which turns a would-be silent cross-tenant leak into a hard failure. `SearchMemberConnectionTest` pins the rule three ways: a runtime `QueryExecuted` guard, a comment-stripped source assertion on the arm, and a directory sweep over the whole search namespace that will catch an arm nobody has written yet.
+
+### 9.1 The list-page keyword filters (J1e)
+
+Every row-list page takes a `?q`. These are not search *arms* — they narrow a list the viewer is already authorized to be looking at — so they coin no permission and change no gate; the route's existing `can:` middleware and the presenter's existing row rule both apply first, unchanged. Three of them are nonetheless authorization-relevant enough to record here.
+
+**The members roster filters in PHP, over rows the `pgsql_auth` hop has already bounded.** This is §9's standing rule arriving one increment later on the same method: `listMembers()` is safe on that connection only because it adds no predicate, and a keyword *is* a predicate. `TenantMembershipService::listMembers(Tenant, ?SearchTerms)` therefore builds its rows exactly as before and applies `SearchTerms::matchesAny()` to each one afterwards. The candidate set is one roster — tens to low hundreds — so the scan is the honest shape, not a compromise. `MembersRosterFilterTest` asserts this **structurally**: it listens on `pgsql_auth` and fails if the user's text ever appears in a binding there. An outcome-only test would pass just as happily against an implementation that fetched every tenant's matching users and filtered the leak out in PHP afterwards.
+
+**Its one deliberate asymmetry with the search arm, which runs the safe direction.** The roster's `q` **finds pending invitations**; `MemberSearchArm` structurally cannot (the measurement two paragraphs up). Both are correct: `/members` has already fetched and rendered those identities, so filtering the list it is showing discloses nothing new — while global search would have to go and fetch them. Pinned in both directions so neither half can be "made consistent" by accident.
+
+**The audit log's `q` narrows to target and actor, and never reads the diff.** It resolves to `(auditable_type = 'form' AND auditable_id IN (matching forms)) OR user_id IN (matching users)`. The refusal above — that a keyword over `old_values`/`new_values` is a channel over exactly what `AuditRedactor` removes — is *why*, and it holds whether the search is a global arm or a filter on the page itself. Two properties keep it that way rather than leaving it to discipline:
+
+  - The forms and users subqueries confine the non-leakproof operators (`@@`, `ILIKE`) to `forms` and `users`; every predicate on `audits` stays `=`/`IN` over plain columns, which is also what keeps `audits_tenant_auditable_idx` and `audits_tenant_user_idx` reachable under RLS (J1b's leakproof measurement, applied forward).
+  - The users subquery runs on the **default** connection, per the standing rule.
+
+  `AuditKeywordFilterTest` seeds a distinctive token into a diff and requires it to be unfindable *while* a target-title search still works — so the refusal cannot degrade into a dead parameter unnoticed.
+
 **Resolved decisions (2026-07-05, decided with the product owner rather than silently picked):**
 
 1. **Impersonation — deferred.** The platform console does **not** support "log in as this user" in Phase 0. It is a large security surface and would need an `acting_as_user_id`-style `audits` column (and the `audits` table itself, which does not exist until Phase 1) to keep a super-admin's own actions distinguishable from actions taken while impersonating. Revisit when support tooling genuinely requires it; design the `acting_as_user_id` column alongside the Phase-1 `audits` table if so.
+
+   > **AS BUILT (I11a then I11b, 2026-08-09) — THE PRECONDITION AND THE FEATURE ARE BOTH SHIPPED.** ⚠️ This line read *"the feature is NOT BUILT YET"* until the pre-merge review of the integration PR, which is the branch that ships impersonation — the document denied a feature its own merge delivers, which is the failure mode this corpus has an ADR-numbering incident to show for. I11b built the cross-host single-use token hand-off described below, the banner, the exit path and the 30-minute cap (`EnforceImpersonationTimeout`); the four decisions of record recorded two paragraphs down are all implemented. What follows is kept as written because it is still the reasoning, not a status. `audits.acting_as_user_id` exists, is written by `AuditLogger` on every row, and is read by both viewers, the CSV/XLSX export and `/api/v1`. It landed **before** I11b's actual impersonation, deliberately: a release in which the ledger could be lied to but not record the lie is the window `security-threat-model.md` §8 describes, and shipping the column first closes it by construction.
+   >
+   > ⚠️ **This entry is a DEFERRAL, not a specification, and reading it as one is a trap I11b must avoid.** The single sentence above is the *entire* impersonation requirement in this repository — a grep for `impersonat` across `docs/`, the PRD, the backlog, the ADRs and the threat model returns nothing else normative. Actor eligibility, a banner, the exit path, session TTL, read-only vs read-write, and notifying the tenant were all **unspecified**, and were therefore decided with the product owner on 2026-08-09 rather than inferred: **full read-write impersonation, fully audited; any ACTIVE tenant member may be impersonated but never another super-admin and never yourself; the affected tenant sees it in their OWN `/audit-log` and the Owner is notified through I3's notification substrate.** Those four are decisions of record — do not re-derive them.
+   >
+   > The structural constraint I11b inherits, and the one that shapes everything: `SESSION_DOMAIN` is null, so **the session cookie is host-only** (`routes/tenant.php` records the correction). A super-admin authenticated on the central host has *no* session on `acme.…`, so impersonation cannot be a session flip — it is a cross-host, single-use, TTL'd token handoff. stancl/tenancy ships a `UserImpersonation` feature for exactly that shape, but it is commented out in `config/tenancy.php` and is not adoptable as-is: it calls `loginUsingId()` and leaves no trace of who the operator really was, which is precisely the failure this column exists to prevent.
 2. **Audit-log visibility of super-admin actions — transparency.** A tenant's own Audit Log (PRD Feature #12) **will** surface actions the platform/support team took against that tenant's data. This aligns with the processor posture in `docs/data-privacy-gdpr-compliance.md` (the tenant is Controller; the platform is Processor and should be transparent about its access). This is the principle the Phase-1 `audits` work must implement; B2c records it here because the `audits` table does not exist yet.
 3. **Internal staff graduation — binary.** Platform-side access stays a single full-access boolean (`is_super_admin`). Graduated tiers (e.g. read-only support vs. full super-admin) are **not** introduced now — nothing in the current product defines an internal staffing model that needs them. Revisit if/when that model is defined; the change would be additive (a tier column/enum + gating), not a rework of the binary flag.
 
@@ -428,7 +692,7 @@ ADR-0002 §D3 documents *why* each layer is enforced (a descriptive table). This
 ## 11. Out of Scope / Deferred
 
 - Detailed OpenAPI request/response shapes for `/api/v1/users`, `/api/v1/roles` → Doc #14 (API Specification).
-- SSO/SAML → Phase 4 (architecture plan §3).
+- ~~SSO/SAML → Phase 4 (architecture plan §3).~~ **BUILT (P1a–P1c, ADR-0016)** — a per-tenant SAML 2.0 Service Provider, SP-initiated only, Enterprise-gated. §7.1 above already describes JIT provisioning as one of the four doors, so this line was contradicting its own document. Its threat surface is `docs/security-threat-model.md` §8.
 - Dedicated-database tenancy → ADR-0002's own explicitly deferred future ADR.
 - GDPR subject-access/erasure mechanics for `users`/`tenant_users` rows → Doc #12 (Data Privacy & GDPR/Compliance Doc).
 - Full audit-event redaction rule detail → Doc #13 (Audit & Compliance Logging Spec) — this doc only specifies that role/permission changes emit `audits.event = 'permission_changed'` (already in the Data Dictionary's `AuditEvent` enum).

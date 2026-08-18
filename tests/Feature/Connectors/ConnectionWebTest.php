@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
+use App\Enums\ConnectorProviderKey;
 use App\Enums\ConnectorSubscriptionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\PlanTier;
@@ -96,7 +97,7 @@ it('renders the integrations index with the provider catalog, connections and th
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('integrations/Index', false)
-            ->has('providers', 1)
+            ->has('providers', count(ConnectorProviderKey::cases()))
             ->where('providers.0.key', 'slack')
             ->where('providers.0.connected', true)
             ->has('connections', 1)
@@ -104,7 +105,7 @@ it('renders the integrations index with the provider catalog, connections and th
             ->has('connections.0.rules', 2)
             ->has('summary.rules')
             ->has('summary.deliveries')
-            ->has('eventTypes', 4)
+            ->has('eventTypes', count(DomainEventType::cases()))
             ->where('can.create', true));
 });
 

@@ -19,15 +19,19 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsBreadcrumb,
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsCard,
     MdsDataTable,
     MdsEmptyState,
+    MdsIcon,
     MdsModal,
     MdsPagination,
     statusVariant,
     type DataTableColumn,
+    type BreadcrumbItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import RuleFormModal from '@/components/integrations/RuleFormModal.vue';
@@ -37,6 +41,8 @@ import type { ConnectionCard, DeliveryRow, Meta, Option, RuleDetail } from '@/co
 import type { FlashTestResult } from '@/types/inertia';
 
 const props = defineProps<{
+    /** Server-built (J2d): `Integrations / {rule name}`, each crumb resolved against its own gate. */
+    crumbs: BreadcrumbItem[];
     connection: ConnectionCard | null;
     rule: RuleDetail;
     deliveries: { data: DeliveryRow[]; meta: Meta };
@@ -116,9 +122,10 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Integration rule · ${rule.name}`" />
 
-        <Link href="/integrations" class="detail__back">← Back to integrations</Link>
-
         <PageHeader :title="rule.name" icon="plug">
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
                 <template v-if="can.update">
                     <!-- No `title` explaining the disabled state: a natively disabled button is not focusable,
@@ -143,15 +150,20 @@ function formatDate(iso: string | null): string {
                 <dl class="detail__meta">
                     <div class="detail__meta-row">
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(rule.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(rule.status)" dot /></dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Workspace</dt>
                         <dd>{{ connection?.external_account_label ?? 'Removed' }}</dd>
                     </div>
                     <div class="detail__meta-row">
-                        <dt>Channel</dt>
-                        <dd class="detail__mono">{{ channelLabel }}</dd>
+                        <!-- "Destination", not "Channel" (H16c). This row read `Channel` and rendered
+                             `channelLabel`, so EVERY tabular rule showed an em dash under a heading naming a
+                             concept its provider does not have — a Sheets defect H16b shipped and Airtable
+                             would have doubled. `destination_label` is server-resolved for all three
+                             providers; the channel pair stays the fallback for a rule stored before it. -->
+                        <dt>Destination</dt>
+                        <dd class="detail__mono">{{ rule.destination_label ?? channelLabel }}</dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Events</dt>
@@ -159,7 +171,10 @@ function formatDate(iso: string | null): string {
                     </div>
                     <div class="detail__meta-row">
                         <dt>Scope</dt>
-                        <dd>{{ rule.form_title ?? 'All forms' }}</dd>
+                        <dd>
+                            <Link v-if="rule.form_url" :href="rule.form_url" class="scope-link">{{ rule.form_title }}</Link>
+                            <template v-else>{{ rule.form_title ?? 'All forms' }}</template>
+                        </dd>
                     </div>
                 </dl>
             </MdsCard>
@@ -187,8 +202,11 @@ function formatDate(iso: string | null): string {
             </MdsCard>
         </div>
 
-        <MdsCard v-if="!grantLive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- J4a: an `MdsCard` with no `role` becomes an info `MdsAlert`. The paragraph drops
+             `.detail__prose`, which pins `color: var(--mds-color-text-body)` and would override the alert's
+             tone foreground on a tinted field; that class has two other consumers here and is left alone. -->
+        <MdsAlert v-if="!grantLive" class="detail__notice" tone="info">
+            <p>
                 <template v-if="connection === null || connection.disconnected">
                     The workspace this rule delivered to was <strong>disconnected</strong>. Reconnect it from
                     Integrations to resume — this rule is kept and paused until you do.
@@ -197,14 +215,46 @@ function formatDate(iso: string | null): string {
                     This workspace needs to be reconnected before anything is delivered.
                 </template>
             </p>
-        </MdsCard>
+        </MdsAlert>
 
-        <MdsCard v-else-if="!isActive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- The paused-rule twin. `warning` rather than `info`: the rule is configured and expected to be
+             delivering, and is not. Still not `assertive` — it was already true on load. -->
+        <MdsAlert v-else-if="!isActive" class="detail__notice" tone="warning">
+            <p>
                 This rule is <strong>{{ rule.status }}</strong> and isn’t delivering. Resume it to start again —
                 that also clears the failure counter.
             </p>
-        </MdsCard>
+            <!-- H16b — WHY it stopped, not merely that it did. A paused Sheets rule is almost always a
+                 drifted header row or a destination we can no longer reach, and both are things the tenant
+                 fixes in a minute IF they are told which. `paused_reason` is the `[code] sentence` the
+                 adapter itself wrote, so nothing here is the provider's own unreviewed text. -->
+            <p v-if="rule.paused_reason" class="detail__reason">
+                <MdsIcon name="alert" size="sm" class="detail__reason-icon" aria-hidden="true" />
+                <span>{{ rule.paused_reason }}</span>
+            </p>
+            <div v-if="rule.spreadsheet_id && can.update" class="detail__reason-actions">
+                <!-- `spreadsheet_id` is the tabular destination's document id for BOTH providers — a Google
+                     spreadsheet id or an Airtable base id — so this condition needed no widening; only the
+                     button's copy did. -->
+                <!-- Opening the edit modal RE-INSPECTS the destination, so the tenant sees its CURRENT
+                     headings rather than the ones stored when the rule was written — which, on a drifted
+                     rule, is precisely the difference they need to see. -->
+                <MdsButton variant="secondary" icon-left="edit" @click="editOpen = true">
+                    Review columns
+                </MdsButton>
+                <MdsButton
+                    v-if="rule.spreadsheet_url"
+                    as="a"
+                    variant="tertiary"
+                    icon-left="external-link"
+                    :href="rule.spreadsheet_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Open in {{ connection?.provider_label ?? 'the provider' }}
+                </MdsButton>
+            </div>
+        </MdsAlert>
 
         <section class="detail__log">
             <h2 class="detail__card-title detail__log-title">Delivery log</h2>
@@ -213,7 +263,7 @@ function formatDate(iso: string | null): string {
                     <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
                 </template>
                 <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" />
+                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
                 </template>
                 <template #cell-attempt_count="{ row }">
                     {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
@@ -245,6 +295,8 @@ function formatDate(iso: string | null): string {
         <RuleFormModal
             v-model:open="editOpen"
             :connection-id="rule.connection_id"
+            :provider="connection?.provider ?? null"
+            :destination-kind="connection?.destination_kind ?? null"
             :forms="forms"
             :event-types="eventTypes"
             :rule="rule"
@@ -271,13 +323,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-3);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-text-secondary);
-}
-
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
@@ -319,8 +364,44 @@ function formatDate(iso: string | null): string {
     font-family: var(--mds-font-family-mono);
 }
 
+/* The alert owns tint, padding and radius; only the spacing survives. The descendant reset is needed
+   because slotted content is compiled in THIS component and no longer inherits `.detail__prose`. */
 .detail__notice {
     margin-bottom: var(--mds-space-5);
+}
+
+.detail__notice p {
+    margin: 0;
+}
+
+/* H16b — the adapter's own explanation for a paused rule, on the warning surface. Same recipe as the
+   provider caution on the Integrations page, and the same reason: the icon carries the meaning alongside
+   the colour, and `status-warning-{bg,fg}` is a measured pair. */
+.detail__reason {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--mds-space-2);
+    margin: var(--mds-space-3) 0 0;
+    padding: var(--mds-space-3);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-status-warning-bg);
+    color: var(--mds-color-status-warning-fg);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+}
+
+.detail__reason-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Wrap rather than overflow — the standing 375px rule for any row of actions. */
+.detail__reason-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mds-space-2);
+    margin-top: var(--mds-space-3);
 }
 
 .detail__prose {
@@ -358,5 +439,23 @@ function formatDate(iso: string | null): string {
     .detail__meta dt {
         margin-top: var(--mds-space-2);
     }
+}
+
+/* J2d — the Scope column's form link. `-fg`, never `-bg`: the J2a WCAG 1.4.11 finding, and the same token
+   `inbox__form-link` and `forms__title-link` already use. There is no global `a` reset in this app, so an
+   unclassed link renders in browser-default #0000EE — the one-design-system rule caught by review. */
+.scope-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.scope-link:hover {
+    text-decoration: underline;
+}
+
+.scope-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 </style>

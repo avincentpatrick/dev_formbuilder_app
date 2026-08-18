@@ -6,6 +6,7 @@ namespace App\Support\Forms;
 
 use App\Enums\FormScheduleState;
 use App\Models\Form;
+use App\Models\Submission;
 use Carbon\CarbonInterface;
 
 /**
@@ -56,11 +57,18 @@ final class FormSchedule
     }
 
     /**
-     * The respondent-facing acceptance label for the runtime (H12b consumes it). `$finalizedCount` is the
-     * live non-draft submission count, supplied only when the form has a `max_responses` cap (otherwise null).
+     * The respondent-facing acceptance label for the runtime (H12b consumes it). `$consumedCount` is the live
+     * count of submissions that consumed a paid slot ({@see Submission::scopeConsumesCapacity()}),
+     * supplied only when the form has a `max_responses` cap (otherwise null).
      * Precedence: an explicit close beats a pending open beats a full cap.
+     *
+     * The comparison is `>=` where `FormAcceptanceGuard::assertCapacity()` uses `>`, and that asymmetry is
+     * correct rather than a bug: the guard runs mid-transaction with a capacity-consuming row being finalized
+     * already counted, while this label is computed with nothing in flight. (The qualifier matters since I9a
+     * — a `screened_out` row in flight is written before the guard counts and then excluded by the predicate,
+     * so it is not among the "already counted".)
      */
-    public static function acceptance(Form $form, ?int $finalizedCount, CarbonInterface $now): string
+    public static function acceptance(Form $form, ?int $consumedCount, CarbonInterface $now): string
     {
         if (self::isAfterClose($form, $now)) {
             return 'closed';
@@ -70,7 +78,7 @@ final class FormSchedule
             return 'opens_soon';
         }
 
-        if ($form->max_responses !== null && $finalizedCount !== null && $finalizedCount >= $form->max_responses) {
+        if ($form->max_responses !== null && $consumedCount !== null && $consumedCount >= $form->max_responses) {
             return 'capacity_reached';
         }
 

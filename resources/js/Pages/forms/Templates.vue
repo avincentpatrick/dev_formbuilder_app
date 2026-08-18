@@ -53,7 +53,11 @@ function useTemplate(template: TemplateCard): void {
             </template>
         </PageHeader>
 
-        <ul v-if="templates.length" class="templates__grid" aria-label="Form templates">
+        <!-- JR4 — `role="list"` is NOT redundant and must not be tidied away: `list-style: none` below
+             removes list semantics in WebKit, so without it VoiceOver announces the cards with no sense
+             of how many there are. `forms/Index.vue:412` carries the same note and named this file as
+             the one place still missing it. -->
+        <ul v-if="templates.length" class="templates__grid" role="list" aria-label="Form templates">
             <li v-for="template in templates" :key="template.id" class="templates__cell">
                 <MdsCard>
                     <template #header>
@@ -105,7 +109,12 @@ function useTemplate(template: TemplateCard): void {
 <style scoped>
 .templates__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    /* JR4 — `min(100%, 280px)`, not a bare `280px`: a track floor wider than the container overruns, and
+       because `.app-shell` is `overflow-x: clip` the overrun is CLIPPED rather than scrolled, so the e2e
+       document-width assertion cannot see it. This was the one grid in the app without the guard
+       (`forms/Index.vue:685` named it). 280px is never wider than the ~343px phone box today — which is
+       exactly why it survived, and exactly why it should not be left to the next type scale to find. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
     gap: var(--mds-space-4);
     margin: 0;
     padding: 0;

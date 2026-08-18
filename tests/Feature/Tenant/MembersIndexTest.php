@@ -46,6 +46,9 @@ function committedMemberUser(string $name): User
         'name' => $name,
         'email' => Str::lower(Str::random(10)).'@acme.test',
         'password' => Hash::make('secret-password-123'),
+        // J3a — the authenticated tenant group carries `verified`; an unstamped identity handed to
+        // `actingAs()` is bounced to /email/verify and the page assertions below read as product failures.
+        'email_verified_at' => now(),
     ]);
     $user->setConnection((string) config('database.default'));
 

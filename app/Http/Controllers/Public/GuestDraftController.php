@@ -15,6 +15,7 @@ use App\Notifications\ResumeLinkNotification;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Branding\BrandPalette;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Http\JsonResponse;
@@ -87,6 +88,11 @@ final class GuestDraftController extends Controller
             appVersion: $request->appVersion(),
             draftCurrentStep: $request->draftCurrentStep(),
             ttlDays: is_numeric($ttl) ? (int) $ttl : null,
+            // Increment P3a — every request on this channel makes a baseline claim, exactly as
+            // {@see SubmissionAnswerEditService::edit()} treats "every HTTP edit". The flag is true even when
+            // the value is null, because null IS the claim a first save makes.
+            checkBaseline: true,
+            baseContentChecksum: $request->baseContentChecksum(),
         ));
 
         $submission = $result->submission;
@@ -94,8 +100,13 @@ final class GuestDraftController extends Controller
         $resumeUrl = $this->resumeUrl($token->tenantId, $minted->token);
 
         if ($request->finishLater() && $submission->guest_contact_email !== null) {
+            // The only branded email a RESPONDENT receives, and the reason branding must reach mail at all
+            // (H23a4). Resolved from the ambient guest-runtime tenant, in-request.
             Notification::route('mail', $submission->guest_contact_email)
-                ->notify(new ResumeLinkNotification($form->title, $resumeUrl));
+                ->notify(
+                    (new ResumeLinkNotification($form->title, $resumeUrl))
+                        ->withBrand(BrandPalette::current())
+                );
         }
 
         return response()->json([
@@ -105,6 +116,10 @@ final class GuestDraftController extends Controller
                 'resume_token' => $minted->token,
                 'resume_url' => $resumeUrl,
                 'expires_at' => gmdate('c', $minted->expiresAt),
+                // Increment P3a — the baseline for this device's NEXT save, taken from what the service just
+                // wrote rather than re-read. A device that does not chain this forward will be refused on its
+                // following save, which is the intended direction for a guard to fail.
+                'content_checksum' => $result->contentChecksum,
             ],
         ], $result->created ? 201 : 200);
     }

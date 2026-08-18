@@ -15,6 +15,7 @@ use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPipeline;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -77,7 +78,15 @@ final class SyncSubmissionController extends Controller
             return [
                 'client_submission_uuid' => $uuid,
                 'status' => $result->created ? 'created' : 'duplicate',
-                'submission' => ['id' => $result->submission->id, 'status' => $result->submission->status->value],
+                // Increment J2e — `reference` joins the pair, so an offline client can replace the provisional
+                // queue tag it has been showing with the real handle the moment a row settles. Without it the
+                // outbox would have to re-fetch, or keep quoting a code the tenant cannot find.
+                // ⚠️ This shape IS the /api/v1 contract Scramble exports, so `openapi.json` moves with it.
+                'submission' => [
+                    'id' => $result->submission->id,
+                    'reference' => SubmissionReference::format($result->submission->reference),
+                    'status' => $result->submission->status->value,
+                ],
                 'error' => null,
             ];
         } catch (SubmissionValidationException $e) {

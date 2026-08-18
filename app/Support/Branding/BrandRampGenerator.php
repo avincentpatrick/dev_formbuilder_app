@@ -60,8 +60,16 @@ final class BrandRampGenerator
      * Bumped whenever a target, ground or role changes. Stored on every ramp
      * ({@see BrandRamp::$engineVersion}) so a future change is an explicit re-derivation rather than a
      * silent repaint of every live tenant.
+     *
+     * **2 — JR1, the Vivid Product re-skin (2026-08-12).** The neutral ramp moved from the warm
+     * paper/drafting-blue family to a cool one, and the four grounds below ARE neutral primitives, so a
+     * ground that stayed put would have been measuring every tenant's ramp against a canvas the app had
+     * stopped painting: a stored "6.4:1 against your dark canvas" for a canvas that no longer exists.
+     * Targets and roles are untouched — only the grounds moved. The re-derivation is
+     * `2026_08_12_000100_rederive_tenant_brand_ramps_for_engine_v2`, which re-runs this generator over
+     * each tenant's saved `brand_color`; it is what makes the bump explicit rather than a silent repaint.
      */
-    public const int VERSION = 1;
+    public const int VERSION = 2;
 
     /** The text every primary fill carries. `--mds-color-text-on-primary` is `#FFFFFF` in BOTH themes. */
     private const string ON_PRIMARY = '#FFFFFF';
@@ -90,13 +98,20 @@ final class BrandRampGenerator
      * The grounds each theme measures against — the REAL semantic tokens, not approximations.
      *
      * `surface` is `--mds-color-bg-surface` (dark re-points it to `neutral-100`), `canvas` is
-     * `--mds-color-bg-canvas` (`neutral-50`, which the dark neutral flip carries to `#0C2337`), and `ink`
+     * `--mds-color-bg-canvas` (`neutral-50`, which the dark neutral flip carries to `#0F131C`), and `ink`
      * is `neutral-900` — near-black in light, PALE in dark, which is why the tint search finds a light
      * colour in one theme and a dark one in the other from the same rule.
+     *
+     * **These six literals are a SECOND COPY of six design-system values and are drift-tested**, by
+     * `tests/Unit/Branding/BrandRampGroundParityTest.php` — added in JR1 for the reason JR1 discovered:
+     * nothing tied them to the token sources, so the neutral ramp could move underneath them and every
+     * derived ratio would have gone quietly wrong. That is the same class of defect
+     * {@see BrandPalette}'s parity test exists for; this is the second instance of it found in the
+     * branding stack.
      */
     private const array GROUNDS = [
-        'light' => ['surface' => '#FFFFFF', 'canvas' => '#F3F4F1', 'ink' => '#0E1620'],
-        'dark' => ['surface' => '#123350', 'canvas' => '#0C2337', 'ink' => '#EAF1F6'],
+        'light' => ['surface' => '#FFFFFF', 'canvas' => '#F5F7FC', 'ink' => '#121A2A'],
+        'dark' => ['surface' => '#1A2130', 'canvas' => '#0F131C', 'ink' => '#EFF4FD'],
     ];
 
     /** Target ratios per theme and role — the midpoint of the two ratified accents. See the docblock. */

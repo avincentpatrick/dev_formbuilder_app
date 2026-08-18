@@ -141,6 +141,37 @@ final class ConnectorOAuthStateService
         );
     }
 
+    /**
+     * The PKCE `code_verifier` for a flow, DERIVED from its state token rather than stored (H16c).
+     *
+     * ── WHY DERIVATION AND NOT A STORE ───────────────────────────────────────────────────────────────────
+     *
+     * PKCE needs one secret held across the two half-flows, and this framework has nowhere to hold it: the
+     * authorize request runs on a tenant subdomain with a session, the callback runs on the central domain
+     * with none, and that split is §D2/§D3's whole design. A cache or table row would be the third piece of
+     * per-flow server state in a framework whose stateless-token design exists precisely to avoid the first.
+     * The state token is already the thing both halves hold, so the verifier hangs off it.
+     *
+     * ── WHY IT IS STILL A SECRET, WHICH IS THE PART WORTH CHECKING ───────────────────────────────────────
+     *
+     * An attacker who intercepts the redirect sees `code` AND `state`, so deriving from the state LOOKS like
+     * deriving a secret from a public value. It is not: the derivation is an HMAC under the same key that
+     * signs the state, which the attacker does not hold. What is public is the state; what protects the
+     * exchange is the key. An attacker who holds the key can already mint states, so PKCE was never the
+     * control standing between them and this endpoint.
+     *
+     * Domain-separated by prefix from {@see sign()}, the convention `AppServiceProvider` already uses to
+     * derive this service's key from `APP_KEY` — the same secret must never be asked two questions.
+     *
+     * The output is 43 base64url characters: exactly the PKCE minimum (RFC 7636 §4.1 requires 43–128 from
+     * the unreserved set `[A-Za-z0-9-._~]`, which base64url satisfies), and 32 bytes of HMAC output is the
+     * entropy the same RFC recommends.
+     */
+    public function codeVerifierFor(string $state): string
+    {
+        return self::base64UrlEncode(hash_hmac('sha256', 'connector-pkce.v1.'.$state, $this->key, true));
+    }
+
     private function sign(string $body): string
     {
         return hash_hmac('sha256', $body, $this->key, true);

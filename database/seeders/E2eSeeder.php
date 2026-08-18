@@ -5,25 +5,32 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\AnalyticsAxis;
+use App\Enums\AuditEvent;
 use App\Enums\BillingInterval;
 use App\Enums\ConnectionStatus;
 use App\Enums\DomainEventType;
 use App\Enums\DomainVerificationFailure;
+use App\Enums\FeedbackStatus;
 use App\Enums\FieldType;
 use App\Enums\FormScheduleState;
+use App\Enums\NotificationType;
 use App\Enums\PlanTier;
 use App\Enums\ResourceCapacity;
+use App\Enums\SubmissionPdfOutcome;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Enums\TenantUserStatus;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointStatus;
+use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
 use App\Models\Domain;
+use App\Models\FeedbackReport;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormVersion;
+use App\Models\Notification;
 use App\Models\Plan;
 use App\Models\Role;
 use App\Models\SavedReportView;
@@ -41,16 +48,24 @@ use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Notifications\NotificationPreferenceResolver;
 use App\Services\Scoping\ScopeNodeService;
 use App\Services\Submissions\AnswerIndexProjector;
 use App\Services\Webhooks\WebhookEndpointService;
 use App\Support\Analytics\AnalyticsQuery;
+use App\Support\Audit\AuditLogger;
+use App\Support\Audit\AuditRedactor;
 use App\Support\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\DeterministicIds;
+use Database\Seeders\Concerns\SeedsGamificationLedger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -63,11 +78,82 @@ use Spatie\Permission\PermissionRegistrar;
  */
 class E2eSeeder extends Seeder
 {
+    use DeterministicIds;
+    use SeedsGamificationLedger;
+
     private const OWNER_EMAIL = 'demo@meridian.test';
 
+    /**
+     * ⚠️ DO NOT "FIX" THIS TO SATISFY J3a'S FOUR CHARACTER CLASSES. IT IS EXEMPT BY CONSTRUCTION.
+     *
+     * Every seeded password is written through `Hash::make()` and read back by `Hash::check()` on the LOGIN
+     * path, which has no opinion whatever about character classes — `Password::defaults()` governs a password
+     * being CHOSEN, not one being verified. Nothing in the suite re-registers or resets with these strings:
+     * their only consumers are `POST /login` here and in `tests/e2e/global-setup.ts`.
+     *
+     * Changing them would churn this file, {@see DemoSeeder}, `tests/e2e/global-setup.ts`,
+     * `tests/e2e/support/console.ts`, `docs/TESTING-GUIDE.md` and the tracker's next-prompt — for zero
+     * behavioural gain, while breaking every credential the user has memorised.
+     */
     private const OWNER_PASSWORD = 'meridian-e2e-2026';
 
+    /** The central-domain console operator (Increment I10e) — see seedSuperAdmin(). */
+    private const SUPER_ADMIN_EMAIL = 'console@meridian.test';
+
+    private const SUPER_ADMIN_PASSWORD = 'meridian-console-2026';
+
     private const PENDING_EMAIL = 'pending@meridian.test';
+
+    /**
+     * A KNOWN password for the unverified placeholder (J3b). It previously carried `Str::random(48)`,
+     * which is right for a placeholder nobody signs in as — but the verify-email accessibility scan has
+     * to actually BE that person, and `/email/verify` sits behind `auth`. Signing in is the only way to
+     * reach the page a locked-out member sees.
+     */
+    private const PENDING_PASSWORD = 'meridian-e2e-2026';
+
+    /**
+     * A deterministic invite token (J3b), so `/invitations/{token}` is addressable by a spec.
+     *
+     * The stored column is the SHA-256 of this string — `InvitationController::resolvePendingInvite()`
+     * hashes what it is given and matches on the digest, so the plaintext never touches the database and
+     * a fixed value here leaks nothing that a fixed seeded password does not. It was `Str::random(48)`
+     * before, which is correct for a real invite and makes the page unreachable to a test.
+     */
+    private const INVITE_TOKEN = 'e2e-invitation-token-do-not-reuse-in-production';
+
+    /**
+     * A user enrolled in two-factor (J3b), for the `/two-factor-challenge` scan.
+     *
+     * ⚠️ DELIBERATELY NOT A MEMBER OF ANY WORKSPACE. Fortify authenticates on credentials alone, and
+     * `RedirectIfTwoFactorAuthenticatable` diverts to the challenge BEFORE the login completes — so no
+     * membership is needed to reach that page. Giving them one would add a row to `/members`, which
+     * `responsive-axe` already loads, for no benefit: this identity exists to be stopped at the door.
+     */
+    private const TWO_FACTOR_EMAIL = 'twofactor@meridian.test';
+
+    private const TWO_FACTOR_PASSWORD = 'meridian-e2e-2026';
+
+    /**
+     * A syntactically valid base32 TOTP secret. It is never used to derive a code — the scan renders the
+     * challenge form and stops — but `hasEnabledTwoFactorAuthentication()` reads the column for
+     * null-ness, so a placeholder that could not be decoded would be a trap for the next person who
+     * tries to extend this fixture into a full sign-in.
+     */
+    private const TWO_FACTOR_SECRET = 'ABCDEFGHIJKLMNOP';
+
+    /**
+     * The password-reset fixture (J3b). Plaintext here, `Hash::make()`d into `password_reset_tokens`,
+     * because Laravel's DatabaseTokenRepository stores a hash and compares with `Hash::check()`.
+     *
+     * ⚠️ THE PAGE ITSELF NEEDS NONE OF THIS, AND THAT IS WORTH KNOWING BEFORE SOMEBODY "FIXES" A SCAN
+     * THAT LOOKS UNDER-BUILT. Fortify's `GET /reset-password/{token}` renders the form without
+     * consulting the token at all — validation happens on POST — so the DOM an accessibility scan sees
+     * is identical for any token string. The row is seeded anyway so the fixture is HONEST: a future
+     * test that submits the form has a token that actually resolves, rather than discovering on the day
+     * that the scan had been passing over a dead link.
+     */
+    private const RESET_TOKEN = 'e2e-password-reset-token';
 
     /** A second ACTIVE member (G10b2) — the grant modal needs a recipient other than the acting Owner. */
     private const REVIEWER_EMAIL = 'reviewer@meridian.test';
@@ -99,8 +185,20 @@ class E2eSeeder extends Seeder
             $tenant->domains()->create(['domain' => 'acme']);
         }
 
+        // I10e — the central-domain console operator. Before the tenant work below and deliberately outside
+        // it: this writes one central `users` row and touches nothing tenant-scoped.
+        $this->seedSuperAdmin();
+
+        $this->seedAuthScanFixtures();
+
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
-        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', Str::random(48));
+        // ⚠️ THE ONE IDENTITY THAT MUST STAY UNVERIFIED, AND IT IS NOT AN OVERSIGHT.
+        // `InvitationController::show()` reads `email_verified_at === null` as `needsRegistration`, so
+        // stamping this placeholder turns the invitation page from "set a name and a password" into "sign in
+        // as the invited account" — silently breaking the invite fixture, and with it the invitation
+        // accessibility scan J3b adds. It is also the only unverified user in the fixture, which makes it the
+        // natural subject for the `verified` gate's own e2e coverage.
+        $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', self::PENDING_PASSWORD, verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 
         // Active Owner membership + a pending invite. Wrapped in a transaction so applyLocal's
@@ -155,7 +253,7 @@ class E2eSeeder extends Seeder
                     'invited_by' => $owner->id,
                     'invited_at' => now(),
                     'invite_expires_at' => now()->addDays(7),
-                    'invite_token' => hash('sha256', Str::random(48)),
+                    'invite_token' => hash('sha256', self::INVITE_TOKEN),
                 ]);
             }
 
@@ -625,6 +723,18 @@ class E2eSeeder extends Seeder
             $this->seedCustomDomains($tenant);
 
             $this->seedScopingHierarchy($owner, $reviewer);
+
+            // K1c. After every submission block above, so the fixture's own collection and review history
+            // reaches the ledger — nothing here drives `SubmissionPipeline`, so no `SubmissionCreated` was
+            // ever raised for any of it. Announcements are suppressed, which is what keeps the notification
+            // counts several Playwright specs assert on exactly where they were.
+            $this->seedGamificationLedger();
+            $this->seedNotifications($owner, $reviewer);
+
+            $this->seedFeedback($owner, $reviewer);
+
+            // Last, so the ledger it inspects already contains everything the seeders above wrote.
+            $this->seedAuditLog($owner, $reviewer);
         });
 
         $tenant->forceFill(['owner_user_id' => $owner->id])->save();
@@ -743,6 +853,105 @@ class E2eSeeder extends Seeder
             'config' => ['channel_id' => 'C0ARCHIVE1', 'channel_name' => 'archive'],
             'consecutive_failure_count' => 20,
             'last_failure_at' => now(),
+            'created_by' => $owner->id,
+        ]);
+
+        // ── H16b: a Google Sheets grant, so /integrations' EXISTING axe scan covers the tabular surface —
+        // the destination column, the 7-day caution and a drift-paused rule with its reason card. No new spec
+        // is needed: responsive-axe.spec.ts already visits this page across 3 viewports × 2 themes, and a
+        // surface the seeder never mounts is a surface those six runs cannot see.
+        //
+        // Through the FACTORY, not ConnectionService, for the reason the Slack fixture above records: a real
+        // grant can only come from an OAuth exchange and there is no provider to call in e2e. Nothing here
+        // triggers an outbound request either — the sheet sidecars fire only when a human opens the rule
+        // modal, which no spec does.
+        $sheets = Connection::factory()->googleSheets()->create([
+            'status' => ConnectionStatus::Active,
+            'connected_by' => $owner->id,
+        ]);
+
+        $sheetsMapping = [
+            'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+            'columns' => [
+                ['header' => 'full name', 'field_key' => 'full_name'],
+                ['header' => 'colour', 'field_key' => 'colour'],
+                ['header' => 'submission id', 'field_key' => '__submission_id'],
+            ],
+        ];
+
+        ConnectionSubscription::factory()->forConnection($sheets)->create([
+            'name' => 'Submissions → Q3 Intake sheet',
+            // Only `submission.*` events can reach a spreadsheet — a row IS a submission's answers, which is
+            // why SubscriptionConfigRules::eventTypeGuard() refuses the rest. Seeding the whole catalog here
+            // would seed a rule the product itself now rejects.
+            'event_types' => ['submission.created', 'submission.updated'],
+            'config' => [
+                'spreadsheet_id' => 'E2E_SHEET_0000000000000001',
+                'spreadsheet_title' => 'Q3 Intake',
+                'sheet_name' => 'Responses',
+                'mapping' => $sheetsMapping,
+            ],
+            'created_by' => $owner->id,
+        ]);
+
+        // The drift case — the one a tenant actually meets, and the reason the reason-card exists at all.
+        $drifted = ConnectionSubscription::factory()->forConnection($sheets)->paused()->create([
+            'name' => 'Clinic Intake → responses sheet',
+            'event_types' => ['submission.created'],
+            'config' => [
+                'spreadsheet_id' => 'E2E_SHEET_0000000000000002',
+                'spreadsheet_title' => 'Clinic responses',
+                'sheet_name' => 'Responses',
+                'mapping' => $sheetsMapping,
+            ],
+            'last_failure_at' => now(),
+            'created_by' => $owner->id,
+        ]);
+
+        // `paused_reason` is READ FROM THE LEDGER rather than stored on the rule, so the reason card renders
+        // only when a blocked delivery exists to carry it. A paused rule without one would mount it empty.
+        WebhookDelivery::factory()->forSubscription($drifted)->create([
+            'status' => WebhookDeliveryStatus::DeadLettered,
+            'attempt_count' => 1,
+            'response_status_code' => null,
+            'response_time_ms' => 210,
+            // ⚠️ THE WORDING IS `MappingDrift::summary()`'s, NOT AN APPROXIMATION OF IT. This line used to
+            // read "The spreadsheet's columns changed…", which the engine has never produced — and it carried
+            // the `[column_drift]` prefix the ADAPTERS did not add until H16c, so the e2e was certifying a
+            // reason card that could not render in production. A seeded string that only resembles the real
+            // one is a test asserting its own fixture.
+            'response_body_excerpt' => '[column_drift] The columns changed: added “reviewer”; moved “colour”.',
+        ]);
+
+        // ── Airtable (H16c) ─────────────────────────────────────────────────────────────────────────────
+        // A third provider card and a third destination shape on the same page, so the responsive/axe sweep
+        // sees a rules table carrying all three at once. Deliberately NOT given a drifted twin: the reason
+        // card it would render is byte-identical to the Sheets one above, and a second scan of the same
+        // markup buys nothing — the H16b note on `responsive-axe.spec.ts` makes that argument already.
+        $airtable = Connection::factory()->airtable()->create([
+            'external_account_label' => 'Airtable',
+            'connected_by' => $owner->id,
+        ]);
+
+        ConnectionSubscription::factory()->forConnection($airtable)->create([
+            'name' => 'Submissions → Applicant tracker',
+            'event_types' => ['submission.created'],
+            'config' => [
+                // The base id, the table id, and the table name as a caption — the id is the identity, so a
+                // rename in Airtable cannot break this rule.
+                'spreadsheet_id' => 'appE2E00000000001',
+                'spreadsheet_title' => 'Applicant tracker',
+                'sheet_id' => 'tblE2E00000000001',
+                'sheet_name' => 'Applicants',
+                'mapping' => [
+                    'fingerprint' => hash('sha256', 'full name|colour|submission id'),
+                    'columns' => [
+                        ['header' => 'full name', 'field_key' => 'full_name'],
+                        ['header' => 'colour', 'field_key' => 'colour'],
+                        ['header' => 'submission id', 'field_key' => '__submission_id'],
+                    ],
+                ],
+            ],
             'created_by' => $owner->id,
         ]);
 
@@ -887,8 +1096,505 @@ class E2eSeeder extends Seeder
         app(ResourceGrantService::class)->grant($owner, $reviewer, $ncr, ResourceCapacity::Reviewer, true);
     }
 
+    /** The `fixtureUuid()` namespace for the notification rows below. */
+    private const NOTIFICATION_FIXTURE_PREFIX = 'i4:notification:';
+
+    /**
+     * Notification fixtures (Increment I4) — so the bell carries a badge, the popover has rows to scan, and
+     * the Settings preferences card renders a NON-default state.
+     *
+     * ⚠️ **THE TABLE IS EMPTY WHEN THIS RUNS, AND THAT IS EXACTLY WHY THE GUARD IS NOT `exists()`.** This
+     * seeder writes submissions with `Submission::create()`, memberships with `TenantUser::create()` and
+     * performs no review transitions at all — never `SubmissionPipeline`, `TenantMembershipService` or
+     * `SubmissionReviewService`, which are the only announce sites for I3's four notification listeners
+     * (see {@see self::seedAnalyticsFixture()}'s reason (2) for the same deliberate bypass). So an
+     * emptiness guard would WORK today and start silently skipping the moment a later seed routes anything
+     * through the real writers. Every row is keyed on a DETERMINISTIC primary key from
+     * {@see self::fixtureUuid()} and upserted — the {@see self::seedCustomDomains()} posture — so a re-seed
+     * CONVERGES rather than doubling or skipping.
+     *
+     * ⚠️ **AND DO NOT "FIX" THAT BY ROUTING A SEEDED SUBMISSION THROUGH `SubmissionPipeline`.**
+     * `E2eSeederIdempotencyTest` pins the exact submission counts, and the pipeline's synchronous listeners
+     * would attempt real outbound HTTPS during `db:seed` while polluting the delivery ledgers the H14/H15b
+     * axe scans assert on.
+     *
+     * ⚠️ **ONE ROW BELONGS TO THE REVIEWER, ON PURPOSE.** Playwright only ever logs in as the Owner, so a
+     * regression that dropped `Notification::scopeForUser()` would be INVISIBLE in a fixture where every
+     * row is the Owner's — the badge would read the same either way. With the reviewer's row present the
+     * Owner's badge is 7 while the table holds 10. (It was 4 and 7 until K1b: the Owner genuinely earns
+     * three gamification badges here, because `seedForms()` drives the real services and each announces.
+     * K1c's own ledger seeding adds no further rows — it suppresses announcements deliberately, precisely
+     * so this fixture's counts stay where the Playwright specs expect them.)
+     *
+     * ⚠️ **THE ONE DIVERGING PREFERENCE IS ON THE ONE TYPE WITH NO NOTIFICATION.** `review_requested` is
+     * silenced on both channels for the Owner and is the only type the Owner holds no row for, so the
+     * fixture cannot contradict itself — a seeded bell row for a type the seeded preference says is
+     * silenced is exactly what a later reader would "fix". Written through the real
+     * {@see NotificationPreferenceResolver::set()}, never the factory, for the reason
+     * {@see self::seedAuditLog()} records for `AuditLogger`: the both-booleans rule has to be PRODUCED by
+     * the code path the product uses.
+     *
+     * `created_at` is back-dated with `forceFill(...)->saveQuietly()`, which is legitimate here and NOT the
+     * `audits` case: `notifications` is not append-only and carries the ordinary strict UPDATE policy —
+     * precisely why {@see self::seedAuditLog()} cannot spread ITS rows in time and says so.
+     *
+     * Public, not private, on the {@see self::seedCustomDomains()} seam, so the idempotency test can re-run
+     * this block alone.
+     */
+    public function seedNotifications(User $owner, User $reviewer): void
+    {
+        $intakeSubmissionId = Submission::query()
+            ->whereHas('form', fn (Builder $query) => $query->where('title', 'Clinic Intake'))
+            ->orderBy('id')
+            ->value('id');
+
+        $endpoint = WebhookEndpoint::query()->where('name', 'CRM sync')->first();
+
+        // Real ids, so every link in the demo actually loads. Degrade rather than fatal if an upstream
+        // block was skipped — the analyticsFixtureRows() posture.
+        $submissionId = is_string($intakeSubmissionId) ? $intakeSubmissionId : null;
+        $endpointId = $endpoint === null ? null : (string) $endpoint->getKey();
+
+        /** @var list<array{key: string, user: string, type: NotificationType, ago: int, read: bool, emailed: bool, data: array<string, mixed>}> $rows */
+        $rows = [
+            [
+                'key' => 'received',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionReceived,
+                'ago' => 6,
+                'read' => false,
+                'emailed' => false,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+            [
+                'key' => 'returned',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionReturned,
+                'ago' => 180,
+                'read' => false,
+                'emailed' => true,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+            [
+                // form_title null on purpose — the two review outcomes write `$form?->title`, so a trashed
+                // form yields null and NotificationCopy's "one of your forms" fallback has to render.
+                'key' => 'approved',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::SubmissionApproved,
+                'ago' => 1_440,
+                'read' => true,
+                'emailed' => true,
+                'data' => ['submission_id' => $submissionId, 'form_title' => null],
+            ],
+            [
+                'key' => 'invited',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::MemberInvited,
+                'ago' => 2_880,
+                'read' => true,
+                'emailed' => true,
+                'data' => ['email' => self::PENDING_EMAIL, 'role' => 'viewer', 'invited_by' => (string) $owner->getKey()],
+            ],
+            [
+                'key' => 'webhook',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::WebhookFailed,
+                'ago' => 4_320,
+                'read' => false,
+                'emailed' => true,
+                'data' => ['webhook_endpoint_id' => $endpointId, 'endpoint_name' => 'CRM sync', 'failure_count' => 20],
+            ],
+            [
+                // A submission id that names nothing, so NotificationPresenter's reachability pass resolves
+                // `url` to NULL and the popover renders its non-interactive row — the only fixture that
+                // would catch an <a href=""> regression. A FAILED export at the same time, so the bell's
+                // "Export failed" title (which corrects a live I3 defect) is on screen for the axe scan.
+                'key' => 'export',
+                'user' => (string) $owner->getKey(),
+                'type' => NotificationType::ExportReady,
+                'ago' => 5_760,
+                'read' => false,
+                'emailed' => true,
+                'data' => [
+                    'submission_id' => self::fixtureUuid(self::NOTIFICATION_FIXTURE_PREFIX.'missing-target'),
+                    'form_title' => 'Clinic Intake',
+                    'outcome' => SubmissionPdfOutcome::Failed->value,
+                ],
+            ],
+            [
+                'key' => 'reviewer-received',
+                'user' => (string) $reviewer->getKey(),
+                'type' => NotificationType::SubmissionReceived,
+                'ago' => 120,
+                'read' => false,
+                'emailed' => false,
+                'data' => ['submission_id' => $submissionId, 'form_title' => 'Clinic Intake'],
+            ],
+        ];
+
+        foreach ($rows as $row) {
+            $id = self::fixtureUuid(self::NOTIFICATION_FIXTURE_PREFIX.$row['key']);
+            $at = now()->subMinutes($row['ago']);
+
+            $attributes = [
+                'user_id' => $row['user'],
+                'type' => $row['type']->value,
+                'data' => array_filter($row['data'], static fn (mixed $value): bool => $value !== null),
+                'read_at' => $row['read'] ? $at->copy()->addMinutes(5) : null,
+                'emailed_at' => $row['emailed'] ? $at : null,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ];
+
+            $existing = Notification::query()->whereKey($id)->first();
+
+            if ($existing instanceof Notification) {
+                $existing->forceFill($attributes)->saveQuietly();
+
+                continue;
+            }
+
+            // forceCreate, NOT `(new Notification)->forceFill(...)->saveQuietly()`: saveQuietly suppresses
+            // model EVENTS, which on this model are BelongsToTenant::creating (which fills tenant_id, and
+            // without which the strict-RLS WITH CHECK rejects the row) and HasUuidv7::creating. forceCreate
+            // fires both, and HasUuidv7 only fills an EMPTY key, so the deterministic id survives.
+            Notification::query()->forceCreate([...$attributes, 'id' => $id]);
+        }
+
+        // The one divergence, so the preferences card renders something other than the platform defaults.
+        app(NotificationPreferenceResolver::class)
+            ->set($owner, NotificationType::ReviewRequested, false, false);
+    }
+
+    /** Deterministic ids for the feedback fixture (I7a), so re-seeding updates rather than duplicates. */
+    private const FEEDBACK_FIXTURE_IDS = [
+        '0192e2e0-0000-7000-8000-00000000fb01',
+        '0192e2e0-0000-7000-8000-00000000fb02',
+        '0192e2e0-0000-7000-8000-00000000fb03',
+        '0192e2e0-0000-7000-8000-00000000fb04',
+    ];
+
+    /**
+     * Feedback fixtures (I7a, PRD Feature #11) — so `/feedback` renders a POPULATED table for the
+     * responsive-axe scan rather than its empty state.
+     *
+     * ⚠️ **ONE ROW PER STATUS, AND THAT IS THE POINT.** All four `FeedbackStatus` cases map to four
+     * DIFFERENT badge variants (info / warning / success / neutral), and a scan over a table where every
+     * pill is the same colour proves nothing about the other three — the same argument
+     * {@see self::seedAuditLog()} makes for its event spread. `resolved` and `wont_fix` also exercise the
+     * resolver column, which nothing else in this fixture fills.
+     *
+     * ⚠️ **THE LAST ROW CARRIES A DELIBERATELY LONG, UNBROKEN REMARK.** The remarks cell is the widest
+     * free-text column on the page, and 375px overflow is the trap that has now caught three surfaces
+     * (Domains, Audit log, and this one before it shipped).
+     *
+     * One row belongs to the REVIEWER for the reason `seedNotifications()` gives: Playwright only ever
+     * signs in as the Owner, so a fixture where every row is the Owner's would hide a regression that
+     * accidentally scoped this list to the viewer.
+     *
+     * Written with `forceCreate`, not through {@see App\Services\Feedback\FeedbackService}: the service
+     * requires an `UploadedFile` and an open tenant context to attach a screenshot, and this fixture wants
+     * neither. `status` is written from the enum, never a literal — the column has no CHECK constraint.
+     */
+    private function seedFeedback(User $owner, User $reviewer): void
+    {
+        $rows = [
+            ['user' => $owner, 'route' => '/dashboard', 'status' => FeedbackStatus::New, 'remarks' => 'The date range picker resets when I switch tabs.'],
+            ['user' => $reviewer, 'route' => '/submissions', 'status' => FeedbackStatus::Reviewed, 'remarks' => 'Could the inbox remember my last filter?'],
+            ['user' => $owner, 'route' => '/forms', 'status' => FeedbackStatus::Resolved, 'remarks' => 'Duplicating a field lost its options — fixed now, thanks.'],
+            [
+                'user' => $reviewer,
+                'route' => '/analytics',
+                'status' => FeedbackStatus::WontFix,
+                'remarks' => 'Please add a pie chart to the analytics page https://example.test/reference/dashboards/comparison-of-chart-types-for-categorical-data',
+            ],
+        ];
+
+        foreach ($rows as $index => $row) {
+            $id = self::FEEDBACK_FIXTURE_IDS[$index];
+            $closed = $row['status']->isTerminal();
+
+            $attributes = [
+                'user_id' => $row['user']->getKey(),
+                'route' => $row['route'],
+                'remarks' => $row['remarks'],
+                'browser_info' => ['viewport' => '1440x900', 'platform' => 'e2e-seed'],
+                'status' => $row['status']->value,
+                'submitted_at' => now()->subDays(($index + 1) * 3),
+                'resolved_at' => $closed ? now()->subDay() : null,
+                'resolved_by' => $closed ? $owner->getKey() : null,
+            ];
+
+            $existing = FeedbackReport::query()->whereKey($id)->first();
+
+            if ($existing instanceof FeedbackReport) {
+                $existing->forceFill($attributes)->save();
+
+                continue;
+            }
+
+            FeedbackReport::query()->forceCreate([...$attributes, 'id' => $id]);
+        }
+    }
+
+    /**
+     * A uuid that names nothing, doubling as the "target no longer exists" fixture (label and url both
+     * resolve to null) AND as this seeder's idempotency sentinel.
+     */
+    private const AUDIT_FIXTURE_ID = '0192e2e0-0000-7000-8000-00000000a11d';
+
+    /**
+     * Audit-ledger fixtures (Increment I2) — so /audit-log renders with every badge variant and both kinds
+     * of redacted diff for the responsive-axe scan.
+     *
+     * ⚠️ **THE TENANT ALREADY HAS AUDIT ROWS, so this is about SPREAD, not non-emptiness.** `PublishService`,
+     * `WebhookEndpointService::create` and `ResourceGrantService::grant` all audit inside this seeder's own
+     * transaction, and since I2 so does every `FormService` write — the page is populated with `created`
+     * and `published` rows before this method runs. What is MISSING without it is the tail: no `deleted`,
+     * `restored`, `archived` or `exported` row exists anywhere in the seeded data, and no diff carries a
+     * redacted field. The scan would be green over three badge variants and a redaction notice that never
+     * rendered.
+     *
+     * Two consequences of that, both easy to get wrong:
+     *  - The idempotency guard CANNOT be "does any audit row exist" — it always will. It keys on
+     *    {@see self::AUDIT_FIXTURE_ID}, a uuid nothing else writes.
+     *  - Rows are written through the real {@see AuditLogger}, never `Audit::factory()`. The factory
+     *    bypasses {@see AuditRedactor}, so a hand-written `redacted_fields` would be a fiction that the axe
+     *    scan then validates. The redaction has to be PRODUCED by the code path the product uses.
+     *
+     * **Every row lands at `now()`, and that is an accepted limitation rather than an oversight.**
+     * `Audit::UPDATED_AT` is null, `record()` takes no `occurredAt`, and back-dating would need an UPDATE
+     * the append-only RLS shape denies. So the E2E exercises the date filters' PRESENCE AND LAYOUT, not
+     * their selectivity. Do not add an `occurredAt` parameter to AuditLogger for a seeder's benefit.
+     */
+    private function seedAuditLog(User $owner, User $reviewer): void
+    {
+        if (Audit::query()->where('auditable_id', self::AUDIT_FIXTURE_ID)->exists()) {
+            return;
+        }
+
+        $audit = app(AuditLogger::class);
+        $ownerId = (string) $owner->getKey();
+        $submissionId = (string) Str::uuid7();
+
+        // `deleted` (danger) against a target that is GONE — the label/url-null path in the target cell.
+        $audit->record(
+            AuditEvent::Deleted,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            old: ['title' => 'Pilot Survey (2025)', 'status' => 'archived'],
+            new: null,
+            actorId: $ownerId,
+        );
+
+        // `restored` (info) — emitted nowhere else in the seeded data.
+        $audit->record(
+            AuditEvent::Restored,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            new: ['draft_version_id' => (string) Str::uuid7(), 'draft_version_number' => 3, 'source_version_number' => 2],
+            actorId: $ownerId,
+        );
+
+        // `archived` — on screen this must read NEUTRAL, not the amber a form STATUS badge would use.
+        $audit->record(
+            AuditEvent::Archived,
+            'form',
+            self::AUDIT_FIXTURE_ID,
+            old: ['status' => 'draft'],
+            new: ['status' => 'archived', 'archived_at' => now()->toIso8601String()],
+            actorId: $ownerId,
+        );
+
+        // `exported` (warning) with NO payload — the zero-changes row, which renders the disabled
+        // "No field changes recorded" action state.
+        $audit->record(AuditEvent::Exported, 'submission', $submissionId, actorId: $ownerId);
+
+        // THE §2.1 FIXTURE. `guest_contact_email` and `guest_ip` are in AuditRedactor::PII['submission'],
+        // so the real redactor placeholders BOTH sides and fills redacted_fields — giving one diff that
+        // carries a redacted change AND an unredacted one, which is what makes the flag legible.
+        $audit->record(
+            AuditEvent::Updated,
+            'submission',
+            $submissionId,
+            old: ['status' => 'submitted', 'guest_contact_email' => 'jane@example.test', 'guest_ip' => '203.0.113.9'],
+            new: ['status' => 'approved', 'guest_contact_email' => 'jane@example.test', 'guest_ip' => '203.0.113.9'],
+            actorId: $ownerId,
+        );
+
+        // A many-field diff whose secret is redacted from a DIFFERENT map (SECRETS, not PII), and whose
+        // long URL is the widest unbreakable string on the page — the 375px overflow trap arriving on a
+        // second surface after Domains.
+        $audit->record(
+            AuditEvent::Updated,
+            'webhook_endpoint',
+            (string) Str::uuid7(),
+            old: ['name' => 'CRM sync', 'url' => 'https://api.crm.example.com/webhooks/forms', 'secret' => 'whsec_'.str_repeat('a', 48), 'status' => 'active'],
+            new: ['name' => 'CRM sync (v2)', 'url' => 'https://api.crm.example.com/webhooks/forms/v2/inbound-with-a-deliberately-long-path', 'secret' => 'whsec_'.str_repeat('b', 48), 'status' => 'paused'],
+            actorId: $ownerId,
+        );
+
+        // A RESOLVABLE target for the modal E2E to locate by its row text.
+        $audit->record(
+            AuditEvent::PermissionChanged,
+            'users',
+            (string) $reviewer->getKey(),
+            old: ['role' => 'viewer'],
+            new: ['role' => 'reviewer'],
+            actorId: $ownerId,
+        );
+    }
+
     /** Resolve an existing identity on the pre-auth connection (users RLS hides non-members), or create it. */
-    private function resolveOrCreateUser(string $email, string $name, string $password): User
+    /**
+     * The central-domain console operator, for Increment I10e's admin-console accessibility scan.
+     *
+     * ⚠️ THIS FIXTURE ASSERTS SOMETHING UNTRUE ABOUT THE ACCOUNT, AND THAT IS A DELIBERATE, BOUNDED TRADE.
+     * It sets `two_factor_confirmed_at` while leaving `two_factor_secret` NULL — a state no real enrolment
+     * produces. It works because the two gates read different things: {@see EnsureSuperAdminMfa} checks ONLY
+     * `two_factor_confirmed_at`, so the console opens; Fortify's `hasEnabledTwoFactorAuthentication()`
+     * additionally requires a SECRET when `fortify.features.two-factor.confirm` is true (it is), so login
+     * issues no TOTP challenge. The account therefore reaches `/admin/*` in one POST, with no authenticator
+     * app and no TOTP implementation in the test suite.
+     *
+     * Acceptable ONLY because this is an accessibility gate, not a security one: the middleware's real
+     * behaviour — that an unenrolled super-admin is redirected to `admin.mfa.setup` — is covered in Pest by
+     * `SuperAdminConsoleTest`, and nothing here weakens that. If a future increment wants to e2e the
+     * ENROLMENT flow, it needs a genuine TOTP, not this.
+     *
+     * ⚠️ DO NOT reuse `UserFactory::confirmedTwoFactor()`. It writes `encrypt('PLACEHOLDERSECRET')`, which
+     * flips `hasEnabledTwoFactorAuthentication()` to TRUE and makes the account TOTP-challenged at login with
+     * a secret nobody can compute against — a permanent lockout. `DemoSeeder::ensureSuperAdmin()` carries the
+     * same warning for the same reason, and deliberately leaves its own admin UNENROLLED so a human can
+     * complete the real flow. These two seeders want opposite things and both are right.
+     *
+     * Idempotent, and outside the tenant transaction: it writes one central `users` row and no tenant-scoped
+     * rows at all — idempotency comes from {@see self::resolveOrCreateUser()}, the same primitive every other
+     * seeded account uses, plus a `forceFill` that is a no-op on a second run.
+     *
+     * ⚠️ THE PROMOTION MUST RUN ON `pgsql_privileged`, AND THE FIRST VERSION OF THIS METHOD DID NOT.
+     * `$admin->forceFill([...])->save()` on the DEFAULT connection issues `UPDATE users … WHERE id = ?` as
+     * `meridian_app`. `users` carries ENABLE **and FORCE** row-level security ({@see TenantIsolation::enableAndForce()}
+     * applies it even to the table owner, and CI creates the database `OWNER meridian_app`, so the owner
+     * exemption does not save it); the SELECT policy is join-shaped and fails closed with no context, the
+     * permissive carve-out being `TO meridian_auth` only; and PostgreSQL applies SELECT policies to an UPDATE
+     * that reads columns, which `WHERE id = ?` does. This operator has NO tenant membership BY DESIGN, so it
+     * is invisible from every context and the promotion affected ZERO ROWS — silently, with no error, leaving
+     * `is_super_admin` false and the console 404ing behind {@see EnsureSuperAdmin}. Proven, not reasoned:
+     * `tests/Feature/Auth/CentralHostLoginTest.php` reproduces the no-op over the app connection.
+     * `DemoSeeder::ensureSuperAdmin()` had the identical defect and is fixed the same way.
+     *
+     * The same invisibility is why `E2eSeederIdempotencyTest` has no case here: that file asserts through the
+     * DEFAULT connection inside a tenant context, where this row cannot be seen, so a case there could only
+     * assert “did not throw” — the near-vacuous shape this codebase keeps catching in review. The promotion is
+     * covered instead by the connection-level test above, which is where the bug actually lived.
+     */
+    private function seedSuperAdmin(): void
+    {
+        $admin = $this->resolveOrCreateUser(self::SUPER_ADMIN_EMAIL, 'Console Operator', self::SUPER_ADMIN_PASSWORD);
+
+        $this->promoteToSuperAdmin((string) $admin->id, $admin->two_factor_confirmed_at ?? now());
+    }
+
+    /**
+     * Promote an operator over `pgsql_privileged`, and REFUSE TO REPORT SUCCESS ON ZERO ROWS.
+     *
+     * A query-builder UPDATE rather than `$model->save()` for one reason: it returns the affected row count,
+     * which is the only observable that distinguishes "promoted" from "silently promoted nothing". Eloquent's
+     * `performUpdate()` discards that number, which is precisely why the original bug could not be seen.
+     *
+     * The postcondition is deliberately conditional on the row being VISIBLE to this connection. Zero rows
+     * means two different things: under `php artisan db:seed` (the real path, and the one CI's e2e job runs)
+     * the row is committed and visible, so zero can only mean the write was refused — a bug, and it throws.
+     * Inside `RefreshDatabase` the row was created on the DEFAULT connection's open transaction and this
+     * separate session genuinely cannot see it, so zero is expected and says nothing. Distinguishing them is
+     * what lets this guard be strict where it matters without breaking `DatabaseSeederSmokeTest`.
+     *
+     * This also covers a hazard the fix itself relies on: `config/database.php` defaults
+     * `DB_PRIVILEGED_USERNAME` to a superuser, but on a managed Postgres where that role is merely the table
+     * OWNER, `FORCE ROW LEVEL SECURITY` still applies and this write would regress to zero rows. Same class
+     * of failure `OcrCompatibilityBackfill::assertPrivilegedRole()` already refuses to ship past.
+     */
+    private function promoteToSuperAdmin(string $userId, mixed $confirmedAt): void
+    {
+        $privileged = DB::connection('pgsql_privileged');
+
+        $affected = $privileged->table('users')->where('id', $userId)->update([
+            'is_super_admin' => true,
+            'two_factor_confirmed_at' => $confirmedAt,
+            'two_factor_secret' => null,
+        ]);
+
+        if ($affected === 0 && $privileged->table('users')->where('id', $userId)->exists()) {
+            throw new RuntimeException(
+                "Failed to promote {$userId} to super-admin: the row exists but the UPDATE affected zero rows. "
+                .'The pgsql_privileged role is not bypassing FORCE row-level security on `users`.'
+            );
+        }
+    }
+
+    /**
+     * ⚠️ `$verified` IS LOAD-BEARING FROM J3a, AND THE DEFAULT IS THE ONE THAT KEEPS THE E2E SUITE ALIVE.
+     * `routes/tenant.php`'s authenticated group now carries `verified`, so an unverified identity is bounced
+     * to `/email/verify` — including at `tests/e2e/global-setup.ts`'s very first navigation, which waits on a
+     * dashboard URL. Before J3a this seeder set no verification timestamp at all, so every e2e identity was
+     * unverified and mounting the gate would have failed all 506 specs before one of them ran.
+     *
+     * ⚠️⚠️ ONE INSERT — `forceFill()` ON A NEW MODEL — AND NEVER `create()` THEN `save()`. THIS COST A RED
+     * E2E RUN, AND THE FIRST FIX FOR IT WAS ITSELF THE BUG.
+     *
+     * Two separate traps stack here, and only the second is fatal:
+     *   1. `User` declares `#[Fillable(['name', 'email', 'password'])]`, so `email_verified_at` is not
+     *      mass-assignable. `artisan db:seed` wraps the run in `Model::unguarded()`
+     *      (`SeedCommand::handle()`), so a fourth key in `create()` works THERE and silently drops the
+     *      moment the seeder is constructed and run directly — which is what `E2eSeederIdempotencyTest`
+     *      and `DemoSeederIdempotencyTest` do.
+     *   2. **The follow-up `save()` that looks like the obvious fix updates ZERO ROWS AND THROWS NOTHING.**
+     *      `users` carries a permissive INSERT policy but an **own-row UPDATE** policy keyed on
+     *      `app.current_user_id`, which is null throughout seeding — so a create-then-stamp pair matches no
+     *      UPDATE policy, reports success, and leaves the account unverified. With `verified` mounted on the
+     *      authenticated group that is a LOCKOUT: `tests/e2e/global-setup.ts` signs the demo owner in and is
+     *      redirected to `/email/verify`, and all 506 specs die before one runs. `promoteToSuperAdmin()`
+     *      below already carries the privileged-connection version of this same lesson.
+     *
+     * `forceFill()` on a NEW model carries the non-fillable column into the INSERT itself, where the
+     * permissive policy applies — the shape Lane B's P1b JIT provisioning independently arrived at.
+     */
+    /**
+     * The two standalone fixtures the J3b accessibility scans need, neither of which belongs to a
+     * workspace (see the constants above for why the two-factor identity deliberately has no membership).
+     *
+     * ⚠️ THE 2FA USER IS ONE INSERT, NOT A CREATE-THEN-STAMP. `two_factor_secret` and
+     * `two_factor_confirmed_at` go into the INSERT itself, where `users_app_insert`'s permissive policy
+     * applies. A follow-up `save()` would match no row — `app.current_user_id` is null throughout seeding
+     * and PostgreSQL applies SELECT policies to an UPDATE whose WHERE reads a column — so it would report
+     * success, write nothing, and leave an identity that never challenges. That is the defect J3b's first
+     * PR fixed in the product and the one this seeder has already been bitten by once.
+     */
+    private function seedAuthScanFixtures(): void
+    {
+        if (User::on('pgsql_auth')->where('email', self::TWO_FACTOR_EMAIL)->doesntExist()) {
+            $user = new User;
+            $user->forceFill([
+                'name' => 'Tessa Twofactor',
+                'email' => self::TWO_FACTOR_EMAIL,
+                'password' => Hash::make(self::TWO_FACTOR_PASSWORD),
+                'email_verified_at' => now(),
+                'two_factor_secret' => Fortify::currentEncrypter()->encrypt(self::TWO_FACTOR_SECRET),
+                'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode([])),
+                'two_factor_confirmed_at' => now(),
+            ])->save();
+        }
+
+        // `updateOrInsert`, because the table's primary key is the EMAIL: a second seeder run would
+        // otherwise violate it rather than refresh the row. Not tenant-scoped and not under RLS.
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => self::OWNER_EMAIL],
+            ['token' => Hash::make(self::RESET_TOKEN), 'created_at' => now()],
+        );
+    }
+
+    private function resolveOrCreateUser(string $email, string $name, string $password, bool $verified = true): User
     {
         $existing = User::on('pgsql_auth')->where('email', $email)->first();
         if ($existing !== null) {
@@ -897,7 +1603,15 @@ class E2eSeeder extends Seeder
             return $existing;
         }
 
-        return User::create(['name' => $name, 'email' => $email, 'password' => Hash::make($password)]);
+        $user = new User;
+        $user->forceFill([
+            'name' => $name,
+            'email' => $email,
+            'password' => Hash::make($password),
+            'email_verified_at' => $verified ? now() : null,
+        ])->save();
+
+        return $user;
     }
 
     private function roleId(string $name): string
@@ -980,7 +1694,10 @@ class E2eSeeder extends Seeder
                 ['submission_id' => $submission->id],
                 [
                     'form_version_id' => $version->id,
-                    'answers' => $this->sampleAnswers($version),
+                    // Empty for `screened_out` (I9a) — that state MEANS the respondent was shown no
+                    // questions, so a populated document would contradict it on the detail page. The 1:1
+                    // answer row is still written, because the inbox and PDF presenters read through it.
+                    'answers' => $row['status'] === SubmissionStatus::ScreenedOut ? [] : $this->sampleAnswers($version),
                     'attachment_refs' => [],
                 ],
             );
@@ -1150,6 +1867,7 @@ class E2eSeeder extends Seeder
         $u = SubmissionStatus::UnderReview;
         $x = SubmissionStatus::Archived;
         $d = SubmissionStatus::Draft;
+        $so = SubmissionStatus::ScreenedOut;
 
         $chs = 'Community Health Survey';
         $hr = 'Household Roster';
@@ -1195,8 +1913,13 @@ class E2eSeeder extends Seeder
             ['form' => $fts, 'back' => 4, 'hour' => 15, 'status' => $x, 'source' => $api, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
             // ── Branching Router ×2. The d-22 row is the ADVERSARIAL one: offline_sync WITH last_saved_at,
             //    which §D5's `source IN (guest, manual)` restriction must keep out of the denominator.
+            //    The d-5 row carries `screened_out` (I9a), and it is on THIS form deliberately: the Branching
+            //    Router is Doc #27 §4.1's own example — every section gated on a URL-prefilled hidden field —
+            //    so a bare visit is exactly the empty step projection the state is derived from. It was
+            //    CONVERTED from `under_review` rather than appended, so `submissions` (33) and `countable`
+            //    (30) both hold; only the split within the countable rows moved.
             ['form' => $br, 'back' => 22, 'hour' => 9, 'status' => $s, 'source' => $o, 'locale' => 'en', 'saved' => true, 'fill_seconds' => 1800],
-            ['form' => $br, 'back' => 5, 'hour' => 16, 'status' => $u, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
+            ['form' => $br, 'back' => 5, 'hour' => 16, 'status' => $so, 'source' => $g, 'locale' => 'fil', 'saved' => false, 'fill_seconds' => null],
             // ── Closed Survey ×1 — capacity-closed, but a direct write is not the ingest path. ────────
             ['form' => $cs, 'back' => 12, 'hour' => 10, 'status' => $s, 'source' => $g, 'locale' => null, 'saved' => false, 'fill_seconds' => null],
             // ── Three UNCONVERTED drafts. Excluded from every countable aggregate by scopeCountable(), so
@@ -1205,26 +1928,6 @@ class E2eSeeder extends Seeder
             ['form' => $hr, 'back' => 7, 'hour' => 10, 'status' => $d, 'source' => $g, 'locale' => 'es', 'saved' => true, 'fill_seconds' => null],
             ['form' => $pu, 'back' => 2, 'hour' => 8, 'status' => $d, 'source' => $m, 'locale' => 'en', 'saved' => true, 'fill_seconds' => null],
         ];
-    }
-
-    /**
-     * A stable UUID from a human-readable fixture key, so a row is greppable and a re-seed converges.
-     *
-     * Hand-rolled rather than `Ramsey\Uuid::uuid5()`: that package is only a transitive dependency here,
-     * and `Str::uuid()`/`orderedUuid()` are both random, which is exactly what an upsert key must not be.
-     */
-    private static function fixtureUuid(string $key): string
-    {
-        $hash = hash('sha256', $key);
-
-        return sprintf(
-            '%s-%s-5%s-%s-%s',
-            substr($hash, 0, 8),
-            substr($hash, 8, 4),
-            substr($hash, 13, 3),
-            dechex((hexdec(substr($hash, 16, 2)) & 0x3F) | 0x80).substr($hash, 18, 2),
-            substr($hash, 20, 12),
-        );
     }
 
     /**

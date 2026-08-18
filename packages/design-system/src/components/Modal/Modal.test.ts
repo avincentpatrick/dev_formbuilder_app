@@ -1,0 +1,746 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import Modal from './Modal.vue';
+import { openModalCount, popModalRoot, pushModalRoot } from './inert-stack';
+// Imported STATICALLY and at the top, not with `await import()` inside the case. The index pulls in all
+// 24 components, which costs ~2.7s under full-suite load and blew the 5s per-test timeout — green in a
+// single-file run, red only in the full suite. As a top-level import the cost lands in module load
+// instead, and it fails HARDER: deleting the re-export breaks the whole file at load rather than one case.
+import { openModalCount as openModalCountFromPackage } from '../../index';
+
+/**
+ * Increment I10a — `MdsModal` marks the rest of the page `inert` while open, closing the WCAG 2.4.3 row
+ * filed from I8c (`docs/feature-backlog.md:109`).
+ *
+ * There was no Modal spec before this file, which is part of why the defect lasted: the Tab trap is a
+ * `keydown` handler on the panel, so it only ever sees Tab events that are ALREADY inside the dialog, and
+ * nothing anywhere asserted what happens to the page behind it.
+ *
+ * These assert the DOM contract, not the visual one. `inert` is read as an ATTRIBUTE throughout, which is
+ * what axe-core reads. Every case attaches to the real `document.body` except the `#storybook-root` one,
+ * which attaches to a `<div>` precisely because its whole point is that the mount target must survive.
+ */
+
+/** A body-level element standing in for "the app" — the thing that must go inert. */
+function appNode(): HTMLElement {
+    const el = document.createElement('div');
+    el.id = 'app';
+    el.innerHTML = '<button type="button">background action</button>';
+    document.body.appendChild(el);
+    return el;
+}
+
+type Wrapper = ReturnType<typeof mount>;
+let mounted: Wrapper[] = [];
+
+function openModal(extra: Record<string, unknown> = {}): Wrapper {
+    const wrapper = mount(Modal, {
+        attachTo: document.body,
+        props: { open: true, title: 'Remove member', ...extra },
+    });
+    mounted.push(wrapper);
+    return wrapper;
+}
+
+/**
+ * `inert` is asserted through `closest('[inert]')`, not `hasAttribute` on the backdrop.
+ *
+ * @vue/test-utils STUBS `<Transition>` as a real `transition-stub` ELEMENT, so under test the backdrop is
+ * a grandchild of the teleport target where in a real browser it is a direct child (a real Transition
+ * renders no wrapper). The walk is correct in both shapes — it marks the topmost node on the path's
+ * siblings either way — but an assertion pinned to the backdrop itself would be pinned to the stub.
+ */
+function isBackground(el: Element): boolean {
+    return el.closest('[inert]') !== null;
+}
+
+beforeEach(() => {
+    mounted = [];
+    document.body.innerHTML = '';
+    document.body.style.overflow = '';
+});
+
+afterEach(() => {
+    // Unmount FIRST so a mid-test assertion failure cannot leak a stack entry into the next case and turn
+    // one real failure into a cascade of three. The count check below still catches a genuine leak,
+    // because releasing on unmount is itself the property under test.
+    for (const wrapper of mounted) wrapper.unmount();
+    // A leaked entry would silently blank the NEXT spec file's assertions — specs share one happy-dom
+    // document, so this is a guard against cross-file pollution, not ceremony.
+    expect(openModalCount()).toBe(0);
+    document.body.innerHTML = '';
+    document.body.style.overflow = '';
+});
+
+describe('MdsModal — inert background', () => {
+    it('marks a body-level sibling inert while open, and no ancestor of the dialog', async () => {
+        const app = appNode();
+        const wrapper = openModal();
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(true);
+
+        const backdrop = document.querySelector('.mds-modal__backdrop');
+        expect(backdrop).not.toBeNull();
+        // The dialog itself, and everything above it, must stay reachable — otherwise the modal inerts
+        // itself and the whole component is a no-op with extra steps.
+        expect(isBackground(backdrop as Element)).toBe(false);
+        expect(document.body.hasAttribute('inert')).toBe(false);
+
+        void wrapper;
+    });
+
+    it('does NOT inert the wrapper the dialog renders inside when teleport is off', async () => {
+        // THE `#storybook-root` CASE. Every Storybook story and four app specs render with teleport:false,
+        // so the backdrop is a CHILD of the story/test root rather than a body sibling. The naive rule
+        // ("inert every body child except our backdrop") would mark that root — and `checkA11y(page,
+        // '#storybook-root')` would then scan an empty accessibility tree and PASS SILENTLY. A green a11y
+        // job over nothing is worse than a red one, so this is the highest-value case in the file.
+        const root = document.createElement('div');
+        root.id = 'storybook-root';
+        document.body.appendChild(root);
+
+        const sibling = document.createElement('p');
+        sibling.textContent = 'story background';
+        root.appendChild(sibling);
+
+        mounted.push(
+            mount(Modal, {
+                attachTo: root,
+                props: { open: true, title: 'Remove member', teleport: false },
+            }),
+        );
+        await flushPromises();
+
+        expect(root.hasAttribute('inert')).toBe(false);
+        expect(sibling.hasAttribute('inert')).toBe(true);
+        expect(isBackground(document.querySelector('.mds-modal__backdrop') as Element)).toBe(false);
+    });
+
+    it('never marks an element that opts out with data-mds-inert-exempt', async () => {
+        // ToastHost teleports to <body> DELIBERATELY so a toast is not trapped under a modal. Inerting it
+        // would remove it from the accessibility tree, so a toast raised while a dialog is open would be
+        // announced to nobody and clickable by nobody.
+        const app = appNode();
+        const toasts = document.createElement('div');
+        toasts.setAttribute('data-mds-inert-exempt', '');
+        document.body.appendChild(toasts);
+
+        openModal();
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(true);
+        expect(toasts.hasAttribute('inert')).toBe(false);
+    });
+
+    it('releases only what it marked, leaving a consumer’s own inert attribute alone', async () => {
+        const app = appNode();
+        const alreadyInert = document.createElement('div');
+        alreadyInert.setAttribute('inert', '');
+        document.body.appendChild(alreadyInert);
+
+        const wrapper = openModal();
+        await flushPromises();
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(false);
+        // Cleaning up via querySelectorAll('[inert]') would strip this and the consumer would never know.
+        expect(alreadyInert.hasAttribute('inert')).toBe(true);
+    });
+
+    it('releases inert BEFORE returning focus to the opener', async () => {
+        // Ordering, not end state: focus() on an element inside an inert subtree is a SILENT no-op, so the
+        // reverse order breaks return-focus in every modal in the product with nothing in the console.
+        // Asserting `document.activeElement` afterwards would not redden — happy-dom will happily focus an
+        // inert element — so this records what the page looked like at the instant focus() was called.
+        const app = appNode();
+        const opener = app.querySelector('button') as HTMLButtonElement;
+        opener.focus();
+        expect(document.activeElement).toBe(opener);
+
+        let backgroundInertWhenFocused: boolean | null = null;
+        opener.focus = () => {
+            backgroundInertWhenFocused = app.hasAttribute('inert');
+        };
+
+        const wrapper = openModal();
+        await flushPromises();
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(backgroundInertWhenFocused).toBe(false);
+    });
+
+    it('releases inert when unmounted while still open', async () => {
+        const app = appNode();
+        const wrapper = openModal();
+        await flushPromises();
+        expect(app.hasAttribute('inert')).toBe(true);
+
+        wrapper.unmount();
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(false);
+    });
+
+    it('takes the page when `open` is toggled false → true, the path every consumer actually uses', async () => {
+        // Every other case here mounts with open:true, which only exercises the watcher's `immediate` first
+        // run. All 29 production consumers bind `:open` to reactive state and toggle it — so without this
+        // case the ordinary open path had no coverage at all.
+        const app = appNode();
+        const wrapper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: false, title: 'Remove member' },
+        });
+        mounted.push(wrapper);
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(false);
+        expect(document.body.style.overflow).toBe('');
+
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(true);
+        expect(document.body.style.overflow).toBe('hidden');
+        expect(isBackground(document.querySelector('.mds-modal__backdrop') as Element)).toBe(false);
+    });
+
+    it('returns focus when the modal closes by UNMOUNTING rather than by `open` going false', async () => {
+        // `v-if="x" :open="true"` unmounts instead of closing, and two live consumers use it
+        // (forms/Index.vue's AssignScopeModal, scopes/Index.vue's move confirm). Releasing inert without
+        // returning focus would strand the user on <body> — DSR §4.5 forbids exactly that.
+        const app = appNode();
+        const opener = app.querySelector('button') as HTMLButtonElement;
+        opener.focus();
+        expect(document.activeElement).toBe(opener);
+
+        let refocused = false;
+        opener.focus = () => {
+            refocused = true;
+        };
+
+        const wrapper = openModal();
+        await flushPromises();
+
+        wrapper.unmount();
+        await flushPromises();
+
+        expect(refocused).toBe(true);
+        expect(app.hasAttribute('inert')).toBe(false);
+    });
+
+    it('applies the lock on a modal that is mounted ALREADY open', async () => {
+        // `v-if="x" :open="true"` is a live pattern (forms/Index.vue's AssignScopeModal, scopes/Index.vue's
+        // move confirm) and it is how EVERY Storybook story renders. Without `immediate: true` on the
+        // watcher those get no inert, no scroll lock and no initial focus — and the axe story would be
+        // green over a no-op.
+        const app = appNode();
+        openModal();
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(true);
+        expect(document.body.style.overflow).toBe('hidden');
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+    });
+});
+
+describe('MdsModal — stacking', () => {
+    it('inerts only the topmost dialog’s background, including the dialog beneath it', async () => {
+        // Builder.vue's ConflictDialog is ALWAYS mounted and can open from a background PATCH while the
+        // schedule / confirm / import modal is up, so this is reachable rather than theoretical.
+        const app = appNode();
+        const lower = openModal({ title: 'Unsaved changes' });
+        await flushPromises();
+        const lowerBackdrop = document.querySelector('.mds-modal__backdrop') as HTMLElement;
+
+        const upper = openModal({ title: 'Version conflict' });
+        await flushPromises();
+
+        expect(openModalCount()).toBe(2);
+        expect(app.hasAttribute('inert')).toBe(true);
+        // Matching native <dialog>: the dialog underneath is background too.
+        expect(isBackground(lowerBackdrop)).toBe(true);
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+
+        // The lower dialog gets the page back; the page itself stays inert. A boolean instead of a stack
+        // would have released everything here.
+        expect(isBackground(lowerBackdrop)).toBe(false);
+        expect(app.hasAttribute('inert')).toBe(true);
+        expect(document.body.style.overflow).toBe('hidden');
+
+        await lower.setProps({ open: false });
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(false);
+        expect(document.body.style.overflow).toBe('');
+    });
+
+    it('inerts by PAINT order, not declaration order, when the later-declared modal opens first', async () => {
+        // ⚠️ THE REGRESSION TEST FOR THIS INCREMENT'S OWN WORST DEFECT, found by adversarial review and not
+        // by the suite. A teleported modal's position in <body> is frozen at MOUNT time by template
+        // declaration order — Vue appends the Teleport's anchors once and never re-anchors — while the stack
+        // is ordered by OPEN time. Builder.vue declares ConflictDialog first and ShareModal fifth and mounts
+        // both unconditionally, so a 409 landing while Share is open opens the conflict dialog second: later
+        // in the stack, earlier in the DOM. At a shared z-index paint order is DOM order, so the naive stack
+        // would have inerted the dialog the user is looking at and left the invisible one live.
+        //
+        // The case below is that exact shape: `first` is declared/mounted first but opened SECOND. Note the
+        // other stacking case cannot catch this — it mounts both already open, so the two orders agree.
+        const app = appNode();
+        const first = openModal({ open: false, title: 'Version conflict' }); // declared first, opens second
+        const second = openModal({ open: false, title: 'Share form' }); // declared second, opens first
+        await flushPromises();
+
+        await second.setProps({ open: true });
+        await flushPromises();
+        await first.setProps({ open: true });
+        await flushPromises();
+
+        const backdrops = Array.from(
+            document.querySelectorAll<HTMLElement>('.mds-modal__backdrop'),
+        );
+        expect(backdrops).toHaveLength(2);
+
+        // DOM order is still declaration order — that is the premise, and it is what makes this hard.
+        const [declaredFirst, declaredSecond] = backdrops;
+        expect(declaredFirst.querySelector('.mds-modal__title')?.textContent).toBe('Version conflict');
+
+        // The LAST-OPENED dialog must be the live one and must paint on top.
+        expect(isBackground(declaredFirst)).toBe(false);
+        expect(isBackground(declaredSecond)).toBe(true);
+        expect(Number(declaredFirst.style.zIndex)).toBeGreaterThan(Number(declaredSecond.style.zIndex));
+        expect(app.hasAttribute('inert')).toBe(true);
+
+        await first.setProps({ open: false });
+        await flushPromises();
+
+        // Handing back down: the remaining dialog becomes live again and its raise is dropped to the base.
+        expect(isBackground(declaredSecond)).toBe(false);
+        expect(declaredSecond.style.zIndex).toBe('1000');
+    });
+
+    it('ignores a re-push of a root already on the stack', async () => {
+        const app = appNode();
+        const wrapper = openModal();
+        await flushPromises();
+        const root = document.querySelector('.mds-modal__backdrop') as HTMLElement;
+
+        pushModalRoot(root);
+        pushModalRoot(root);
+
+        // Without the includes() guard the stack would hold three entries and the single pop on close would
+        // leave the page inert forever with no modal on screen.
+        expect(openModalCount()).toBe(1);
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+        expect(app.hasAttribute('inert')).toBe(false);
+    });
+
+    it('ignores a pop of a root that is not on the stack, rather than releasing the topmost', async () => {
+        // splice(-1, 1) removes the LAST element, so dropping the `at === -1` guard turns a stray pop into a
+        // silent release of whichever modal is currently on top.
+        const app = appNode();
+        openModal();
+        await flushPromises();
+
+        popModalRoot(document.createElement('div'));
+
+        expect(openModalCount()).toBe(1);
+        expect(app.hasAttribute('inert')).toBe(true);
+        expect(document.body.style.overflow).toBe('hidden');
+    });
+
+    it('empties its bookkeeping on release, so a later consumer inert is never stripped', async () => {
+        // The sibling case plants `inert` BEFORE opening, so that element is never claimed. This covers the
+        // other half: an element we DID mark must leave the `marked` set on release, or a later release
+        // would strip an attribute the consumer set in the meantime.
+        const app = appNode();
+        const wrapper = openModal();
+        await flushPromises();
+        expect(app.hasAttribute('inert')).toBe(true);
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+        expect(app.hasAttribute('inert')).toBe(false);
+
+        // The consumer now owns it. A second open/close cycle must leave that alone.
+        app.setAttribute('inert', '');
+        await wrapper.setProps({ open: true });
+        await flushPromises();
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(app.hasAttribute('inert')).toBe(true);
+    });
+
+    it('keeps the scroll lock while any modal is still open', async () => {
+        appNode();
+        const first = openModal({ title: 'First' });
+        const second = openModal({ title: 'Second' });
+        await flushPromises();
+
+        expect(document.body.style.overflow).toBe('hidden');
+
+        // The pre-I10a bug this fixes for free: the FIRST close cleared the lock outright.
+        await first.setProps({ open: false });
+        await flushPromises();
+        expect(document.body.style.overflow).toBe('hidden');
+
+        await second.setProps({ open: false });
+        await flushPromises();
+        expect(document.body.style.overflow).toBe('');
+    });
+});
+
+/**
+ * Increment J1a — `initialFocus`, the designated initial-focus target DSR §4.5 has specified since this
+ * component was written and which had never been built.
+ *
+ * ⚠️ THE DEFAULT IS THE DEFECT, AND THESE CASES PIN IT IN BOTH DIRECTIONS. `focusable()` queries the panel
+ * in DOM order and `<header>` — which carries `.mds-modal__close` — precedes `.mds-modal__body`, so every
+ * modal in the product opens focused on its own Close button. The first case below asserts that is still
+ * true when the prop is absent (a behaviour change there would be a silent regression across ~10 live
+ * dialogs), and the rest assert the opt-in.
+ *
+ * Neither the Storybook story nor any axe scan can reach this: the runner never presses a key, and a broken
+ * `initialFocus` renders identical markup. Vitest is the only gate that can see it.
+ */
+describe('MdsModal — the public package surface', () => {
+    it('re-exports openModalCount from the package index, not just from inert-stack', async () => {
+        // The third of J1a's three changes, and it had no gate at all until this case: every other spec
+        // imports from './inert-stack', so deleting the index re-export reddened nothing. J1d's chord guard
+        // consumes it through the package, which is the path that has to keep working.
+        expect(typeof openModalCountFromPackage).toBe('function');
+        expect(openModalCountFromPackage()).toBe(0);
+
+        openModal();
+        await flushPromises();
+
+        // Reads the SAME module instance as the deep import — if the bundler ever gave the package index
+        // its own copy of inert-stack, this would report 0 while the dialog is open and J1d's chord guard
+        // would silently never fire.
+        expect(openModalCountFromPackage()).toBe(1);
+        expect(openModalCount()).toBe(1);
+    });
+});
+
+describe('MdsModal — initialFocus', () => {
+    function openWithInput(extra: Record<string, unknown> = {}): Wrapper {
+        const wrapper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Search', ...extra },
+            slots: {
+                default: '<input data-mds-initial-focus type="search" aria-label="Search" />',
+                actions: '<button type="button">Go</button>',
+            },
+        });
+        mounted.push(wrapper);
+        return wrapper;
+    }
+
+    it('focuses the designated target rather than the close button', async () => {
+        openWithInput({ initialFocus: '[data-mds-initial-focus]' });
+        await flushPromises();
+
+        // Asserted by ROLE-bearing attributes rather than tag name: `getAttribute('type')` would pass for a
+        // `<button type="search">`, which is not a thing, but the pairing here is what the palette needs.
+        const active = document.activeElement as HTMLElement | null;
+        expect(active?.hasAttribute('data-mds-initial-focus')).toBe(true);
+        expect(active?.classList.contains('mds-modal__close')).toBe(false);
+    });
+
+    it('falls back to the pre-J1a target when the selector matches nothing', async () => {
+        // A consumer whose slot content is v-if'd away must get a focused dialog, never a stranded one.
+        //
+        // Asserts the CLOSE BUTTON specifically, not merely "something inside the panel". `closest()`
+        // matches the element itself, so a panel-focused result satisfies the looser assertion — which
+        // means mutating the expression to `(designated ?? panel.value)`, i.e. deleting the `items[0]`
+        // fallback this case exists to pin, would pass. Naming the control is what makes it fail.
+        openWithInput({ initialFocus: '[data-does-not-exist]' });
+        await flushPromises();
+
+        expect(document.activeElement?.classList.contains('mds-modal__close')).toBe(true);
+    });
+
+    it('does not strand focus when the selector is INVALID CSS', async () => {
+        // `querySelector('[')` throws a DOMException rather than returning null, and this runs inside a
+        // `nextTick` callback that Vue does not route through its error handler. Unguarded, the throw
+        // escapes as an unhandled rejection AFTER the page was made inert — so the opener is blurred into
+        // an inert subtree, focus lands on <body>, and because onKeydown is bound to the panel, Escape and
+        // the Tab trap are both unreachable. A keyboard trap (WCAG 2.1.2) reached through the prop added
+        // to satisfy DSR 4.5's "never left stranded".
+        openWithInput({ initialFocus: '[' });
+        await flushPromises();
+
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+    });
+
+    it('does not strand focus when the target matches but cannot take focus', async () => {
+        // The mode a `?? fallback` on the RETURN VALUE structurally cannot catch: the selector matches, so
+        // the fallback never fires, but `.focus()` on a disabled input is a silent no-op. Reachable in one
+        // refactor — the marker attribute drifting onto a wrapper, or an input disabled while results load.
+        const wrapper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Search', initialFocus: '[data-mds-initial-focus]' },
+            slots: { default: '<input data-mds-initial-focus disabled aria-label="Search" />' },
+        });
+        mounted.push(wrapper);
+        await flushPromises();
+
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+    });
+
+    it('without the prop, focuses the CLOSE BUTTON — right for a confirm, wrong for an input', async () => {
+        // Both the regression guard and the proof of the docblock's claim. `focusable()` walks the panel in
+        // DOM order and `<header>` precedes `.mds-modal__body`, so the close button wins — even in a dialog
+        // whose entire point is the input below it.
+        //
+        // Worth pinning rather than "fixing": for a destructive confirmation this is exactly what DSR §4.5
+        // asks for (a cancel-shaped target, so a stray Enter cannot confirm), and ~10 live dialogs rely on
+        // it. `initialFocus` opts a dialog out; it must never become the default.
+        //
+        // ⚠️ WHAT THIS HARNESS CAN AND CANNOT SEE, MEASURED RATHER THAN ASSUMED. happy-dom 20.10.6 does
+        // not implement `offsetParent` at all — `typeof el.offsetParent === 'undefined'` and
+        // `'offsetParent' in el === false`. So `focusable()`'s `el.offsetParent !== null` filter evaluates
+        // `undefined !== null`, i.e. TRUE for every element, and the list here is a strict SUPERSET of the
+        // browser's (it would include hidden and detached nodes).
+        //
+        // That does not weaken THIS case — the close button is first in DOM order either way, which is the
+        // property being pinned — but it does mean the VISIBILITY half of `focusable()` is unfalsifiable in
+        // Vitest: delete the filter and nothing here reddens. Do not read a green suite as coverage of it.
+        openWithInput();
+        await flushPromises();
+
+        expect(document.activeElement?.classList.contains('mds-modal__close')).toBe(true);
+        expect(document.activeElement?.hasAttribute('data-mds-initial-focus')).toBe(false);
+    });
+
+    it('resolves the selector INSIDE the panel, never against the whole document', async () => {
+        // A page-level element carrying the same marker must not steal focus out of the dialog — which is
+        // what a `document.querySelector` implementation would do, and it would pass every case above.
+        const decoy = document.createElement('input');
+        decoy.setAttribute('data-mds-initial-focus', '');
+        document.body.appendChild(decoy);
+
+        openWithInput({ initialFocus: '[data-mds-initial-focus]' });
+        await flushPromises();
+
+        expect(document.activeElement).not.toBe(decoy);
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+    });
+});
+
+/**
+ * `returnFocus` (J6) — the mirror of `initialFocus`, and the reason it was owed.
+ *
+ * ⚠️ THESE CASES ARE ABOUT A FAILURE THAT PRODUCES NO ERROR. `takePage()` has always verified that focus
+ * landed and explained why at length; `closePage()` called `opener?.focus?.()` and trusted it. `.focus()`
+ * on an element that cannot take focus is a silent no-op, so a dead opener left the reader on `<body>` with
+ * no dialog left to bind Escape or trap Tab — the stranding DSR §4.5 forbids in the very sentence that asks
+ * for return-focus.
+ *
+ * The three ways an opener dies between open and close: it is REMOVED (an Inertia visit re-rendering the
+ * shell), it stops being RENDERED, or it stays INERT because a non-dialog surface is holding the page
+ * underneath. happy-dom lays nothing out, so the rendering one is the e2e spec's; removal and inertness are
+ * DOM facts and belong here.
+ */
+describe('MdsModal — returnFocus, because an opener can die while the dialog is open', () => {
+    function openerButton(id: string): HTMLElement {
+        const el = document.createElement('button');
+        el.id = id;
+        el.textContent = id;
+        document.body.appendChild(el);
+
+        return el;
+    }
+
+    it('leaves the normal path exactly as it was: a live opener still gets focus back', async () => {
+        // ⭐ THE CONTROL. Every existing consumer passes no `returnFocus`, and the verification must be
+        // invisible to them — it fires only where focus demonstrably ended up nowhere.
+        const opener = openerButton('opener');
+        opener.focus();
+
+        const wrapper = openModal();
+        await flushPromises();
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(document.activeElement).toBe(opener);
+    });
+
+    it('falls back to a returnFocus candidate when the opener was removed while open', async () => {
+        // ⭐ THE J4b1 FINDING-2 SHAPE, reduced to its mechanism. The palette makes this routine: activating a
+        // result navigates, the shell re-renders, and an opener captured inside a since-closed mobile drawer
+        // is simply gone by close time.
+        const opener = openerButton('opener');
+        const fallback = openerButton('fallback');
+        opener.focus();
+
+        const wrapper = openModal({ returnFocus: ['#fallback'] });
+        await flushPromises();
+
+        opener.remove();
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(document.activeElement).toBe(fallback);
+    });
+
+    it('skips a returnFocus candidate that is INERT and takes the next one', async () => {
+        // The reason `firstFocusable` and not `querySelector`: with a surface holding the page, a candidate
+        // can match and still be unfocusable, and `.focus()` would say nothing about it.
+        const opener = openerButton('opener');
+        const shell = document.createElement('nav');
+        shell.setAttribute('inert', '');
+        shell.innerHTML = '<button id="buried">Buried</button>';
+        document.body.appendChild(shell);
+        const reachable = openerButton('reachable');
+        opener.focus();
+
+        const wrapper = openModal({ returnFocus: ['#buried', '#reachable'] });
+        await flushPromises();
+
+        opener.remove();
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(document.activeElement).toBe(reachable);
+    });
+
+    it('hands focus to a surface still holding the page when nothing else can take it', async () => {
+        // ⭐ THE LAST RESORT, AND IT ONLY FIRES WHERE THE READER WOULD OTHERWISE HAVE NOTHING AT ALL: focus is
+        // on `<body>` and a surface is still pushed, so every other element in the document is inert.
+        const drawer = document.createElement('div');
+        drawer.innerHTML = '<a id="drawer-item" href="/x">Item</a>';
+        document.body.appendChild(drawer);
+        appNode();
+
+        const opener = openerButton('opener');
+        opener.focus();
+
+        pushModalRoot(drawer, 'surface');
+
+        const wrapper = openModal();
+        await flushPromises();
+
+        opener.remove();
+
+        await wrapper.setProps({ open: false });
+        await flushPromises();
+
+        expect(document.activeElement).toBe(document.querySelector('#drawer-item'));
+
+        popModalRoot(drawer);
+    });
+
+    it('does NOT steal focus out of a dialog that is still open beneath, or even MOVE it inside one', async () => {
+        // ⭐ popModalRoot's own contract, preserved for free — and this is why the check asks "is focus
+        // stranded?" rather than "did the opener take it". When a LOWER dialog closes under an open upper
+        // one, the opener's no-op is CORRECT: focus must not jump to a control behind an open dialog. A
+        // verification written as "did the opener get focus" would have broken exactly this.
+        //
+        // ⚠️ THE UPPER DIALOG TAKES AN `initialFocus` DELIBERATELY, AND THE MUTATION PASS IS WHY. The first
+        // version of this case let the upper modal focus its own default target — the CLOSE button, which is
+        // also the first focusable in the panel — so "always consider focus stranded" moved focus from that
+        // button to that same button and the case SURVIVED. Pinning a focused element that the fallback
+        // would also have chosen is not pinning anything.
+        appNode();
+        const lower = openModal({ returnFocus: ['#app button'] });
+        await flushPromises();
+
+        const upper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'On top', initialFocus: '#deep' },
+            slots: { default: '<button type="button">First</button><button id="deep" type="button">Deep</button>' },
+        });
+        mounted.push(upper);
+        await flushPromises();
+
+        const insideUpper = document.activeElement;
+        expect((insideUpper as HTMLElement).id).toBe('deep');
+
+        await lower.setProps({ open: false });
+        await flushPromises();
+
+        expect(document.activeElement).toBe(insideUpper);
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+    });
+
+    it('never captures <body> as an opener, because focusing the body SUCCEEDS and takes focus', async () => {
+        // ⭐ A PRE-EXISTING DEFECT J6's TESTS UNCOVERED RATHER THAN INTRODUCED. A modal mounted already open
+        // with nothing focused — two live call sites do exactly that, as does every Storybook story —
+        // captured `document.activeElement`, which is `<body>`. On close it called `.focus()` on that, and
+        // `document.body.focus()` is not the no-op the code assumed: the body is the document's default focus
+        // target, so the call succeeds. Closing such a modal did not merely fail to restore focus, it TOOK
+        // focus — here, out of a dialog that was still open above it.
+        const upper = mount(Modal, {
+            attachTo: document.body,
+            props: { open: true, title: 'Upper', initialFocus: '#stay' },
+            slots: { default: '<button type="button">First</button><button id="stay" type="button">Stay</button>' },
+        });
+        mounted.push(upper);
+        await flushPromises();
+
+        // Mounted already open with nothing focused, so its captured opener would have been <body>.
+        const lower = openModal({ title: 'Lower' });
+        await flushPromises();
+
+        // Put focus back where the reader had it, then close the body-opener modal.
+        (document.querySelector('#stay') as HTMLElement).focus();
+        await lower.setProps({ open: false });
+        await flushPromises();
+
+        expect((document.activeElement as HTMLElement).id).toBe('stay');
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+    });
+
+    it('hands focus to the TOPMOST holder, not the bottom of the stack', async () => {
+        // ⭐ ALSO FOUND BY THE MUTATION PASS, WHICH IS THE POINT OF RUNNING ONE. Reversing `pageOwningRoot`
+        // to answer `stack[0]` survived every case above, because in all of them the stack had exactly ONE
+        // entry left and first == last. With a surface beneath a dialog it is a real defect: focus would be
+        // handed to a drawer sitting BEHIND an open dialog — the precise thing popModalRoot's contract
+        // forbids — and because that drawer is inert by then, `.focus()` is a no-op and the reader is left
+        // on `<body>` with nothing reachable at all.
+        const drawer = document.createElement('div');
+        drawer.innerHTML = '<a id="drawer-item" href="/x">Item</a>';
+        document.body.appendChild(drawer);
+        pushModalRoot(drawer, 'surface');
+
+        const lower = openModal({ title: 'Lower' });
+        await flushPromises();
+
+        const opener = openerButton('doomed');
+        opener.focus();
+        const upper = openModal({ title: 'Upper' });
+        await flushPromises();
+
+        opener.remove();
+
+        await upper.setProps({ open: false });
+        await flushPromises();
+
+        // The lower DIALOG is the topmost holder now, so focus belongs inside it — never in the drawer
+        // underneath, and never on the body.
+        expect(document.activeElement?.closest('.mds-modal__panel')).not.toBeNull();
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.id).not.toBe('drawer-item');
+
+        await lower.setProps({ open: false });
+        await flushPromises();
+        popModalRoot(drawer);
+    });
+});

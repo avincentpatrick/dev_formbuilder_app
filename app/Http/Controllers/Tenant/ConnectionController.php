@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreConnectionRuleRequest;
 use App\Models\Connection;
+use App\Models\Form;
 use App\Models\User;
 use App\Services\Connectors\ConnectionPresenter;
 use App\Services\Connectors\ConnectionService;
 use App\Services\Connectors\ConnectorChannelDirectory;
+use App\Services\Connectors\MappableColumnCatalog;
+use App\Services\Connectors\TabularDestinationDirectory;
 use App\Support\Connectors\ConnectorConnectOutcome;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -62,6 +66,89 @@ final class ConnectionController extends Controller
     public function channels(Connection $connection, ConnectorChannelDirectory $directory): JsonResponse
     {
         return response()->json($directory->list($connection));
+    }
+
+    /**
+     * Everything a spreadsheet column can be bound to, for the form the rule is scoped to (H16b).
+     *
+     * A sidecar rather than an index prop because it depends on a choice made INSIDE the open modal — the
+     * tenant picks the form, and re-rendering the page to learn its fields would discard the rule they are
+     * half-way through writing.
+     *
+     * `form_id` is validated with `exists:` on the RLS-scoped table, so another tenant's form is "not found"
+     * rather than forbidden — the {@see StoreConnectionRuleRequest} convention.
+     */
+    public function mappableColumns(Request $request, Connection $connection, MappableColumnCatalog $catalog): JsonResponse
+    {
+        $validated = $request->validate([
+            'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
+        ]);
+
+        // `whereKey()->first()` rather than `find()`: the latter's signature admits an array and so returns
+        // `Form|Collection|null`. That is a real ambiguity here rather than a PHPStan nicety — the id comes
+        // from a request, and `?form_id[]=` is a shape a caller can send.
+        $form = isset($validated['form_id'])
+            ? Form::query()->whereKey($validated['form_id'])->first()
+            : null;
+
+        return response()->json($catalog->for($form));
+    }
+
+    /**
+     * Read an existing document's tabs and header row so a mapping can be authored against it (H16b).
+     *
+     * Provider-neutral since H16c: a Google spreadsheet's tabs or an Airtable base's tables, resolved by
+     * {@see TabularDestinationDirectory} from the connection's own provider.
+     *
+     * Same always-200 contract as {@see channels()} and for the same reason, plus one specific to this
+     * surface: the tenant is mid-way through a rule form, and a 4xx here would lose everything they had
+     * already typed into it.
+     */
+    public function inspectDestination(Request $request, Connection $connection, TabularDestinationDirectory $directory): JsonResponse
+    {
+        $validated = $request->validate([
+            'reference' => ['required', 'string', 'max:2048'],
+            'sheet_name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return response()->json($directory->inspect(
+            $connection,
+            $validated['reference'],
+            $validated['sheet_name'] ?? null,
+        ));
+    }
+
+    /**
+     * Create a document for this grant, with the given headers in row 1 (H16b).
+     *
+     * Only providers that CAN provision reach the capability — Airtable deliberately cannot, and answers with
+     * an explaining `error` rather than a 500 (ADR-0009 §D8; H16c).
+     *
+     * ⚠️ A WRITE BEHIND A JSON SIDECAR, WHICH THE H15b DOCBLOCK ABOVE SAYS THIS SURFACE DOES NOT DO — so the
+     * exception is argued rather than assumed. That rule exists because a domain exception on a tenant-web
+     * route renders as a 302 (`bootstrap/app.php` keys its JSON branch on the `api/v1/*` PATH), which a fetch
+     * client follows into HTML. {@see TabularDestinationDirectory} never throws, so the hazard cannot arise.
+     *
+     * The alternative — an Inertia visit — was rejected on behaviour, not taste: this produces a value the
+     * OPEN FORM needs (the new id, its tab, its header row) and the rule is not saved yet, so a redirect
+     * would have to round-trip the tenant's half-finished input through the session to survive.
+     *
+     * The write it performs is in the tenant's own provider account, never in our database: nothing here persists, and
+     * the id only reaches `connection_subscriptions.config` when the tenant submits the rule.
+     */
+    public function createDestination(Request $request, Connection $connection, TabularDestinationDirectory $directory): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'headers' => ['required', 'array', 'min:1', 'max:200'],
+            'headers.*' => ['present', 'string', 'max:255'],
+        ]);
+
+        return response()->json($directory->create(
+            $connection,
+            $validated['title'],
+            array_values(array_map(strval(...), $validated['headers'])),
+        ));
     }
 
     /** Revoke the grant locally and return to the list. Rules survive, paused (ADR-0009 §D7). */

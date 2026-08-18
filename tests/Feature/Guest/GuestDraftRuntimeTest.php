@@ -11,6 +11,7 @@ use App\Events\SubmissionCreated;
 use App\Models\Form;
 use App\Models\FormSection;
 use App\Models\Submission;
+use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\ResumeLinkNotification;
@@ -124,8 +125,14 @@ it('overwrites the same draft in place on a subsequent save (409 suspended)', fu
     $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
 
     $first = $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
-    $second = $this->postJson($url, ['answers' => ['age' => '31', 'full_name' => 'Ada'], 'client_submission_uuid' => $uuid])
-        ->assertOk(); // 200, not 201 — an in-place overwrite
+    // The CONTENT 409 stays suspended: materially different answers under one uuid still overwrite in place.
+    // The save carries P3a's baseline, which is what tells this apart from a second DEVICE writing — that
+    // case is the sibling test below, and it is refused.
+    $second = $this->postJson($url, [
+        'answers' => ['age' => '31', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $first->json('data.content_checksum'),
+    ])->assertOk(); // 200, not 201 — an in-place overwrite
 
     expect($second->json('data.id'))->toBe($first->json('data.id'))
         ->and($second->json('data.completeness_percent'))->toBe(100);
@@ -378,15 +385,20 @@ it('does not restamp the draft expiry on a later save (stamp-once)', function ()
     $uuid = Uuid::uuid7()->toString();
     $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
 
-    $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
+    $first = $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
 
     enterTenant($f->tenant->id);
     $originalExpiry = Submission::query()->firstOrFail()->draft_expires_at->toIso8601String();
 
-    // Two days later, a second save must NOT move the (creation-time) expiry.
+    // Two days later, a second save must NOT move the (creation-time) expiry. It carries the baseline P3a
+    // added, exactly as the SPA does — without it this is a lost-update refusal rather than a save.
     $this->travel(2)->days();
     TenantContext::flush();
-    $this->postJson($url, ['answers' => ['age' => '31', 'full_name' => 'Ada'], 'client_submission_uuid' => $uuid])->assertOk();
+    $this->postJson($url, [
+        'answers' => ['age' => '31', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $first->json('data.content_checksum'),
+    ])->assertOk();
 
     enterTenant($f->tenant->id);
     expect(Submission::query()->firstOrFail()->draft_expires_at->toIso8601String())->toBe($originalExpiry);
@@ -527,4 +539,203 @@ it('refuses loudly, rather than promoting against a different graph, when the br
 
     enterTenant($tenant->id);
     expect(Submission::query()->firstOrFail()->status)->toBe(SubmissionStatus::Draft);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment P3a — the lost-update guard over HTTP. The resume link is what makes this reachable: it hands a
+| SECOND device the same client_submission_uuid, so one draft acquires two writers.
+|--------------------------------------------------------------------------
+*/
+
+it('HEADLINE: refuses the second device over HTTP with 409 draft_conflict and keeps the first device work', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    // Phone saves, then emails itself the resume link.
+    $seed = $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
+    $sharedBase = $seed->json('data.content_checksum');
+    expect($sharedBase)->not->toBeNull();
+
+    // Tablet opens the link and is handed the SAME base the phone holds.
+    $resumed = $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$seed->json('data.resume_token')}")
+        ->assertOk();
+    expect($resumed->json('data.content_checksum'))->toBe($sharedBase)
+        ->and($resumed->json('data.client_submission_uuid'))->toBe($uuid); // the same logical submission
+
+    // Tablet saves first and moves the stored state on.
+    $this->postJson($url, [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])->assertOk();
+
+    // The phone, still holding the pre-tablet base, saves. Before P3a this silently erased 'Ada'.
+    $this->postJson($url, [
+        'answers' => ['age' => '31'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict');
+
+    // The tablet's answers survive and the phone wrote nothing.
+    enterTenant($f->tenant->id);
+    $answers = SubmissionAnswer::query()->where('submission_id', $seed->json('data.id'))->value('answers');
+    expect(data_get($answers, 'full_name'))->toBe('Ada')
+        ->and(data_get($answers, 'age'))->toBe('30')
+        ->and(Submission::query()->count())->toBe(1);
+});
+
+it('lets the refused device recover by re-reading the draft and saving from the fresh base', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $seed = $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
+    $resumeToken = $seed->json('data.resume_token');
+    $stale = $seed->json('data.content_checksum');
+
+    // Another device writes.
+    $this->postJson($url, [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $stale,
+    ])->assertOk();
+
+    // The refusal is not a dead end — the message says Reload, and reloading is what actually works.
+    $this->postJson($url, ['answers' => ['age' => '31'], 'client_submission_uuid' => $uuid, 'base_content_checksum' => $stale])
+        ->assertStatus(409);
+
+    $fresh = $this->getJson("http://acme.meridian.test/api/v1/public/drafts/{$resumeToken}")->assertOk();
+    $this->postJson($url, [
+        'answers' => ['age' => '31', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $fresh->json('data.content_checksum'),
+    ])->assertOk();
+
+    enterTenant($f->tenant->id);
+    $answers = SubmissionAnswer::query()->where('submission_id', $seed->json('data.id'))->value('answers');
+    expect(data_get($answers, 'age'))->toBe('31')->and(data_get($answers, 'full_name'))->toBe('Ada');
+});
+
+it('refuses a client that stops sending the baseline rather than silently dropping the guard', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $url = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $this->postJson($url, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])->assertCreated();
+
+    // The fail-CLOSED direction over HTTP. A stale client is refused; it is not quietly unguarded.
+    $this->postJson($url, ['answers' => ['age' => '31'], 'client_submission_uuid' => $uuid])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict');
+});
+
+it('rejects a malformed baseline at validation rather than treating it as a conflict', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => 'not-a-sha256',
+    ])->assertStatus(422);
+});
+
+it('HEADLINE: refuses a stale device SUBMITTING over a draft another device advanced', function (): void {
+    // ⚠️ THE SHARPEST INSTANCE, FOUND BY THE ADVERSARIAL PASS RATHER THAN BY THE ROW. A submit against an
+    // existing draft SAVES first and then PROMOTES, so before P3a a stale device did not merely overwrite the
+    // other device's answers -- it finalized the row with its own stale copy, and no later save could undo it.
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $draftUrl = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $seed = $this->postJson($draftUrl, [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+    $sharedBase = $seed->json('data.content_checksum');
+
+    // The tablet saves real work into the draft.
+    $this->postJson($draftUrl, [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])->assertOk();
+
+    // The phone, still on the pre-tablet base, presses Submit.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '31', 'full_name' => 'Bob'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $sharedBase,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict');
+
+    // Nothing was finalized and the tablet's answers are intact.
+    enterTenant($f->tenant->id);
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($row->status)->toBe(SubmissionStatus::Draft);
+    $answers = SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers');
+    expect(data_get($answers, 'full_name'))->toBe('Ada');
+});
+
+it('still replays an offline submit that makes no baseline claim, because stranding it breaks the promise', function (): void {
+    // ⚠️ THE DELIBERATE ASYMMETRY WITH THE DRAFT CHANNEL. An outbox row serialized by an earlier build has no
+    // baseline, and refusing it would strand a real, finished response that nothing can resubmit. The draft
+    // channel fails CLOSED because a refused tick costs a retype; this one fails OPEN because a refused
+    // replay costs the response.
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '30', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+    ])->assertSuccessful();
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
+        ->toBe(SubmissionStatus::Submitted);
+});
+
+it('promotes a submit that carries the CURRENT baseline, so the token is used and not merely present', function (): void {
+    // ⚠️ THIS TEST EXISTS BECAUSE A MUTATION SURVIVED. Nulling the token in the controller still produced a
+    // 409 on the stale-submit case above -- `claimsBaseline()` reads the real request value, so the guard
+    // fired for the WRONG reason and the assertion could not tell. Only a submit that must SUCCEED on a
+    // correct baseline discriminates "the token is compared" from "the token is merely non-null".
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+    $draftUrl = "http://acme.meridian.test/api/v1/public/f/{$f->token}/draft";
+
+    $seed = $this->postJson($draftUrl, ['answers' => ['age' => '30'], 'client_submission_uuid' => $uuid])
+        ->assertCreated();
+
+    // One more save, so the baseline has genuinely MOVED and a stale value would be caught.
+    $moved = $this->postJson($draftUrl, [
+        'answers' => ['age' => '31'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $seed->json('data.content_checksum'),
+    ])->assertOk();
+
+    expect($moved->json('data.content_checksum'))->not->toBe($seed->json('data.content_checksum'));
+
+    // The same device submits with the CURRENT base and is promoted.
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['age' => '31', 'full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+        'base_content_checksum' => $moved->json('data.content_checksum'),
+    ])->assertSuccessful();
+
+    enterTenant($f->tenant->id);
+    $row = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($row->status)->toBe(SubmissionStatus::Submitted);
+    expect(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
+        ->toBe('Ada');
 });

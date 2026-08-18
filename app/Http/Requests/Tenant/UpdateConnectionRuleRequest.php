@@ -8,8 +8,10 @@ use App\Enums\ConnectorSubscriptionStatus;
 use App\Enums\DomainEventType;
 use App\Http\Requests\Api\V1\UpdateConnectionSubscriptionRequest;
 use App\Services\Connectors\ConnectionSubscriptionService;
+use App\Support\Connectors\SubscriptionConfigRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Partially update a delivery rule from the session-authed Integrations UI (H15b). A byte-for-byte mirror of
@@ -19,8 +21,9 @@ use Illuminate\Validation\Rule;
  * and a `required` rule anywhere here would 422 a request that is not trying to change those fields at all.
  * Re-activating resets the failure counter in the service (the webhook-endpoint breaker convention).
  *
- * `config.channel_id` is `required_with:config` rather than `sometimes`: `config` is replaced wholesale by the
- * service, so a partial `config` would silently drop the destination and leave a rule that can never deliver.
+ * The destination keys are `required_with:config` rather than `sometimes`: `config` is replaced wholesale by
+ * the service, so a partial `config` would silently drop the destination and leave a rule that can never
+ * deliver. WHICH keys those are is per-provider and comes from {@see SubscriptionConfigRules} (H16a).
  */
 final class UpdateConnectionRuleRequest extends FormRequest
 {
@@ -39,9 +42,8 @@ final class UpdateConnectionRuleRequest extends FormRequest
             'event_types' => ['sometimes', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['sometimes', 'nullable', 'uuid', 'exists:forms,id'],
-            'config' => ['sometimes', 'array'],
-            'config.channel_id' => ['required_with:config', 'string', 'max:64'],
-            'config.channel_name' => ['nullable', 'string', 'max:150'],
+            ...SubscriptionConfigRules::documentedShape(partial: true),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this), partial: true),
             'status' => ['sometimes', Rule::in(ConnectorSubscriptionStatus::values())],
         ];
     }
@@ -51,9 +53,7 @@ final class UpdateConnectionRuleRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return [
-            'config.channel_id' => 'channel',
-            'config.channel_name' => 'channel name',
+        return SubscriptionConfigRules::attributesFor(SubscriptionConfigRules::providerFor($this)) + [
             'event_types' => 'events',
             'form_id' => 'scope',
         ];
@@ -64,9 +64,21 @@ final class UpdateConnectionRuleRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'config.channel_id.required_with' => 'Choose a channel to deliver into.',
+        return SubscriptionConfigRules::messagesFor(SubscriptionConfigRules::providerFor($this)) + [
             'event_types.min' => 'Choose at least one event.',
         ];
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     *
+     * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
+     * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
+     *
+     * @return array<int, \Closure(Validator): void>
+     */
+    public function after(): array
+    {
+        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
     }
 }

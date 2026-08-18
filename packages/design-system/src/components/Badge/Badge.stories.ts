@@ -17,6 +17,7 @@ const meta = {
             options: ['success', 'warning', 'danger', 'info', 'neutral'],
         },
         label: { control: 'text' },
+        dot: { control: 'boolean' },
     },
     args: { variant: 'neutral', label: 'Neutral' },
 } satisfies Meta<typeof Badge>;
@@ -31,6 +32,18 @@ export const Danger: Story = { args: { variant: 'danger', label: 'Error' } };
 export const Info: Story = { args: { variant: 'info', label: 'Pending' } };
 export const Neutral: Story = { args: { variant: 'neutral', label: 'Removed' } };
 export const WithIcon: Story = { args: { variant: 'success', label: 'Active', icon: 'check' } };
+
+/* JR2 — the list-status disc. It paints `currentColor`, i.e. whatever `-fg` the variant set, so it is
+   the same colour as the label and axe measures it as part of the same pill. Scanned in both themes
+   because the dark `-fg` steps are a different family (pale-200s on deep-800 tints), and because the
+   disc is the smallest coloured object the design system draws — 6px is where a marginal ratio shows.
+   `DotWithIcon` is the guard case: it asserts by construction that a caller who sets both gets the
+   icon and NOT a disc-plus-arrow, which is what `MdsStatTile`'s delta badge would otherwise render. */
+export const WithDot: Story = { args: { variant: 'success', label: 'Live', dot: true } };
+export const WithDotDark: Story = { args: { variant: 'success', label: 'Live', dot: true }, decorators: [dark] };
+export const DotWithIcon: Story = {
+    args: { variant: 'success', label: 'Active', icon: 'check', dot: true },
+};
 
 export const SuccessDark: Story = { args: { variant: 'success', label: 'Active' }, decorators: [dark] };
 export const WarningDark: Story = { args: { variant: 'warning', label: 'Suspended' }, decorators: [dark] };

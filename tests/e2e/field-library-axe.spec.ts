@@ -1,25 +1,44 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { forceTheme } from './support/axe';
+import { forceTheme, settlePaint } from './support/axe';
+import { openBuilder, showBuilderPane } from './support/navigate';
 
 // Accessibility + interaction gate for the builder's question-library picker (Increment G9b): the left-pane
 // Library toggle lists the platform-seeded questions (E2eSeeder runs PlatformFieldLibrarySeeder), inserting
 // one adds a materialized field to the draft, and each field's config panel exposes a one-click "Save to
 // library". The full-page builder a11y is owned by builder-axe (all 3 viewports); here we scope the axe scan
 // to the LEFT PANE so we cover the NEW picker UI without re-litigating the pre-existing toolbar.
+//
+// ⚠️ SINCE JR5 THE LEFT PANE MUST BE *SELECTED* BEFORE ANYTHING IN IT CAN BE REACHED. Below 60em of the
+// builder's own container exactly one pane is on screen, so the Library toggle, the picker and the config
+// panel's Advanced tab are each behind a `showBuilderPane()` call at the mobile and tablet projects. The
+// pane is `display: none`-d, never unmounted, which is what keeps the `.include()` below resolving — and
+// is also precisely why `scanLeftPane` needs its own visibility guard.
 
 const themes = ['light', 'dark'] as const;
 
-async function openBuilder(page: Page): Promise<void> {
-    await page.goto('/forms', { waitUntil: 'networkidle' });
-    await page.getByRole('link', { name: 'Community Health Survey' }).click();
-    await page.waitForURL('**/builder', { timeout: 30_000 });
+/** This spec always drives the same seeded form; the shared helper takes the title explicitly. */
+async function openSurveyBuilder(page: Page): Promise<void> {
+    await openBuilder(page, 'Community Health Survey');
 }
 
 // Axe scan scoped to the left pane (the Fields ⇄ Library toggle + the active picker), mirroring builder-axe's
 // tag set. Scoped rather than whole-page so it gates the new UI, not the toolbar builder-axe already covers.
 async function scanLeftPane(page: Page, label: string): Promise<void> {
+    // ⚠️ JR5 — WITHOUT THIS THE SCAN BELOW CAN PASS OVER NOTHING, AND IT IS THE WORST OUTCOME IN THIS
+    // INCREMENT. Below 60em of the builder's container exactly one pane is displayed; axe evaluates a
+    // `display: none` subtree as zero nodes and reports zero violations, so a caller that forgot
+    // `showBuilderPane(page, 'fields')` would get a GREEN scan of an invisible pane at the mobile and
+    // tablet projects. `.include()` cannot catch it — the element is still in the DOM, which is the whole
+    // reason `display: none` was chosen over `v-if` (three gates in this suite need it attached).
+    await expect(page.locator('.builder__pane--left')).toBeVisible();
+
     await page.mouse.move(0, 0);
+
+    // Wait for the un-hover to PAINT — see `support/axe.ts`'s `assertClean`: parking the pointer starts a
+    // transition on the control it left, and a scan issued on the same frame can read an intermediate
+    // foreground against a settled background. J2b's CI flaked on exactly that in `builder-axe`.
+    await settlePaint(page);
     const results = await new AxeBuilder({ page })
         .include('.builder__pane--left')
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -35,7 +54,8 @@ async function scanLeftPane(page: Page, label: string): Promise<void> {
 
 for (const theme of themes) {
     test(`Library picker — ${theme}`, async ({ page }) => {
-        await openBuilder(page);
+        await openSurveyBuilder(page);
+        await showBuilderPane(page, 'fields');
         await page.getByRole('button', { name: 'Library' }).click();
         // Scope to the picker — the seeded form's canvas may already contain a same-named field.
         const picker = page.locator('.library');
@@ -46,17 +66,21 @@ for (const theme of themes) {
 }
 
 test('inserting a library question adds a field to the draft', async ({ page }) => {
-    await openBuilder(page);
+    await openSurveyBuilder(page);
+    await showBuilderPane(page, 'fields');
     await page.getByRole('button', { name: 'Library' }).click();
     // Scope the insert to the picker (the canvas may hold a same-named field).
     await page.locator('.library').getByRole('button', { name: /Full name/ }).click();
     // The materialized field is auto-selected → the config Basics tab's Label input carries the item label.
+    // That input is in the CONFIG pane, which is a different pane from the picker below the threshold.
+    await showBuilderPane(page, 'settings');
     await expect(page.getByRole('textbox', { name: 'Label' })).toHaveValue('Full name', { timeout: 10_000 });
 });
 
 test('a field can be saved to the library from its config panel', async ({ page }) => {
-    await openBuilder(page);
+    await openSurveyBuilder(page);
     // The builder auto-selects the first field → open its Advanced tab → Save to library (one click).
+    await showBuilderPane(page, 'settings');
     await page.getByRole('tab', { name: 'Advanced' }).click();
     await page.getByRole('button', { name: 'Save to library' }).click();
     await expect(page.getByText(/Saved .* to your library/)).toBeVisible({ timeout: 10_000 });

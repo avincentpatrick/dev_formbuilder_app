@@ -76,9 +76,20 @@ erDiagram
 
     tenants ||--o{ audits : "auditable events (nullable tenant_id)"
     submissions ||--o{ audits : "polymorphic auditable (representative example)"
+
+    tenants ||--o{ google_auth_requests : "in-flight Google sign-ins (J3c2)"
+
+    tenants ||--o{ point_awards : "gamification ledger (K1a)"
+    users ||--o{ point_awards : "who earned it (external, single-column FK)"
+
+    tenants ||--o{ badge_awards : "earned badges (K1b)"
+    users ||--o{ badge_awards : "who earned it (external, single-column FK)"
 ```
 
 **Reading notes:**
+- **Neither gamification table has a line to the thing it is ABOUT, and in both cases that is the design** (K1a–K1b / ADR-0020 §D3, §D9). On `point_awards`, `subject_type`/`subject_id` name a form, a form version, a submission, a member — or, for `member.invited`, a SHA-256 of an email that references no row anywhere; a polymorphic pair with a non-row member cannot carry a database FK. On `badge_awards` there is **no subject column at all**: a badge is about a member's whole history against one `PointRule`, not about any single row, so there is nothing to draw and nothing to constrain. In both tables the only drawn relationships are the two that are real. `docs/data-dictionary.md` §31–§32 have the full shapes, including why `point_awards`' pair may never become nullable and why `badge_awards` stores no threshold.
+- **`google_auth_requests` has no line to `users`, and its absence is the design** (J3c2 / ADR-0019 §D1). The person is the *outcome* of that flow, not a party to it: nobody is authenticated while any of its three rows-worth of writes happen. Where a Google account attaches to a local identity is `users.google_id` — a plain unique column, not a join table — so there is no relationship to draw. `docs/data-dictionary.md` §30 has the full shape, including why the central-host arm produces no row at all.
+- **The SAML tables (`sso_connections`, `sso_auth_requests`, `sso_auth_failures`) are not drawn here either.** That is pre-existing and stated rather than quietly inherited: they form a self-contained protocol subgraph hanging off `tenants`, and `docs/data-dictionary.md` §27–§29 specifies them. A future pass may add an auth-subgraph diagram; adding four disconnected boxes to the overview would cost more legibility than it buys.
 - `form_fields ||--o{ field_library` and `forms ||--o{ form_templates` (as *source*) are **intentionally not drawn** — both are copy-on-use blueprints (`docs/data-dictionary.md` §11–12's Design Notes: "instantiating a template clones this into a brand-new form... the new form never shares or references the template's own rows going forward"), not live foreign-key relationships. Only `form_templates.source_form_version_id` (a real, nullable FK for traceability) is drawn.
 - `attachments`'s and `audits`'s polymorphic associations (`attachable_type`/`attachable_id`, `auditable_type`/`auditable_id`) have **no database-level foreign key** by design (`docs/data-dictionary.md` §10's Design Notes) — the lines above are illustrative of the relationship, not a literal constraint. Only the three or four most structurally central polymorphic targets are drawn per table for readability; `docs/data-dictionary.md` §13 and `docs/multi-tenancy-rbac-design.md` §7/§9 name the fuller list (`form_field_validations`, `webhook_endpoints`, `subscriptions`, `tenant_users`, `settings`, and others are also valid `auditable_type`/`attachable_type` values not drawn here).
 - `model_has_roles`/`model_has_permissions`'s `model_id` is itself polymorphic (Spatie's own convention, `model_type` + `model_id`) — drawn here as a direct relationship to `users` only, since `users` is the only model type these tables reference in Phase 1 (`docs/multi-tenancy-rbac-design.md` §4).

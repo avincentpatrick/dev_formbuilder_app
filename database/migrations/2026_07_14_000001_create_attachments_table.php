@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * The one unified polymorphic file table (data-dictionary §10, Increment G6) — replacing legacy's
  * `image_path`/`file_path`/`excel_path`/`pdf_path` column sprawl with a single model every channel
  * that produces a file shares: respondent submission media, OCR source scans, avatars, branding logos,
- * feedback screenshots, export artifacts, archived webhook payloads (the eight {@see AttachmentKind}).
+ * feedback screenshots, export artifacts, archived webhook payloads (the nine {@see AttachmentKind}).
  *
  * Ownership is polymorphic via `uuidMorphs('attachable')` — `attachable_type` (a short morph-map alias:
  * `submission` / `form_field` / …, registered in AppServiceProvider) + `attachable_id`, with NO database

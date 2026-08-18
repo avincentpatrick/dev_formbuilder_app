@@ -5,38 +5,66 @@ declare(strict_types=1);
 use App\Http\Controllers\Public\GuestFormController;
 use App\Http\Controllers\Public\PwaManifestController;
 use App\Http\Controllers\Public\ServiceWorkerController;
+use App\Http\Controllers\Tenant\AchievementsController;
 use App\Http\Controllers\Tenant\AnalyticsController;
 use App\Http\Controllers\Tenant\AnalyticsViewController;
 use App\Http\Controllers\Tenant\AttachmentController;
+use App\Http\Controllers\Tenant\AuditLogController;
 use App\Http\Controllers\Tenant\BrandingController;
+use App\Http\Controllers\Tenant\BrandingLogoController;
 use App\Http\Controllers\Tenant\ConnectionController;
 use App\Http\Controllers\Tenant\ConnectionRuleController;
 use App\Http\Controllers\Tenant\ConnectorAuthController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DomainController;
 use App\Http\Controllers\Tenant\FeedbackController;
+use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
 use App\Http\Controllers\Tenant\FormController;
+use App\Http\Controllers\Tenant\FormHubController;
+use App\Http\Controllers\Tenant\FormPrintController;
 use App\Http\Controllers\Tenant\FormPublishController;
 use App\Http\Controllers\Tenant\FormSaveResumeController;
 use App\Http\Controllers\Tenant\FormScheduleController;
 use App\Http\Controllers\Tenant\FormScopeController;
+use App\Http\Controllers\Tenant\FormShareController;
+use App\Http\Controllers\Tenant\FormShareQrController;
 use App\Http\Controllers\Tenant\FormTemplateController;
 use App\Http\Controllers\Tenant\FormXlsformController;
+use App\Http\Controllers\Tenant\GoogleCompleteController;
+use App\Http\Controllers\Tenant\ImpersonationSessionController;
 use App\Http\Controllers\Tenant\InvitationController;
 use App\Http\Controllers\Tenant\MemberController;
+use App\Http\Controllers\Tenant\NotificationController;
+use App\Http\Controllers\Tenant\OnboardingController;
 use App\Http\Controllers\Tenant\PreferencesController;
 use App\Http\Controllers\Tenant\ResourceGrantController;
 use App\Http\Controllers\Tenant\ScopeNodeController;
+use App\Http\Controllers\Tenant\SearchController;
+use App\Http\Controllers\Tenant\Sso\SsoAcsController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginCompletionController;
+use App\Http\Controllers\Tenant\Sso\SsoLoginController;
+use App\Http\Controllers\Tenant\Sso\SsoMetadataController;
+use App\Http\Controllers\Tenant\Sso\SsoSettingsController;
+use App\Http\Controllers\Tenant\Sso\SsoStepUpCompletionController;
+use App\Http\Controllers\Tenant\Sso\SsoStepUpController;
 use App\Http\Controllers\Tenant\SubmissionController;
+use App\Http\Controllers\Tenant\SubmissionDraftController;
+use App\Http\Controllers\Tenant\SubmissionEditController;
 use App\Http\Controllers\Tenant\SubmissionInboxController;
 use App\Http\Controllers\Tenant\SubmissionReviewController;
 use App\Http\Controllers\Tenant\TenantSettingsController;
+use App\Http\Controllers\Tenant\TwoFactorRequiredController;
 use App\Http\Controllers\Tenant\WebhookController;
+use App\Http\Middleware\AppSecurityHeaders;
+use App\Http\Middleware\EnforceImpersonationTimeout;
+use App\Http\Middleware\EnforceTenantMaintenance;
+use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
+use App\Models\Audit;
 use App\Models\Connection;
 use App\Models\Form;
 use App\Models\ResourceGrant;
@@ -78,10 +106,159 @@ Route::middleware([
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
     'auth',
+    // verified (J3a) — PRD Feature #14's verification half, which had been built end-to-end and enforced on
+    // ZERO routes since Phase 0. The alias resolves to App\Http\Middleware\EnsureVerifiedEmail, which
+    // OVERRIDES the framework default (bootstrap/app.php) to exempt impersonated sessions and to answer a
+    // JSON caller in kind. Its own interstitial is Fortify's `/email/verify`, outside this group.
+    //
+    // ⚠️ ITS POSITION RELATIVE TO `auth` IS NOT WHAT ORDERS THEM, AND WRITING IT HERE IS NOT THE GUARANTEE
+    // IT LOOKS LIKE. `AuthenticatesRequests` is in bootstrap/app.php's `$middleware->priority()` list and
+    // `EnsureVerifiedEmail` is not, so `auth` is pulled ahead of this wherever either is written — moving
+    // this line above `auth` changes nothing, which is why no test can catch that edit. It is written after
+    // `auth` because that is what the pipeline does, not because the line enforces it.
+    //
+    // WHAT THIS POSITION *DOES* CONTROL is the order against the two gates BELOW, which are likewise absent
+    // from the priority list and therefore run in written order. Both matter:
+    //  · before EnforceTenantTwoFactor — so an unverified member under org-2FA enforcement proves the
+    //    mailbox BEFORE being asked to enrol a second factor against an address nobody has confirmed they
+    //    own. Reversed, they enrol first and verify second, which is the wrong way round.
+    //  · it is also the cheapest check here: `email_verified_at` rides along on the row
+    //    RlsAwareUserProvider already loaded, so unlike the 2FA gate's tenant-scoped settings read this
+    //    needs no query and no RLS GUC.
+    'verified',
+    // AppSecurityHeaders (I1) — frame-ancestors 'none' + nosniff + Referrer-Policy on every authenticated
+    // page. Named here rather than globally on `web` on purpose: the guest runtime below also uses `web`,
+    // and a global mount would set frame-ancestors 'none' on it and break every embed in the product.
+    AppSecurityHeaders::class,
+    // EnforceTenantTwoFactor (I8a) — PRD Feature #14's org-level enforcement policy. LAST in the array
+    // deliberately: it reads a tenant-scoped setting, so EstablishTenantDatabaseContext must already have
+    // set the RLS GUC, and `auth` must already have resolved the user. The enrollment interstitial it
+    // redirects to is registered in its OWN group below, outside this one — see that group's header for
+    // why the exemption is structural rather than a path allow-list.
+    EnforceTenantTwoFactor::class,
+    // EnforceImpersonationTimeout (I11b) — the 30-minute hard cap. AFTER `auth` (it logs out the user it
+    // finds) and after EstablishTenantDatabaseContext (the closing audit row is tenant-scoped and needs the
+    // RLS GUC), so it is named last for the same reason EnforceTenantTwoFactor is. Deliberately absent from
+    // the ARRIVAL group above: the deadline is written by that request, so a gate reading "no stamp yet"
+    // there would end every session in the act of creating it.
+    EnforceImpersonationTimeout::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    // ── The onboarding block (Increment J5b) — LANE A's, claimed in PROGRESS.md before it was written ──
+    //
+    // "Stop showing me the getting-started checklist", on the caller's OWN membership row. No `can:` gate
+    // and no `feature:` gate, and neither is an omission: there is no instance to authorize (the WHERE
+    // clause is the authorization — the /notifications/read-all posture below), and the checklist is not a
+    // paid capability, it is how a brand-new workspace finds its feet.
+    //
+    // ⚠️ NOT under /settings, though it is a per-user preference and `user_ui_preferences` lives there.
+    // The flag is per MEMBERSHIP, not per person (a dismissal in one workspace must not silence the card in
+    // another), so it belongs beside the surface that owns it rather than beside the cross-tenant
+    // preferences a settings route implies.
+    Route::post('/onboarding/dismiss', OnboardingController::class)->name('onboarding.dismiss');
+
+    /*
+    | The notification centre (Increment I4, PRD Feature #13b) — a BELL, not a page. There is deliberately
+    | no /notifications Inertia page: the popover shows the latest rows and every deep link goes to the
+    | thing itself, so a full-page list would be a second surface with no second job.
+    |
+    | ⚠️ ALL THREE ROUTES ARE JSON, AND BOTH HALVES OF THAT ARE DELIBERATE.
+    |
+    | The READ is a sidecar (the /scopes/{n}/impact + /integrations/.../channels precedent), polled on ~60s
+    | and refetched on Inertia navigation. It is NOT an Inertia::optional() shared prop, which is what the
+    | I-map originally called for: a partial reload RE-DISPATCHES THE CURRENT PAGE'S CONTROLLER — Inertia
+    | filters what it SERIALIZES, not what it COMPUTES — so a tick with /audit-log open would pay for a full
+    | ledger paginate plus a count(*) and throw the result away (AuditLogPresenter's docblock accepts that
+    | cost once per navigation, not once per minute). Nothing about notifications enters
+    | HandleInertiaRequests::share(), which renders on every page in the application.
+    |
+    | The two WRITES are also JSON, which is a NAMED EXCEPTION to the rule scopesClient/integrationsClient
+    | state ("every mutation on this surface is an Inertia visit"). That rule exists because bootstrap/app.php
+    | keys its domain-exception branch on the `api/v1/*` PATH, so a DomainException raised on a web route
+    | 302s even to a fetch expecting JSON. Neither route here raises one — they stamp a timestamp on a row
+    | the caller owns — and framework exceptions already negotiate (bootstrap/app.php's
+    | shouldRenderJsonWhen covers 401/403/404/419). The reason it MUST be a fetch is Inertia's own request
+    | stream: it is `maxConcurrent: 1, interruptible: true`, so a router.post() fired in the same tick as
+    | the row's <Link> navigation is silently ABORTED — click-to-read is unimplementable as an Inertia visit
+    | without a wasted second round trip. A 204 also avoids re-rendering the page under the user on every
+    | click, which back() would do.
+    |
+    | ⚠️ NO `can:` GATE ON THE COLLECTION AND NO `feature:` GATE ANYWHERE, AND BOTH ABSENCES ARE DELIBERATE.
+    |  · No permission: the RBAC catalog is closed, and a notification is addressed to ONE person by
+    |    notifications.user_id — so "may I read this?" is answered by Notification::scopeForUser(), never by
+    |    a role. Coining `notifications.view` would invent a permission whose audience is "every
+    |    authenticated user" (the closed-catalog argument AuditLogPresenter makes for `audit_log.export`).
+    |    This is PATCH /settings/appearance's posture: a user reads and edits only their own account.
+    |  · No plan feature: PlanCatalog defines no notifications key on any tier, and PRD Feature #13's own
+    |    acceptance criterion is that notifications are "available on EVERY tier — a Free tenant with no
+    |    webhook access still gets submission notifications". Adding one would be MAKING a pricing decision
+    |    rather than enforcing one (the /audit-log "baseline obligation, not an upsell" argument).
+    |    NotificationRouteGuardsTest asserts both, so neither can be "tidied" into symmetry with the
+    |    neighbours below.
+    |
+    | The per-row write DOES carry a gate, on the BOUND INSTANCE: `notifications` is strict RLS, so binding
+    | resolves any co-tenant's row and NotificationPolicy::markRead is the only thing standing between a
+    | member and a colleague's read state. Same shape, same reason, as analytics.views.update below.
+    |
+    | Static segment before any binding (the H14 rule): /notifications/read-all is declared BEFORE
+    | /notifications/{notification}/read, or the bare binding would capture "read-all" as a uuid.
+    */
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
+        ->name('notifications.read-all');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])
+        ->middleware('can:markRead,notification')->name('notifications.read');
+
+    /*
+    | The achievements surface (Increment K1e, gamification-design.md §10) — the gamification engine's web
+    | half, and the ONLY half a Free tenant can reach: the whole /api/v1 group sits behind
+    | `feature:api_access`, which Free does not carry, while ADR-0020 §D6 grants `gamification` on every
+    | tier (§D11(e), measured rather than assumed).
+    |
+    | ⛔ `module:gamification`, NEVER `feature:gamification`, AND THE DIFFERENCE IS THE SENTENCE THE REFUSAL
+    | SAYS. RequireFeature raises "Your plan doesn't include X. Upgrade your plan to use it." — but §D6
+    | grants this key on every tier, so the plan half can NEVER be what refuses it, and the only thing that
+    | can is a tenant that switched the module off in Settings. For that reader "upgrade your plan" points
+    | at a purchase which would change nothing. RequireModule reads the toggle directly and refuses 403
+    | `module_disabled` with copy naming something somebody inside the workspace can undo. doc #28 §9
+    | forbids the other gate by name; K1d built this one.
+    |
+    | ⚠️ THESE ARE THE FIRST `module:` GATES ON A WEB ROUTE — K1d mounted the middleware on /api/v1 only, so
+    | bootstrap/app.php's WEB arm for ModuleDisabledException (a `back()` with a toast) had never run until
+    | now. It is the same shape the five `feature:`-gated web GETs already use (see /analytics below, whose
+    | own note records that a direct visit "still bounces off `feature:` with a toast").
+    |
+    | NO `can:` GATE ON EITHER ROUTE, and that is ADR-0020 §D7 rather than an omission: every member may see
+    | their OWN points, badges, streak and standing with no permission at all. The one payload that needs a
+    | permission — the NAMED ladder, plus the workspace totals that travel with it — is resolved INSIDE the
+    | controller against `viewAny,PointAward` (= dashboard.org.view) and arrives as a null prop. Gating the
+    | door instead would 403 a Form Editor out of their own achievements, which is the opposite of the
+    | decision. The `kpis.members` posture on /dashboard, one surface over.
+    |
+    | NO `feature:` GATE EITHER, for the reason above: no plan withholds this key, so a plan gate here could
+    | only ever fire with the wrong message. AchievementsRouteGuardsTest pins all four absences so none of
+    | them can be "tidied" into symmetry with the neighbours.
+    |
+    | ⚠️ /achievements/streak IS A JSON SIDECAR, NOT A SHARED INERTIA PROP, and it is the /notifications
+    | block above's mechanism for the same reason: an Inertia partial reload RE-DISPATCHES the current
+    | page's controller — Inertia filters what it SERIALIZES, not what it COMPUTES — so putting the count in
+    | HandleInertiaRequests::share() would pay for this read on every page in the application, including
+    | /audit-log and /submissions, which already carry a paginate plus a count(*) per navigation. doc #28
+    | §10 states the requirement; this is it. The composable that reads it refetches on NAVIGATION ONLY and
+    | holds no interval — useNotificationFeed's idle-stop records why a second poller would be a security
+    | regression, not merely a cost: every poll touches the session, and config/session.php expires on 120
+    | minutes of INACTIVITY.
+    |
+    | Static segment before any binding (the H14 rule) — there is no binding here today, but /achievements
+    | is a collection root and the next route added under it would be the one that breaks it.
+    */
+    Route::get('/achievements', AchievementsController::class)
+        ->middleware('module:gamification')->name('achievements');
+    Route::get('/achievements/streak', [AchievementsController::class, 'streak'])
+        ->middleware('module:gamification')->name('achievements.streak');
 
     // Settings — the current appearance reaches the page via the shared `ui.theme` prop (no controller
     // needed for the read). The appearance write persists the four personalization axes to
@@ -90,10 +267,30 @@ Route::middleware([
     Route::get('/settings', [PreferencesController::class, 'show'])->name('settings');
     Route::patch('/settings/appearance', [PreferencesController::class, 'updateAppearance'])
         ->name('settings.appearance.update');
+    // Per-user notification preferences (I4, data-dictionary §23) — the same posture as the appearance
+    // write directly above, and for the same reason: a user edits only their own account, and
+    // notification_preferences is strict-RLS keyed on user_id. ONE type per request, BOTH booleans always
+    // (see UpdateNotificationPreferenceRequest — the deliberate opposite of UpdateAppearanceRequest's
+    // all-`sometimes` axes, because §23's unit is a row rather than a field). An Inertia visit rather than
+    // a sidecar write, unlike /notifications above: this one has a rendered page to redirect back to, and
+    // a validation failure has somewhere to put its errors.
+    Route::patch('/settings/notifications', [PreferencesController::class, 'updateNotifications'])
+        ->name('settings.notifications.update');
     // Tenant-level (org-wide) settings — Owner/Admin only (H10 draft-expiry window). Distinct from the
     // per-user appearance write above; gated on the Spatie permission, not just `auth`.
     Route::patch('/settings/drafts', [TenantSettingsController::class, 'updateDrafts'])
         ->middleware('can:tenant.settings.manage')->name('settings.drafts.update');
+
+    // App Settings (I5, PRD Feature #10) — the same org-wide posture and the same gate as /settings/drafts
+    // above. Deliberately NOT `feature:`-gated: these are not paid capabilities, they are how a tenant
+    // configures the product it already has, and the Modules write in particular must stay reachable on
+    // every plan (it is how a tenant switches a capability back ON after switching it off).
+    Route::patch('/settings/access', [TenantSettingsController::class, 'updateAccess'])
+        ->middleware('can:tenant.settings.manage')->name('settings.access.update');
+    Route::patch('/settings/maintenance', [TenantSettingsController::class, 'updateMaintenance'])
+        ->middleware('can:tenant.settings.manage')->name('settings.maintenance.update');
+    Route::patch('/settings/modules', [TenantSettingsController::class, 'updateModules'])
+        ->middleware('can:tenant.settings.manage')->name('settings.modules.update');
 
     // Tenant branding (H23a2, ADR-0014). Rendered inside /settings; no page of its own.
     //
@@ -113,21 +310,124 @@ Route::middleware([
     Route::delete('/settings/branding/logo', [BrandingController::class, 'destroyLogo'])
         ->middleware('can:tenant.settings.manage')->name('settings.branding.logo.destroy');
 
+    // Single sign-on — the TENANT CONFIGURATION surface (Phase 4, P1a, ADR-0016). The protocol surface is a
+    // different route group entirely, mounted without `auth` further down this file; these four are ordinary
+    // authenticated settings routes and share nothing with it but a feature name.
+    //
+    // NO `{connection}` SEGMENT, AND NOT BY OMISSION: `sso_connections` is UNIQUE on `tenant_id` (§D2), so
+    // the resource is a singleton and the row is reached by RLS rather than by an id. A future multi-IdP
+    // row would change the LOGIN surface (which provider does the login page offer?), not just this path.
+    //
+    // ⚠️ THE GATING ASYMMETRY IS DELIBERATE AND MUST NOT BE "TIDIED UP" INTO CONSISTENCY — the third
+    // instance of ADR-0012 §D9 in this file, after /domains below and branding above. Only the two writes
+    // that can CREATE or WIDEN carry `feature:sso_saml`; the read, the on/off switch and the removal do not,
+    // because a tenant downgraded off Enterprise still has an identity provider pointed at this SP and must
+    // retain a path to undo what a paid tier let them create.
+    //
+    // ⚠️ THE STATUS TOGGLE IS ON THE UNGATED SIDE, AND THE FIRST DRAFT OF THIS BLOCK HAD IT ON THE OTHER —
+    // which left a downgraded tenant able to DELETE the trust anchor but not DISABLE it. "Destroy or
+    // nothing" is the inverse of an escape hatch, and against SsoConnectionStatus::Disabled's own contract
+    // (retained so the anchor and its audit history survive a suspension). Enabling is still gated, in
+    // SsoConnectionService::changeStatus() rather than here, because one route serves both directions:
+    // a tenant may always undo, never redo.
+    //
+    // ⚠️ `step-up` GUARDS THE IMPORT AND ONLY THE IMPORT. Rewriting idp_certificates is a complete
+    // authentication takeover for the tenant — a larger blast radius than members.role or members.remove,
+    // both of which already carry it (I8a, PRD #14). It is NOT on the read (a password prompt to look at a
+    // page devalues the prompt where it means something), nor on the status toggle or the delete, which must
+    // stay reachable per the asymmetry above. Safe here because the import is a plain Inertia visit, which
+    // gets RequirePassword's redirect — never mount `step-up` on a JSON sidecar, which gets a bare 423.
+    //
+    // ⚠️ THE IMPORT IS A `PUT` BECAUSE ITS PAYLOAD IS A STRING. @inertiajs/core does NOT method-spoof, and
+    // PHP populates $_FILES only for a multipart POST — so a PUT carrying an upload arrives EMPTY. The page
+    // reads any chosen file client-side into the same textarea to keep the wire JSON. If a real file input
+    // is ever added, this becomes a POST (the /settings/branding/logo precedent).
+    Route::get('/settings/sso', [SsoSettingsController::class, 'show'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso');
+    Route::put('/settings/sso/idp-metadata', [SsoSettingsController::class, 'importMetadata'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml', 'step-up'])->name('settings.sso.metadata');
+    Route::patch('/settings/sso', [SsoSettingsController::class, 'update'])
+        ->middleware(['can:tenant.settings.manage', 'feature:sso_saml'])->name('settings.sso.update');
+    Route::patch('/settings/sso/status', [SsoSettingsController::class, 'updateStatus'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.status');
+    Route::delete('/settings/sso', [SsoSettingsController::class, 'destroy'])
+        ->middleware('can:tenant.settings.manage')->name('settings.sso.destroy');
+
+    /*
+    | SSO STEP-UP (Phase 4, P1c, ADR-0016 §D22–§D24) — the protocol answer to `step-up`, and the reason two
+    | SAML routes live in the AUTHENTICATED group while the other three sit in the unauthenticated protocol
+    | group far below.
+    |
+    | Both of these are about a session that already exists: the first asks the tenant's IdP to re-prove the
+    | member currently signed in, and the second is where that proof is finally converted into
+    | `auth.password_confirmed_at`. Neither is reachable by an identity provider, and neither is part of the
+    | metadata this SP publishes.
+    |
+    | ⚠️ NEITHER MAY EVER CARRY `step-up` ITSELF. RequireRecentPassword redirects INTO the first and out of
+    | the second, so gating either is an infinite redirect between two routes that each look correct in
+    | isolation. There is no test that would read as "this route is missing a middleware", which is why the
+    | warning is here rather than in a comment beside an assertion.
+    |
+    | ⚠️ NO `can:` GATE, AND THAT IS NOT AN OMISSION. Step-up is not a permission — it is how ANY member
+    | proves they are still at the keyboard. The four surfaces it guards carry their own `can:` (settings
+    | manage, roles.assign, members.remove, ownership.transfer), so authorising the proof as well would mean
+    | a member who is refused permission gets a 403 from a route whose only job is to say "yes, it is me".
+    |
+    | ⚠️ NOT `feature:sso_saml` EITHER — SsoGate answers inside the controller, so an unentitled or
+    | unconfigured workspace gets the same 404 the rest of the SAML surface gives rather than
+    | RequireFeature's back()-with-a-toast, which would bounce a member into a redirect loop with the gate.
+    |
+    | The completion hop takes the `request_id` as a path segment because a row must NEVER be identified by
+    | being the newest one — two step-ups begun inside one second are a tie, and PostgreSQL breaks ties by
+    | physical order. The id alone stamps nothing: the session must also be the one the row names.
+    */
+    Route::get('/sso/saml/step-up', SsoStepUpController::class)
+        ->middleware('throttle:saml-step-up')->name('sso.step-up');
+    //
+    // ⚠️ THE SEGMENT IS PINNED AT THE ROUTER AND THROTTLED (P1d), MATCHING THE GOOGLE HANDOFF'S POSTURE.
+    // `SsoAuthRequest::mintRequestId()` produces `_` plus 32 hex characters, so a value that cannot be one
+    // now 404s before `redeem()` runs a lookup at all — the shape `->where('handoff', ...)` already gives
+    // the sibling flow. Neither the constraint nor the limiter is the security boundary (the session must
+    // still be the one the row names); what they remove is a free, unbounded guessing surface behind
+    // `auth`, which is the one thing this route offered that its sibling did not.
+    Route::get('/sso/saml/step-up/complete/{requestId}', SsoStepUpCompletionController::class)
+        ->where('requestId', '_[0-9a-f]{32}')
+        ->middleware('throttle:saml-step-up-complete')
+        ->name('sso.step-up.complete');
+
     // Member administration (Owner/Admin) — authorization is the Spatie permission on each route
     // (B2b). Owner is never invitable; it changes hands only via the ownership-transfer route (§5, §7).
     // The roster page is gated on the same manage ability (the permission catalog is closed — there is no
     // separate members.view — so viewing the roster is an Owner/Admin management surface).
+    //
+    // ⚠️ THE THREE MUTATIONS CARRY `step-up`, THE READ DOES NOT (I8a, PRD Feature #14). Removing someone,
+    // changing what they may do, and handing over the workspace are the tenant-side high-blast-radius
+    // actions the PRD names; each requires a password confirmation from the last 15 minutes rather than
+    // merely a live session. `members.index` is a read and is deliberately left alone — gating it would
+    // put a password prompt in front of simply looking at the roster, which trains people to type their
+    // password on reflex and devalues the prompt on the three routes where it means something.
     Route::get('/members', [MemberController::class, 'index'])
         ->middleware('can:tenant.members.invite')->name('members.index');
     Route::post('/members/invitations', [MemberController::class, 'invite'])
         ->middleware('can:tenant.members.invite')->name('members.invite');
+    // `tenant.roles.assign` has been seeded to Owner/Admin and documented in RBAC §5 since Phase 0 with
+    // ZERO code behind it — the same dormant-key situation I7a found on `feedback.view`. I8a consumes it
+    // rather than minting a `tenant.members.role`: the catalog is closed by design, and a second key for
+    // the same capability is how a matrix comes to disagree with itself.
+    Route::patch('/members/{user}/role', [MemberController::class, 'changeRole'])
+        ->middleware(['can:tenant.roles.assign', 'step-up'])->name('members.role');
     Route::delete('/members/{user}', [MemberController::class, 'remove'])
-        ->middleware('can:tenant.members.remove')->name('members.remove');
+        ->middleware(['can:tenant.members.remove', 'step-up'])->name('members.remove');
     Route::post('/members/ownership', [MemberController::class, 'transferOwnership'])
-        ->middleware('can:tenant.ownership.transfer')->name('members.ownership');
+        ->middleware(['can:tenant.ownership.transfer', 'step-up'])->name('members.ownership');
 
-    // In-app feedback (Feature #11) — every role may submit (can:feedback.submit). Screenshot capture
-    // and the cross-tenant support console are Phase 1 (need the attachments table + elevated read).
+    // In-app feedback (Feature #11). Every role may SUBMIT (can:feedback.submit); Owner/Admin may VIEW
+    // the workspace's own reports (can:feedback.view — seeded since Phase 0, first consumed in I7a). The
+    // status lifecycle is deliberately absent here: it belongs to the platform support console.
+    Route::get('/feedback', [FeedbackController::class, 'index'])
+        ->middleware('can:feedback.view')->name('feedback.index');
+    Route::get('/feedback/{feedbackReport}/screenshot', [FeedbackController::class, 'screenshot'])
+        ->middleware('can:feedback.view')->name('feedback.screenshot');
     Route::post('/feedback', [FeedbackController::class, 'store'])
         ->middleware('can:feedback.submit')->name('feedback.store');
 
@@ -188,6 +488,19 @@ Route::middleware([
     Route::post('/forms/templates/{template}/instantiate', [FormTemplateController::class, 'instantiate'])
         ->middleware(['can:create,'.Form::class, 'feature:form_templates'])->name('forms.templates.instantiate');
 
+    // The form hub (Increment J2b, PRD §3.7 "a form is a hub … rather than a row that fans out into
+    // unlinked screens"). ⚠️ REGISTERED AFTER /forms/templates ABOVE — the H14 static-segment rule; a
+    // {form} pattern declared first would capture `templates` as a form id.
+    //
+    // ⚠️ `can:viewOverview,form`, NOT `can:view,form`. FormPolicy::view delegates to canEdit, so it admits
+    // the same set as `update` and refuses a Reviewer and a Viewer — the two roles that arrive here from
+    // the inbox, the audit ledger and global search, and the whole reason this page exists. The analytics
+    // route below keeps `can:view,form` deliberately unchanged; FormAnalyticsGateTest pins its refusals.
+    //
+    // Until J2b a GET here matched the URI but not the method, so it answered 405 rather than 404 — which
+    // is why nothing in the product could link to a form and every such link went to /forms or the builder.
+    Route::get('/forms/{form}', FormHubController::class)
+        ->middleware('can:viewOverview,form')->name('forms.show');
     Route::patch('/forms/{form}', [FormController::class, 'update'])
         ->middleware('can:update,form')->name('forms.update');
     Route::post('/forms/{form}/archive', [FormController::class, 'archive'])
@@ -214,6 +527,22 @@ Route::middleware([
     // export's read gate); parse failures reject the file UPFRONT, before the draft is touched.
     Route::post('/forms/{form}/draft/xlsform-import', [FormXlsformController::class, 'import'])
         ->middleware(['can:update,form', 'feature:xlsform_export'])->name('forms.xlsform.import');
+
+    // Printable blank form (Increment I12) — a published version typeset for a pen, and the artifact
+    // the OCR chain's filled scans are produced FROM (`docs/ocr-pipeline-design.md` §2.5). Shaped
+    // after the XLSForm export directly above it: {version} scope-bound to {form}, gated `can:view,form`
+    // (a read/derive of the form's own structure), delivered as a file rather than an Inertia visit.
+    //
+    // UNGATED by plan, deliberately. The obvious-looking `feature:ocr_single` would be wrong twice:
+    // that key is Professional+ in PlanCatalog, and printing a blank form is useful with no OCR
+    // anywhere in the picture — a field team printing forms to fill by hand and key in later needs
+    // nothing from the OCR pipeline. Same posture as I1's share surface and the submission PDF.
+    //
+    // A DRAFT version 404s, in the controller rather than here: a route middleware cannot read the
+    // bound row's status without a query, and the reasoning belongs next to the abort.
+    Route::get('/forms/{form}/versions/{version}/print', FormPrintController::class)
+        ->scopeBindings()
+        ->middleware('can:view,form')->name('forms.print');
 
     // Interactive builder (Increment D4a) — the three-pane workspace + its fine-grained mutation surface.
     // `show` renders the page; the rest are JSON edits the builder's CSRF fetch sidecar calls directly
@@ -257,6 +586,28 @@ Route::middleware([
     Route::get('/forms/{form}/graph', [FormBuilderController::class, 'graph'])
         ->middleware('can:update,form')->name('forms.graph');
 
+    // Per-form response statistics (Increment I10c) — docs/PRD.md:198's "Form Owner/Editor view shows:
+    // submissions over time for that form … and a breakdown by submission channel".
+    //
+    // ⚠️ THE ABSENCE OF `feature:advanced_analytics` IS THE DECISION, NOT AN OVERSIGHT. PRD.md:198 is a
+    // PHASE-1 acceptance criterion, and ADR-0011 §D9 gates the genuinely Phase-3 surface — arbitrary axis
+    // selection, scope-subtree selection, saved views, answer-value aggregation and the streamed export, all
+    // of which stay behind the gate on /analytics below. ToggleableModules' own hint for that key already
+    // names per-form statistics alongside the dashboard; this page is dashboard family, scoped to one form. The page is
+    // built so it CANNOT drift into a second /analytics — five structural mechanisms, listed in
+    // FormAnalyticsPresenter's docblock, starting with a one-dependency constructor and no FormRequest.
+    // There is deliberately NO /forms/{form}/analytics/export.
+    //
+    // `can:view,form` is FormPolicy::view — the same read gate save-as-template and the XLSForm export use
+    // for a per-form derive, and no new permission key. It resolves to Owner/Admin (forms.edit.any) and to a
+    // Form Editor holding an editor grant on THIS form, which is exactly PRD.md:198's stated audience. A
+    // Reviewer and a tenant Viewer are refused, and that too is a decision rather than an accident: a
+    // Viewer's org-wide surface is /dashboard and a Reviewer's is the inbox, and both already answer "how
+    // many responses" for everything they can reach. FormAnalyticsGateTest pins those refusals so a later
+    // "tidy-up" to can:viewAny,Submission is visible rather than silent.
+    Route::get('/forms/{form}/analytics', FormAnalyticsController::class)
+        ->middleware('can:view,form')->name('forms.analytics');
+
     // Assign a form to the scoping hierarchy (Increment G10b2). Deliberately NOT part of PATCH /forms/{form}:
     // writing scope_node_id confers capacity on the form — and via SubmissionPolicy on its whole submission
     // history — to every holder of a grant on that node and on any includes_descendants ancestor. `can:update,form`
@@ -285,6 +636,23 @@ Route::middleware([
     Route::patch('/forms/{form}/confirmation', [FormConfirmationMessageController::class, 'update'])
         ->middleware('can:update,form')->name('forms.confirmation');
 
+    // The share surface (Increment I1, PRD Feature #3) — the public link name + the guest-access toggle, the
+    // two columns the guest runtime resolves on and that until now had no writer outside the XLSForm importer
+    // and the e2e seeder. Same shape as the four routes above: its own endpoint, a guarded
+    // FormService::setShareSettings write, never mass-assignment (both columns ARE fillable, and together they
+    // are the difference between a private draft and an open collection endpoint).
+    //
+    // Ungated by plan, deliberately: no entitlement in the catalog covers guest forms, and inventing one here
+    // would be a pricing decision rather than the enforcement of one. What IS tiered — reaching the form on a
+    // custom domain — is gated on the domains surface, where that was decided.
+    //
+    // The QR is a GET on the same gate rather than a data URI in the page props, so "download the QR" is a
+    // plain browser navigation (the XLSForm-export precedent) instead of a canvas round-trip.
+    Route::patch('/forms/{form}/share', [FormShareController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.share');
+    Route::get('/forms/{form}/share/qr.svg', FormShareQrController::class)
+        ->middleware('can:update,form')->name('forms.share.qr');
+
     // Manual encoding (Increment F4b) — the first Submission Pipeline channel with a UI. Authorization is
     // SubmissionPolicy::create (submissions.create + per-form collaborator scope + the form is published),
     // resolved by `can:create,<Submission>,form`: the Authorize middleware passes the Submission class-string
@@ -297,6 +665,23 @@ Route::middleware([
         ->name('forms.submissions.create');
     Route::post('/forms/{form}/submissions', [SubmissionController::class, 'store'])
         ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.store');
+
+    // Save-as-draft for manual encoding (Increment I9b) — PRD Feature #7's last gap. UNGATED twice over, and
+    // both omissions are deliberate: no `feature:save_and_resume` (docs/ux/form-filling-ux-flow.md pins this
+    // as "the one channel never gated behind a paid plan" — losing an hour of transcription is data loss, not
+    // a missing convenience) and no `$form->save_and_resume` check (that column is the author's decision about
+    // RESPONDENTS parking a response, a different question from whether staff may avoid retyping).
+    // Same `can:create` gate as submitting: a draft IS a submissions row, and promoting it is the submission.
+    Route::post('/forms/{form}/submissions/draft', [SubmissionDraftController::class, 'store'])
+        ->middleware('can:create,'.Submission::class.',form')->name('forms.submissions.draft');
+
+    // Resume a saved draft — the encode page hydrated with its stored answers. Bound on the SUBMISSION, so
+    // the gate is the bound-model form against a Submission-argument policy method; `promote` is reused
+    // rather than minting a third ability, because "may resume this draft" and "may finalize this draft" are
+    // the same claim. Carries the same OSM tile CSP as the create page — it renders the same geo control.
+    Route::get('/submissions/{submission}/resume', [SubmissionDraftController::class, 'edit'])
+        ->middleware(['can:promote,submission', PublicRuntimeSecurityHeaders::class])
+        ->name('submissions.resume');
 
     // Submissions inbox (Increment F7) — the authenticated read + review + export surface over every pipeline
     // channel. `viewAny`/`view` gate the pages (SubmissionPolicy); row-level visibility (tenant-wide for
@@ -311,6 +696,25 @@ Route::middleware([
         ->middleware('can:review,submission')->name('submissions.review');
     Route::get('/forms/{form}/submissions/export', [SubmissionInboxController::class, 'export'])
         ->middleware('can:export,'.Submission::class.',form')->name('forms.submissions.export');
+    // One form's responses (Increment J2c) — the Responses tab of the form hub's strip, and the destination
+    // `FormTabSet` pointed at the filtered global inbox for until this route existed.
+    //
+    // ⚠️ DECLARED AFTER `/submissions/create` (above) AND `/submissions/export` (immediately above), the
+    // H14 static-segment rule: those are more specific URIs on the same prefix, and a bare `{form}/submissions`
+    // registered first is fine for THESE two (their extra segment disambiguates) but the ordering is kept
+    // uniform so the next author adding a `/forms/{form}/submissions/{something}` does not have to notice.
+    // Note a GET here answered **405** rather than 404 before J2c — `forms.submissions.store` already owns
+    // this exact URI on POST — which is the same "the URI matched but the method did not" shape that hid the
+    // missing form hub until J2b.
+    //
+    // ⚠️ TWO GATES, the `forms.scope` precedent above. `can:viewAny,Submission` is the inbox's own gate and
+    // is what `FormTabSet` keys the Responses tab on; `can:viewOverview,form` is what bounds the {form}
+    // binding, without which any member holding `submissions.view` could read ANY form's title above an
+    // empty list. Together they admit all five roles, scoped — which `FormTabSetReachabilityTest` requires,
+    // since it drives this URL as a plain Viewer.
+    Route::get('/forms/{form}/submissions', [SubmissionInboxController::class, 'forForm'])
+        ->middleware(['can:viewOverview,form', 'can:viewAny,'.Submission::class])
+        ->name('forms.submissions.index');
     // Queued single-submission PDF (Increment H17). POST, not GET: it has side effects (an audit row, a
     // metered export, a queued job). Gates on `can:view` rather than the per-form `can:export` used
     // above — the file contains exactly the one submission the user is already permitted to read on
@@ -318,6 +722,24 @@ Route::middleware([
     // warrants. Returns a redirect + toast; the artifact arrives by email and on the detail page.
     Route::post('/submissions/{submission}/pdf', [SubmissionInboxController::class, 'generatePdf'])
         ->middleware('can:view,submission')->name('submissions.pdf');
+
+    // Post-submission answer editing (Increment I9c, PRD Feature #12) — correcting a FINALIZED submission's
+    // answers. `can:update,submission` is SubmissionPolicy::update, the first code to consume
+    // `submissions.edit.any/.own` (seeded to Owner/Admin and Form Editor since Phase 0 with nothing behind
+    // them). Note the gate is NOT `can:review`: a Reviewer may decide a submission's outcome and may not
+    // rewrite its answers, which are different powers held by different roles.
+    //
+    // The GET carries the OSM tile CSP for the same reason the create and resume pages do — it renders the
+    // same G5b2 geo control (ADR-0006 D3). The PATCH returns a redirect and needs none.
+    //
+    // Which STATES are editable is not expressed here: a route middleware cannot read the row's status
+    // without a query, and the answer has to be re-asserted under a lock anyway (a reviewer can archive the
+    // row between the page loading and Save). SubmissionAnswerEditService::EDITABLE owns it.
+    Route::get('/submissions/{submission}/edit', [SubmissionEditController::class, 'edit'])
+        ->middleware(['can:update,submission', PublicRuntimeSecurityHeaders::class])
+        ->name('submissions.edit');
+    Route::patch('/submissions/{submission}/answers', [SubmissionEditController::class, 'update'])
+        ->middleware('can:update,submission')->name('submissions.answers.update');
 
     // Attachments (Increment G6) — the shared polymorphic media write path. `store` stages an uploaded file
     // against the form's published version (SubmissionPipeline re-points it to the submission at persist),
@@ -415,6 +837,26 @@ Route::middleware([
     // on a web route redirects rather than returning JSON.
     Route::get('/integrations/connections/{connection}/channels', [ConnectionController::class, 'channels'])
         ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.channels');
+    // H16b — the tabular-destination sidecars, the Sheets counterpart to the channel picker above. The read
+    // is `can:view` like `channels`; the CREATE is `can:update,connection` because it writes a document into
+    // the tenant's Drive using their grant, which is not something a reader may do with it.
+    //
+    // ⚠️ The create is a POST behind a fetch, which the comment above says this surface does not do. The
+    // reason that rule exists — a domain exception on a web route becomes a 302 a fetch client follows into
+    // HTML — cannot arise here, because TabularDestinationDirectory never throws and always answers 200 with
+    // a nullable `error`. See ConnectionController::createDestination() for why an Inertia visit is wrong.
+    //
+    // H16c renamed these from `/sheets`: Airtable goes through the same pair, and a base picker calling
+    // `/sheets?reference=appXXXX` reads as a bug. Safe to rename — both are internal sidecars with no consumer
+    // outside this app's own client.
+    // The mappable-column catalog depends on a choice made INSIDE the open modal (which form the rule is
+    // scoped to), so it cannot be an index prop without discarding the half-written rule to learn it.
+    Route::get('/integrations/connections/{connection}/columns', [ConnectionController::class, 'mappableColumns'])
+        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.columns');
+    Route::get('/integrations/connections/{connection}/destinations', [ConnectionController::class, 'inspectDestination'])
+        ->middleware(['can:view,connection', 'feature:native_connectors'])->name('integrations.connections.destinations.inspect');
+    Route::post('/integrations/connections/{connection}/destinations', [ConnectionController::class, 'createDestination'])
+        ->middleware(['can:update,connection', 'feature:native_connectors'])->name('integrations.connections.destinations.store');
     Route::delete('/integrations/connections/{connection}', [ConnectionController::class, 'destroy'])
         ->middleware(['can:delete,connection', 'feature:native_connectors'])->name('integrations.connections.destroy');
 
@@ -458,6 +900,131 @@ Route::middleware([
         ->middleware(['can:update,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.update');
     Route::delete('/analytics/views/{savedReportView}', [AnalyticsViewController::class, 'destroy'])
         ->middleware(['can:delete,savedReportView', 'feature:advanced_analytics'])->name('analytics.views.destroy');
+
+    /*
+    | The audit log (Increment I2, PRD Feature #12) — the Owner/Admin compliance ledger, the first surface
+    | that lets a human READ what H4 has been writing since July.
+    |
+    | `can:viewAny,Audit` IS the authorization: AuditPolicy resolves exactly the `audit_log.view`
+    | permission, seeded to Owner and Admin only and explicitly withheld from Viewer. No `ability:` — that
+    | is Sanctum token-scope middleware and a session carries no token (the H14 convention).
+    |
+    | NO `feature:` GATE, AND THE ABSENCE IS DELIBERATE. `PlanCatalog` defines no audit key on any tier,
+    | because accountability is a baseline obligation rather than an upsell — so unlike Analytics, Webhooks,
+    | Integrations and Domains, this destination turns on a permission alone. Adding a feature key here
+    | would be MAKING a pricing decision rather than enforcing one (the I1 forms.share precedent).
+    |
+    | Static segment before any binding (the H14 rule): /audit-log/export is declared here, and there is
+    | deliberately NO /audit-log/{audit} route. An audit row has no detail page — the before/after diff is
+    | rendered from props the list already carries, so the row IS the detail — and a bare {audit} pattern
+    | would be the first thing able to shadow /export.
+    */
+    /*
+    | Global search (Increment J1b — PRD §3.7, "global search is non-negotiable").
+    |
+    | ⚠️ NO `can:` GATE, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. There is no `search` permission and
+    | none is coined: the RBAC catalog is closed at 29 keys, and a key whose audience is "every authenticated
+    | user" is the dormant-seeded-key anti-pattern this repo has already been bitten by three times.
+    | `ApiAbilities` records the same choice for `read:analytics` — map onto existing permissions instead of
+    | coining a thirtieth. Authorization is ENTIRELY PER-ARM inside SearchService: each arm answers
+    | `allowed()` from an existing key and then applies its own row predicate. A route-level gate would be
+    | either too wide (letting a Reviewer's request reach an arm they may not use) or too narrow (refusing a
+    | Viewer the submissions arm they legitimately hold).
+    |
+    | ⚠️ NO `feature:` GATE EITHER. `PlanCatalog` defines no search key on any tier, so adding one would be
+    | MAKING a pricing decision rather than enforcing one — the I1 share-surface argument.
+    |
+    | A WEB route, never /api/v1: `config/scramble.php` documents only the `api/v1` path, so `openapi.json`
+    | stays byte-identical and the contract-tests job is untouched.
+    */
+    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+
+    /*
+    | The ⌘K palette's type-ahead (J1d). Same group, same absence of `can:`/`feature:` gates, same reasoning
+    | as the page above — authorization is entirely per-arm, and this endpoint adds no surface the page does
+    | not already expose.
+    |
+    | ⚠️ THROTTLED, AND THE PAGE IS NOT. This one fires on a debounce tick rather than on a navigation, so
+    | it is the only search route where a stuck client can loop. 120/min leaves comfortable headroom over a
+    | fast typist behind a 250 ms debounce (~4/s peak), while still bounding a runaway.
+    */
+    Route::get('/search/suggest', [SearchController::class, 'suggest'])
+        ->middleware('throttle:120,1')->name('search.suggest');
+
+    Route::get('/audit-log', [AuditLogController::class, 'index'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.index');
+    Route::get('/audit-log/export', [AuditLogController::class, 'export'])
+        ->middleware('can:viewAny,'.Audit::class)->name('audit-log.export');
+
+    /*
+    | End an impersonated session (I11b). Inside the authenticated group, and no `can:` gate — the caller
+    | IS the impersonated member as far as authorization is concerned, and there is no permission that
+    | means "may stop being impersonated". What actually gates it is the session marker: the controller
+    | writes the closing ledger row only when one is present, so a member who POSTs here on an ordinary
+    | session simply gets logged out, which is a thing they could already do.
+    */
+    Route::post('/impersonate/exit', [ImpersonationSessionController::class, 'destroy'])
+        ->name('impersonate.exit');
+});
+
+/*
+| The 2FA enrollment interstitial (Increment I8a, PRD Feature #14) — one route, and the ONLY reason it is
+| a group of its own is that it must sit OUTSIDE EnforceTenantTwoFactor.
+|
+| ⚠️ A GATE THAT REDIRECTS EVERYWHERE REDIRECTS TO ITSELF. This is the same carve-out routes/admin.php has
+| given `admin.mfa.setup` since B2c, drawn the same way — STRUCTURALLY, by living outside the guarded
+| group, rather than as a path allow-list inside EnforceTenantTwoFactor. The difference matters: an
+| allow-list would also have to name `/settings` (the personal 2FA panel lives there), and every future
+| `/settings/*` route would then inherit an exemption nobody decided to grant. One route out, visible here.
+|
+| Everything else in the pipeline is identical to the authenticated group above — this page needs the same
+| tenant context, the same session, and the same security headers. Only the enforcement gate is absent.
+| Sign-out is reachable from it because POST /logout is a Fortify route in its own group; that is the
+| second door "enroll or leave" requires, and it must not be tidied inside this gate.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    'auth',
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/two-factor/required', TwoFactorRequiredController::class)->name('two-factor.required');
+});
+
+/*
+| Impersonation ARRIVAL (Increment I11b, RBAC §9 resolved decision 1) — the cross-host handoff the console
+| minted. Its own group for the same structural reason the invitation group below has one: it runs the
+| subdomain tenant-context pipeline WITHOUT `auth`.
+|
+| `SESSION_DOMAIN` is null, so the session cookie is HOST-ONLY — a super-admin authenticated on the central
+| console has NO session here, and requiring one would be circular in exactly the way it is for an invitee
+| who is not a member yet. Tenant context IS established, which is what makes the strict-RLS token row
+| visible and what scopes the lookup: a token minted for another workspace does not resolve on this host.
+|
+| ⚠️ THE 2FA EXEMPTION IS NOT DRAWN HERE, and that is the one carve-out in this file that is deliberately
+| NOT structural. `EnforceTenantTwoFactor` is absent from this group because the group has no `auth` — but
+| the operator's NEXT request lands on /dashboard inside the authenticated group above, where the gate does
+| apply. It has to recognise an impersonated session from the SESSION, not from a path, so the exemption
+| lives in that middleware. See its docblock for why bouncing an operator to a member's enrollment page is
+| worse than letting them through.
+|
+| No `throttle` beyond the global web limiter: the token is single-use, 60-second, 256 bits of CSPRNG
+| output looked up by sha256 digest. There is nothing here to guess at a rate that matters, and a limiter
+| keyed on IP would be a denial-of-service surface against the operator rather than a defence.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    // AppSecurityHeaders (I1): frame-ancestors 'none' on the request that mints an authenticated session
+    // for platform staff — precisely the shape of act that must not happen inside somebody's iframe.
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/impersonate/{token}', [ImpersonationSessionController::class, 'show'])
+        ->name('impersonate.consume');
 });
 
 /*
@@ -465,16 +1032,179 @@ Route::middleware([
 | but WITHOUT `auth`: the invitee is not a member yet, so requiring auth would be circular. Tenant
 | context is still established, which is exactly what makes the strict-RLS invite row visible (only
 | within its own tenant) and lets accept materialize the reserved role. Styled pages land in Increment C.
+|
+| H23a4 adds the brand logo to this group for the same structural reason and a different audience: the
+| caller is an EMAIL CLIENT, which carries no session and often fetches through a proxy days after the
+| message was sent. It stays on the APP host (this group identifies by subdomain) because ADR-0009 §D2 and
+| ADR-0012 scope a custom domain to the guest runtime only — so the logo URL in every branded email is
+| composed by TenantUrl's app arm, and this is the group that serves it. Deliberately NOT signed: an
+| expiry on an image inside an inbox is a broken image on a timer. See BrandingLogoController.
 */
 Route::middleware([
     'web',
     InitializeTenancyBySubdomain::class,
     PreventAccessFromCentralDomains::class,
     EstablishTenantDatabaseContext::class,
+    // AppSecurityHeaders (I1): the invitation pages accept a role-granting POST from a link in an email —
+    // exactly the shape of act that must not be framed. The branding logo shares this group and is served to
+    // email clients, which the header does not affect (frame-ancestors governs framing, not <img> fetching).
+    AppSecurityHeaders::class,
 ])->group(function (): void {
     Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
     Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('/invitations/{token}', [InvitationController::class, 'decline'])->name('invitations.decline');
+
+    // No `feature:branding` middleware: the gate is inside the controller, via
+    // TenantBrandingService::isActive(), because an unentitled tenant must answer 404 (an image that is
+    // not there) and not the middleware's 403 (an image that exists and is being withheld).
+    Route::get('/branding/logo', BrandingLogoController::class)->name('branding.logo');
+});
+
+/*
+| SAML 2.0 Service Provider — the PROTOCOL surface (Phase 4, P1a, ADR-0016). Same subdomain pipeline as the
+| invitation group and WITHOUT `auth`, for the same structural reason one step further out: the caller is an
+| identity provider, or a browser being bounced through one, and on the login path there is by definition no
+| session yet — requiring auth would be circular. Tenant context is still established BEFORE any query, which
+| is what makes the strict-RLS `sso_connections` row visible and confines it to its own tenant.
+|
+| ⚠️ THE TENANT COMES FROM THE HOST, NEVER FROM THE REQUEST BODY. An attacker choosing which tenant to
+| address chooses only which public subdomain to visit; the assertion's audience is then checked against THAT
+| tenant's SP entity id, so a response minted for another tenant dies on the audience check.
+|
+| ⚠️ NOT `feature:sso_saml` — the gate is inside the controller, via SsoGate. RequireFeature answers a web
+| request with back() plus a toast, which is meaningless for a cross-origin POST from an IdP, and any answer
+| other than 404 discloses another organisation's plan to an unauthenticated caller. Unentitled, unconfigured,
+| draft and disabled must all be indistinguishable — the BrandingLogoController posture above, on a surface
+| where the disclosure matters more.
+|
+| AppSecurityHeaders is mandatory here rather than incidental: `frame-ancestors 'none'` on a request that
+| mints a session is what stops the whole flow being driven inside an attacker's iframe.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    // ⚠️ THIS ENDPOINT CARRIED NO LIMITER UNTIL P1d, WHILE THE COMMENT BELOW JUSTIFIED ONE FOR "BOTH
+    // HALVES" OF THE ROUND TRIP AND NEVER MENTIONED IT — an asymmetry that reads as an oversight rather
+    // than a decision. It is unauthenticated, reachable by anyone holding a hostname, and composes a DOM
+    // document per request. Same ceiling as its siblings on purpose: an identity provider legitimately
+    // re-fetches SP metadata on a schedule.
+    Route::get('/sso/saml/metadata', SsoMetadataController::class)
+        ->middleware('throttle:saml-metadata')->name('sso.metadata');
+
+    // P1b — the login round trip. Both halves are unauthenticated and both carry their own per-IP limiter:
+    // the login path mints a database row on every hit, and the ACS runs XML signature validation over an
+    // attacker-supplied document, so each is work an anonymous caller can ask for repeatedly. Ceilings are
+    // generous against a human clicking "sign in" twice and tight against a script.
+    Route::get('/sso/saml/login', SsoLoginController::class)
+        ->middleware('throttle:saml-login')->name('sso.login');
+
+    // P1e — the same-site hop that finishes a sign-in. It belongs in THIS group rather than the authenticated
+    // one for the reason the whole group exists: it is how a person becomes authenticated, so `auth` here
+    // would be circular. It needs `web` (unlike the ACS beside it) because reading the browser's session is
+    // its entire job, and it needs `AppSecurityHeaders` most of all — `frame-ancestors 'none'` on the request
+    // that mints a session is what stops the flow being driven inside an attacker's iframe.
+    //
+    // ⚠️ THE SEGMENT IS PINNED AT THE ROUTER AND THROTTLED, the posture P1d gave the step-up hop and J3c2 gave
+    // the Google handoff. A value that cannot be one `SsoAuthRequest::mintRequestId()` produced 404s before
+    // `redeem()` performs a lookup at all. Neither the pattern nor the limiter is the security boundary — the
+    // session must still be one that minted the row — what they remove is a free, unbounded guessing surface
+    // on an unauthenticated route.
+    Route::get('/sso/saml/login/complete/{requestId}', SsoLoginCompletionController::class)
+        ->where('requestId', '_[0-9a-f]{32}')
+        ->middleware('throttle:saml-login-complete')
+        ->name('sso.login.complete');
+});
+
+/*
+| The Assertion Consumer Service — the SAME pipeline as the group above, MINUS `web` (Phase 4, P1e).
+|
+| ⚠️ THIS SPLIT IS A BUG FIX, NOT A TIDY-UP, AND THE BUG WAS MEASURED RATHER THAN REASONED. Inside `web`,
+| `StartSession` runs on this request. The request carries no session cookie — `SameSite=Lax` withholds it
+| from a cross-site POST, which is the premise the whole SSO seam is built on — so `Store::setId(null)`
+| generates a FRESH id, and `StartSession::addCookieToResponse()` emits it UNCONDITIONALLY (its only guard
+| is `! is_null(session.driver)`). Measured against a running stack: `POST /sso/saml/acs` with no cookie
+| answers with `Set-Cookie: <app>-session=<a new, empty session>; path=/` and a regenerated `XSRF-TOKEN`.
+|
+| Host-only, same name, same path as the member's real cookie — so a browser REPLACES it. The identity
+| provider's POST is a top-level navigation, so the response is first-party to us and the cookie is stored.
+| The browser then follows our 302 to the completion hop carrying the ACS's empty session instead of the one
+| that started the flow.
+|
+| ⚠️ THAT MEANS P1c's STEP-UP HOP HAS NEVER WORKED IN A REAL BROWSER: the member arrives with no session,
+| `auth` bounces them to the sign-in page, their original session is gone, and the regenerated `XSRF-TOKEN`
+| would 419 their next write. And it would have made P1e's login hop 404 for everybody — an outage wearing
+| the exact same 404 that the security refusal wears, which is why no acceptance test could have told them
+| apart. No test in this repository can see it at all: the Pest client never feeds `Set-Cookie` into the
+| next request, and `Store::loadSession()` merges onto a memoised store, so attributes survive an id change
+| in-process. The harness models the session as a process global; a browser models it as a cookie.
+|
+| The fix is to stop starting a session here, which is what this endpoint's docblock has claimed since P1b:
+| "there is no session to require". Removing `web` also drops `VerifyCsrfToken` — so the exemption in
+| `bootstrap/app.php` is now belt AND braces rather than the only thing standing between this route and a
+| 419, and it stays exactly where it is for the day somebody moves this route back.
+|
+| ⚠️ WHAT IT COSTS, STATED RATHER THAN DISCOVERED: nothing in this pipeline may touch `$request->session()`
+| — and "this pipeline" includes the EXCEPTION RENDERERS, which is the half a middleware list does not
+| show you. An exception escaping this controller is rendered by the global handler, and the one that can
+| (`MembershipException`, from a connection naming a role absent from the catalog) renders as
+| `back()->withErrors()` — a flash into a store nothing saves, and a 302 to the identity provider's own
+| Referer instead of the uniform 404 §D4 promises. Pre-existing, recorded as §9 item 27's neighbour.
+| `EstablishTenantDatabaseContext` reads `$request->user()`, which resolves through the container's session
+| store rather than the request's and answers null here exactly as it did before. If a future ACS arm needs
+| the session, it needs the completion hop instead — that is the whole shape of P1c and P1e.
+*/
+Route::middleware([
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    // ⚠️ CSRF-EXEMPT by exact path in bootstrap/app.php, and now also CSRF-UNREACHABLE: a cross-origin form
+    // POST from an identity provider carries no token, and with SameSite=Lax no session cookie arrives
+    // either. That is not a gap — what replaces the token is the `InResponseTo` binding to a row this SP
+    // minted, plus the assertion's signature. Since P1e it creates no session either: it marks the row and
+    // hands the browser back to a same-site hop on this workspace's own host.
+    Route::post('/sso/saml/acs', SsoAcsController::class)
+        ->middleware('throttle:saml-acs')->name('sso.acs');
+});
+
+/*
+| Google sign-in — the completion hop (Increment J3c2 — ADR-0019 §D7). The same unauthenticated
+| tenant-context pipeline as the SAML protocol group above, and for the same reason: this request CREATES a
+| session rather than acting on one, so `auth` here would be circular.
+|
+| ⚠️ ONLY THE COMPLETION HOP LIVES HERE. The mint and the callback are in `routes/google-auth.php`, because
+| both must also serve the CENTRAL host and this file declares no `->domain()` — a central-host request
+| would match a route registered here and then die in `InitializeTenancyBySubdomain`. This one is
+| tenant-only by construction: it exists precisely because the session cookie is host-only and the browser
+| has to come back to the workspace's own host to be given one.
+|
+| ⚠️ THE `{handoff}` PATTERN IS PART OF THE CONTROL, NOT A TIDY-UP. Constraining it to 64 hex characters
+| means a malformed token 404s at the router, before it reaches a `hash('sha256', …)` lookup — the
+| `SsoAuthRequest::isMintedShape()` discipline, which exists because unvalidated text on its way to a
+| fixed-width column is how an endpoint gets a suppression primitive.
+|
+| Its own limiter, never shared with the mint route: a completed sign-in costs exactly one hit of each, so
+| a shared bucket would halve whichever ceiling an operator thought they were setting.
+|
+| AppSecurityHeaders is mandatory rather than incidental here: `frame-ancestors 'none'` on a request that
+| mints a session is what stops the whole flow being driven inside an attacker's iframe.
+*/
+Route::middleware([
+    'web',
+    InitializeTenancyBySubdomain::class,
+    PreventAccessFromCentralDomains::class,
+    EstablishTenantDatabaseContext::class,
+    AppSecurityHeaders::class,
+])->group(function (): void {
+    Route::get('/auth/google/complete/{handoff}', GoogleCompleteController::class)
+        ->where('handoff', '[0-9a-f]{64}')
+        ->middleware('throttle:google-auth-complete')
+        ->name('auth.google.complete');
 });
 
 /*
@@ -510,6 +1240,12 @@ Route::middleware([
     EstablishTenantDatabaseContext::class,
     // The guest SPA shell hosts the G5b2 geo control's Leaflet map → allow the OSM tile origin (ADR-0006 D3).
     PublicRuntimeSecurityHeaders::class,
+    // Tenant maintenance mode (I5 / PRD Feature #10). LISTED AFTER the identification middleware above, and
+    // that position is load-bearing: it reads the flag off the tenant they have already resolved and bound,
+    // which is the whole reason `maintenance_mode` is a `tenants` column and not a `settings` row. Sorted
+    // ahead of them it would find no tenant, pass everything through, and leave the feature dead with a
+    // green build — TenancyMiddlewarePriorityTest asserts the resolved order.
+    EnforceTenantMaintenance::class,
 ])->group(function (): void {
     Route::get('/f/{slug}', [GuestFormController::class, 'mint'])
         ->middleware('throttle:guest-mint')->name('guest.form.mint');

@@ -78,6 +78,11 @@ it('accepts an invitation end-to-end through the no-auth invitation route', func
     // The GET below renders the Inertia root view; skip Vite so it doesn't need built assets (the CI
     // tests job doesn't run `npm build`), mirroring the B1 SmokeTest.
     $this->withoutVite();
+
+    // ⚠️ THE POST BELOW VALIDATES A NEW PASSWORD, SO IT REACHED api.pwnedpasswords.com ON EVERY CI RUN —
+    // and stayed green either way, because `NotPwnedVerifier` catches a failed lookup and FAILS OPEN to
+    // "uncompromised". Found and closed in J3a; see `fakeHibp()`'s docblock in tests/Pest.php.
+    fakeHibp();
     $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
     $tenant->domains()->create(['domain' => 'acme']);
 
@@ -100,9 +105,21 @@ it('accepts an invitation end-to-end through the no-auth invitation route', func
 
     $this->get('http://acme.meridian.test/invitations/plain-token')->assertOk();
 
+    // ⚠️ THE INVITE PATH ENFORCES THE SAME PASSWORD POLICY AS REGISTRATION, ASSERTED END-TO-END THROUGH THE
+    // ROUTE — because this is the one password surface that has historically declared its own rules, and a
+    // trait-level assertion cannot see a controller that stops using the trait. A long, un-breached,
+    // lowercase-only passphrase is exactly what J3a's four character classes must reject here.
+    $this->from('http://acme.meridian.test/invitations/plain-token')
+        ->post('http://acme.meridian.test/invitations/plain-token', [
+            'name' => 'Pending Person',
+            'password' => 'correct-horse-battery-staple',
+        ])->assertSessionHasErrors('password');
+
+    $this->assertGuest();
+
     $this->post('http://acme.meridian.test/invitations/plain-token', [
         'name' => 'Pending Person',
-        'password' => 'correct-horse-battery-staple',
+        'password' => 'Correct-Horse-Battery-9',
     ])->assertRedirect('/dashboard');
 
     $this->assertAuthenticated();

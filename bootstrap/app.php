@@ -6,6 +6,7 @@ use App\Exceptions\Authorization\GrantException;
 use App\Exceptions\Connectors\InvalidConnectorStateException;
 use App\Exceptions\Connectors\UnknownConnectorProviderException;
 use App\Exceptions\Entitlements\FeatureGateException;
+use App\Exceptions\Entitlements\ModuleDisabledException;
 use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Entitlements\RateLimitExceededException;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
@@ -23,13 +24,18 @@ use App\Exceptions\Submissions\SubmissionValidationException;
 use App\Exceptions\Tenancy\MembershipException;
 use App\Exceptions\Xlsform\XlsformImportException;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnforcePlatformMaintenance;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureSuperAdminMfa;
+use App\Http\Middleware\EnsureVerifiedEmail;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use App\Http\Middleware\RequireFeature;
+use App\Http\Middleware\RequireModule;
+use App\Http\Middleware\RequireRecentPassword;
 use App\Support\Api\ApiErrorResponse;
+use App\Support\Auth\InvalidGoogleAuthStateException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -79,6 +85,13 @@ return Application::configure(basePath: dirname(__DIR__))
             // `web`: a third-party GET from a consent screen carries no session and no CSRF token, and the
             // signed `state` parameter is the CSRF control (ADR-0009 §D3). The group declares its own stack.
             Route::group([], base_path('routes/connectors.php'));
+            // First-party Google sign-in (J3c2 / ADR-0019) — the mint and the callback. Loaded here rather
+            // than in routes/tenant.php because BOTH must also serve the central host, and that file
+            // declares no ->domain(). ⚠️ Loaded BEFORE TenancyServiceProvider::mapRoutes(), which runs in
+            // booted(): a same-URI route in routes/tenant.php would therefore be dead rather than
+            // conflicting, which is why the completion hop there uses a path these two do not.
+            // The group declares its own stack — Fortify's, not the connector one; see the file.
+            Route::group([], base_path('routes/google-auth.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -86,6 +99,35 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // ── THE SAML ASSERTION CONSUMER SERVICE IS THE ONLY CSRF-EXEMPT POST IN THIS APPLICATION (P1b) ──
+        // It is a cross-origin form POST from a tenant's identity provider. There is no token to send, and
+        // with SameSite=Lax no session cookie arrives either — which is not a gap, because this request
+        // acts on no session. CSRF protects an EXISTING authenticated session from being driven without
+        // its owner's intent; there is nothing here for it to protect. ⚠️ P1b said this request "CREATES
+        // the session"; P1e moved that to a same-site hop, and also took this route out of the `web`
+        // group — so `ValidateCsrfToken` no longer runs on it at all and this entry is now belt AND
+        // braces. It is kept, not deleted, because the day somebody puts that route back inside a
+        // stateful stack is the day it becomes load-bearing again with no other warning.
+        //
+        // What replaces it is stronger than a token and is why `allow_unsolicited` is permanently false:
+        // the assertion must be signed by the tenant's own trust anchor AND carry an `InResponseTo` naming
+        // a live, unconsumed `sso_auth_requests` row this SP minted. A CSRF token only proves the browser
+        // visited us first; neither of those can be forged by someone who has not compromised the IdP.
+        //
+        // BY EXACT PATH, not `sso/saml/*`: a wildcard would sweep in `/sso/saml/metadata` and every future
+        // endpoint under that prefix, granting an exemption nobody decided to give — the
+        // EnforcePlatformMaintenance path-list lesson, in the direction that REMOVES a control. The tenant
+        // is identified from the host, so one entry covers every subdomain without naming any.
+        $middleware->validateCsrfTokens(except: ['sso/saml/acs']);
+
+        // Platform maintenance (I5 / PRD Feature #10) — GLOBAL, not `web`. "Blocks the entire product"
+        // includes /api/v1 (routes/api.php declares its own stacks) and the connector callbacks
+        // (routes/connectors.php sits outside `web` entirely), so a group mount would leave two holes that
+        // each look fine until someone tries them. Exemptions are BY PATH — global middleware runs before
+        // routing, so `$request->route()` is null and a name-based list would silently exempt nothing,
+        // starting with the admin console. See EnforcePlatformMaintenance.
+        $middleware->append(EnforcePlatformMaintenance::class);
 
         // Bridges resolved tenant/user → PostgreSQL RLS session variables (ADR-0002 §D3). Registered
         // as an alias; Increment B attaches it to the authenticated subdomain tenant route group,
@@ -96,16 +138,32 @@ return Application::configure(basePath: dirname(__DIR__))
         //
         // ability / abilities (Increment E) are Sanctum's token-ability gates for the /api/v1 surface
         // (CheckForAnyAbility = any-of; CheckAbilities = all-of); not auto-registered by the package.
+        //
+        // step-up (I8a) — PRD Feature #14's re-authentication for high-blast-radius actions. A NARROWER
+        // window (auth.step_up_timeout, 15 min) than the framework's `password.confirm` default of three
+        // hours. ⚠️ Never mount it on a route a JSON sidecar calls: RequirePassword answers an
+        // `Accept: application/json` request with a bare 423 instead of redirecting. See the class.
+        // verified (J3a) — OVERRIDES the framework's own `verified` alias rather than adding a second name,
+        // so every future `->middleware('verified')` gets the impersonation exemption and the documented
+        // JSON envelope by default. Two things the stock EnsureEmailIsVerified cannot express; see the class.
         $middleware->alias([
+            'verified' => EnsureVerifiedEmail::class,
             'tenant.context' => EstablishTenantDatabaseContext::class,
             'superadmin' => EnsureSuperAdmin::class,
             'superadmin.mfa' => EnsureSuperAdminMfa::class,
+            'step-up' => RequireRecentPassword::class,
             'ability' => CheckForAnyAbility::class,
             'abilities' => CheckAbilities::class,
             // feature:<key> (H5c) — plan feature-gate on top of ability/can. Requires tenant context (all
             // gated routes have it); passes through a null (unseeded/dev) plan, blocks a resolved plan that
             // denies the feature. See RequireFeature.
             'feature' => RequireFeature::class,
+            // module:<key> (K1d) — the TENANT'S OWN toggle, which is a different question from the plan's.
+            // Never a replacement for feature:<key>; a capability a plan can withhold wants both. It exists
+            // because gamification is granted on every tier (ADR-0020 §D6), so a feature: gate on that key
+            // could only ever fire on a self-disable and would answer it with "upgrade your plan". See
+            // RequireModule / ModuleDisabledException.
+            'module' => RequireModule::class,
         ]);
 
         // Middleware ordering (ADR-0002 §D3). The tenancy pipeline must ESTABLISH the RLS session
@@ -262,6 +320,19 @@ return Application::configure(basePath: dirname(__DIR__))
             return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
         });
 
+        // A tenant reached a capability IT switched off for itself (K1d) — raised by RequireModule. Beside
+        // the arm above because they are neighbours in shape and NOT in meaning: this one is a 403 with
+        // `module_disabled`, never a 402, because there is nothing to buy and the refusal is undoable from
+        // inside the tenant. The two codes stay distinct so an integration can tell a plan limit it cannot
+        // fix from a workspace setting somebody there can. See ModuleDisabledException.
+        $exceptions->render(function (ModuleDisabledException $e, Request $request) use ($isApi) {
+            if ($isApi($request)) {
+                return ApiErrorResponse::make($e->status(), $e->code(), $e->getMessage(), $e->details());
+            }
+
+            return back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+        });
+
         // An analytics declaration that violates one of ADR-0011 §D7's bounds, or a saved view's stored
         // definition that can no longer be read (H24a). A 422, never a 500: the bounds are enforced in
         // AnalyticsQuery's CONSTRUCTOR rather than only as validator rules — deliberately, so the saved-view
@@ -336,22 +407,39 @@ return Application::configure(basePath: dirname(__DIR__))
         // Reaching here on the guest channel means the form was republished between the token mint and the
         // submit (the guest controller's own current-version check narrows the window; this is the race
         // backstop). Mapped to 409 rather than the generic 500 the missing closure previously produced —
-        // the SPA reloads against the new version. Only the /api/v1 surface; a web (manual-encode) request
-        // is an invariant violation there (the policy requires a published form) and keeps the default.
+        // the SPA reloads against the new version.
+        //
+        // ⚠️ THE WEB ARM EXISTS SINCE I9b, AND ITS ABSENCE WAS ARGUED CORRECTLY UNTIL THEN. The old comment
+        // read: "a web (manual-encode) request is an invariant violation there (the policy requires a
+        // published form) and keeps the default." True while `submit()` was the only web caller — its version
+        // is resolved from `current_published_version_id`, so Stage 2a cannot fail. It is FALSE for
+        // `promote()`, which re-asserts the DRAFT'S PINNED version: a keyer holding a v1 draft while an admin
+        // publishes v2 now reaches this on a real, ordinary flow. Without an arm that is a 500 on a page the
+        // user has just spent ten minutes on.
         $exceptions->render(fn (SubmissionException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, 'submission_version_superseded', $e->getMessage())
-            : null);
+            : back()->with('toast', [
+                'type' => 'error',
+                'message' => 'This form has been updated since the draft was saved, so the draft can no longer be submitted.',
+            ]));
 
         // Submission Pipeline CONTENT conflict (Increment G8c, offline-first-sync-design §5) — the same
         // client_submission_uuid was already persisted with materially DIFFERENT answers (a genuine concurrent
         // edit, not an idempotent replay). A distinct 409 code from submission_version_superseded so the offline
         // client can tell "the form changed" from "another copy of this response already exists"; both route to
         // the same review-and-resubmit UX. The draft save-vs-promote race (H9b) carries its own
-        // `draft_already_finalized` code via SubmissionConflictException::code(). Only /api/v1; a web
-        // (manual-encode) request keeps the default.
+        // `draft_already_finalized` code via SubmissionConflictException::code().
+        //
+        // ⚠️ THE WEB ARM EXISTS SINCE I9b, replacing "Only /api/v1; a web (manual-encode) request keeps the
+        // default." Both causes are now reachable from the encode page: a resumed draft can race its own
+        // promote (`draft_already_finalized`), and Stage 2b went live on this channel the moment it started
+        // sending a `client_submission_uuid` (`submission_conflict` — two tabs on one draft, different
+        // answers). The draft AUTOSAVE endpoint deliberately does NOT rely on this closure: it is a JSON
+        // `fetch`, so it catches locally and returns a typed envelope, because a `back()` redirect is
+        // unreadable to the composable driving it.
         $exceptions->render(fn (SubmissionConflictException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(409, $e->code(), $e->getMessage())
-            : null);
+            : back()->with('toast', ['type' => 'error', 'message' => $e->getMessage()]));
 
         // Scheduled-form refusal (Increment H12a) — the form is not accepting a submission right now: not yet
         // open (`form_not_open`), closed past `closes_at` (`form_closed`), or its `max_responses` cap is full
@@ -386,6 +474,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (InvalidConnectorStateException $e, Request $request) => $isApi($request)
             ? ApiErrorResponse::make(400, 'invalid_connector_state', $e->getMessage())
             : redirect()->away((string) config('app.url')));
+
+        // First-party Google sign-in `state` failures (J3c2 / ADR-0019 §D6). Thrown by
+        // EstablishGoogleAuthContext BEFORE any tenant context is set, so a forged/tampered/expired state
+        // never engages RLS. Same posture as the connector renderer above and one deliberate difference:
+        // it lands on `/login?google=failed` rather than the bare app URL, because unlike a connector
+        // callback this IS a sign-in and the person is mid-flow. The tenant host is NOT named — we could
+        // not verify which workspace this was, and naming one would disclose whether it exists. The closed
+        // `?google=failed` value is §D9's single indistinguishable outcome; nothing is echoed.
+        $exceptions->render(fn (InvalidGoogleAuthStateException $e, Request $request) => $isApi($request)
+            ? ApiErrorResponse::make(400, 'invalid_google_auth_state', $e->getMessage())
+            : redirect()->away(rtrim((string) config('app.url'), '/').'/login?google=failed'));
 
         // A provider key with no configured adapter (H15a) — an unknown URL, not a server fault. 404 keeps
         // the non-disclosure posture the rest of the surface uses for "this does not exist".

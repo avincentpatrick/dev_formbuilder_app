@@ -12,7 +12,6 @@ use App\Enums\SubmissionStatus;
 use App\Http\Requests\Api\V1\AnalyticsReportRequest;
 use App\Support\Analytics\AnalyticsQuery;
 use Carbon\CarbonImmutable;
-use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -57,7 +56,9 @@ class AnalyticsFilterRequest extends FormRequest
             // `sometimes`, not `required` — see the class docblock. An absent pair means "the default window".
             'from' => ['sometimes', 'date_format:Y-m-d'],
             'to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'timezone' => ['sometimes', 'string', Rule::in(DateTimeZone::listIdentifiers())],
+            // The framework `timezone` rule — same IANA list, no 419-entry enum in any generated schema
+            // (see AnalyticsReportRequest for the full openapi/tzdata reasoning).
+            'timezone' => ['sometimes', 'string', 'timezone'],
             'granularity' => ['sometimes', Rule::enum(AnalyticsGranularity::class)],
 
             'selection' => ['sometimes', Rule::enum(AnalyticsFormSelection::class)],

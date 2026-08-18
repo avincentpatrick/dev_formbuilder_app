@@ -39,7 +39,7 @@ The following were already decided in the approved architecture plan and are tre
 
 - **Backend**: Laravel 11/12, PHP 8.3+.
 - **Database**: PostgreSQL (ADR-0001), specifically *because* it offers native Row-Level Security and JSONB+GIN, neither of which MySQL provides at parity.
-- **Multi-tenancy package**: `stancl/tenancy` v4, described in the plan as the "2026 production-standard package" for Laravel multi-tenancy, which natively supports both a single-database (shared-schema, discriminator-column) mode and a multi-database (one physical database per tenant) mode under one abstraction.
+- **Multi-tenancy package**: `stancl/tenancy`, described in the plan as the "2026 production-standard package" for Laravel multi-tenancy, which natively supports both a single-database (shared-schema, discriminator-column) mode and a multi-database (one physical database per tenant) mode under one abstraction. *(This ADR said "v4" here and in four other places; **v3.10.0** is what is installed — corrected 2026-08-14 by P2a, see the ⚠️ note under "Future migration path".)*
 - **RBAC**: Spatie Laravel-Permission, tenant-scoped via its "teams" feature (a separate, complementary concern to isolation — RBAC governs *what a user in Tenant A is allowed to do*; this ADR governs *whether Tenant A can touch Tenant B's rows at all*, regardless of role).
 - **Team size/stage**: a small team building toward an MVP launch, not a funded platform team standing up per-tenant infrastructure from day one. Cost and operational simplicity at this stage are real, first-class constraints, not excuses.
 - **Expected tenant profile at launch**: a modest number of tenants (low tens to low hundreds) growing over time; most tenants are expected to be cost-sensitive SMB/NGO/research customers, with a smaller number of larger, possibly compliance-driven (government/enterprise) tenants anticipated later rather than at launch. This assumption is a concrete extrapolation from the plan's phase roadmap (dedicated-DB tenancy and SSO/SAML/data-residency are explicitly Phase 4 items) rather than a number stated verbatim in the plan, and is noted here as such.
@@ -57,7 +57,7 @@ Three well-established isolation models exist for multi-tenant relational data, 
 
 ## Decision
 
-**Adopt shared database, shared schema, with a `tenant_id` discriminator column on every tenant-scoped table — implemented via `stancl/tenancy` v4 in single-database mode — and reinforce it with PostgreSQL Row-Level Security (RLS) policies on every tenant-scoped table as a database-enforced backstop.** Tenant context is treated as a system-wide constraint enforced independently at every architectural layer, not solely as an application-query concern.
+**Adopt shared database, shared schema, with a `tenant_id` discriminator column on every tenant-scoped table — implemented via `stancl/tenancy` in single-database mode — and reinforce it with PostgreSQL Row-Level Security (RLS) policies on every tenant-scoped table as a database-enforced backstop.** Tenant context is treated as a system-wide constraint enforced independently at every architectural layer, not solely as an application-query concern.
 
 This is a "trust, but verify" architecture: the application is expected to get tenant scoping right (global scopes, tenant-aware base models, middleware), and the database is configured to make it structurally impossible to serve cross-tenant rows even if the application layer fails to.
 
@@ -129,7 +129,35 @@ Tenant context is established and/or re-validated independently at every layer t
 | **Realtime (Reverb)** | Private/presence channel names are namespaced by tenant (e.g., `private-tenant.{tenant_id}.dashboard`), and channel authorization callbacks re-verify the requesting user's tenant membership server-side — a client cannot simply subscribe to another tenant's channel name by guessing it. | Not called out as a separate bullet in the plan's §2.1 list, but a direct consequence of "enforce tenant context as a system-wide constraint" applied to Reverb, which the plan elsewhere selects for live dashboards/builder presence/sync triggers. Flagged as a concrete extension made here. |
 | **Super-admin** | An explicit `is_super_admin` boolean on `users` (never a hardcoded/positional ID convention, per the plan). Legitimate cross-tenant operations (support tooling, billing reconciliation, platform analytics) go through a narrow, explicitly-audited service layer that uses a **separate, elevated Postgres role** with its own carve-out policy (`CREATE POLICY superadmin_bypass ON submissions USING (current_setting('app.is_superadmin_context', true) = 'true')`), rather than ever disabling RLS wholesale on the main application role. | Concrete mechanism decision beyond the plan's language, made because "just disable RLS for super-admins" would reintroduce exactly the single-point-of-failure risk this ADR exists to avoid. Every use of the elevated role is itself logged via the carried-forward `Auditable` trait. |
 
-### D4. `stancl/tenancy` v4 configuration specifics
+**Amendment (Increment I7b, 2026-08-08) — a carve-out MAY carry additional conjuncts, and on some tables it must.**
+The gate shown in the Super-admin row above is a **default, not a contract.** It is correct on a table whose
+base shape is the nullable-`tenant_id` "global" exception in D2 — the platform slice is already readable by
+every tenant there, so widening the elevated role to "all rows" grants it nothing it could not already
+reach. It is **wrong** on a table whose base shape is strict or append-only, where "all rows" means every
+tenant's complete history. `audits` is the first such table: the unrestricted form would have handed the
+platform operator every form title, every reviewer's `returned_reason` and every membership change in the
+deployment, bought in order to display a handful of platform-settings rows. It therefore takes the narrowed
+form — `current_setting('app.is_superadmin_context', true) = 'true' AND tenant_id IS NULL`
+(`2026_08_08_000001_apply_platform_audit_read_to_audits.php`) — which reaches the PLATFORM slice and nothing
+else, so **a tenant still cannot read the operator's actions and the operator cannot read a tenant's.**
+
+D2's "generated by a reusable migration helper … not hand-written per table" rule is honoured rather than
+excepted: the narrowed shape is a NAMED generator, `TenantIsolation::platformRowsBypass()` /
+`platformRowsBypassSql()`, whose emitted SQL is pinned in `tests/Unit/TenantIsolationSqlTest.php` exactly as
+its unrestricted sibling's is. `tests/Feature/Audit/PlatformAuditRlsTest.php` additionally asserts the LIVE
+policy's `qual` from `pg_policies` — the only such assertion in the suite — so a dropped conjunct is a
+merge-blocking failure rather than a review miss. (Mutation-verified: swapping the generator for
+`applySuperAdminBypass()` reddens three cases, including the one that proves the operator cannot read a
+tenant row.)
+
+The policy is named `{table}_platform_{command}`, deliberately OUTSIDE the `{table}_superadmin_%` prefix the
+bypass migrations sweep in their `down()`. A shared prefix would let an unrelated rollback drop it while its
+`GRANT` survived, and the reading page would then render zero rows with no error under copy stating that
+nobody had ever performed a platform action — a plausible lie on a compliance surface. It also keeps
+`SELECT policyname FROM pg_policies WHERE policyname LIKE '%_superadmin_%'` an honest answer to "where does
+the operator hold an unrestricted read".
+
+### D4. `stancl/tenancy` configuration specifics
 
 - Deployed in **single-database mode** (tenant identification + scoping only), not its multi-database/connection-swapping mode — the multi-database mode is explicitly reserved as the mechanism for the future Phase 4 dedicated-DB option (see below), not enabled now.
 - The **central app** (marketing site, tenant self-registration/signup, billing portal) runs outside any tenant context, on its own domain (e.g., `app.example.com` or a root marketing domain), consistent with stancl/tenancy's central/tenant app split.
@@ -141,6 +169,75 @@ Tenant context is established and/or re-validated independently at every layer t
 - No foreign key, unique constraint, or index may span tenant boundaries. Every unique constraint that is logically "unique per tenant" (e.g., a form's `public_slug`, a section's `name` slug) is declared as a **composite unique constraint including `tenant_id`** (`unique(tenant_id, public_slug)`), never a bare global-unique constraint — both because global uniqueness across tenants is rarely the actual business rule, and because a global constraint would become a real obstacle to the future per-tenant extraction path described below.
 - Every raw/`DB::` query (reports, bulk operations, analytics) must explicitly include the tenant predicate in code and is flagged in code review as a location where the ORM global-scope convenience layer does *not* apply — RLS is the actual guarantee for these, which is precisely why RLS exists rather than treating "always use Eloquent" as sufficient policy.
 - Tenant-scoped Eloquent models extend a common base model / apply a common `BelongsToTenant` trait, so the global scope is structural (inherited), not something each new model author must remember to add manually.
+
+**Amendment (Increment P2c, 2026-08-14) — the rule is now measured, and the as-built schema does not satisfy it.**
+Nothing had ever checked the first clause. `App\Support\Tenancy\ConstraintBoundaries` holds the census with a
+rationale per entry; `tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php` asserts it against `pg_index` and
+`pg_constraint` in both directions, and `scripts/constraint-boundary-lint.php` names the migration line that
+wrote each one. Measured on a freshly migrated `meridian_testing` (56 base tables):
+
+| | Total | Crossing the boundary | Recorded |
+|---|---|---|---|
+| Unique, non-primary indexes | 43 | 13 on a `tenant_id`-carrying table without it in the KEY | 13 |
+| Foreign keys | 113 | 29 whose TARGET carries `tenant_id` while the key does not | 29 |
+| Composite `(tenant_id, x_id)` FKs | 9 | — | the compliant shape |
+
+⚠️ **The two TOTALS in this table were wrong when first written, and the way they were wrong is worth more than
+the numbers.** They said 42 and 112, taken from a `psql` census run against a `meridian_testing` that was two
+migrations stale — J3c2's `google_auth_requests` (2 unique indexes, 1 FK) and `users.google_id` (1 unique index)
+were simply not in it. The **crossing** counts were right throughout, because those came from the drift test,
+which runs under `RefreshDatabase` and therefore against a schema migrated seconds earlier. **A number
+measured against a convenient database and a number measured against a migrated one are different kinds of
+claim**, and only the second belongs in a document. P2a paid for this once already, sweeping a `meridian`
+three migrations behind and reporting every total one short.
+
+⚠️ **The FK crossing count moved too, and NOT for that reason — it went 26 → 29 when the predicate was
+corrected**, not when the database was refreshed. The first sweep asked "do both tables carry `tenant_id`",
+which silently drops every FK whose *source* has none: `role_has_permissions`'s two and
+`tenants.logo_attachment_id`. Recorded separately from the staleness lesson above so that a predicate bug is
+not laundered as a data-freshness one — they are different mistakes and only one of them is about
+databases.
+
+⚠️ **The unique half is mostly principled and the foreign-key half is mostly not.** Of the 13 indexes, **9**
+are values that are globally unique by definition (a hostname), matched before any tenant is resolved (an
+OAuth state on the central host, a SAML `InResponseTo`), or secrets where a cross-tenant collision would
+itself be the bug — and **4 are merely UUID-anchored**, which is a weaker claim: they are safe because
+guessing a UUIDv7 is infeasible, not because global uniqueness is the intent. *(An earlier draft said 11 and
+2. It promoted into the principled bucket the two entries whose own recorded reason says "what makes this
+safe is UUID unguessability, NOT referential integrity" — making the unique half look better founded than
+the catalog supports.)* ⚠️ **One of the 13 is not safe by intent at all**: `permissions_name_guard_name_unique`
+is `(name, guard_name)` where its sibling `roles_tenant_id_name_guard_name_unique` leads with the tenant, and
+`permissions_tenant_insert` permits a tenant-owned row today — so the asymmetry is a live defect recorded
+rather than fixed, with its own revisit trigger.
+
+The 29 foreign keys are different in kind: mostly the Phase 0–1 core schema, written before the convention
+was applied consistently. ⚠️ **But not "all of them", and the tidy version of that sentence did not survive
+checking**: `usage_counters_subscription_id_foreign` (07-23), `tenants_logo_attachment_id_foreign` (08-05)
+and `feedback_reports_screenshot_attachment_id_foreign` (08-07) were all authored *after* `scope_nodes`
+introduced the composite shape on 2026-07-20 — the last of them eighteen days after. **This is still a gap
+the ADR did not know it had rather than a set of decisions it made**, but the gap was being widened while
+nothing measured it, which is the argument for the gate rather than for a convention.
+
+⚠️ **RLS is not a backstop for either.** PostgreSQL documents that "referential integrity checks, such as
+unique or primary key constraints and foreign key references, always bypass row security". So a unique index
+without `tenant_id` can refuse a tenant a value because of a row it cannot see, and a foreign key without it
+will accept a reference to a neighbour's row and act on the `ON DELETE` clause — on 20 of the 29, `CASCADE`.
+`docs/data-dictionary.md` already states this for `sso_auth_requests`, whose FK is composite for exactly this
+reason; P2c is that reasoning applied to the rest of the schema.
+
+**The rule's third noun — "or index" — is discharged by D1's ordering rule, not here.** A non-unique index
+constrains nothing: it cannot refuse a write or cascade a delete, so it cannot span a boundary in any sense
+this ADR can enforce. Ten plain indexes on tenant-scoped tables do not lead with `tenant_id` (the PostGIS
+`submission_geo_index_geom_gist` and the polymorphic morph indexes among them); they are a query-planning
+matter under D1 and are listed in `docs/feature-backlog.md` rather than gated, because putting ten entries
+with no isolation consequence into the constant would dilute a list whose whole value is that every entry has
+one.
+
+**Remediation is deliberately NOT part of this increment.** It requires `(tenant_id, id)` unique indexes on
+eight parent tables that lack them, 26 FK drop/recreate pairs preserving each `ON DELETE` action, and a
+circular `forms` ↔ `form_versions` pair untangled — a schema increment with its own risk profile, filed in
+`docs/feature-backlog.md`. Three of the 29 cannot be remediated that way at all: `role_has_permissions`'s two
+and `tenants.logo_attachment_id` have no `tenant_id` column on the SOURCE to put in a key.
 
 ### D6. Verification & CI gates
 
@@ -180,9 +277,19 @@ Given the stated stakes, verification is treated as a first-class deliverable of
 
 The plan explicitly reserves a **dedicated-database tenancy option** for Phase 4, alongside SSO/SAML and data-residency options, for enterprise/compliance-driven tenants. This ADR does not build that option now, but it **does** commit to not foreclosing it:
 
-- `stancl/tenancy` v4 supports both single- and multi-database modes under one abstraction specifically so that a future switch is a *configuration and data-migration* exercise (extract one tenant's rows, provision a fresh isolated database, point that tenant's record at the new connection, backfill/replay) rather than a schema or package redesign.
+- `stancl/tenancy` supports both single- and multi-database modes under one abstraction specifically so that a future switch is a *configuration and data-migration* exercise (extract one tenant's rows, provision a fresh isolated database, point that tenant's record at the new connection, backfill/replay) rather than a schema or package redesign.
+
+  > ⚠️ **Corrected 2026-08-14 (P2a).** This bullet and §D4 below both said **v4**. The installed version is **v3.10.0** (`composer.json` pins `^3.10`; `composer.lock` agrees), and v4 has never been installed. The correction matters because the "one abstraction, so the switch is configuration" claim is the load-bearing premise of this whole section, and it was resting on a package version nobody had checked. ADR-0017 re-examines the claim against v3.10 as actually installed and finds it **partly false**: the stock `PostgreSQLSchemaManager` *replaces* `search_path` rather than prepending `public`, which would take PostGIS's `geometry` type, `users`, `tenants`, `jobs` and the `migrations` table out of scope in one config edit. The door this ADR promises to leave open is still open; it is not one line wide.
 - This is workable *only* because of decisions locked in now: `tenant_id` as a UUID (not an auto-increment integer that could collide across tenants once split into separate databases), no cross-tenant foreign keys or unique constraints (D5), and every tenant-scoped table already self-contained per `tenant_id` partition.
+
+  > ⚠️ **Corrected 2026-08-14 (P2c). "No cross-tenant foreign keys or unique constraints" was not true of this schema, and had never been checked.** There are **29 foreign keys whose target carries `tenant_id` while the key does not**, against 9 that use the composite shape — measured in D5's amendment above. The clause is offered here as a property that makes per-tenant extraction workable, so the error is load-bearing rather than cosmetic: a reader planning that work would have taken the hardest part as already done.
+  >
+  > **What the bullet gets right is the part that actually carried P2b.** UUID keys and per-`tenant_id` self-containment are real and are why `tenants:extract` was not hard to write. Cross-tenant references do not currently *exist* in the data — they are unreachable in practice because every write path resolves its parent under RLS first, and reaching a neighbour's row would additionally require guessing a UUIDv7. What is false is that the SCHEMA prevents them: PostgreSQL bypasses row security for referential-integrity checks, so the constraint layer would accept one, and on 20 of the 29 the `ON DELETE` action is `CASCADE`.
+  >
+  > **The same failure class as P2a's `Dedicated db | In effect: Yes` and P2b's `0700` directory mode** — a property asserted in prose that the platform does not provide. It is recorded rather than quietly fixed because the fix is a schema increment (see D5's amendment), and because the pattern is worth naming: all three were found by measuring something a document had only ever stated.
 - Building the actual extraction tooling (per-tenant export/import, connection-swapping configuration, a per-tenant migration runner for the multi-database mode) is explicitly **not** part of this decision and is deferred to a dedicated Phase 4 ADR once a specific customer or compliance driver justifies the investment — consistent with the plan's "migrate high-value tenants later, only if justified" guidance. This ADR's obligation is narrower and non-negotiable: do not design today's shared schema in a way that makes that future extraction hard.
+
+  > ✅ **Partially discharged 2026-08-14 (P2b, ADR-0018).** The **export** half of the first deliverable is built: `php artisan tenants:extract` writes one tenant's record as NDJSON plus a manifest. **The obligation above was met** — the extraction was not hard, and the reason is exactly the properties this section names: uuid keys, no cross-tenant FKs, every tenant-scoped table self-contained per `tenant_id`. *(⚠️ Amended by P2c, 2026-08-14: "no cross-tenant FKs" is inherited from the bullet above and is false as written — there are 29 the constraint layer would accept. It held for P2b because none has ever been **exercised**, which is a fact about the write paths rather than about the schema. The distinction is the one the correction above draws, and it does not change P2b's outcome: `tenants:extract` already reports an unresolvable reference rather than dropping it, which is the behaviour a cross-tenant row would need.)* What it was NOT is automatic. Two things had to be decided rather than derived, and both are the places the shared schema's convenience becomes a hazard at the boundary: **`users` is central**, so RLS there is a join and the extract is a roster with nine columns withheld; and **six tables' SELECT policies are deliberately wider than one tenant**, so RLS alone returns the platform catalog too. The **import** half, the connection swap and the per-tenant migration runner all remain deferred — see ADR-0018 "When to Revisit".
 
 ---
 
@@ -202,7 +309,7 @@ One Postgres schema per tenant, same database instance, offers meaningfully bett
 - Migrations must run across N schemas (either a looped migration runner or per-schema migration state tracking), which is real, ongoing operational complexity absent from the shared-schema model, and grows linearly with tenant count rather than staying flat.
 - Laravel/Eloquent's tooling has comparatively weak native support for dynamic per-request `search_path`/schema switching relative to a simple global-scope-plus-column approach — this would be swimming against the framework's grain rather than with it.
 - Postgres schema count becomes a genuine operational concern at scale (system catalog bloat, `pg_dump`/backup/vacuum overhead across thousands of schemas) — a ceiling this product would eventually hit if it succeeds, meaning schema-per-tenant would likely require *another* migration later anyway, without buying the compensating simplicity benefit that shared-schema has today.
-- It does not match `stancl/tenancy` v4's most mature, best-documented mode (single-database), nor the plan's explicit instruction ("shared database, shared schema, `tenant_id` discriminator").
+- It does not match `stancl/tenancy`'s most mature, best-documented mode (single-database), nor the plan's explicit instruction ("shared database, shared schema, `tenant_id` discriminator").
 - It remains a theoretically valid option to revisit *if* a specific future compliance driver demands schema-level isolation without the full cost of database-per-tenant — but no such driver is currently anticipated, so it is not being built for speculatively.
 
 ### Database-per-tenant — rejected for MVP, explicitly revisited at Phase 4
@@ -225,5 +332,5 @@ Named explicitly as the alternative *to* the RLS reinforcement half of this deci
 
 - *Form-Builder SaaS — Documentation & Architecture Plan* (source of truth for this ADR): §1 (Recommended Tech Stack — Multi-tenancy row, Database row), §2.1 (Multi-Tenancy), §3 (Phase 0 and Phase 4 roadmap items), §5 (Best Practices — tenant scoping and `is_super_admin` items), Documentation Artifacts #9, #11, #21.
 - Legacy schema audit (`dev_pk_new`) — confirms the negative case directly: no `tenant_id` concept, no tenant-scoped authorization, and the specific cautionary precedent of the `users.id === 1` super-admin convention (duplicated across four code layers, silently transferable if user #1 were ever deleted and the ID reused) that this ADR's explicit `is_super_admin` boolean decision (D3) is designed to avoid repeating.
-- `stancl/tenancy` v4 documentation — single-database vs. multi-database tenancy modes (external reference; verify current package documentation at implementation time rather than treating any specific API detail above as pinned).
+- `stancl/tenancy` documentation — single-database vs. multi-database tenancy modes (external reference; verify current package documentation at implementation time rather than treating any specific API detail above as pinned).
 - PostgreSQL documentation — `CREATE POLICY`, `ALTER TABLE ... FORCE ROW LEVEL SECURITY`, `SET LOCAL` and `current_setting()` semantics under connection pooling (external reference; verify current version-specific behavior at implementation time).

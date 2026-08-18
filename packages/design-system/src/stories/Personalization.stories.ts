@@ -16,8 +16,10 @@ import TextInput from '../components/TextInput/TextInput.vue';
  *  · TealLight / TealDark cover the accent's new colour pairings. The dark one matters most: before
  *    G11 the accent stub had no dark variant at all, and because [data-accent] carried the same
  *    specificity as [data-theme-mode='dark'] and came later in source order, teal won in dark mode
- *    and painted the light #1B5E5E on the #123350 ground — 1.74:1 for action-primary-fg and the focus
- *    ring, against minimums of 4.5 and 3. Nothing caught it because nothing ever set the attribute.
+ *    and painted the light #1B5E5E on the then-#123350 ground — 1.74:1 for action-primary-fg and the
+ *    focus ring, against minimums of 4.5 and 3. Nothing caught it because nothing ever set the attribute.
+ *    (JR1 moved that ground to #1a2130, where the same mistake would measure 2.15:1 — still a failure.
+ *    The 1.74 is left as the incident recorded it.)
  *
  *  · ExtraLarge / DyslexiaFont cover metrics rather than colour: whether components still lay out
  *    correctly when the type scale grows 25% or the body face is swapped for a substantially wider one.

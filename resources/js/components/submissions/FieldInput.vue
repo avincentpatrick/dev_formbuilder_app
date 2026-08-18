@@ -160,6 +160,19 @@ const props = defineProps<{
     modelValue: AnswerValue;
     error?: string;
     requiredMarker?: RequiredMarker;
+    /**
+     * Render MEDIA answers as a read-only summary (Increment I9c). Set only by the post-submission edit
+     * surface, where files are deliberately out of scope: replacing an upload means re-pointing attachment
+     * ownership, deciding what happens to the displaced rows, rewriting `attachment_refs` and gating on scan
+     * status — a vertical of its own — `docs/feature-backlog.md`, row 'Post-submission MEDIA editing'.
+     *
+     * ⚠️ IT AFFECTS MEDIA ONLY, and it is a DISPLAY affordance, not a security control. The server refuses
+     * client-supplied media on that route regardless
+     * ({@link SubmissionAnswerEditService::mergeMedia}) — a disabled control is a suggestion, and the PATCH
+     * body is a plain JSON document. If this prop is ever widened to disable other controls, the same rule
+     * applies: the server has to say no too, or it is not a no.
+     */
+    readOnly?: boolean;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue] }>();
 
@@ -177,6 +190,18 @@ const yesNoOptions = [
     { value: 'no', label: 'No' },
 ];
 
+/**
+ * The five media field types, matching PHP's `FieldType::isMedia()`. `signature` is included even though it
+ * has no encode CONTROL: the read-only summary below is about displaying what a submission already holds,
+ * and a signature captured on the public runtime is exactly such a value.
+ */
+const MEDIA_TYPES = ['file_upload', 'image_capture', 'audio_capture', 'video_capture', 'signature'];
+
+/** The attachment list behind a read-only media row; empty for any other value shape. */
+const readOnlyFiles = computed<MediaAttachmentRef[]>(() =>
+    Array.isArray(props.modelValue) ? (props.modelValue as MediaAttachmentRef[]).filter((ref) => typeof ref === 'object' && ref !== null) : [],
+);
+
 const control = computed<
     | 'text'
     | 'textarea'
@@ -190,12 +215,18 @@ const control = computed<
     | 'likert-matrix'
     | 'geo'
     | 'media'
+    | 'media-readonly'
     | 'note'
     | 'prefilled'
     | 'unsupported'
 >(() => {
     const t = props.field.field_type;
     if (t === 'note') return 'note';
+    // Increment I9c — the edit surface shows what was captured and offers no way to change it. Ordered
+    // BEFORE the `supported` check for the same reason the `hidden` branch is: `signature` is deliberately
+    // `supported: false` on this channel, and falling through would tell an editor a file they can plainly
+    // see is "not available for manual entry yet".
+    if (props.readOnly === true && MEDIA_TYPES.includes(t)) return 'media-readonly';
     // Increment H7 — a hidden field. Externally sourced ⇒ a real text input (this channel has no URL, so a
     // keyer is the only possible source). Otherwise a read-only row: the server writes the authored literal
     // over anything this page could send, so an editable control would be a lie. Ordered BEFORE the
@@ -441,6 +472,36 @@ function setCascadeLevel(index: number, value: string): void {
         @update:model-value="emit('update:modelValue', $event)"
     />
 
+    <!-- Media, read-only (Increment I9c): what the submission already holds, with no way to change it.
+         Names the files rather than showing a bare count, because "2 files" gives an editor nothing to
+         check against the paper form in front of them. -->
+    <div v-else-if="control === 'media-readonly'" class="encode-readonly-media">
+        <span class="encode-readonly-media__label">{{ field.label }}</span>
+        <ul v-if="readOnlyFiles.length > 0" class="encode-readonly-media__list">
+            <li v-for="file in readOnlyFiles" :key="file.id" class="encode-readonly-media__item">
+                {{ file.name ?? file.mime ?? 'Attached file' }}
+            </li>
+        </ul>
+        <p class="encode-readonly-media__note">
+            {{
+                readOnlyFiles.length > 0
+                    ? 'Files cannot be changed here.'
+                    : 'No file was captured. Files cannot be added here.'
+            }}
+        </p>
+        <!-- ⚠️ THE ERROR IS RENDERED HERE OR IT IS RENDERED NOWHERE, and "nowhere" is a dead end rather than
+             a cosmetic gap. An edit that flips a branch answer can make a previously-irrelevant REQUIRED
+             media field relevant; Stage 3 then raises `field_required` on a field this surface offers no
+             control for. Without this line the editor gets "1 answer needs attention", a jump link that
+             lands on a block whose whole text is "No file was captured", and no way to ever satisfy it.
+             With it, the message names the only escape. `aria-live` because the summary jump moves the
+             reader here and the block holds no focusable element to announce on arrival. -->
+        <p v-if="error" class="encode-readonly-media__error" role="alert" aria-live="polite">
+            {{ error }} Files cannot be added on this screen — undo the change that made this question apply,
+            or ask an administrator.
+        </p>
+    </div>
+
     <!-- Display-only note -->
     <p v-else-if="control === 'note'" class="encode-note">{{ field.label }}</p>
 
@@ -635,5 +696,57 @@ function setCascadeLevel(index: number, value: string): void {
     line-height: var(--mds-type-body-sm-line-height);
     color: var(--mds-color-text-secondary);
     font-style: italic;
+}
+
+/* Read-only media (Increment I9c) — the same sunken-card treatment as a prefilled row, because it says the
+   same thing to the reader: this is recorded, and you cannot change it here. */
+.encode-readonly-media {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    border: 1px solid var(--mds-color-border-default);
+    border-radius: var(--mds-radius-md);
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.encode-readonly-media__label {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-label-font-size);
+    font-weight: var(--mds-font-weight-medium);
+    color: var(--mds-color-text-body);
+}
+
+.encode-readonly-media__list {
+    margin: 0;
+    padding-left: var(--mds-space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+}
+
+.encode-readonly-media__item {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-body);
+    /* A stored filename is untrusted text of any length — wrap it rather than letting it push the encode
+       card into horizontal overflow (the 375px responsive-axe gate, the standing lesson). */
+    overflow-wrap: anywhere;
+}
+
+.encode-readonly-media__note {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+    font-style: italic;
+}
+
+.encode-readonly-media__error {
+    margin: 0;
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-status-danger-fg);
 }
 </style>

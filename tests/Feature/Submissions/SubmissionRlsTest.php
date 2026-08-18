@@ -16,6 +16,7 @@ use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Submissions\SubmissionReference;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -102,6 +103,11 @@ function seedSubmission(): array
 /**
  * A raw submissions insert row (bypasses Eloquent) for probing the write policies directly.
  *
+ * ⚠️ `reference` IS MINTED HERE BECAUSE NOTHING ELSE WILL. These rows go in through
+ * `DB::table('submissions')->insert()`, so `Submission::booted()`'s `creating` hook — which is what fills the
+ * column everywhere else — never fires, and `submissions.reference` is `NOT NULL` with no database default.
+ * Without this line every case in this file dies on a 23502 that looks like an RLS failure and is not.
+ *
  * @return array<string, mixed>
  */
 function submissionRow(string $tenantId, string $formId, string $versionId, ?string $clientUuid = null): array
@@ -114,6 +120,7 @@ function submissionRow(string $tenantId, string $formId, string $versionId, ?str
         'status' => 'submitted',
         'source' => 'guest',
         'client_submission_uuid' => $clientUuid,
+        'reference' => SubmissionReference::mint(),
     ];
 }
 

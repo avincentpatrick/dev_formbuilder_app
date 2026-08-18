@@ -48,11 +48,21 @@ function capPayload(FormVersion $version, ?string $uuid = null): SubmissionPaylo
     );
 }
 
-function finalizedCount(string $formId): int
+/**
+ * This file's own oracle, and it must be the SAME predicate the guard enforces — hence the scope rather than
+ * a hand-spelled copy. It used to be a seventh duplicate of `status <> 'draft'`.
+ *
+ * To be precise about what the change did and did not buy, since the honest version is less flattering than
+ * the obvious one: no case in THIS file seeds a `screened_out` row, so both spellings agree here today and
+ * the repoint is behaviourally a no-op. Its value is structural — the oracle can no longer drift from the
+ * guard the day someone adds such a case, which is the failure mode a hand-copied predicate in a test file
+ * is built for. The cases that actually exercise the narrowed predicate live in `ScreenedOutTest`.
+ */
+function capacityCount(string $formId): int
 {
     return Submission::query()
         ->where('form_id', $formId)
-        ->where('status', '!=', SubmissionStatus::Draft->value)
+        ->consumesCapacity()
         ->count();
 }
 
@@ -71,7 +81,7 @@ it('accepts up to the cap and refuses the next submission, rolling it back', fun
     }
 
     // The rejected submit rolled back — exactly the cap remains finalized.
-    expect(finalizedCount($version->form_id))->toBe(2);
+    expect(capacityCount($version->form_id))->toBe(2);
 });
 
 it('refuses a promote that would exceed the cap, leaving the draft resumable', function (): void {
@@ -88,7 +98,7 @@ it('refuses a promote that would exceed the cap, leaving the draft resumable', f
         ->toThrow(FormNotAcceptingSubmissionException::class, 'response limit');
 
     expect(Submission::findOrFail($draft->id)->status)->toBe(SubmissionStatus::Draft)
-        ->and(finalizedCount($version->form_id))->toBe(1);
+        ->and(capacityCount($version->form_id))->toBe(1);
 });
 
 it('never caps an uncapped form', function (): void {
@@ -98,7 +108,7 @@ it('never caps an uncapped form', function (): void {
         $this->pipeline->submit(capPayload($version));
     }
 
-    expect(finalizedCount($version->form_id))->toBe(5);
+    expect(capacityCount($version->form_id))->toBe(5);
 });
 
 it('scopes the cap COUNT to the form, not the tenant', function (): void {
@@ -114,5 +124,5 @@ it('scopes the cap COUNT to the form, not the tenant', function (): void {
 
     expect(fn () => $this->pipeline->submit(capPayload($capped))) // the 2nd — refused
         ->toThrow(FormNotAcceptingSubmissionException::class);
-    expect(finalizedCount($capped->form_id))->toBe(1);
+    expect(capacityCount($capped->form_id))->toBe(1);
 });

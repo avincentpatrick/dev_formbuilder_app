@@ -231,6 +231,30 @@ Plan: `C:\Users\DOH\.claude\plans\read-progress-md-and-start-shimmying-yeti.md` 
 
 *(Newest entry on top. Every entry: date, what was in progress, what's left, any blockers.)*
 
+- **2026-08-15 (Phase 4 — LANE B, `P2c`: the ADR-0002 §D5 constraint-boundary gate; MERGED (PR #155 → `e949930`, 6/6 with every job's `conclusion` AND `steps` count parsed individually — 11–20 steps each, none empty))** — Took the queued row "the ADR-0002 §D5 boundary linter". **Verifying it against the code changed the increment, ninth time running: the row aimed the whole thing at unique indexes, and P2a had already built that gate a day earlier.** The half §D5 names *first* had never been measured. Live catalog: **113 foreign keys, of which 29 point at a `tenant_id`-carrying table without carrying it in the key**, against 9 using the composite `(tenant_id, x_id) → (tenant_id, id)` shape. PostgreSQL documents that referential-integrity checks *always bypass row security*, so the constraint layer is the one place this schema's backstop is structurally absent — and **20 of the 29 are `ON DELETE CASCADE`, making it a cross-tenant WRITE rather than a dangling read.** Delivered as gate-and-record (scope agreed with the user up front): a reasoned constant with a rationale per entry and a 60-character floor, a drift test asserting both directions against `pg_index`/`pg_constraint`, and a host-run AST linter that names the migration line the catalog cannot. **ADR-0002 §D5 amended in place rather than a new ADR**, which also allocated no number while the 0017 collision was live. **`ADR-0002`'s Consequences section asserted "no cross-tenant foreign keys or unique constraints (D5)"** as a property that keeps extraction workable — corrected, keeping the half that is true (no such reference *exists* in the data; what is false is that the schema prevents one). Same failure class as P2a's `Dedicated db | In effect: Yes` and P2b's `0700`. **CI: Pest 4073 / 17,233 assertions, reconciling EXACTLY at +6 tests / +6 assertions against base `a5cea89`'s own green run (4067 / 17,227)** — 7 new cases less the 1 moved out — predicted before the run and matched to the digit; third increment running that this has closed first try. Gates: lint 93/101/29 + 115 checked / 0 unreadable · PHPStan 18 phantoms, zero non-phantom · `openapi.json` byte-identical · Pint passed · gitleaks 24 findings, **zero tracked**. **What is left for Lane B: the threat model's still-owed SSO section (§8 has authentication rows since J3c1 and no SSO rows at all), then CRDT sync.** Remediation of the 26 fixable FKs is filed in `docs/feature-backlog.md` with its real cost — eight parent tables need a `(tenant_id, id)` unique, `forms` ↔ `form_versions` is circular — and three of the 29 cannot be fixed that way at all, having no `tenant_id` on the source. **Lessons, and the two sharpest are about the gates rather than the schema.** (1) **The adversarial pass ran after 6/6 was green and found BOTH gates blind in the same place** — the linter judged foreign keys on the SOURCE table, so it never examined the exact three constraints the constant calls its centrepiece, proven by removing each and watching the script hold exit 0 while the drift test reddened; and the drift sweep expanded `indkey`, which carries `INCLUDE` columns as well as key columns, so a covering unique would have read as compliant — **the tell was `with ordinality` computing an `ord` that nothing used.** Fourth increment running that this pass has earned its place, and 14 findings were each verified against the live catalog before acting rather than taken on trust. (2) **A gate must print what it EXAMINED, not only its verdict** — a dropped-table pre-pass skipped all 101 migration files while exiting 0, and the only thing that revealed it was the pass line reporting how many constraints it checked (zero). (3) **Three recorded reasons were factually false**, the worst being `permissions_name_guard_name_unique` filed under "secrets" when `permissions_tenant_insert` permits a tenant-owned row today and, unlike `roles`, its unique does not lead with `tenant_id` — the one live defect in the list, now recorded as such. (4) **The planning census ran against a database two migrations stale**, putting 42/112 into an ADR where the truth is 43/113; the crossing counts were right only because they came from the drift test, which runs under `RefreshDatabase`. Second time this has bitten (P2a was first). (5) **The base was RED on arrival and another session fixed it independently the same day** — J3c2 had staled P2b's extract census; #154 landed the same repair while this branch carried its own, so the duplicate was dropped in a rebase and the more conservative of the two `state_id` judgements was taken. **A red base is inherited by everyone and owned by nobody.** (6) `phpstan clear-result-cache` is required after `composer install`, or a stale-vendor analysis is served from cache — it read 31 errors where the truth was 18. (7) An empty `gh pr checks` meant CONFLICTING, not a broken pipeline.
+
+- **2026-08-14 (Phase 4 — LANE B, `P2a`: isolation tiering; MERGED (PR #150 → `1aa906d`, squash + delete branch, all 6 CI green with real steps))** — Took the queued row "dedicated-database tenancy" and **could not build it as named, which is the finding.** Three exploration agents and three design agents were run against the code before planning; the row's own foundations turned out to be fiction in four places. **CI: Pest 3926 passed / 16,781 assertions (2 warnings, pre-existing in `StructuredRuleEvaluatorTest`, verified on a stashed tree), E2E 533 passed / 3 flaky / 10 skipped / 0 failed (17.1m), Storybook axe 229 across 34 suites, Static + Contract + Frontend green.** Four commits: the guards, the corrections, the ADR, and one CI fix that was not mine to need.
+
+  **WHY THE ROW IS FORECLOSED, AND IT IS NOT ABOUT EFFORT.** (1) **Identity is resolved before any tenant exists** — Fortify routes `/login` with `domain => null`, and the `pgsql_auth` connection exists precisely because the join-shape RLS on `users` fails closed pre-context; at the moment of login there is no subdomain and therefore no tenant database to look a person up in. One human also belongs to several workspaces, so per-tenant `users` means N password hashes and N TOTP secrets for them. (2) **Three RLS policies subquery a neighbouring table** — `users`→`tenant_users`, `resource_grants`→`forms`/`scope_nodes`, draft-children→`form_versions` — and PostgreSQL has no cross-database subquery; a policy whose referent is absent does not fail closed, it **errors on every SELECT**. (3) Production is **one box with one PostgreSQL instance** (ADR-0005), so a dedicated database buys blast-radius containment and not the word — and **not residency at all**, which needs a region and is a hosting decision. **ADR-0017** therefore decides isolation *tiering* with the runtime default unchanged, names **schema-per-tenant in the same instance** as the target, and rejects database-per-tenant on the record. It also records that schema-per-tenant is **not** the "one uncommented line" `config/tenancy.php` implies: stock `PostgreSQLSchemaManager::makeConnectionConfig()` **replaces** `search_path` rather than prepending, dropping `public` and with it the `geometry` type, `users`, `tenants`, `jobs` and the `migrations` table.
+
+  **TWO LIVE DEFECTS, BOTH FOUND BY THE NEW GUARDS ON THEIR FIRST RUN, AND BOTH INVISIBLE TO GREP.** (a) **The admin console had been telling operators dedicated-DB tenancy was live.** `TenantDetailPresenter::features()` *generates* its table from `plans.feature_flags` and labels unknowns with `ucfirst(str_replace('_',' ',$key))`; `EntitlementService::feature('dedicated_db')` resolves true on Enterprise and `ToggleableModules` does not list it — so every Enterprise tenant saw `Dedicated db | Plan grants: Yes | In effect: Yes | Note: —` beside capabilities that genuinely work. Because the row is generated, the search a reader runs before concluding "nothing consumes this key" finds a seeder, a docblock and one negative unit test, and never the surface. `PlanCatalog`'s **seeded, rendered** Enterprise description compounded it. This is P1c's "a test pins copy, not truth" recurring one increment later, in a place no test could have been written because nobody knew the sentence existed. (b) **`Tenant` had been serving a stale `updated_at` since the model was written.** `created_at`/`updated_at` were missing from `getCustomColumns()`, so VirtualColumn's `encodeAttributes()` copied them into the `data` blob on save and `decodeVirtualColumn()` set them back **over** the real column on read; Eloquent stamps `updated_at` *after* the `saving` event that encodes, so the copy is always one save behind (measured on the dev database: column 19:54:38, blob 19:54:11). `created_at` escaped notice for a year only because it never changes. **The whitelist alone does not heal an existing row** — the decode loop iterates the keys *present in* `data` — hence migration `2026_08_16_000001`, cast through `jsonb` because the column is `json`.
+
+  **`domains` CARRIES `tenant_id NOT NULL` AND HAS ZERO RLS POLICIES**, deliberately: it is the table read to decide which tenant a request *is*, so scoping it by tenant is circular. It is also exactly the case `scripts/migration-lint.php`'s own `EXEMPT_TABLES` comment denied existed. The consequence is why `TenantScopedTables` holds classification as **data with a rationale** rather than as a derived rule: any future code reasoning "carries `tenant_id`, therefore RLS is filtering it" reads every tenant's hostnames, custom domains and verification tokens. Classification is a *decision*, and no query separates "unprotected because somebody reasoned about it" from "unprotected because somebody forgot" — so the list carries the reasoning and `TenantTableClassificationDriftTest` carries the drift, in both directions.
+
+  **THE REVERSE DIRECTION EARNED ITS KEEP IMMEDIATELY, AT MY EXPENSE.** It failed naming `sso_auth_failures` — a table P1c itself added — because my catalog sweep had run against `meridian`, a dev database never migrated past P1c. **Every total I had reported was one short.** The authority is `meridian_testing` after `RefreshDatabase`: **55 base tables · 169 policies across 41 tables · 40 carrying `tenant_id`**. The unique-index sweep was wrong the same way twice: `pg_constraint` alone misses **partial** uniques, which Laravel emits as bare indexes with no constraint row, so the real count is **10** — not the 6 a design agent predicted nor the 7 I first measured.
+
+  **FOUR DOCUMENTS WERE WRONG ABOUT THEIR OWN FOUNDATIONS, ALL CORRECTED.** `tenants.data_residency_region` is documented at `data-dictionary.md` §1 as "an explicitly-reserved, currently-unused column" and `data-privacy-gdpr-compliance.md` §5 reasons *from* that reservation — it has never existed; marked in the same style as the `domain` row two lines above it and deliberately **not** created, because residency needs a region and not a column. ADR-0002 said `stancl/tenancy` **v4** in five places against an installed **v3.10.0**, and its "one abstraction, so the switch is configuration" claim rested on it. `tenants:migrate` is a **green no-op** pointed at a directory that does not exist — and pointing it at a real one while `bootstrappers` is `[]` would run the tenant schema into the **central** database and report success. `technical-architecture.md` layer 13's escape hatch is narrower than it claimed; **R9 stays OPEN** (the load test it has always asked for still has not been run) with its fallback repointed at a topology with known prerequisites.
+
+  **THE SECRET-SCAN TRAP FIRED A THIRD TIME, INSIDE THE FIX FOR THE SECOND.** `phase1-completion` had been red on gitleaks since `c94ba81`. A J3b archive entry documented a test fixture by reproducing its literal value, which is itself a `generic-api-key` match on a line carrying no directive. J3c1 diagnosed that exactly right, added the allow-directive to the archive line — and then wrote a Current Status paragraph *explaining* the diagnosis that reproduced the value again, on a line that again carried none. So the branch stayed red, in a different file. **P2a went red having introduced nothing**, established by scanning three ranges in order: the 24 changed files (clean), the P2a commit range (clean), Lane A's `c94ba81..ceb1448` (two findings, both the same value). A rebase did not help, because the fix carried the defect forward. **Prose about a scanner is still input to the scanner** — the rule is not "document the match", it is "never write the value without the directive on the same line". Fixed in Lane A's block, which Rule 7(d) reserves to them; stated in the commit rather than done quietly, because the alternative was leaving the shared integration branch un-mergeable for both lanes over one token. Verified with gitleaks **8.21.2**, the version CI pins, across all 1,865 tracked files.
+
+  **THE PEST DELTA RECONCILES EXACTLY, WHICH IS THE WHOLE POINT OF THE RULE.** 3926 against `ceb1448`'s **3863** is **+63**, and the four new test files plus one added console case are exactly 63 (46 · 7 · 5 · 4 · 1). P1c's +29 was recorded as unreconciled because it was compared against a base two merges stale; this one was compared against a run of the **same base** and closed on the first try.
+
+  **SIX MUTATIONS VERIFIED RED THEN RESTORED**: the whole role condition, the context-mismatch check, a name removed from `STRICT`, a phantom name added, `audits` moved into `NULLABLE_GLOBAL` (two independent reds, by design), the `domains` exemption deleted, and `NOT_PROVISIONED` emptied. One limitation stated rather than papered over: the privileged role is **both** `rolsuper` and `rolbypassrls`, so neither half of the role guard is independently pinned — the test proves the conjunction, and distinguishing them would need a role created as committed DDL.
+
+  **ONE TEST DELIBERATELY NOT WRITTEN, WITH THE REASON IN THE FILE.** `RefreshDatabase` wraps every test in a transaction, so `SET LOCAL` always takes and the `applyLocal`-outside-a-transaction no-op — the exact failure `assertContextEstablished()` exists for — is **structurally unreproducible** in this suite. A test asserting the empty GUC would fail here while being true in production, and the tempting "fix" would pin the harness's behaviour as though it were the product's.
+
+  **NOT BUILT, ON PURPOSE**: provisioning · any `bootstrappers` entry · any `tenants` column (including `data_residency_region`) · a `feature:dedicated_db` gate or `FeatureGateException::forKey()` arm · any change to `TenantAwareJob`/`MaintenanceJob` · the extraction substrate (**P2b**, whose two entry criteria are now written into ADR-0017's revisit triggers: what a tenant's extract contains for `users`, where RLS returns *active members only* and yields a dangling FK while shipping credential material; and whether platform-shared rows are in or out, where RLS returns a superset) · the §D5 boundary linter (**P2c**). **`docs/security-threat-model.md` still carries no SSO rows and no isolation-topology rows** — inherited from P1a–P1c, not created here, still owed. **Gate counts now: controllers 90 · migrations 99 · jobs 29**; `openapi.json` byte-identical, verified by regenerating it rather than assuming, since the contract job introspects models for response shapes. **Next for Lane B: `P2b`.**
+
 - **2026-07-26 (Phase 3 — Increment H12b: scheduled-forms UI; MERGED (PR #64 → `2278f2d`, squash + delete branch, all 6 CI green); H12a was also merged first this session)** — **First action: merged H12a (PR #63 → `a07beae`, squash + delete branch, all 6 CI green), branched H12b off `main`.** Plan `…starry-matsumoto.md`; three decisions locked with the user (TZ = wall-clock-in-zone stored UTC · builder = modal-from-toolbar-button · encode = banner+disabled-submit). **Builder:** new `ScheduleModal.vue` from a "Schedule" toolbar button (XLSForm-import `MdsModal` precedent) → `PATCH /forms/{form}/schedule` via Inertia `useForm().patch` (inline 422s via `MdsFormField :error`); native `<input type="datetime-local">` (no DS date primitive) + `MdsSelect` tz + `MdsNumberInput` cap + "Clear schedule"; `BuilderPresenter` surfaces the raw window/cap + the **server-canonical `DateTimeZone::listIdentifiers()`** (client list can't drift → no 422). **TZ linchpin (caught by a test):** `UpdateFormScheduleRequest` parses the naive wall-clock in the chosen zone **then `->utc()`** before storage — Eloquent's datetime cast serializes a Carbon in its OWN zone as a naive string, so a non-UTC offset is silently dropped by the `timestamptz` column otherwise; the first draft (`->date($k,null,$tz)` without `->utc()`) stored 09:00-as-UTC and the new test failed → fixed. **Guest:** `SchemaResponse.form.schedule` typed; `App.vue` full-screen closed/opens_soon/capacity state (`MdsEmptyState`) **fresh-load only — resume path never gated** (H12a grace); `RuntimeSession.submit()` **fail-closed offline for scheduled/capped forms** (unscheduled keep the G8b outbox); mid-fill 403 → new `schedule` `ErrorKind` → the state. All copy/predicates in one testable `lib/schedule.ts`. **Encode:** `EncodeFormPresenter` emits the twin block via a shared pure `FormScheduleView` (both presenters delegate → can't drift); `Encode.vue` banner + disabled submit when `acceptance != open`. **Gates (local):** vue-tsc 0 (both tsconfigs, run as `node node_modules/vue-tsc/bin/vue-tsc.js` — the `.bin` shim isn't on PATH under the Windows `--no-bin-links` install); Pint + PHPStan L8 **0** on changed files; Pest — `FormScheduleSettingsTest` (+TZ +BuilderPresenter props, 6), new `EncodeFormSchedulePresenterTest` (5), guest + `ScheduledFormAcceptanceTest`/`MaxResponsesCapacityTest` (53) + Forms/OpenApiContract (124) regression-green; **no `openapi.json` drift** (guest block delegates but keeps its `@return` shape). Vitest (`schedule.test.ts` + error-normalizer 403 cases) + the seeded **Closed Survey** `/f/closed-survey` public-runtime-axe scan are **CI-only** (Windows can't run Vitest/Vite/Playwright). **CI caught one regression the local gates couldn't:** the new **Schedule** toolbar button pushed the non-wrapping `.builder__actions` past narrow viewports / large personalization fonts → the responsive-overflow gate failed, and that overflow cascaded into axe **color-contrast** flags as buttons spilled off the light toolbar surface (the closed-form scans I added all passed). Fixed with `flex-wrap` on `.builder__actions` (commit on the same PR); re-ran → all 6 green → squash-merged. **Lesson for H13a+:** any new builder-toolbar control must clear the responsive-overflow gate — the Playwright/axe job is the only place this surfaces (Windows can't run it locally). **Done:** H12a + H12b both merged; **next = H13a** (webhook engine core, H-map row 235). **No forward seams broken;** narrowings: native tz select (no typeahead) + native datetime-local (no styled DS date primitive) both deferred; `capacity_reached` still doesn't emit `form.closed` (H12a synchronous guard only).
 
 - **2026-07-24 (Phase 3 — Increment H10: save-and-resume UX; BUILT + fully green, branch `h10-save-resume-ux`; H9b was merged first this session)** — **First action: merged H9b (PR #58 → `59ceb73`, squash, all 6 CI green), branched H10 off it.** Layered the respondent + admin UX on the H9b surface (plan `…flickering-robin.md`; all three open decisions locked with the user to the recommended options: **include the per-form toggle · newest-wins non-destructive reconciliation · persist the current step server-side**). **Guest SPA** (`resources/public-runtime/`): `main.ts` reads `data-resume-token`; `App.vue` branches to a standalone `resumeDraft()` (own auth context, NOT the share-token `withFreshToken`), reconciles via pure `lib/reconcile.ts` (server `last_saved_at` vs local Dexie `updated_at`, checksum-mismatch/no-local ⇒ server wins silently, local-newer ⇒ local wins + note; loser never deleted), seeds `retainedAnswers` + the draft's uuid/step/locale, renders page-local `WelcomeBackBanner.vue`; **`createFormRuntime` gained `initialClientSubmissionUuid`** so a resumed submit PROMOTES the draft row (the H9a linchpin, never a duplicate); new `SaveForLater.vue` (button + `MdsModal`, self-hides via `useDraftFlow()`) calls `ApiClient.saveDraft` with the **FULL retained answers** (not the pruned submit set) + optional email→`finish_later`. **Backend:** net-new `tenants.draft_ttl_days` (stamp-once choke point in `GuestDraftController`→`SubmissionPayload::$ttlDays`→`createDraft`; reaper untouched) with a **net-new Owner/Admin tenant-settings surface** (`TenantSettingsController` + `UpdateDraftSettingsRequest`, `can:tenant.settings.manage`, writes only the subdomain tenant); net-new `submissions.draft_current_step` (+`last_saved_at`/`locale` on the resume-read); net-new `forms.save_and_resume` + `FormService::setSaveAndResume` + `PATCH /forms/{form}/save-resume` + `Builder.vue` `MdsCheckbox` + a per-form `save_resume_disabled` 403 on the draft-SAVE (resume-READ stays open — never strand data); `PublicFormPresenter` exposes `save_and_resume = form.save_and_resume && tenantAllows` (tenant half mirrors `RequireFeature` fail-open); `SubmissionInboxPresenter` **default-hides drafts** (they were visible before!) + surfaces `completeness_percent`/`last_saved_at`/`draft_expires_at`. **Verified-unneeded (not skipped):** the plan's "web `SubmissionException` render" — the only `promote()` caller is the `/api/v1` encoder route (already 409), no web caller exists. **Gates:** Pest **1237** (+9: `DraftSettingsTest` 4, `GuestDraftRuntimeTest` +4, `SubmissionInboxTest` +1); Vitest +15 (CI) + a save-for-later axe scan; PHPStan L8 **0**; Pint/controller-gate/migration-lint/job-payload-lint green; vue-tsc clean; openapi.json regenerated (additive only). **What's left:** merge PR (open next), then **H11** (dashboard KPIs). **Forward seam for H12a:** the draft-vs-**close** rule (closed/scheduled/`max_responses` don't exist yet). **Env note:** the docker container's php.ini `memory_limit=128M` OOMs the full `php artisan test` run in the unrelated `XlsformExportTest` (finfo mime) — run `php -d memory_limit=1024M vendor/bin/pest` in-process to get the local green; CI is unaffected.
@@ -716,3 +740,3007 @@ Opened and merged with no red cycle. **Pest 1965 passed / 7043 assertions** — 
 - **2026-08-05 (fourth session entry) — H23a4 BUILT and 6/6 CI GREEN ON THE FIRST RUN as PR #97, then LEFT OPEN at the user's request** (they want to revisit before merging — do NOT merge unprompted). Tenant branding now reaches transactional email and the submission PDF, completing ADR-0014 §D8's five consuming surfaces bar the guest runtime. The hard part was not colour, it was the QUEUE: a queued `Notification` is delivered by `SendQueuedNotifications`, not by `TenantAwareJob`, so `TenantContext::currentTenantId()` is null on the worker and `TenantBrandingService::isActive()` reads its entitlement half from that static rather than its `$tenant` argument — branding read inside `toMail()` would have unbranded EVERY tenant with a green suite. `BrandPalette` resolves at DISPATCH and rides the payload; the end-to-end test flushes the GUC before running a real worker so it cannot pass on ambient state. Ships the repo's first Blade mail layer (a Meridian theme rendered as Blade rather than `.css`, our own top-level template, and exactly ONE published vendor component — the header, because the text arm would otherwise `strip_tags` or escape the logo), a new unauthenticated `GET /branding/logo` (deliberately unsigned: an expiry on an image in an inbox is a broken image on a timer), and COLOUR-ONLY PDF branding (dompdf needs `ext-gd` for PNG/WebP and it is absent from the app image and all four CI jobs). Closed a LIVE defect in passing — threat-model §5's markdown-mail row, where `[` was unescaped and a tenant named `[Reset your password](https://evil.example)` rendered a working phishing link in a platform-branded email; `Markdown::withSecuredEncoding()` closes it, mutation-verified. Also corrected TWO stale paragraphs in ADR-0014 that H23a3 had fixed in the DSR but left standing in the ADR. Gates: Pest 2337 (+61), Vitest 1181, PHPStan exactly 55 zero introduced verified per file, all linters and `composer audit` clean, `openapi.json` byte-identical. Process lessons: the container's CLI `memory_limit` is exactly 128M and `-d memory_limit=…` on `artisan test` does NOT reach Pest's child — use `php -d memory_limit=2G vendor/bin/pest`; and two concurrent Pest runs were started by accident (the documented `migrate:fresh`-under-the-other hazard), killed and re-run clean. **Next = H23b, the last unblocked Phase-3 row; it wants H23a4's logo route, which exists only on the unmerged branch, so its base branch is a decision to take before starting.** OCR remains blocked on documents: the Google Vision API key was supplied this session (`OCR_GOOGLE_VISION_KEY`), the scans and ground truth were not.
 
 - **2026-08-05 (Phase 3 — H23b BUILT: tenant branding reaches the public guest runtime, offline-cached; the branding vertical and the last unblocked Phase-3 row are both closed)** — User: "Read PROGRESS.md and build H23b." Plan mode, plan approved after two costed questions. Branched off `main`, **not** off the unmerged #97 — the prior archive line predicted H23b "wants H23a4's logo route", which was inferred rather than read; H-map row 258 scopes the row to *tokens plus offline cache-invalidation* and the logo is not in it, so the base-branch question dissolved. **Application half:** one shared Blade partial (`partials/brand-ramp.blade.php`) now emits the ramp for BOTH the admin root and the guest shell — a guest-specific two-block variant naming only `:root` looked right and loses at (0,1,0) to `theme-overrides.css`'s (0,3,0) system-dark block, so the third block's selector shape is load-bearing and is kept in one place. Callers own *whether* (the admin root applies H23a3's precedence rule; the guest surface deliberately has none, since a respondent has no preferences for the brand to lose to), the partial owns *how*. `GuestBrandingPresenter` is the single reader for all three guest surfaces, using `TenantBrandingService::sharedRamp()` — usable here, unlike in H23a4, because the guest group binds `TenantContract` while a queue worker binds nothing. **One live defect closed in passing, approved by the user before building:** `<meta name="theme-color">` and `PwaManifestController::THEME_COLOR` were both `--mds-accent-teal-600` since G8a on a surface that has never emitted `data-accent`, so the browser chrome and installed splash were a colour appearing nowhere in the form; both now track the light `--mds-color-action-primary-bg`, defaulting to `--mds-primary-600`, while `background_color` stays a neutral per ADR-0014 §D7. **Offline half — re-prime, never purge:** deleting `guest-shell-html` would trade a fieldworker's offline access to a primed form for a stale colour, so `lib/brand-cache.ts` re-fetches other cached shells instead, writing only 200s, and **defers without advancing the stored fingerprint when offline** (advancing it would permanently suppress the retry). Dexie → v2 for an `app_state` store, with a test proving the v1 outbox survives the upgrade. **Two transferable lessons:** (1) within one Pest test the container keeps the `Tenant` bound by the FIRST request (stancl `Tenancy::initialize()` early-returns on an unchanged key), so the obvious "change the brand and re-render" assertion fails against a correct product — the fingerprint's DERIVATION is asserted instead, which is stronger anyway; (2) `GuestRuntimeTest`'s whole-document `data-theme-mode` search was a proxy that expired the moment a stylesheet legitimately named the attribute — it moved to the `<html>` open tag and a new branded case makes the pin sharper, not weaker. **Opened as PR #98 `0e4b7e1`, 6/6 CI green on the FIRST run** (Contract 50s, frontend 1m28s, static 1m35s, a11y 2m21s, Pest 3m43s, E2E 13m43s) — the E2E job is the load-bearing one, being the only gate that drives the guest runtime in a real Chromium with a live service worker. The local dev DB is empty (0 tenants), so the plan's manual browser check was deliberately skipped rather than seed the user's environment uninvited. Gates: Pest 2287 (+11) full suite green (its 2 warnings are pre-existing — `StructuredRuleEvaluatorTest` compiles an invalid regex on purpose), Vitest 1189 (+8), vue-tsc both tsconfigs, Vite build, Pint, controller-gate / migration-lint / job-payload-lint clean, PHPStan exactly 55 with zero introduced verified per file, no migration, `openapi.json` byte-identical. Docs: ADR-0014 as-built (the fifth consuming surface, which CAN resolve `var()`, so §D8's sixth-surface revisit trigger does not fire), `offline-first-sync-design.md` §4.1 new, DSR §2.9, `testing-strategy.md`; ADR-0014's two stale Consequences paragraphs left untouched because #97 already strikes them through and duplicating would conflict. **Phase 3 now has NO unblocked rows — the next move is a user decision between supplying the OCR samples, un-deferring H16a (the strongest fallback: its drift engine is shared with the OCR linelist, so it clears a second blocker too), un-cutting payments, or Track B.** OCR still blocked on documents, not on the API key.
+
+- **2026-08-05 (Phase 3 — the four options were put to the user, who chose to UN-DEFER H16a; PR #98 merged; H16a BUILT: the Google Sheets connector backend and the shared column-mapping/drift engine)** — User: "Read PROGRESS.md. Phase 3 has no unblocked rows left — put the four options to me before picking one." Put all four (plus the blank-form-printer fifth move) with the recommendation stated; user chose **H16a**, and separately **merge #98, hold #97**. #98 merged as `b3a7971` (branch deleted); **#97 remains open by request**. Then built H16a on `h16a-google-sheets-connector`. **Verification against Google's live docs NARROWED a locked decision in the direction the user chose**: the plan authorised `drive.file` + `spreadsheets` only if verification showed it necessary, and Google's own scope table classifies `drive.file` **Recommended, Non-sensitive** for the Sheets API while `spreadsheets` is **Sensitive** — so `drive.file` ships alone. **The sharpest finding: Google returns HTTP 401 for an EXPIRED token and a REVOKED grant identically**, so the obvious classification would have revoked a live connection roughly hourly. **PHPStan's "unused constant" flagged a real latent defect** — `ConnectionTokenRefresher` marked a grant permanently dead on ANY OAuth exception including a transport timeout, unreachable while Slack was the only provider and reachable on every Google send from now on. **13 mutations run: 12 reddened, and the one that came back green indicted the CODE** (an unreachable `! $alreadyPaused` guard, now deleted, with the test strengthened to drive two deliveries and pin the real mechanism). **Three process lessons about mutations that lie** — a `sed` whose pattern never matched, a mutation that introduced a syntax error, and one that was behaviourally equivalent — plus: `git checkout --` after a mutation reverts to the COMMITTED state and silently undoes uncommitted work. **And `openapi.json` nearly regressed silently**: Scramble reads `rules()` statically, so returning the config shape from a method degraded `config` to an array-of-strings, which the CI contract gate structurally cannot catch (it diffs a fresh export against the committed file — both were equally wrong). Fixed with a static `documentedShape()` union plus a dynamic `requiredFor()`. Also fixed three places where the "provider-agnostic" H15a framework was Slack-shaped, one of which (`config.channel_id` required in all four request classes) made a Sheets rule unvalidatable. ADR-0009 §D6 and §D8 amended in place — both revisit triggers fired — and `data-privacy-gdpr-compliance.md` §7 revised in this increment as that bullet itself required, since a Sheets row carries ANSWERS and the connector envelope is no longer metadata-by-default. **Opened as PR #99, 6/6 CI GREEN.** Two further defects were found by RE-READING the adapter after the suite was already green — an unquoted sheet name in A1 notation (Google's own default tab is `Form Responses 1`, with spaces) and a 400 misclassified as retryable when it is in fact how Google reports a deleted tab — which is the standing lesson that a defect the gates cannot see is found by LOOKING. The `git checkout --` trap then bit a THIRD time, discarding both fixes while uncommitted and making one mutation run measure unfixed code.
+
+- **2026-08-06 (the I-map RE-PLAN + I0 — the audit that falsified "Phases 0+1+2 COMPLETE", and the workflow that finishes the app)** — User: "re-plan properly… do not miss anything… our main goal here is to finish the app and make it ready for testing." Prompted by the user challenging how thin the admin console and dashboard looked — and the instinct was right. **Method:** three parallel Explore agents — (1) a line-by-line audit of all 14 PRD §5 Main Features' acceptance criteria against CODE, ignoring phase labels and docblock claims; (2) a 10-source inventory of every deferred/cut/blocked/TODO item (PROGRESS, H-map, feature-backlog, PRD §6/§9, risk register, exceptions-log, code TODOs, Track B, GDPR doc, webhook doc); (3) a substrate map for the six new build areas. **Findings:** THREE Phase-1 features unbuilt (#13 notifications — dropped because H-map:380 falsely called it "not a PRD item"; #10 app settings; #12 audit viewer) and six PARTIAL, including the worst: **#3's share surface does not exist — `public_slug`/`allow_guest_submissions` have no route and no UI writer, so a real tenant cannot share a form.** Silent drops with no tracker row: post-submission editing (permissions seeded since Phase 0), Share-panel fast-follow, ScreenedOut (live `max_responses` bug), CSV formula-injection prefix (threat-model:127), blank-form print renderer, openapi↔tzdata CI bomb. Also surfaced: `password.confirm` guards ZERO routes; nothing anywhere reads `feedback_reports`; Reverb was never installed (not merely unconfigured). **Decisions (user, 2026-08-06):** integration-branch workflow — `phase1-completion` off main, increment PRs INTO it, self-merge on green, main untouched until ONE final reviewed PR when testable; **#97 folds in FIRST** (notifications mail needs its BrandPalette/templates); **polling not Reverb** (Reverb → Track B; R10 already called realtime an enhancement). OCR stays last (docs, not the key, are the blocker); I12 (blank-form print renderer) is what lets the user produce their own scans. **The I-map:** I1 share → I2 audit trail → I3/I4 notifications → I5 app settings (+MdsSwitch) → I6 demo seed + landings + TESTING-GUIDE.md → I7 feedback loop + console depth → I8 security hardening → I9 review/edit + ScreenedOut → I10 dashboard polish → I11 impersonation → I12 print renderer; parked: OCR/H16b/H16c/payments/Track-B/R12/GDPR-legal, each with its unblock condition; backlog's 55 rows NOT silently promoted. **I0 executed this session:** `phase1-completion` created off main `b3a7971`; #97 merged in clean (its ADR-0014 strikethroughs coexist with H23b's as-built note; BrandPalette + branded mail now on the integration branch); ci.yml triggers extended to the integration branch; the tz bomb defused — three `Rule::in(DateTimeZone::listIdentifiers())` sites → the framework `timezone` rule, `openapi.json` −1,692 lines (~19%), dead imports pruned; tracker corrected (the false phase claim is now flagged in place, the I-map recorded in Current Status + roadmap table). Alignment note: the H16a session committed its tracker updates to the #99 BRANCH, not main — its facts are carried in the corrected status so no merge loses them. Prior session same day: H16a built + opened as PR #99 (6/6 green, held); H23b merged as #98.
+- **2026-08-06 (I1 — the SHARE SURFACE: PRD Feature #3's missing half, built on `phase1-completion`)** — User: "Read PROGRESS.md. Build I1 (share surface) on phase1-completion." Plan mode; four costed questions answered before any code. **The gap I1 closed:** `forms.public_slug` + `allow_guest_submissions` had existed since the initial forms migration and the guest runtime that consumes them was complete and tested — but **no route, request, service method, presenter or UI ever wrote either column** (only `XlsformImporter` and `E2eSeeder`). A tenant could build and publish a form and still had no way to hand it to a respondent. Built on the `forms.save-resume` 4-file template: `UpdateFormShareRequest` + `FormService::setShareSettings` + `FormShareController` + `FormShareQrController`, `can:update,form`, ungated by plan (no entitlement covers guest forms; inventing one would be a pricing decision). **Four decisions the user took, each changing the work:** (1) **QR is SERVER-rendered** — `bacon/bacon-qr-code` v3.1.1 was ALREADY in `composer.lock` via `laravel/fortify` (which server-renders the 2FA QR), and `XMLWriter`+`iconv` were verified present in the container, so the tracker's "small npm lib" became zero new npm deps and zero exposure on the `npm audit --omit=dev` gate; promoted to a direct `composer.json` require via `composer update --lock` (a **one-line** content-hash diff, no version movement); delivered to `<img src>`, not the `v-html` the 2FA panel uses. (2) **`frame-ancestors` decided in BOTH directions** — `*` on the public runtime (PRD:187 *requires* third-party iframe embedding; before I1 that held **by accident**, since the string existed nowhere in the tree) and a NEW `AppSecurityHeaders` (`frame-ancestors 'none'` + `X-Frame-Options: DENY` + `nosniff` + `Referrer-Policy`) on four groups explicitly — there was **no app-side security-headers middleware at all** before this. (3) The share write is **audited in I1**, the first `auditable_type = 'form'` row; I2 follows that convention for the rest. (4) Social = `navigator.share()` + `mailto:` only — no third-party brand marks. **⚠️ THE DEFECT A TEST FOUND, AND IT WAS MINE:** `AppSecurityHeaders` must **REPLACE** an inherited `frame-ancestors`, not defer to one. The first draft deferred, on the reasonable-sounding theory that a policy which had already decided framing knew better. It does not — `PublicRuntimeSecurityHeaders` is *also* mounted on the authenticated manual-encode page (for its OSM `img-src`), so deferring handed the guest runtime's `frame-ancestors *` to a **logged-in, session-bearing page**: a clickjacking hole opened by the very change meant to close one. Caught only because the plan had pre-identified that route as the one place both middlewares meet and demanded a test asserting BOTH policies land on it. The sibling hazard is still latent and pinned: if the ordering ever reverses, `PublicRuntimeSecurityHeaders`' no-clobber guard trips and the **OSM tile allowlist silently vanishes** — a blank map on one page, no error in any log. **A second real bug fixed in passing:** `XlsformImporter::slugTaken()` respected the `SoftDeletes` scope while the unique index `(tenant_id, public_slug)` has **no `deleted_at` predicate**, so a trashed form squats its slug forever and the `-2`/`-3` suggestion loop could return a value Postgres rejects with a 23505. Extracted to `App\Support\Forms\FormSlug` (shared by importer + share surface) with `withTrashed()`; **the fix was mutation-verified** — reverting `withTrashed()` reddens the new test with the exact bad value (`clinic-intake` instead of `clinic-intake-2`). **Pinned semantics (the tracker asked to "verify and pin"):** a slug change invalidates **nothing** — share tokens are HMACs over (tenant, form, version) and resume links carry a token, not a slug, so a guest mid-form and a saved draft both survive a rename; only the old `/f/{slug}` URL dies, which is exactly what the modal now warns about before the save. Gates: **26 Pest** in `FormShareTest` + **7** in `AppSecurityHeadersTest`, **11 Vitest**, 4 new axe rows (the Share panel scanned in BOTH its states — `Community Health Survey` has no slug, `Clinic Intake` has a live link — read-only, so no seeded state is mutated under the other specs). Docs: DSR Appendix B (3 new glyphs, with why each is not a reuse), threat-model §4 (two paired clickjacking rows, one ACCEPTED and one MITIGATED), piping-design §16/§262 (the `default-src` tripwire is intact — `frame-ancestors` has no `default-src` fallback, so it narrows nothing), feature-backlog (Share-panel row **narrowed, not deleted**, to branded social + script-snippet embed + per-form embed-origin allowlist). **One PRD gap recorded rather than dropped:** Feature #3 also requires per-form rate limiting / CAPTCHA; only the global `throttle:guest-mint` exists, and it is now an explicit **I8** line item — silently dropping named PRD criteria is the exact failure the audit behind this queue found.
+- **2026-08-06 (I2 — the AUDIT TRAIL END-TO-END: PRD Feature #12's viewer, its export, and the eleven emission sites that make them worth opening, built on `phase1-completion`)** — User: "Read PROGRESS.md. Build I2 (audit trail end-to-end) on phase1-completion." Plan mode; two costed questions answered before any code (**include all six remaining `FormService` writes**; **one PR, not a split**). **The gap:** the H4 substrate was sound — `audits` append-only at the database, `AuditLogger` redacting before write, `/api/v1/audits` reading it — but no human in the product could see it, and the ledger it would have shown had holes. **Coverage closed first, deliberately, because a UI over a partial trail looks complete and is not:** `FormService` create/updateMetadata/assignScope/setSaveAndResume/setConfirmationMessage/setSchedule/archive (its own docblock had assigned these to I2 "as a set"), `RestoreService` (whose `$actor` was accepted, documented as reserved, and missing from the closure's `use()` list), a new `TenantSettingsService` extracted from the last tenant-settings write still living in a controller with no transaction, all four `TenantBrandingService` verbs, the three tenant-actor `CustomDomainService` verbs, and **the 7th `TODO(audit)` site** — H4 counted six and this one survived uncounted because four review verbs funnel through one private `SubmissionReviewService::apply()`. **⚠️ TWO HAZARDS THE PLANNING FOUND BEFORE THE CODE DID, both now guarded by named tests:** (1) **`domains.id` is an `increments()` INTEGER** while `audits.auditable_id` is `uuid NOT NULL` — a domain audit keyed on the domain row pushes `'3'` into a uuid column and 500s with `SQLSTATE 22P02` on the first live claim, invisible to PHPStan, to the `audits_event_check` and to the migration linter. Keyed on the **tenant uuid** with the hostname in the payload (spec §1's role-grant device), and **mutation-verified**: reverting it reddens with that exact error. (2) **`domains` is RLS-EXEMPT and `audits` is not**, and the `audits` `WITH CHECK` compares the AMBIENT GUC rather than the row's owner — so tenant B's domain handled under tenant A's context would file B's event in **A's ledger**, and no database policy could catch it. `auditDomain()` refuses on both no-context and tenant mismatch, failing **silent** because the sweep is a `$tries = 1` MaintenanceJob that would otherwise land in `failed_jobs` on every tick forever. `verify`/`activate`/`deactivate`/`sweep` are deliberately unaudited, each for its own reason, and the tests pin the ABSENCE so a later reader does not "fix" a decision. **A defect a test found in my own work:** `TenantSettingsService` snapshotted `$tenant->getOriginal()`, but a model built by `Tenant::create([...])` carries only the attributes it was passed — so a column the caller never set was simply absent, and `AuditDiff` faithfully rendered "(absent) → 45" when the truth was "— → 45". The ledger would not have been vague; it would have been **making a false claim that a setting had not previously existed**. Fixed with a `refresh()` inside the transaction, and the test now pins the key's PRESENCE holding null. **Two claims WITHDRAWN rather than shipped as plausible prose, after mutation testing refused to confirm them:** the second argument of `applyLocal()` does *not* keep the exporter's Actor column populated (the `users` policy resolves an active co-tenant through its membership branch with no user GUC at all), and the `->with('user:id,name')` eager load is an **N+1 guard that no test enforces** (`data_get` lazy-loads). What IS verified: deleting `applyLocal()` empties the file at HTTP 200. **The viewer** (`/audit-log`, folder `audit` — the repo's first deliberate URL/folder divergence, written down so nobody "fixes" one half): offset `paginate()` not the API's cursor (`MdsPagination` needs `last_page`, and the `count(*)` cost is recorded); `orderByDesc('id')` on uuidv7, never `created_at`, which no index leads; **no default date window**, because a ledger's value is "what happened, ever"; a server-computed `empty_reason` rather than a client guess; a `target{}` object whose `label`/`url` are legitimately null (`resource_grants` are hard-deleted by design and half the aliases have no page); and an actor with **three** states — `System`, a name, and `Unknown user` for a departed member whose row the join-shape `users` policy now hides. **The export** clones `SubmissionExporter`'s lazy stream, one file row per audit row with the diff pre-rendered (raw-JSON columns rejected: they reproduce the unreadability the increment exists to fix and trip XLSX's 32,767-char cell limit); its self-referential `audit_log.exported` row carries the filters and deliberately **no row count** — the stream can be abandoned, so an intended count would be a false entry in the one table that exists not to contain those — and the file honestly **contains its own export row**, pinned so nobody hides it. **A documented DSR §3.8 deviation:** `event-variant.ts` owns the badge COLOUR while the server owns the LABEL, because `archived` is `warning` as a form STATE and an ordinary historical fact as an EVENT, and amber on every such row spends the attention channel that `exported`/`permission_changed` need. **Also:** `submissions.remarks` joined `AuditRedactor::PII` (the `feedback_reports.remarks` precedent — free text with no audience discipline) while `returned_reason` stays raw, since it was authored for the respondent and already emailed to them. `:loading` on `MdsDataTable` is wired for the first time in the repo. **One process note worth keeping:** running `npx prettier` reformatted four pre-existing files to a style this repo does not use (there is no prettier config and CI does not run it) — reverted with `git checkout`, and the lesson is that a formatter with no project config is a formatter with someone else's opinions. Gates: Pest full suite green, Vitest 1225 (+27), vue-tsc both tsconfigs, Vite build, Pint, PHPStan zero introduced verified per file, no migration, `openapi.json` untouched (I2 adds no `/api/v1` surface). Docs: spec §1 (two new alias rows + the permanent `settings` keying rule I5 inherits), §2 (`remarks`, with the `returned_reason` asymmetry), §3 (as-built); data-dictionary §13 `auditable_id`; threat-model's formula-injection row widened to name the audit export as a THIRD path, still assigned to I8 because one shared helper across three exporters is the honest shape.
+- **2026-08-06 (I3 — the NOTIFICATIONS SUBSTRATE: PRD Feature #13a, the feature the H-map dropped as "not a PRD item", built on `phase1-completion`)** — User: "Read PROGRESS.md. BUILD I3 — the NOTIFICATIONS SUBSTRATE — on the `phase1-completion` workflow." Plan mode; **two costed forks put to the user before any code and both answered with the recommendation**: (1) `review.requested` does NOT become a `DomainEventType` case — there is no request-review verb in the product (`markUnderReview()` is a reviewer *claiming* a submission), and that enum is the webhook + Slack **subscription** vocabulary, so an unemitted case is a checkbox a tenant can tick that can never fire; `NotificationType::ReviewRequested` became a second fan-out of `submission.created` instead, so exactly THREE cases were added (`submission.approved`, `submission.returned`, `member.invited`). (2) All **seven** `NotificationType` cases ship AND all seven are wired — `export_ready` and `webhook_failed` already had purpose-built branded emails at `GeneratePdfJob`/`DeliverWebhookJob`, so those two get an in-app row only (`record()`, not `dispatch()`), closing the gap data-dictionary:53 had recorded against H17. **Built:** `notifications` + `notification_preferences` (both **strict** RLS on the `saved_report_views` argument — `belongs_to_user` emits policies with no tenant predicate at all, a cross-tenant leak for a consultant in two tenants, and `migration-lint` cannot catch the wrong variant), a `recreate_webhook_deliveries_event_type_check` migration (without it a tenant subscribes to `submission.approved` and the fan-out INSERT dies with 23514 on an already-migrated database), the enum with `label()`/`pathFor()`/`actionLabel()`/channel defaults/role sets, three `DomainEvent` classes, the `SubmissionReviewService::apply()` restructure, the `MemberInvited` emission **alongside** the invitation email rather than behind it, six webhook/connector fan-out twins, `NotificationPreferenceResolver` + `NotificationRecipientResolver` + `NotificationDispatcher` + `NotificationMailer` + `NotificationCopy`, four sync listeners, and one `EventNotification` for the whole catalog. **A design pass run in parallel found five things the plan had missed and all five were folded in**: the `notifications` table name collides with Laravel's own `DatabaseNotification` (so `'database'` is now a forbidden channel repo-wide, pinned by a guard test); a `DomainEventType` case with no fan-out listener is the exact defect used to reject `review.requested`, so the six twins were added; `SlackMessageFormatter::linkLabel()` was a latent bug that would have labelled a submission link "Open form"; `member.invited` carries no `form_id`, so it matches tenant-wide endpoints only; and per-candidate `holdsAny()` would have put one grant query per collaborator-scoped member inside a public guest POST — answered with `ResourceGrantResolver::primeFor()` (a PRIME, so the answer still comes from `decide()`, the one interpreter of `resource_grants`) and a bounded-query test. **Two simplifications taken on the way:** the two presenters' byte-identical exhaustive `eventTypeLabel()` matches — under docblocks promising "one catalog, one set of words" that nothing enforced — collapsed into `DomainEventType::label()`; and four `->has('eventTypes', 4)` literals became `count(DomainEventType::cases())`. **The post-commit proof is mechanical, not asserted by name**: `SubmissionReviewEventsTest` reads `DB::transactionLevel()` from inside the listener, which reddens if anyone moves `event()` back into the closure — something `assertDispatched` passes happily. **Recipient resolution asserts agreement with `Gate::forUser()` itself**, because the bell announcing a submission the inbox 403s on is a leak rather than a cosmetic bug. Both tables are deliberately **unaudited**, argued in audit-spec §1 (a notification is a derivative of an already-audited act; `read_at` churn would flood a never-pruned ledger), and `notifications.data` is contractually barred from holding a token or signed URL. Docs: data-dictionary §22/§23 as-built (including **amending §22's Reverb bullet** — polling is I4's transport by user decision), the `NotificationType` catalog row, audit-spec §1, webhook-design §3 (three payload rows plus a built/unbuilt ledger, and `member.invited`'s `email` recorded as a **stated deviation** from the default-exclude principle). Gates: Pint, PHPStan back to its 55 baseline, all three lint scripts, Vitest 1225, vue-tsc both tsconfigs, build, **full Pest 2518 passed**. New traps recorded: a non-member is invisible to `User::where('email', …)` under the users-visibility policy (read `tenant_users` instead), a Unit test that assigns an Eloquent date attribute dies on the connection resolver, and `npm` lives in the `node` container.
+- **2026-08-06 (I4 — the NOTIFICATIONS UI: PRD Feature #13b, the pixels I3 deliberately did not build, on `phase1-completion`)** — User: "Read PROGRESS.md. BUILD I4 — the NOTIFICATIONS UI (PRD Feature #13b) — on the phase1-completion workflow." Plan mode; **three costed forks put to the user before any code, all three answered with the recommendation**: (1) the feed is a **read-only JSON sidecar**, not the "LAZY Inertia prop" the tracker itself specified — an `Inertia::optional()` prop is refreshed by a partial reload, and a partial reload re-dispatches the current page's controller, so a 60-second tick with `/audit-log` open would buy a full ledger paginate plus a `count(*)` and discard it, in every open tab, forever; (2) **popover-only** centre, no `/notifications` page, matching PRD #13's "recent events" and keeping the increment at its planned M; (3) **click-to-read via 204 JSON writes**, a named exception to the repo's "every web-route mutation is an Inertia visit" rule — Inertia's request stream is `maxConcurrent: 1, interruptible: true`, so a `router.post()` fired in the same tick as the row's `<Link>` navigation is silently aborted, which makes click-to-read unimplementable as a visit without a wasted second round trip. **Shipped:** `NotificationController` (3 methods, ~30 code lines), `NotificationPolicy` (one `markRead` ability, the `SavedReportViewPolicy::owns()` case verbatim), `NotificationPresenter`, `UpdateNotificationPreferenceRequest`, `NotificationCopy::inApp()`, `NotificationPreferenceResolver::resolveAll()`, four new TS modules under `components/notifications/`, `useNotificationFeed.ts`, a rewritten `NotificationBell.vue`, `NotificationPreferencesCard.vue`, `E2eSeeder::seedNotifications()`, four Pest suites + a Unit suite + a seeder-convergence case, six Vitest suites, and a `responsive-axe` interaction block that stubs the feed route so a poll cannot land mid-scan. **Three defects found that were not on the plan, none of them reachable from the happy path.** `GeneratePdfJob` records an `export_ready` row for EVERY terminal outcome, so a quota-blocked or failed export produced a bell row headed "Export ready" over a submission with no artifact — the email arm had always been honest, the bell never was. `SubmissionPolicy::view()` has **no respondent clause**, yet the two review-outcome notifications are addressed to `respondent_user_id`, so a form editor whose grant is later revoked keeps a row pointing at Laravel's bare 403 page, outside the Inertia shell, with no navigation back — I4 answers that by resolving every row's `url` through the real `Gate` and shipping `null` when the target is gone or forbidden, and files the authorization widening for I9 rather than taking it as a drive-by. And the first spelling of the export fix was `!== Ready`, which renders a MISSING outcome as a failure and contradicts the sentence directly beneath it — caught by its own test before any of it shipped. **Two design decisions worth their own line.** The in-app copy is built server-side, amending an I3 docblock that said it would not be: `data` is a six-arm discriminated union only PHP authors, where an exhaustive `match` makes an eighth case a fatal and a TypeScript `default:` arm makes it a blank row nobody notices. And the poll stops after 30 idle ticks — a security decision, not a performance one, because every poll touches the session and an eternal one would keep an abandoned tab authenticated forever, deleting the 120-minute idle expiry that I8's step-up work assumes. The seeder plants one row on the **reviewer** on purpose: Playwright only ever logs in as the Owner, so a regression dropping `Notification::scopeForUser()` would be invisible in an all-Owner fixture. Gates: Pest 2595, Vitest 1284, PHPStan 55/0 new, Pint, controller-gate, migration-lint, job-payload-lint, `composer audit` + `npm audit --omit=dev` clean, `openapi.json` byte-identical (web-only routes; Scramble is scoped to `api/v1`).
+
+- **2026-08-06 (post-I4 — the standing "hold every PR open" instruction is SUPERSEDED, and the backlog is re-sequenced end to end)** — User: *"let's focus on all the tasks that can be made by you. I will test the app when it is completely built so it will not delay the development. I don't want any pending tasks to be missed."* **This inverts how the 2026-08-05 hold was being applied.** That decision's surviving half is that `main` receives nothing until the one final integration PR; what it never meant — and what had grown around it — was leaving individual PRs unmerged and treating "the user cannot verify this yet" as a reason to park work. Recorded as Standing Rule 5. **Acted on immediately:** PR #97 (H23a4) CLOSED as redundant — its commits were folded into `phase1-completion` during I0, verified with `git merge-base --is-ancestor` rather than asserted; and PR #99 (H16a) retargeted from `main` to `phase1-completion` and merged, resolving four conflicts by hand. The interesting one was `docs/security-threat-model.md`, where both sides had recorded something TRUE about the same CSV-formula-injection row — I2's widened blast radius (`AuditExporter` is a third path to a spreadsheet cell, assigned to I8) and H16a's addendum (a Sheets connector row is a strictly worse sink, since `=IMPORTXML(...)` would be evaluated by Google's servers on arrival with no human opening anything, closed STRUCTURALLY by `valueInputOption=RAW`) — so the facts were merged rather than a side picked. **Four sequencing decisions locked with the user:** OCR goes last and costs nothing to defer (verified, not assumed: H18/H19 are a LEAF — nothing in I5–I12 depends on them, and I12's blank-form printer is what produces the scans, so OCR could not precede it anyway); Google credentials supplied and verified loaded, un-parking H16b/H16c; payments stay cut to Phase 4 until the form builder and data collection are tested; Track B last. **Two traps found and written down rather than left for the next reader.** (1) The app emits `http://localhost/oauth/google_sheets/callback` while the user registered the port-carrying URL `.env.example` has always documented — and the obvious fix, a port in `CENTRAL_DOMAIN`, would silently delete the super-admin console route, the connector callback route ITSELF, the platform-host guard and subdomain tenant identification, because that env var feeds two config keys and `Route::domain()` matches `Request::getHost()`, which strips ports. The real fix was attempted here and REVERTED — it breaks ~10 asserted redirects and needs a `phpunit.xml` change that does not belong in a merge commit — so it is recorded as an H16b obligation, on the I2 → I8 precedent. (2) Google's Testing publishing status expires refresh tokens after 7 days, which no amount of correct token handling on our side can survive; H16b must say so in the UI. **A local-gate lesson worth more than either:** a green local Vitest is NOT proof every test ran — a worker occasionally fails to START in this Docker setup, and that file's tests then never run and never appear in the total while the run still reports "passed". Seen as 1284 -> 1270 -> 1292 across three runs of the same tree; check the FILE COUNT (64), not just pass/fail.
+
+- **2026-08-06 (I5 — APP SETTINGS: PRD Feature #10, plus the design system's first `MdsSwitch`, on `phase1-completion`)** — User: "Read PROGRESS.md. BUILD I5 — APP SETTINGS (PRD Feature #10) + MdsSwitch — on the phase1-completion workflow." Plan mode; **three costed forks put to the user before any code, all three answered with the recommendation**: (1) build the REAL self-join path rather than shipping a toggle whose "open" position does nothing — before I5, `/register` created an account belonging to no workspace at all, so invite-only had one live position and one decorative one; (2) module toggles compose INTO `EntitlementService::feature()` as a one-directional third layer (effective = (legacy ∥ plan) AND NOT tenant-disabled) rather than becoming the "second flagging system" PRD #10 explicitly warns against; (3) the dyslexia-font control swaps to `MdsSwitch` too, so no page shows two visually different controls meaning the same thing. **Shipped as PR #104 (`50849fb`) with a documented verification gap: 2 of 6 CI jobs confirmed.** GitHub Actions was in a **major outage** for the entire window (status page: "Incident with Actions", critical); the four unconfirmed jobs **never ran** — `Service Unavailable`, `Failed to resolve action download info`, `not acquired by Runner of type hosted` — and **not one CI failure in this increment touched the code**. E2E (22m40s) and design-system a11y (3m53s) both PASSED, which is the pair that matters most (E2E scans `/settings` at 3 viewports × 2 themes, so the four new cards and fifteen switches are axe-clean on a live app). Every unconfirmed job was run to completion locally with the identical command: Pest **2740/2740**, PHPStan **55 = baseline exactly**, Pint, `composer audit`, `npm audit --omit=dev`, vue-tsc, build, Vitest **1292/1292**, `openapi.json` **byte-identical**. The re-verification is queued as run `31121401137` on the merged state and is recorded as **item 0 of Next Session** — merge-on-green was NOT abandoned quietly, it was deferred with an owner and a command. **Two mid-session corrections worth keeping.** First: the local suite reported 3 failures that were **mine, not the code's** — I ran a second Pest process while the full suite was in flight, which `migrate:fresh`es the schema underneath it; one of the three was the pre-existing `MembershipRoutesTest`, which is what made the cause unambiguous, and all three passed in isolation. Second, and more consequential: I diagnosed the CI block as a GitHub **billing/spending-limit** problem from GitHub's own verbatim error text and advised on that basis; **the user made the repository PUBLIC** — an irreversible act — and CI still failed, at which point checking githubstatus.com showed a critical Actions outage that had very likely been causing both error classes all along. **The billing analysis was sound in itself** (a private repo on the Free plan really is capped at 2,000 min/month, and this repo really was burning ~30 min × 2 runs per increment, because `ci.yml` triggers on the PR *and* on the post-merge push) **but the status page should have been checked before advising an irreversible change.** Going public does permanently remove the minutes ceiling; it was not what was needed that afternoon. A secrets audit of the newly-public history came back clean — `.env` never committed, no real credentials, only fake `xoxb-` test fixtures — and no repo secrets or `pull_request_target` exist, so fork PRs have nothing to steal. `ci.yml` gained `workflow_dispatch` + a nightly `schedule` so an outage-skipped verification heals itself, **both inert until the file reaches `main`** (GitHub reads those triggers from the default branch only) — until then the tracker line plus `gh run rerun` is the control. Flagged for Track B: `deploy.yml` is `workflow_run` + **self-hosted** on a now-public repo, dormant behind `vars.DEPLOY_ENABLED`, and that flag must not simply be flipped without revisiting the gate.
+
+**2026-08-07 — I6: demo seed + landings + `docs/TESTING-GUIDE.md`, and a seeder that had been broken for months.** The increment that makes the application testable by hand. Opened by re-checking I5's outstanding CI verification: the run on the integration HEAD came back **3 of 6** — Frontend newly confirmed alongside E2E and a11y — while Static, Contract and Pest were cancelled after fifteen minutes having executed **zero steps**, never having acquired a runner. Three further reruns over the session behaved identically; GitHub's status page held Actions at `major_outage` (impact *critical*) throughout. Not one failure touched repository code, and all three unconfirmed gates were run to completion locally on both trees. **`DatabaseSeeder` turned out to be broken and to have been for a long time**: `WithoutModelEvents` wraps its whole run — and every seeder it calls — in `Model::withoutEvents()`, which suppresses the `creating` hooks that fill the uuid primary key and `tenant_id`, so `migrate:fresh --seed` raised 23502. It survived because nothing had ever executed the file; CI seeds only `E2eSeeder`. Its two un-upserted `User::factory()->create()` calls would also have 23505'd on a second `db:seed`. `DatabaseSeederSmokeTest` now runs it. **`DemoSeeder`** builds two tenants of its own and never touches `acme` (whose counts a merge-blocking test pins): `demo` on Business and a deliberately thin `northwind` on Starter, all five roles plus a cross-tenant consultant and a pending invite, six forms with distinct jobs, ~520 submissions over 90 days, and audit/notification/feedback/settings variety. Submissions are hand-rolled — the five recorded reasons against `SubmissionPipeline` all hold — with index rows through the production `AnswerIndexProjector`. The audit tail is back-dated by **INSERT**, which `append_only` RLS permits where the UPDATE idiom is structurally impossible, with `redacted_fields` produced by `AuditRedactor` rather than authored, and no `occurredAt` added to `AuditLogger`. **The landings are one route, and the plan's own prescription would have broken a pinned test**: constraining `routes/web.php` to the central domain lets a tenant `/` answer custom hosts with a 302 where `CustomDomainRoutingTest` pins a 404, so the branch went inside the existing route instead — central host renders, workspace host redirects by auth state, custom domain still 404s, asserted as "404 and specifically not a redirect". `Welcome.vue` went from a hard-coded walking-skeleton stub to a token-built landing page, exceptions-log #8, and the first central-domain page in the responsive-axe matrix. **The guide was written against the running app, which caught four errors before it shipped** — there is no bare `GET /admin` route, the settings cards were not the set first written, Pest does *not* share the dev database (`phpunit.xml` pins `meridian_testing`; only Playwright can disturb it), and drafts are hidden from the unfiltered inbox but appear under an explicit filter. Walking it also caught a fixture defect no test would have: the reviewer's grants included the form carrying 85% of the submissions, so the permission model showed 446 against 497 — invisible. Excluding it makes it **104 against 497**. Chapter 17 is the deliberate other half, a table of what is *not* built with the increment that owns each row. Registered by citation rather than by number, since the `#1–#27` index belongs to the architecture plan's §4 list. Local gates all green: Pest **2757/2757** (1007s, +17 = exactly the tests added), PHPStan 55 = baseline, Pint clean, the three lint scripts, both audits, Vitest 1307/1307 across 67 files, vue-tsc, build, and `openapi.json` byte-identical.
+
+**2026-08-07 — I6 merged at 6/6, and the CI debt it closed was hiding two real failures.** PR #105 (`4364fbe`) into `phase1-completion`, with the post-merge integration run green as well — which is what finally retired the I5 verification debt open since 08-06. **The debt was not procedural.** GitHub Actions returned to `operational` on 08-07 after a multi-day `major_outage` during which Static, Contract and Pest were cancelled four times having executed zero steps; the very first run that actually executed came back **red**, on a tree whose every local gate was green (Pest 2757/2757, clean `composer audit`). Two findings, neither in I6's code. **(1)** Two `TenantMaintenanceTest` cases lacked `$this->withoutVite()` — the only two rendering the real guest shell (`public-runtime.blade.php` carries `@vite`) and expecting a 200, where the three paused cases render the maintenance blade and passed. The Pest job builds no assets, so `@vite` throws and the 200 arrives as a 500; locally they passed only because `public/build` happened to exist. **These were I5 defects CI had never been allowed to run.** Reproduced by moving the manifest aside per the tracker's own instruction; 7/7 with the fix. **(2)** Three `league/commonmark` advisories — including CVE-2026-71488, a high-severity quadratic-time DoS — published 08-06 20:30–20:39 UTC, between the clean local audit and CI's. Transitive; 2.8.2 → 2.9.0, `composer.json` untouched, 327 mail/notification/branding tests green on the new version. **Standing lesson, now pinned in item 0: an unverified gate is not a green gate, and a clean local `composer audit` has a shelf life measured in hours. Never merge to `main` on local gates alone.** The outage/real-failure tell is also pinned: a job killed by the outage reports `cancelled` with `steps: []`; a real failure has steps with a failed one among them.
+
+**2026-08-07 — I7a: PRD Feature #11 closed end-to-end, and an RLS carve-out that was only half a carve-out.** Branch `i7a-feedback-loop`, commit `d1aae38`, **PR #106** into `phase1-completion` (4/6 CI green at hand-off; Pest + E2E still running — verify before assuming). Feedback had been **write-only since C3**: two writers, zero readers, so a report a tester filed landed in a table no page could open. Now capture → shared `attachments` → the workspace's own read-only `/feedback` (which finally consumes `feedback.view`, seeded since Phase 0 with nothing behind it) → the platform console with the New → Reviewed → Resolved lifecycle. **ADR-0015** closes the PRD's own explicit open decision: native `getDisplayMedia` over html2canvas, because a DOM snapshot renders the Leaflet picker and the signature canvas blank — precisely the screens a bug report is about — and would put a ~1 MB, three-year-stale production dependency in front of the npm-audit gate; the file input is rendered **always**, so declining the prompt costs the reporter nothing. **The finding worth carrying: the super-admin RLS bypass is only the database half.** `BelongsToTenant` adds its own `where tenant_id = <context ?? sentinel>` predicate, and the console has no context — so the cross-tenant read returned nothing, silently, under an empty state reading "No feedback yet". The mirror-image lesson landed in the test: `FeedbackRlsTest` had to drop that same scope, because leaving it on would have let the suite pass whether the Postgres policies existed or not. Four more traps pinned rather than left to be rediscovered — route-model binding 404s every valid id on a console route over an RLS table; the bypass is SELECT-only so transitions audit into the *reporting tenant's own* ledger; `attachments` gets no bypass at all (one would have exposed every respondent file to display one image); and the audit alias is the **plural** `feedback_reports`, since the singular writes a valid-looking row with redaction silently off. **And CI caught a second defect a green local tree could not, for the second increment running:** the first run came back red on **nine unrelated tests** — `DemoSeederIdempotencyTest`, `DatabaseSeederSmokeTest` and the three sweep-command suites — while every feedback test passed everywhere. The console suites must seed COMMITTED rows (the elevated connection cannot see RefreshDatabase's transaction) and had followed `SuperAdminBypassTest` in not cleaning up; that precedent's reasoning held only because it commits `users`, and these commit **tenants**, which other suites legitimately assert over. The deadlock objection the old note raised is answered by *when*: the purge is registered through `beforeApplicationDestroyed()`, which Laravel runs after RefreshDatabase's own rollback, so the DELETE lands with no locks left to block on. **A committed cross-connection fixture is global state, and "migrate:fresh wipes it next run" is not a cleanup strategy inside a single suite run.** Two environment findings alongside: `token-references.test.ts` caught an undefined design token for the second increment running, and the full local suite now dies at exactly 981 tests on the container's 128M ceiling while CI runs unlimited — fix the invocation (`php -d memory_limit=3G vendor/bin/pest`), not the tests.
+
+**2026-08-07 — I7a merged at 6/6 green.** PR #106 squashed into `phase1-completion` as `5b7bc7f`, on `e840002`, with every job carrying real steps (no `steps: []`) and a clean local suite of 2780 passed / 0 failed. Two process notes the increment paid for. **The first CI run was red and the second was green, and neither told the whole story on its own:** the red run found a genuine committed-fixture leak, and the *local* run that was supposed to corroborate it came back with five bogus failures because a second Pest process was started while the first was still running — `migrate:fresh` dropped the schema underneath it, exactly as this file's own gotcha says it would. So one wasted 17-minute run was self-inflicted, and the honest sequence is: CI caught the real defect, the local suite caught nothing, and the local suite's apparent failures were noise I created. **Also: `vendor/bin/pest`'s exit code disagreed with its own summary** (exit 0 alongside `5 failed`), so read the summary line, not `$?`. PRD Feature #11 is now closed end-to-end and the I-map's I7 row is half done; I7b (tenant detail, plan-assign UI, platform-only audit viewer) is next.
+
+**2026-08-07 — I7b: console depth, and an RLS carve-out that was one line away from being a surveillance tool.** Branch `i7b-console-depth`. Three things that existed but could not be reached are now reachable: `POST /admin/tenants/{tenant}/plan` had shipped in H5a with **no UI at all**; there was no `/admin/tenants/{tenant}` page, so an operator could suspend a workspace but not see its plan, usage or domains; and I5's platform-settings writes had been depositing `audits` rows with `tenant_id = NULL` since 08-06 that **no surface could read**. Shipped: a workspace detail page (identity + owner + plan-assign + usage + capabilities + read-only domains), linked row names on the tenant list, and `GET /admin/audit-log`. **The centre of the increment was a decision not to take the obvious implementation** — `applySuperAdminBypass('audits', ['SELECT'])` is one line and would have exposed every tenant's complete history; a new named generator `TenantIsolation::platformRowsBypass()` narrows the gate with `AND tenant_id IS NULL` instead, so neither side of the wall can read the other's. The plan said hand-write that policy; ADR-0002 §D2 says policies are generated, and the user chose the generator. **Four things were found rather than built:** two live 500s on uuid columns (`/admin/tenants/not-a-uuid`, and `plan_id=garbage`, where `'uuid'` without `bail` does not help), an admin nav that overflowed below ~900px and always had, and an `MdsModal` `#footer`/`#actions` slot mix-up that rendered confirm buttons nowhere — caught by a Vitest case, not by review. **Two process lessons:** mutating the live database to verify a policy test proves nothing, because `RefreshDatabase` rebuilds it (mutate the migration file); and **local PHPStan on this machine is blind to Eloquent model properties, reporting ~64 phantom errors CI does not see** — measure the delta against the parent branch, never the absolute count.
+
+**2026-08-07 — I7b merged at 6/6 green, after CI rejected the first push.** PR #107 squashed into `phase1-completion` as `c736220`, on `ec8418b`, every job carrying 11–20 real steps. **The first push failed Static analysis with three genuine PHPStan errors that this machine's container had reported as clean** — a nullsafe call on a non-nullable `Carbon`, a redundant `is_string()`, and an `array` passed where `list<string>|null` was required. The cause is worth more than the fix: local Larastan here cannot resolve Eloquent model properties, so it not only invents ~64 phantom errors CI never sees, it **silences real ones**, because an unresolvable type degrades to `mixed` and `mixed` suppresses everything downstream. A measured delta of 0 against the parent branch was therefore not evidence of anything. **Local static analysis in this container is not a weak signal — it is not a signal.** Budget a CI round-trip on any increment touching model properties or types derived from them. Second lesson, cheaper: **do not `mv .env` aside while the stack is up** — the app container exits immediately and takes any background run with it.
+
+**2026-08-07/08 — I8 (three PRs: #108 I8a identity · #109 I8b guest anti-abuse · #110 I8c export sanitization + a11y gates), all 6/6 CI green, merged into `phase1-completion`.** PRD Features #14 and #3 both closed end-to-end; `docs/security-threat-model.md` has no `Open` rows left. Reconnaissance found three of the I-map's declared I8 work items already done or wrong (HIBP shipped in Phase 0 B1; the Blueprint dark `bg-active` 2.52:1 fix landed in H21d1 and only the exceptions-log entry was stale; `password.confirm` guarded seven Fortify routes, not zero). I8a fixed a live 2FA-enrolment defect that was a lockout on the super-admin's mandatory page — two JSON sidecars read `res.json()` on a 423 and rendered a blank QR, untested because nothing had ever exercised a `/user/two-factor-*` route — and paid 43 pre-existing console-test failures as the honest cost of putting step-up on the whole console. It also consumed `tenant.roles.assign`, a permission seeded since Phase 0 with no code behind it, to build the role-change route PRD #14 named but the product never had. I8b closed PRD #3's last criterion with a self-hosted proof-of-work challenge (no npm dependency, no third-party credentials, no CSP change, solved at send time so the offline outbox needed no schema change) plus a per-IP-within-one-form rate limit. I8c wrapped all seven `Row::fromValues()` sites in a `SpreadsheetCell` prefix and corrected I2's note about which audit-export column is actually exposed (`Actor`, not `Changes`). Deferred with restated reasoning: the admin console stays out of Playwright — the `otplib` blocker dissolved, but step-up added a four-redirect `globalSetup` that cannot be verified outside CI.
+
+**2026-08-08 — I9a (`SubmissionStatus::ScreenedOut` + the `max_responses` capacity bug), the first of I9's three PRs.** I9 was split with the user on the I7a/I7b and I8a/b/c precedent: I9a ScreenedOut → I9b encode save-as-draft → I9c post-submission editing. **I9a discharges `docs/workflow-branching-design.md:140`, a consequence that document recorded and deliberately declined to solve** — on a capped form, respondents who were shown no questions were consuming the paid cap. The state is derived SERVER-SIDE by a new pure static `FinalizedStatus` from `StepProjection::isEmpty()`, i.e. byte-for-byte the question the guest runtime already asks to render H21b's terminal panel, so no client flag and no new wire contract. **The tracker's own I9 scope line was wrong**: it called for an "enum + CHECK migration" and `submissions.status` has no CHECK constraint — I9a ships no migration at all, and the two partial indexes that hard-code `WHERE status <> 'draft'` were deliberately left alone because `submissions_form_finalized_idx` also serves H24a's per-form series. The capacity predicate became a NAMED SIBLING (`scopeConsumesCapacity()`) rather than a change to `scopeCountable()`, and all six sites moved together or the public banner would have claimed "capacity reached" on a form still accepting. **A 38-agent adversarial review ran before the commit and its yield was almost entirely in the class a green suite cannot see — but the refuters were too aggressive: 33 raised, 3 survived, and hand-verification promoted about a dozen back.** It found two real defects (`review_requested` being sent for a terminal row a reviewer cannot action; both seeders writing full answer documents onto screened-out rows), one vacuous test of my own (the "banner agrees with the guard" case compared the scope to itself while its comment claimed otherwise), and eight false documentation statements including three written by this increment. The uncontested finding was the third occurrence of I8's exceptions-log lesson: a docblock cited a `ConsumesCapacityScopeTest` that does not exist. **Also caught live and now recorded in the tracker: a Vitest run under load reported 68 files passed with exit code 0 while printing a worker timeout — nine files and 167 tests never ran.** Clean re-run: 77 files, 1404 tests. Local gates: Pest 2957 passed / 0 failed, PHPStan 77 = the recorded local baseline (delta zero), Pint clean, all three lint gates pass, `openapi.json` a deterministic two-line diff.
+
+**2026-08-08 — I9a MERGED as PR #111 (`5b5248f`), 6/6 CI green with every job running real steps (11–20 each).** The first run was 5/6: `Static analysis` failed on the prod-only npm-audit gate with a HIGH advisory in transitive `nanoid <3.3.17` (GHSA-2v37-7h3g-55p8, via `vite → postcss → nanoid`), published after the lockfile was written and after this session's own clean local audit — the second occurrence of the I5 `league/commonmark` lesson, and the reason the gate runs on every PR. `npm audit fix --package-lock-only`, `package.json` untouched, nine patch-level transitive upgrades; the gate went from 1 high to 0 vulnerabilities. Noted for the next lockfile change: it cannot be validated locally, because `node_modules` does not move when only the lockfile does.
+
+**2026-08-08 — I9b (manual-encode save-as-draft + resume) BUILT AND COMMITTED on `i9b-encode-drafts`, NOT merged; the gate run and PR are the first task next session.** Five commits: server `f6bce57`, client `59a4c33`, tests `25091ac`, docs `de47423`. Closes PRD Feature #7's last gap by reusing `SubmissionDraftService`'s advertised service seam; `EncodeFormPresenter::present()` gained the optional `?Submission $draft` parameter that I9c will reuse for the edit surface. **The adversarial review found 33 real defects in 36 raised — the ratio inverted from I9a's 3-of-33 after one prompt change (telling the verifiers that "it's a deliberate decision" and "docs aren't behaviour" are BAD refutations), and I9a's ~12 wrongly-refuted findings are the reason that change was made.** Three were serious and all three were mine: two authorization holes (both draft lookups resolved on `client_submission_uuid` alone, so a member authorized on form A could write into — and then promote — form B's draft, with `SubmissionPolicy::promote()` never running because `promote()` is invoked directly); the version-pin bug I had explicitly guarded twelve lines away on the sibling path; and silent data loss on the most common exit, because `dispose()` cleared timers without saving and `beforeunload` never fires for an Inertia `<Link>`. Fixing the first turned up that the unique index is `(tenant_id, client_submission_uuid)` — **per tenant, not per form** — so a foreign uuid cannot create a new row at all and is now an explicit typed 409 distinguishing the two-tab race from a uuid that was never yours. **Deviated from the approved plan on the reaper: it does NOT restamp draft expiry, because `GuestDraftRuntimeTest` pins stamp-once as a deliberate contract on the shipped guest path** — the compensating control is that the resume banner names the expiry date. **`token-references.test.ts` caught a real defect rather than being its documented flake**: two invented design tokens that would have shipped as a silent visual bug, since a dangling `var()` with no fallback invalidates the declaration at computed-value time. Second time the "re-run in isolation before waving it through" rule has paid for itself. Also corrected a long-standing tracker error: **CI's PHPStan reports `[OK] No errors`, not the "baseline 55" the next-prompt block had claimed for several increments** — verified from PR #111's green Static-analysis log.
+
+**2026-08-08 — I9b MERGED as PR #112 (`27f7c0f`), 6/6 CI green with real steps; PRD Feature #7 closed end-to-end.** The first CI run came back **4/6 on a tree whose local gates were all green** — the third vindication in two sessions of "do not merge on local gates alone", after I9a's post-lockfile npm advisory and the silently-skipped Vitest worker. Neither failure was in the feature. The thin-controller gate caught `store()` at cyclomatic complexity 12 once the review fixes landed, **and that was a process failure: after those fixes I re-ran Pest, Vitest and vue-tsc but not the three lint gates, because they had passed before them** — "re-run the gates" has to mean all of them. The second was `->component('submissions/Encode')` missing the `false` flag that disables Inertia's page-file existence check, which every other `->component()` call in `tests/` passes for the same reason `withoutVite()` exists; it passed locally only because a case-insensitive dev filesystem resolves a lookup Linux does not. Both fixed in `c1f8690`; the complexity fix extracted `resolveTarget()`, which reads better than the inlined conditionals anyway. **The user added two standing rules to this tracker during the session** (Rule 4's closing-format amendment and Rule 6, signal every wait) — preserved through the merge and in force from now on.
+
+**2026-08-08 — I9c MERGED as PR #113 (`90b2c19`), 6/6 CI green with real steps (11–20 each); post-submission answer editing is live and I9 IS CLOSED.** The third dormant-key occurrence: `submissions.edit.any/.own` had been seeded to Owner/Admin and Form Editor since Phase 0 with zero consumers until `SubmissionPolicy::update()`. Shipped as `GET /submissions/{submission}/edit` + `PATCH /submissions/{submission}/answers` on the existing encode surface through I9b's presenter seam, which now serves three modes off one `?Submission` derived from its status. Editable in the four finalized non-terminal states only; `screened_out` and `archived` are refused **by name**, the first because that state consumes no `max_responses` slot (I9a) so editing answers into one would either consume a paid slot past a full cap or leave answers on a row meaning "was shown no questions" — the same hazard `archive()`'s `$from` refuses in writing, with the same answer (a `capacity_consumed_at` column, not a fifth enum entry). Editing an approved row demotes it to `under_review` as ONE combined audit row. **The adversarial review earned its cost three times over, and every finding was invisible to a green suite.** `submission.updated` had **no dispatch listener on either channel** — the case was subscribable and permanently silent, verbatim the defect the catalog's own docblock says must not arrive by the back door; `WebhookFanOutTest` now sweeps every `DomainEventType` case for both listeners. `openapi.json` was **not regenerated**, so four `event_types` enums shipped advertising seven values while eight FormRequests accepted eight — fixed, with a contract test that compares the spec to `DomainEventType::values()` and reddens when a value is removed. And `AttachmentReferenceValidator` would have **rejected every edit of any submission carrying media**, because it asserts `attachable_type === 'form_field'` while `SubmissionFinalizer` re-points attachments to `'submission'` at submit; only a test with a real media answer found it. **A mutation check found a defect nothing was aiming at**: seven mutations were run, six reddened, and the seventh — swapping the replay clock for `now()` — did not, which proved that test vacuous and exposed the real cause. The service was storing the **un-pruned** document while projecting the **pruned** one, so after every edit the JSONB and the typed index disagreed and an answer the original submit had pruned came back. Both finalize doors store the pruned document; this one did not. With that fixed the clock mutation reddens with the right message — a wrong clock silently **deletes** an answer that was relevant when the response was filed. **The lost-update guard had to move to the client, and the first version was security theatre**: comparing a value read at the top of the method against one read under the lock is always equal, because both reads happen inside one request. The lost update spans two requests, so what shipped is an optimistic-concurrency baseline emitted by the presenter and carried on the PATCH — the builder's own recorded convention — with `present|nullable` rather than `required`, since the checksum column is nullable and `required` would make pre-checksum rows permanently uneditable. Two smaller process lessons cost real time. **Pest helper functions are global**: `indexedForm()` already existed in another suite, and the full run died on `Cannot redeclare function` while every per-file run passed. And the full suite **must** be `php -d memory_limit=3G vendor/bin/pest` — `artisan test` re-execs and loses the flag, which is written down in the Verification loop and was ignored anyway, costing one OOM'd run. Six stale doc references closed, including a pre-specified `submission.updated` webhook payload wrong in three fields, a TESTING-GUIDE row asserting the feature was impossible, and "PRD Feature #12", which is the audit trail and is used with that meaning in five other files. Gates on the merged tree: Pest **3061 passed / 0 failed**, Vitest **1434 across 78 files**, PHPStan **74 against a base of 82** (documenting two real `FormField` columns removed 8), Pint 1069 files, vue-tsc, build, both audits, all three lint gates, and `openapi.json` byte-identical.
+
+
+**2026-08-09 — I10 SHIPPED AS FOUR MERGED PRs (#114 I10a, #115 I10b, #116 I10c, #117 I10d), each 6/6 CI green with real steps; PRD Features #4 AND #5 both closed. #118 (I10e) left OPEN at 5/6 with its blocker evidenced.** The I-map's scope line was wrong in BOTH halves and in OPPOSITE directions — the fifth increment running: the per-form trend and its form-editor scoping had already shipped in H24a/H24b1, while a per-form analytics page did not exist at all and `markSynced()` DELETED the row PRD:223 requires the respondent to see. Verifying against code first also corrected three plan details (AnalyticsFormSet's path, the index's origin, and all three admin-console blockers). Split five ways on the I9 precedent, I10a first because it changes a primitive the others render. **The five adversarial reviews raised 32 + 26 + 29 findings with almost nothing refuted, and every serious one was invisible to running anything**: I10a's paint-order inversion (teleport anchors freeze at MOUNT time, so the always-mounted ConflictDialog would have inerted the dialog the user was looking at) passed 9 tests, 7 mutations, type-check and build; I10b's new precondition was satisfied by the very case it excluded; I10c shipped copy telling users to widen a date range on a page with no date range; I10d had a review flow that would resubmit the WRONG submission and a delivered row that could be resurrected with EMPTY answers, because deletion had been doing concurrency work nobody wrote down. **Three mutations refused to redden, each exposing a test that only looked like one** — a pruner fixture that could not trigger either arm it guarded, a focus assertion searching `<body>`'s text, and a parent binding nothing covered. Two process rules paid for in blood: COMMIT BEFORE THE REVIEW (a verifier agent deleted a guard on disk and left it there), and NEVER `git checkout -- <path>` to undo a mutation test (it restores the committed state and ate two batches of review fixes). And one defect only CI could see: `const online = useOnline()` where the composable returns `{ online, dispose }` — always truthy, so the offline pill silently never rendered, past vue-tsc, 1514 Vitest tests and a 29-finding review. I10e's own lesson is that a backlog row's stated blockers can all be false: the TOTP it blamed needed zero lines of crypto, because `EnsureSuperAdminMfa` reads only `two_factor_confirmed_at` while Fortify requires both columns.
+
+**2026-08-09 — I10 CLOSED (I10e #118 merged, 6/6) and I11a opened (PR #119).** I10e's four-CI-cycle blocker was a RACE IN THE TEST SETUP, not an app fault: the login form is an Inertia XHR, so the page performs no document navigation and `waitForLoadState('networkidle')` resolves instantly against the already-idle previous load — the setup then read a guest session before the POST had landed. A Pest test proved the whole server side clean in one run, and the browser half was reproduced against the LOCAL docker stack rather than CI (`E2E_BASE_URL=http://acme.localhost:8080`), turning a 2-minute cycle into 30 seconds. Two real defects fell out that the a11y scans were not looking for: both seeders were promoting the super-admin over the app connection and affecting ZERO rows silently (FORCE RLS + a join-shape SELECT policy + PostgreSQL applying SELECT policies to an UPDATE whose WHERE reads a column — a freshly seeded demo database had no super-admin at all), now fixed with a zero-row postcondition that throws; and `AdminLayout` overflowed horizontally at 375px, its first measurement at any viewport. CI also surfaced a pre-existing calendar flake in `AnalyticsPageTest` — 28 days is exactly four weeks, so `date_trunc('week')` returns 4 buckets when the window opens on a Monday and 5 otherwise; it passed six days in seven. I11a then added `audits.acting_as_user_id` BEFORE the impersonation feature, so the ledger can never be lied to without recording the lie. Its adversarial review falsified the increment's headline claim in BOTH directions: the console can never display an impersonated row (they are tenant-scoped; the platform viewer reads the `tenant_id IS NULL` slice twice over) and its test hand-wrote a shape the writer cannot produce; and "the tenant can never learn the operator's name" was disproved against a live database, because nothing stops an operator also holding a membership of the tenant they impersonate into. The standing lesson from both: **a claim about what RLS makes impossible must be verified against Postgres, not reasoned about** — and a test that passes because of transaction isolation is indistinguishable from one that passes because the policy worked.
+
+**2026-08-09 — I11a CLOSED (PR #119 merged, `899e6e2`, 6/6 CI green). `audits.acting_as_user_id` is live; I11b is next.** The merge blocker was 12 red Pest tests across seven suites the increment does not touch — three sweeps, a reaper, a rollup, a token-refresh fan-out and both seeder smoke tests. Three hypotheses had been tried and disproved and a `git revert` bisect was queued; **none of it was needed, because the failing run had already printed the answer.** `DatabaseSeederSmokeTest` asserts the exact `tenants.slug` list and its diff named the culprit outright: `+ 1 => 'impersonated-slice'`. The review-fix commit's new case minted a tenant through `committedPlatformTenant()`, which writes on `pgsql_privileged` OUTSIDE RefreshDatabase's transaction — it must, since the elevated `pgsql_superadmin` connection cannot see uncommitted rows — and the slug fell outside the `platform-audit-%` marker `purgeCommittedPlatformAuditFixtures()` deletes by. Nothing rolls such a row back and `migrate:fresh` runs once per process, so it survived into every later file. **One leaked ACTIVE tenant explains all twelve in two shapes:** the seeder suites fail on the row itself; the four sweep suites drain a FIXED number of queued jobs on the documented assumption that their own tenant is the only active one (`ScheduledFormSweepTest`:42 says so in as many words), so the drain consumed the stranger's child and the test's own tenant was never swept — reading as "the form is still Scheduled" / "no usage_counters row" / "the expired draft still exists", symptoms with no visible link to their cause. **This repo had diagnosed the identical failure once already** (`tests/Pest.php`:617-641, from I7a: *"Nine unrelated tests went red in CI on a locally-green tree"*); the marker was a convention then, and a convention is what the next author walks past, so it is now a CONTRACT — the helper throws on an unmatched slug, with `tests/Unit/CommittedFixtureMarkerTest.php` as its mutation guard. Also corrected: a docblock in `ImpersonationContext` that asserted a hypothesis as a measurement (*"REMOVING IT COST TWELVE FAILURES"* — the next CI run contained that guard and reproduced all twelve), and an `AnalyticsPageTest` clock reset written as the last statement of a test body, which only ran while the test passed. Gates: Pest 3099/0 (12194 assertions), Pint 1079 files, PHPStan 74 = unchanged baseline. **Two I11b decisions taken with the user: the impersonated session is hard-capped at 30 minutes with an auto-exit middleware; the Owner notification is in-app + email and honours the email preference.**
+
+**2026-08-09 — ALIGNMENT REVIEW: goal confirmed, six principles made decisions of record (PRD §3.7), J-queue J1–J5 registered after I12.** The user re-stated the Kobo × Fillout goal and six standing principles (frictionless · gamified · global search NON-NEGOTIABLE · workflow-centric · non-duplicative · connected); a 3-agent code sweep confirmed the goal matches PRD §1.1/§4 and 12 of 14 PRD features closed, then found the principle gaps precisely: NO global search anywhere (zero text filters on any list page; TopNav.vue:6 defers the slot the DSR specs), NO gamification (the onboarding plan's first-run moment was never built), weak connectedness (no form hub page, no per-form submissions route, inert dashboard charts, ShareModal reachable only inside the builder, /analytics a dead end), and an auth surface with no live password feedback, erified enforced on ZERO routes, no welcome email and no social login — while forgot-password proved already BUILT end-to-end. Four decisions taken, recorded in the tracker's ALIGNMENT block: password = min 12 + HIBP + the four character classes with a live checklist UI; Google-only social login; OCR and ALL uploading features (incl. bulk Excel/CSV data import) wait for the user's explicit signal; full gamification engine is the very last increment before Track B. Point-by-point traceability of the user's original message lives in plan hi-can-you-check-moonlit-pearl.md.
+
+**2026-08-09 — I11b CLOSED (PR #120 merged `994354e`, 6/6 green) — I11 COMPLETE; closed out by the alignment session.** The building session ended with PR #120 open at 5/6: impersonation.spec.ts red with ERR_NAME_NOT_RESOLVED on the cross-host hop while honestly green across three consecutive local runs — both true at once. The cause was in ci.yml, not the feature: the E2E job's APP_URL was the TENANT host, and TenantUrl::centralHost() composes {label}.{app.url host}, so the server-built redeem URL doubled the subdomain into acme.acme.meridian.test — unmapped in /etc/hosts, and invisible locally because *.localhost resolves ANY label natively. One env-line fix with a defending comment (b28fba8); 6/6 on the next run and merged. Lesson recorded as process rule #7: a server-GENERATED absolute URL is only proven by a browser navigating it under CI's DNS. Also for the record: builder-axe 'empty canvas (dark) [mobile]' went FLAKY in the red run (light-theme foregrounds on a dark surface, passed on retry) — a known shape now, not a fresh regression if it recurs. I12 (blank-form print renderer) is next; the J-queue (alignment review 2026-08-09) follows it before H16b.
+
+**2026-08-09 — I12 BUILT: the blank-form print renderer, and with it the WHOLE I-MAP (I0–I12) is complete.** A tenant could build, publish and share a form and had no way to put it on paper; this closes that and is the first link in the OCR purpose chain (the printed form is how the user produces filled scans — it deliberately stops at the artifact and never reaches ingestion). `GET /forms/{form}/versions/{version}/print`, scope-bound, `can:view,form`, shaped after the XLSForm export down to its ABSENCE of side effects (no audit, no metering, no storage — unlike the submission PDF, which is queued precisely because it stores an artifact against the tenant quota). Ungated by plan on purpose: `feature:ocr_single` is Professional+ and printing a blank form is useful with no OCR in the picture. A DRAFT 404s — not a preference, since a draft's `schema_snapshot` is literally `[]` and the request would otherwise 200 with a titled document containing no questions; a SUPERSEDED version still prints, which is the case the OCR chain needs. **Three layout decisions taken with the user (comb boxes; grids/signature print for real while geo/media are marked "not collected on paper"; a printed field key per area) are recorded in the new `docs/ocr-pipeline-design.md` §2.5, which is NORMATIVE for §3** — that doc had no layout requirements at all, so the increment wrote the spec rather than consuming one. **`PrintAnswerArea` is the fourth `default`-less 31-case match and disagrees with `PdfFieldRole` and `OcrFieldEligibility` on purpose, pinned as assertions** (the printed form is the INSTRUMENT, not the extraction target). **THE ORDERING TRAP was the defect most likely to ship looking correct:** `SchemaSnapshotSerializer` sorts by `key` for checksum stability, which is ALPHABETICAL, so rendering the snapshot as it arrives produces a plausibly-shuffled form — the test fixture's key order is the exact reverse of its sequence order so a presence-only assertion cannot pass by accident. **Two dompdf constraints were read out of `vendor/` rather than guessed:** its core fonts are WinAnsi so `U+2610` drops SILENTLY (every box is CSS-bordered, and the test round-trips the RENDERED output through Windows-1252 — source scanning would fail on a Blade comment and pass on an HTML entity, exactly backwards); and a fixed block's offsets are page-CONTENT-relative with `right` never read, which is why `.runhead`'s `top` is negative and its width explicit. **The adversarial review found a shipped correctness defect no test could see:** `cascading_select` was classed as a tick-list, but its option pool is one FLAT list spanning every level, so the paper set "Manila" beside "NCR" as a sibling — a child option offered as an alternative to its own parent; it is now a comb with one captioned run per level. Four more review fixes: a conditional SECTION printed unmarked (the expression lives on the section row, so the per-field marker structurally cannot see it); a field with an unmatched `section_key` VANISHED from the paper silently; an optional `$brand` no caller passed; and the "not collected on paper" marker sharing a class with instructional prose. **New Blade trap worth knowing: `@endif@if` with no space does not compile** — the second directive survives as literal text and fails as a PHP syntax error in the compiled view under `storage/framework/views/`, several frames from the template line. Gates: Pest 3181/0, Vitest 84 FILES/1531, PHPStan 74 = unchanged baseline with zero from the new files, Pint 1099, openapi.json byte-identical; five mutations each reddened its own test and nothing else. **J1 (global search) is next — the J-queue runs before H16b.**
+
+**2026-08-09 — I12 CLOSED (PR #121 merged `3fe606b`, 6/6 CI green, every job with real steps 11–20). THE I-MAP IS COMPLETE: I0–I12 all merged into `phase1-completion`.** CI passed first time with no fixes needed. Local gates on the merged tree: Pest 3181/0 (12,469 assertions), Vitest 84 FILES/1531, PHPStan 74 = unchanged baseline with zero from the new files, Pint 1099, openapi.json byte-identical. **Two process facts earned this session and worth carrying:** (1) an interim full Pest run reported 5 failures in suites the branch does not touch, purely because **Vitest was running concurrently** — the standing "Pest and Vitest sequentially" rule; the clean re-run on the identical tree was 3181/0 and the contended run took 50% longer (1551s vs 1028s), which is the tell, and nothing was diagnosed on the strength of the contended run; (2) that run was piped through `tail -8`, so **the shell exit code was `tail`'s and reported success while Pest had failed** — do not pipe a gate command whose exit status you intend to read. **J1 (global search) is next**, the first row of the J-queue registered by the 2026-08-09 alignment review; the J-queue runs before H16b.
+
+## 2026-08-10 — J1 global search, part one: J1a merged (PR #122), J1b built and pushed
+
+Started the J-queue. Split J1 into five sub-PRs on the I10 rule — the piece that can redden an EXISTING
+green gate goes first — after a three-agent code sweep falsified several premises the tracker carried: there
+is no FTS anywhere (only PostGIS is enabled; ADR-0001's claim that `pg_trgm`/`citext`/`pgcrypto` are on is
+false as-built), **no seeded `search` permission key** (the dormant-key tell does NOT fire — the only
+zero-consumer keys are the `tenant.billing.*` payment stubs), `TopNav.vue`'s deferral is at line 5 and is a
+prose comment rather than a `<slot>`, and PRD §3.7 scopes search to forms/submissions/members/settings —
+**audit rows are not on that list**, and cross-tenant audit search was already deliberately refused.
+
+**J1a (PR #122, 6/6 green)** shipped `MdsTextInput type="search"`, `MdsModal`'s `initialFocus`, the
+`openModalCount` re-export, and **DSR §3.4.1 — a command-palette spec that did not exist anywhere in
+`docs/`**, written before the thing it specifies (the I12 precedent). Its adversarial review returned 35
+findings across two lenses and found a **keyboard trap in the new prop**: by the time `initialFocus`
+resolves the page is already inert, an invalid selector *throws* (and `nextTick` does not route through
+Vue's error handler), a match that cannot take focus is a silent no-op, and either way focus lands on
+`<body>` with Escape and the Tab trap unreachable — WCAG 2.1.2, reached through the prop added to satisfy
+§4.5's "never left stranded". Two more lessons: **a bare HTML tag literal in a `.vue` comment fails the
+Storybook build and nothing else** (its preset preserves comments for docgen; Vitest, vue-tsc and Vite all
+skip them, so three gates stay green and only the merge-blocking one reddens), and **a comment of mine
+asserted a hypothesis as a measurement** — I read happy-dom's `offsetParent` as non-null when it is
+`undefined` and not implemented, which means `focusable()`'s visibility filter is a no-op under Vitest.
+
+**J1b** built the substrate: two generated `tsvector` STORED columns + GIN (not a projection table — that
+would be a third encoding of the form-visibility rule and a second PII store, and `submissions.pii_erased_at`
+has zero writers), `SearchTerms` (load-bearing, not defensive: `to_tsquery('simple','foo &')` raises 42601,
+i.e. a 500 from typing an ampersand), `KeywordFilter`, the extraction of `Form::scopeVisibleTo()` as the list
+twin of `FormPolicy::view`, per-entity arms behind an interface, `GET /search`, and a JavaScript-free nav
+field that absorbs the ~180-assertion e2e blast radius on a static element. 59 tests / 151 assertions.
+
+**The mutation discipline paid for itself four times.** Two mutations refused to redden and each exposed a
+vacuous test: swapping the analytics rule into the form scope was masked because the ARM GATE refuses a
+Viewer first, and flattening the visibility OR was masked because **Laravel's `addNewWheresWithinGroup()`
+groups BOTH slices of the where list, so the next local scope retroactively wraps whatever preceded it**.
+Two request-validation bugs also came from tests rather than reading: a `max:200` rule that contradicted the
+feature's own principle by turning a long paste into a 422-to-nowhere, and a missing `nullable` that made
+every whitespace-only search 422 — because `TrimStrings` + `ConvertEmptyStringsToNull` run before validation
+and deliver `null` with the key present, which a unit-level `validator()` call never reproduces.
+
+J1b is committed and pushed but **not merged**: it still owes the `EXPLAIN` index-usage test (an unused GIN
+index passes all 59 tests — identical rows, only the plan changes), the 375px bounding-box/non-overlap e2e,
+a scope≡policy set-equality test, three doc updates, the gate sweep and its review. J1c is the leak PR and
+the reason the split exists.
+
+## 2026-08-10 — J1b finished: the search substrate, and the two GIN indexes it had to remove
+
+J1b's owed work is done and the increment is ready to merge, but the headline is that finishing it
+REVERSED one of its own design decisions. The `EXPLAIN` index-usage test was written to catch a silent
+failure, and it caught one: **both GIN indexes were structurally unreachable.** PostgreSQL refuses to
+promote a non-leakproof clause to an index qual on a relation carrying RLS quals
+(`restriction_is_securely_promotable()`), `@@` is not leakproof, and `forms`/`submissions` are ENABLE'd
+AND FORCE'd for a role that is neither superuser nor bypassrls — so the match was always a heap Filter.
+All 59 of J1b's other tests passed over it, because identical rows come back either way and only the plan
+differs. Measured on PG 17.0.5 three independent ways: `ts_match_vq` is `proleakproof = f`; a 5,000-row
+probe table loses its GIN the instant one tenant policy is applied via the production generator, same
+session and same rows; and penalising sequential scans to cost 10^10 does not bring it back, which is what
+proves this is eligibility and not the cost model. `LIKE`/`ILIKE` measure non-leakproof too, so `pg_trgm`
+is no escape hatch — plain btree comparison is, which is the shape to reach for if this is ever revisited.
+The submissions index had a SECOND, RLS-independent reason: its arm's three-branch OR carries an ANY
+SubLink that stays a `SubPlan`, so `generate_bitmap_or_paths()` abandons the whole OR. Both indexes
+dropped with the user's decision; the columns stay because `@@` and `ts_rank` still need them; the tenant
+predicate is what bounds the work and it IS promotable.
+
+**J1b as pushed would have failed CI three times over, and none of it was visible locally until the full
+sweep** — the branch had never had a CI run. Five real PHPStan L8 errors in the search files (fixed by
+typing the qualified column `literal-string`, which also makes the no-injection argument static rather
+than only runtime, plus `array_values()`); `TopNav.vue` referencing `--mds-space-9`, which does not exist
+(the scale skips 7 and 9), so the padding silently collapsed and the magnifier overlapped the caret; and a
+cross-test pollution bug in the new set-equality test, which minted a global role on `pgsql_privileged` —
+outside RefreshDatabase's transaction, therefore COMMITTED — and reddened `RbacRlsTest` a hundred files
+later while every single-file run passed.
+
+The owed set-equality test found a real divergence: `Form::scopeVisibleTo()` never checked
+`forms.edit.own`, so a Reviewer or Viewer holding an Editor grant sat inside the scope and outside
+`FormPolicy::view()` — reachable under the SHIPPED role matrix, masked only because both live callers gate
+on `viewAny` first, which is the same masking that made an earlier J1b mutation survive. Fixed fail-closed
+inside the subquery; `FormListScopingTest` still passes unedited.
+
+Three lessons worth carrying: a `pgsql_privileged` write commits and leaks (and an `afterEach` cleanup
+would deadlock on the FK, since it runs before the rollback); Pest's `toContain()` is variadic, so a
+"message" second argument is silently asserted as a second needle; and a failure message that does not
+print what it SAW costs an hour — "found 0" told nothing until it listed the statements it had seen.
+Doc claims were run as real queries against the seeded demo corpus rather than reasoned about, which
+corrected two steps naming the wrong seeder's accounts and one keyword matching no demo form.
+
+Gates: Pest 3265/0 (12,685 assertions), Vitest 85 files/1542, Pint 1120, PHPStan 74 = baseline delta 0,
+three lint gates, vue-tsc, build, `openapi.json` byte-identical. E2E and Storybook axe could NOT be run
+locally — CI is their only authority, and `tests/e2e/search-nav.spec.ts` records that its first CI run is
+its real first run. J1c is next and is the leak PR.
+
+## 2026-08-10 — J1b merged (#123), and J1c built: the leak PR, measured rather than argued
+
+J1b merged 6/6 with real steps, including the two gates that could not be run locally — and
+`search-nav.spec.ts` passed on its first real CI execution.
+
+J1c is the reason J1 was split at this seam, and the hazard stopped being theoretical before any code was
+written. `TenantMembershipService::listMembers()` resolves identities on `pgsql_auth`, whose
+`users_auth_select ... USING (true)` policy exists so the pre-auth login path can resolve an identity with
+no tenant context; `users` has no `tenant_id` column, so on that connection there is no tenant boundary at
+all. It is safe there only because its id set comes from an RLS-bounded `tenant_users` read BEFORE the hop
+and it adds no predicate of its own. Measured on the seeded corpus, one tenant's admin running
+`email ILIKE '%o%'`: 8 rows on `pgsql_auth` including `owner@northwind.test` — another tenant's user — and
+6 on the app connection. So the members arm runs on the default connection, and the standing rule is now
+written into RBAC §9: no user-supplied predicate may ever run on `pgsql_auth`.
+
+Three things only mutation or a real query could have told us. The arm's own `whereExists` over
+`tenant_users` is not merely belt-and-braces: `meridian_auth` is granted SELECT/UPDATE on `users` and
+nothing else, so that predicate cannot execute on the pre-auth connection — swapping the arm there reddens
+11 cases loudly instead of silently returning every tenant's members, which is precisely the failure mode
+an arm written without it would have. Pending invites are structurally unreachable on the app connection
+even through a `tenant_users` join (the join returns the 6 actives and drops the invited row, whose
+`tenant_users` row is perfectly visible), so "active only" is a recorded decision with a measurement and
+the fix — if ever needed — is a policy decision about `users_visibility`, never a connection hop. And the
+`ESCAPE '!'` on the ILIKE is load-bearing because `SearchTerms` KEEPS underscore in its token class, so an
+unescaped `m_ria` matches `maria`.
+
+The tracker's own instruction to add a `users.search_vector` migration was overturned on evidence:
+`SearchTerms::parse()` splits `ana@acme.org` three ways while PostgreSQL's parser emits one `email` lexeme,
+so a tsvector could never match an email search — and an index would be unreachable regardless, since J1b
+measured `~~`/`~~*` at `proleakproof = f`, the same wall that removed the GIN indexes.
+
+Two smaller findings worth carrying. A source-text lint failed on its own documentation — the first draft
+grepped `MemberSearchArm` for `pgsql_auth` and matched the docblock that exists to explain why not to use
+it; stripping comments with `token_get_all` first makes the lint assert what it claims. And PHPStan's local
+baseline turned out to be mostly a missing-annotation gap rather than a tooling quirk: `User` carried 2
+`@property` annotations where `Form` carries 28, so adding three (id, name, email — each verified NOT NULL
+against the live schema) cleared 51 pre-existing errors and took local from 74 to 23, which is the "~22
+phantoms" the tracker had estimated.
+
+`ShellAbilities` was extracted from `HandleInertiaRequests` so the sidebar and the search catalog consume
+one definition of "which destinations may this user reach" rather than two.
+
+Gates: Pest 3286/0 (12,752 assertions), Pint 1127, PHPStan 23, three lint gates.
+
+## 2026-08-10 — J1c merged (#124), and J1d built: the ⌘K palette
+
+J1c merged 6/6 with real steps. J1d is the command palette, and it is mostly an exercise in not
+re-answering questions the substrate already answered: `GET /search/suggest` reuses `SearchRequest` and
+`SearchService` unchanged, so every gate, predicate and absent-not-zero rule is inherited and the endpoint
+adds no authorization surface. What is new is the transport and the widget.
+
+Plain JSON, never an Inertia partial — a partial re-dispatches the CURRENT page's controller on every
+request, so each debounce tick on the builder would re-run a full builder render to fetch five rows. No
+`counts` key, because `hasMore` already comes free from the arms' limit+1 overfetch and a real COUNT(*)
+per arm is the wrong shape on a keystroke path; omitting it also keeps the count-disclosure question off
+the hot path entirely. `no-store, private`, because the payload is permission-filtered per user and a
+shared cache serving one member's results to another is the disclosure the arms exist to prevent arriving
+through the transport. Throttled, because it is the only search route a stuck client can loop.
+
+The `openModalCount()` lag is the design detail worth remembering. MdsModal pushes onto the inert stack
+inside `nextTick` but releases synchronously, so the count lags `open` on the way up only. A handler that
+checked the count first would see its own palette as "somebody else's dialog" and could never toggle it
+shut — reordering the two guards reddens exactly that case and nothing else, which is the mutation that
+proves the ordering is load-bearing. Checking our own ref first fixes it without an await, and the await
+would have been actively worse: an async handler surrenders preventDefault()'s synchronous window and the
+browser takes ⌘K for its address bar.
+
+The ARIA contract is asserted in Vitest rather than left to axe, because axe does not resolve an
+aria-activedescendant id — a dangling one, which is worse than an absent one since the screen reader then
+announces nothing, passes every scan. Options are div[role=option] inside div[role=listbox] (a button
+trips nested-interactive and breaks activedescendant; li fails aria-required-children), DOM focus never
+leaves the input, and the live region lives inside the dialog because inert silences everything outside an
+open modal. Storybook globs the design-system package only, so this app-tree component gets no story and
+no checkA11y scan at all; command-palette.spec.ts is its only automated a11y gate, and exceptions-log #9
+records that so a green design-system-a11y job is not misread as coverage.
+
+One repeat offence, caught earlier this time: I reached for `--mds-color-surface-active`, which does not
+exist. Checking every token against tokens.css BEFORE the first test run is J1b's --mds-space-9 lesson
+actually applied rather than merely written down. The ⌘K hint is absolutely positioned inside the existing
+form rather than added as a new flex child, so it cannot shift the nav's flex distribution — the geometry
+search-nav.spec.ts guards and assertClean is structurally blind to. DSR §3.2's locator note is amended in
+the same commit: an explicit role="combobox" overrides type="search"'s implicit searchbox, so the palette's
+locator differs from every other search field's — precisely the failure mode that note exists to prevent.
+
+Gates: Pest 3294/0 (12,781 assertions), Pint 1128, PHPStan 23, controller-gate, vue-tsc.
+
+## 2026-08-10 — J1d merged (#125). Four of five J1 sub-PRs done; J1e mapped but not started
+
+J1d merged 6/6 after one round of review fixes, and the fixes are the point of the entry. CI found a real
+accessibility bug that the unit tests structurally could not: below the 480px breakpoint `#topnav-search`
+is `display: none`, `.focus()` on a hidden element is a silent no-op, so MdsModal captured `<body>` and
+closing the palette stranded focus — the outcome DSR §4.5 forbids. Every Vitest case passed and always
+would, because happy-dom has no layout engine and cannot distinguish a hidden element from a visible one.
+The opener is now a list resolved by checkVisibility(), falling back to the compact icon link. Two of the
+gates were also lying: the "fires from inside a text field" case clicked the nav searchbox, which does not
+exist at 375px, and the Escape case asserted only "not BODY", which would pass on any arbitrary focus
+target. Both strengthened. The palette's live region was failing color-contrast intermittently and is now
+visually hidden — §3.4.1 requires it inside the dialog, not visible, and a flaky gate is worse than none.
+
+J1e was mapped with a six-agent fan-out and deliberately NOT started, because the map changed its size:
+three of the six lists (forms, webhooks, members) have no filter parameter, no filter bar and no
+empty_reason at all, so J1e is building filter surfaces from scratch on three pages plus adding `q` to
+three, plus the audit narrowing, plus the LibraryPicker migration. A half-applied pattern across six lists
+cannot merge, and starting it with insufficient room would have left exactly the state Standing Rule 1
+forbids. The whole recon — the per-list table with file:line, the one pattern, four hazards and the two
+non-negotiable security constraints — is written into the J1e block in Current Status so the next session
+starts from the map rather than redrawing it.
+
+Session totals across J1b, J1c and J1d: Pest 3199 -> 3294, Vitest 85 -> 87 files, PHPStan local 74 -> 23,
+and four PRs merged at 6/6 with real steps. Every one of them was caught out by something a green local
+suite could not see — unreachable indexes, a non-existent design token, a cross-tenant connection, and a
+focus target that does not exist at mobile.
+
+## 2026-08-11 — J1e built: `q` on the six row-lists, and the third encoding the recon missed
+
+The last J1 sub-PR. Search stopped being only a destination: every row-list narrows in place. Two new
+design-system components (`MdsFilterBar`, `MdsSearchField`), `q` on all six presenters **and on both
+exports**, `empty_reason` everywhere, `LibraryPicker` migrated onto `MdsTextInput`, 42 new Pest cases,
+15 new Vitest cases, 6 new e2e scans. The user took two decisions up front (Enter/blur rather than a
+debounce, because each of these is a full Inertia render; and normalise the submissions inbox's old-style
+filter bar rather than leave two surfaces).
+
+**The recon mapped six lists and missed a third encoding of the audit filter — the one that would have
+shipped a lie.** `AuditLogController` hands ONE `filters()` array to both `AuditLogPresenter::index()` and
+`AuditExporter::stream()`, and `AuditExporter::baseQuery()` was an independent copy of the same five
+`->when()` clauses, with `recordSelfReferentialExport()` a third site listing them. The page builds the
+download URL from the same `queryParams()` it navigates with, precisely so "I exported what I was looking
+at" is a compliance guarantee — so adding `q` to the presenter alone would have shown three rows on screen
+and streamed four thousand, and no existing test compared the two. Extracted to `AuditFilterQuery` FIRST,
+with `AuditLogPageTest` + `AuditExportTest` passing UNEDITED as the proof it moved nothing. Same defect one
+surface over, also closed: the inbox's Export button now carries `q`.
+
+**A test written to assert one row got two, and corrected a shipped docblock: an 8-character submission
+reference is not a lookup, it is a ~49-day window.** `SearchTerms::MIN_UUID_PREFIX` justified 8 on the
+grounds that anything shorter "would match a meaningful fraction of any tenant's submissions and stop being
+a lookup" — true of a random uuid, false of a **uuidv7**, whose first 12 hex characters are a 48-bit
+millisecond timestamp, so the first eight are its top 32 bits and identical across the window. Confirmed
+directly (`019fec56-91cb…` / `019fec56-91ce…`), not reasoned. **The constant was deliberately NOT raised:**
+the inbox and the palette both DISPLAY `substr($id, 0, 8)` and the arm's contract is that what is shown can
+be pasted back in, so raising it alone would refuse the very string the product prints; real randomness
+starts at hex 14, so a selective prefix means a different reference format — the "real short handle" already
+filed for J2, one change rather than two. A full uuid is an exact lookup and always was.
+
+**The adversarial review found that the clamp echo had no reader.** Every presenter carefully echoes
+`SearchTerms::raw()` so the box shows what actually ran; nothing on the client read it after mount, because
+`selected.q` is seeded once and `preserveState: true` keeps it. A 300-character paste would have sat in the
+box over results computed from 200, re-submitting on every Enter because the two never matched.
+`MdsSearchField` now adopts `applied` when it changes — guarded on "the user has not typed since they hit
+Enter", because this input is deliberately never disabled and overwriting someone mid-word is the worse bug.
+
+**Both security constraints held and are pinned structurally rather than by outcome.** Members filters in
+PHP over `$rows`, after the `pgsql_auth` hop: `MembersRosterFilterTest` listens on that connection and fails
+if the user's text appears in a binding, because an outcome-only test would pass equally against an
+implementation that leaked and filtered the leak out afterwards. Its fixture seeds identities COMMITTED on
+`pgsql_privileged`, and for this file that is load-bearing — `pgsql_auth` is a separate session that cannot
+see `RefreshDatabase`'s uncommitted rows, so a factory-created "belongs to no tenant" row would be invisible
+to a leaking query too and the sharpest assertion would prove nothing. Audit narrows to target + actor
+subqueries; the pinning case seeds a distinctive token into `new_values` and requires it unfindable *while*
+a target-title search still works, so the refusal cannot decay into a dead parameter. Both branches keep
+`@@`/`ILIKE` inside subqueries against `forms`/`users`, so every predicate on `audits` stays leakproof and
+therefore still index-promotable under RLS — J1b's finding applied forward rather than rediscovered.
+
+**Two components went into the package for a coverage reason, not a taxonomy one.** Storybook globs
+`packages/design-system/src/**` only, so an app-tree component gets no story and no `checkA11y` scan at all
+(exceptions-log #9) — and the contract these carry is the one axe structurally never sees: `heading-order`
+fails only when `PageHeader`'s h1 and `MdsEmptyState`'s h3 are adjacent, i.e. only when a list is empty,
+which every seeded e2e scan avoids. `responsive-axe.spec.ts` gains six filtered-to-zero scans that assert
+the empty state actually rendered before scanning it. The keyword input has no `disabled` prop at all.
+
+**J1a's Storybook trap was avoided rather than re-paid:** both new docblocks name elements in prose instead
+of angle brackets, with the reason recorded — the surviving `<button>`/`<select>`/`<label>` literals
+elsewhere in the package prove some tags are safe, which is exactly why "there is one right there" is not
+evidence.
+
+**The submissions inbox's old empty state was already wrong before `q` existed** — it inferred "did you
+filter?" on the client and could not see `countable()`, the server's own display default hiding drafts, so
+an inbox holding nothing but drafts told a reviewer that responses "appear here as forms are filled out".
+Now server-computed, with `countable()` deliberately not counted as a filter.
+
+**TESTING-GUIDE §17.1's per-list table was run as real queries against a freshly seeded demo corpus** rather
+than reasoned about — which is how it was found that the demo seeds no webhook endpoints and no submission
+remarks, so two steps say so instead of promising rows that are not there.
+
+Two new local-gate facts: **the full Pest suite now exhausts the container's 128M PHP limit** and dies with
+a fatal in `routes/tenant.php` partway through, which reads like a route bug and is not (`php -d
+memory_limit=2G vendor/bin/pest`); and **Vitest is 90 files on disk** while full runs reported 79 then 83
+under load — the standing drop, re-confirmed.
+
+**2026-08-11 — J1e MERGED (PR #126, `59971c3`, 6/6 CI green with real steps 11–20). J1 IS COMPLETE; J2 is next.**
+CI found the one thing no local gate could, and the FIRST answer was wrong: `builder-axe.spec.ts:104` (mobile,
+dark) failed, was re-run on the theory that it was that file's documented flake, and **failed again**. Abandoning
+the flake theory and reading the two runs' numbers is what solved it — they DISAGREED (`#7da9c4` on `#1d4260`,
+4.17, mostly-flipped; then `#1c4b72` on `#123350`, 1.42, dark-on-dark, across 309 lines), and two different
+INTERMEDIATE colours is a timing signature rather than a palette change. J1e touches no token, no `Button.vue`,
+no `Builder.vue`, and its only builder component is `v-else` on a tab that test never opens. Both causes were
+harness defects already solved elsewhere in the repo and never adopted in that file: (1) its LOCAL `scan()`
+never parked the pointer, while shared `assertClean()` has done `page.mouse.move(0, 0)` since it was written
+with the reason in its own words — and it is the spec that `.click()`s tabs and buttons then scans immediately,
+over a `.mds-button--secondary` that is `background-color: transparent` whose only opaque state is `:hover`;
+(2) `forceTheme()` collapsed transitions to 1ms and commented about intermediate reads but never waited —
+`setAttribute` invalidates style and the recalc and paint land on a later frame (two rAFs, since the first fires
+before the paint). **Fixing both took the E2E job from 464 passed / 1 failed / 1–3 flaky to 466 / 0 / 0 FLAKY**,
+which retires the `:159` "known flake, do not chase" entry and very likely I11a's empty-canvas one: they were
+this artifact all along. Merged gates: Pest 3336/0 (13,194 assertions), Vitest 90 files/1583, PHPStan 23 delta 0,
+Pint 1135, controller-gate 83, openapi.json byte-identical, e2e 466/0/0.
+
+## 2026-08-11 — J2 begins: the form hub. J2a merged (#127); J2b's server half committed.
+
+J2a (PR #127, `d80730d`, 6/6 with real steps) shipped the primitives: `MdsTabNav`, `MdsBreadcrumb`, and
+optional links on `MdsStatTile` + `BarDatum`. Package-only, so all 17 existing tile call sites and 12 charts
+render byte-identical output. **`MdsTabNav` is deliberately NOT the ARIA tablist** DSR §3.4 also specifies —
+its items are links that load a page, and a roving tabindex would remove every non-active destination from
+the tab sequence; no gate catches that, because a tablist of links is valid ARIA, so `TabNav.test.ts` is the
+only place in the repo asserting the absence of `tablist`/`role=tab`/`aria-selected`/`tabindex`.
+
+Its adversarial review found **a real WCAG 1.4.11 failure no gate we run can see**: the underline shipped as
+`action-primary-bg` — which is what §3.4's `--mds-primary-600` maps to, so it read as following the spec — but
+`-bg` is a FILL and `BRAND_RAMP_PAIRINGS` pairs it solely with `on_primary`, giving **2.12:1 in dark** (1.95:1
+teal) where a non-text component owes 3:1. `-fg` is guaranteed against surface AND canvas in both themes for
+every tenant brand. axe does not check border contrast. Two more: `isInteractive` and its template `v-if`
+tested different predicates, so `href: ''` stripped `role="img"` and its label and rendered zero links; and an
+unguarded `:href` bound `href=""` onto `MdsStatTile`'s div. And **un-pruning the chart's plot made it announce
+the dataset twice** — the sr-only table is the plot's alternative and now comes off when the plot is readable.
+Four claims in J2a's own docs were false and were corrected by counting (the `#breadcrumbs` slot had two
+consumers, not zero; 11 of 17 tables ship row actions, not all; 17 StatTile call sites, not eleven; the
+exceptions-log amendment contradicted itself within two sentences), and one of its tests was vacuous.
+`MdsDataTable` did NOT get `rowHref` — `#cell-<key>` already does the job and 11 tables would nest
+interactive content — recorded in DSR §3.3 as a decision with a real reconsideration trigger.
+
+J2b's server half (`f250519`, on `j2b-form-hub`, not pushed): `GET /forms/{form}` now exists, where a GET
+previously answered **405** — the reason nothing in the product could link to a form. Gated on the new
+`FormPolicy::viewOverview` = `dashboard.form.view AND (dashboard.org.view OR a grant)`, the user's decision
+and byte-for-byte the rule `Submission::scopeVisibleTo()` already applies, so it coins no permission key.
+`FormAnalyticsGateTest` passes unedited as proof the widening did not leak. `FormSharePresenter` was extracted
+from `BuilderPresenter` FIRST, with 40 builder/share cases passing unedited. **Its second mutation SURVIVED**
+— deleting the `dashboard.form.view` conjunct left all twelve cases green while the docblock already claimed
+the file mutated it out; no shipped role can distinguish the two, the conjunct stays because `resource_grants`
+is a capacity store rather than a permission store, and a synthetic member now pins it. Gates: Pest 332 in
+tests/Feature/Forms, Pint clean, controller-gate passed, **PHPStan 20 — DOWN from the 23 baseline**, because
+three `@property` timestamp annotations on `Form` cleared the new phantom plus three pre-existing ones.
+
+## 2026-08-11 — J2b finished: the form hub's Vue half, and the dead link it nearly shipped
+
+`GET /forms/{form}` had a route, a gate and a presenter but **no page** — `FormHubController` rendered
+`forms/Show`, which did not exist on disk. This session built it, gave it inbound links, and paid J2b's doc
+debt (the server half committed zero docs; `viewOverview` appeared nowhere in `docs/`).
+
+**The finding worth keeping: the strip's own second tab was a 404.** `FormHubPresenter::tabs()` emitted
+`/forms/{form}/submissions`, which is **J2c's route and does not exist yet** — so the page opened to remove
+dead ends would have shipped one in its primary navigation. It now points at `/submissions?form_id={id}`,
+verified safe by reading the code rather than hoping: the inbox takes `form_id` as a plain query string with
+no `Rule::in` and composes it as a bare `where`, so a form with zero responses filters to an empty list
+instead of 422-ing against a dropdown derived from forms-that-have-submissions. The durable fix is
+`FormTabSetReachabilityTest` — a dataset issuing a REAL request per tab href, one request per case because
+the tenant GUC is torn down on the way out. Mutating the href back reddens exactly two of its cases.
+
+**`MdsTabNav` and `MdsBreadcrumb` gained `linkComponent` (user decision).** Both rendered bare anchors, so
+every tab and crumb click was a full document load that tore down the persistent `AppLayout`. The package
+imports zero Inertia by design, so the element is injected instead; the default stays `'a'`, and both J2a
+specs plus every story pass **unedited**. Two things only the tests show: the injected component must receive
+`href` as a real prop (a fallthrough attribute renders a working-looking anchor that never becomes a client
+visit), and the call site must `markRaw` it. In a template the prop is `:ariaLabel` — `vue-tsc` treats the
+kebab spelling as an HTML attribute and then reports the required prop as missing.
+
+**Two more user decisions:** the builder takes the breadcrumb ONLY, not the strip (a three-pane workspace on
+a `height:100%` grid cannot spare a second header row), and `forms/Index.vue`'s row title was pulled forward
+from J2d — it linked to the builder and only for a role that could edit, so a non-editor saw inert text and
+the hub would otherwise have had no inbound link at all.
+
+**Three things the page refuses to do, each recorded where someone would add it.** The Last-response tile
+carries no href, because `max(submitted_at)` and `orderByDesc('id')` can name different rows. A recent row
+links only when the Responses tab is present — provable, since `viewAny ∧ (row ∈ visibleTo) ⟹ view(row)`,
+and unobservable in production because all five roles hold `submissions.view`, so it is labelled a
+fail-closed guard exactly like the `dashboard.form.view` conjunct. And a form's sub-page always takes THREE
+crumbs: `MdsBreadcrumb` renders the last as text, so a two-crumb trail prints the hub's name with no link on
+it — the dead end intact, with a separator.
+
+**Two type/markup traps paid once.** A `MdsDataTable` row shape must be a `type` alias, never an interface —
+TypeScript grants the implicit index signature only to the former, and as interfaces the failure cascades
+into every `#cell-*` slot binding `Record<string, unknown>`. And the panel headings are unconditional `h2`s:
+`heading-order` fails only when a panel is EMPTY, which for a brand-new form is both at once — a state no
+seeded e2e fixture can reach, so it is pinned in Vitest.
+
+Gates: full Pest 3049/0 (12,260 assertions, 3051 collected so nothing was skipped); Forms + Analytics 453/0
+on their own with `FormAnalyticsGateTest` and `BuilderRoutesTest` **unedited**; Vitest 93 files / 1,645
+tests; PHPStan 20 (delta 0); Pint clean; controller-gate 43, migration-lint 63, job-payload-lint 28; vue-tsc
+clean; build clean; `openapi.json` byte-identical. Four mutations run, each reddening exactly one case.
+
+**And a gate-measurement finding worth more than the numbers: the recorded Pest baselines are not
+reproducible by the command the tracker documents, and the gap is not J2's.** A full local
+`vendor/bin/pest` gives 3,049 of 3,051 collected against J1e's recorded 3,336. Three checks say no test was
+lost: collected equals executed; `tests/Unit` + `tests/Feature` sum exactly to the collected total and no
+`*Test.php` lives outside those two registered suites; and static `it(`/`test(` counts rise monotonically
+across `59971c3` → `d80730d` → `f250519` → HEAD as 2,607 → 2,607 → 2,620 → 2,638, with the +13 landing
+exactly on `FormHubGateTest` and the +18 on this session's two files. CI runs `php artisan test` while the
+tracker documents `vendor/bin/pest`, which is the likeliest divergence. Report the DELTA, not the absolute —
+the PHPStan lesson applied one gate over.
+
+## 2026-08-11 — JR registered: the Vivid Product re-skin, chosen from rendered mockups and deliberately not started
+
+**No code was written and no repo file changed except this tracker pair.** The session ran alongside
+another agent's live J2c work (25 staged files); every investigation agent was held strictly read-only
+and the two tracker edits were surgical inserts rather than rewrites, for exactly that reason.
+
+The user judged the UI **"too plain"** and asked for options. The diagnosis was measured rather than
+asserted: `packages/design-system/tokens/*.json` shows thirty individually-safe choices compounding —
+system fonts only, radii stopping at 12px, `shadow-1` at **5% alpha**, primary `#1C4B72` with brass and
+teal barely used, a flat 36/30/24/20/16 type scale. Four directions were then rendered in full across
+Login / Dashboard / Forms list / Form builder, each with WCAG ratios computed from its own hex values so
+no direction could win on looks and die at the contrast gate. The user chose **01 · Vivid Product**.
+Every palette was derived from colours the app already owns, so none of the four was a rebrand and all
+survive H23a's tenant ramp.
+
+A follow-up question — *"there is white space on the left and right of the list pages"* and *"is this
+mobile responsive?"* — was answered by a 12-agent workflow (3 recon → 4 independent proposals → 4
+adversarial verifiers → judge; the judge died mid-stream and the call was made from the material).
+**Both answers changed on contact with the code.** The gutter is arithmetic, not taste: `max-width: 1200px`
+beside a 240px sidebar gives 0 gutter at 1440px — Playwright's desktop viewport — and 240px each side at
+1920px, which is why nothing ever caught it. And the app is **considerably more responsive than the
+session's first reply claimed** (drawer, hamburger, full-bleed modals, table card-collapse, chart and
+toast relayout all shipped); the real gap is the **481–1024px band**, where `MdsDataTable` does nothing
+and every dense table becomes a sideways scroller — a defect the component's own source already names.
+That, not the gutter, is the strongest argument for JR3's card grid.
+
+Three findings worth more than the feature they came from. **A `min-width: 1025px` rule fires its widest
+layout at the narrowest content box**, because the sidebar steps 240 → 64px at that boundary (1025px box
+= 721px; 1024px box = 896px) — enrichment must key off the container. **Renaming a form has exactly one
+call site in the entire client**, a row action on the page being redesigned, so a routine tidy of those
+actions would delete the capability product-wide. And **the forms list already receives a `description`
+for every row and renders it nowhere** — the `feedback_reports` "nothing reads it" smell, found a third time.
+
+JR is sequenced **after J2 and before J3**, correcting this session's own first answer of "before J4":
+J3 builds new auth UI, so a re-skin landing after it would rebuild those pages twice. Full spec with every
+measurement and file:line citation is in plan `what-is-the-status-modular-torvalds.md`; the two published
+artifacts are the visual spec and are linked from the JR block in Current Status.
+
+## 2026-08-11 — J2b merged at #128, and J2c: one form's responses
+
+**J2b sat complete-but-unpushed, so no CI job had ever seen it.** Opening the PR was the whole point: five
+jobs went green (Pest 3370/0) and E2E returned **81 failures across four spec files**, every one a
+`waitForURL` timeout with the cause printed in the log — `navigated to "/forms/{uuid}"` while waiting for the
+builder glob. Not a flake and not a regression: J2b repointed `forms/Index.vue`'s row title at the hub, and
+`/forms` has **no builder row-action at all** (its `edit` icon is *Rename form*, a modal), so the title link
+was the only way in and the way in is now the hub's Builder tab. The navigation was spelled **six times** —
+J1e's "the second caller is the one that lies" from the other direction, since the copies did not disagree
+with each other, they all agreed with a page that had moved. One shared helper, net −10 lines. A docblock
+trap paid en route: the builder glob's two asterisks and slash CLOSE a block comment, and the file then fails
+to parse with "Missing semicolon" pointing at an apostrophe four lines below.
+
+**J2c built `GET /forms/{form}/submissions`.** The hub's Responses tile followed with no client change,
+because it reads its href back off the shared tab set — J2b's stated design paying off in one line. One
+component serves both routes (`form` prop present or absent) and one presenter method serves both queries
+(optional `?Form $boundForm`), so every existing caller and test passed unedited; a second page would have
+spelled the filter bar, the URL builder, the export href and the empty-state branching twice. The namespace
+already held `create`, `store`, `draft` and a per-form `export`, so a GET there answered **405, not 404**.
+
+**The dropdown could not name a form with no responses** — derived from submissions, it could answer every
+question except the one it is most often asked. Now `Form::scopeReadableBy()`, byte-for-byte
+`FormPolicy::viewOverview()`, coining no key. Not `scopeVisibleTo()`: that is the authoring scope and returns
+the empty set for a Reviewer and a Viewer, the two roles that live in this inbox. Nothing in the repository
+had ever asserted `filters.forms`.
+
+**The adversarial review returned twelve substantiated findings and the first is J2c shipping the defect this
+row exists to remove.** Its own new breadcrumbs opened with a hard `href: '/forms'` — a route gated on
+`viewAny,Form`, which a Reviewer and a Viewer hold none of, on four pages both can reach. A tenant 403 is a
+bare Blade page, so it is a dead end with no way back, and it is invisible to every gate we run because
+`MdsBreadcrumb` renders an href-less crumb as text. The strip already had this property and the trail did
+not: `FormTabSetReachabilityTest` issues a real request per tab href; breadcrumbs have no equivalent, which
+J2d should build. Two more: the row→form link could 403 (the visibility scope's respondent arm has no form
+counterpart) or 404 (a soft-deleted form renders "—", which shipped as a live hyperlink), and
+`scopeReadableBy`'s docblock argued away a conjunct with a claim — "the route carries the policy" — that is
+false for the scope's only path. Also four tests that could not fail, four false docblock claims, and
+`encode.test.ts` still dropping the `#breadcrumbs` slot: the identical omission fixed in `show.test.ts` one
+file earlier.
+
+**Two defects were caught by predicting a mutation rather than running one.** `hasAnyFilter()`'s `form_id`
+skip was dead code, because `forForm()` never puts `form_id` in `$filters` — so `empty_reason` depended on a
+controller continuing to omit a key rather than on a rule stated in the presenter. And the export-after-clear
+case called `wrapper.vm.clearFilters?.()`, which no-ops under `<script setup>` and passed against both
+implementations.
+
+**⛔ AND THE FINDING THAT OUTLIVES THE INCREMENT: THE LOCAL FULL-SUITE PEST RUN SILENTLY DROPS WHOLE TEST
+FILES.** It surfaced only because the delta would not reconcile — 23 cases added, +16 collected. **330
+`*Test.php` files exist on disk; a full `--list-tests` collects 285.** The 45 missing are overwhelmingly
+`tests/Feature/Forms/` — **40 of its 44 classes**, including both of J2c's new files. Run that directory
+alone and all 44 collect (365 tests); run it inside `tests/Feature` and 4 survive. Not memory (identical at
+2G and 6G), not a stale cache (none exists), and not stable across trees. **This is the ~321-test local-vs-CI
+gap J2b documented as unexplained**, and J2b's proof checked the wrong invariant: "collected equals executed"
+shows only that the runner ran what it collected, and the companion `Unit + Feature = total` check was
+self-referential. The correct local check is the FILE COUNT, exactly as for Vitest. Until the root cause is
+closed, a local full-suite Pest absolute *or delta* is not reportable; CI is the authority and an increment's
+own tests are verified by running their files directly.
+
+**J2c closed the same day at PR #129 (`199ba16`), 6/6 with real steps — but its first CI run was red, and
+the defect was a lesson written down twenty lines from where it was broken.** Six deterministic E2E
+failures, every `Submission detail` scan, because the settle locator waited on `← Back to submissions` —
+the hand-rolled link J2c had just replaced with `MdsBreadcrumb`. J2b made the identical substitution on the
+analytics page, updated its locator in the same commit, and left a comment in that very file explaining it.
+The control costs one grep: before deleting a string from a page, grep `tests/e2e/` for it. The replacement
+waits on the trail's LANDMARK rather than a crumb's text, so it survives changes to the trail's depth.
+
+CI reconciles the increment exactly: **Pest 3397/0** (13,656 assertions), **+27** on J2b's 3370, matching the
+additions one for one — 10 gate + 9 page + 6 inbox + 2 reachability. **E2E 478 passed / 0 failed / 2 skipped
+and 0 FLAKY**, the first zero-flaky run since J1e, which is `settlePaint()` working: J2b's run carried one,
+and its cause was measured (an intermediate foreground over a settled background, on the button the test had
+just clicked) rather than shrugged at.
+
+---
+
+## 2026-08-11 — J2d, the dead-end sweep, and the two gate defects the breadcrumb was hiding
+
+Every surface that NAMES a form now reaches it, and the trail finally gained the property the tab strip has
+had since J2b. `rbac §9` had filed this by name — "breadcrumbs have no equivalent, and nothing structural yet
+enforces one" — and closing it is what turned a link sweep into a defect hunt.
+
+**`formsCrumb()` is deleted; trails are server-built by `App\Support\Navigation\CrumbTrail`.** Seven
+controllers emit a `crumbs` prop and six client `computed`s are gone. The argument is not tidiness: an href
+inside a client `computed` lives somewhere **no Pest test can reach**, which is precisely how J2c shipped a
+`/forms` crumb that 403s for a Reviewer and a Viewer. `CrumbTrailReachabilityTest` reads the trail back off
+the real Inertia response and navigates every href, so nothing is transcribed and a test cannot quietly agree
+with a page that has moved. A refused CRUMB keeps its label and loses only its href — the deliberate opposite
+of a refused TAB, because dropping a crumb renumbers the trail and makes one page render a different DEPTH
+per role.
+
+**One live defect, one guard, and the adversarial review is what separated them.** `submissions/Show.vue` is
+gated on `can:view,submission` ALONE, and `SubmissionPolicy::view()` admits a **respondent** — an arm
+`viewOverview()` has no counterpart for — so a keyer whose grant was revoked (a live route) opened the page
+and got a 403 from both middle crumbs. That one is real and is pinned by a request asserting the 403. Its
+soft-deleted-form twin was written up as equally live and **is not**: `Form` uses `SoftDeletes` but no delete
+route exists and nothing in `app/` calls `$form->delete()`, while `FormService::archive()` only sets `status`
+and `archived_at` — an archived form's hub resolves **200** and stays linked. Four docblocks had inherited
+that overclaim and were corrected to say "fail-closed guard" instead. This is the same species of error J2b's
+surviving mutation forced out of `FormPolicy`, caught one increment later by review rather than by a gate.
+
+**`FormHubLink` is the only place `/forms/{id}` is spelled.** `pathsFor()` returns only ids
+`Form::scopeReadableBy()` vouches for — byte-for-byte `viewOverview()` **and** carrying no `withTrashed()` —
+so it answers both questions the route asks: will binding resolve it, and will the gate admit this reader.
+Naming a form and reaching it are different questions, which is why the audit ledger and both charts keep
+their `withTrashed()` label query beside it rather than collapsing the two. Its own test found a **crash
+before any consumer existed**: `forms.id` is a Postgres `uuid` column, so a `whereIn` carrying a chart bucket
+key raises SQLSTATE 22P02 — a 500, which SQLite would have coerced to a harmless no-match.
+
+**`/notifications` was a live palette defect that no status code could flag.** `DestinationCatalog` offered
+it as a page; it is `NotificationController::index(): JsonResponse`, and the route block says so outright.
+Both consumers hand catalog URLs to the Inertia router, so choosing it hard-navigated the user onto raw JSON
+— a **200 with the wrong content type**, which is exactly why the only test covering that file
+(`toStartWith('/')`) never saw it. Deleted, keywords folded into `/settings`, and
+`DestinationReachabilityTest` now drives all twelve rows requiring an **Inertia** response, with gating driven
+from the CATALOG rather than the routes.
+
+**`FormSearchArm` widened to `readableBy` (user decision), and the widening is what made its URL change
+provable.** A Reviewer and a Viewer had been getting zero form results while J2b had opened the hub to all
+five roles. Repointing the URL off `/forms/{id}/builder` could not have been proven by navigation before —
+every role the arm served could open the builder too — but those two roles cannot, so
+`SearchResultReachabilityTest` navigating what they are handed catches the old href outright. Three
+`SearchVisibilityTest` cases were inverted, each recording what it used to assert and why.
+
+**The review returned 15 findings and the most user-visible was the dullest.** Five new links shipped as
+unstyled raw anchors: there is no global `a` reset in this app, so they rendered browser-default blue on four
+pages — a one-design-system violation that every green gate was blind to. It also caught three docblocks
+whose justification was **invented rather than measured** (`urlencode` and `rawurlencode` differ only on a
+space, which cannot appear in an address; the bucket-key crash no live caller can trigger; an archived-row
+payoff that archiving does not produce), a **vacuous** member-narrowing assertion against a one-member
+roster, a shared Vitest mock mutated without `try/finally`, and a `ConnectorEventContextResolver` that had
+changed a live Slack destination with **no test at all**. It now has four.
+
+**Gates: Pest 1346/1346 across the nine affected directories, with `tests/Feature/Forms`, `Submissions` and
+`Analytics` passing UNEDITED (855/855) as the proof the trail migration moved nothing; Vitest 94 FILES /
+1669; PHPStan 20 = delta 0; Pint clean 1,151; vue-tsc clean; `openapi.json` BYTE-IDENTICAL by fresh export +
+diff; controller-gate 43, migration-lint 63, job-payload-lint 28; Playwright compile-check 480.** Five
+mutations were predicted before being run and all five behaved as predicted — two live, two reddening only
+their synthetic case and shipping labelled as fail-closed guards.
+
+**`committedTenantIdentity()` was promoted into `tests/Pest.php` on its fourth copy.** Any test that renders
+`/members` needs it: `listMembers()` resolves identities on `pgsql_auth`, a separate session that cannot see
+`RefreshDatabase`'s uncommitted rows, and indexes with `$users[$m->user_id]` — so a `User::factory()` member
+500s the page on an undefined array key. It reads exactly like a product bug and is a fixture one.
+
+**CI then found two things no local gate could, and one of them defeats the control the last two increments
+installed.** The first was mine outright: `ConnectorDeepLinkTest` asserted a full absolute URL and passed
+locally, then failed all three dataset rows in CI, because the scheme is config-driven and defaults to
+`https` — `http` only in the dev container. Assert the PATH; a server-generated absolute URL is not a
+literal.
+
+The second is worth more. `analytics-axe.spec.ts` requires every bar chart's sr-only table to tabulate every
+plotted category, and making the form axis linkable **by design** drops that table: one linked datum takes
+the plot out of `role="img"`, which un-prunes every label and value into the accessibility tree and turns the
+table into a duplicate that announces the dataset twice. I ran the J2b/J2c grep over `tests/e2e/` for deleted
+strings and it correctly found nothing — because this is not a locator matching a label, it is a
+**behavioural contract asserted structurally**. The standing lesson needs its complement: grep for the
+strings you delete, and reason about the contracts you change. The Vitest twin of that very assertion was
+predicted and updated in the same increment; only a gate that cannot run locally caught its e2e counterpart.
+
+The fix **branches rather than relaxes**, and the distinction is the whole point: "a table OR some links"
+would have retired a §D12 gate to make a change pass. The interactive path now proves more than the old
+assertion did — links present, sr-only table deliberately absent, `.mds-bar__summary` present, every plotted
+category named in the tree, and the page's unconditional paired `MdsDataTable` still carrying the full list.
+
+**Merged as PR #130 (`30f8778`), 6/6 with real steps (11–20 each, so genuinely executed rather than an
+outage). CI reconciles: Pest 3475 passed / 0 failed (13,973 assertions), +78 on J2c's 3397; E2E 478 passed /
+0 failed / 0 FLAKY, holding the zero-flaky run J2c's `settlePaint()` first achieved.**
+
+---
+
+## 2026-08-12 — J2e: the short submission handle, and the local-gate diagnosis that closes a root cause
+
+`submissions.reference` — eight Crockford Base32 characters (no I/L/O/U), stored uppercase and ungrouped,
+displayed `7K4M-2QXB`, unique per tenant, server-issued at row creation by a `Submission::booted()` hook.
+Built on branch `j2e-submission-reference`; closes the J2 row and hands off to JR1.
+
+**The finding worth more than the feature: `RecursiveDirectoryIterator` silently truncates on the container's
+bind mount.** Same PHP code, same files — `database/migrations` 91 on the host and **64** in the container,
+`app/Http/Controllers` 84 vs **43**, `tests` 347 vs **307**. `find` and `glob` are unaffected. PHPUnit/Pest
+discovers test files through that iterator, so the "collection silently drops ~45 of 330 test FILES" mystery
+J2c filed as OPEN is a Docker-for-Windows `readdir` truncation rather than anything about Pest — and the
+"controller-gate 43, migration-lint 63" counts this tracker has carried for months were recording a scan of
+roughly half the tree. **Run the three lint gates on the HOST.**
+
+**The collision design was wrong on the first pass, and the adversarial review is what caught it.** A
+pre-flight probe (the `FormSlug::suggest()` shape) cannot work here: both writers create INSIDE
+`DB::transaction`, so the probe is a TOCTOU read, and once the index raises 23505 the transaction is in ERROR
+state — re-minting in place is impossible (25P02). Its attempts are probes, not inserts. The recovery moved
+to the transaction boundary, where re-running the closure builds a fresh model and the hook mints again; the
+23505 arms are ORDERED rather than told apart by constraint name, so `SavedReportViewService`'s "catch the
+CODE, never the message" rule survives. The backfill then hit the identical wall in its own effect test —
+correct in production autocommit, broken under any caller holding a transaction — and its chunk UPDATE is now
+wrapped in a nested transaction, i.e. a SAVEPOINT.
+
+**Two ordering decisions that read as details and are not.** The unique index is created BEFORE the backfill
+(Postgres treats NULLs as distinct, so un-backfilled rows coexist under it and the backfill writes THROUGH
+the constraint — the alternative, a PHP `seen` set, is a second authority testable only probabilistically).
+And it carries no `deleted_at IS NULL` arm: a soft-deleted submission keeps its code reserved forever,
+because freeing it would let a written-down code resolve later to a DIFFERENT submission. Verified on the
+real seeded database — 521 pre-existing rows, all backfilled, all distinct, clean `up → down → up`.
+
+**The guest runtime had a live defect nobody had filed.** `deriveReference()` printed `MER-XXXXXX` on the
+confirmation screen and in the offline outbox, derived from a uuid and stored NOWHERE — so a respondent
+quoting it to the tenant got nothing back. One reference now, server-issued; the offline code is relabelled a
+**queue tag** with copy saying a reference is issued once the response is sent. `outbox-status.ts`'s rule
+forbidding a code change was right under its premise, and the premise is gone.
+
+**Four tests went red by design and each had predicted it** — `ListKeywordFilterTest` ("this case goes red
+the day either half changes"), `SearchSubmissionArmTest`, `SearchTermsTest`, and one no grep could have
+found: `public-runtime-offline.spec.ts` asserted the code does NOT change across sync, a behavioural contract
+rather than a label, which is process rule 7b recurring exactly as J2d wrote it. **And the increment's own
+disclosure lint was vacuous on its first run** — it matched `where(` case-sensitively and therefore skipped
+`orWhere(`, the single call site it exists to police. A failing expectation is what exposed it.
+
+**Local gates: Pest 540/0 (Submissions + Connectors), 165/0 (Unit + Feature Search), 436/0 at the model-hook
+checkpoint; PHPStan 20 = delta 0; Pint clean 1,162; vue-tsc clean; `openapi.json` byte-identical (it does not
+move — Scramble types the sync `submission` field as a bare string); controller-gate 84, migration-lint 91,
+job-payload-lint 28 on the host; Playwright compile-check 480 in 14 files.**
+
+**Merged as PR #131 (`515411d`), 6/6 with real steps. CI reconciles: Pest 3537 passed / 0 failed (15,085
+assertions), +62 on J2d's 3475; Vitest 95 FILES all green; E2E 478 passed; Storybook axe 207; Contract tests
+byte-identical; Static analysis green with all three lint gates at their FULL counts.**
+
+It took three CI runs, and not one of the failures was in shipped code — which is itself the clearest possible
+demonstration of the iterator finding. `AnalyticsIndexShapeTest` (an index-inventory guard doing its job, 8→9)
+lives in a directory the truncating iterator drops, so no local Pest run could collect it; and the new
+`/search` Vitest spec had its first run anywhere in CI, because local Vitest hung at teardown twice on this
+host. The last of its three failures is the one worth keeping: it asserted the refused-scope empty state did
+not contain the word "permission" and failed, because the page carries that word unconditionally in a standing
+scope note. The assertion was testing the copy; it now asserts the two empty states render IDENTICALLY, which
+is the actual disclosure contract.
+
+## 2026-08-12 — JR1: the Vivid token diff, and the grounds nobody had pinned
+
+Built the first row of the approved Vivid Product re-skin on `jr1-vivid-tokens`. The user confirmed the
+FULL palette rather than the accent alone, and reading the published artifact before planning is what made
+that scope visible: `.mk--vivid` is a complete token contract — cool neutrals, a re-hued success and
+warning, 20px cards, brand-tinted shadows, a 38px/750 page title — not a saturated primary. Every number
+was computed rather than asserted: 50+ pairings across both themes, all passing.
+
+Three findings outrank the feature. **First, `#0E6FE8` cannot be `action-primary-fg`** — 4.71:1 on the
+white surface but 4.27:1 on the canvas, and until now `fg` and `bg` were the same token. The fill is the
+direction's signature and stays; the text role took `primary-700`. **Second, the neutral ramp dragged the
+tenant-branding engine with it.** Four of `BrandRampGenerator`'s six measurement grounds are copies of
+neutral primitives, and nothing tied the copy to the source — so a re-skin would have left every branded
+tenant with a stored `measurements` array certifying contrast against a canvas the product no longer
+paints, with no test failing and no screenshot looking wrong. That is `BrandPalette::PRODUCT`'s failure
+shape, found a second time in the same stack, which is the argument for guarding the class rather than the
+instance: `BrandRampGroundParityTest` now pins all six literals, `VERSION` went to 2, and a migration
+re-derives every stored ramp from the tenant's saved input colour — the input being the only thing that
+survives a version bump, since the tokens are the output of a lightness search with no v1→v2 mapping.
+
+**Third, ADR-0014's anchor claim was halved and the reason is the more useful artefact.** "Fed Teal's hue
+the engine re-derives `teal-600` and `teal-50` byte-identically" survived only for `teal-600`, because
+`bg` is measured against `#FFFFFF` — a ground that cannot move — while `tint` is measured against light
+ink, which moved. `--mds-accent-teal-50` was deliberately NOT updated to match the engine: doing so would
+leave the assertion comparing the engine against a number copied from the engine, destroying exactly the
+independence the claim asserts. A circular assertion that reads like corroboration is worse than an honest
+divergence. Only the half anchored to an immovable ground was ever robust.
+
+Two pre-existing doc defects surfaced. DSR §2.2's semantic table gave the dark `action-primary-*` column as
+`primary-400/300/200` — the lightened-accent shape H21d1 had already found to be a real WCAG failure and
+fixed in the CSS alone, so the reference described the bug as the design for four increments and nothing
+failed, because no test reads that table. And JR1 moved the evidence under TabNav's `-bg`-is-a-failure rule
+without moving its conclusion: the same pairing went from 2.12:1 to 3.42:1 and now passes for the default
+accent while teal still fails at 2.41 — recorded explicitly, because a fill that happens to clear 3:1 today
+is a coincidence the next re-skin can revoke in either direction.
+
+Four of my own tests went red. The fixture regeneration read the raw `measurements` property instead of
+`toArray()`, which rounds to the two decimals §4.1 prints — failing all twelve TypeScript parity vectors
+while every token still matched, which reads as total disagreement between engines that in fact agree
+completely. Two more were jsonb round-trip artefacts (Postgres does not preserve key order; `json_encode`
+turns the float floor 3.0 into an int). The fourth **could not fail**: it stored a ramp built by the current
+engine and merely relabelled it `engine_version: 1`, so the "old" measurements were already the new ones.
+Genuine v1 output no longer exists in the tree, so the test now corrupts the stored ratios to a value the
+engine cannot emit and asserts they come back correct.
+
+Two extrapolations turned out wrong after the PR opened, and neither was visible in a diff of hexes. The
+artifact specifies only the control (12px) and card (20px) radii, so stepping the whole scale up from those
+was an inference — and `radius-sm` at 8px renders the 18px checkbox as a near-circle (a circle there is 9px),
+which is the radio's shape, and §3.2 makes shape the non-colour signifier separating them. And the derived
+dark `neutral-0` landed 0.00016 luminance ABOVE `neutral-50`, inverting the ramp's one structural promise;
+`#0d1322` beside `#0f131c` reads as obviously darker and is not. In dark that token is the input background,
+so every input would have sat a fraction lighter than the canvas rather than sunken into it — a depth cue
+pointing the wrong way, at a magnitude no screenshot review would flag. Both fixed, and the second is now a
+test: `theme-overrides.test.ts` asserts both neutral ramps are monotonic in luminance, in both directions,
+with the steps read from `primitive.json` and an anti-vacuity case. The ramp is the substrate every semantic
+alias resolves through, so an inversion anywhere in it surfaces later as an arbitrary component looking
+subtly wrong — ordering is the cheapest invariant to assert and the most expensive to debug from the symptom.
+
+Deliberately not done: danger and brass (the mockup specifies neither), the per-form chip scale (deferred to
+JR3, where its consumer lives), and the card radius wiring (JR2 — cards sit at 12px in between, by design).
+Success is now a teal a few degrees from the personalization accent, which is the accent/semantic collision
+§2.2 forbids arriving from the direction the rule did not anticipate; shipped as approved and logged as
+exceptions-log #10 rather than resolved inside a token diff.
+
+## 2026-08-12 — JR2: the six components, and the increment CI cannot see
+
+Second row of the approved Vivid re-skin. `Card`, `StatTile` and the `Modal` panel take
+`--mds-radius-xl` — the token JR1 shipped with zero consumers so this would be a component edit
+rather than a redefinition of `md`, which every control also reads. `Button` gained the accent glow
+it never had (it read no shadow token at any state and was the flattest thing in the six), `Badge`
+gained an opt-in status dot wired at the product's only two scannable status columns, `EmptyState`
+gained a tinted medallion, and `DataTable` gained an uppercase tracked header, 61px rows and tabular
+end-cells. Three tokens added: `--mds-tracking-wide`, `--mds-shadow-accent`, `--mds-shadow-danger`.
+
+The finding that shaped the whole increment is that **no gate can see it**. Nothing in the repo
+asserts a radius, a shadow, a padding or a row height, and there is no visual-regression harness at
+all — so the six jobs stay green whatever the corners do, and the only automated signal is an axe
+contrast failure on a job that cannot run on this host. Verification was screenshots of the running
+seeded app, light and dark, at 1440 and 375.
+
+Which is how the one real defect surfaced: with the header uppercased, `Status` and `Version`
+obeyed and `Form` and `Updated` did not, because those two are the sortable columns and their text
+lives inside a `<button>`. `font: inherit` resets the `font-*` longhands only; the UA stylesheet
+separately sets `text-transform: none` and `letter-spacing: normal` on form controls. One header row,
+two type treatments — invisible to happy-dom, to axe, and to a diff.
+
+Two claims in the pre-flight survey were wrong and were caught by opening the files rather than
+trusting the line references: `Skeleton` has no card variant (its `--block` has zero consumers), and
+`ConflictDialog` is an `MdsModal` that inherited the new panel for free — the radius at the cited
+line is a nested column that correctly stays at 12px.
+
+The real scope was never the six components but the lookalikes: at the branch point `resources/` held
+84 `--mds-radius-md` declarations, 59 of them in the 30 files that also paint a card surface. (The
+survey reported that as "84 across 26 files" and it went into three documents before anyone ran the
+grep — two measurements welded together, and the file count is 30. Corrected everywhere; a number
+that cannot be reproduced by grep argues nothing.) Answered with a three-tier rule in DSR §2.6
+(control 12 / compact surface 16 / page-level card or dialog 20) rather than a list, applied to
+`DomainCard`, the auth card, the guest confirmation card and `Toast`.
+
+The self-review then caught the badge dot shipping inconsistently, which is worse than not shipping
+it at all. The first pass wired it at two call sites and the docs called those "the product's only
+scannable status columns"; a grep for `statusVariant(` found thirteen `#cell-status` templates, so the
+same pill would have been dotted on the forms list and undotted on the form hub two clicks away. The
+fix was not to add eleven more but to find the rule that decides all of them — every `#cell-status`
+badge carries `dot`, nothing else does, 13/13 — because an invariant a grep can check outlives a
+sentence about two columns.
+
+Deliberate divergences, both measured: the table header keeps `bg-surface` rather than the mockup's
+tint, because dark `bg-sunken` IS the dark canvas and the band would vanish on the one list that
+mounts its table bare; and card padding stays at `space-5`, because the two artifacts disagree and
+padding is the one value with 52 call sites and no visual net. Card and StatTile arrangement
+unchanged by user decision.
+
+Two things this increment fixed that predate it: a JR1 comment claiming tabular figures on the stat
+value while the declaration did not exist, and `MdsButton`'s spinner having no reduced-motion arm.
+The second nearly became a regression — tokenising its literal `600ms` into the identically-valued
+`--mds-duration-deliberate` would have made it spin at ~1000 rev/sec under reduced motion, because
+the tokens collapse to 1ms. For a functional indicator, reduced motion means slower, not instant;
+`MdsSpinner` already knew this and `MdsButton` now matches it.
+
+**The adversarial review then found a critical defect that all six gates would have passed.** The
+gradient's `@supports` guard tested `background-clip: text` (2016) while the declaration it guards
+needs `color-mix()` (2023). In that seven-year window of engines the guard opens, the
+`background-image` — substituted late because it carries a `var()` — turns out to contain an
+unparseable `color-mix()`, goes invalid at computed-value time and falls back to `none`, while
+`color: transparent` and `-webkit-text-fill-color: transparent` survive as plain values. The
+dashboard's headline figure would have rendered as blank space on Safari ≤16.1, Chrome ≤110,
+Firefox ≤112 and pinned Android WebViews. The reasoning had been done correctly forty lines away for
+the glow tokens, which need no guard because `box-shadow`'s initial value is `none` and `none` is the
+pre-JR2 rendering; same mechanism, opposite consequence, and the confidence was copied instead of the
+reasoning being redone. An `@supports` condition must name every feature its block depends on, not
+the one the technique is named after.
+
+Three more real defects came out of the same pass. `line-height: 1.05` on the stat value was reverted:
+its premise, "a stat value is a single line by construction", is false of the component's own callers,
+which pass prose and formatted dates — and with the gradient painting through the padding box, a
+descender outside a too-short line box now has no ink under it at all. The table row hover turned out
+to be a measured 1.000:1 no-op on the six pages that mount their tables bare on the canvas, because it
+painted `bg-canvas` onto `bg-canvas`; JR2 had added a transition to smooth a colour change that does
+not happen, two rules below a comment stating the very premise that proves it. And the empty-state
+medallion measured 1.00:1 against the canvas — the flourish the user chose was, on the first screen a
+new tenant sees, simply absent.
+
+The badge dot took three attempts. Two call sites, then all thirteen `#cell-status` columns, then the
+rule that actually holds: keyed to `statusVariant()`, 23 of 23, because "is this a scannable column"
+is not something a component can know and "is this a status" already has an answer in the codebase.
+
+Four documentation claims were false and three code comments asserted mechanisms that cannot occur —
+including a guard whose named victim has no reachable call path. All corrected in place, with the
+correction recorded rather than the sentence quietly rewritten.
+
+Merged as PR #133 (`7d56cd8`), 6/6 with real steps: Pest 3551/0 across 15,132 assertions (delta zero
+— JR2 touches no PHP), E2E 477 passed with 1 flaky, and the Storybook axe run 218 across 32 suites,
+up from 207, which is exactly the eleven stories the increment adds. The axe job mattered more than
+usual here: it is the merge-blocking contrast gate, it cannot be run on this host, and a re-skin is
+precisely the kind of change it exists to catch.
+
+## 2026-08-12 — Alignment session: a held row is out of scope, not pending (no code)
+
+No code, no increment. A second agent held the working tree for JR2 throughout, so this session made
+**zero edits to the tree** and landed its one change through a detached worktree — see the mechanic
+recorded in Rule 5.
+
+**What prompted it.** A routine status report was asked for, then a percentage breakdown, then a
+per-phase breakdown. All three led with what the user is holding: Phase 3 was reported as "~86%, and it
+cannot be finished without you," which is true, useless, and buries the two rows (H16b/H16c) that
+**can** be finished. The user's correction: *"i told you that we will skip all tasks that needs my
+interaction… as long as the task doesnt require the tasks that i told you to put on hold."*
+
+**The diagnosis is that Rule 5 was only half-applied.** Since 2026-08-06 held rows had not been *built* —
+that half was working. They were still being **reported**: as "blocked on you", as denominators in every
+percentage, and as the reason a phase looked open. That hands the user back a decision they already made,
+every session. Rule 5 now closes it: a held row is **out of scope, not pending** — never reported,
+counted, scheduled or asked about — with the held list stated as closed (OCR chain · all
+uploading/import · payments · Track B · GDPR/legal/pricing).
+
+**A second decision of record came out of it.** Asked whether Phase 4 should begin if Phase 3 runs out of
+non-held work and no signal has arrived: *"it should be."* So a held row never stalls the queue and never
+keeps a phase open. Recorded with the caveat that **Phase 4 is not wholly buildable either** — payments
+was cut *into* it and is held, and GDPR tooling splits from the GDPR/legal call — so entry is on
+SSO/SAML, dedicated-DB tenancy, data residency and CRDT sync. Also recorded: this changes no queue
+order, because JR3–JR5, J3, J4, J5 and the final integration PR are all non-held work still ahead of
+Phase 4.
+
+**Two process findings, both from being corrected mid-session.** An `AskUserQuestion` asking which of two
+buildable lanes to take was rejected — with a second agent running, the answer is to take the lane with
+no file overlap and proceed, and asking is itself the defect. And a tracker edit was rejected because
+both sessions share **one checkout**: a write lands on whatever branch the other agent has checked out,
+and switching branches yanks the tree from under them. The worktree recipe is now in Rule 5 so the next
+session does not rediscover it.
+
+**One claim corrected in-session:** "the other agent cannot see my memory" was wrong — `MEMORY.md` is
+keyed to the project directory, so any session in this repo loads the same index. The argument for
+putting the rule in the tracker is therefore durability, git-visibility and reviewability, not
+cross-agent visibility.
+
+## 2026-08-12 — Lane B (connector lane): a self-sufficient worktree stack, then H16b end to end
+
+Ran in the git worktree `c:\laragon\www\fb-lane-b` under Standing Rule 7, concurrently with Lane A's
+design work and with zero file overlap.
+
+**Task 1 — the second stack.** `docker-compose.override.yml` (untracked, gitignored by name at
+`.gitignore:41`) sets `name: fb-lane-b`, which is almost the whole isolation story: the base compose
+file declares no `container_name`, no `networks:` and one named volume, so Compose derives
+`fb-lane-b-*` containers, an `fb-lane-b_default` network the other stack cannot reach by service name,
+and a separate `fb-lane-b_pgdata`. Host ports remapped to app 8081 / postgres 5433 / redis 6380 / vite
+5174 / mailpit 1026+8026, every one carrying `!override` because **`ports:` merges by APPEND** — without
+it the second stack inherits all six of the first's and collides. Three traps worth keeping: the vite
+port must move INSIDE the container too (`public/hot` is written from the dev server's own port, so a
+host-only remap points the browser at the other lane's Vite); `composer install` exceeds composer's 300s
+process timeout on this bind mount (`-e COMPOSER_PROCESS_TIMEOUT=0`); and `.gitignore:3` is the literal
+`.env`, **not** `.env*`, so `.env.lane-b` and `docker-compose.lane-b.yml` are committable and must not be
+used for this.
+
+**Rule 7(c) amended, and the amendment is structural rather than procedural.** `phpunit.xml` pins
+`DB_DATABASE=meridian_testing` but says nothing about `DB_HOST`, which falls through to `.env`'s SERVICE
+NAME `postgres` — and a service name resolves on the calling container's own network. So each lane's
+`migrate:fresh` can only drop its own schema, by construction. Measured rather than asserted: Lane A's
+dev database read `tenants=2 users=10 forms=7 submissions=518` before and after a full
+`migrate:fresh --seed` in Lane B, and `tests/Feature/Connectors` then ran 153/593 entirely inside
+`fb-lane-b-app-1`. The `ps -eo args` probe survives, scoped to two agents sharing ONE stack.
+
+**Task 2 — H16b in three PRs.** #134 the redirect-URI port (`1660d00`), #135 the tabular destination
+seam (`8198dcd`), #136 the rule UI.
+
+The port bug had **two** victims: `centralHost()` feeds `callbackUrl()` and `tenantHost()`, so besides the
+`redirect_uri_mismatch` the post-consent browser was returned to a portless tenant host nothing serves.
+The fix takes the port from `app.url` **guarded on `app.url`'s host being the central domain** — that
+guard is why the ten asserted redirects in `ConnectorOAuthFlowTest` did not move, where the earlier
+unguarded attempt reddened them. Pinning `APP_URL` in `phpunit.xml` changed exactly one test in the whole
+suite: `GeneratePdfJobTest`'s first case asserted `alpha.localhost:8080` while reading the AMBIENT app.url,
+passing by coincidence because `.env` and `.env.example` agree.
+
+**The client-side Google Picker was dropped as a decision.** ADR-0009 §D8 and the tracker both said it was
+H16b's job — an aside that became a plan of record by repetition, while `config/connectors.php`, written in
+the same increment, had recorded the real alternative ("created by us or named by id"). Only the first half
+works: an id a tenant pastes is unreachable under `drive.file` unless we already hold a per-file grant. The
+Picker needs a browser API key only the user can mint plus the app's first third-party script, the trade
+`FormBotChallenge` already records refusing. `spreadsheets.create` IS permitted under `drive.file`, so
+Meridian creates the sheet and writes its header row. ADR-0009 §D8 amended in place.
+
+**Lessons worth carrying.** Scramble publishes a rule key's PRECEDING COMMENT verbatim as that property's
+`description` — I11a recorded it once and this nearly repeated it; the CI contract gate cannot catch it,
+because it diffs a fresh export against the committed file and both are equally wrong. Only reading the
+regen diff finds it. A test that claimed the column catalog invented four keys was itself blind: the
+tenancy middleware forgets the GUC in `terminate()`, so its own post-request query ran with no context and
+RLS hid every version — an empty expectation matching an empty actual is a bug wearing green. And
+`MdsSegmentedControl` renders its own fieldset and legend, so a wrapper gives the group two; vue-tsc was the
+only gate that could catch it, since happy-dom computes no styles and Storybook globs the design-system
+package only, so an app page never gets an axe scan.
+
+## 2026-08-13 — LANE A: JR3, the forms list as a card grid with the table behind a view toggle (PR #137, `b66af9d`)
+
+Merged 6/6 with real steps (11–20 per job): CI Pest **3600/0** (15,338 assertions, +49 on JR2's 3551),
+E2E **488 passed / 2 flaky**, Storybook axe **220 across 33 suites** (up from 218 — the two stories added),
+Contract byte-identical, Static clean.
+
+Cards are the default; the enriched seven-column table is one click away and addressable as `?view=table`.
+Every value on the card already existed in the database. The strongest justification turned out not to be
+the empty gutter that prompted the row but the **tablet band**: `MdsDataTable` collapses to card-per-row
+only at ≤480px, so 481–1024px was a sideways-scrolling strip — measured after, 2-up at 834px with nothing
+to scroll.
+
+**Three defects found by LOOKING at the running app, none visible to any gate in this repo.**
+(1) The container-query threshold was in `px`, so it was correct at exactly one font scale: at
+`extra_large` the label `IN PROGRESS` needs 103px against a 101px column and ellipsed **on the 1600px
+desktop grid**. Now `18em`, which scales with the labels; verified across 3 scales × 7 viewports.
+(2) A single long word in a tenant-supplied title overflowed its track and was eaten by `overflow: hidden`
+— `min-width: 0` lets the box shrink and does nothing about a word. (3) The nine-icon cluster wrapped to
+two lines in every table row, which is what the table view exists to avoid.
+
+**`max-width` in a container query measures the CONTENT box.** The first threshold was 260px, written
+believing it could never fire; it fired on every 300px card — the grid's own track floor — because the
+card carries 40px of padding.
+
+**The fifth must-fix, which the JR block never named:** seven e2e tests reached `/forms` rows by
+`locator('tr')`, which matches nothing once cards are the default, at all three viewports, on a suite that
+cannot run on this host. One view-agnostic `formEntry()` helper, filtering on the title link rather than
+`hasText` because a card renders the description too. `?view=table` is now its own `responsive-axe` entry
+— the default flip had silently un-covered the table entirely.
+
+**The identity scale needed doubling up, and the arithmetic is the finding.** The semantic palette already
+occupies four of the six perceptual colour families and the chart scale spends five more, leaving five
+families for six slots; it splits 3 green / 3 purple, order alternating. Hues were *searched* for lightness
+against their own 12% tint — the ground the initials are actually read on — because a solid fill with white
+initials would force ≥4.5:1 against white and confine the palette to hues whose dark twins go muddy.
+
+**The adversarial review found three shippable defects and seven false numbers.** A card that announced
+"Closes in 3 days" for an unpublished draft while the chips correctly excluded it; `last_response_at` on
+the wire as a non-spec timestamp that `formatDate()` would print as "Invalid Date" on any engine stricter
+than V8 (fixed at both sites — the hub had it too); and a hand-rolled relative-time formatter reproducing
+verbatim the rounding defect the shared helper documents in its own comment. Plus a test titled "nine row
+actions" that asserted eight — the missing one being the only mount of `AssignScopeModal` in the client —
+and a Pest file where every case ran as an owner, so `visibleTo`'s grant subquery was compiled by no test.
+
+**CI caught what local runs did not, on a gate never run:** `token-references.test.ts` scans every
+`var(--mds-…)` and its regex stops at a `$`, so an interpolated token name read as undefined. Spelling the
+six out is what lets the guard cover them at all.
+
+**One reporting error, recorded because it is a method fault:** a cancelled E2E job was read as a pass —
+a `grep -o` over the jobs JSON spanned two objects and picked up a neighbour's `"conclusion":"success"`.
+Parse job status per-job; a cancelled job is not a green one however far it got.
+
+**Known costs, stated rather than discovered later:** the table view scrolls sideways at ≤1280px where the
+four-column version did not, and nothing cheap buys it back (which is why the grid is the default); the
+identity index is a hash, so colour collisions are likely in a small tenant and the glyph initials are the
+disambiguator; and at ≤480px `MdsDataTable` is not a scroll container, so the single-line action cluster
+has no scroll region there.
+
+
+## 2026-08-13 — Lane B (connector lane): H16c, the Airtable connector
+
+Three PRs. **#138 MERGED 6/6** (`1a6b976`) — the provider and the PKCE seam. **#139** (enumeration,
+inspection, delivery) and **#140** (the rule editor) are OPEN, locally green on every gate, and
+**have no CI run at all** — see the outstanding-verification note at the end.
+
+**The organising fact: Airtable can enumerate, which is the one thing `drive.file` could not.** Most of
+this increment is that propagating. H16b creates the Sheets destination because "paste an id" fails for a
+scope that shows us only files we created — "reachable by construction" was an answer to a Google
+constraint, not a property of tabular destinations. Airtable's `schema.bases:read` lists bases properly, so
+the tenant picks a base and a table that already exist, and **`schema.bases:write` was refused** (ADR-0009
+§D8, user-ratified). Consequently H16b's `ProvisionsTabularDestinations` was split:
+`InspectsTabularDestinations` is the reading half Airtable claims, provisioning extends it, and
+`GoogleSheetsDirectory` needed no edit. Bundling the two had looked like cohesion and was really a
+workaround for one scope limitation wearing the shape of a design.
+
+**PKCE, and the framework had nowhere to put a verifier.** Airtable requires `code_challenge`/`S256`, and
+the two half-flows run on different hosts in different requests — which is §D2/§D3's whole
+design, and exactly what makes "stash it in the session" unavailable. It is DERIVED from the signed `state`
+both halves already hold: `base64url(HMAC-SHA256('connector-pkce.v1.'+state, stateKey))`, 43 chars, RFC
+7636's minimum. No session, no cache entry, no `oauth_states` table — so §D3's rejection of a
+server-side nonce store stands unweakened, which it would not have if PKCE had forced one. The objection
+worth pre-answering: an attacker who intercepts the redirect sees `code` AND `state`, so this looks like
+deriving a secret from a public value; it is not, because the derivation is an HMAC under a key they do not
+hold. The four-method `ConnectorProvider` contract survived in COUNT but not in SIGNATURE —
+`authorizeUrl()` and `exchangeCode()` each gained a `$codeVerifier` — and that is the honest answer to
+the ADR's "when the second and third providers land" revisit line, which is now closed in the ADR itself.
+
+**A real H16b defect, found by a new test, live since #136.** `ConnectionPresenter::pausedReasons()` selects
+paused rules' excerpts with `LIKE '[%]%'`, and `MappingDrift::summary()` carries no code — so every
+drift-paused rule stored a reason the presenter then dropped, and the tenant saw a paused rule with **no
+explanation**, on the one failure the drift card exists to explain. It survived because the e2e seeder
+fabricates a correctly-prefixed excerpt the code never produced: a test certifying a behaviour that did not
+exist. Both adapters now prefix `[column_drift]`, and the seeder's string was rewritten to `summary()`'s
+actual wording. The engine cannot add the prefix itself — `App\Support\Mapping` is forbidden from
+importing connector code, and a source-parsing test enforces that.
+
+**Three more, two of them mine.** (1) `destinationNoun()` first returned `spreadsheet` for Sheets, which
+quietly made "tabular" and "spreadsheet" synonyms and re-pointed copy that had always meant the TAB —
+"that tab isn't in the spreadsheet any more" became "that spreadsheet isn't there any more", advice for a
+different problem. A tabular provider has TWO nouns; `containerNoun()` now carries the outer one, and the
+existing Sheets tests caught it. (2) Making the reference parser provider-keyed moved a Slack connection's
+failure from "this integration has no tabular destination" to "your link looks wrong" — **ask "can this
+provider do this?" before "is this input valid?"**. (3) `token-references.test.ts` red-lit three `--mds-*`
+names invented from memory rather than copied from the sibling component; **grep the sibling's tokens, never
+recall them.** A fourth, cheap: `Http::fake()` APPENDS stubs rather than replacing them, so a per-iteration
+fake left the first `whoami` answering both connects and a correct multi-account test failed against correct
+code.
+
+**Airtable's four real differences from Sheets, each pinned by a test.** A record is a KEYED OBJECT, so the
+positional mapping is zipped back onto the destination's VERBATIM field names — `ColumnFingerprint`
+casefolds, and writing to `full name` when the field is `Full Name` makes Airtable refuse the whole record.
+An empty value is OMITTED rather than written, the opposite of the positional rule where a blank holds a
+column open. Delivery keys on the TABLE ID (`config.sheet_id`), so a rename is invisible instead of a 404,
+leaving genuine field changes as the only thing drift ever reports. And `typecast: true` is sent, because a
+form answer is always text and a mapped field often is not — its one disclosed cost, that typecast can
+ADD a single-select option (a schema side effect Airtable permits on the data scope alone), is recorded in
+ADR-0009 and in the GDPR §7 sub-processor bullet rather than left to be discovered.
+
+**Two renames, both deliberate deviations from the approved plan.** `SheetDestinationDirectory` →
+`TabularDestinationDirectory` and `/sheets` → `/destinations`: the plan said reuse `/sheets` because it
+is cheaper, and on reading it in place an Airtable base picker calling `/sheets?reference=appXXXX` reads as a
+bug to whoever finds it next. Mechanical, no behaviour change, and PR 3 rewrote most of the affected client
+files anyway.
+
+**And the front end's last provider literal is gone.** `RuleFormModal` gated three behaviours on
+`provider === 'google_sheets'` — the channel fetch, the `submission.*` event narrowing and the `config`
+submit shape — all three of which would have been wrong for Airtable at once. They now read a
+server-resolved `destination_kind`. What capabilities honestly CANNOT decide is WHICH tabular editor mounts,
+so that stays one provider-keyed map in one place; a first draft also shipped `enumerable`/`creatable` and
+two nouns that nothing read, and an unread prop is the `--block`-with-no-consumer smell this repo has been
+bitten by before.
+
+**Gates (local, Lane B's own stack).** Pest `tests/Feature/Connectors` + `Unit/Mapping` + `Unit/Connectors`
+270/0 across #138+#139 and 225/0 on #140's tree; PHPStan delta 0 (local baseline 20, all pre-existing
+model-property phantoms); Pint clean; vue-tsc clean; Vitest 98 files / 1752 tests; `npm run build` clean;
+host lint gates 84/93/28; `openapi.json` regenerated for #139 with the diff READ (two new descriptions, both
+publishable) and byte-identical for #140; migration up→down→up; the E2eSeeder run end to end against
+Lane B's database (1 Airtable, 1 Sheets, 2 Slack connections).
+
+**⚠️ OUTSTANDING VERIFICATION.** From ~18:50 GitHub Actions stopped creating runs for this
+repository — nothing after #138's post-merge run, on any branch or event. Opening #139 produced no run;
+closing and reopening it produced no run either; `actions/permissions` reports `enabled: true`. This is the
+exact failure `ci.yml`'s header block was written for, and both of its remedies are unavailable because
+`workflow_dispatch` and `schedule` are read from the DEFAULT branch only and `main` has received nothing yet.
+**Neither PR was merged**, because merging on local green is precisely the I5 precedent this tracker keeps.
+
+---
+
+## 2026-08-13 — LANE A: JR4, the list-page width class + the container-keyed tablet band (PR #141, `176fbe4`)
+
+Merged on 6/6 with real steps (11–20 each). CI **Pest 3615/0** (15,384 assertions — delta 0, JR4 touches no
+PHP), **E2E 502 passed / 1 flaky** (up from 488: the 13 new `list-layout` cases), **Storybook axe 223 across
+33 suites** (up from 220: exactly the three stories added). Local: Vitest **99 files / 1775 tests**, vue-tsc
+clean on both projects, `npm run build` clean, controller/migration/job lints **84 / 92 / 28**.
+
+**Two deliverables.** `.app-shell__inner` was 1200px beside a 240px sidebar, so the dead gutter per side ran
+0 @1440 · 80 @1600 · 240 @1920 · 560 @2560 — and Playwright's widest project is 1440, where it is exactly
+zero, which is why no gate ever saw it. Ten list/grid pages now take a 1600px column through a `WIDE_PAGES`
+set mirroring the existing `FLUID_PAGES` mechanism (one persistent layout instance, no props, no page-side
+change). Opt-IN deliberately: forgetting a list page changes nothing, while forgetting to exclude a settings
+form would render 1600px of input fields. `domains`, `search` and `scopes` are excluded and the exclusion is
+measured — they are single-column stacks of full-width cards, so widening them *causes* the defect.
+
+And `MdsDataTable` collapsed to card-per-row only at `@media (max-width: 480px)`, leaving 481–1024px a
+sideways-scrolling strip on six tenant list pages, three log pages and the admin console. It now carries
+`container-type: inline-size` on a new frame element and collapses below **56em of container**.
+
+**The row's framing was half wrong, and the code said so in ten minutes.** "The other eight list pages, still
+bare MdsDataTables" — five of the pages named render no table at all. The real inventory is 22 tag sites in
+17 files. Three increments running, the doc-sourced row has been wrong about its own scope.
+
+**56em is derived.** The sidebar is 240px above 1024px and 64px at or below, so the content box is 896px at a
+1024px viewport and **721px at 1025px** — narrower on the wider screen. 896 is the widest box that can exist
+while the sidebar is still a rail, so collapsing at exactly that width makes the switch *continuous* across
+the swap: cards at 375/834/1024/1025/1200, table from 1201, zero document overflow at all nine viewports.
+Any smaller threshold turns a table back into cards as the window widens. Gated on `columnCount >= 3` because
+the two-column chart tables sit in ~300px cards at every viewport while a full-width phone is ~343px — the
+ranges overlap, so no single width can separate them.
+
+**Three things the collapse needed that the old block never did:** `display: block` on the table (a grid child
+of a `display: table` element gets an anonymous cell), `grid-column: 1 / -1` on the zero-rows row (a colspan
+means nothing to a grid — and `responsive-axe` loads `/members?q=…` at 834px asserting only a heading, so it
+would have passed straight over it), and `thead { display: none }` instead of the visually-hidden clip,
+because thirteen sortable columns put their toggle in that header and a clipped control is still a focus stop
+nobody can see. The toggles are re-rendered as a chip row above the cards.
+
+**Two defects the visual sweep found, and the first was my own fix.** `minmax(12rem, 22rem)` on `MdsFilterBar`
+is wrong: `auto-fit` counts repetitions from the MAX track size when it is definite, so a 706px tablet bar
+packed one control per row where it had packed three — a cosmetic slab turned into a four-row filter rail on
+the exact viewport the increment exists to fix. The cap belongs on the child. Second, the Owner's row on
+`/members` passes none of its action gates, so the card layout gave it a blank 50px strip.
+
+**And the sweep itself nearly lied.** `networkidle` never settles against a Vite dev server under load. Worse,
+the first two runs measured the OLD component: inotify does not cross the Windows Docker bind mount, so the
+dev server never saw a single edit and `.mds-table__frame` was absent from every frame. Restart the node
+container after any SFC edit and confirm what Vite is actually serving before believing a frame.
+
+**Recorded as `exceptions-log.md` #12**, because §6 said the table collapses "at the mobile breakpoint" and
+that the library implements bands mobile-first with `min-width` — a container query is neither. Scope: one
+component, one query; the three breakpoint tokens remain the contract for everything genuinely keyed on the
+window. Cost: nothing in this repo can execute a container query, so the threshold is pinned as source-text
+assertions, the collapsed layout finally has Storybook stories, and `tests/e2e/list-layout.spec.ts` measures
+the scroll wrapper's own box rather than a document width `overflow-x: clip` keeps flat.
+
+**A measurement lesson worth more than the increment:** JR3 recorded Pest 3600 from its own BRANCH, which
+forked before Lane B's connector work landed; 3615 is what `phase1-completion` totals with both lanes merged.
+A branch number and an integration number are different measurements — compare against the same base, or
+against zero delta on an increment that touches no PHP.
+
+---
+
+## 2026-08-13 — LANE B: H16c unblocked and completed (#139 `5501c7c`, #140 `f3c85ed`), and the CI diagnosis corrected
+
+**The previous session's CI diagnosis was wrong, and it was wrong in the confident direction.** It recorded
+*"push events work; pull_request events are not producing runs"*, measured from "the last pull_request run of
+any kind is h16c1's at 18:22". That measurement was **already stale when it was written**: Lane A's #141 got a
+successful `pull_request` run at **21:17 the same evening**. `pull_request` events were healthy throughout.
+
+**The real cause: both PRs genuinely CONFLICTED with `phase1-completion`.** GitHub does not dispatch a
+`pull_request` event for a branch whose `refs/pull/N/merge` it cannot compute — no mergeable merge commit,
+no run, ever. That is why opening, closing/reopening and retargeting all produced nothing: close/reopen was
+the one lever the entry recommended and the one that addresses nothing. The tell was sitting in plain sight —
+**`gh pr view <n> --json mergeable` returned `UNKNOWN`**, which means unmergeable, not "CI is down".
+
+**The conflict was a stacked-PR + squash-merge artifact, not a content clash.** #138 was squash-merged as
+`c13b91b`, while `h16c2`/`h16c3` still carried the original `1a6b976`; git therefore saw two unrelated commits
+both ADDING `AirtableConnector.php` → an `add/add` conflict, plus content conflicts in `ConnectorProviderKey.php`
+and `config/connectors.php`. **`git diff 1a6b976 c13b91b` was EMPTY** — identical trees, pure history shape.
+Two cheap checks sized the fix before touching anything: no `app/`, `config/` or `routes/` file had changed on
+the base since `c13b91b`, and the branch docs commit `e2db26d` had a **patch-id identical** to the base's
+`94b45c8` (`af7bbe58…`), so a rebase would drop it automatically — and it did, reporting *"patch contents
+already upstream"*. `git rebase --onto origin/phase1-completion <merged-sha>` + `--force-with-lease` flipped
+`mergeable` to `MERGEABLE` and produced a run **within seconds**. #140 hit the same conflict a second time
+after #139 squash-merged, exactly as predicted.
+
+**Results: both merged on a genuine 6/6.** #139 Pest 6m47s / E2E 17m42s; #140 Pest 6m41s / E2E 18m10s;
+Static, Contract, a11y and Frontend green on both. The 6/6 bar held — no repeat of the I5 precedent.
+
+**⚠️ A LANE-COLLISION NEAR-MISS, AND THE GENERAL RULE IT YIELDS.** #140's rebase conflicted in
+`PROGRESS_ARCHIVE.md`, presenting as *"HEAD has 63 lines, incoming has none"* — because HEAD held **Lane A's
+JR4 archive entry** while Lane B's own entry had already auto-merged above it. A blanket `--ours`/`--theirs`
+across both tracker files would have **silently deleted one lane's archive entry**, and the diff would have
+looked plausible either way. Resolved per-file instead: surgical marker removal in `PROGRESS_ARCHIVE.md` to
+keep BOTH entries, `--ours` in `PROGRESS.md` where the branch's text was genuinely superseded. Both files
+ended byte-identical to the base, so #140 shipped **code only**. **When two lanes share a file, resolve
+per-file and re-grep for the other lane's content before continuing** — the conflict presentation actively
+hides whose work is on which side.
+
+**Phase 3's Lane B remainder is now empty**, so by Rule 5's never-idle clause the lane entered **Phase 4 on
+SSO/SAML**. Planned against the code rather than the docs, which paid immediately: **`sso_saml` is a seeded
+entitlement key with zero enforcement consumers** — granted to Enterprise at `PlanCatalog.php:47,65`,
+deliberately excluded from tenant self-service at `ToggleableModules.php:27`, and consumed by nothing in
+`app/` or `routes/`. There is no `laravel/socialite`, no SAML package and no `app/Http/Controllers/Auth/`
+directory at all. The user settled three forks on 2026-08-13 — **SAML 2.0 only** behind a protocol-neutral
+seam, **step-up re-authenticates via the IdP with `ForceAuthn`** rather than a local password, and
+**JIT provisioning at a tenant-configured default role with a per-tenant toggle defaulting ON**.
+
+---
+
+## 2026-08-13 — LANE A · JR5: the builder's responsive layout (the last JR row)
+
+Branch `jr5-builder-tabs`, zero PHP. The session opened on a prompt two rows stale (it asked for JR3, merged
+at #137; JR4 was merged at #141), and the row itself was wrong in three of its five words — **four-for-four
+now on verifying a doc-sourced row against the code before planning against it.**
+
+`Builder.vue`'s single `@media (max-width: 1024px)` rule **already linearized all three panes**, so nothing
+was hidden, off-screen or sideways-scrolling at 375px; the cost was ergonomic (scroll past ~31 palette
+buttons to reach the canvas). The defect the row never named is arithmetic: the builder is the app's only
+fluid page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
+below — **785px at a 1025px viewport against 960px at a 1024px one**. The three-column grid stayed on above
+1024, so across **1025–1200 the canvas track was 185px**, a state no Playwright project (375/834/1440) has
+ever rendered.
+
+One `@container (max-width: 60em)` on a container `.builder` establishes itself replaces the media query and
+fixes all three bands. **60em = 960px answers two independent questions that agree**: `260 + 340 + 360`,
+and `1024 − 64` (the widest box that can exist while the sidebar is still a rail) — the second is what makes
+the switch continuous across the sidebar swap. The inclusivity of `max-width` is load-bearing; at
+`59.9375em` the inversion returns from the other side. `em` not `px`, pinned by a `font-size` declaration on
+the container, so the threshold is 960 / 1080 / 1200px across the three type scales.
+
+The switcher is `MdsSegmentedControl` — a **radiogroup, deliberately not a tablist**: thirteen `[role="tab"]`
+locators across three specs, four of them loops that click every match, would have been joined by a second
+tablist. `MdsTabs` remains J4's, and DSR §3.4 now says not to retrofit it here. This does **not** reopen the
+J2b "no tab strip on the builder" decision: that refused a *navigation* row of links with routes and gates,
+and this carries no href, no `aria-current`, no landmark, and is `display: none` above the threshold.
+
+**Measured, 36 cases, zero failures**, plus a toolbar win that was measured rather than estimated: **375px
+369px → 225px (−144px)**, 834px 225px → 177px.
+
+**Two live defects fixed en route.** `.builder`'s `grid-template-rows: auto 1fr` assumed two children, so a
+warnings banner took the panes' flexible row. And **`MdsSegmentedControl` had no `position` on its fieldset**
+while its `<legend>` and `<input>`s are absolutely-positioned visually-hidden nodes — at 375px with the
+config pane selected the 1px legend sat 73px below the workspace and **the page gained 73px of real vertical
+scroll**. G11 found the identical bug horizontally on `MdsDataTable`, whose own comment already called it "a
+latent bug in this component". Same one-line fix; the component had **no unit test** until now (six Storybook stories already ran under the merge-blocking axe gate).
+
+**Two environment findings that cost real time and belong in the next hand-off.** (1) The local Vitest forks
+pool now fails **green**: a full run took 88 minutes and reported "50 passed (50)" with 50
+`Failed to start forks worker` errors and **exit code 0** — half the suite silently never ran, and the file
+count itself lied. `--pool=threads` starts workers reliably but OOMs on the full set; chunking by directory
+works. File count is now **101**. (2) **`tsconfig.json` excludes `resources/js/**/*.test.ts` and does not
+cover `tests/e2e/`**, so `npm run type-check` never sees either and Playwright is transpile-only — the six
+edited specs and both new test files were type-checked separately under `--strict`.
+
+**An adversarial pass run AFTER 6/6 CI green found a real regression every gate had passed**, which is the
+strongest argument yet for running one on a layout increment. 26 findings across five lenses, each refuted
+by three independent verifiers. The one that mattered: `saveError` is rendered in exactly one place in the
+client — `ConfigPanel.vue`'s `<p v-if="saveError" role="alert">` — inside the config pane, so a write that
+failed while the author was on Add or Form mounted that alert inside a `display: none` subtree: not painted,
+not in the accessibility tree, never announced. The replaced rule only linearized, so it was reachable at
+every width before this increment; the silence was new, on exactly the paths most likely to fail. Fixed with
+`watch(saveError, …)`. **The finding was first reported as refuted because I grepped `Builder.vue` for an
+error surface — the surface lives in `ConfigPanel.vue`. Grep the component that OWNS the state, not the page
+that composes it.**
+
+**Two of the new assertions could not fail, which is worse than not having them.** The `@container` positive
+assertions were satisfied by the page's own script comment, which spells the literal string — a revert to a
+viewport media query would have stayed green. The `v-if` negative assertion required the directive after the
+class attribute, while this repo writes directives first. Both anchored, and all three strengthened
+assertions mutation-tested against the broken code before being believed.
+
+**And a number called "measured" was computed, and computed wrong.** The old canvas track was **185px, not
+183px**: `box-sizing: border-box` is global, so the 1px pane borders sit inside the 260/340 tracks — which
+this increment's own sweep already proved (box 1200 → canvas 600, box 961 → canvas 361, neither showing a
+border subtraction). The 60em derivation is `260 + 340 + 360`. Two prose overclaims went the same way:
+"nothing reads scrollHeight" (FieldPalette reads its own; no *gate* asserts on the document's) and
+"MdsSegmentedControl had no test at all" (no *unit* test — six Storybook stories already ran under the axe
+gate).
+
+**Merged as PR #142 (`e02a8ce`), 6/6 with real steps.** CI Pest **3637/0** (15,468 assertions), E2E **506
+passed / 10 skipped / 0 failed**, Storybook axe **223 across 33 suites — unchanged, which was the predicted
+signal since JR5 adds no stories on purpose**, Vitest **101 files**. The Pest delta of +22 on JR4's 3615 is
+Lane B's H16c merging in between, not this increment, which touches no PHP.
+
+**One process finding worth carrying: PR #142 showed NO CI checks at all for four hours and it looked exactly
+like the `pull_request`-event outage the tracker had recorded.** It was not. `gh pr view --json mergeable`
+reported `CONFLICTING`/`DIRTY`, and GitHub does not run pull_request checks on a PR whose merge commit cannot
+be created — `phase1-completion` had moved under the branch. **Check `mergeable` before diagnosing a missing
+run as an outage.** Lane B reached the same conclusion independently and has already deleted the tracker's
+"pull_request events are not producing runs" claim, which was measured from a window that was already stale
+when it was written.
+
+---
+
+## 2026-08-13 — LANE B: SSO/SAML `P1a` — the SAML SP, end to end (PR #143, `f29ed08`, 6/6)
+
+Phase 4's first row, merged as one PR over two commits. CI **Pest 3712 / 15,818 assertions**, **E2E 502**,
+**Storybook axe 223 across 33 suites**, Contract/Frontend/Static green; E2E 18m20s, Pest 6m52s. Plan
+`read-progress-md-including-standing-fluffy-valiant.md`, approved. ⚠️ **The 3712 is not comparable to Lane
+A's 3637 from JR5 (#142)** — different bases, both merged the same afternoon; the integration branch now
+carries both and the next Lane B run is the first honest baseline. E2E and axe unchanged on purpose: no e2e
+spec (Lane A held six of those files) and no Storybook story.
+
+**Held as ONE PR because `(1/2)` alone ships a dead endpoint.** The SP metadata route existed with no writer,
+so `/sso/saml/metadata` 404'd for every tenant — the `--block`-with-no-consumer smell. `(2/2)` is the write
+path that makes it reachable, and **`Active` had to be reachable in this slice** or the PR would still have
+shipped the dead endpoint it was being held for.
+
+**THE PLAN WAS WRONG IN TWO PLACES AND THE CODE SAID SO — both found by an adversarial pass run against the
+approved plan, not against the finished work.** That ordering is the transferable part: the pass cost one
+agent and caught two defects that would otherwise have merged green.
+
+**(1) `getOriginal()` DECRYPTS.** It rebuilds the model with `setRawAttributes()` and maps every attribute
+through `transformModelValue()`, applying the cast — so on `idp_certificates` (`encrypted:array`) it returns
+the plaintext key list. `$hidden` is consulted only by `attributesToArray()` and does nothing here; the
+siblings fail the other way, `getDirty()`/`getChanges()` yielding multi-KB ciphertext. The repo's own
+snapshot idiom (`Arr::only($model->getOriginal(), array_keys($columns))`, `TenantSettingsService.php:102`)
+would therefore have written IdP signing keys in plaintext into `audits` — **append-only by RLS policy, no
+DELETE policy for any role, never pruned.** Verified in the framework source before acting on it. The service
+hand-builds its payload with the column structurally absent; `AuditRedactor::SECRETS` registers it as a
+backstop. **Both are tested because they catch different regressions** — the redactor test stays green if
+someone "simplifies" the payload back to `getOriginal()`, so only the raw-body `not->toContain($cert)`
+assertion would catch that, and only the redactor test would catch a future writer that snapshots the model.
+
+**(2) THE GATING ASYMMETRY WAS INVERTED, AND THE INVERSION READ LIKE THE RULE.** The approved plan put
+`status` on the `feature:`-gated policy write, mirroring `/domains`. But `/domains` has no on/off switch, so
+the mirror was wrong in a way the precedent could not show: a tenant downgraded off Enterprise could
+**delete** the trust anchor and not **disable** it. "Destroy or nothing" is the opposite of ADR-0012 §D9's
+escape hatch, and against `SsoConnectionStatus::Disabled`'s own contract. `status` moved to its own route
+gated `can:tenant.settings.manage` alone, with the service refusing only the enable direction. **The rule
+generalises: a downgraded tenant may always UNDO, never REDO** — copying an asymmetry is not the same as
+reproducing its reasoning.
+
+**A THIRD, SUBTLER ONE: TWO GATES THAT DISAGREED.** `RequireFeature` blocks only when `currentPlan() !== null`
+(a deliberate "dev/test has no plans" pass-through), while `SsoGate::isEntitled()` called `feature()` bare and
+fails to `false`. On a tenant with no resolved plan the write ROUTE admitted the request while the PAGE said
+"not entitled" — and worse, **a test that skipped `assignPlanTier()` would have asserted a gate that was doing
+nothing, in the direction that makes it look present.** Both now share the pass-through, pinned by a test,
+because "make them consistent" is a plausible-looking change in either direction.
+
+**FOUR MORE, EACH A 500 OR WORSE.** The parser returns `?string` for `name_id_format` into a NOT NULL column
+(`<md:NameIDFormat>` is `minOccurs="0"`; ADFS omits it) — and a column DEFAULT does not save you, because an
+explicit null is still explicit and on the UPDATE path a default is irrelevant entirely. **No size bound on
+the metadata document existed at all**: measured at ~38 MB of DOM for 16 MB of XML, which against a 128 MB
+`memory_limit` is a fatal — no toast, no 422 — now bounded twice, in the request for a field error and in
+`parseHardened()` before `loadXML` because that one cannot be bypassed, both on BYTES since Laravel's `max:`
+counts characters. The singleton race through `updateOrCreate`'s check-then-insert surfaced as an unhandled
+`QueryException` (there is no such arm in `bootstrap/app.php`), fixed with `lockForUpdate()`. And `step-up`
+was absent from the one route that can take over authentication for an entire tenant — a larger blast radius
+than `members.role`, which has carried it since I8a.
+
+**FOUR DERIVATIONS OF THE SAME FOUR ROLES, COLLAPSED TO ONE.** `MemberController` held a private const, a
+`Rule::in()` literal in `invite()` and a third spelling in `changeRole()`; the `sso_connections` migration
+derived the set from `RolePermissionSeeder::ROLES` minus `owner`. **Only the migration's was derived, and it
+is the one the DATABASE enforces** — so a drifted picker fails as `SQLSTATE 23514`, not as validation, and no
+static gate catches it. `AssignableRoles` is that one expression, and a test compares it against
+`pg_get_constraintdef('sso_connections_default_role_check')` so the two are checked against each other rather
+than merely written to match.
+
+**A GAP IN THIS REPO'S GATES, FOUND BY ASKING WHAT NOTHING COVERS.** Pest asserts the Inertia PROPS;
+`vue-tsc` type-checks templates without executing them; the Vite build compiles an SFC without ever mounting
+it. **So a component that throws on mount ships as a blank page with all six jobs green.** Added
+`resources/js/components/sso/cards.test.ts`, mounting every card in every state the presenter can produce —
+including `unreadable`/`not_yet_valid` certificates and the downgraded tenant, three branches the happy path
+never reaches. Worth copying to the next Inertia surface.
+
+**THE P1a/P1b BOUNDARY, STATED IN THREE PLACES RATHER THAN DISCOVERED.** An Active connection publishes an
+ACS location that does not exist until P1b. The gap is **inert, not merely small**: `allow_unsolicited` is
+`false` permanently (an unsolicited assertion has no `InResponseTo` to bind; accepting one is a login-CSRF
+primitive) and `/sso/saml/login` is unrouted, so no button, link or redirect can reach it. Publishing SP
+metadata is a complete, useful act — it is the half of the handshake the admin performs in someone else's
+console, which takes real change-control time. Said in the UI as words rather than a disabled control, in
+ADR-0016 §D14, and in a canary test asserting the 404 that **P1b must change by hand.**
+
+**Docs written because the code already cited them.** ADR-0016 closes ~15 dangling references that `(1/2)`
+shipped with; `docs/data-dictionary.md` §27/§28 cover the two tables `(1/2)` added without a section, the
+same gap ADR-0012 records H22a closing for `domains`. Also the audit spec's §1 row and §2 redaction bullet,
+and a `FeatureGateException` arm — without it the refusal read *"Your plan doesn't include sso_saml."*
+
+**Lane discipline held.** Zero overlap with Lane A's JR5, which merged the same afternoon: no `docs/ux/*`, no
+`docs/feature-backlog.md`, no `tests/e2e/*`, no `resources/js/components/shell/`. The one shared file,
+`resources/js/Pages/Settings/Index.vue`, Lane A does not touch. ⚠️ **Lane A's axe specs sweep `/settings`
+without either lane editing the other's files**, so the new signpost card was cloned from the already
+axe-clean custom-domains card rather than authored fresh — an a11y defect there would have reddened Lane A's
+spec in a file Lane A was mid-edit on.
+
+---
+
+## 2026-08-13 — LANE B: SSO/SAML `P1b` — the login round trip and JIT provisioning (PR #144, `0b445d4`, 6/6)
+
+**A tenant can now actually sign in with SAML**, which is the first time that sentence has been true. P1a shipped the trust anchor and published an ACS location nothing could reach; ADR-0016 §D14 recorded the gap deliberately and left a canary asserting `/sso/saml/login` and `/sso/saml/acs` both 404'd while a connection was Active. **That canary was rewritten by hand into the round trip it stood for** — activate → `GET /sso/saml/login` → post a signed assertion → authenticated on `/dashboard`, `last_login_at` stamped.
+
+CI: **Pest 3756 passed / 16,081 assertions** (P1a's 3712 **+44**, which is exactly the 11 login, 32 ACS and 1 org-2FA cases — the canary was rewritten, not added), **E2E 505 of 516**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,803 tests**. E2E 18m18s, Pest 6m52s. Two commits behind one PR, for P1a's reason: `(1/2)` alone redirects to an IdP whose answer nothing can consume.
+
+**WHAT SHIPPED.** `(1/2)` `SsoAuthnRequestBuilder`, `SsoAuthRequestService`, `SsoLoginController`, `/sso/saml/login`, two per-IP limiters, `SsoAuthRequestFactory`. `(2/2)` `SsoSamlSettings`, `SsoAssertionValidator`, `SsoAssertion`, `SsoIdentityResolver`, `SsoIdentity`, `SsoUserProvisioner`, `SsoLoginService`, `SsoAuthenticationException`, `SsoAcsController`, `/sso/saml/acs`, the CSRF exemption, `sp.login_url` through the presenter and the SP card, and `tests/Support/Sso/FakeIdp.php`. ADR-0016 gained **§D15–§D21**, its consequences and four revisit triggers; `docs/data-dictionary.md` §27/§28 gained the writer, the consumer and the `last_login_at` hazard. No migration — no new table, no new column; `last_login_at` already existed.
+
+### The finding worth carrying furthest: a library that reads `$_SERVER` is untested until you seed it
+
+`Response::isValid()` builds its `currentURL` — the value the assertion's `Destination` and `Recipient` are checked against — from `Utils::getSelfRoutedURLNoQuery()`, which reads `$_SERVER['REQUEST_URI']` and `HTTP_HOST`. **Laravel's test client never populates those**: it constructs a Symfony request and does not call `overrideGlobals()`. Left alone, `currentURL` collapses to the bare host — and php-saml's `destinationStrictlyMatches` defaults to **false**, making the comparison `strncmp($destination, $currentURL, strlen($currentURL))`, a **prefix match that passes**. The suite would have been green and the Destination check would not have been running: the H16b drift-excerpt shape again, in the direction that makes a control look present.
+
+`SsoSamlSettings::at()` pins host, port, protocol and request path from `SsoMetadataController::assertionConsumerServiceUrl()` — §D3's single composition point — and restores all of it plus `$_SERVER` in a `finally`, because these are process-global statics and a leak would retarget the next request's check. `destinationStrictlyMatches` is turned on, so an assertion destined for `…/sso/saml/acs.evil` is refused rather than accepted on a prefix.
+
+**The general rule this generalises to:** `_addDefaultValues()` also defaults `wantAssertionsSigned` and `rejectUnsolicitedResponsesWithInResponseTo` to **false**. Every security flag is now written out explicitly. **A default that happens to agree with you is a coincidence, not a control** — and nothing goes red the day it changes.
+
+### Clock skew is enforced twice, because php-saml's allowance is not configurable
+
+`Constants::ALLOWED_CLOCK_DRIFT` is a hard-coded **180 seconds**; `config('saml.clock_skew_seconds')` is **60**, and `config/saml.php` argues at length that the window is the period a captured assertion stays replayable. Both cannot be true unless somebody enforces the tighter one, so `assertWithinConditions()` runs a second pass over the assertion's own `Conditions` **after** the library is satisfied — never before, because timestamps nothing has verified a signature over are a claim rather than a condition. Pinned by a document 120 s stale (inside the library's allowance, outside ours) **and** by its mirror at 30 s, so the check cannot quietly become "refuse everything". Without the pass, the config file documenting the tolerance was lying.
+
+`FakeIdp::conditionsStaleBy()` had to move the window's **edge**, not slide it: the first draft slid the whole ±5-minute window by 120 s, which leaves it wide open, and the "refuses a stale assertion" case asserted nothing until that was found.
+
+### Look up, validate, then consume — the order is most of the security
+
+`isValid($requestId)` takes the expected id as an argument, so it has to be known before validation, and feeding it a value read from the document being validated would be checking a string against itself. Hence: read `InResponseTo` (untrusted, a lookup key only) → **read** the live unconsumed row → validate against *the row's* `request_id` → consume. Consuming at look-up time would let any unauthenticated caller invalidate a stranger's pending sign-in by posting a body carrying its `InResponseTo`. The atomic `consumed_at` UPDATE runs **before** the assertion-id cache ledger deliberately: it is the mechanism a cache eviction cannot silently turn into a no-op. `consumed_at` was left out of the model's `$fillable` so the read-then-write shape cannot reappear.
+
+### One INSERT, never a create-then-update, on any pre-auth path
+
+`users` has a permissive INSERT policy (`WITH CHECK (true)`) but an **own-row UPDATE** policy keyed on `app.current_user_id` — which is still NULL at the ACS, because `EstablishTenantDatabaseContext` runs before `auth` and there is no session yet. A follow-up `$user->save()` therefore **matches no policy, updates zero rows and throws nothing**, leaving `email_verified_at` null — which the `verified` middleware turns into a lockout with nothing to trace. Found by a test rather than by reading. `forceFill` on a new model carries the non-fillable column into the INSERT itself.
+
+### The four membership outcomes, and one defect found and deliberately left
+
+Active → in, with no write. **Suspended → REFUSED**: an explicit administrative sanction, and the one status the shared attach path would happily reactivate. **Invited → activated at the INVITED role**, ungated by the JIT toggle, because an admin who invited somebody as an Admin said something about that person by name and letting the directory's default demote them would make the invitation surface untrustworthy. Everything else → JIT at `default_role_name`. A full seat quota **refuses** rather than admitting a seatless member — a session with no membership sees an empty workspace through RLS and reads as data loss — inside one transaction, so the refusal orphans no account. `joinViaSso()` shares `joinOpenTenant()`'s entire body through a new private `attachMember()`; the only difference is the audit's `via`, because "which door did this person come through" is the only question the two doors answer differently.
+
+⚠️ **`joinOpenTenant()` REACTIVATES A SUSPENDED MEMBERSHIP, AND THAT IS A LIVE BUG ON THIS BRANCH.** On an open-registration workspace a suspended member can silently un-suspend themselves by re-registering. Same class as the bug this row guards against on the SSO path, in Lane B's own file, three-line fix — **recorded rather than folded in**, because it belongs to I5's registration flow and not to P1b.
+
+### Posture, and a cost written down rather than discovered
+
+Every ACS failure is the same 404 (§D4 extended from the gate to the whole endpoint): an ACS that explains why an assertion failed is an oracle for anyone tuning a forgery — "wrong audience" says the signature verified, "already consumed" says the request id was real. Reasons go to the log with a stable machine token and **never to `audits`**, which is append-only by RLS and never pruned, so an unauthenticated writer is an amplification primitive. **The accepted cost is in the ADR: an employee whose IdP clock has drifted sees a bare 404 and their admin has no in-app view of why.** A tenant-scoped failures panel is owed work, needing a bounded prunable store rather than the ledger.
+
+Org-level 2FA is **not** exempted for an SSO arrival, and that is now pinned by a test rather than a docblock: "require 2FA for all tenant members" is a control an admin switched on, and inferring an exemption from the presence of SSO would silently drop it. Both halves are asserted — the ACS still succeeds, and the *next* request is bounced — so the case is a statement about the policy rather than about where the middleware happens to be mounted.
+
+### php-saml owns the inbound half only
+
+The `AuthnRequest` is DOM-built here for two facts, not taste. Its `AuthnRequest` mints a **49-character** id (`ONELOGIN_` + sha1) with no seam to supply one, while `sso_auth_requests.request_id` is `char(33)` and the id is what `InResponseTo` is matched against. And it builds the document by **heredoc interpolation**, splicing the tenant-controlled `idp_sso_url` raw into `Destination="…"` — exactly what `SsoMetadataController` forbids; `SsoMetadataParser`'s `FILTER_VALIDATE_URL` closes it upstream today, but that is a property of a different class. Two consequences: **no `<samlp:RequestedAuthnContext>`** (the library defaults it ON, emitting `PasswordProtectedTransport` with `Comparison="exact"`, which refuses a successful passwordless or certificate-based login), and `ForceAuthn` emitted only when asked rather than as a literal `"false"`.
+
+### Two test-harness findings that will recur
+
+⚠️ **An existing member must be a COMMITTED identity.** The provisioner resolves through `TenantMembershipService::resolveUserByEmail()`, which reads on `pgsql_auth` — **a separate database session that cannot see `RefreshDatabase`'s open transaction**. A `User::factory()` user is therefore invisible to the code under test, the provisioner takes the JIT branch instead of the "already a member" branch, and the case silently measures the wrong path — surfacing only as a `users_email_unique` violation, because the INSERT can see what the SELECT could not. `committedTenantIdentity()` is the shape that reproduces production, and its email is random by design. The mirror image: **assertions about a JIT-created user must run on the DEFAULT connection**, or `->exists()->toBeFalse()` passes whether or not the row exists.
+
+⚠️ **Never identify a row by "the newest one."** `startLogin()` first read the latest `sso_auth_requests` row; two sign-ins started inside one second are a tie under any `orderBy` this table offers, PostgreSQL breaks ties by physical row order, and two cases were answering an already-consumed request. It now reads the `ID` out of the `SAMLRequest` the redirect actually carried — exact, and it re-proves the binding for free. Same defect as the `assignPlanTier` double-subscription tie.
+
+**`tests/Support/Sso/FakeIdp.php` is a real signer** — memoized RSA keypair, XML-DSig over the **assertion**, a knob per failure mode. `SsoConnectionFactory::certificate()` could not be reused: it throws the private key away. 32 ACS cases / 204 assertions cover unsigned, envelope-signed-only, an untrusted key, signature wrapping hidden in a schema-legal `<saml:Advice>`, wrong audience / destination / issuer, no NameID, both replay mechanisms independently, the skew pair, transport bounds, cross-tenant replay and all three provisioning refusals.
+
+### Gates
+
+PHPStan **delta zero** against the local baseline of 20 (the two it did add — `parse_url` returning `int|false` into `setSelfPort()`, and a null into `setBaseURLPath()` — were real and were fixed) · Pint clean, read from the JSON · controller/migration/job linters pass, **controllers 86 → 88, migrations unchanged at 95** · `openapi.json` byte-identical · vue-tsc clean · local full Pest 3421 passed / 14,702 assertions (needs `-d memory_limit=2G`, ~34 minutes, and dies at 128M partway through without it).
+
+⚠️ **The local Vitest pool is still broken and `--pool=threads` has its own false positive.** A full `npm test` ran **40 of 103 files** with `Failed to start forks worker` errors. Chunking by directory works. But under threads, `resources/js/components/notifications/relative-time.test.ts` fails environmentally — it sets `process.env.TZ` between calls and a worker **thread** cannot reset V8's cached ICU default zone. It is green under forks, which is what CI runs (103 files, 1,803 tests). Do not chase it.
+
+**The one user-facing way in is a URL on the SP-details card** (`sp.login_url`), which is lane hygiene rather than preference: `resources/js/Pages/auth/Login.vue` is the core file of Lane A's in-flight J3, and it renders neither a session `status` nor a generic error, so a redirect-with-flash there would have been silently invisible. A "continue with SSO" button is owed by the auth vertical.
+
+**`P1c` — protocol-aware step-up — is next, and P1b made it urgent.** A JIT-provisioned SSO user holds a random hash nobody knows; `RequireRecentPassword` compares `auth.password_confirmed_at`, and the only way to stamp it is a password they cannot produce. Every `step-up` route — including the SSO metadata import itself — is a dead end for exactly the users SSO was built for. The seam is already there and unused: `SsoAuthIntent::StepUp`, `force_authn`, `return_to`, and `mint()`'s three optional parameters.
+
+---
+
+## 2026-08-13 — LANE A · J3a: the auth vertical's PHP half (PR #145)
+
+J3 was split into three on the user's decision (three sub-PRs; Google via a central callback + signed
+handoff; split panel on the front doors only). **J3a** is the PHP half: the four character classes, the
+`verified` gate, a welcome email, and `member_joined`. **J3b** (split-panel `AuthLayout`,
+`MdsPasswordStrength`, the four deferred auth-axe pages) and **J3c** (Google sign-in) remain.
+
+CI: Pest **3767/0** (16,016 assertions) · E2E **505 passed / 1 flaky**, full 18m01s · Vitest **103** ·
+Storybook axe **223/33** · lint **86/96/29** · `openapi.json` **byte-identical**.
+
+**⚠️ THE ROW WAS WRONG IN THREE PLACES — FIVE-FOR-FIVE.** The auth pages are not the unstyled B1 versions
+(`FortifyServiceProvider.php:50` is stale prose; all eight have been design-system-styled since C1, so J3b
+is a re-layout, not a styling pass). The split panel has NINE `AuthLayout` consumers, not seven. And
+`openapi.json` does **not** move — Scramble's `api_path` is `api/v1`, so a web-only increment cannot touch
+it; the row said to expect it to move and regenerate deliberately.
+
+**⚠️⚠️ THE ZERO-ROW UPDATE ON `users`, WHICH BIT TWICE AND IS THE LESSON OF THE INCREMENT.**
+`users_app_update` is permissive, but PostgreSQL applies **SELECT** policies to an UPDATE whose `WHERE`
+reads a column, and `users_users_visibility` needs `app.current_user_id` or an ACTIVE co-tenant. With no
+GUC the row is invisible to its own update: **zero rows affected, no exception, no log line.** Measured
+directly — `0 affected` with the GUC cleared while the row is plainly there.
+
+  1. **It took the E2E job red, and the fix was itself the bug.** My seeder repair used `User::create()`
+     then `forceFill(['email_verified_at' => …])->save()`. The second write landed nothing, so
+     `global-setup.ts` signed the demo owner in, was redirected to `/email/verify`, and **all 506 specs
+     died before one ran** — the exact failure the increment had set out to prevent. It must be ONE INSERT
+     (`forceFill()` on a NEW model). Lane B's P1b reached the same shape independently, and its PR
+     described this trap while I was reading it.
+  2. **It is also a live, pre-existing product bug**, now in `docs/feature-backlog.md` under "Discovered
+     defects": `PUT /user/profile-information` is a Fortify route with **no tenancy middleware**, so
+     changing your name or email in Settings does nothing at all, silently. It matters more from J3a on,
+     because that endpoint is the only escape from a verification lockout: `UpdateUserProfileInformation`
+     nulls `email_verified_at` on an email change, and `/settings` is inside the gate the member just fell
+     behind. `auth/VerifyEmail.vue` now names the address and carries a correction form; the write path it
+     needs is this bug, so `EmailVerificationGateTest` deliberately asserts **only the half that works**.
+     Today the two defects cancel — the email never changes, so verification is never nulled — which is not
+     a property to ship on. **J3b's first job.**
+
+**FOUR MORE DEFECTS THE ROW NEVER NAMED.** (a) Three tests reached `api.pwnedpasswords.com` on every CI run
+and stayed green either way, because `NotPwnedVerifier` catches a failed lookup and **fails OPEN to
+"uncompromised"** — a merge-blocking gate silently depending on a third party. `fakeHibp()` is now in
+`tests/Pest.php`, the only place it can live. (b) The bell's type map had drifted since I11b, and the test
+that should have caught it compared two hand-maintained copies of the same list; fixed as a class —
+`NOTIFICATION_VISUAL` is `Record<NotificationTypeKey, …>` (a missing case fails type-check) and
+`NotificationTypeParityTest` reads the TS union off disk and asserts it equals `NotificationType::values()`,
+the half TypeScript cannot see. (c) The welcome email inferred workspace membership from
+`request()->getHost()`; Free caps `active_seats` at **2**, so the third self-registrant on any free
+workspace would have been told in writing they were a member of the workspace that had just refused them —
+and **my own test asserted that behaviour**. (d) A redundant nullsafe of mine, found by measuring the
+PHPStan delta **by identifier** rather than by count.
+
+**SEVEN OF MY OWN CLAIMS WERE WRONG, AND EACH CORRECTION IS IN THE CODE RATHER THAN ONLY THE COMMIT LOG.**
+The written position of `'verified'` does not order it against `auth` (`bootstrap/app.php`'s `priority()`
+list does — moving the line reddens nothing). The `forbidden` envelope is scoped to `api/v1/*`. Deleting the
+impersonation exemption would **not** redden `impersonation.spec.ts`, because every seeded identity is
+verified and that branch is never reached there — one Pest case is its only guard. My invite-path assertion
+used an anonymous class and could not see the controller at all. `PasswordPolicyTest`'s fixtures were all
+ASCII, so `[0-9]` — the exact drift the class docblock names — passed. The rollback case asserted something
+that could not fail. And the seeder fix was the bug.
+
+**MUTATION DISCIPLINE, WITH A NEW RULE.** Eight mutations verified red-then-green. ⚠️ **Two "did not
+redden" results were failed string replacements, not weak tests** — verify the mutation actually applied
+before drawing a conclusion from it.
+
+**AN ADVERSARIAL PASS RAN AFTER 6/6 GREEN** (80 agents, five lenses, three independent skeptics per finding,
+each prompted to refute). One survived: the welcome email's membership inference. The skeptics also
+correctly refuted that finding's stated impact — they read `/dashboard`'s routes and found no `can:` gate,
+so the claimed 403 does not exist — which is the pass working in both directions. **And CI then found a
+defect the review had missed.** Neither replaces the other.
+
+**⚠️ LOCAL VITEST, CORRECTED.** `--pool=threads` is right, but its one casualty is `relative-time.test.ts`,
+which mutates `process.env.TZ` — a worker thread cannot honour that; the file is green under the default
+pool. The default (forks) pool inside the node container **cannot scale even chunked**: 8 of 21
+design-system files with 13 worker errors, and the same command then returned "no tests, 21 errors". Run
+the files your change touches individually, **retry a "no tests" result**, and treat CI as the authority.
+⚠️ And **`composer install` inside the app container after merging the other lane** — 31 SSO failures that
+looked like a merge break were P1b's `onelogin/php-saml` never having been installed here.
+
+**CROSS-LANE.** I flagged that P1b would need to stamp `email_verified_at` on JIT-provisioned users; Lane B
+had already done it, with the right reasoning. The P1b merge then hoisted `joinOpenTenant()`'s body into a
+shared `attachMember(Tenant, User, roleName, via)`, so **`member_joined` now fires for SSO joins too** — a
+decision, recorded at the emission site rather than left as an accident of the merge: the notification
+answers "who is in this workspace and when did they arrive", equally true of an IdP arrival, and `$via`
+distinguishes them in the audit ledger where the distinction belongs. The one merge conflict was that
+closure's `use` list (mine needed `$tenant`, theirs `$via`); resolved as the union, not by taking a side.
+
+---
+
+## 2026-08-14 — LANE B: SSO/SAML P1c, protocol-aware step-up (PR #146)
+
+**Built:** the step-up round trip an SSO member can actually complete; the tenant-scoped sign-in failures
+panel ADR-0016 §D19 recorded as owed; and the suspended-membership guard in the shared `attachMember()`
+path. Four commits, one PR into `phase1-completion`. CI: **Pest 3845 passed / 16,466 assertions**, **E2E 504 passed / 2 flaky / 10 skipped / 0 failed**, **Storybook axe 223 across 33 suites**, **Vitest 103 files / 1,808 tests**; Static, Contract and Frontend green. Pest 7m57s, E2E 17m57s.
+
+**THE FINDING THAT CHANGED THE DESIGN, AND THE PROMPT DID NOT ANTICIPATE IT.** The row required the stamp to
+check "a `user_id` matching the currently authenticated user" at the ACS. It cannot be checked there.
+`config/session.php:202` sets `same_site` to `lax`, so the identity provider's cross-site top-level POST
+carries no session cookie — a fact `SsoAcsController` had stated in prose since P1b, while explaining its
+CSRF exemption, with nobody drawing the consequence. `Auth::id()` at the ACS is null even for a member
+signed in two tabs away.
+
+The tempting fix is to `Auth::login()` there and stamp the fresh session. It works, and it is wrong four
+times over: it replaces the session the step-up is being performed *for*, discards what that session held,
+leaves the old one live server-side, and quietly turns the subject check from a statement about the SESSION
+into a statement about the ASSERTION — which is the property that made the check worth having. So the flow
+gained one same-site hop (`verified_at` at the ACS → `completed_at` at a GET on our own host, which Lax
+*does* send cookies on). **Two columns, never a reuse of `consumed_at`**, because "an assertion arrived" and
+"the browser came back and the clock was stamped" are different events and the table's own retention policy
+already rejects collapsing distinct events into one column.
+
+**THE STEP-UP ARM DOES THREE THINGS LESS THAN THE LOGIN ARM.** No `Auth::login()`; no provisioning (an
+unknown subject is a mismatch, never a new joiner — the absence of a create is what guards that, not
+`jit_provisioning_enabled`); and no `last_login_at`, because that column answers "is sign-in working" for an
+admin and a healthy step-up keeping it fresh would let a broken login path look fine for weeks.
+
+**`return_to` STORES A PATH AND NOTHING COMPARES HOSTS.** A host comparison is the check that keeps being
+got wrong; a path resolves against the origin the browser is already on, so same-origin is a property rather
+than an assertion. The consequence is stated rather than discovered: a foreign absolute URL contributes only
+its path, on our host — harmless, and reachable only via a foreign `Referer` on a request that already
+passed CSRF.
+
+**THE FAILURES PANEL IS MOSTLY A STORE.** §D19's revisit trigger had already named the obstacle — the
+obvious table is append-only and an anonymous endpoint must not be able to fill it — so the work was the
+bound, not the card. `sso_auth_failures` trims on every insert to a per-tenant row cap **and** a retention
+window. ⚠️ **Not a scheduled prune, measured rather than preferred**: `routes/console.php:40` records that
+nothing runs the scheduler on the production box yet, so a nightly job would be a bound that exists in the
+repository and not on the machine. ⚠️ **The cap is "not among the newest N", never "older than the Nth"** —
+a grinder writes dozens of rows inside one second and a timestamp comparison keeps every tied row, failing
+at exactly the volume it exists for.
+
+⚠️ **AND THE `request_id` COLUMN WOULD HAVE BEEN A SUPPRESSION PRIMITIVE.** It comes from an unvalidated
+document into a `char(33)`: an over-long value makes the INSERT throw, the recorder swallow it (correctly —
+a failure to record a failure must not turn a 404 into a 500) and the panel stay empty for as long as
+somebody keeps sending them. `SsoAuthRequest::isMintedShape()` keeps it out of the column instead, so the
+row is still written with a null. `subject_email` follows the same posture from the other side: NULL for
+every pre-validation refusal, because before a signature verifies there is no address anyone should be
+shown.
+
+⚠️ **THE STATUS CARD HAD BEEN LYING SINCE P1b MERGED, AND A GREEN TEST WAS DEFENDING THE LIE.** The active
+banner still said signing in with SSO *"isn't switched on yet"* — exact in P1a, false the day the round trip
+landed — and `cards.test.ts` asserted that sentence. **A test pins copy; nothing pins truth.** A statement
+about what a NEIGHBOURING increment has not built yet has an expiry date and no gate will notice it pass.
+Corrected in both files with the lesson recorded in each, because the shape will recur every time one
+increment ships a caveat about another.
+
+⚠️ **FIVE-FOR-FIVE ON VERIFYING A DOC-SOURCED ROW AGAINST THE CODE.** The prompt called the
+`joinOpenTenant()` suspended-membership reactivation "a live bug on this branch". It is latent: nothing in
+the application writes `TenantUserStatus::Suspended` — the enum case has no producer, only two tests set it
+by raw `update()` — and `CreateNewUser` validates `Rule::unique('pgsql_auth.users','email')` with no trashed
+carve-out, so a suspended member cannot re-register under their own address to reach the path. Both halves
+must be false before it is reachable. Fixed anyway (three lines, and P1b had made that method the SSO door
+too), but reported as a guard rather than as a closed hole — "we closed a live one" and "we closed a latent
+one" are different claims and only one was true.
+
+⚠️ **CI CAUGHT TWO REAL PHPSTAN ERRORS, AND THE LOCAL BASELINE IS 0 ON THIS TREE RATHER THAN 20.** The Lane
+B prompt warns of ~20 phantom `property.notFound` errors CI does not report; this run returned exactly the
+two genuine ones and nothing else, so the delta WAS the whole list. Measuring the delta was still the right
+instruction — it simply happened to equal the count here. Both errors were mine and both were real: a
+route-supplied `string|int` window reaching `shouldConfirmPassword()` (which the parent had never needed to
+narrow, because it only ever passed the value straight through), and `map()->all()` over an Eloquent
+collection **preserving keys** where a `list` was declared — not a typing quibble, since a prop reaching
+Inertia as an object with numeric keys renders nothing while every server-side assertion still passes.
+
+⚠️ **I CONTAMINATED MY OWN LOCAL FULL-SUITE PEST RUN, AND KILLED IT RATHER THAN REPORT ITS NUMBER.**
+Standing Rule 7(c)'s `migrate:fresh` hazard applies WITHIN a lane, not only across lanes: the ~34-minute
+background run was still going when I ran two targeted suites against the same container. **Run the
+`ps -eo args | grep '[p]est'` probe before every Pest invocation, including against your own.** CI is the
+authority for the totals and always was.
+
+**OWED TO ANOTHER LANE, NAMED IN THE ADR RATHER THAN LEFT IMPLICIT.** An admin whose SSO breaks cannot step
+up through SSO. The escape hatch works — `/user/confirm-password` is routed on the tenant subdomain, a
+member with no usable password reaches it by password reset, the fork falls back to the password prompt
+whenever SSO cannot serve, and `GET /settings/sso` is ungated so the failures panel still says what broke —
+but the LINK belongs on `resources/js/Pages/auth/ConfirmPassword.vue`, which is Lane A's J3b.
+
+**Docs:** ADR-0016 §D22–§D26, two new accepted costs, two new revisit triggers, §D19 half-closed and the
+P1c trigger discharged; `docs/data-dictionary.md` §28's two columns plus a new §29. ⚠️
+`docs/security-threat-model.md` still carries **no SSO rows at all** — inherited from P1a/P1b, not created
+here, and worth one before Phase 4 closes.
+
+⚠️ **THE ONE CI PEST FAILURE WAS AN ASSERTION THAT CAN ONLY PASS ON WINDOWS, AND IT COST A RUN.**
+`assertInertia(...->component('Settings/Sso'))` reported "page component file does not exist" for a file
+that does. Inertia's default page path is `resource_path('js/pages')` — LOWERCASE — against this repo's
+`resources/js/Pages`, with no `config/inertia.php` to correct it: case-insensitive locally, fatal on Linux.
+**Nine pre-existing `component()` call sites pass `false` to disable the check and not one says why.** The
+tenth is documented. The general shape is worth more than the fix: **a local green proves nothing about an
+assertion whose outcome depends on the filesystem**, and the error message names a missing file rather than
+a config mismatch, so it reads as a real defect.
+
+**THE PEST DELTA IS RECORDED AS UNRECONCILED RATHER THAN EXPLAINED AWAY.** 3845 against the 3816 of the run
+immediately before it on this integration branch (Lane A's #147, which merged while P1c was in flight) is
++29, while the three new/extended test files run 34 cases on their own. Different merge commits, and the
+arithmetic does not close. Both new files are confirmed present in the CI log, so nothing was dropped.
+**Fourth time: compare a branch number only against a run of the same base** — Lane A's 3767, which the P1c
+prompt would have had me compare against, was two merges stale before this row finished.
+
+
+## 2026-08-14 — LANE A · J3b: the auth vertical's design half, and the P0 its first job uncovered (PRs #147 `84459b4`, #148 `b22084e`, both 6/6)
+
+**Two PRs on the user's decision, fix first.** J3b's first job was not design: J3a had recorded a zero-row
+write on `PUT /user/profile-information` and deliberately not fixed it. Splitting the increment got that off
+the integration branch in hours instead of behind a multi-day design pass.
+
+**#147 — THE DEFECT WAS SIX ENDPOINTS, NOT ONE, AND THE SIXTH WAS A PERMANENT LOCKOUT.**
+`config/fortify.php` mounted every Fortify route with no tenancy middleware, so `app.current_user_id` was
+unset. `users_app_update` is permissive — but PostgreSQL applies SELECT policies to an UPDATE whose `WHERE`
+reads a column, and `users_users_visibility` needs the acting user or an ACTIVE co-tenant, so the row was
+invisible to its own update: zero rows, no exception, no log line, and `save()` does not inspect the
+affected-row count. Casualties: `PUT /user/profile-information`, `PUT /user/password`, the four 2FA writes —
+and **`GET /email/verify/{id}/{hash}`, which the backlog entry never named.** `markEmailAsVerified()` wrote
+nothing while `save()` still returned `true`, so `Verified` fired and the redirect carried `?verified=1`.
+With J3a's `verified` gate mounted, a new registrant could follow a valid link, be told it worked, and be
+bounced back forever — their only escape being the correction form that posts to the first broken endpoint.
+
+The fix is one middleware on the group. The alternative — writing on a connection that can see the row —
+**could not have reached the four vendor-owned 2FA/verification controllers at all.** `priority()` cannot
+substitute for the line: it reorders what a route already carries and never adds. Documented boundary: it
+runs before the controller, so a write issued after `Auth::login()` in the same request still has no GUC.
+
+⚠️ **WHY 3,767 PASSING TESTS NEVER CAUGHT IT — THE HARNESS SUPPLIED THE MISSING GUC.** `enterTenant()`
+issues `SET LOCAL`, `RefreshDatabase` wraps the test in one transaction, and the route had no `terminate()`
+to clear it. `TwoFactorEnrollmentTest` asserted a full enrol → confirm → recovery-codes round trip **that
+wrote nothing in production**. A regression test therefore has to clear the GUC with
+`TenantContext::applyLocal(null, null)` — `forget()` is session-scoped and cannot clear an in-transaction
+`SET LOCAL`. Measured before relying on it: a session-scoped `set_config` issued AFTER a `SET LOCAL` DOES
+take effect, which is what lets the fixed middleware win from inside the transaction. Verified red-then-green
+both ways: 5 failed → 5 passed, and reverting the config line (with the revert confirmed applied) reddened 6
+while leaving the 9 pre-existing cases green.
+
+**A second false claim found at the source.** `TenantIsolation`'s docblock called the `users` UPDATE/DELETE
+policies "own-row" when both are `USING (true)`, and its inline comment asserted that permissive writes let
+Fortify's account management update the user's own row — the false premise the whole defect rested on. The
+misdiagnosis had already propagated into Lane B's P1b notes. Both corrected in place.
+
+**#148 — THE DESIGN HALF.** `AuthLayout` gains `variant?: 'card' | 'split'` defaulting to `card`, so seven
+of its nine consumers needed no edit; Login and Register pass `split`, whose value panel is compressed from
+`Welcome.vue`'s own `capabilities` so the landing page and the front door cannot describe the product
+differently. `MdsPasswordStrength` renders the SERVER's list — `PasswordPolicy::requirements()` had **zero
+production consumers** and now ships to four surfaces as per-view props. `password-policy.test.ts` finally
+exists (`PasswordPolicyTest.php:141-154` had been naming it since J3a); it READS the PHP off disk rather
+than copying the patterns, and drifting `\p{N}` → `[0-9]` reddens exactly the non-ASCII case.
+
+⚠️ **THE CONTAINER-QUERY THRESHOLD WAS OFF BY EXACTLY THE PADDING — JR3's LESSON, REPEATED.** `@container`
+measures the CONTENT box, so `.auth`'s 2 × `--mds-space-6` is outside it: 54em engages at a **912px
+viewport**, not the 864 the first comment claimed. Measured: 911 is the card, 912 is the split, container
+863 vs 864. Exceptions-log #12 already records JR3 paying for this on `MdsDataTable`; it is in the log twice
+now (#14). **A number I called derived was stated in the wrong box model, in an increment whose whole claim
+was measurement.**
+
+⚠️ **`AuthLayout` DELIBERATELY TAKES NO `overflow-x: clip`.** That clip pins `documentElement.scrollWidth`
+flat, which is why the e2e overflow assertion can no longer fail on any authenticated page (#12, #13). The
+auth pages are the one place it still measures something real, and this increment added four scans that
+depend on it.
+
+**THE CONTAINING-BLOCK DEFECT IS NOW A GATE RATHER THAN A DISCOVERY.** `MdsSpinner` and `MdsTimeSeriesChart`
+were instances four and five. Rather than a fourth per-component test, `clipped-node-containment.test.ts`
+scans the whole tree: the design system must have **zero**, the app tree **exactly seven** known ones, so an
+eighth fails where it is written. The seven are recorded and deliberately unfixed — the fix is one line, the
+verification is not, and whether each is *live* depends on an ancestor scroll container source text cannot
+see. ⚠️ It needed an explicit `WALK_TIMEOUT_MS`: the default 5s timed out under contention and read as a
+real failure.
+
+**⚠️⚠️ THE SCAN THAT COULD NOT BE BUILT IS THE INCREMENT'S BIGGEST FINDING: THE TWO-FACTOR CHALLENGE PAGE IS
+UNREACHABLE BY ANYONE.** Measured: `POST /login` → 302 → `/two-factor-challenge`, then that page → 302 →
+`/login`. Fortify's `TwoFactorLoginRequest::hasChallengedUser()` resolves the pending user with
+`$model::find(session('login.id'))` on the DEFAULT connection, and mid-login `app.current_user_id` is NULL —
+so `users_users_visibility` hides the row, `find()` returns null, and the controller concludes there is no
+challenged user. **It is the read-side twin of the write-side bug #147 fixed**, and anyone who actually
+enrols in 2FA is locked out at their next sign-in. Nothing caught it because **no seeded identity has ever
+had a real TOTP secret** — the E2E super-admin carries `two_factor_confirmed_at` with a NULL secret on
+purpose. Recorded in `docs/feature-backlog.md` and NOT fixed: the natural fix widens when the user GUC is
+set, which is security-relevant, and its blast radius includes `two-factor.login.store` and the recovery-code
+path. `twofactor@meridian.test` is seeded and unused, waiting for it.
+
+**SIX-FOR-SIX ON VERIFYING A ROW AGAINST THE CODE.** The row was wrong in five more places, and three of
+them removed most of the seeder risk that took E2E red in J3a: `/two-factor/required` carries no enforcement
+gate and needed no fixture; Fortify's `GET /reset-password/{token}` validates nothing, so any token renders
+the same DOM; the 2FA identity needs no membership. Plus `AuthLayout` had nine consumers, not seven, and
+`PasswordPolicy::requirements()` had no consumers at all.
+
+**A PREMISE THAT CANNOT BE MIRRORED IN PEST, AND THE ASYMMETRY THAT HIDES IT.** A test driving `POST /login`
+for a **seeder-created** identity fails under `RefreshDatabase` — `retrieveByCredentials()` resolves on
+`pgsql_auth`, a separate session that cannot see the open transaction — and it fails as `Call to a member
+function all() on array` from inside Fortify, which reads like an application bug. A case driving the SAME
+seeded user via `actingAs()` passes, because that never touches `retrieveByCredentials()`.
+
+**TWO CI FAILURES ON THE FIRST #148 RUN.** gitleaks flagged the fixture `password: 'Abcdefghijk1'` — and a <!-- gitleaks:allow -->
+`gitleaks:allow` directive **must sit on the same line as the match**; on the line above it does nothing.
+⚠️ **AND THIS VERY SENTENCE THEN FAILED CI ON `phase1-completion` FOR THE SAME REASON — QUOTING THE MATCH
+IS THE MATCH.** The line above needed its own directive, which is why it now carries one. The run that
+merged this entry (`c94ba81`) is red, and every branch cut from it inherited the failure; J3c1 found it
+because its own PR went red on a rule it had not tripped. **A lesson written down about a secret-scanner
+match must carry the directive it is describing.**
+And the two-factor scan, which is the finding above. ⚠️ **A cancelled run is not a green one**: my own push
+cancelled the first run and a `gh run watch` on it still exited 0. Parse `conclusion` per job.
+
+**⚠️ AND A NEAR-MISS OF MY OWN, IN THIS FILE'S SIBLING.** The first attempt at the next-prompt update sliced
+`PROGRESS.md` with `str.index()` — and **Standing Rule 7(e) quotes the whole Lane A prompt inline**, so the
+first match was at line 50 and the edit deleted 921 lines. Caught by reading `git diff --stat` before
+committing. Anchor tracker edits on a **column-0 line match**, never on a substring that the file quotes.
+
+**CI on #148: Pest 3856 / 16,516 assertions, E2E 530 passed (16.4m), Vitest 106 files, Storybook axe 229
+across 34 suites, lint 88/96/29, `openapi.json` byte-identical.** ⚠️ The Pest figure is NOT a delta — Lane B
+merged P1c (#146) into the base mid-flight. Against P1c's own 3850/16,479 the delta is **+6 tests / +37
+assertions**, exactly the six `AuthScanFixturesTest` cases; Vitest **+3** and axe **+6 stories / +1 suite**
+are exact; E2E 505 → 530 is +24 for the four working scans plus one previously-flaky case now passing.
+**Fifth time: compare a branch number only against a run of the same base** — and note J3a's own recorded
+3767/16,016 was stale, since the run that actually merged #145 reported **3811 / 16,279**.
+
+**Sweep: 57 rows** (3 pages × 8 viewports × 2 themes + 3 personalization cases) — zero horizontal overflow,
+exactly one `<h1>` everywhere, exactly one "Sign in" button on login, no extra document `scrollHeight` at
+375 × `extra_large` × OpenDyslexic. ⚠️ It measured **geometry, not appearance**: no screenshots were
+reviewed, and contrast rests on the axe gates instead. ⚠️ A standalone sweep script must live in the **repo
+root** to resolve `playwright`; a scratchpad copy cannot.
+
+## 2026-08-14 — LANE A · J3c1: the two-factor challenge becomes reachable (PR #149, `09defc0`)
+
+**6/6, every job parsed individually.** Pest **3863 / 16,563**, E2E **536 passed / 0 failed**, Static ·
+Contract · Frontend · Storybook-axe green. Against J3b's #148 run on the same base (3856 / 16,516) the
+delta is **+7 tests / +47 assertions** — six `TwoFactorChallengeTest` cases plus the premise case that
+replaced a paragraph. E2E 530 → 536, exactly +2 declarations × 3 projects.
+
+**J3c was split in two.** J3c1 is this; J3c2 is Google sign-in, whose plan is already written and approved.
+The split was not optional: the user's decision that personal 2FA still applies to a Google sign-in routes
+that flow **through** the page this increment repaired.
+
+**THE DEFECT.** `POST /login` → 302 → `/two-factor-challenge`, then that page → 302 → `/login`, forever,
+for everyone, with no self-service escape (`two-factor.disable` is behind `auth` + `password.confirm`,
+both past the challenge). `EloquentUserProvider::getModel()` returns a **class-string**, so Fortify's
+`$model::find(session('login.id'))` is a STATIC call that structurally bypasses
+`RlsAwareUserProvider::createModel()` — the provider was configured correctly and unreachable from that
+line. ⚠️ **`84459b4` armed it**: before #147 the 2FA writes affected zero rows, so nobody could acquire a
+real secret through the UI and the divert never fired.
+
+**THE PREDICTED FIX WAS REFUSED.** The backlog called for widening `app.current_user_id` from
+`session('login.id')`. That redefines what the GUC MEANS — every RLS policy is written against "the
+authenticated user", `login.id` names someone who passed factor ONE — and Fortify has no per-route
+middleware hook, so it would land on four other routes. `EstablishTenantDatabaseContext` is untouched.
+
+**THE BLAST RADIUS WAS ONE ITEM WIDER THAN THE ENTRY KNEW, AND IT FAILED OPEN.** The recovery path also
+WRITES: `replaceRecoveryCode()` rotates the spent code before `Auth::login()`, with no user GUC — the
+zero-row shape again. **A used recovery code was never rotated and stayed valid forever.** Measured live
+with the fix disabled: the sign-in still succeeded and the spent code survived.
+
+**FOUR LESSONS WORTH THE ARCHIVE.**
+
+1. **The adversarial pass paid for itself twice running.** Run after 5 of 6 CI jobs were green, it found
+   five real defects — including a threat-model row I had just written that was **factually wrong**: the
+   login limiter does not increment "only on failure". `limiters.login` being set means Fortify's own
+   `LoginRateLimiter` is never consulted, and the live `ThrottleRequests` bucket counts successes and is
+   never cleared. Also: a case that could pass vacuously, an invariant asserted on the one path that
+   cannot break it, and an assertion (`$model->exists`) that could not fail.
+2. **Verify the harness that measures the mutation.** Two full mutation runs reported "nothing reddened"
+   for every mutation while the runs were genuinely red — the attribution regex captured `classname=`
+   instead of `name=`. Believing it would have meant rewriting working tests.
+3. **CI on `phase1-completion` had been red since `c94ba81` and nobody noticed**, because the previous
+   session's own archive entry **quoted** the literal it was warning about, on a line with no directive.
+   Every branch cut from it inherited the failure. Quoting a secret-scanner match IS a match.
+4. **Container-side file discovery silently under-counts on this host.** Inside
+   `dev_formbuilder_app-app-1`, `RecursiveDirectoryIterator` — and therefore PHPUnit's file iterator —
+   misses whole directories on the Windows bind mount (`tests/` 327 of 367, controllers 44 of 90,
+   migrations 71 of 98), deterministically and with exit 0. Run the lint gates on the host and Pest per
+   leaf directory. Symfony Finder is unaffected, so PHPStan in the container is sound — and PHPStan
+   *cannot* run on the host, which dies on a Windows fiber/paging error.
+
+**Also recorded:** a seeded identity with no membership cannot be SELECTed at all inside `RefreshDatabase`
+(neither arm of `users_users_visibility` can admit it, and you cannot set the self GUC without already
+knowing the id) — the way in is a `User::created` listener registered before the seeder. And
+`docs/security-threat-model.md` gained its first authentication rows; it had none, which is how a live
+lockout went unrecorded there.
+
+**Environment:** Docker Desktop's engine wedged mid-session (500 on every API route) and needed a full
+restart plus `wsl --shutdown`; both lanes' stacks were brought back up afterwards.
+
+## 2026-08-14 — LANE A · J3c2 COMPLETE: first-party Google sign-in (PR #151, `7377a68`, 6/6)
+
+**"Continue with Google" on both front doors, on tenant hosts and the central host.** CI: Pest
+**3981 / 17,031 assertions**, E2E **541 passed / 1 flaky / 10 skipped**, Vitest **107 files / 1,835**,
+lint **93/100/29**, `openapi.json` untouched. Measured against the SAME base (`afaa023`, after Lane B
+merged P2a mid-flight): **+55 tests / +250 assertions**, reconciling exactly as 36 + 14 + 2 + 2 + 1.
+
+**THE ADVERSARIAL PASS FOUND A LIVE SECURITY DEFECT AFTER ALL SIX JOBS WERE GREEN.** Four independent
+lenses, every finding handed to a skeptic prompted to refute it: 8 raised, 3 refuted, **5 real**, two
+confirmed by the verifier RUNNING the mutation rather than reading it. The serious one is **OAuth
+login-CSRF**: nothing tied the browser that started a sign-in to the one that finished it, so an attacker
+could obtain an authorization code without spending it, hand the victim the callback URL, and have
+`Auth::login()` run on the ATTACKER's account in the VICTIM's browser — everything typed, uploaded or
+configured afterwards landing in an account somebody else controls. The tenant arm was the same attack
+against the handoff URL, accepted in any browser with an attacker-chosen `return_to`.
+
+**Why it was easy to miss, which is the transferable part.** ADR-0009 §D3 calls the signed `state` "the
+CSRF control". An HMAC over server-chosen data proves *we minted the token*; it proves nothing about who
+holds it — a statement about PROVENANCE that reads like one about ORIGIN. ⚠️ And the connector flow does
+**not** supply the missing half either: its `uid` claim names the member a connection is *attributed* to,
+and its callback lands on a host that never sees the tenant session. So this was never a protection J3c2
+dropped; it is one the family never had, and a sign-in is simply the first flow where its absence is
+exploitable. The first draft of the fix's own docblock said the opposite, and the refuting agent caught
+it — a reviewer correcting the reviewer's correction.
+
+**The fix costs one session key.** `google.flow_sid` holds the `state_id` of the flow this browser
+started and is compared at the two hops that create a session. No cross-host cookie and no token-format
+change are needed, because each of those hops is same-host with its own mint. It compares the flow's own
+id rather than merely requiring *some* value — otherwise an attacker who lures the victim through the
+mint route first would have handed them a binding.
+
+**THE SECOND HIGH FINDING WAS AN AVAILABILITY DEFECT WITH THE SAME ROOT CAUSE: A FAITHFUL PORT OF
+SOMETHING WHOSE TABLE MEANT THE OPPOSITE.** `trim()` copied `SsoAuthFailureRecorder::trim()`, whose table
+holds finished LOG rows, onto a table holding the LIVE state of every in-flight sign-in. The rank-only
+cap therefore deleted rows that were still redeemable: while one member sits on Google's consent screen
+for up to ten minutes, anyone at all can mint enough rows for that workspace to push theirs past the cap
+— **unauthenticated denial of *authentication* for an entire tenant**, with the log blaming
+`state_replayed` and pointing the operator at replay. Liveness is now the outer `AND`, and the
+consequence is stated rather than hidden: the table is capped at N *spent* rows plus whatever the rate
+limiter admits inside one state TTL, because deleting somebody's in-flight sign-in is not an acceptable
+answer to a capacity question.
+
+**TWO TESTS WERE VACUOUS AND BOTH GUARDED SOMETHING THAT MATTERS.** The seat-quota "no orphaned account"
+case asserted two things that were *unconditionally* false — one blocked by RLS with both GUCs cleared
+after `terminate()`, one on a connection that structurally cannot see `RefreshDatabase`'s transaction —
+so removing `provision()`'s `DB::transaction` left all 32 cases green while every full-workspace sign-in
+stranded a live account. It now RETRIES after raising the cap, where a survivor collides on
+`users_email_unique`. The trim case compared two reads of the same surviving rows: a tautology that
+passed even with the subquery inverted to keep the OLDEST N — an inversion that in production makes every
+mint past the cap delete the row it just wrote, permanently breaking sign-in for that workspace.
+
+**THREE DEFECTS WERE ALREADY IN THE TREE, AND ONE COST 100 MINUTES OF TEST RUNS.**
+
+- `GoogleAuthRequest` used `BelongsToTenant` **without `implements TenantScoped`**. The trait adds its
+  read scope unconditionally but gates the `tenant_id` auto-fill on the interface, so the model scoped
+  its reads, its relations worked, and only INSERTs were broken — reported as `42501 new row violates
+  row-level security policy`, which points at the RLS policy rather than at four missing characters in
+  the class declaration. It was the ONLY model in the tree missing the pairing; a new ~1s guard,
+  `tests/Unit/Models/TenantScopedContractTest.php`, now asserts it and is mutation-verified.
+- **A self-deadlock.** `users.google_id` is UNIQUE, so its UPDATE takes `FOR UPDATE`, while the
+  `tenant_users` INSERT takes `FOR KEY SHARE` on the same `users` row for its foreign key. The link runs
+  on `pgsql_auth` — a SEPARATE session — so ordering it inside the transaction made the request wait for
+  a transaction that could not commit until it returned. No error, no rollback, no timeout: two runs sat
+  for 26 and 75 minutes. **A Pest run that HANGS rather than fails is a lock, not a slow host** —
+  `pg_blocking_pids()` named the application's own connection, and a hand-run psql reproduction of the
+  INSERT with the same `set_config(..., true)` inside a savepoint SUCCEEDED, which ruled out the borrowed
+  context and left the lock interaction as the only candidate.
+- A genuine PHPStan `method.notFound` in the committed seam: `fromSocialiteUser()` was typed against
+  Socialite's `Contracts\User`, which has no `getRaw()` — it compiled, ran, and passed its unit tests
+  (which build a concrete `Two\User`) while being wrong the moment anything checked.
+
+**BOTH LANES INDEPENDENTLY HIT THE gitleaks QUOTING TRAP ON THE SAME DAY, FROM OPPOSITE DIRECTIONS.**
+Lane B's P2a found it when its PR went red; Lane A found it by running the pinned scanner locally before
+opening one. The paragraph explaining that quoting the fixture literal reproduces the match quoted it, on
+a line with no directive — the third occurrence. **The rule is upgraded: do not write the literal at all,
+name the fixture rather than its value.** A directive protects one line and must be remembered every
+time; not writing the value has nothing to forget. And run the scanner BEFORE opening a PR, because that
+failure is *inherited* rather than caused, so a green local branch proves nothing about a red base.
+
+**THE APPROVED ROUTE TABLE COULD NOT SERVE ITS OWN DECISION OF RECORD — EIGHT-FOR-EIGHT ON CHECKING A
+DOC-SOURCED ROW AGAINST THE CODE.** It placed the mint route in `routes/tenant.php`, which declares no
+`->domain()`, so a central-host request matches it and dies in identification — while the user's decision
+is that Google works on tenant hosts AND the central host. Registering the same URI in both files does
+not help: `routes/google-auth.php` loads from `withRouting(then:)` while `routes/tenant.php` is mapped
+later inside `booted()`, so the tenant copy would be dead code no test notices. Both now take Fortify's
+own pipeline, with the workspace resolved from the HOST as `RegistrationGate` already does for
+`/register`. ADR-0019 gains **§D6a** (this) and **§D6b** (the browser binding), and **§D8a** records that
+"and invited people" overstates what §D4 allows — an invitation placeholder is unverified, so a
+brand-new invitee is refused by the verified-account condition, correctly and by the decision of record.
+
+**MUTATION PASS: 16 MUTATIONS, ALL 16 REDDEN EXACTLY THE INTENDED CASE.** Two of the first eleven
+reddened NOTHING and both were real gaps: the provisioner's *second* `email_verified` check was
+undefended (the callback refuses first, so the flow never reaches it), and the Suspended refusal was
+masked by `attachMember()`'s own guard — the case passed while the logged reason silently changed from
+`membership_suspended` to `seat_quota_exhausted`, which is the only thing distinguishing them for an
+operator, since §D9 makes the user-facing outcome uniform. ⚠️ **The harness failed twice before any
+result was believed**: its first version used `grep -cF` on a multi-line needle and reported 212
+occurrences of a three-line string; J3c1's had reported "nothing reddened" through genuinely red runs.
+Both failures are indistinguishable from results, which is why every step now asserts its own
+precondition and prints "HARNESS FAILURE" rather than a number it cannot justify.
+
+**VISUAL SWEEP: 30 rows, 0 problems**, frames reviewed in both themes rather than only measured. ⚠️ The
+first sweep flagged all 30 for a 40px touch target and was WRONG: `MdsButton`'s visual box is 40px at
+size `md` and a `::before` overlay with `min-height: 44px` carries WCAG 2.5.8, so a naive
+`getBoundingClientRect()` check condemns every button in the product.
+
+**Also of note:** a THIRD session was editing the same working tree (writing `docs/ACCESS-MATRIX.md` on
+the user's request). `git add -A` swept its work into a commit, which had to be backed out and
+force-pushed; the rebase onto P2a was then done in a `git worktree` so that session's uncommitted files
+were never touched. **Check `git status` before staging when a second agent may hold the tree.**
+
+## 2026-08-14 — LANE A · J3c2 (Google sign-in) begun: dependency, ADRs, seam, schema, state (branch `j3c2-google-signin`, no PR yet)
+
+**Six commits, pushed, nothing half-edited.** The increment was split so the riskiest and most
+irreversible parts landed first, and each was verified against the running stack rather than reasoned
+about.
+
+**THE PLAN'S #1 RISK IS CLEARED.** `laravel/socialite v5.29.0` resolves cleanly against
+`laravel/framework ^13.8`, so the hand-rolled `HttpGoogleIdentityProvider` held in reserve is not needed.
+Stated cost rather than glossed: it pulls four transitive packages, three of which
+(`league/oauth1-client`, `phpseclib`, `random_compat`) exist for OAuth**1** providers this product will
+never use.
+
+**ADR-0009 COULD NOT SIMPLY BE OVERRIDDEN, so it was amended in four places.** §D2 extended (the
+one-central-callback rule carries over, but this callback takes `web` because its central arm signs in
+there, and declares no `Route::domain()` because that would 404 on `localhost` and make the fake
+unexercisable locally). §D3 amended — **its own revisit trigger fired**, and the interesting part is that
+it fired against **one of two legs**: the outbound `state` stays a stateless HMAC bounded by Google's
+single-use code, while the handoff that creates the session is a row. §D4's trigger answered with a
+sibling middleware rather than a reuse. And the **Socialite rejection carved out** by answering its three
+reasons one at a time — `->stateless()` is Socialite's own mode for this topology, Google's driver is
+first-party rather than the third-party package the clause objected to, and the adapter it said Socialite
+would replace **is written anyway**, so reverting is one binding line.
+
+**ADR-0019 written**, twelve sub-decisions. §D11 is the one to read: a user's own second factor still
+applies, **deliberately diverging from ADR-0016 §D22's opposite answer for SAML**, because SAML is an
+enterprise trust anchor an administrator configured while Google is a consumer credential the end user
+chose. Recorded as a divergence with its argument, so it is not later "fixed" in either direction.
+
+**MEASURED, NOT ASSERTED.** The schema's three CHECK constraints were exercised live: an UPDATE stamping
+`completed_at` with no `handoff_hash` raises 23514, and `fill()` cannot reach `completed_at` — the
+non-fillable guard that stops a well-meaning `fill()` reintroducing the read-then-write race. The state
+service was exercised live too: the token carries no `/` (so it survives a query-string round trip), both
+the tenant and central arms round-trip, tamper/garbage/wrong-version/expired are each refused, and — the
+one worth keeping — **a CONNECTOR state token presented to this verifier is refused**, which is what makes
+the derived-key domain separation a genuine replacement for the connector state's `prov` claim rather than
+a claim about one.
+
+**14 unit cases on the seam**, seven of them on `email_verified` failing closed — that claim is this
+flow's analogue of SAML's signature check, it arrives inside a raw JSON array, and `(bool) "false"` is
+`true`.
+
+**Remaining** (listed precisely in the Lane A block and the next-prompt line): the request service, the
+middleware, the provisioner, three controllers and routes, the UI, ~24 feature cases, and the docs.
+
+## 2026-08-14 — LANE B / P2b: the per-tenant extraction substrate (PR #152)
+
+**The first of the three deliverables ADR-0002's "Future migration path" has deferred since 2026-07-03**, and
+the one ADR-0017 declined to build until its two entry criteria had answers. New **ADR-0018**. Both criteria
+turned out to follow from decisions already on the record, so nothing was escalated; both are recorded as
+reversible.
+
+**THE TWO ANSWERS.** **`users` is a membership roster** — nine columns withheld, each with a reason beside
+it. Four are credentials for a **central** identity (one human, N workspaces), so extracting them would hand
+one tenant material for an account still live in workspaces it has nothing to do with; `last_active_tenant_id`
+is *another workspace's UUID*, the single cross-tenant fact the architecture exists to withhold. **Platform-
+shared rows are out and counted** — the widened six are read under an explicit `tenant_id = ?` on top of RLS,
+driven by `TenantScopedTables::rlsReturnsSuperset()`, so P2a's classification is load-bearing rather than
+documentary. Measured: 10 templates, 6 library questions, 29 permissions, 5 roles excluded.
+
+⚠️ **THE DANGLING FOREIGN KEY ADR-0017 PREDICTED IS REAL AND IS REPORTED RATHER THAN REMOVED** — reproduced on
+the dev tenant before any test existed. The fix that bullet's phrasing invites, widening the GUC so the roster
+is "complete", was refused on J3c1's grounds and would additionally resolve the platform operator named by
+`impersonation_tokens.operator_id`, who belongs to no tenant at all. The 34 `users`-referencing columns are
+derived from `pg_constraint`, not listed — a list is what goes stale when a migration adds `forms.archived_by`.
+
+**THE FOUR WAYS A CLEAN RUN MEANS NOTHING.** Wrong role (verified live: as `meridian` it aborts and never
+creates the directory) · no context (the GUC is read back) · a **renamed** secret, where a `WITHHELD` entry
+matching no column filters nothing while every "password is withheld" assertion stays green · torn reads
+across 43 tables (one REPEATABLE READ transaction, isolation level **read back**, not promised).
+
+⚠️ **THE REPO WAS WRONG ABOUT ITS OWN DRIVER, AND MUTATION TESTING IS WHAT FOUND IT.** Deleting
+`ExtractRowEncoder`'s boolean branch left the end-to-end assertion green, so it was measured: on PHP 8.4.24 /
+pdo_pgsql 8.4.24 with `ATTR_EMULATE_PREPARES = false`, `boolean` returns a PHP bool and every integer width a
+PHP int, because a native prepared statement carries the column's type OID. **Four comments in this repo assert
+the `'t'`/`'f'` string behaviour** — Phase-0 folklore, true only under emulated prepares. Their `::int` casts
+stay correct; only the reason was wrong. The branch stays (one `options` override turns every flag into the
+string `"f"`, which a JSON-trusting destination reads as TRUTHY) and `DriverTypeMappingTest` pins the measured
+mapping. `numeric` stays a string — the driver's doing, not the encoder's.
+
+⚠️ **THE ADVERSARIAL PASS EARNED ITS PLACE FOR THE THIRD INCREMENT RUNNING, AFTER 6/6 WAS ALREADY GREEN.**
+(1) `assertWithheldColumnsExist()` — the guard whose entire value is stopping a credential reaching a file —
+was called **inside the write loop**, so a renamed secret on the 43rd table fired only after 42 had been
+written, leaving a directory of real tenant data produced by a run whose whole point was that it refused.
+Hoisted to a pre-flight. (2) **`0700` does nothing on the production host**: ADR-0005 is Windows Server 2016
+running PHP natively, where `mkdir()`'s mode is ignored and `chmod()` toggles only the read-only attribute —
+so the containing directory's ACL is the entire filesystem control, and three places claimed otherwise. Same
+failure class as P2a's `dedicated_db | In effect: Yes`. (3) The **GeoJSON transform had never been executed by
+anything** — the only `TRANSFORMED` entry, and no fixture had a geo row, so it shipped on inspection. That is
+the boolean finding recurring one file later: a coercion nothing can redden is either dead code or an unpinned
+assumption.
+
+**THE CENSUS GATE CAUGHT ITS OWN AUTHOR TWICE**, and the second was hidden behind the first because the check
+was an `expect()` inside a loop. Rewritten to collect and assert once — a gate that reveals its findings one
+per run teaches people to distrust its green.
+
+**PEST DELTA RECONCILED EXACTLY**, against a run of the SAME BASE that `afaa023` happens to have (31764000285):
+3926 / 16,781 → the five new files measured 82 passed / 182 assertions at that commit, and CI reported
++82 / +182. Closed on the first try.
+
+**NOT BUILT, ON PURPOSE**: import · attachment blob transfer · `user_ui_preferences` · **any HTTP surface**
+(a route needs a permission key, which is an authorization widening). **`docs/security-threat-model.md` still
+carries no SSO rows** — inherited from P1a–P1c, not created here, and still owed.
+
+⚠️ **AND ONE CROSS-LANE CONSEQUENCE THIS INCREMENT INHERITED RATHER THAN CAUSED.** Lane A flagged that two ADRs
+now carry the number **0017** — P2a's `0017-tenant-isolation-tiering` and J3c2's `0017-first-party-google-sign-in`.
+Neither lane erred: each checked the sequence before starting and each correctly saw 0016 as the highest.
+**ADR-0018 is unambiguous and the next free number is 0019**, and 0018's header now states in one line that every
+"ADR-0017" inside it means the tenant-isolation file. **Lane B did not renumber Lane A's file** — their own note
+asks for one deliberate reviewed commit rather than a tail-end sweep, and 117 occurrences across 65 files are
+interleaved between the two meanings, including inside shared documents where both lanes cite their own 0017 in
+adjacent paragraphs. **The generalisable rule: a globally-numbered artefact — an ADR, a migration timestamp, an
+exceptions-log entry — is a SHARED-NAMESPACE ALLOCATION and cannot be chosen safely from inside one lane.** The
+same session also produced a duplicate migration prefix (`2026_08_16_000001` twice), harmless only because the
+two migrations are independent.
+
+## 2026-08-15 — J4a (design-system primitives), plus two unblocking PRs neither lane could have caught
+
+**Merged: #153** (ADR-0017 → ADR-0019), **#154** (the red integration branch), **#156** (J4a itself). Lane A.
+
+**The session opened by finding `phase1-completion` ALREADY RED at two commits, and nobody had noticed.**
+J3c2 added `users.google_id` and the `google_auth_requests` table; P2b added a drift test with a hard-coded
+per-table census. Each PR was green on its own base; they met on the integration branch and the census went
+stale in the same merge that created it. **The census failure was only the symptom — `google_id` had no
+withholding decision at all**, so it was scheduled to leave the building in the next tenant extract. It is
+withheld now as a stable globally-unique JOIN KEY: two tenants each holding an extract could match rows on it
+and establish exactly which members they share, with neither operator ever being told. Pinned BY NAME, and
+both mutations reddened exactly one test against a verified green baseline of 51.
+
+**The ADR collision was resolved per-occurrence, not by a global replace.** 133 refs across 66 files, 72 moved
+and 61 stayed, decided by reading each line — a path rule would have been wrong in both directions
+(`deployment-infrastructure.md` reads as Lane B's and its one reference is Lane A's; `technical-architecture.md:526`
+reads as neither and is wholly Lane B's). ⚠️ **0010 looked free and is not**: ADR-0011, -0012 and -0013 each
+reserve it for H1d and each says so while declining to fill it.
+
+**J4a shipped three primitives and 20 adopted surfaces, with zero PHP.** The row was wrong in five places
+(ten-for-ten now on verifying one against the code): "~15 primitives" is a number nobody has ever itemised,
+`MdsBreadcrumb` had already shipped in J2a, the two breadcrumb stragglers were the wrong two, `MdsTooltip`'s
+named defects were already fixed in page text, and one "notice" was a date-range caption pinned verbatim by a
+test.
+
+**Six lessons worth carrying:**
+
+1. **A call-site class overriding a shared component needs more than one class-worth of specificity, or it is
+   luck.** Vue puts the child's scope-id and the parent's on the SAME root element, so
+   `.mds-alert[data-v-child]` and `.builder__warnings[data-v-parent]` are both (0,2,0) and bundle injection
+   order decides. Found by the adversarial pass AFTER 6/6 green; no gate here can see it, because the banner
+   renders only after an import produces warnings.
+2. **Name the thing, never quote it.** A guard that scans text matched the comment explaining the guard —
+   three times, in three different gates. `token-references.test.ts` strips BLOCK comments but scans line
+   comments, so a `//` explaining that a variable must not carry the design-system prefix failed by spelling
+   it. gitleaks had already done this twice.
+3. **A pipe hides the exit status you care about.** `npx storybook build … | tail -5 && echo OK` reads *tail's*
+   status. Same family as reading Pint's exit code instead of its JSON.
+4. **`height:` matches inside `line-height:`** — a hyphen is a non-word character. The assertion failed
+   against a CORRECT stylesheet and would have been "fixed" by deleting a line-height the component needs.
+5. **An astral initial is two UTF-16 units.** `AccountMenu` indexed with `[0]` and rendered U+FFFD for any
+   non-BMP name — and the replacement reintroduced the same class of bug two lines below the comment warning
+   about it, via a `.slice(0, 2)`. Only an astral test case can tell the two implementations apart.
+6. **Reviewing frames is not measuring them.** The sweep's numbers were all clean; looking at the frames is
+   what confirmed the pending-invite chip reads neutral against brand, and that 0 audit rows with `is_system`
+   carry an avatar.
+
+**Deferred with reasons stated rather than dropped:** `MdsTooltip` (structurally blocked — `.sidebar` is
+`overflow-y: auto`, which forces `overflow-x: auto`, so the rail DSR §3.4/§6 asks for a tooltip in clips it;
+needs a `Teleport` interoperating with `Modal/inert-stack.ts`), the `MdsProgress` step-count variant (its
+reference implementation is better specified than §3.9 and migrating risks 17 assertions in a separate SPA),
+a person-identity colour scale (reusing the form-identity six measures 2.91:1 under white in dark and would
+put a person and a form at 0°), and ~20 further notices that carry individually-argued `role` choices.
+
+---
+
+## 2026-08-15 — CROSS-LANE ALIGNMENT: one boundary map, a namespace ledger, and what a lane does when its queue empties
+
+User-requested alignment while **both lanes were merged and idle** (zero open PRs, both worktrees clean,
+base `be67d06`). Docs-only; no code file changed, so no gate could move.
+
+**The defect was duplication, not disagreement.** Each lane's next-prompt restated its own copy of the
+subsystem split rather than pointing at one authority, and the copies drifted until they contradicted:
+Lane A's conceded five named subtrees to Lane B; Lane B's claimed all of `app/Services/`, all of
+`app/Support/` and all of `config/`. Lane A's very next row (J4b) edits `app/Support/Navigation/CrumbTrail.php`
+— its own under one map, a trespass under the other, **with both lanes reading their own map correctly.**
+Same shape as the ADR-0017 collision, same fix: one authority in Standing Rule 7(b), referenced and never
+copied, with "a restated boundary is itself the defect" written into both prompts.
+
+**Two user calls, both reversible.** `app/Services/` and `app/Support/` are not wholesale Lane B's — it owns
+`{Sso,Tenancy,Connectors}` under each, and `app/Support/Navigation/` is Lane A's on the merits (Lane A wrote
+`CrumbTrail` in J2d). `resources/public-runtime/` goes to Lane B for the CRDT row, with the cost stated up
+front: it is one of the three chunks Lane A's Vitest gate sums, so Lane A's 110-file baseline moves.
+
+**The finding that would have stalled the project silently.** Both lanes would soon have reported "queue
+empty" with a real build row outstanding — the **full gamification engine** (the 2026-08-09 decision of
+record, the last increment before deployment) is in neither queue, and nothing said what a lane does when
+its rows run out. New Rule 7(f): first lane to empty claims gamification; last lane to empty **recommends**
+the final integration PR rather than performing it; the held list re-enters at that merge and no earlier.
+
+**Also closed:** the ADR/migration namespace ledger as Rule 7(g) (next free is 0020; **0010 is reserved for
+H1d and is not free**, per its own citations in `0011:8`, `0012:8`, `0013:8`); the note that
+`phase1-completion` is checked out in `fb-lane-b` so the other lane must branch from `origin/`, never local
+HEAD; and the Phase-4 roadmap row, stale by four merged PRs and still calling two foreclosed rows "not started".
+
+**Remaining after this:** Lane A J4b -> J4c -> J5; Lane B threat-model SSO section -> CRDT sync; then
+gamification; then the final integration PR to `main`.
+
+**Lesson, and it generalises past this repo:** a coordination rule that is *copied* into each participant's
+briefing has no single point of truth, so it drifts silently and each participant keeps verifying against its
+own copy. Duplication is what made the drift invisible, not carelessness. The same reasoning already applies
+here to globally-numbered artefacts (ADRs, migration prefixes): reading the current maximum is not a reservation.
+
+---
+
+## 2026-08-15 — LANE B, `P1d`: the threat model's SSO section, and the login-CSRF it found
+
+`docs/security-threat-model.md` had carried **no SSO rows at all** since P1a, which three documents said
+in their own words and none of them fixed. It gains **§2 +2 surface rows** (the ACS on its own; the
+tenant-facing SAML endpoints), **§3 +1** (cross-tenant assertion acceptance), a **19-row SAML table in §8**,
+and **§9 items 17–25**, with item 8 widened.
+
+**The row said "section" and the document's own preamble forbade one in writing** — J3c1 had already
+argued that a new §9 renumbers Residual Risks and Out of Scope while six documents cite §4–§8 by number.
+Verified live against four §9 citations. So the content went *into* the existing sections on the
+bolded-bridge idiom §5 and §7 already use. Ten-for-ten on verifying a doc-sourced row against the artefact.
+
+**The finding that outgrew the row: the SAML login arm has no browser-flow binding.** Structurally the
+login-CSRF J3c2's adversarial pass found in the Google path. Measured rather than reasoned — `GET
+/sso/saml/login` writes **zero** session keys, and an assertion posted from a session that had never
+visited the mint endpoint answered `302 /dashboard`, authenticated as the asserted subject. Google's fix
+cannot be reused: both of its session-creating hops share a host with the mint, while the ACS is a
+cross-site POST under `SameSite=Lax` and structurally receives no cookie. It needs the same-site
+completion hop the step-up arm already has. **User decision: verify, then split** — recorded as the
+document's second `Open` verdict and scheduled as **P1e**, now in the Lane B queue ahead of CRDT sync. The
+probe was deliberately not committed; P1e commits the inverse.
+
+**Three controls this repository documented and never built**, the fifth, sixth and seventh instances of
+that pattern and the first time three landed together: an `SsoCertificateInspector` docblock claiming the
+ACS checks certificate validity dates (it has one consumer, the settings presenter, and php-saml parses no
+validity dates anywhere — so an expired signing certificate authenticates indefinitely); a "scheduled
+prune" of `sso_auth_requests` that never existed, for a table an unauthenticated endpoint appends to one
+row per hit; and a 60-second clock-skew narrowing that covers `Conditions` only while the library still
+judges `SubjectConfirmationData` and `SessionNotOnOrAfter` at its hard-coded 180.
+
+**Built:** the trim (liveness as the outer `AND`, so no in-flight sign-in is evictable at any volume — the
+J3c2 defect, not repeated), a limiter on `/sso/saml/metadata`, and a router-level pattern plus throttle on
+the step-up completion hop.
+
+**The adversarial pass found a defect in this increment's own new code**, five increments running: the trim
+is a DELETE on the authentication mint path, and a deadlock between two concurrent mints would have
+answered `GET /sso/saml/login` with a 500 — worse than the unbounded growth it fixes. Guarded, with the
+threat-model row amended to claim a best-effort bound rather than an invariant.
+
+**Mutation pass: 8 mutations, all 8 reddened, zero undefended.** Each verified APPLIED by md5 with its
+needle asserted to match exactly once; M0 proved the harness green first; the tree was asserted clean
+before and after every step. M1 (deleting the liveness predicate) reddens four cases and still does with
+the guard in place. **M8 is the transferable one: a `throttle:` alias naming an unregistered limiter
+resolves to an unlimited passthrough and fails silently, so a middleware assertion alone is vacuous.**
+
+**Also repaired:** `security-threat-model.md:51` was blank, severing P2c's constraint-boundary row from
+§3's table so the section's highest-consequence isolation row had been rendering as a literal paragraph of
+pipes since P2c merged — invisible to every gate, since nothing lints markdown, and found by counting
+cells per line.
+
+**Lesson, and it is the uncomfortable one:** seven line-number citations into this document across four
+files were converted to section citations — three already stale before this increment — and then the same
+anti-pattern turned up **five times in this increment's own new prose**, caught only by re-reading the
+diff. The author of a rule is not exempt from it, and a document that cites by line number is a citation
+with an expiry date nobody can see.
+
+## 2026-08-16 — LANE A · J4b1 (PR #158): MdsTooltip, MdsMenu, sidebar grouping, and a drawer that takes the page
+
+J4b was split in two by user decision, by subsystem: J4b1 is design-system + shell and touches **zero PHP**;
+J4b2 (the breadcrumb closure) follows. Merged `6f8f94b`, 6/6 with every job's `conclusion` and `steps` parsed.
+Vitest **114 files / 1,964 tests** (+4 / +81, reconciling exactly as 26 Tooltip + 23 Menu + 9 useInertBackground
++ 4 TopNav + 16 Sidebar + 3 AppLayout).
+
+**The row was wrong in five places — eleven-for-eleven now.** The drawer *did* have an Escape handler (bound on
+a non-focusable div, so it only fired while focus was inside the shell); `markRaw` is *not* absent from the repo,
+only from `resources/`; `FormRowActions` is a weak `MdsMenu` consumer because **five** of its nine buttons are
+e2e-pinned, not one; `MdsTooltip` did have a consumer all along (the rail the DSR mandates twice); and the
+breadcrumb closure is blocked twice rather than being wiring.
+
+**The Storybook axe gate runs on this host.** It has been recorded as impossible for several increments; it needs
+the package's own dependency tree (`npm --prefix packages/design-system install`) plus its own browser, and must
+be invoked through the root script or from inside the package — from the repo root the framework preset fails to
+resolve, which is the symptom that got written down as "cannot run". A merge-blocking gate believed unrunnable is
+a gate nobody runs, and it failed J4b1's first CI run. What it caught: a Vue SFC parse error while the app build,
+`vue-tsc`, Vitest and a direct `parse()` all passed. Trigger is tag-shaped literals in `<script>` comments,
+**file-dependent rather than per-literal** — three failed, two passed, two injected elsewhere passed; controls run
+in both directions (original restored and re-failed; line endings ruled out). No clean per-token rule, so the
+answer is the standing one: **name the thing, never quote it** — fourth gate, first Vue one.
+
+**The accent bar was a live 1.4.11 failure, not hygiene.** Planned as a `-bg`→`-fg` token change on principle;
+measured in the running app at **2.54:1 dark / 4.38:1 light** against the 3:1 owed, now 6.15 / 6.51. `-bg` resolves
+to the same `rgb(14,111,232)` in both themes, so one fill carried both grounds. axe checks no indicator contrast.
+
+**The adversarial pass found three more after 6/6 — fifth increment running.** (1) The drawer had **no reachable
+way out**, a regression the increment introduced: taking the page inerts the top nav and the hamburger with it, and
+the shipped reasoning ("Escape and the scrim, exactly as MdsModal treats its opener") was a false comparison —
+`MdsModal` ships a labelled close button *inside* its panel. The scrim is a bare div with no role, name or tab stop.
+**A surface that takes the page owes a dismiss control that survives its own inerting** is now a DSR rule.
+(2) A disabled menu item with an `href` still navigated — `preventDefault` cannot win a race against a link
+component whose own handler Vue merges first. (3) `placeTooltip` never clamped its main axis, contradicting its own
+docstring. The clamp test then failed and **the test was wrong, not the code**.
+
+**Two more things the suite caught that no gate would have.** The tooltip never appeared at all — a zero-area rect
+read as "offscreen", so it showed, measured and hid in one frame; every case that *seeded* visibility passed, and
+seeding visibility is what the axe stories do. And a menu inside a dialog would have closed the **dialog**: Escape
+must bind on the menu's own root, because `MdsModal` listens on its panel — an ancestor — so a document-level
+bubble listener is last to see the key. Only an ancestor spy distinguishes the two implementations.
+
+**Vitest lied about its own file count**: a chunk printed "29 passed (29)" against 30 files on disk and exited 1,
+skipping `token-references.test.ts` — the one gate validating the new tokens. `clipped-node-containment.test.ts`
+separately fails as a **timeout** under load (107s vs 30s) and passes in 6.1s alone.
+
+**Four findings left unfixed, deliberately, and two are masked by the first**: ⌘K is a dead key while the drawer is
+open (the palette `preventDefault()`s before its guard, and the drawer joining a *dialog* count is the real leak;
+the fix is in unclaimed `resources/js/composables/`); a stacked modal over the drawer strands focus on `<body>`,
+unreachable only because the ⌘K defect blocks the sole global opener; `useInertBackground` never re-pushes on a
+root identity change; and the tooltip's capture-phase Escape is page-global.
+
+Also shipped: a `tokens/z-index.json` scale naming five rungs that were literals in four files, with a Vitest case
+holding the modal rung equal to the inert stack's own constant; and DSR §3.4.1 amended, because it said the inert
+exemption "belongs to the toast host alone" while §3.4a — in the same file — instructed J4b to take a second one.
+
+## 2026-08-16 — LANE A · J4b2 (PR #162): the breadcrumb closure, and a crumb that was stricter than its route
+
+The last two of DSR §3.4's six migrations — `webhooks/Show` and `integrations/RuleShow` — now render
+`MdsBreadcrumb` from a server-built trail. J4b is closed. CI Pest **4106 / 17,296**; PHPStan delta 0; lint
+93/101/29 unmoved; `openapi.json` byte-identical.
+
+**The row called it controller wiring; it was blocked twice in the server.** `CrumbTrail` had no generic
+crumb API, and both roots carry a plan FEATURE as well as a policy while nothing in the class had ever
+consulted entitlements. Twelve-for-twelve now on checking a row against the code.
+
+**And the fix for that second blocker introduced a defect of its own, caught by the adversarial pass after
+6/6 — sixth increment running.** `RequireFeature` fails **open** on a null plan (`currentPlan() !== null &&
+! feature($key)`, which its docblock calls a "dev/test has no plans" pass-through); `feature()` returns
+**false** in that same state, because `currentPlan()?->featureEnabled() ?? false` cannot tell *denied* from
+*nothing to ask*. The crumb was therefore **strictly stronger than the route it mirrors** — request
+admitted, page 200, root crumb inert — and the unconditional back-link had been deleted in the same commit,
+so there was no other way out. Already live in the green suite: two existing test files assert 200 on those
+routes with no plan seeded, and nothing asserts `crumbs`. **A crumb must offer exactly what the route
+accepts: more permissive hands out links that bounce, stricter hands out dead ends.**
+
+**The mutation pass had a general hole: I varied the OPERATOR and never the OPERANDS.** Three mutations all
+reddened correctly, yet copying one method's body verbatim into the other survived everything — every
+seeded plan granting `webhooks` also grants `native_connectors`, and every role holding one permission
+holds the other. The module toggle is the one seam that separates them, and now pins both.
+
+**Two docblocks were corrected rather than left flattering** — they claimed a live protection for a reader
+who cannot reach these pages, since the detail routes carry the same feature middleware and each policy's
+`view()`/`viewAny()` are identical. Labelled as fail-closed guards no shipped route can observe.
+
+**Two crumbs, not three,** though a form middle-crumb was available for free from `form_url`: a breadcrumb
+is a path, and there is no `/webhooks/{form}` route to stand on.
+
+**Separately, a self-inflicted one worth recording.** The J4b1 tracker update (#160) deleted **1,086 lines**
+of PROGRESS.md — Current Status, the roadmap and the ledger — because the script replaced from the FIRST
+occurrence of the hand-off marker, which is the example inside Rule 7(e), not the real line ~1,085 lines
+below. It merged: docs-only changes are green by construction, and the `grep -c` used afterwards returned 1,
+which reads as success and was in fact the symptom. Restored as #161, verified by normalized diff (exactly 4
+lines removed, all four intended). ⚠️ **And the first version of the warning added to Rule 7(e) made it
+worse** — it quoted the marker to advise anchoring on it, the quote wrapped, and that created a third
+line-start occurrence inside the note warning about the first two. Rewritten without quoting it. Fifth
+"name the thing, never quote it" of the session, and the only one to booby-trap its own remedy. The rule
+that survives: **assert the resulting LINE COUNT, because a marker check tells you what you found and only
+the line count tells you what you destroyed.**
+
+---
+
+## 2026-08-16 — LANE B: P1e, the SAML login arm's browser-flow binding (PR #165, `05abb23`)
+
+Closed the threat model's second `Open` verdict — §8's solicited-assertion row and §9 item 22 — reproduced
+during P1d rather than inferred. `GET /sso/saml/login` wrote zero session keys, so an assertion posted from a
+browser that never visited the mint answered `302 /dashboard` as the asserted subject: an attacker holding an
+account at the tenant's own IdP could withhold the auto-POST form and have a victim's browser complete their
+sign-in. Google's one-line fix could not be borrowed — the ACS is a genuinely cross-site POST under
+`SameSite=Lax` and receives no cookie — so the login arm got the same-site completion hop the step-up arm has
+had since P1c. 6/6, CI **Pest 4117 / 17,508** and **E2E 540**, **+25 / +224** against base `1527211`'s own run,
+**predicted before the run and matched to the digit on both numbers**.
+
+**Verifying the row found three more things it did not say — eleven-for-eleven.** A CHECK constraint forbids a
+login row from carrying `user_id`, so the prescribed hop had nowhere to learn who to sign in; the answer was a
+new `resolved_user_id` rather than widening a constraint three docblocks cite by name. Then two live defects
+nobody had filed. **The ACS was replacing the browser's session cookie** — measured with `curl`, not reasoned:
+inside `web`, `StartSession` mints a fresh id when no cookie arrives and emits it unconditionally, so a browser
+replaced the member's real cookie and followed the 302 with an empty one. **P1c's step-up hop had therefore
+never worked in a real browser**, and P1e would have 404'd for everybody — with the outage and the security
+refusal sharing one observable, so an acceptance test would have passed either way. No test here could see it:
+the Pest client never feeds `Set-Cookie` forward and the store is memoised per process. **The harness models
+the session as a process global; a browser models it as a cookie.** And **the trim was evicting sign-ins still
+in flight**, because `consumed_at IS NOT NULL` stopped meaning "finished" when P1c introduced the hop — the
+corrected three-armed shape already existed on `google_auth_requests`, ported forward when J3c2 hit this and
+never back to the table it came from.
+
+**18 mutations across three rounds, zero undefended — and the survivors were the interesting part.** M2,
+deleting the browser comparison, reddens exactly the three binding cases and nothing else. M12, putting the ACS
+back in `web`, reddens exactly one: the cookie header assertion. Round 1's four survivors were each a guard
+masked by a redundant partner, so **reporting "4 undefended" would have been as wrong as reporting "0"**; round
+2 removed both halves of each pair, two reddened, one exposed a genuine gap that gained a test, and one
+survives by construction because a CHECK makes its two guards equivalent.
+
+⚠️ **The harness itself failed twice, and both failures are the lesson.** Its first run printed
+**"M0 baseline: 0 passed / 0 failed" and accepted that as green** — a gate that reports only a verdict cannot
+tell "nothing is wrong" from "nothing was examined", and M0 now asserts an expected count. Its second run
+crashed decoding Pest's UTF-8 output under cp1252 **between applying a mutation and reverting it**, leaving a
+deleted security call in the working tree. **A mutation harness that can exit with a mutation still applied is
+more dangerous than no harness.**
+
+⚠️ **The adversarial pass found four more after the work looked done — sixth increment running — and the worst
+was a comment.** Four places named `Auth::loginUsingId()` as the call the hop makes; the code deliberately does
+the opposite, because that resolves on `pgsql_auth` whose policy is `USING (true)`. **Reconciling code to those
+comments would have made any account in the deployment signable into any workspace.** Also: no `SsoGate` on the
+hop (so an admin's kill switch did not stop in-flight completions, and `last_login_at` refreshed on a disabled
+connection), a missing UPDATE predicate, and two tests that had quietly become unfailable.
+
+⚠️ **Three self-inflicted defects in my own diff, all caught by checking rather than reading:** a severed table
+row — P1d's own `:51` defect reintroduced by the increment citing it, found by counting cells per line; a bash
+double-quoted string that command-substituted two backticked identifiers out of an ADR; and a column documented
+against `audits` because the anchor matched the file's first `user_id` row. Plus one **false positive I
+correctly did not act on** — `\|` is a legal escaped pipe.
+
+ADR-0016 gained §D27–§D30 in place on the P2c precedent; **no ADR number was allocated, `0020` stays free and
+`0010` stays reserved for H1d.** The base moved four PRs under me while this was in flight; the rebase was
+**conflict-free**, which is Rule 7(b)'s boundary earning its keep. **CRDT sync is now the last named Lane B
+row, and Rule 7(f) governs from there.**
+
+---
+
+## 2026-08-17 — LANE A · J4c1: `MdsTabs`, and a tab underline that had been failing 1.4.11 in teal dark
+
+**`MdsTabs` is built and adopted into `ConfigPanel.vue`** — the product's ONLY in-page tablist, so the
+primitive had exactly one possible consumer and that consumer was the reason it was owed. Zero PHP, so
+Pest, PHPStan, the three lint gates and `openapi.json` cannot move (`openapi.json` regenerated with
+`scramble:export` and diffed rather than asserted). Vitest **116 files / 1,991 tests**, exit 0 on all three
+chunks; Storybook axe **40 suites / 284**. No exceptions-log entry, no ADR.
+
+**The extraction bought scrutiny rather than reuse — J4b's `MdsMenu` justification — and found three
+defects the same way. Thirteen-for-thirteen on checking a row against the code.** An app-tree component
+gets no story and therefore no `checkA11y` scan, and the builder's thirteen end-to-end locators click every
+tab on that page without ever asking what any of them POINTS AT. Hidden by that gap: no `aria-controls`
+anywhere; a `tabpanel` with `tabindex="0"` while full of form controls, which the APG reserves for panels
+holding nothing focusable; and that panel then setting `outline: none`, so the redundant stop it minted was
+invisible to whoever landed on it.
+
+**The fourth was a live WCAG 1.4.11 failure, and only measurement separated it from hygiene.** The selected
+tab's 2px underline used `action-primary-bg` — a fill, guaranteed only against the text printed on it. Third
+time the project has paid for that substitution (J2a on `MdsTabNav`, J4a on the accent bar), and **DSR §3.4's
+own Tabs paragraph was still prescribing it**, which is how it came to be implemented: a leftover
+instruction in a spec is not inert. Measured in the running builder, old → new: blueprint light 4.71 → 7.01,
+blueprint dark 3.42 → 8.29, teal light 7.48 → 7.48 (one colour for both tokens there), **teal dark
+2.41 → 6.39**. The 2.41 is below the 3:1 a non-text indicator owes, on a §2.9 accent any user can pick.
+The four new values reproduce `MdsTabNav`'s recorded JR1 numbers to the digit.
+
+**The mutation pass disproved one of my own docblocks.** J4b2's hole was varying the operator and never the
+operands, so this varied strings and subjects. Eleven mutations; the dangling-`aria-controls` version, the
+wrong-tab label, the restored panel tabindex, the missing tab stop, the fill token, the flipped arrow and an
+undiscriminating tab set all reddened, and a control correctly survived. **But mutating the call site from
+`ariaLabel` to `aria-label` also survived, and the docblock said that would leave the tablist unnamed.** Vue
+CAMELIZES a hyphenated prop key, so the prop is filled either way and only `vue-tsc` rejects it. Corrected
+in place. ⚠️ **The harness itself had a bug worth keeping: `grep -F -c` counts matching LINES, not needle
+occurrences**, so every multi-line needle reported a false count — it refused to mutate rather than
+mis-applying, which is the safe direction, but a mis-counting guard silently skips coverage.
+
+**The adversarial pass found a defect this increment itself introduced — seventh increment running it,
+third time it has caught the increment's own new code.** `.mds-tabs__list` was `overflow-x: auto` AND
+carried the 1px rule AND its tabs carried a negative bottom margin to overlap it. `overflow-x: auto` with
+the other axis unset coerces `overflow-y` to `auto` (CSS Overflow 3 — the rule that forces `MdsTooltip` to
+teleport out of the sidebar rail), and a negative bottom margin on a flex item in that box shrinks the
+container by 1px while the item's border box does not. Measured in the running builder: `scrollHeight` 35
+against `clientHeight` 34, at 1440 and at 375. **Fifth instance of the class** after `MdsDataTable`,
+`MdsSegmentedControl`, `MdsSpinner` and `MdsTimeSeriesChart`. ⚠️ **Nothing we run could have caught it** —
+happy-dom lays nothing out, the e2e assertion reads the DOCUMENT's scroll box (pinned flat by the shell's
+`overflow-x: clip`), and axe's `scrollable-region-focusable` fires only where the region has NO focusable
+descendants, so axe was correctly silent about a region that should never have scrolled. `MdsTabNav` never
+had it: its rule is on the outer landmark, its scrolling on a separate child. `MdsTabs` now matches.
+
+⚠️ **The guard written for it then failed against its own explanation.** It scanned the whole file for the
+offending declaration and matched the CSS comment describing it — "name the thing, never quote it", sixth
+occurrence in this project and the second to booby-trap the note explaining it. Fixed both ways, and the
+scoping is the durable half: the guard walks DECLARATION BLOCKS only, which is `token-references.test.ts`'s
+own recorded lesson — a whole-file guard must be scoped to the region the contract lives in, or documenting
+the contract violates it.
+
+**The builder prohibition survived the component's arrival rather than expiring with it.** DSR §3.4 forbids
+retrofitting a tablist onto the pane switcher; that note was written when `MdsTabs` did not exist and reads
+as if it were waiting for one. J4c1 adopted the primitive into `ConfigPanel` on that same page and touched
+neither the pane switcher nor the Structure ⇄ Logic toggle. `ConfigPanel.test.ts` now asserts the page holds
+exactly one tablist, so the argument has a gate as well as a paragraph.
+
+**Two inherited numbers corrected by measuring the base tree.** The Vitest baseline is **114 files / 1,968
+tests**, not the 1,964 the hand-off carried — J4b2 added 4 and never restated the total — so J4c1's delta is
++2 files / +23, reconciling exactly. And a `resources/js` chunk printed "52 passed (52)" against 53 files
+and exited 1 on its first run, 53/808 on two re-runs: **the test delta names the casualty the file count
+only counts** (808 − 797 = 11 = `useTheme.test.ts`).
+
+**A new gate-ordering cost, paid once.** `npm run ds:install` runs on the HOST and writes win32-native
+binaries into `packages/design-system/node_modules` — the same bind-mounted path the node container reads —
+after which the container's own install dies on `EIO … unlink … esbuild.exe` and the container EXITS. Vite
+stops serving and every subsequent screenshot is of nothing at all. `rm -rf` that directory (gitignored)
+and restart. Recorded in `docs/feature-backlog.md` beside the "the Storybook gate runs locally" note, which
+had the how and not this.
+
+---
+
+## 2026-08-17 — LANE A · J4c2: `MdsCombobox`, and retiring an exceptions-log entry four things depended on
+
+**`MdsCombobox` is built and adopted into `CommandPalette.vue`, which was the product's only ARIA 1.2
+combobox and a logged deviation for exactly that reason.** J4c is closed. Vitest **117 files / 2,012
+tests**, exit 0 on all three chunks; `openapi.json` byte-identical, regenerated and diffed; zero PHP.
+
+**The palette's own test file passes BYTE-UNEDITED — all ten cases — which is the evidence this is an
+extraction rather than a change** (the `Modal.test.ts` precedent from `useInertBackground`). Six of the ten
+pin the ARIA contract that moved.
+
+**The extraction moved the root element and silently broke the modal's initial focus.** `MdsTextInput`'s
+root IS the input under Vue's default `inheritAttrs`, so `data-mds-initial-focus` had been landing on
+something focusable; `MdsCombobox` has a real wrapper, so the same attribute moved onto a div — and
+`.focus()` on a non-focusable element is a silent no-op. DSR §4.5 names that outcome exactly: a keyboard
+trap reached through the very prop meant to prevent one. It degraded rather than broke (MdsModal verifies
+and falls back) but the fallback is the close affordance, not the search field. **The general rule: an
+attribute that worked because a component had no wrapper is a dependency on that component's SHAPE, and
+wrapping is not a refactor-safe operation for it.**
+
+**And the visual sweep caught one that every other gate was green over: the component shipped UNSTYLED.**
+The first draft rendered a bare input carrying the shared input class, assuming it is global. It is not —
+`.mds-input` is declared inside `TextInput.vue`'s SCOPED style block and exists nowhere else — so the box
+arrived with no border, radius, min-height or fill. Every ARIA assertion passed, happy-dom computes no
+layout, and axe has no rule for "unstyled". Fixed by rendering `MdsTextInput`, whose root is the input, so
+the explicit role and the four ARIA attributes still land on the real control. **Reviewing the frame rather
+than only measuring it is the only thing that could have found this.**
+
+⚠️ **The sweep lied twice before it told the truth.** It waited for the first option — which the SYNTHETIC
+see-all row satisfies instantly, before the 250ms debounce starts — so the first run measured an empty
+result set and would have read as a passing grouped path; wait for a GROUP, which only a real response can
+produce. And its `role="group"` query was page-wide and caught the forms filter bar's group, reporting it
+as a palette group. **A measurement that can pass without the code under test having run is not a
+measurement.**
+
+⚠️ **One Escape closes the palette — checked in three states, because the first reading said otherwise.** An
+instantaneous `isHidden()` immediately after the keypress returned false in light and true in dark; waiting
+for the state shows true for an empty query, a rendered listbox and a moved highlight. That property is the
+whole justification for `MdsCombobox` not binding Escape, so it was worth re-checking rather than
+explaining away.
+
+**Retiring exceptions-log #9 was not a one-line delete, and the ORDER mattered.** It was cited five times
+and four were not about comboboxes at all — it had become the canonical citation for the Storybook coverage
+gap. Deleting first would have dangled every one: the ADR-0017 shape one level down. So the fact got a
+durable home at **DSR §4.6.1**, four citations were re-pointed, and the fifth (`FormRowActions.vue`, stale
+twice over — it claimed the system had no menu primitive, which `MdsMenu` disproved in J4b, and repeated the
+`~15 primitives` figure J4a established nobody had itemised) was corrected outright. The entry is replaced
+by a **tombstone** rather than a gap, because the log's own preamble warns that a log which miscounts its
+own entries is the failure mode it exists to prevent. **#9 is never reused.**
+
+✅ **`KNOWN_UNGUARDED` shrank for the first time ever.** `CommandPalette.vue` is off it — not fixed in
+place, but because its two clipped nodes moved into `MdsCombobox`, which positions its own root. The
+backlog row goes seven → six and the design system's own count stayed at zero, which is the assertion that
+would have caught the lazy version of this move.
+
+---
+
+## 2026-08-17 — LANE A · J5a: the route-admits-this-feature predicate leaves CrumbTrail
+
+**J5 is part-built and unmerged on `j5-onboarding`** (`ad5669c`, `dea71f2`, both pushed). J5a is done and
+green; J5b (the onboarding service) and J5c (the dashboard's second first-run choice) remain. Recorded here
+on the J1e precedent — a built-but-unmerged branch should not be re-derived.
+
+**`App\Support\Entitlements\FeatureAdmission` is extracted out of `CrumbTrail`.** J4b2 wrote the predicate
+as a private static there, mirroring `RequireFeature`: `currentPlan() === null || feature($key)`. The
+mirror matters because the two disagree by a SIGN FLIP in one reachable state — the middleware ADMITS a
+request when there is no plan catalog at all, while `EntitlementService::feature()` returns false there,
+because `currentPlan()?->featureEnabled() ?? false` cannot tell *denied* from *nothing to ask*. A surface
+built on `feature()` alone is therefore stricter than the route it mirrors: request admitted, page 200,
+affordance withheld. J5c needs the identical question for the first-run template choice, and a second copy
+is how two definitions of "does the route admit this?" drift — already paid for with two ADRs numbered 0017
+and a duplicate migration prefix. **`CrumbTrail` keeps its private seam and delegates, and both of its
+suites pass BYTE-UNEDITED (49 passed / 148 assertions)** — the extraction evidence.
+
+⚠️ **Pint coupled the helper back to its own caller, for the sake of a comment.** A fully-qualified doc
+reference to the breadcrumb builder made the `fully_qualified_strict_types` fixer add a real `use` for it,
+so the extracted predicate imported the one class it was extracted FROM. Harmless at runtime and wrong in
+direction: a shared predicate must not know who calls it. The class is named in prose instead. **A formatter
+can introduce a dependency — read the diff it makes, not just its exit status.** (And read Pint's JSON
+`result`, never its exit code.)
+
+**Verifying the J5 row found three things before a line was written — sixteen-for-sixteen.** (1) "The
+first-run landing was never built" is FALSE: `Dashboard.vue:235` already renders a zero-forms empty state
+with a Create action; what is missing is that onboarding plan §2 specifies TWO equally-weighted choices and
+the built moment offers one, though the gallery exists. (2) That same section ARGUES AGAINST a scripted
+tour — *"no forced tour beyond this one choice point"* — so the user's getting-started checklist must be a
+passive dashboard affordance rather than a gate in front of the product. Not a wizard. (3) The template
+choice is a PAID feature (`feature:form_templates`), so §2's two equal choices are unbuildable as written
+for a free tenant, and offering it anyway is J4b2's *links that bounce*; ADR-0011 §D9's absent-not-locked
+doctrine governs the refusal.
+
+**J5 ships real PHP, unlike all of J4c**, so Pest, PHPStan, the four lint gates and `openapi.json` can all
+move and none may be asserted unchanged. Note `openapi.json` is regenerated with
+`php artisan scramble:export --path=…` — there is no `openapi:generate` command.
+- **2026-08-17 (Phase 4 — LANE B, `P3a`: the cross-device draft lost-update guard — THIS WAS THE "CRDT SYNC" ROW, RESCOPED ON THE EVIDENCE; MERGED as PR #168 → `02877c2`, 6/6 with every job's `conclusion` AND `steps` count parsed individually — 18 · 11 · 11 · 12 · 16 · 20, none empty. CI **Pest 4135 / 17,595** and **E2E 541**, a delta of **+18 / +87** on base `1409933`'s own green run, predicted before the run and matched to the digit on both numbers)** — **Verifying the row against the code replaced it, twelve-for-twelve.** `docs/offline-first-sync-design.md` is 100% as-built through §2–§7 (G8a/G8b/G8c/H9a/H9b/H10/H23b); the only thing left in it was §9's *Out of Scope* list, whose first line is CRDT — **deferred on the record in FIVE documents** (`PRD.md:441` calls it *"not committed by default"*), with a revisit trigger (*real usage data showing concurrent multi-device editing*) that **is an input nobody here can supply**, since nothing is deployed. The data-residency shape (ADR-0017 §D6) exactly, already foreclosed off this queue. **And the row had lost its own qualifier in transcription** — `PROGRESS_ARCHIVE.md:207` reads "CRDT sync **if needed**"; every later copy dropped it. User decision 2026-08-17: close the real gap, not CRDT. **The row was not empty, because §8's premise — the ground the deferral stands on — is FALSE as built:** H9b/H10 shipped a handoff (`GuestDraftResumeController` + the emailed link), a merge rule (`reconcile.ts`) and a **shared `client_submission_uuid`** (`useFormRuntime.ts:296`), and `SaveForLater.vue:92` ships the copy *"it works on any device"*. So one draft has two writers, `updateDraft()` whole-document-replaces, and nothing guarded it — **reproduced before fixing**: seed `{age}`, A adds `{country}`, B saves from the pre-A state, `country` gone, `created:false`, no exception. **The fix already existed one channel over and had never been ported back** — `SubmissionAnswerEditService::edit()`'s client-supplied baseline, on the same column, whose own comment describes this defect *and* records the wrong way to build it (the token must come from the CLIENT; a server-side re-read is always equal because the lost update spans two requests). The P1e shape exactly. **No migration** — `answers_content_checksum` already existed and is nullable, so a legacy null base equals a null stored value. It compares **base-vs-stored**, so `saveDraft()`'s documented 409 suspension is narrowed, not reversed. **The adversarial pass found the two sharpest instances after the first fix was green (seventh increment running)** by sweeping **all four** `saveDraft()` callers rather than the two the row implied: both submit paths save-then-`promote()`, so a stale device **finalized** over another device's answers — terminal — and the encode one **contradicted a banner P3a had just added** ("saving has stopped to avoid overwriting it", then Submit overwrites it). **The two channels take opposite postures on a missing token, deliberately:** draft fails CLOSED (a refused tick costs a retype); submit fails OPEN on an *absent* claim, because a submit can arrive from the offline outbox replayed from a row serialized by an earlier build, and stranding a finished response breaks the offline-first promise. A *stale* claim is refused on both; the baseline is frozen into the outbox row at enqueue (un-indexed, so no Dexie version bump). **Mutation pass: 24 mutations, four rounds, zero undefended.** M1 (reintroducing the defect) reddens exactly the headline; **M3 — comparing incoming instead of base, the precise wrong-comparison the sibling warns about — reddens 3.** **M16 and M19 each survived as a guard masked by a redundant partner** (nulling the token still refused, for the *wrong reason*) and each exposed a real gap that gained a discriminating test — a submit that must SUCCEED on a moved baseline. **M11 survives BY CONSTRUCTION** (64-hex-or-null makes `!=` and `!==` equivalent; kept strict because that is a property of the domain). **M12 is an unpinnable gap, recorded as such** — adding the check to `createDraft()`'s 23505 fold survives everything, because reaching it needs a real insert race, so the omission is enforced by an explicit `checkBaseline: false` argument and *said* not to be test-enforced. **Lessons about the tooling, and two are new.** (1) **M0 must assert an EXPECTED COUNT** — mine aborted round 2 with "EncodeDraftTest is NOT green at baseline: 2 failed", catching a fail-closed regression in a file I had not yet run; a zero-failures baseline would have mutated against red. It also needs a **start**-state cleanliness assertion, not only an end-state one. (2) **The Vitest gate lied twice and exited 0 both times** — 30/32 files in `public-runtime`, and 41/53 in `resources/js` when run concurrently with gitleaks. `--maxWorkers=2`, one chunk at a time, nothing else running, and **check the file count against disk**. (3) A bash heredoc mangles backslashes in a Python script — write scripts with the Write tool, which is the P1e "edit docs via a script file, never shell quoting" lesson one level up. (4) The mechanical claim check earned its keep again: `docs/feature-backlog.md` was held by Lane A for J4c2, so the media-resumability narrowing **stays unfiled** rather than being written into a held file. **Gates:** Pest Submissions **399 / 1,570** (base 388/1,520) and Guest **70 / 273** (base 63/236) — **+18, reconciling exactly** as 6+5+7; PHPStan 18 = baseline; the four lint gates **94 · 102 · 29 · 102/115/0, all unchanged** (no controller/migration/job file added); `openapi.json` moved **deliberately** and was re-verified stable on a second regeneration; gitleaks 24/0 tracked; Pint passed from the JSON; Vitest public-runtime **32/720** and resources/js **53/813** — **Lane A's baseline moves and must be re-measured.** **No ADR, no migration prefix, no exceptions-log entry.** **`P3a` was Lane B's last named row: the queue is EMPTY and Rule 7(f) is in force — Lane B has claimed the FULL GAMIFICATION ENGINE and did NOT open the integration PR.**
+
+- **2026-08-17 (Phase 4 — LANE B, `K1a`: the gamification POINTS ENGINE — the first of five increments on the row Rule 7(f) told Lane B to claim when its named queue emptied)** — User: *"BUILD IT."* Plan mode; three product forks put to the user and answered as decisions of record (**leaderboard visibility reuses the org/own split — no thirtieth permission key; existing history is BACKFILLED from `audits`; gamification is FREE ON EVERY TIER**, the toggle being the only control). **The namespace claim was committed FIRST, in its own commit, before any file that uses it existed** (Rule 7(g)): **ADR-0020**, **doc #28**, and the migration block **`2026_08_17_000101`–`000199`** — a separate hundred-block rather than an adjacent number, because Lane A holds `2026_08_17_000001` and was still writing, and adjacency is exactly how `2026_08_16_000001` came to mean two migrations. **VERIFYING THE ROW AGAINST THE CODE FOUND THREE THINGS — SEVENTEEN-FOR-SEVENTEEN.** (1) Nothing existed, measured not assumed (a sweep for points/score/badge/achievement/streak/leaderboard/rank/xp/reward/milestone returned **zero** implementation hits; `MdsBadge` is the status pill, `score` is `likert_matrix`'s payload, `points` is GeoJSON vertices). (2) **There is no historical event stream to replay** — `DomainEvent`s are in-memory only and nothing persists them, so a listener-only engine starts every workspace at zero including the demo tenants; `audits` is the one ledger that survives, and its own migration calls its index *"one actor's actions"*, which is literally a streak query. That is why the backfill is possible and is K1c. (3) **J5's progress concept is 100% derived** — `GettingStartedChecklist` recomputes per request and the whole feature persists ONE byte, so "earned on 12 Jul" is unrecoverable from it and the ledger is genuinely new; what IS reused is `MdsChecklist`/`MdsProgress`'s "N of M, never a percentage" rule, `DashboardMetricsService::visibleFormsQuery()`, `ShellAbilities::for()` and the four step keys. **BUILT:** `point_awards` (`append_only` RLS — SELECT+INSERT only, so the ledger is unrewritable by construction and the Modules card's "nothing already earned is deleted" is a fact about the schema), `PointRule` (7 rules, weights copied AT AWARD TIME so re-weighting moves future awards only), `PointsRecorder`, eight listeners, a new **plain** `FormCreated` event (the `MemberJoined` precedent — minting a `DomainEventType` case would attach a webhook subscription contract forever), and `gamification` into `PlanCatalog::FEATURE_KEYS` on **every** tier + `ToggleableModules` + a `FeatureGateException` label arm. **THE ADVERSARIAL PASS FOUND FOUR THINGS AND TWO WERE MINE. (a) A PRIVACY DEFECT I HAD JUST WRITTEN:** `member.invited` keys on a SHA-256 of the invitee's email and `point_awards` is an EXTRACTED table, so an unsalted digest is a **globally stable join key** — two tenants each holding an extract could join on it and prove they invited the same person, which is verbatim the fact `TenantExtractColumns` withholds `users.google_id` for, calling it *"the one cross-tenant fact this architecture exists to withhold"*. Fixed by salting with the tenant id, passed as an **explicit argument** (an ambient `TenantContext` read would make the digest depend on WHEN it was called, and the symptom would be duplicate awards rather than an error). **(b)** The new table was missing from P2b's extraction census (`TenantScopedTables::STRICT` + the `TenantExtractColumnDriftTest` census). **(c) `FormService::create()` HAS TWO CALLERS** — `TemplateService::instantiate()` wraps it in its own transaction, so the new post-commit emission fires with an outer transaction open; a test drives that path. **(d)** A listener-count claim in my own docblock was already wrong (21 vs 25). ⚠️ **AND ONE WRONG DIAGNOSIS, CORRECTED RATHER THAN SHIPPED:** a failing re-invite test looked exactly like a case-sensitivity defect in `TenantMembershipService::invite()`; it is not one. `resolveUserByEmail()` runs on the separate `pgsql_auth` connection, which cannot see `RefreshDatabase`'s uncommitted rows — a test-environment boundary, unreachable in production, and the comment asserting the defect was removed. **M0 MUTATION PASS: 19 mutations, 18 killed on the first pass, 1 survivor, now 19/19 — ZERO UNDEFENDED.** Three mutations were killed only by tests written *because reasoning through the list found them surviving first*: **`ON CONFLICT DO NOTHING` → plain INSERT survived EVERYTHING** (the duplicate raises 23505, the recorder swallows it, the row count is still 1 — but the CALLER's transaction is left poisoned, which given (c) would take out a template instantiation over a scoreboard row), a **return scored as something other than a review** (the existing test drove approve→return→approve, so the first approve already satisfied it), and **the weights** (every assertion compared a stored value against the same enum the code read). The one true survivor — making the welcome award repeatable — survived because driving `joinOpenTenant()` twice proves the EMITTER's early return, not what the listener keys on; killed by firing `MemberJoined` directly, then **re-applied to prove the new test discriminates rather than merely passes**. **Gates:** Pest Gamification **24 / 61** (new), Unit **1148 / 4705**, Forms **389 / 1492**, Tenancy+Gamification **305 / 764**; PHPStan **18 = baseline, delta 0**; the four lint gates **94 · 103 · 29 · 103/117/0** (migrations +1 and constraints +2, both mine); `openapi.json` **byte-identical and re-verified stable on a second export** (K1a adds no `/api/v1` route); Pint passed from the JSON; gitleaks **0 leaks over 29 changed files**. ⚠️ **The gitleaks method is a trap worth keeping:** the worktree's `.git` is a file whose Windows-absolute gitdir cannot resolve inside a Linux container, so the plain container run reports `0 commits scanned … no leaks found` — **vacuous, and must never be read as clean**; the real scan copies the changed+untracked files to a scratch dir and runs `detect --no-git`. ⚠️ **The Pest single-instance probe must run INSIDE the container** — the host `ps` cannot see a containerised Pest and reads 0 while one is running. **MERGED as PR #169 (`8545dba`), 6/6 with every job's `conclusion` AND `steps` count parsed individually (11 · 11 · 20 · 16 · 12 · 18, none empty): CI Pest 4163 / 17,670, E2E 540 (17.8m).** ⚠️⚠️ **THE DELTA DID NOT MATCH THE PREDICTION AND THE MISS IS THE LESSON.** Forecast +25/+62; actual **+28/+75** against base `93c4320`'s own run (4135 / 17,595). It reconciles exactly: 24 new Gamification tests plus **FOUR** `->with()` dataset rows on the two constants this increment extended — I found ONE (`TenantExtractColumnDriftTest`) and assumed it was the only one, when `SettingsVocabularyTest` consumes `ToggleableModules::KEYS` in TWO datasets and `TenantTableClassificationDriftTest` consumes `TenantScopedTables::all()` in a third. **Extending a constant is a test-count change: grep for EVERY `->with(` that consumes it.** ⚠️ **E2E 541→540 is NOT a lost test** — Playwright counts flaky separately from passed, and base was 541+1 flaky+10 skipped = 552 against this run's 540+2+10 = 552. A bare "passed" count is not a suite size. **No exceptions-log entry — `#16` stays free.** **Rule 7(f) checkpoint 2 is NOT reached: Lane A is still on J5, so both queues are not empty and the final integration PR is not recommended.**
+- **2026-08-17 (LANE A, `J5`: onboarding §2's first-run moment + the getting-started checklist — MERGED as PR #170 → `e68cbbc`, 6/6 with every job's `conclusion` AND `steps` count parsed individually: 11 · 16 · 11 · 18 · 20 · 12, none empty. CI **Pest 4178 / 17,785**, a delta of **+15 / +115** on K1a's own green run — PREDICTED from Lane B's number plus J5's fifteen new tests and matched to the digit; **E2E 541 passed / 1 flaky / 10 skipped = 552 total**, identical to the standing 552, a flaky moving buckets rather than coverage being lost)** — **Verifying the row found a FOURTH thing the earlier three had missed, seventeen-for-seventeen, and it is the one no layout could have fixed.** §2's two choices were unequal in *outcome*: `instantiate():50` has always redirected into the **builder** while `store():90` returned **`back()`**, so one choice landed you in the product and the other returned you holding a toast. User decision 2026-08-17: `store()` redirects into the builder for **every** caller — safe by construction, because `FormService::create()` writes the creator an explicit Editor `ResourceGrant`. **And a conflict between two documents that turned out not to be one:** §2's *"two equally-weighted choices"* would violate DSR §3.10 — *never more than one primary CTA* — **if the moment were an empty state**, which is exactly why `forms/Index.vue` renders one primary and one tertiary and is correct to; §2 names the card grid in its own sentence. **The gate mirror is why J5a extracted `FeatureAdmission`:** the template card resolves server-side because `EntitlementService::feature()` fails **closed** on an unseeded catalog while the middleware fails **open**, and the Pest case pinning that **deliberately seeds no plan**, since adding one would make it pass against the broken implementation. **The checklist's load-bearing arm is "every row done ⇒ hidden"** — every established workspace already satisfies all four rows, so `tenant_users.onboarding_dismissed_at` ships with **no backfill**; dismissal is per person per WORKSPACE, not per person. **`MdsChecklist` went in the package** because an app-tree component gets no story and therefore no `checkA11y` scan (DSR §4.6.1); it is **not** §3.9's step-count variant, which is multi-step form navigation with a visited-set rule and stays unbuilt. **Mutation pass: 22 mutations, two survivors, both holes in the tests this increment had just written** — a feature key indistinguishable because every seeded plan granting one grants the other (**J4b2's recorded hole verbatim**, closed with J4b2's own remedy, the module toggle), and a `back()` surviving a bare `assertRedirect()` because **a `back()` is a redirect too and a follow-up GET proves reachability, not that anyone was sent there**. Control survived, so "everything reddened" is evidence rather than a tautology. **Adversarial pass: four defects in its own new code (ninth increment running it, fifth catching itself)** — a lede reading *"Two ways in"* to tenants who get one card, a heading and lede rendered above the permission-refused empty state, copy claiming the workspace was empty when the count was that reader's own, and **found by looking at the frame** a header button that was a third create affordance pointing back at a duplicate of the same moment. **"Name the thing, never quote it", seventh occurrence and the third where the note explaining a rule broke it** — fixed by **scoping** source-text guards to the comment-stripped stylesheet. **Pint introduced a dependency twice more**, plus once by hand in `OnboardingController`: a fully-qualified `{@see}` becomes a real `use`, coupling a class to one it never calls for the sake of a comment. **A measured number that looks like J4c1's defect and is not it:** `.mds-checklist` reports `scrollWidth` 1104 vs `clientWidth` 1094, which is a 24px dismiss button's 44px hit area — no axis has an `overflow`, the card's padding absorbs it, document scroll is 0 at 1440/834/375, and `overflow: clip` would shrink the tap target. ⚠️ **Neither new surface is reachable by any automated a11y gate**: `E2eSeeder` creates forms, submissions and seven members, so the CI axe scan of `/dashboard` sees neither the first-run moment (needs zero forms) nor the checklist (hides when all four rows are done) — `MdsChecklist` is covered by Storybook across nine stories in both themes, but **the dashboard's composition of it and the first-run grid are covered only by the visual sweep**, a concrete instance of §4.6.1's gap. **That sweep needed a workspace the seed data does not contain** — scratch tenant **`j5sweep`** (`owner@j5sweep.test` / `meridian-demo-2026`) is provisioned as `DemoSeeder` does and **left in place**; the dev DB also needed `artisan migrate`, since Pest runs against `meridian_testing` and a new column otherwise 500s the dashboard. **New tooling lever: `--maxWorkers=4` starts Vitest workers where the default count times out on both pools**, and a single-file run failing that way reports `no tests` with **exit 1** — honest, unlike the documented fails-green case. **Two rebases mid-flight** (P3a, then K1a) and both were clean, `PROGRESS.md` and the append-only archive included. **Gates:** Vitest **118 files / 2,054** (the `resources/js` 825 predicted from Lane B's 813 + 12 and matched); Storybook axe **42/299**; PHPStan **18 = baseline**; lint **95 · 104 · 29 · 104/117/0**; `openapi.json` byte-identical on both bases; Pint `files: []`. **Migration prefix `2026_08_17_000001` spent; no exceptions-log entry, `#16` still free.** ⛔ **`0020` is NOT free — K1a spent it while J5 was in flight, so the next free ADR is `0021`**, caught only by re-reading the ledger after the second rebase. **J5 was Lane A's last named row: the J-queue (J1–J5) is CLOSED and LANE A'S QUEUE IS EMPTY. Lane A does NOT claim gamification — Lane B claimed it first and is already two increments in (K1a merged, K1b in flight) — and does NOT open the integration PR, because 7(f) gives that to whichever lane empties LAST, which is now Lane B.**
+
+- **2026-08-17 (Phase 4 — LANE B, `K1b`: the gamification BADGE catalog and its ledger — the second of five increments on the claimed row)** — **The namespace claim was committed FIRST, in its own commit, before any file it names existed** (Rule 7(g)): migration prefixes **`2026_08_17_000102`/`000103`** inside Lane B's own hundred-block, **no ADR** (`0021` stays free — the catalog is cheap to reverse and lives in doc #28; the one decision that is *not* is an inversion of ADR-0020 §D4 and belongs beside it, as **§D9**, amended in place), `#16` unspent, and three files outside the gamification subtree named explicitly because **a new `NotificationType` case is not a one-file act** — it feeds THREE exhaustive `match` sites outside the enum (`NotificationCopy::for()`, `::inAppDescription()`, `NotificationPresenter::canOpen()`), and missing one is an `UnhandledMatchError` at runtime rather than a compile error. **BUILT:** `BadgeKey` (10 cases, each a `(PointRule, threshold)` pair — one criterion kind, so evaluation is a single index-only count on the leading prefix of the idempotency guard that already exists), `badge_awards` (`append_only`, `unique(tenant_id, user_id, badge)`, **no `threshold` column** and **no subject column at all**), `BadgeAwarder`, and `NotificationType::BadgeEarned`. ⚠️⚠️ **THE CENTRAL FINDING IS THAT K1a's OWN ARGUMENT DOES NOT REACH THIS INCREMENT.** K1a could say *"`ON CONFLICT DO NOTHING` never raises, so there is nothing to catch"*. **Three things in the badge path CAN raise** — the threshold `count(*)`, a `42501` RLS refusal, and a **`23514` from a `BadgeKey` case added without widening its CHECK** — and in PostgreSQL a raise aborts the *whole* transaction, so a bare `catch` swallows it and hands the caller a transaction that is already dead. A **one-line enum edit would have taken out `TemplateService::instantiate()`**. The fix is a nested `DB::transaction()` SAVEPOINT (`SavedReportViewService` / `SubmissionReferenceBackfill` precedent, the second recording that without it its own effect test failed on `25P02`), and **the announcement sits OUTSIDE it deliberately** — inside, a failed notification would roll the badge back and the next award would re-earn and re-fail forever. ⚠️ **THE MUTATION PASS FOUND A REAL GAP, AND IT IS K1a's SURVIVOR SHAPE EXACTLY (14 mutations, 10 killed first pass, now 13/14 + 1 by construction).** `$affected === 1` → `>= 0` **survived every test in the file**: the replay case cannot see it (on a replay `award()` returns false and the evaluator is never reached), so it only bites on a *second genuinely-new* award of a rule already badged — and the badge-row count is useless there because the unique index holds it at one either way. **Only the notification count discriminates.** Killed by a new test, then **re-applied to prove it discriminates**. The lone survivor (*fold a badge failure into `award()`'s answer*) survives **BY CONSTRUCTION** because `evaluate()` is total — and that pass also caught the catalog lookup sitting OUTSIDE the guard, which made "cannot throw" a claim rather than a fact; it is inside now. ⚠️⚠️ **AND THE FORECAST WAS WRONG WHERE K1a's WAS: I PREDICTED THE SEEDER FIXTURES WOULD NOT MOVE, AND THREE ASSERTIONS WENT RED.** The reason is better than a miscount — `DemoSeeder` and `E2eSeeder` drive `FormService::create()` and `PublishService::publish()` **for real**, so badges are genuinely EARNED during seeding and each announces. **Measured on a real `migrate:fresh --seed`**: demo notifications **20 → 25**, second workspace **0 → 2**, e2e fixture **7 → 10 rows / unread 4 → 7**. **A seeder that drives real services is a caller; any increment adding a side effect to those services moves every fixture that counts rows.** The second-workspace assertion is load-bearing for tenant-context-leak detection, so it now pins the **kind** as well as the count (`['badge_earned']`) — a leaked demo row would be one of the other nine types. ✅ **The `publisher` threshold was written as 10 and corrected to 3 on the product's real shape** (the demo tenant has SEVEN forms in total, so ten is a dead rung), and the seeded run then **confirmed the ladder**: the demo owner holds `publisher`, the editor does not. ⚠️ **PINT INTRODUCED A DEPENDENCY AGAIN — the J5a lesson repeating one increment later.** `fully_qualified_strict_types` turned two `{@see}` **precedent citations** into real `use` imports, leaving `BadgeAwarder` importing `SavedReportViewService` and `SubmissionReferenceBackfill`. Backticked now, with the reason inline, exactly as `scripts/migration-lint.php` already does for itself. **Read the diff a formatter makes, not only its exit status.** ⚠️ **The adversarial pass found an API hazard the row never named:** `evaluate()` takes an **explicit** `$tenantId` while its notification picks up the **ambient** one — identical for every caller today, and K1c is about to call it per-tenant from a job. It **fails closed** (the `WITH CHECK` compares against the GUC, so a mismatch raises `42501`, the guard swallows it, nothing is announced) and that is now pinned. **Two absences are argued in the enum rather than left as gaps:** `form.created` DOES earn a badge; **`submission.edited` does not**, because it is the only rule whose act **mutates collected evidence** and a badge would reward the volume of corrections — the anti-farming reasoning one register over. **`welcome` is awarded but never announced** (`BadgeKey::announces()`, one `false` arm with a real consumer — not the refused `isRepeatable()` shape), because its criterion cannot be failed and it lands in the same request that creates the membership. **`NotificationType::BadgeEarned` defaults email OFF** — the second departure ever and a *different* argument from the first: you cannot earn a badge without being in the app at that moment, so the email is structurally redundant rather than merely high-volume. `pathFor()` returns **null** until K1e has somewhere to point (a full payload with nowhere to go, pinned separately from the thin-payload nulls), and `canOpen()` gains its arm **now** because omitting it is silent today and a fatal the day K1e returns a path. **Gates:** Pest **Gamification 52 + Unit/Gamification 18 = 70** (⚠️ `tests/Unit/Gamification` is a NEW leaf directory — add it to the per-leaf list or it silently never runs), Notifications/Tenancy/Seeders green; PHPStan **18 = baseline, delta 0**; four host linters **94 · 105 · 29 · 105/119/0** (migrations +2 as predicted; constraints +2 where I forecast +3); **`openapi.json` BYTE-IDENTICAL, re-verified stable on a second export**; **Pint `passed` read from the JSON, twice**; vue-tsc clean; Vitest notifications chunk **3 files / 22 tests, real exit 0**; **gitleaks 0 leaks over 585.87 KB / 26 files** — ⚠️ **the first gitleaks run was VACUOUS (`scanned ~0 bytes`)** because an MSYS `/tmp` mount does not resolve for the Docker daemon; the scratch dir must sit on a Windows-visible path, and "no leaks found" over zero bytes is not a clean scan. ⚠️ **The mutation harness itself lied twice and both are new**: printing Pest's UTF-8 output to a cp1252 **stdout** raises `UnicodeEncodeError` (the documented `errors='replace'` covers the READ side only), and `out.lower().split("Tests:")` lowercases the needle out of existence so the guard scanned the whole log and read a green baseline as red on a test named *"…except for a failed export"*. **Split first, then lowercase.** **MERGED as PR #171 (`b0d8782`), 6/6 with every job's `conclusion` AND `steps` count parsed individually (11 · 12 · 11 · 16 · 18 · 20, none empty): CI **Pest 4236 / 18,008**, **E2E 542 (16.7m)**, axe 299.** ✅ **The delta reconciles to the digit — +58 / +223** on base `9d21f38`'s own green run (4178 / 17,785): 18 + 19 + 9 + 7 + 3 + 1 + 1. **K1a's miss did not repeat**, because every `->with(` consuming an extended constant was grepped for before the run. ⚠️ **E2E 541→542 is not a gained test** — 542+0 flaky+10 skipped = 552, against base 541+1+10 = 552. ⚠⚠️ **CI FAILED TWICE FIRST AND NEITHER FAILURE WAS THE CODE:** both were GitHub-side `HTTP 429`s — attempt 1 died in `Set up job` with **`steps: 1`**, unable to download the `setup-php` action; attempt 2 reached **`steps: 11`** and died in `composer install` with a dozen packages 429'ing off `codeload.github.com` (exit 100). **The STEP COUNT is what distinguished them from a real failure** — `steps: 1` means nothing ran, one notch above the `steps: []` outage tell. Third re-run, after letting the window clear, was green. ⚠️ **And the background watcher exited 0 for the failed run**, exactly as I11b recorded: a watcher's exit code is not evidence.
+
+- **2026-08-17 (LANE A, `J6`: the four latent J4b1 findings — MERGED as PR #172 → `289b360`, 6/6 with every job's `conclusion` AND `steps` count parsed individually: 16 · 18 · 11 · 20 · 11 · 12, none empty. **CI Pest 4236 / 18,008 — a delta of EXACTLY ZERO against K1b's own green run**, which is what zero PHP predicts and is verified against a run of the same base rather than asserted; **E2E 542 passed / 10 skipped = 552**, identical to K1b's 552 with no flaky at all; the four lint gates reproduced the local numbers to the digit. ⚠️ **Seven attempts were needed and none of the failures was the code** — GitHub-side `codeload` 429s, 25 in one job, the `setup-php` action itself undownloadable; the tell is the failing STEP NAME, not the step count, which reached 19 on a job that had still died in composer — plus three more found underneath them, two of which were pre-existing)** — Taken under Rule 7(f)'s *"waiting on the other lane"* state: gamification is Lane B's and the final integration PR is Lane B's, but neither of those makes four live defects in Lane A's own subsystem someone else's problem, least of all immediately before the merge to `main`. **The four had been recorded in the J4b1 status block and nowhere else** — none was filed in `docs/feature-backlog.md` — so J6 files and strikes all four there, each carrying what its original filing got wrong. **The claim was committed first, in its own commit, before a line of code** (Rule 7(g)): `resources/js/composables/useCommandPalette.ts` is in NEITHER column of 7(b), the `resources/js/composables/` situation for the third time. Nothing spent from either shared namespace — `0021` still the next free ADR, `0010` still reserved for H1d, `#16` still free, zero PHP so no migration prefix. **⚠️ THE OVERLAP CHECK AGAINST K1b NEEDED A HUMAN READ, NOT A GREP:** a path extraction over Lane B's claim line returns `docs/feature-backlog.md` and `docs/ux/*`, but **both appear there inside a NEGATION** (*"ARE NOT TAKEN"*), so a script comparing path sets would have reported a two-file collision that does not exist. A claim ledger has to be read. **⚠️ THE ROW'S FRAMING WAS WRONG ABOUT FINDING 1 — EIGHTEEN-FOR-EIGHTEEN.** Every hand-off blamed the dead ⌘K key on `preventDefault()` preceding the guard. It does, and it should: declining over a real dialog is correct, and handing ⌘K back there opens the browser's find bar on top of a modal. The comment defends the order of the two **guards**, not that call's position. The real defect was that `openModalCount()` documented itself as counting *blocking dialogs* since J1a and, from J4b, also counted the **mobile nav drawer** — whose own seam argues at length that making it a dialog would be a regression. Stack entries now carry a `kind`; `dialog` is the default, so **`Modal.test.ts`'s original 22 cases pass byte-unedited**. **Finding 2 was two defects**: the palette's private `isVisible()` asked `checkVisibility()`, which answers about *rendering* and is blind to `inert` — **the same class the selector LIST was built to fix in J1a**, blind to `inert` instead of to layout — and `closePage()` **trusted** `opener.focus()` while `takePage()` twelve lines up verifies religiously. One predicate now lives in `focus-target.ts`; `MdsModal` gains `returnFocus`, and the palette passes its existing `openerSelectors` as that list. **⚠️ The verification had to run a tick later than the release, measured rather than reasoned** — the close watcher is pre-flush, so the panel is still mounted and focus still legitimately inside it; the strand happens when the `v-if` tears it out. **⚠️⚠️ THREE MORE CAME OUT FROM UNDERNEATH.** (1) **`document.body.focus()` is not a no-op and two docblocks asserted it is** — the body is the default focus target, so a captured body opener does not fail to restore focus, it **takes** it, including out of an upper dialog still open. (2) **The same defect exists in `useInertBackground`, and J6's own first fix made it reachable** (the drawer is a `surface`, so a dialog can now sit on top of it, and a resize past 480px releases the drawer underneath). (3) **`firstFocusable`'s docstring overstated its code** — `querySelector` made it *the first selector whose FIRST match can take focus*, skipping reachable siblings. **GATES:** Vitest **120 files / 2,091**, exit 0 per chunk, re-measured after rebasing onto K1b because that PR edits a file inside one of the three chunks; Storybook axe **42/299** = baseline; **zero PHP**, so PHPStan **18 delta 0**, the four lint gates **95 · 106 · 29 · 106/119/0** (the migration counts moved with K1b, not J6), `openapi.json` byte-identical, Pint `passed` from the JSON. **⚠️⚠️ THE STORYBOOK BUILD CAUGHT WHAT NOTHING ELSE COULD: six tag-shaped literals in J6's own new `Modal.vue` docblocks broke the SFC parse** — *"Element is missing end tag"* past the end of the file — with Vitest, `vue-tsc`, the lint gates and the app's own Vite build all green. **NAME THE THING, NEVER QUOTE IT, ninth occurrence and the first caught by a build.** The two pre-existing literals went too: that docblock says they survive *and* that their surviving is not evidence any literal is safe. **⚠️ And the repair script needed reading** — a regex over comments left five ungrammatical phrasings, the *read the diff a formatter makes* lesson applied to my own script. **MUTATION PASS 21/21 as expected** (plus 5/5 on the tooltip), varying strings and subjects with three controls that must survive; **the first run's three unexpected survivors were all holes in tests J6 had just written**, and one of them is what surfaced the pre-existing focus theft — `isStranded()` forced true survived because the stacked case's upper dialog focused its own default target, **which is also the panel's first focusable**, so the fallback moved focus from that button to that same button. One survivor is recorded as **deliberate**: the two paths are observationally equivalent, and a surviving mutant is a defect only if the difference is observable. **⚠️ The harness's own restore was dirtying the tree silently** — text-mode read+write translated all 343 line endings while `assert restored == src` passed, because the check normalized the very thing it could have broken; compare **bytes**, and `sys.stdout` needs `errors='replace'` as much as the reader thread does. **⚠️ THE SWEEP LIED TWICE BEFORE IT TOLD THE TRUTH, and both failures are worth more than the passes:** a leftover modal backdrop intercepted pointer events from the previous scenario, and a follow-up asserted a popover *survives* a consumed Escape — invalid, because `NotificationBell`'s root carries `@focusout`, so moving focus to the rail item closed it **before any key was pressed**. Rewritten to count Escapes reaching a bubble-phase `document` listener, with a control. **⚠️ One factual correction the sweep forced: the ACCOUNT MENU is not a `useDismissable` consumer** — it moved to `MdsMenu`, and that file's docblock says so *while still naming the composable*, so a grep for the name matches the comment explaining its absence. Real consumers: the notification bell and the feedback button; **both** mechanisms were driven, because a fix verified against one proves half of it. **⚠️ CI's first two runs failed on GitHub-side `codeload` 429s, not on the code** — 25 of them in one job, and the `setup-php` action itself undownloadable; the tell is the failing STEP (*Install PHP dependencies* / *Set up job*), and the two jobs that could detect a design-system regression passed in both runs.
+
+## 2026-08-18 — 🅱️ LANE B: `K1c`, streaks + team progress + the two-source history backfill (PR #173, `f6c7207`)
+
+Third of five on the gamification row Lane B claimed under Rule 7(f). 6/6 green with every job's `conclusion`
+**and** `steps` count parsed individually (11 · 12 · 16 · 11 · 20 · 18). **CI Pest 4312 / 18,186**; **E2E 541
+passed + 1 flaky + 10 skipped = 552** — identical suite size to J6's 552, one test moved from first-try pass
+to pass-on-retry.
+
+**Verifying the row against the code found its premise false — and the premise was in three documents at
+once.** The row, doc #28 §9 and ADR-0020 §D5 all said the backfill replays `audits` *"through the same
+`PointRule` map"*. There is no such map: `invite()` writes **no audit row whatsoever**, `accept()` writes
+neither a row nor an event, and `('submission','updated')` is written by **two** services. So the backfill
+reads `audits` for the five act rules and `tenant_users` for the two membership rules, with review and edit
+separated on the **shape** of `new_values`. Recorded as **ADR-0020 §D10, in place** — §D1's substrate is
+unchanged; what was wrong was a factual claim about where the evidence lives.
+
+**It uncovered a live defect K1a shipped:** an invited member who accepted earned no `member.joined` points,
+**no `welcome` badge**, and sent the inviting Owner no notification, because `MemberJoined` was raised only
+from the self-serve doors. Fixed rather than filed — the backfill grants every historical invited member
+their join points, so leaving it would have made the scoreboard permanently disagree with itself.
+
+**Nothing was spent from either shared namespace, and that is a finding.** No migration (`2026_08_17_000104`
+stays free): streaks and team progress are derived, K1a had already built the index the streak walk reads,
+and `audits.id` is a uuidv7 — so chronological, index-covered replay came free. No ADR number (`0021` free,
+`0010` reserved). `#16` free. `openapi.json` byte-identical.
+
+**Three decisions doc #28 had left to K1c**, all taken and recorded: the day boundary is a stated literal
+(`DAY_BOUNDARY = 'UTC'`) passed as a parameter, never `config('app.timezone')`; a streak survives "nothing
+yet today" and breaks after a full missed day; and the demo fixture awards the acts the seeders fabricate
+through the real writer, because widening the audit tail is exactly what §D1 refuses.
+
+**Gates.** Gamification 52→98, Unit/Gamification 18→47, Seeders 16, Queue 50, Tenancy 284,
+Forms+Submissions+Analytics 896. PHPStan 18 = baseline (its first read of 19 was a real error of mine, not a
+phantom). Linters 95 · 106 · 30 · 106/119/0. Pint passed and its diff read — no import introduced. gitleaks
+0 leaks over 1,620,445 bytes / 29 files, byte count confirmed from inside the container.
+
+**Mutation: 27 declared, 27 run, 27 matched** — 26 killed, 1 control survived — and it found two real holes
+in tests written the same day: a longest-run assertion that **agreed by accident** with two data runs, and a
+guard whose effect is **invisible in the returned value** and had to be asserted on the query count instead.
+Two find-strings were correctly skipped for matching a docblock as well as the code.
+
+**Lessons worth carrying.** A specification is not evidence — verify the row against the code (twenty for
+twenty). Measure a new test file; do not hand-count an `expect()->and()` chain (the test delta was forecast
+exactly, the assertion delta was not, and the whole miss was in two hand-counted edited files). A replay
+that keys differently from its listener does not fail loudly, it **inflates**, because the subject is part
+of the idempotency index. Assert **both directions** of a narrowing. And GitHub was the flakiest part of the
+pipeline for the third increment running: `pr merge` reported 503 on four of five attempts, but attempt four
+had already merged — the git ref is the authority, never the CLI's exit status.
+
+**Also filed at last: the media-resumability narrowing**, owed since P3a and blocked three times by Lane A's
+hold on `docs/feature-backlog.md`. The architecture doc promises resumable multipart upload with per-chunk
+retry; G8b shipped whole-file with per-file retry. Filed with both remedies costed and with the part that is
+not free stated — R4 names resumable retry as its own mitigation, so narrowing the promise re-opens the risk.
+
+## 2026-08-18 — J7 (Lane A): the builder's save indicator stops lying, and the parity test two docblocks already promised
+
+Merged as **PR #174** (`922ecef`), 6/6 on the first attempt. Taken under Rule 7(f)'s *"waiting on the other lane"* state: Lane A's named queue is
+empty, gamification is Lane B's and the final integration PR is Lane B's — which is a reason to say so, not a reason to idle.
+
+**Two defects, both verified against the code before planning.** (1) `.builder__save` is a polite live region that read an in-flight COUNTER as a
+verdict; `guard()` catches the throw, so the decrement in the `.finally()` ran on the failure path exactly as on the success path, and the page
+announced *"All changes saved"* beside an assertive alert saying the opposite — at every width including 1440px. WCAG 4.1.3. The store now carries
+an explicit `SaveState`. (2) `ShellAbilityParityTest` was cited by `ShellAbilities:26` and `DestinationCatalog:22` as the guard holding the sidebar and
+the command palette together, and **did not exist**; seven other `*ParityTest` files did. The twelve rows agree today, so it is the drift guard those
+docblocks already advertise rather than a repair.
+
+**The hand-off's own named candidate was misframed — nineteen-for-nineteen.** It named `DestinationCatalog::visibleTo()`'s `feature()` sign
+flip. Real, but wrong on three of four load-bearing claims: `Sidebar.vue` cannot be "moved too" (it gates client-side off a prop that is `null` in
+exactly the disputed state, so the fix there is a shared-prop contract change), the `/domains` argument is a different AXIS (which key) from the sign
+flip (null-plan semantics), and the current behaviour is deliberately test-pinned with prose while two OTHER test files pin the opposite convention
+just as deliberately. The real finding — the codebase holds two contradictory conventions for an unseeded plan catalog — is now a backlog row
+replacing the misframed one.
+
+**Fixing one defect found three more; the row named one site and the fix reached four.** Two `saveError` clears sat on the SUCCESS path of
+`persistField`/`persistSection`, so a later write succeeding erased an earlier row's real failure — an indicator-only fix ships that untouched.
+A 409 also read as saved (it sets `conflict` without setting `saveError`, so the burst drained clean). And `ConfigPanel`'s `role="alert"` lived
+inside its `v-else`, rendering only when something was SELECTED — and selection goes null on exactly the failure-adjacent paths, so a failed write
+with nothing selected was reported nowhere in the client. That is also why the failed toolbar string is *Not saved* rather than empty.
+
+**Gates.** CI Pest **4329 / 18,235**, a delta of +17 tests / +49 assertions on K1c's green run — exactly the new parity test's locally-measured
+17/49, predicted before the run and matched to the digit. E2E 542 passed / 10 skipped = 552, unchanged. Vitest **122 files / 2,108** (+2 files / +17
+tests). PHPStan 18 = baseline, delta 0. Four lint gates **95 · 106 · 30 · 106/119/0** — the job count moved 29→30 and that +1 was
+Lane B's K1c backfill job, not J7's: measure the delta against your own base, never against a number written before another lane merged.
+`openapi.json` byte-identical. Visual sweep 11/11 in the running app with the failure forced via `page.route()` abort.
+
+**The mutation passes corrected the design twice, and both defects were J7's own.** `toBe` on an associative array is `===`, which compares KEY
+ORDER, so three parity "map" cases were silently asserting order as well and a pure reorder reddened four cases instead of one — destroying the
+legibility that was the entire argument for separating them. And an anti-vacuity case pinned the production strings `manageForms` /
+`advanced_analytics`, so a legitimate consistent rename would have reddened it. Both fixed; a parser guard has no business having an opinion about
+which abilities exist. Totals: parity 8 killed / 2 controls survived, store 7 killed / 2 controls survived, all files byte-identical afterwards.
+
+**Environment facts established this run.** Docker Desktop died mid-session and its containers do not all come back with it (five of seven needed an
+explicit start). The host CANNOT run Vitest at all — the rolldown win32 binding is missing, so it dies on startup rather than failing green. But
+the host CAN run Pest for a test needing no database: `ShellAbilityParityTest` ran host-side while Docker was down, a direct dividend of placing it in
+`tests/Unit` with no container dependency. **A gate that needs nothing is a gate you can still run when the stack is gone.**
+
+**Three findings that lived in `PROGRESS.md` prose and nowhere else are now backlog rows** — JR4's TopNav overlap at 834px with `extra_large`
+(every increment named as its owner has since merged without touching it), I2's two server-paginated tables carrying `sortable: true` (filed with its
+fork stated, not resolved), and the unseeded-catalog conflict. Four more rows record what J7 deliberately did not take: the verdict is batch-scoped
+rather than per-row, an identical repeated failure does not re-announce, the read-only form still claims saved, and the failed indicator is not toned.
+Nothing was spent from either shared namespace — `0021` still the next free ADR, `0010` still reserved for H1d, `#16` still free.
+---
+
+## 2026-08-18 — 🅱️ LANE B — `K1d`: the gamification leaderboard and its API
+
+**Built.** Two read-only `/api/v1` routes (`gamification/me`, `gamification/leaderboard`), a
+`LeaderboardService` with five value objects, `RequireModule` + `ModuleDisabledException` as a new
+`module:<key>` route gate, `PointAwardPolicy`, three API resources, and `read:gamification` as the
+fourteenth Sanctum ability. **No table, no migration, no ADR number, no thirtieth permission key** — the
+ladder is a `SUM` and a `COUNT` grouped over an index `point_awards` already carried, which is what
+ADR-0020's Consequences said a rollup should wait for.
+
+**The row's premises held; what was underneath them did not.** ADR-0020 §D7 settles who may *see* the named
+list and never says **who is on it**, and the two available answers differ: group the ledger, or read the
+membership. The ledger is append-only, so a departed member's rows outlive their membership — grouping it
+names ex-colleagues forever. The roster is `tenant_users` at `status = 'active'`, recorded as §D11, which
+also tabulates the **three** places the workspace totals and the ladder now deliberately fail to reconcile:
+guest submissions (§D8, already known) plus departed members in two forms (`team.points` and
+`team.contributors`, both new).
+
+⚠️ **The sharpest finding was a predicate I had written off as decorative.** `LeaderboardService`'s
+`whereExists` over `tenant_users` looked redundant with the `users_visibility` RLS policy, and I documented
+it as an expected mutation survivor on `MemberSearchArm`'s precedent. Asking what *could* kill it showed the
+policy's first arm is `id = app.current_user_id`, **unconditional** — so a caller whose own membership has
+been removed still sees their own row and would be seated on the ladder as a ghost. Every other member is
+filtered identically by both mechanisms, which is exactly why the caller is the only case that separates
+them. The documented survivor became a killed mutant and a new test.
+
+⚠️ **Three defects in the increment's own new code, found by an adversarial read BEFORE any test existed —
+and none of the three was test-catchable.** A comment claiming `member_count` equals `team.active_members`
+"by construction" when it is `<=` (the roster read has no `withTrashed()`); a dead `ORDER BY` on the roster
+that the value object's `usort` discards, reading as though tie ordering depended on it; and a
+fully-qualified `{@see \App\…}` inside a docblock, which is the recorded Pint `fully_qualified_strict_types`
+trap that turns a comment into a real import.
+
+⚠️ **A plan-catalog property that makes the module gate nearly untestable, and a Free-tier consequence
+nobody had noticed.** Every tier granting `api_access` also grants `gamification`, so **no plan fixture can
+separate the two gates** — a wrongly-mounted `feature:gamification` would pass every tier-based test, and
+the only discriminating state is a self-disabled tenant, where it produces the wrong sentence. Meanwhile a
+**Free** tenant has gamification and cannot reach it over the API at all, because the whole group sits
+behind `feature:api_access`. Measured the hard way: the API suite's first run failed 14 of 15 on exactly
+that, having chosen Free precisely to prove no plan withholds gamification. K1e's web surface is a Free
+tenant's only door to the feature.
+
+**Merged as PR #175 (`1b92405`), 6/6 with every job's `conclusion` AND `steps` count parsed individually (11 · 12 · 11 · 16 · 20 · 18, none empty).** CI **Pest 4366 / 18,381** — **+37 tests / +146 assertions on J7's own green run (4329 / 18,235)**, which is exactly the sum of the three locally-measured directory deltas. ⚠️ Measured against **J7's** base, not K1c's: Lane A merged J7 (#174) mid-build, and comparing to a number written before another lane merged is how a clean delta reads as a discrepancy. **E2E 541 + 1 flaky + 10 skipped = 552**, identical to K1c.
+
+**Gates.** Test deltas measured per file: Unit/Gamification 47→58, Feature/Gamification 98→108,
+Feature/Api 95→111; every other baseline leaf directory unchanged (Seeders 16, Queue 50, Tenancy 284,
+Dashboard+Onboarding 31). `openapi.json` regenerated, diffed, promoted and verified byte-identical on a
+**second** export; Redocly clean. ⚠️ The first export typed `entries` as an untyped array because an
+`array_map` over a closure gives Scramble nothing to infer — a `LeaderboardEntryResource` turns it into a
+`$ref`. PHPStan read **20 against a baseline of 18 and both were real**, fixed to 18. Four host linters
+green, controllers 95→96. Pint flagged one unused import, fixed by naming the class the docblock was
+contrasting with. gitleaks 901,175 bytes / 27 files, count confirmed inside the container, 0 leaks.
+
+⚠️ **Two harness lessons, both of the "the check measured the wrong thing" shape.** A sweep piped Pest
+through `grep '^  Tests:'` **before** stripping ANSI, so nothing ever matched and seven directories reported
+silence; and a `grep -qE 'FAIL|failed'` guard on the same transcript reported failures in two green
+directories because it matched the word inside **test names**. Judge on the summary line, and strip escapes
+before matching, not after.
+
+---
+
+## 🅰️ LANE A — `J8`, the TopNav theme-toggle overlap (2026-08-18)
+
+**The row was real and its title was wrong, which is the twenty-first consecutive time verifying a row
+against the code changed what the row was.** `docs/feature-backlog.md` called it *"the theme-toggle labels
+overlap the Feedback link at 834px with `extra_large`"*. Measured on the running dashboard before touching
+anything, the labels spilled their fieldset at **every** type scale — **8.5px at 834px on the DEFAULT
+scale**, 4.5px of it across the Feedback trigger — rising to 40.1px at `large`, 66.8px at `extra_large`,
+and 139–193px by 601px. So it was never an `extra_large` defect, and **834px is one of the three e2e
+viewport projects**: the overlap has been rendered in every tablet run this suite has ever made.
+
+**Why nothing caught it.** `MdsSegmentedControl` is `inline-flex` with no wrap and no overflow handling
+(exceptions-log #13 cost 5), and this instance is the **only** child of `.topnav__right` declaring
+`min-width: 0` — so it absorbed the entire squeeze while its content refused to reflow. The fieldset
+collapsed from 217px to 43px; the content stayed 214–236px. `.app-shell { overflow-x: clip }` then
+swallowed the evidence, exactly as that cost predicts. `search-nav.spec.ts` already ran at `extra_large`
+plus OpenDyslexic and still missed it, because its non-overlap case pairs the SEARCH against the wordmark
+and the bell — the theme toggle and the Feedback trigger are both inside `.topnav__right`, so neither is
+the search and the pair was never compared.
+
+**⛔ THE APPROVED PLAN'S CENTRAL PREMISE WAS FALSE, AND MEASURING IT IS WHAT KEPT LANE A OUT OF K1e's
+FILES.** The row and the plan both held that the defect belonged to `MdsSegmentedControl` and that *"nine
+consumers spill the same way"*. They do not. Every consumer was measured at every width and both extremes
+of the type scale: `forms/Index`'s Layout switcher and `analytics`'s Dashboard-view switcher never spill,
+375px under `extra_large` included. Only the topnav's instance is a flex item in a `space-between` bar
+competing against five siblings. **So the fix is shell-only and `packages/design-system/` was never
+touched** — which is also why Storybook axe is unchanged on structural rather than hopeful grounds, and
+why Lane B's `K1e` finds that directory exactly as it left it.
+
+**What shipped: three states, every threshold measured.** Labels where they fit; glyphs where they do not
+(**visually hidden, never removed** — `MdsIcon` is `aria-hidden` unless given a `label` and this control
+passes none, so that span is each radio's only accessible name); and not rendered at all below the width
+where even the glyphs stop fitting, where Settings → Appearance still carries the same `setMode` control
+and `/settings` is in the nav model at every width — verified, not assumed.
+
+⚠️ **COLLAPSING TO ICONS WAS NOT SUFFICIENT, AND THE SECOND MEASUREMENT IS THE ONE THAT MATTERED.** With
+labels hidden the content is 139px, and the box keeps being squeezed below it — the spill returned at 760
+(standard) / 800 (`large`) / 834 (`extra_large`). There was no third thing to give up: `.fb`, the bell and
+the account menu all keep their automatic minimum size, and the only remaining source of width was the
+search field, which is **not available** — global search is a standing product principle and this toggle is
+a beyond-spec convenience by its own docblock. Wrapping was foreclosed too: `.topnav` is a fixed 64px with
+`flex-shrink: 0`, so a wrapped control trades a horizontal defect for a vertical one.
+
+### Three findings that were not the row
+
+🔴 **(1) THE FIX RE-CREATED A DEFECT CLASS THIS REPO HAS PAID FOR FOUR TIMES, AND AN EXISTING GATE CAUGHT
+IT MID-BUILD.** `clipped-node-containment.test.ts` walks the whole app tree for the visually-hidden idiom
+in a file that positions nothing, and the new label rule matched. The runtime was in fact safe — the
+segment is positioned by `MdsSegmentedControl` — but that is precisely the latent shape: correct only for
+as long as another component keeps a line this file cannot see. Fixed by stating the containing block
+locally rather than adding the file to `KNOWN_UNGUARDED`, so **the list did not grow**. First instance of
+that class caught while it was being written rather than increments later.
+
+🔴 **(2) THE DYSLEXIA FACE DOES NOT LOAD IN DEV, SO THE OBVIOUS "I MEASURED IT" WOULD HAVE BEEN VACUOUS.**
+`data-dyslexia-font` re-points `--mds-font-family-body` to OpenDyslexic, which is substantially wider. The
+attribute applies — the computed `font-family` changes — but `document.fonts` reports the face `error`,
+`fonts.check()` is false, and the label width is **identical to the fallback's**. Cause: Vite serves the
+stylesheet from `:5173` while the document is on `:8080`, so the `/fonts/*.woff2` fetch is cross-origin and
+`artisan serve` sends no CORS header. Built assets are same-origin, so it very likely **does** load in CI
+and production. The thresholds were therefore widened rather than pinned to what this machine could see —
+959→**1024** (§6's tablet boundary) and 859→**899** — which is close to free, because the collapsed state
+is face-independent: the labels are gone and the glyphs are SVG.
+
+🔴 **(3) `/tmp` IS SHARED BETWEEN THE TWO LANES, AND IT PRODUCED A GATE RESULT THAT WAS NOT MINE.** A Pint
+run written to `/tmp/pint.json` came back `result: "fail"` naming three files — all of them in
+`app/Services/Sso/` and `app/Support/Sso/`, i.e. **Lane B's subtree**, in an increment that changed zero
+PHP. `/tmp` resolves to `C:/Users/DOH/AppData/Local/Temp`, which both lanes' shells share, and nothing this
+lane ran rewrote that file before it later read `passed`. Acting on it would have meant "fixing" three of
+the other lane's files for no reason — a cross-lane trespass caused purely by a scratch-filename collision.
+**Write gate output to the session scratchpad, never to a bare `/tmp/<name>`.**
+
+### Gate notes worth keeping
+
+⚠️ **A Vitest chunk exited `137` — SIGKILL, an OOM — while a Playwright browser was running beside it**, and
+it printed no summary line at all. Read the exit code echoed into the file, not the pass line: a chunk that
+never finishes looks like a chunk that was never counted. Re-run serialised.
+
+⚠️ **`--reporter=basic` is not valid in this Vitest** and dies as `ERR_LOAD_URL … Does the file exist?` —
+a harness failure that reads like a test failure.
+
+⚠️ **The mutation harness refused a mutation and was right to.** `html[data-font-size]` appeared **4×**, not
+the 3 the plan predicted: the fourth is inside the docblock explaining it. Narrowed the find-string to
+`html[data-font-size] .theme-quick` — the standing *"assert the find-string count, a docblock will match
+too"* rule, now on its second lane.
+
+⚠️ **And one assertion of mine was too strong before it was ever committed.** A control case asserted that
+no media block reaches 960px; widening the collapse threshold to 1024 made that false **on a correct
+file**. Replaced with the real invariant — *collapse before you hide, compared WITHIN a type scale*, since
+the enlarged hide (899) and the default collapse (899) legitimately coincide.
+
+**Gates on the merged tree.** Vitest **123 files / 2,115** (`packages/design-system` 35/545 ·
+`resources/public-runtime` 32/720 · `resources/js` 56/850 — +1 file / +7 tests, all mine, and the +7 rather than the +6 forecast is the control case being split in two mid-build). Mutation pass
+**8 killed + 1 control survived**, bytes identical after restore. `vue-tsc` clean on both projects; the two
+files `tsconfig.json` does not cover type-checked by hand. Four host linters **96 · 106 · 30 · 106/119/0** —
+⚠️ controllers is 96 and the hand-off said 95, because **K1d merged mid-increment**; the +1 is Lane B's API
+controller, not this row's. PHPStan **18 = baseline, delta 0**. Pint `result: "passed"`. `openapi.json`
+untouched (zero PHP). Storybook axe **42 suites / 299** asserted unchanged on the structural ground that
+Storybook globs `packages/design-system/src/**` only and this increment touched no file under it.
+
+---
+
+## 2026-08-18 — 🅱️ LANE B · `K1e` — the gamification UI, and the last row in either queue
+
+An achievements surface (`/achievements`), a dashboard card and a sidebar affordance whose count badge is a
+JSON sidecar (`GET /achievements/streak`) read by `useMemberStreak` — the shape doc #28 §10 required by name.
+`BadgeShelfService` + `BadgeShelf` + `BadgeStanding` are the one thing K1e had to BUILD rather than consume:
+`BadgeAwarder` only writes and `LeaderboardService` only counts, so nothing in the engine could answer
+*"which badges do I hold, when did I earn them, and how close am I to the rest"*.
+
+**VERIFYING THE ROW AGAINST THE CODE MOVED IT IN FIVE PLACES — 22-for-22 — and two of the five contradicted
+the hand-off that named them.**
+
+1. **The "nav affordance" is a four-file coupling, mechanically enforced.** J7's `ShellAbilityParityTest`
+   asserts `nav-model.ts` and `app/Support/Search/DestinationCatalog.php` agree on destination keys, **order**
+   and the `(ability, feature)` tuple — three cases, each failing by name. J8 had recorded that catalog as
+   belonging to **neither lane**, so the claim had to cover a file nobody owns, and global search reaches the
+   new page by construction rather than by anyone remembering. The item is also the **first** nav entry
+   carrying a `feature` and no `gate`, which made a fourth combination assertable in that parser's
+   anti-vacuity case for the first time.
+2. ⛔ **`#16` stays free; the instruction to spend it was wrong on the spec.** DSR **Appendix B → Registry
+   growth**: *"add glyphs to `icons.ts` as features need them… a MINOR change"*; `exceptions-log.md` #2's
+   Disposition: *"extend it as features require"*; and I1 added `share`/`link`/`qr` with no entry. Adding a
+   glyph is **conformance, not deviation** — `award` is documented in Appendix B instead, and `badge_earned`
+   is re-pointed off K1b's `trend-up` placeholder, which also gives `trend-up` back its single meaning.
+3. **First `module:` gates on a web route.** K1d mounted the middleware on `/api/v1` only, so
+   `bootstrap/app.php`'s `back()` arm had never executed. Verified it does not redirect to `/achievements`.
+4. **`feature: 'gamification'` is the correct nav axis** and reduces exactly to the module toggle (§D6 grants
+   the key on every tier). A second client-side `module` axis was considered and refused. The dashboard card
+   deliberately reads the **other** axis — `moduleEnabled()`, the middleware's exact mirror — because a card
+   must not be withheld from a reader whose link works.
+5. 🔴 **`team` belongs BEHIND the ladder gate, not beside it** — the one gating call the spec left open.
+   `TeamProgress` names nobody, so it reads as ungated; serving it that way hands a Form Editor the
+   workspace-wide totals `DashboardMetricsService` withholds on exactly `dashboard.org.view` — **a widening of
+   an existing permission performed by a new page**.
+
+🔴 **THE ADVERSARIAL PASS RAN BEFORE THE TESTS AND FOUND EIGHT DEFECTS IN K1e's OWN NEW CODE.** Writing tests
+first would have codified all eight. **(a) A phantom toast**: `bootstrap/app.php` keys its API branch on the
+request PATH, not `Accept`, so a `module:`-gated refusal to a `fetch` is a **302 with a session flash** — an
+unguarded sidecar in a module-disabled workspace degrades harmlessly *in the client* while leaving *"switched
+off for this workspace"* to pop on a random page, once per navigation, forever. `useMemberStreak` therefore
+takes the destination's own visibility. **(b) An unreachable empty state**: the page guarded "no badges" on
+both shelf halves being empty, which `assemble()` makes impossible on-tenant (it walks the whole catalog, so
+the halves always sum to ten) — dead code carrying copy for a state it could not reach, while the state that
+matters fell through to a bare heading. Also: a docblock asserting an off-tenant guard the class does not
+have; **two fully-qualified `{@see \App\…}` Pint would have turned into real imports** — the K1d trap, one of
+them written two lines above my own warning about it; an `<ol>` whose positional semantics contradict
+competition ranking (ranks skip, so the ladder is a `<ul>` with the rank as text); an unlabelled badge count;
+a duplicated tile label; and six invented design tokens.
+
+**MUTATION: 12 + 1 CONTROL. 9 killed, control survived — and the three survivors were the valuable part, all
+the same shape: a guard that reads as load-bearing and changes nothing if deleted.** `BadgeKey::tryFrom()` in
+`earnedOn()` was **removed** rather than documented — `assemble()` indexes that map by catalog key and never
+iterates it, so an unknown key was already dropped structurally. `mostRecentFirst()`'s catalog fallback is
+redundant because `assemble()` emits catalog order and PHP's sort has been stable since 8.0; kept on the
+`roster()` belt-and-braces precedent, but its docblock no longer claims to be the mechanism. And the `(int)`
+casts carried a **false** note: **measured**, `get_debug_type()` on `COUNT(*)` and `SUM()` both return `int`
+here, because pdo_pgsql fetches native types — corrected in `BadgeShelfService` **and in `LeaderboardService`,
+which has carried the wrong claim since K1d**. ⚠️ **A predicted killer is a hypothesis too**: three of mine
+were wrong, and only running them said so.
+
+⚠️ **A STALE TODO ALMOST PRODUCED A DUPLICATE.** doc #28 §11 said the media-resumability narrowing was *"still
+unfiled"*; `docs/feature-backlog.md` already carried it, signed *"found by P3a, filed by K1c"*. Caught only by
+opening the file the TODO pointed at before writing to it. That file was claimed and is **released untouched**.
+
+⛔ **WHAT WAS NOT DONE: THE VISUAL SWEEP.** No Playwright pass touched `/achievements` in the running app. In
+its place: 12 component cases, 15 feature cases, the Storybook axe run, and `/achievements` added to
+`tests/e2e/responsive-axe.spec.ts`, which scans it whole-page at three widths in CI and owns the
+horizontal-overflow assertion. **Two `auto-fit` grids, a badge card carrying a meter and a four-child ladder
+row have never been seen rendered at 375px outside CI.** Named rather than left to be discovered.
+
+**GATES.** Pest per leaf dir: Gamification **129** (+21) · Unit/Gamification **70** (+12) · Search **123** (+2) ·
+Unit/Navigation **17** (unchanged) · Api 111 · Dashboard+Onboarding 31 · Tenancy 284 · Seeders 16 · Queue 50 ·
+Forms 390 · Submissions 399 · Analytics 107 — **local delta +35**, which CI matched to the digit: **4401 /
+18,594** against J8's **4366 / 18,381**, both carrying the same 2 pre-existing warnings.
+⚠️ **IT WAS FIRST RECORDED AS +36, AND THE ERROR IS THE ONE THIS FILE KEEPS WARNING ABOUT — THE WRONG BASE.**
+`tests/Unit/Navigation` reported *"1 failed, 16 passed"* on the run where the new nav item first broke its
+count guard, and I read the **16** as the baseline. The total was **17 both before and after**: the
+`withFeatureOnly` case is a new ASSERTION inside an existing test, not a new test. Caught only because CI
+disagreed by exactly one and the base run's own summary line was pulled rather than the hand-off's number.
+**A per-directory baseline read off a RED run is not a baseline.** Vitest **125 files / 2,143** (35/545 ·
+32/720 · 58/878). **Storybook axe 42 / 299, unchanged and MEASURED rather than argued structurally** — the
+design-system package ships without Storybook installed, so `npm install` there was a prerequisite and this is
+the first increment in four to actually run that gate. PHPStan **18 = baseline, delta 0**. Four host linters
+**97 · 106 · 30 · 106/119/0** (+1 controller = `AchievementsController`). `vue-tsc` clean on both projects.
+`openapi.json` **byte-identical** — both new routes are tenant web routes. Pint `result: "passed"`, and its
+one fix was read: a real import for a real type usage in a test.
+
+**NAMESPACES: NOTHING SPENT.** No ADR (`0021` free, `0010` reserved for H1d), no migration prefix
+(`2026_08_17_000104` still free — every number is derived, and the streak badge persists no "seen" state),
+no exceptions-log entry.
+
+⚠️ **`LANE B QUEUE EMPTY — 2026-08-18`. BOTH QUEUES ARE NOW EMPTY**, so Rule 7(f) checkpoint 2 applies to Lane
+B as the lane that emptied last: the final integration PR to `main` is **recommended, not performed**.
+
+---
+
+## 2026-08-18 — LANE B: the merge-gate review, `M1` (PR #178), and the FINAL INTEGRATION PR to `main` (#179)
+
+**The session Rule 7(f) checkpoint 2 exists for.** `main` had received nothing since 2026-08-05 (`b3a7971`),
+so this was the highest-consequence action in the project and it was **recommended, not performed**: the plan
+was approved first, the fix set was the user's choice, and the PR was opened only after both.
+
+**THE REVIEW WAS A FULL-COVERAGE FAN-OUT OVER THE DIFF, NOT A RUBBER STAMP ON 419 GREEN RUNS.** 18 shards,
+**1,073 of 1,073 changed files**, and the coverage was **proven by arithmetic before any agent ran** — the
+shard lists sum to 1,073, contain zero duplicates, and are set-identical to `git diff --name-only`. That
+proof is the point: 149k added lines is roughly 2M tokens, more than any single context holds, so "read the
+whole diff" is only literally true with fan-out; one reviewer would have sampled and called it coverage.
+
+⚠️ **THE ADVERSARIAL PASS WENT THREE FOR THREE — EVERY CODE BLOCKER WAS DOWNGRADED, EACH ON A FACT THE
+FINDER HAD NOT CHECKED.** The 2FA gap on the `/api/v1` mint → **minor**: the middleware is an *enrolment
+nudge* by its own docblock, and Fortify's own 2FA-enrolment routes sit outside the same gate behind
+`password.confirm`, so a password-only attacker already had a strictly better path, and minted abilities are
+capped at the issuer. The SSO account-takeover → **major**: all six links hold, including the email-change
+finale, but `sso_saml` comes only from Enterprise, which is seeded `active: false` and assignable only by the
+super-admin console — **deployment state, not a code control**, which is precisely why it was fixed anyway.
+The guest draft 409 → **major**: the P3a guard is *not* undone, because the service throws before the write,
+and "fresh uuid after a 409 → a second row" is the pre-existing documented G8c recovery shape. **A finding
+is a hypothesis. Never act on a severity nobody has tried to refute.**
+
+🔴 **AND THE FINDING THAT JUSTIFIED THE WHOLE EXERCISE WAS NOT CODE.** `docs/ACCESS-MATRIX.md` added a
+**real personal email address** to a table headed *"every account below uses the same password"*, on a
+**public** repository, and the line is absent from `main` — so the integration merge would have created a
+**new** public exposure by the act of finishing. No gate here looks for that: gitleaks scans for credentials,
+not identities. It was a one-line fix and nothing else in the review came close to it in value.
+
+**`M1` (PR #178, `4abbb0e`) — what was fixed rather than filed.** The email line · `SsoUserProvisioner`
+adopting an existing central account (**JIT may create an account, never adopt one**; narrow by construction,
+since a membership row of *any* status still passes) · `Settings/Sso.vue` addressing a `#footer` slot
+`MdsModal` does not declare, so Vue silently discarded both buttons and **`DELETE /settings/sso` was
+unreachable from the UI** · `NotificationType::BadgeEarned->pathFor()`, a K1b→K1e hand-off documented in the
+enum *and* in a test written to fail on the flip, which K1e never came back for · plus the documentation that
+was false about its own branch (README's *"Phase 0 walking skeleton"* front page, the RBAC design's
+*"impersonation IS NOT BUILT YET"* in the branch that ships it, TESTING-GUIDE's *"not built yet: step-up +
+org 2FA"*, two stale sidebar lists) and the integrator-facing one: **`X-Webhook-Signature` carries two
+comma-joined `sha256=` values during a rotation window** and both documents described only the single-value
+form, so an integrator implementing `hash_equals` from the docs would have had every delivery silently
+rejected from the first rotation — in production only, after an unrelated admin action, looking like an
+attack.
+
+⚠️ **`CENTRAL_DOMAIN` WAS SETTABLE NOWHERE** while `config/tenancy.php` defaults it to `meridian.test`, so
+the documented `cp .env.example .env` produced a stack whose `/admin/*` console 404s **after** a successful
+sign-in. Three documents referenced the variable; none defined it.
+
+⚠️ **THE SSO FIX WAS DESCRIBED AS A ONE-LINER AND WAS NOT** — verifying the row against the code moved it,
+as it has every time. The refusal needs its own `SsoFailureReason`, and `sso_auth_failures.reason` is
+CHECK-constrained to `SsoFailureReason::values()`, so it needs **migration `2026_08_17_000104`** on the K1b
+`badge_earned` precedent. Without it the new guard would raise a **23514 while being recorded** — throwing on
+the one endpoint anyone on the internet can post to. The failure-log test is therefore also the migration's
+test: asserting the row exists asserts the widened CHECK accepts the value, which no unit test over the enum
+could do.
+
+**FILED, NOT FIXED: 50 rows in `docs/feature-backlog.md`**, grouped by subsystem, each with `file:line`, a
+concrete failure scenario and a live-vs-latent marker. The three that matter most: **the e2e
+horizontal-overflow assertion is structurally INERT on every `AppLayout` page** (`.app-shell { overflow-x:
+clip }`) while three separate files claim it works — a gate the project has been trusting measures nothing;
+**an expired IdP signing certificate authenticates assertions forever** while `/settings/sso` renders it as
+expired (a recorded threat-model residual whose first ship to `main` is this merge); and
+**`WebhookEventDispatcher::fanOut()` picks endpoints by ambient RLS alone**, latent only because that
+listener is synchronous today.
+
+✅ **THE `/achievements` VISUAL SWEEP WAS RUN — the one thing K1e recorded as NOT done.** 375/834/1440,
+zero horizontal overflow, zero console errors, both `auto-fit` grids collapsing to a single 343px column.
+⚠️ **And it survived the trap the review itself uncovered:** `scrollWidth`-vs-`clientWidth` is **inert**
+under `overflow-x: clip`, so the sweep also measured every descendant with `getBoundingClientRect()` —
+clipping does not move layout rects — and asserted the landing page explicitly (H1, 10 badge marks, 6 ladder
+rows), which the e2e loop does not.
+
+**GATES (M1, PR #178, 6/6 with every job's `conclusion` AND `steps` parsed individually — 11 · 12 · 20 · 18 ·
+16 · 11, none empty):** CI Pest **4404 / 18,617**, +3 on 4401 and matching the local prediction to the digit
+(same 2 pre-existing warnings) · E2E **551 + 10 skipped = 561** · Vitest **125 / 2,143** · Storybook axe
+**42 / 299** · PHPStan **18 = baseline, delta 0** · host linters **97 · 107 · 30 · 107/119/0** (+1 migration
+on both counts; constraints stay 119 because a CHECK *recreate* is not a new constraint) · Pint **PASS,
+1,392 files** · `openapi.json` **byte-identical**.
+
+⚠️ **TWO HARNESS TRAPS FIRED AND BOTH READ AS GREEN.** A full local Vitest run printed `77 passed` and
+**exited 0** while 48 workers timed out — 77 + 48 = 125, the whole baseline; `--no-file-parallelism` per
+directory recovered it (design-system 35/545 exactly). And `pint --format=json` returned `files: []` with
+`time 0` and `memory 0`, **indistinguishable from having scanned nothing** — only the verbose run's 1,392
+proved otherwise. **Read the count, never the colour.**
+
+⚠️ **WHAT MADE THE MERGE SAFE TO CLICK, VERIFIED RATHER THAN ASSUMED:** `deploy.yml` is gated on
+`vars.DEPLOY_ENABLED == 'true'` **and** `runs-on: self-hosted`, and `gh variable list` / `gh secret list` are
+both **empty** — re-checked immediately before the PR was opened. Track-B deployment stays held
+**structurally**, not by convention. The intended side effect: `ci.yml`'s `workflow_dispatch` + nightly
+`schedule` triggers, inert for the entire I-map because GitHub reads them from the default branch only, arm
+themselves the moment this lands.
+
+**NAMESPACES:** ADR `0021` still free · `0010` still reserved for H1d · `#16` still free · **migration
+`2026_08_17_000104` SPENT**, so Lane B's block resumes at **`2026_08_17_000105`**. K1e's claim was **released**
+here — it was still open when the session began, and a claim that is not released is a leak.

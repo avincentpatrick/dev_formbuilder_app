@@ -5,12 +5,16 @@
  * a manual "Sync now", and on boot when rows are already queued. The true Background-Sync `sync` event in sw.ts
  * is an additional no-tab path; both drive the same Dexie DB + same replay function, so idempotency makes them
  * safe to overlap. `navigator`/`window`/`document`/`fetch` are injectable for tests.
+ *
+ * ── I10d ────────────────────────────────────────────────────────────────────────────────────────────────
+ * It additionally owns the per-submission LIST (`docs/PRD.md:223`, UX §7.1): the rows themselves, which of
+ * them is being sent right now, and which conflicts can actually be resolved from the form currently open.
  */
 
 import { onScopeDispose, ref, type Ref } from 'vue';
 import type { MeridianDb, OutboxRow } from '../lib/db';
-import { counts, discardRow, listConflicts, retryAll } from '../lib/outbox';
-import { replayOutbox } from '../lib/replay';
+import { counts, discardRow, listConflicts, listSubmissions, pruneSynced, retryAll, retryRow } from '../lib/outbox';
+import { replayOne, replayOutbox, type ReplayHooks } from '../lib/replay';
 
 /** Background Sync's `SyncManager` is not in the standard TS lib typings. */
 type SyncCapableRegistration = ServiceWorkerRegistration & {
@@ -21,18 +25,37 @@ export interface SyncOutbox {
     pending: Ref<number>;
     needsAttention: Ref<number>;
     conflict: Ref<number>;
+    /**
+     * Conflicts belonging to the form currently open — the only ones this driver can actually resolve
+     * (I10d). Distinct from `conflict`, which is every conflict on the device.
+     */
+    conflictHere: Ref<number>;
     syncing: Ref<boolean>;
+    /** Rows being sent RIGHT NOW, by uuid (I10d). See the note on `syncingUuids` below. */
+    syncingUuids: Ref<ReadonlySet<string>>;
+    /** Every submission on this device, newest first (I10d). */
+    rows: Ref<OutboxRow[]>;
+    /** The conflict row currently being reviewed, excluded from the list so it is not offered twice (I10d). */
+    reviewingUuid: Ref<string | null>;
+    /** Politely announced sync progress (I10d) — see SyncStatus.vue's live region. */
+    lastAnnouncement: Ref<string>;
     quotaWarning: Ref<string | null>;
-    /** Recompute the outbox counts + storage-quota estimate (call after enqueue so the badge updates at once). */
+    /** The form this driver is bound to, so a row can be asked whether it is resolvable here. */
+    slug: string | undefined;
+    /** Recompute the outbox counts + rows + storage-quota estimate (call after enqueue so the UI updates at once). */
     refresh(): Promise<void>;
     /** Replay every pending row once, then refresh. */
     syncNow(): Promise<void>;
     /** Return the "needs attention" rows to pending and replay them (from the banner's Retry). */
     retryNeedsAttention(): Promise<void>;
+    /** Return ONE row to pending and replay just it (I10d — the per-row "Retry now"). */
+    retryOne(uuid: string): Promise<void>;
     /** The oldest unresolved conflict row for this form (Increment G8c), or null — feeds the review UX. */
     nextConflict(): Promise<OutboxRow | null>;
-    /** Drop a reviewed conflict row (and its queued media), then refresh the counts (Increment G8c). */
-    discardConflict(uuid: string): Promise<void>;
+    /** ONE conflict row on this form by uuid (I10d) — what the per-row Review button resolves. */
+    conflictRow(uuid: string): Promise<OutboxRow | null>;
+    /** Drop a row (and its queued media), then refresh the counts. */
+    discardSubmission(uuid: string): Promise<void>;
     /** Best-effort: register a Background-Sync tag (no-tab replay) + nudge the active worker to replay now. */
     registerBackgroundSync(): void;
     dispose(): void;
@@ -47,6 +70,8 @@ export interface SyncOutboxOptions {
     document?: Document;
 }
 
+const MB = 1024 * 1024;
+
 export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}): SyncOutbox {
     const nav = options.navigator ?? (typeof navigator !== 'undefined' ? navigator : undefined);
     const win = options.window ?? (typeof window !== 'undefined' ? window : undefined);
@@ -56,14 +81,76 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
     const pending = ref(0);
     const needsAttention = ref(0);
     const conflict = ref(0);
+    const conflictHere = ref(0);
     const syncing = ref(false);
     const quotaWarning = ref<string | null>(null);
+    const rows = ref<OutboxRow[]>([]);
+    const reviewingUuid = ref<string | null>(null);
+    const lastAnnouncement = ref('');
+
+    /**
+     * ⚠️ IN MEMORY, AND NOT A PERSISTED `'syncing'` STATUS. The decisive reason is `sw.ts`: it replays with no
+     * tab open, and the browser terminates a service worker whenever its Background-Sync budget lapses. A row
+     * written as `'syncing'` and then orphaned would be stuck forever, because `listPending()` filters on
+     * `status === 'pending'` and no future pass would ever pick it up again — the "never silently dropped"
+     * guarantee violated BY the feature meant to uphold it. Recovering from that needs a stale-timestamp
+     * reaper built on a timeout guess, which is more machinery and more failure modes than the state is worth.
+     *
+     * It is also simply honest: "syncing" is a fact about an attempt happening in THIS tab. A row the service
+     * worker is sending shows Queued here, because this tab genuinely does not know.
+     */
+    const syncingUuids = ref<ReadonlySet<string>>(new Set());
+
+    function setSyncing(next: Set<string>): void {
+        // Replace rather than mutate: reactivity on a Set proxy is one more thing to be subtly wrong under
+        // happy-dom, and this costs nothing at these sizes.
+        syncingUuids.value = next;
+    }
+
+    const hooks: ReplayHooks = {
+        onRowStart(uuid) {
+            const next = new Set(syncingUuids.value);
+            next.add(uuid);
+            setSyncing(next);
+            lastAnnouncement.value = 'Sending 1 response';
+        },
+        onRowSettled(uuid, outcome, reference) {
+            const next = new Set(syncingUuids.value);
+            next.delete(uuid);
+            setSyncing(next);
+
+            if (outcome === 'synced') {
+                // Increment J2e — the SERVER's handle, handed in by the replay rather than derived from the
+                // client uuid. The derived code was stored nowhere, so a screen reader was announcing a
+                // number the tenant could not look up. Null only on the pre-J2e path, where saying less is
+                // better than saying something unfindable.
+                lastAnnouncement.value =
+                    reference == null ? 'Response sent' : `Response sent — reference ${reference}`;
+            } else if (outcome === 'needsAttention') {
+                lastAnnouncement.value = 'A response couldn’t be sent and needs your attention';
+            }
+        },
+    };
 
     async function refresh(): Promise<void> {
+        // Prune before reading, so the list never renders a receipt that is already past its window.
+        await pruneSynced(db);
+
         const c = await counts(db);
         pending.value = c.pending;
         needsAttention.value = c.needsAttention;
         conflict.value = c.conflict;
+        rows.value = await listSubmissions(db);
+
+        // ⚠️ FROM AN INDEXED QUERY, NOT FROM `rows`. Deriving it by filtering the list was wrong and the
+        // comment that justified it ("the list is exhaustive for this status") was false: `listSubmissions`
+        // caps at 50 newest-by-created_at across ALL statuses, so on a device carrying a field day's queue an
+        // older conflict falls outside the window. `conflict` comes from an unbounded indexed count, so the
+        // two disagreed — and SyncStatus turns that disagreement into both the Review CTA's visibility AND a
+        // sentence claiming the conflict belongs to another form. The respondent would be told to look
+        // somewhere else for a row that is right here and that they cannot reach.
+        conflictHere.value = (await listConflicts(db, options.slug)).length;
+
         await checkQuota();
     }
 
@@ -75,7 +162,17 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         try {
             const { usage, quota } = await storage.estimate();
             if (usage !== undefined && quota !== undefined && quota > 0 && usage / quota > 0.8) {
-                quotaWarning.value = `Storage is ${Math.round((usage / quota) * 100)}% full — sync soon to free space.`;
+                // `docs/offline-first-sync-design.md:93` asks for the COUNT and the SIZE, not a bare
+                // percentage: "you have N submissions queued and using X MB". A percentage alone tells the
+                // respondent something is wrong without telling them what syncing would buy back.
+                const queued = pending.value + needsAttention.value + conflict.value;
+                const used = Math.round(usage / MB);
+                // `usage` is the ORIGIN's total, not the queue's — it includes cached shells, schemas and
+                // media. Saying "N queued, using X MB" would attribute all of it to the queue; the two facts
+                // are reported side by side instead.
+                quotaWarning.value =
+                    `This site is using about ${used} MB, ${Math.round((usage / quota) * 100)}% of what the browser allows. ` +
+                    `${queued} response${queued === 1 ? '' : 's'} waiting to send — sync soon to free space.`;
             } else {
                 quotaWarning.value = null;
             }
@@ -92,7 +189,7 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         running = true;
         syncing.value = true;
         try {
-            await replayOutbox(db, doFetch);
+            await replayOutbox(db, doFetch, hooks);
         } finally {
             running = false;
             syncing.value = false;
@@ -105,12 +202,31 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         await syncNow();
     }
 
-    async function nextConflict(): Promise<OutboxRow | null> {
-        const rows = await listConflicts(db, options.slug);
-        return rows[0] ?? null;
+    async function retryOne(uuid: string): Promise<void> {
+        if (!(await retryRow(db, uuid))) {
+            return;
+        }
+        await refresh();
+        await replayOne(db, uuid, doFetch, hooks);
+        await refresh();
     }
 
-    async function discardConflict(uuid: string): Promise<void> {
+    async function nextConflict(): Promise<OutboxRow | null> {
+        const conflicts = await listConflicts(db, options.slug);
+        return conflicts[0] ?? null;
+    }
+
+    async function conflictRow(uuid: string): Promise<OutboxRow | null> {
+        const row = await db.outbox.get(uuid);
+
+        // Slug-checked, not just status-checked: the resolver reuses a share-token client bound to ONE form,
+        // so handing it a foreign row would re-mint against the wrong slug.
+        return row !== undefined && row.status === 'conflict' && (options.slug === undefined || row.slug === options.slug)
+            ? row
+            : null;
+    }
+
+    async function discardSubmission(uuid: string): Promise<void> {
         await discardRow(db, uuid);
         await refresh();
     }
@@ -160,13 +276,21 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         pending,
         needsAttention,
         conflict,
+        conflictHere,
         syncing,
+        syncingUuids,
+        rows,
+        reviewingUuid,
+        lastAnnouncement,
         quotaWarning,
+        slug: options.slug,
         refresh,
         syncNow,
         retryNeedsAttention,
+        retryOne,
         nextConflict,
-        discardConflict,
+        conflictRow,
+        discardSubmission,
         registerBackgroundSync,
         dispose,
     };

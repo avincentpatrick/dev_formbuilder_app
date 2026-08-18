@@ -204,11 +204,18 @@ final class AnalyticsMetricsService
             ->where(fn (Builder $q) => $q->whereNull('forms.closes_at')->orWhere('forms.closes_at', '>', $now))
             // The capacity arm, restricted to capped forms so uncapped ones never pay for the correlated
             // count. `acceptance()` reads `>= max_responses` as full, so accepting means strictly fewer.
+            //
+            // The predicate is `Submission::scopeConsumesCapacity()` spelled out by hand — this is a
+            // correlated subquery on a `Form` builder, so the scope cannot be applied — and it is a capacity
+            // question, NOT `scopeCountable()`. Since I9a that means excluding `screened_out` too: a form
+            // whose only remaining "responses" were screened out is still ACCEPTING. `AnalyticsMetricsServiceTest`
+            // pins this against the scope so the hand-spelled copy cannot drift from the enforcement COUNT.
             ->where(function (Builder $q): void {
                 $q->whereNull('forms.max_responses')
                     ->orWhereRaw(
                         '(select count(*) from submissions where submissions.form_id = forms.id '
-                        ."and submissions.status <> 'draft' and submissions.deleted_at is null) < forms.max_responses"
+                        ."and submissions.status <> 'draft' and submissions.status <> 'screened_out' "
+                        .'and submissions.deleted_at is null) < forms.max_responses'
                     );
             })
             ->count();

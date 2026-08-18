@@ -9,6 +9,8 @@
 import { computed, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    MdsBreadcrumb,
+    MdsAlert,
     MdsBadge,
     MdsButton,
     MdsCard,
@@ -19,6 +21,7 @@ import {
     MdsPagination,
     statusVariant,
     type DataTableColumn,
+    type BreadcrumbItem,
 } from '@meridian/design-system';
 import type { FlashNewSecret, FlashTestResult } from '@/types/inertia';
 import PageHeader from '@/components/shell/PageHeader.vue';
@@ -37,6 +40,8 @@ type EndpointDetail = {
     event_types: string[];
     form_id: string | null;
     form_title: string | null;
+    /** The form's hub path, server-resolved; null when the reader cannot open it or it no longer exists. */
+    form_url: string | null;
     secret_masked: string;
     disabled_reason: string | null;
     consecutive_failure_count: number;
@@ -66,6 +71,8 @@ type DeliveryRow = {
 };
 
 const props = defineProps<{
+    /** Server-built (J2d): `Webhooks / {endpoint name}`, each crumb resolved against its own gate. */
+    crumbs: BreadcrumbItem[];
     endpoint: EndpointDetail;
     deliveries: { data: DeliveryRow[]; meta: Meta };
     forms: Option[];
@@ -174,9 +181,10 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Webhook · ${endpoint.name}`" />
 
-        <Link href="/webhooks" class="detail__back">← Back to webhooks</Link>
-
         <PageHeader :title="endpoint.name" icon="activity">
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
                 <template v-if="can.update">
                     <MdsButton variant="tertiary" icon-left="activity" @click="sendTest">Send test ping</MdsButton>
@@ -194,14 +202,20 @@ function formatDate(iso: string | null): string {
                 <dl class="detail__meta">
                     <div class="detail__meta-row">
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(endpoint.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(endpoint.status)" dot /></dd>
                     </div>
                     <div class="detail__meta-row"><dt>URL</dt><dd class="detail__mono">{{ endpoint.url }}</dd></div>
                     <div class="detail__meta-row">
                         <dt>Events</dt>
                         <dd>{{ eventLabels.length ? eventLabels.join(', ') : '—' }}</dd>
                     </div>
-                    <div class="detail__meta-row"><dt>Scope</dt><dd>{{ endpoint.form_title ?? 'All forms' }}</dd></div>
+                    <div class="detail__meta-row">
+                        <dt>Scope</dt>
+                        <dd>
+                            <Link v-if="endpoint.form_url" :href="endpoint.form_url" class="scope-link">{{ endpoint.form_title }}</Link>
+                            <template v-else>{{ endpoint.form_title ?? 'All forms' }}</template>
+                        </dd>
+                    </div>
                     <div class="detail__meta-row"><dt>Signing</dt><dd>{{ endpoint.signing_algorithm }}</dd></div>
                     <div class="detail__meta-row"><dt>Secret</dt><dd class="detail__mono">{{ endpoint.secret_masked }}</dd></div>
                     <div v-if="endpoint.secret_previous_expires_at" class="detail__meta-row">
@@ -228,12 +242,19 @@ function formatDate(iso: string | null): string {
             </MdsCard>
         </div>
 
-        <MdsCard v-if="!isActive" class="detail__notice">
-            <p class="detail__prose">
+        <!-- J4a: was an `MdsCard` with no `role` at all — a statement of the page's current condition that
+             assistive tech was never told about. `MdsAlert` at the info tone, not `MdsBanner`, because the
+             body is more than one line and interpolates the status; and NOT `assertive`, because this was
+             already true when the page loaded. ⚠️ The inner paragraph drops `.detail__prose`: that class
+             pins `color: var(--mds-color-text-body)`, which would override the alert's tone foreground and
+             leave text on a tinted field with no measured contrast. It has two other consumers on this
+             page, so it is left alone rather than edited. -->
+        <MdsAlert v-if="!isActive" class="detail__notice" tone="info">
+            <p>
                 This endpoint is <strong>{{ endpoint.status }}</strong> and isn’t delivering. Re-enable it to resume
                 deliveries — that also clears the failure counter. Existing deliveries can be re-queued once it’s active.
             </p>
-        </MdsCard>
+        </MdsAlert>
 
         <section class="detail__log">
             <h2 class="detail__card-title detail__log-title">Delivery log</h2>
@@ -242,7 +263,7 @@ function formatDate(iso: string | null): string {
                     <span class="detail__mono">{{ (row as DeliveryRow).event_type }}</span>
                 </template>
                 <template #cell-status="{ row }">
-                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" />
+                    <MdsBadge v-bind="statusVariant((row as DeliveryRow).status)" dot />
                 </template>
                 <template #cell-attempt_count="{ row }">
                     {{ (row as DeliveryRow).attempt_count }} / {{ (row as DeliveryRow).max_attempts }}
@@ -258,13 +279,20 @@ function formatDate(iso: string | null): string {
                     {{ formatDate((row as DeliveryRow).created_at) }}
                 </template>
                 <template #row-actions="{ row }">
+                    <!-- J4a — the `title` carrying "Re-enable the endpoint to redeliver" is DELETED, not
+                         replaced by a tooltip. A natively disabled control is not focusable and fires no
+                         pointer events, so that sentence was unreachable by keyboard and by screen reader,
+                         and reachable by mouse only if you happened to hover a control you could not press.
+                         The reason is already on the page — the alert above this table says the endpoint is
+                         disabled and how to resume it — which is exactly what DSR §3.4a prescribes, and what
+                         `RuleShow.vue` and `QuestionPicker.vue` already argued for. `label` still names the
+                         button for assistive tech. -->
                     <MdsIconButton
                         v-if="can.update"
                         icon="redo"
                         label="Redeliver"
                         size="sm"
                         :disabled="!isActive"
-                        :title="isActive ? 'Redeliver' : 'Re-enable the endpoint to redeliver'"
                         @click="redeliver((row as DeliveryRow).id)"
                     />
                 </template>
@@ -326,18 +354,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-4);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-action-primary-fg);
-    text-decoration: none;
-}
-
-.detail__back:hover {
-    text-decoration: underline;
-}
-
 .detail__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
@@ -345,8 +361,15 @@ function formatDate(iso: string | null): string {
     margin-bottom: var(--mds-space-5);
 }
 
+/* The alert owns its tint, padding and radius now; only the spacing between it and the log below
+   survives. The descendant reset is needed because the slotted paragraph is compiled in THIS component,
+   so it carries this scope-id and no longer inherits `.detail__prose`'s margin reset. */
 .detail__notice {
     margin-bottom: var(--mds-space-5);
+}
+
+.detail__notice p {
+    margin: 0;
 }
 
 .detail__card-title {
@@ -410,5 +433,23 @@ function formatDate(iso: string | null): string {
         grid-template-columns: 1fr;
         gap: var(--mds-space-1);
     }
+}
+
+/* J2d — the Scope column's form link. `-fg`, never `-bg`: the J2a WCAG 1.4.11 finding, and the same token
+   `inbox__form-link` and `forms__title-link` already use. There is no global `a` reset in this app, so an
+   unclassed link renders in browser-default #0000EE — the one-design-system rule caught by review. */
+.scope-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.scope-link:hover {
+    text-decoration: underline;
+}
+
+.scope-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 </style>

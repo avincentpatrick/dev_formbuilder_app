@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Http\Controllers\Concerns\ReadsKeywordFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Submissions\ExportSubmissionsRequest;
 use App\Models\Form;
@@ -13,6 +14,8 @@ use App\Policies\SubmissionPolicy;
 use App\Services\Submissions\SubmissionExporter;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Services\Submissions\SubmissionPdfRequestService;
+use App\Support\Forms\FormTabSet;
+use App\Support\Navigation\CrumbTrail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -27,6 +30,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final class SubmissionInboxController extends Controller
 {
+    use ReadsKeywordFilter;
+
     public function index(Request $request, SubmissionInboxPresenter $presenter): Response
     {
         /** @var User $user */
@@ -36,15 +41,69 @@ final class SubmissionInboxController extends Controller
             'form_id' => $this->query($request, 'form_id'),
             'status' => $this->query($request, 'status'),
             'source' => $this->query($request, 'source'),
+            'q' => $this->keyword($request),
         ]));
     }
 
+    /**
+     * One form's responses — `GET /forms/{form}/submissions` (Increment J2c), the Responses tab of the form
+     * hub's strip.
+     *
+     * The SAME presenter method as {@see index()}, given the bound form; the page it renders is the same
+     * Inertia component too. That is the whole design: J1e's audit-export defect was one filter chain
+     * spelled twice, and a per-form inbox is the most tempting place in this codebase to spell a third.
+     *
+     * The tab set is composed HERE rather than in the presenter, following {@see FormAnalyticsController}:
+     * every tab is a gate question, and the presenter deliberately reads nothing about who is asking beyond
+     * the row-visibility scope it already applies.
+     *
+     * ⚠️ TWO GATES ON THE ROUTE, AND THE SECOND ONE IS NOT DECORATION. `can:viewAny,Submission` is the
+     * inbox's own gate but says nothing about WHICH form, so alone it would let any member with
+     * `submissions.view` open this page for any form in the tenant and read its TITLE above an empty list.
+     * `can:viewOverview,form` is the bound-form half. See `routes/tenant.php`.
+     */
+    public function forForm(Request $request, Form $form, SubmissionInboxPresenter $presenter): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('submissions/Inbox', [
+            ...$presenter->list($user, [
+                'status' => $this->query($request, 'status'),
+                'source' => $this->query($request, 'source'),
+                'q' => $this->keyword($request),
+            ], $form),
+            'form' => ['id' => $form->id, 'title' => $form->title],
+            'tabs' => FormTabSet::for($form, $user),
+            'crumbs' => CrumbTrail::forms($user)->form($form)->current('Responses'),
+        ]);
+    }
+
+    /**
+     * One submission — and the page J2d's trail was built for.
+     *
+     * ⚠️ ITS TWO MIDDLE CRUMBS WERE THE INCREMENT'S HEADLINE DEFECT, both live. This route gates on
+     * `can:view,submission` ALONE, which admits a **respondent** ({@see SubmissionPolicy::view()}'s third
+     * arm) that `viewOverview` has no counterpart for — so a keyer whose grant was revoked reached this page
+     * and got a 403 from both hard-coded crumbs. And a soft-deleted form made the same two render `—` as a
+     * live hyperlink to a 404. {@see CrumbTrail} resolves both by asking the destinations' own gates.
+     *
+     * ⚠️ `$submission->form` IS THE NULLABLE RELATION, DELIBERATELY, not a `Form::withTrashed()` lookup.
+     * Its null for a trashed form is the soft-delete signal, and `detail()` has already eager-loaded it, so
+     * this costs no query.
+     */
     public function show(Request $request, Submission $submission, SubmissionInboxPresenter $presenter): Response
     {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('submissions/Show', $presenter->detail($user, $submission));
+        return Inertia::render('submissions/Show', [
+            ...$presenter->detail($user, $submission),
+            'crumbs' => CrumbTrail::forms($user)
+                ->form($submission->form)
+                ->formSubmissions($submission->form)
+                ->current('Response'),
+        ]);
     }
 
     public function export(ExportSubmissionsRequest $request, Form $form, SubmissionExporter $exporter): StreamedResponse

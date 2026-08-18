@@ -5,6 +5,8 @@
  *    authenticated sync/manifest surface; the guest schema itself is still served by the G8a SW schema cache).
  *  - `draft_answers`    — in-progress, not-yet-finalized answers (the G8a localStorage autosave migrates here).
  *  - `outbox`           — FINALIZED submissions queued for replay, keyed by the time-sortable client_submission_uuid.
+ *                         From I10d a DELIVERED row is RETAINED (status `synced`, answers scrubbed) rather
+ *                         than deleted, so the respondent can see what was sent; see outbox.ts.
  *  - `media_queue`      — respondent media blobs awaiting upload, referencing their parent outbox row by uuid.
  *  - `app_state`        — (H23b) small device-scoped scalars that outlive a page load and belong to no form.
  *
@@ -52,6 +54,13 @@ export interface OutboxRow {
     locale: string;
     device_id: string;
     app_version: string;
+    /**
+     * Increment P3a — the server-draft baseline this submission was finalized against; null when no server
+     * draft existed. Un-indexed, so no Dexie version bump (`docs/offline-first-sync-design.md` §3). A row
+     * written by an older build simply has `undefined` here, which replays exactly as it did before P3a —
+     * which is why the SUBMIT channel checks only when a claim is present.
+     */
+    base_content_checksum: string | null;
     submitted_at: string;
     status: OutboxStatus;
     attempts: number;
@@ -61,6 +70,14 @@ export interface OutboxRow {
      *  Not indexed → no `db.version()` bump. */
     conflict_code: string | null;
     server_submission_id: string | null;
+    /** Increment J2e — the server-issued short handle, recorded when the row settles so the outbox can stop
+     *  showing its provisional queue tag and start showing the code the tenant can actually find. Un-indexed
+     *  → no `db.version()` bump, the same reasoning as `conflict_code` above. Null until `synced` (and on any
+     *  row synced by a build that predates J2e, which is why every reader tolerates null). */
+    server_reference: string | null;
+    /** Increment I10d — when the server accepted this row. Un-indexed → no `db.version()` bump, the same
+     *  reasoning as `conflict_code` above. Null for every status except `synced`. */
+    synced_at: string | null;
     created_at: string;
     updated_at: string;
 }

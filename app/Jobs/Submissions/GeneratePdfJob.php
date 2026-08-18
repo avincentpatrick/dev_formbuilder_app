@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Submissions;
 
+use App\Enums\NotificationType;
 use App\Enums\QueueName;
 use App\Enums\SubmissionPdfOutcome;
 use App\Exceptions\Attachments\AttachmentException;
@@ -14,8 +15,10 @@ use App\Models\Submission;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\Submissions\SubmissionPdfReadyNotification;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Submissions\SubmissionPdfRenderer;
 use App\Services\Submissions\SubmissionPdfStorage;
+use App\Support\Branding\BrandPalette;
 use App\Support\Tenancy\TenantUrl;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Facades\Log;
@@ -123,22 +126,42 @@ final class GeneratePdfJob extends TenantAwareJob
      *
      * Failing to notify must never fail the job — the document is already stored, and a bounced
      * mail server is not a reason to re-render and re-charge the quota.
+     *
+     * ── I3: an in-app row as well, and this email stays exactly as it is ────────────────────────
+     * `NotificationType::ExportReady` now also writes to the bell. It does NOT route through
+     * {@see NotificationDispatcher::dispatch()}, which would mint a second, blander email beside
+     * this purpose-built one — it calls `record()`, which writes the row and stamps `emailed_at`
+     * with what happened here. The row is written even when there is no address to mail, because
+     * the in-app record is the durable half; that is why it comes FIRST.
      */
     private function report(string $formTitle, SubmissionPdfOutcome $outcome, ?Attachment $attachment = null): void
     {
         try {
             $email = User::query()->whereKey($this->requestedByUserId)->value('email');
 
+            app(NotificationDispatcher::class)->record(
+                NotificationType::ExportReady,
+                $this->requestedByUserId,
+                [
+                    'submission_id' => $this->submissionId,
+                    'form_title' => $formTitle,
+                    'outcome' => $outcome->value,
+                ],
+                emailed: is_string($email) && $email !== '',
+            );
+
             if (! is_string($email) || $email === '') {
                 return;
             }
 
-            Notification::route('mail', $email)->notify(new SubmissionPdfReadyNotification(
-                $formTitle,
-                $this->submissionId,
-                $outcome,
-                $attachment === null ? null : $this->downloadUrl($attachment),
-            ));
+            Notification::route('mail', $email)->notify(
+                (new SubmissionPdfReadyNotification(
+                    $formTitle,
+                    $this->submissionId,
+                    $outcome,
+                    $attachment === null ? null : $this->downloadUrl($attachment),
+                ))->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
         } catch (Throwable $e) {
             Log::warning('Submission PDF notification failed', $this->failureContext() + ['reason' => $e->getMessage()]);
         }

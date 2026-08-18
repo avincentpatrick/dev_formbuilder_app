@@ -1,10 +1,39 @@
 name: CI
 
+# phase1-completion (I0, 2026-08-06) is the long-lived integration branch for the Phase-1
+# completion wave: increment PRs target IT, merge into it when green, and main receives one
+# reviewed PR at the end. It gets the same two triggers as main so every increment PR runs the
+# full pipeline and every post-merge integration state is re-verified.
 on:
   push:
-    branches: [main]
+    branches: [main, phase1-completion]
   pull_request:
-    branches: [main]
+    branches: [main, phase1-completion]
+
+  # ── Re-verification after a GitHub-side outage (added 2026-08-06, I5) ─────────────────────
+  # I5 merged with only 2 of 6 jobs confirmed: GitHub Actions was in a MAJOR OUTAGE (status page
+  # "Incident with Actions", critical) and four jobs never acquired a runner — they failed with
+  # `Service Unavailable` / `not acquired by Runner of type hosted`, never on our code. The
+  # post-merge `push` run above is the re-verification, but a run that fails for infrastructure
+  # reasons stays failed until somebody re-runs it, and "somebody remembers" is not a control.
+  #
+  # ⚠️ BOTH TRIGGERS BELOW ARE INERT UNTIL THIS FILE REACHES `main`, and that is a GitHub rule,
+  # not an oversight: scheduled and manually-dispatched workflows are read from the DEFAULT
+  # BRANCH only. `main` receives nothing until the single final integration PR at the end of the
+  # I-queue, so until then the working control is the tracker's OUTSTANDING VERIFICATION line
+  # plus `gh run rerun <id> --failed`. They arm themselves the moment the queue lands on main.
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this run was triggered by hand (e.g. re-verify after an Actions outage)"
+        required: false
+        default: "manual re-verification"
+
+  # Nightly re-verification of the default branch. Cheap insurance against exactly the failure
+  # above — an outage-skipped verification heals itself by morning instead of waiting for a human
+  # to notice. Free: the repository is public, so standard-runner minutes are not billed.
+  schedule:
+    - cron: "0 3 * * *"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -49,6 +78,13 @@ jobs:
       # composer.json-only registration would gate nothing.
       - name: Job payload linter (tenant-aware base class, queue name, scalar payloads)
         run: composer run job-payload-lint
+
+      # ADR-0002 §D5. Its companion is tests/Feature/Tenancy/ConstraintBoundaryDriftTest.php, which is
+      # the authority — it reads pg_index/pg_constraint on a migrated database. THIS job has no Postgres
+      # service and no .env, which is exactly why the §D5 gate is two halves rather than one: the drift
+      # test says which constraint crosses the boundary, this says which migration line wrote it.
+      - name: Constraint boundary linter (no FK or unique may span a tenant boundary)
+        run: composer run constraint-boundary-lint
 
       - name: Composer audit (SCA)
         run: composer audit
@@ -337,7 +373,12 @@ jobs:
       REDIS_HOST: 127.0.0.1
       CENTRAL_DOMAIN: meridian.test
       APP_ENV: local
-      APP_URL: http://acme.meridian.test:8000
+      # APP_URL is the CENTRAL origin, never a tenant host. TenantUrl::centralHost() composes
+      # `{label}.{app.url host}` for every server-generated tenant link (invites, resume links,
+      # the I11b impersonation redeem); a tenant host here doubles the subdomain into
+      # `acme.acme.meridian.test`, which no /etc/hosts line maps — ERR_NAME_NOT_RESOLVED in the
+      # browser. Latent until I11b because no earlier spec ever NAVIGATED a server-built URL.
+      APP_URL: http://meridian.test:8000
       SESSION_DRIVER: file
       CACHE_STORE: file
       QUEUE_CONNECTION: sync

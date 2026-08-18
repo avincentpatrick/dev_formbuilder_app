@@ -95,7 +95,8 @@ function onClick(event: MouseEvent) {
     transition:
         background-color var(--mds-duration-base) var(--mds-ease-standard),
         border-color var(--mds-duration-base) var(--mds-ease-standard),
-        color var(--mds-duration-base) var(--mds-ease-standard);
+        color var(--mds-duration-base) var(--mds-ease-standard),
+        box-shadow var(--mds-duration-base) var(--mds-ease-standard);
 }
 
 /* Guarantee a ≥44×44px touch target (WCAG 2.2 §2.5.8 / §4.4) even when the visual box is
@@ -136,15 +137,26 @@ function onClick(event: MouseEvent) {
 }
 
 /* ── Primary (filled Blueprint) ────────────────────────────────────────── */
+/* JR2 — the glow. Before this the button read no shadow token at any state and was the flattest
+   thing in the six, which is most of why the app looked plain: every page's main action was a
+   rectangle of colour sitting ON the surface rather than above it. `--mds-shadow-accent` is mixed
+   off `--mds-color-action-primary-bg` at build time, so a brand-themed tenant's button glows in
+   their own accent — a literal rgba here would put a blue halo under a teal button. It is NOT a rung
+   of the shadow-0..5 ladder; see the token's own note. */
 .mds-button--primary {
     background-color: var(--mds-color-action-primary-bg);
     color: var(--mds-color-text-on-primary);
+    box-shadow: var(--mds-shadow-accent);
 }
 .mds-button--primary:hover:not(:disabled):not(.mds-button--loading) {
     background-color: var(--mds-color-action-primary-bg-hover);
 }
+/* The glow goes on press. A lifted thing that stays lifted while you push it is the one motion cue
+   users read as broken, and dropping the shadow is what makes the darker `-bg-active` fill read as
+   *settling* rather than merely changing colour. */
 .mds-button--primary:active:not(:disabled):not(.mds-button--loading) {
     background-color: var(--mds-color-action-primary-bg-active);
+    box-shadow: none;
 }
 
 /* ── Secondary (outlined Blueprint) ────────────────────────────────────── */
@@ -168,12 +180,16 @@ function onClick(event: MouseEvent) {
 .mds-button--destructive {
     background-color: var(--mds-color-action-danger-bg);
     color: var(--mds-color-text-on-primary);
+    /* Its own glow token rather than the accent one — a red fill under a blue halo is the tell that
+       a shadow was pasted rather than derived. */
+    box-shadow: var(--mds-shadow-danger);
 }
 .mds-button--destructive:hover:not(:disabled):not(.mds-button--loading) {
     background-color: var(--mds-color-action-danger-bg-hover);
 }
 .mds-button--destructive:active:not(:disabled):not(.mds-button--loading) {
     background-color: var(--mds-color-action-danger-bg-active);
+    box-shadow: none;
 }
 
 /* ── Disabled (exempt from AA contrast, §4.1) ──────────────────────────────
@@ -188,6 +204,8 @@ function onClick(event: MouseEvent) {
 .mds-button--disabled {
     pointer-events: none;
 }
+/* JR2: the glow is a property of a LIVE fill, so it goes wherever the fill stops being one. A
+   disabled button whose grey face still casts a coloured halo reads as enabled-but-broken. */
 .mds-button--primary:disabled,
 .mds-button--destructive:disabled,
 .mds-button--primary.mds-button--disabled,
@@ -195,6 +213,7 @@ function onClick(event: MouseEvent) {
     background-color: var(--mds-color-action-disabled-bg);
     color: var(--mds-color-action-disabled-text);
     border-color: transparent;
+    box-shadow: none;
 }
 .mds-button--secondary:disabled,
 .mds-button--tertiary:disabled,
@@ -206,8 +225,11 @@ function onClick(event: MouseEvent) {
 }
 
 /* ── Loading ───────────────────────────────────────────────────────────── */
+/* Same reasoning as disabled: a button that is busy is not a button you can press, so the glow goes
+   for the duration and returns when it can be pressed again. */
 .mds-button--loading {
     cursor: progress;
+    box-shadow: none;
 }
 .mds-button__spinner {
     width: 1em;
@@ -215,7 +237,21 @@ function onClick(event: MouseEvent) {
     border: 2px solid currentColor;
     border-right-color: transparent;
     border-radius: var(--mds-radius-full);
+    /* ⚠️ The literal is CORRECT here and must not be "tidied" into `--mds-duration-deliberate`,
+       which is also 600ms and looks like a free improvement. Reduced motion collapses every duration
+       token to 1ms centrally (theme-overrides.css §2.8), so a tokenised spinner would run at ~1000
+       revolutions per second — a strobing disc, and strictly worse for the user the setting exists to
+       protect. `MdsSpinner` reached the same conclusion independently (Spinner.vue:69-73) and its
+       comment states the principle: a loading spinner is a FUNCTIONAL indicator, so it keeps moving
+       under reduced motion, just slower. This spinner had no reduced-motion arm at all; JR2 adopts
+       Spinner's, so the two now agree. */
     animation: mds-button-spin 600ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mds-button__spinner {
+        animation-duration: 1500ms;
+    }
 }
 
 @keyframes mds-button-spin {

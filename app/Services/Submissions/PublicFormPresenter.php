@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
-use App\Enums\SubmissionStatus;
 use App\Http\Middleware\RequireFeature;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -43,6 +42,14 @@ final class PublicFormPresenter
                 // fail-open when no catalog resolves — so this flag and the draft route never disagree. The
                 // route is still authoritative; this only decides whether the control is shown.
                 'save_and_resume' => $form->save_and_resume && $this->tenantAllowsSaveResume(),
+                // Whether this form requires a proof-of-work spam check before it will accept a submission
+                // (I8b). ⚠️ A HINT, NOT A GATE — and the distinction is load-bearing. The authority is
+                // VerifyGuestBotChallenge on the submit route; this only saves the client a rejected round
+                // trip. It has to be that way because `replay.ts` caches one SchemaResponse per slug per
+                // drain pass, so rows 2..n construct a client that never fetched a schema at all; they
+                // recover through api-client's retry-once on a 403 instead. Emitting it as a gate would
+                // make the offline path depend on a hint it does not have.
+                'bot_challenge' => $form->bot_challenge->value,
                 // The author-editable confirmation copy (Increment H6a, Doc #26 §6.2), emitted RAW — as a
                 // template, with its `${key}` holes unfilled — plus its locale variants. Two reasons it is
                 // not rendered here: `version.schema` below travels VERBATIM with a checksum the runtime
@@ -70,7 +77,7 @@ final class PublicFormPresenter
 
     /**
      * The scheduled-form runtime block (Increment H12a). `acceptance` is the live label; `remaining` is the
-     * cap headroom (null when uncapped). The live finalized COUNT is taken only when a cap exists, so an
+     * cap headroom (null when uncapped). The live COUNT is taken only when a cap exists, so an
      * uncapped form costs no extra query. The explicit array shape keeps the generated OpenAPI types precise.
      *
      * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
@@ -78,17 +85,22 @@ final class PublicFormPresenter
     private function schedule(Form $form): array
     {
         $cap = $form->max_responses;
-        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+        $consumedCount = $cap === null ? null : $this->capacityCount($form);
 
-        return FormScheduleView::present($form, $finalizedCount);
+        return FormScheduleView::present($form, $consumedCount);
     }
 
-    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
-    private function finalizedCount(Form $form): int
+    /**
+     * The live count of submissions that consumed one of this form's paid slots, RLS-scoped to the tenant —
+     * the DISPLAY twin of `FormAcceptanceGuard::assertCapacity()`'s enforcement COUNT, and identical to
+     * `EncodeFormPresenter::capacityCount()` on purpose. All three use {@see Submission::scopeConsumesCapacity()};
+     * if one of them drifts, this banner tells a respondent the form is full while the guard still accepts.
+     */
+    private function capacityCount(Form $form): int
     {
         return Submission::query()
             ->where('form_id', $form->id)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->consumesCapacity()
             ->count();
     }
 

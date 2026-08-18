@@ -6,10 +6,12 @@ use App\Enums\ResourceCapacity;
 use App\Enums\SubmissionStatus;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Authorization\ResourceGrantResolver;
 use App\Services\Submissions\SubmissionInboxPresenter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -153,6 +155,171 @@ it('filters the inbox by form and by status', function (): void {
         ->assertInertia(fn ($page) => $page->where('meta.total', 1));
 });
 
+/*
+| ── The form dropdown (Increment J2c) ──────────────────────────────────────────────────────────────────
+|
+| ⚠️ NOTHING IN THIS REPOSITORY ASSERTED `filters.forms` BEFORE THESE CASES — not here, not in
+| `ListKeywordFilterTest`, nowhere. The only `filters.forms` assertions anywhere were two bare `->has()`
+| calls against the ANALYTICS presenter. That is how the dropdown spent from F7 to J2c being derived from
+| SUBMISSIONS rather than from forms, offering only forms that already had a visible response.
+|
+| It read as correct and no test could tell, because every fixture that exercises the filter seeds a
+| submission first. These three cases are written so the two implementations are distinguishable.
+*/
+
+it('offers a form with NO responses in the dropdown', function (): void {
+    // ⚠️ THE CASE THE OLD IMPLEMENTATION FAILED, and the question the filter is most often asked: an author
+    // publishes a form and comes to the inbox to see whether anything has arrived. Derived from submissions,
+    // that form was not selectable at all — the one thing the reader wanted to check was the one thing the
+    // control could not express.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $answered = publishedInboxForm($tenant, $owner, 'Has Answers');
+    publishedInboxForm($tenant, $owner, 'Nobody Has Answered This');
+    seedInboxSubmission($answered, $owner, SubmissionStatus::Submitted, ['full_name' => 'A1']);
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page->where(
+            'filters.forms',
+            fn (Collection $forms) => $forms->pluck('label')->contains('Nobody Has Answered This')
+        ));
+});
+
+it('scopes the dropdown to the forms the reader may open, not to the whole tenant', function (): void {
+    // The other direction, so the fix cannot decay into "list every form". A Reviewer holds no
+    // `dashboard.org.view`, so `Form::scopeReadableBy()` narrows them to their grants — and a Reviewer with
+    // no grant at all sees an EMPTY dropdown rather than the tenant's form catalog.
+    //
+    // ⚠️ THIS IS ALSO THE MUTATION GUARD FOR THE SCOPE CHOICE. Swap `readableBy` for `visibleTo` (the
+    // AUTHORING scope) and this case still passes — but the Owner case above breaks for Reviewers in
+    // production, which is why the Reviewer-WITH-grant half below exists.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    publishedInboxForm($tenant, $owner, 'Not Theirs');
+
+    $reviewer = User::factory()->create();
+    makeActiveMember($reviewer, 'reviewer');
+
+    $this->actingAs($reviewer)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page->where('filters.forms', []));
+});
+
+it('offers a REVIEWER the form they hold a grant on, which the authoring scope would refuse', function (): void {
+    // ⚠️ THE CASE THAT FORBIDS `Form::scopeVisibleTo()` HERE. That scope keys on `forms.edit.any` /
+    // `forms.edit.own`, and a Reviewer holds NEITHER — so building the dropdown on it returns an empty list
+    // for a role that can see this form's submissions perfectly well, on a page that exists for them. Every
+    // Owner-fixtured test would stay green while the control was blank for the reader who needed it.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner, 'Reviewed Form');
+
+    $reviewer = User::factory()->create();
+    makeActiveMember($reviewer, 'reviewer');
+    makeCollaborator($form, $reviewer, ResourceCapacity::Reviewer);
+    app(ResourceGrantResolver::class)->forget();
+
+    $this->actingAs($reviewer)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page->where(
+            'filters.forms',
+            fn (Collection $forms) => $forms->pluck('label')->contains('Reviewed Form')
+        ));
+});
+
+it('offers an EMPTY dropdown to a member who reads submissions but holds no dashboard.form.view', function (): void {
+    // ⚠️ THE FAIL-CLOSED CONJUNCT INSIDE `Form::scopeReadableBy()`, pinned rather than merely asserted.
+    // An earlier draft of that scope omitted `dashboard.form.view` and justified it with "the route carries
+    // the policy" — which is FALSE for this scope's only path: `GET /submissions` gates on
+    // `can:viewAny,Submission` alone. Without the conjunct this member enumerates every form title in the
+    // tenant on the strength of `dashboard.org.view`, while `/forms/{id}` refuses them every one.
+    //
+    // Unreachable by any shipped role (all five hold the key), so this is a structural guard and is labelled
+    // as one — the same standing as `FormPolicy::viewOverview()`'s identical conjunct.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    publishedInboxForm($tenant, $owner, 'Should Not Be Enumerable');
+
+    $stranger = User::factory()->create();
+    makeActiveMember($stranger, 'viewer');
+    $stranger->syncRoles([]);
+    $stranger->syncPermissions(['submissions.view', 'dashboard.org.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    $this->actingAs($stranger)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('filters.forms', []));
+});
+
+it('carries form_id on every inbox row so the form name can be linked', function (): void {
+    // Increment J2c. `detail()` has shipped `form_id` since F7 while the LIST row did not, so the inbox
+    // printed a form's title on every row and linked none of them — one of the three dead ends
+    // `FormHubController`'s docblock names. Free: `form:id,title` was already eager-loaded.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner, 'Linked Form');
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'A1']);
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            ->where('data.0.form_id', (string) $form->id)
+            ->where('data.0.form_title', 'Linked Form')
+            ->where('data.0.can.open_form', true)
+            ->etc());
+});
+
+it('refuses to mark a row openable when the reader may see the ROW but not its FORM', function (): void {
+    // ⚠️ THE ROW SET IS STRICTLY WIDER THAN FORM READABILITY, AND THIS IS THE GAP.
+    // `Submission::scopeVisibleTo()` admits a row on `respondent_user_id = me` — an arm
+    // `FormPolicy::viewOverview()` has no counterpart for. So a member who ENCODED a submission keeps seeing
+    // it after their grant is revoked (or was never granted), while `/forms/{id}` 403s for them. J2c's first
+    // draft linked the form title unconditionally, which turns that into a live link to a refusal.
+    //
+    // Built with the synthetic-member idiom: a role-less member holding only `submissions.view`, so they
+    // fail `readableBy` on both conjuncts while the respondent arm still surfaces their own row.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner, 'Not Openable');
+
+    $keyer = User::factory()->create();
+    makeActiveMember($keyer, 'viewer');
+    $keyer->syncRoles([]);
+    $keyer->syncPermissions(['submissions.view']);
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    seedInboxSubmission($form, $keyer, SubmissionStatus::Submitted, ['full_name' => 'Mine']);
+
+    $this->actingAs($keyer)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            // The row IS visible — the respondent arm — which is what makes the guard necessary rather
+            // than theoretical. If this ever goes to 0 the case is proving nothing.
+            ->where('meta.total', 1)
+            ->where('data.0.can.open_form', false)
+            ->etc());
+});
+
 it('hides in-progress drafts by default and surfaces them (with completeness) under the Draft filter', function (): void {
     // Increment H10 — drafts (guest "save and finish later") are excluded from the default review list, but
     // the existing Draft status option opts them back in, carrying their progress columns.
@@ -181,6 +348,71 @@ it('hides in-progress drafts by default and surfaces them (with completeness) un
             ->where('meta.total', 1)
             ->where('data.0.status', 'draft')
             ->where('data.0.completeness_percent', 40));
+});
+
+it('offers resume only on draft rows the viewer may finalize', function (): void {
+    // Increment I9b. Three assertions in one because the interesting part is the CONTRAST: a draft the viewer
+    // may promote, a finalized row (never resumable, whatever the permissions), and a viewer with no claim.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Done']);
+    $draft = seedInboxSubmission($form, $owner, SubmissionStatus::Draft, ['full_name' => 'Partial']);
+    $draft->forceFill(['completeness_percent' => 40, 'last_saved_at' => now()])->save();
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=draft')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', true));
+
+    // A finalized row is never resumable — the route 404s on it, so the button must not be offered either.
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=submitted')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', false));
+
+    // A viewer holds `submissions.view` but no editor capacity, so they may read the draft and not continue it.
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+    enterTenant($tenant->id, $owner->id);
+
+    $this->actingAs($viewer)
+        ->get('http://acme.meridian.test/submissions?status=draft')
+        ->assertInertia(fn ($page) => $page->where('data.0.can.resume', false));
+});
+
+it('lists screened-out submissions in the default view and offers them as a filter', function (): void {
+    // I9a. Deliberately the OPPOSITE of the draft rule directly above, and the contrast is the point: a draft
+    // was never finalized, so hiding it is a review convenience; a screened-out response WAS finalized and is
+    // a real thing the tenant received. Hiding it would also hide the one shape that makes a badly-built form
+    // visible — a form that screens everyone out shows a page of "Screened out" pills instead of silence.
+    $this->withoutVite();
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+    $form = publishedInboxForm($tenant, $owner);
+    seedInboxSubmission($form, $owner, SubmissionStatus::Submitted, ['full_name' => 'Done']);
+    seedInboxSubmission($form, $owner, SubmissionStatus::ScreenedOut, []);
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 2)
+            // The filter catalog is `SubmissionStatus::cases()`-derived, so it picked the new option up with
+            // no code change — asserted so that stays true rather than being assumed.
+            ->where('filters.statuses', fn (Collection $statuses): bool => $statuses->contains(
+                fn (array $option): bool => $option === ['value' => 'screened_out', 'label' => 'Screened out'],
+            )));
+
+    $this->actingAs($owner)
+        ->get('http://acme.meridian.test/submissions?status=screened_out')
+        ->assertInertia(fn ($page) => $page
+            ->where('meta.total', 1)
+            ->where('data.0.status', 'screened_out'));
 });
 
 it('paginates the inbox at 25 per page', function (): void {

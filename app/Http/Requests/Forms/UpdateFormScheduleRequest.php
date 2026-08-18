@@ -7,10 +7,7 @@ namespace App\Http\Requests\Forms;
 use App\Services\Forms\FormService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\In;
 
 /**
  * Set (or clear) a form's schedule + response cap (Increment H12a).
@@ -30,7 +27,7 @@ final class UpdateFormScheduleRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string|In>>
+     * @return array<string, array<int, string>>
      */
     public function rules(): array
     {
@@ -43,7 +40,9 @@ final class UpdateFormScheduleRequest extends FormRequest
         return [
             'opens_at' => ['nullable', 'date'],
             'closes_at' => $closesAt,
-            'timezone' => ['required', 'string', 'max:64', Rule::in(DateTimeZone::listIdentifiers())],
+            // The framework `timezone` rule — same IANA list as Rule::in(DateTimeZone::listIdentifiers()),
+            // without Scramble materializing the whole list into openapi.json (see AnalyticsReportRequest).
+            'timezone' => ['required', 'string', 'max:64', 'timezone'],
             'max_responses' => ['nullable', 'integer', 'min:1'],
         ];
     }

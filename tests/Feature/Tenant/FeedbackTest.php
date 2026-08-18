@@ -2,24 +2,48 @@
 
 declare(strict_types=1);
 
+use App\Enums\AttachmentKind;
+use App\Models\Attachment;
 use App\Models\FeedbackReport;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
 
 /*
 |--------------------------------------------------------------------------
-| Increment C3 — in-app feedback (PRD Feature #11).
+| Increment C3 — in-app feedback (PRD Feature #11). Extended in I7a.
 |--------------------------------------------------------------------------
 | Proves the submit path: any role may submit (can:feedback.submit is granted to all), the row is
 | written under the tenant's RLS context (tenant_id filled by BelongsToTenant, user_id from the actor),
 | remarks are required, and a report is strictly tenant-scoped (invisible from another tenant's context).
+|
+| I7a adds the screenshot arm and the tenant-side read surface. The screenshot cases are the interesting
+| ones: the attachment has to exist BEFORE its owner row does (the FK runs report → attachment while the
+| morph columns are NOT NULL), so the two ids agreeing is the thing worth asserting — a mismatch there
+| would be silent, and would leave the console with an image it cannot find.
 */
+
+/**
+ * A tiny (~70-byte) real 1×1 PNG.
+ *
+ * `UploadedFile::fake()->image()` is NOT usable: it needs the GD extension, which this container does not
+ * have, and the failure is a LogicException rather than a skip. Real bytes are better anyway — the service
+ * CONTENT-SNIFFS the MIME rather than trusting the client header, so this fixture exercises the actual
+ * gate. Same device as `brandingLogoFile()` in BrandingRoutesTest.
+ */
+function feedbackScreenshotFile(string $name = 'capture.png'): UploadedFile
+{
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+
+    return UploadedFile::fake()->createWithContent($name, $png);
+}
 
 beforeEach(function (): void {
     TenantContext::flush();
@@ -94,4 +118,145 @@ it('isolates feedback to its own tenant under RLS', function (): void {
     // …while tenant A still sees its own.
     enterTenant($tenantA->id, $userA->id);
     expect(FeedbackReport::query()->count())->toBe(1);
+});
+
+it('stores a screenshot through the shared attachments pipeline and links it both ways', function (): void {
+    Storage::fake('local');
+
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+
+    $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'route' => '/forms/42',
+        'remarks' => 'The map picker renders behind the toolbar.',
+        'screenshot' => feedbackScreenshotFile(),
+    ])->assertRedirect();
+
+    enterTenant($tenant->id, $user->id);
+    $report = FeedbackReport::query()->firstOrFail();
+    $attachment = Attachment::query()->firstOrFail();
+
+    expect($report->screenshot_attachment_id)->toBe($attachment->id)
+        ->and($attachment->kind)->toBe(AttachmentKind::FeedbackScreenshot)
+        // BOTH directions, because only one of them is enforced by anything. The FK guarantees the
+        // report → attachment half; the morph columns have no DB constraint at all, so an id minted in
+        // the wrong order would point at nothing and no error would ever be raised.
+        ->and($attachment->attachable_type)->toBe('feedback_report')
+        ->and($attachment->attachable_id)->toBe($report->id)
+        // PII, unlike a brand logo: the image is a photograph of whatever was on the reporter's screen.
+        ->and($attachment->is_pii)->toBeTrue()
+        ->and($attachment->uploaded_by)->toBe($user->id)
+        ->and($attachment->path)->toContain("tenants/{$tenant->id}/feedback_screenshot/");
+
+    Storage::disk('local')->assertExists($attachment->path);
+});
+
+it('rejects a screenshot that is not a raster image', function (): void {
+    Storage::fake('local');
+
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+
+    // An SVG is an XML document that can carry <script>, and this image is rendered back into the platform
+    // operator's own console, same-origin on the central host — the highest-value stored-XSS target here.
+    $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'Trying to smuggle a script.',
+        'screenshot' => UploadedFile::fake()->create('payload.svg', 4, 'image/svg+xml'),
+    ])->assertSessionHasErrors('screenshot');
+
+    enterTenant($tenant->id, $user->id);
+    expect(FeedbackReport::query()->count())->toBe(0)
+        ->and(Attachment::query()->count())->toBe(0);
+});
+
+it('submits without a screenshot, leaving the pointer null', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $user = User::factory()->create();
+    enterTenant($tenant->id, $user->id);
+    makeActiveMember($user, 'viewer');
+
+    $this->actingAs($user)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'No picture needed for this one.',
+    ])->assertRedirect();
+
+    enterTenant($tenant->id, $user->id);
+    expect(FeedbackReport::query()->firstOrFail()->screenshot_attachment_id)->toBeNull()
+        ->and(Attachment::query()->count())->toBe(0);
+});
+
+it('shows the workspace its own feedback to a holder of feedback.view, and hides it from everyone else', function (): void {
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+
+    $viewer = User::factory()->create();
+    enterTenant($tenant->id, $viewer->id);
+    makeActiveMember($viewer, 'viewer');
+
+    $this->actingAs($viewer)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'Exports are slow on big forms.',
+    ])->assertRedirect();
+
+    // `viewer` holds feedback.submit but NOT feedback.view — it may send, never read.
+    $this->actingAs($viewer)->get('http://acme.meridian.test/feedback')->assertForbidden();
+
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $this->withoutVite();
+    $this->actingAs($owner)->get('http://acme.meridian.test/feedback')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('feedback/Index', false)
+            ->has('data', 1)
+            ->where('data.0.remarks', 'Exports are slow on big forms.')
+            ->where('data.0.status', 'new')
+            ->where('data.0.has_screenshot', false)
+            ->where('meta.per_page', 25)
+            ->where('empty_reason', null)
+            ->has('filters.statuses', 4));
+});
+
+it('serves a screenshot to the workspace and 404s a report that has none', function (): void {
+    Storage::fake('local');
+
+    $tenant = Tenant::create(['name' => 'Acme', 'slug' => 'acme']);
+    $tenant->domains()->create(['domain' => 'acme']);
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'With a picture.',
+        'screenshot' => feedbackScreenshotFile(),
+    ])->assertRedirect();
+
+    $this->actingAs($owner)->post('http://acme.meridian.test/feedback', [
+        'route' => '/dashboard',
+        'remarks' => 'Without a picture.',
+    ])->assertRedirect();
+
+    enterTenant($tenant->id, $owner->id);
+    $withShot = FeedbackReport::query()->whereNotNull('screenshot_attachment_id')->firstOrFail();
+    $withoutShot = FeedbackReport::query()->whereNull('screenshot_attachment_id')->firstOrFail();
+
+    $this->actingAs($owner)
+        ->get("http://acme.meridian.test/feedback/{$withShot->id}/screenshot")
+        ->assertOk()
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+    $this->actingAs($owner)
+        ->get("http://acme.meridian.test/feedback/{$withoutShot->id}/screenshot")
+        ->assertNotFound();
 });

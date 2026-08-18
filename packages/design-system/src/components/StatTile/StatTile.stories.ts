@@ -70,6 +70,27 @@ export const WithCaption: Story = {
     args: { label: 'Draft conversion', value: '62%', icon: 'activity', caption: 'of 48 saved drafts' },
 };
 
+/* ── J2a: the optional link ─────────────────────────────────────────────────────────────── */
+
+/** Every dashboard tile names something the reader can go and look at; until J2 none of them did. */
+export const Linked: Story = {
+    args: { label: 'Submissions', value: '1,284', icon: 'submissions', href: '#submissions' },
+};
+
+/** A linked tile keeps every other state — the delta and its caption are unaffected by the anchor. */
+export const LinkedWithDelta: Story = {
+    args: {
+        label: 'Submissions',
+        value: '1,284',
+        icon: 'submissions',
+        href: '#submissions',
+        delta: 12.4,
+        deltaLabel: 'vs. previous 30 days',
+    },
+};
+
+export const LinkedDark: Story = { args: Linked.args, decorators: [dark] };
+
 export const DeltaDownDark: Story = {
     args: DeltaDown.args,
     decorators: [dark],

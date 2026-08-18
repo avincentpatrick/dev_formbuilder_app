@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
+use Illuminate\Routing\SortedMiddleware;
 use Illuminate\Session\Middleware\StartSession;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
@@ -65,6 +69,34 @@ it('keeps PreventAccessFromCentralDomains between identification and the RLS con
         ->toBeGreaterThan(array_search(InitializeTenancyBySubdomain::class, $priority, true))
         ->toBeGreaterThan(array_search(InitializeTenancyByPublicHost::class, $priority, true))
         ->toBeLessThan(array_search(EstablishTenantDatabaseContext::class, $priority, true));
+});
+
+it('resolves EnforceTenantMaintenance AFTER the tenant is identified on the guest group', function (): void {
+    // ⚠️ THE FAILURE THIS CATCHES IS TOTAL AND SILENT (I5). EnforceTenantMaintenance reads the tenant that
+    // the identification middleware has already resolved and bound — that is the whole reason
+    // `maintenance_mode` is a `tenants` column rather than a `settings` row. If it ever sorts AHEAD of them
+    // there is no bound tenant, resolveTenant() returns null, every request passes through, and tenant
+    // maintenance mode does nothing at all — with no error, no log line, and a green build.
+    //
+    // It is deliberately absent from bootstrap/app.php's priority() array, so it keeps its DECLARED slot in
+    // routes/tenant.php. That is the state this asserts: the resolved order, not the source order.
+    $route = collect(app(Router::class)->getRoutes()->getRoutes())
+        ->first(fn (Route $r): bool => $r->getName() === 'guest.form.mint');
+
+    expect($route)->not->toBeNull();
+
+    $stack = array_values((new SortedMiddleware(
+        app(HttpKernel::class)->getMiddlewarePriority(),
+        $route->gatherMiddleware(),
+    ))->all());
+
+    $identifier = array_search(InitializeTenancyByPublicHost::class, $stack, true);
+    $rlsContext = array_search(EstablishTenantDatabaseContext::class, $stack, true);
+    $maintenance = array_search(EnforceTenantMaintenance::class, $stack, true);
+
+    expect($maintenance)->toBeInt()
+        ->toBeGreaterThan($identifier)
+        ->toBeGreaterThan($rlsContext);
 });
 
 it('leaves nothing the app actually routes on promoted ahead of the session', function (): void {

@@ -6,10 +6,11 @@ namespace App\Http\Requests\Tenant;
 
 use App\Enums\DomainEventType;
 use App\Http\Requests\Api\V1\StoreConnectionSubscriptionRequest;
-use App\Models\Connection;
 use App\Services\Connectors\ConnectionSubscriptionService;
+use App\Support\Connectors\SubscriptionConfigRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Create a delivery rule from the session-authed Integrations UI (H15b). A byte-for-byte mirror of the
@@ -17,11 +18,10 @@ use Illuminate\Validation\Rule;
  * same shape and delegate to the same {@see ConnectionSubscriptionService} — so validation can never drift
  * between them (the {@see StoreWebhookRequest} convention).
  *
- * `config.channel_id` is validated as a SHAPE, not against Slack: confirming a channel exists needs an API call
- * this request has no business making, and the picker already offers real channels. `config.channel_name` is
- * nullable and that is load-bearing rather than lax — when the channel list fails to load the modal falls back
- * to a manual channel id, which by definition has no name, and requiring one would break the exact path the
- * fallback exists to serve.
+ * The `config.*` shape is per-provider and comes from {@see SubscriptionConfigRules} (H16a) — this file used
+ * to hard-code Slack's `config.channel_id`, which is what made a Google Sheets rule unvalidatable. It is still
+ * validated as a SHAPE, never against the provider: confirming a channel or spreadsheet exists needs an API
+ * call this request has no business making.
  *
  * `form_id` uses `exists:` on the RLS-scoped connection, so another tenant's form fails as "not found".
  * Authorization is the route's `can:update,connection` + `feature:native_connectors`.
@@ -43,9 +43,8 @@ final class StoreConnectionRuleRequest extends FormRequest
             'event_types' => ['required', 'array', 'min:1'],
             'event_types.*' => ['string', Rule::in(DomainEventType::values())],
             'form_id' => ['nullable', 'uuid', 'exists:forms,id'],
-            'config' => ['required', 'array'],
-            'config.channel_id' => ['required', 'string', 'max:64'],
-            'config.channel_name' => ['nullable', 'string', 'max:150'],
+            ...SubscriptionConfigRules::documentedShape(),
+            ...SubscriptionConfigRules::requiredFor(SubscriptionConfigRules::providerFor($this)),
         ];
     }
 
@@ -54,27 +53,36 @@ final class StoreConnectionRuleRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return [
-            'config.channel_id' => 'channel',
-            'config.channel_name' => 'channel name',
+        return SubscriptionConfigRules::attributesFor(SubscriptionConfigRules::providerFor($this)) + [
             'event_types' => 'events',
             'form_id' => 'scope',
         ];
     }
 
     /**
-     * The default "config.channel id field is required" is unreadable, and this field is the one a tenant is
-     * most likely to leave empty (the picker starts unselected). {@see Connection} destinations are the only
-     * thing `config` carries today.
+     * The default "config.channel id field is required" is unreadable, and the destination is the field a
+     * tenant is most likely to leave empty (the picker starts unselected).
      *
      * @return array<string, string>
      */
     public function messages(): array
     {
-        return [
-            'config.channel_id.required' => 'Choose a channel to deliver into.',
+        return SubscriptionConfigRules::messagesFor(SubscriptionConfigRules::providerFor($this)) + [
             'event_types.required' => 'Choose at least one event.',
             'event_types.min' => 'Choose at least one event.',
         ];
+    }
+
+    /**
+     * H16b — narrow `event_types` to what the bound connection's provider can actually deliver.
+     *
+     * In `after()` rather than `rules()` so Scramble's STATIC read of the full-catalog `Rule::in` above stays
+     * intact; see {@see SubscriptionConfigRules::eventTypeGuard()} for why that matters to `openapi.json`.
+     *
+     * @return array<int, \Closure(Validator): void>
+     */
+    public function after(): array
+    {
+        return [SubscriptionConfigRules::eventTypeGuard(SubscriptionConfigRules::providerFor($this))];
     }
 }

@@ -41,6 +41,9 @@ export interface AppUser {
 export interface AppAbilities {
     manageMembers: boolean;
     transferOwnership: boolean;
+    // I8a — `tenant.roles.assign`, the Members page's per-row role control. Distinct from manageMembers
+    // on purpose: who is here vs what they may do are two grants in the RBAC §5 catalog.
+    assignRoles: boolean;
     manageForms: boolean;
     viewSubmissions: boolean;
     manageScopes: boolean;
@@ -54,6 +57,15 @@ export interface AppAbilities {
     // `custom_domain` entitlement; the PAGE deliberately does not, so a tenant downgraded off Business can
     // still see and remove a hostname that is still resolving (ADR-0012 §D9).
     manageDomains: boolean;
+    // I2 — AuditPolicy::viewAny (the `audit_log.view` permission, Owner/Admin only; Viewer is excluded on
+    // purpose). THE ONLY GATE HERE WITH NO COMPANION ENTITLEMENT, and the absence is deliberate rather than
+    // an oversight: PlanCatalog carries no audit key on any tier, because an audit trail is a baseline
+    // obligation for every tenant and not an upsell. Do not add a `feature:` to its nav item by symmetry
+    // with its four neighbours.
+    viewAuditLog: boolean;
+    // `feedback.view` (I7a) — Owner/Admin. Like viewAuditLog it carries no companion plan feature: seeing
+    // what your own people reported about the product is a baseline, not a tier.
+    viewFeedback: boolean;
 }
 
 export type FlashToast = { type: 'success' | 'error' | 'info'; message: string };
@@ -84,7 +96,19 @@ export interface EntitlementSnapshot {
 
 declare module '@inertiajs/core' {
     interface PageProps {
-        auth: { user: AppUser | null; can: AppAbilities };
+        auth: {
+            user: AppUser | null;
+            can: AppAbilities;
+            /**
+             * Increment I11b — non-null only while a platform operator is driving this session.
+             *
+             * ⚠️ CARRIES NO OPERATOR IDENTITY, AND MUST NOT GROW ONE. `AuditLogPresenter::actingAsLabel()`
+             * returns the fixed string "Platform operator" as a POLICY (I11a's review found the real name
+             * reaching a tenant page whenever the operator also held a membership). This prop renders on
+             * every request in the application, which makes it the widest possible place to undo that.
+             */
+            impersonating: { exit_url: string } | null;
+        };
         ui: {
             theme: UiTheme;
             /** The tenant's active brand ramp (H23a3), or null. Theme => role => #RRGGBB. */

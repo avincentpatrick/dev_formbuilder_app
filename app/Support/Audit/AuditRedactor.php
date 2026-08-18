@@ -39,6 +39,19 @@ final class AuditRedactor
         // detects the omission. Highest blast radius of anything on this list — these tokens act inside the
         // tenant's own third-party workspace, not against this platform.
         'connection' => ['access_token', 'refresh_token'],
+        // The tenant's IdP signing certificates (P1a / ADR-0016 §D12) — and the ONE entry here that is
+        // not a secret. A signing certificate is public by construction; `encrypted:array` on that column
+        // is an INTEGRITY claim, because anything that can silently rewrite it makes the application trust
+        // assertions minted by a key of the attacker's choosing.
+        //
+        // It is registered anyway, and for a mechanical reason rather than a confidentiality one:
+        // `Model::getOriginal()` maps every attribute through `transformModelValue()`, so it returns this
+        // column DECRYPTED — while `$hidden` guards only `toArray()`/`toJson()`. The repo's ordinary
+        // snapshot idiom (`Arr::only($model->getOriginal(), …)`, TenantSettingsService:102) would therefore
+        // write plaintext keys into a table that is append-only by RLS policy and never pruned.
+        // SsoConnectionService builds its payload by hand and the column is structurally absent from it;
+        // this line is what makes a later "simplification" produce [REDACTED] instead of a wall of base64.
+        'sso_connection' => ['idp_certificates'],
         'tenant_users' => ['invite_token'],
         'personal_access_tokens' => ['token'],
     ];
@@ -49,7 +62,18 @@ final class AuditRedactor
      * @var array<string, list<string>>
      */
     private const array PII = [
-        'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email'],
+        // `remarks` joined this list in I2, when SubmissionReviewService started auditing the four review
+        // transitions. It is registered for the SAME reason `feedback_reports.remarks` already is: free
+        // text with no audience discipline, where a reviewer can paste respondent PII copied straight out
+        // of the answers ("called the mother, number is …"). `audits` is append-only and never deleted,
+        // and data-privacy-gdpr-compliance §9's whole reconciliation rests on this table never having
+        // stored raw PII — so the ledger records THAT the remarks changed (via `redacted_fields`) without
+        // recording what they said, which is §2's principle exactly.
+        //
+        // `returned_reason` is deliberately NOT here, and the asymmetry is the point: it is the reviewer's
+        // explanation AUTHORED FOR the respondent and already emailed to them, so "why was this returned"
+        // is precisely the accountability the ledger exists to preserve.
+        'submission' => ['guest_ip', 'guest_user_agent', 'guest_contact_email', 'remarks'],
         'attachment' => ['original_filename'],
         'feedback_reports' => ['remarks', 'browser_info'],
     ];

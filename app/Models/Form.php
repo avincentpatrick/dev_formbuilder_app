@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
+use App\Enums\ResourceCapacity;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Policies\FormPolicy;
+use App\Services\Analytics\AnalyticsFormSet;
 use App\Services\Authorization\ResourceGrantResolver;
+use App\Services\Forms\FormPresenter;
 use Database\Factories\FormFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +40,8 @@ use Illuminate\Support\Carbon;
  * @property bool $allow_guest_submissions
  * @property bool $single_page_mode
  * @property bool $save_and_resume
+ * @property FormBotChallenge $bot_challenge
+ * @property ?int $guest_rate_limit_per_minute
  * @property ?string $confirmation_message
  * @property ?array<string, mixed> $confirmation_message_translations
  * @property array<string, mixed> $capability_flags
@@ -49,6 +57,9 @@ use Illuminate\Support\Carbon;
  * @property string $timezone
  * @property ?int $max_responses
  * @property ?FormScheduleState $schedule_state
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $deleted_at
  */
 class Form extends Model implements TenantScoped
 {
@@ -108,6 +119,13 @@ class Form extends Model implements TenantScoped
             'allow_offline_sync' => 'boolean',
             'single_page_mode' => 'boolean',
             'save_and_resume' => 'boolean',
+            // I8b — deliberately NOT in $fillable. The two older share columns (public_slug,
+            // allow_guest_submissions) are fillable for historical reasons that UpdateFormShareRequest's
+            // docblock spends a paragraph apologising for; adding two more would hand every form editor
+            // the ability to switch a public form's spam protection off as a side effect of an unrelated
+            // update(). They are written by FormService::setShareSettings() through forceFill(), audited.
+            'bot_challenge' => FormBotChallenge::class,
+            'guest_rate_limit_per_minute' => 'integer',
             // Increment H6a — the confirmation template (Doc #26 §6.2). Deliberately NOT in $fillable:
             // the only writer is FormService::setConfirmationMessage()'s forceFill, so mass-assignment
             // can never reach a template-bearing column, and Form has no $hidden/$guarded — a fillable
@@ -159,5 +177,146 @@ class Form extends Model implements TenantScoped
     public function grants(): MorphMany
     {
         return $this->morphMany(ResourceGrant::class, 'scopeable');
+    }
+
+    /**
+     * The LIST twin of {@see FormPolicy::view()} — "whose form ROW may this user see".
+     * Pinned in both directions by `FormVisibilityScopeTest`.
+     *
+     * Extracted in J1b from {@see FormPresenter::list()}, which had encoded it inline
+     * since G10b. Global search needs the same rule, and this repo's own history says what happens when a
+     * visibility rule is copied instead of shared: `SubmissionPolicy` keeps a docblock pinning its list twin
+     * precisely because "a respondent who could open a row the inbox never lists is exactly the divergence
+     * that pin exists to prevent."
+     *
+     * ⚠️ THIS IS NOT {@see AnalyticsFormSet}'s `visible()`, AND FOLDING THEM WOULD BE
+     * A REAL AUTHORIZATION BUG RATHER THAN A TIDY-UP. That method answers a DIFFERENT question — "whose
+     * SUBMISSIONS may this user aggregate" — and so keys on `dashboard.org.view` with ANY grant capacity, and
+     * returns `Form::withTrashed()`. A **Viewer** holds `dashboard.org.view` and holds **no `forms.*` key at
+     * all**, so under that rule a Viewer would see the title and description of every form in the tenant,
+     * including SOFT-DELETED ones, through global search — while `/forms` correctly shows them nothing.
+     * `AnalyticsFormSet` is the most search-shaped code already in the tree and therefore the obvious thing
+     * to copy; do not.
+     *
+     * Editor capacity, not the null "any capacity" default: this is the authoring rule, so a bare reviewer
+     * grant must not surface a form here with every `can` flag false. Routed through
+     * {@see ResourceGrantResolver::grantedFormIdsQuery()} so it inherits the fail-closed empty set — a user
+     * with no grants matches NOTHING, never an unconstrained query.
+     *
+     * Deliberately adds no `orWhere`, so it needs none of `Submission::scopeVisibleTo()`'s defensive closure;
+     * do not cargo-cult one in. Archive/soft-delete filtering is the CALLER's, because "may I see this row"
+     * and "does this list show archived rows" are different questions.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('forms.edit.any')) {
+            return $query;
+        }
+
+        $granted = app(ResourceGrantResolver::class)->grantedFormIdsQuery($user, ResourceCapacity::Editor);
+
+        // ⚠️ `forms.edit.own` IS THE POLICY'S SECOND CONJUNCT AND IT IS LOAD-BEARING — an Editor grant
+        // ALONE does not confer visibility. The first draft of this scope omitted it, and
+        // `FormVisibilityScopeTest` is what found the divergence: a Reviewer or Viewer holding an Editor
+        // grant was inside the scope's set and outside `FormPolicy::view()`'s, i.e. a list that offers a
+        // row whose builder refuses to open. Nothing observed it in production only because BOTH live
+        // callers — the `can:viewAny,Form` middleware on `/forms` and `FormSearchArm::allowed()` — refuse
+        // those roles one layer up. That masking is exactly J1b's recorded mutation-survivor pattern, and
+        // it is not a reason to leave the rule wrong.
+        //
+        // Fail closed INSIDE the subquery, where `grantedFormIdsQuery()` already keeps its own empty-set
+        // guard: its OR is closure-grouped, so this conjunct ANDs with the whole group rather than
+        // re-associating against one branch of it, and the outer `whereIn` shape stays identical on both
+        // paths.
+        if (! $user->can('forms.edit.own')) {
+            $granted->whereRaw('false');
+        }
+
+        return $query->whereIn('forms.id', $granted);
+    }
+
+    /**
+     * The LIST twin of {@see FormPolicy::viewOverview()} — "whose form may this user OPEN", which is a
+     * different and wider question from {@see scopeVisibleTo()}'s "whose form may this user AUTHOR"
+     * (Increment J2c).
+     *
+     * ⚠️ THE TWO SCOPES ARE NOT INTERCHANGEABLE AND SUBSTITUTING ONE FOR THE OTHER IS SILENT, NOT LOUD.
+     * `scopeVisibleTo()` above keys on `forms.edit.any` / `forms.edit.own`, and a **Reviewer and a Viewer
+     * hold neither** — so using it to build the submissions inbox's form dropdown returns an EMPTY list for
+     * exactly the two roles the inbox exists for, while every test written with an Owner passes. That is why
+     * this exists rather than a second caller of the authoring scope. `SubmissionInboxTest` pins the
+     * Reviewer-with-a-grant case for that reason.
+     *
+     * It is byte-for-byte {@see FormPolicy::viewOverview()} — **both** conjuncts, and the first one is here
+     * because an earlier version of this docblock argued it away with a claim that is false.
+     *
+     * ⚠️ THAT ARGUMENT WAS: "the `dashboard.form.view` conjunct is not repeated here, because a scope answers
+     * 'which rows', the policy answers 'may you at all', and the route carries the policy." **No route on
+     * this scope's only path checks it.** `formOptions()` is reached from
+     * `SubmissionInboxController::index()` on `GET /submissions`, whose sole gate is `can:viewAny,Submission`
+     * = `submissions.view`. Without the conjunct, a principal holding `submissions.view` +
+     * `dashboard.org.view` but NOT `dashboard.form.view` would enumerate every form title in the tenant
+     * while being refused every one of those hubs. No shipped role can reach that state — all five hold the
+     * key — so it is a fail-closed guard exactly like the one inside `viewOverview()` itself, and it is
+     * stated as one rather than delegated to a gate that does not exist. Deleting the sentence was the other
+     * honest option; keeping the guard is the better one.
+     *
+     * ⚠️ `grantedFormIdsQuery($user)` WITH NO CAPACITY, never `ResourceCapacity::Editor`: a Reviewer's grant
+     * is reviewer capacity, so an editor-capacity check would refuse the single role this was widened for —
+     * the same trap `viewOverview()` records for `holdsAny()` versus `holds(Editor)`. It inherits that
+     * method's fail-closed empty set, so a user with no grants matches NOTHING rather than everything.
+     *
+     * ⚠️ NO `withTrashed()`, unlike {@see AnalyticsFormSet::visible()}. Soft-deleted forms stay out, which
+     * is exactly what the inbox's dropdown did before J2c — so this changes no behaviour there, and widening
+     * it would be a separate decision about a separate question. Archive/status filtering is likewise the
+     * CALLER's, for the reason `scopeVisibleTo()` states.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopeReadableBy(Builder $query, User $user): Builder
+    {
+        // The policy's FIRST conjunct, fail-closed. See the docblock: no route on this scope's path checks it.
+        if (! $user->can('dashboard.form.view')) {
+            return $query->whereRaw('false');
+        }
+
+        if ($user->can('dashboard.org.view')) {
+            return $query;
+        }
+
+        return $query->whereIn('forms.id', app(ResourceGrantResolver::class)->grantedFormIdsQuery($user));
+    }
+
+    /**
+     * Forms that are live — collecting, or able to (Increment K1c).
+     *
+     * THE one definition of "a published form", extracted here because K1c's workspace-wide team progress
+     * needed the identical set that `DashboardMetricsService::publishedFormsCount()` had been spelling out
+     * inline. That method is now this scope's second caller rather than its rival — the argument its own
+     * sibling `visibleFormsQuery()` makes for itself in J5b, applied one level down: two copies of a
+     * predicate agree only by inspection, and this codebase has an ADR-numbering incident to show for what
+     * that costs.
+     *
+     * ⚠️ **`current_published_version_id`, NOT `status`.** {@see FormStatus} carries a `Published` case, but
+     * the column is what `FormPublishController` actually writes and what the public runtime resolves
+     * against, so it is the fact rather than a label beside it. And an ARCHIVED form is excluded even though
+     * it was once published: archiving takes it out of service, so counting it would report a workspace as
+     * more live than it is.
+     *
+     * Deliberately carries no visibility conjunct — "is this form published" and "may this reader see it"
+     * are different questions, and the caller composes {@see scopeVisibleTo()} when it wants both.
+     *
+     * @param  Builder<Form>  $query
+     * @return Builder<Form>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query
+            ->where('forms.status', '!=', FormStatus::Archived->value)
+            ->whereNotNull('forms.current_published_version_id');
     }
 }

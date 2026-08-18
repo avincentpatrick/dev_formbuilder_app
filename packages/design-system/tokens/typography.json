@@ -8,18 +8,29 @@
         "regular": { "value": "400" },
         "medium": { "value": "500" },
         "semibold": { "value": "600" },
-        "bold": { "value": "700" }
+        "bold": { "value": "700" },
+        "heavy": { "value": "750" }
+    },
+    "tracking": {
+        "base": { "value": "-0.004em" },
+        "display": { "value": "-0.028em" },
+        "wide": {
+            "value": "0.06em",
+            "comment": "JR2 — positive tracking for an UPPERCASED micro-label (stat-tile labels, table headers, filter-bar eyebrows). Uppercase closes the gaps a lowercase word opens, so a caps label needs letting where a sentence-case one does not. Lives under `tracking`, not `type`: type-scale.test.ts hard-pins eleven type roles and a twelfth reddens it."
+        }
     },
     "type": {
         "display": {
-            "font-size": { "value": "36px" },
-            "line-height": { "value": "44px" },
-            "font-weight": { "value": "700" }
+            "font-size": { "value": "44px" },
+            "line-height": { "value": "54px" },
+            "font-weight": { "value": "750" },
+            "letter-spacing": { "value": "-0.028em" }
         },
         "heading-1": {
-            "font-size": { "value": "30px" },
-            "line-height": { "value": "38px" },
-            "font-weight": { "value": "700" }
+            "font-size": { "value": "38px" },
+            "line-height": { "value": "46px" },
+            "font-weight": { "value": "750" },
+            "letter-spacing": { "value": "-0.028em" }
         },
         "heading-2": {
             "font-size": { "value": "24px" },

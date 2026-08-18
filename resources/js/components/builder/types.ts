@@ -1,6 +1,14 @@
 // Shared builder types (Increment D4a). The server shapes mirror BuilderPresenter's output; the local
 // shapes add a stable client `uid` decoupled from the server `id`, so the undo/redo command stack can
 // keep referring to a field/section even across a delete→undo cycle that mints a brand-new server row.
+//
+// `ShareProps` MOVED OUT to `@/components/forms/types` in J2b — the form hub renders the same block, so the
+// payload stopped being the builder's. It is imported here rather than re-exported: one live import path
+// per type, so two pages cannot end up depending on two names for one shape.
+
+import type { BreadcrumbItem } from '@meridian/design-system';
+
+import type { ShareProps } from '@/components/forms/types';
 
 export type Uid = string;
 
@@ -142,6 +150,7 @@ export interface BuilderPageProps {
         default_locale: string;
         supported_locales: string[];
     };
+    share: ShareProps;
     draft: { id: string; version_number: number } | null;
     sections: ServerSection[];
     fields: ServerField[];
@@ -150,6 +159,15 @@ export interface BuilderPageProps {
     library: LibraryItem[];
     // The canonical IANA identifier list for the Schedule modal's timezone select (Increment H12b).
     timezones: string[];
+    /**
+     * The toolbar's path trail, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * The builder takes the breadcrumb and NOT the tab strip (user decision, J2b) — it is a three-pane
+     * workspace on a `height: 100%` grid and a second header row costs the one screen that cannot spare it —
+     * so this trail is its only way back, which is why the hub crumb being hard-coded mattered:
+     * `can:update,form` does not imply `viewOverview`, it merely coincides with it across the shipped roles.
+     */
+    crumbs: BreadcrumbItem[];
 }
 
 // A group in the canvas: an optional owning section plus its ordered fields. `section === null` is the
@@ -160,3 +178,17 @@ export interface CanvasGroup {
 }
 
 export type Selection = { kind: 'field'; uid: Uid } | { kind: 'section'; uid: Uid } | null;
+
+/**
+ * The builder's EXPLICIT save verdict (`useBuilderStore`).
+ *
+ * Lives here rather than in the store so the toolbar's label module can read it without importing the
+ * 850-line store and its whole module graph.
+ *
+ * `idle` and `saved` are distinct FACTS even though the toolbar renders them identically today: `idle` is
+ * "this session has written nothing", `saved` is "everything this session wrote, landed". `failed` is
+ * reached by a rejected write OR by an open 409 conflict -- in both, the server does not hold what is on
+ * screen. Mirrors `AutosaveState` in `@/composables/useServerAutosave`, minus the two states the builder
+ * has no path to (there is no lost-update baseline here and no session-expiry stop).
+ */
+export type SaveState = 'idle' | 'saving' | 'saved' | 'failed';

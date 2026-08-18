@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Tenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\UpdateSaveResumeRequest;
 use App\Models\Form;
+use App\Models\User;
 use App\Services\Forms\FormService;
 use Illuminate\Http\RedirectResponse;
 
@@ -26,7 +27,10 @@ final class FormSaveResumeController extends Controller
     {
         $enabled = $request->boolean('save_and_resume');
 
-        $this->forms->setSaveAndResume($form, $enabled);
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->forms->setSaveAndResume($form, $enabled, $user);
 
         return back()->with('toast', [
             'type' => 'success',

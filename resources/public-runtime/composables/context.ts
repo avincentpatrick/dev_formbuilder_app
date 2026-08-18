@@ -51,7 +51,16 @@ export const SyncOutboxKey: InjectionKey<SyncOutbox> = Symbol('public-runtime-sy
 /** Offline media staging (Increment G8b), provided by App.vue; threaded into the media control's upload config. */
 export const OfflineMediaKey: InjectionKey<OfflineMediaStash> = Symbol('public-runtime-offline-media');
 /** Open the conflict-review UX for the oldest parked conflict (Increment G8c), provided by App.vue for SyncStatus. */
-export const ConflictReviewKey: InjectionKey<() => void> = Symbol('public-runtime-conflict-review');
+/**
+ * Open the conflict-review flow. The uuid is OPTIONAL and, when given, names the row to review.
+ *
+ * ⚠️ It was `() => void` until I10d, and that signature was a bug the moment the list shipped: every row
+ * grew its own Review button while the resolver still picked `nextConflict()` — the OLDEST conflict — and
+ * the list renders NEWEST-first, so the two were guaranteed to disagree whenever more than one conflict
+ * existed. A respondent could review and resubmit a submission they had not selected while the one they did
+ * select stayed parked.
+ */
+export const ConflictReviewKey: InjectionKey<(uuid?: string) => void> = Symbol('public-runtime-conflict-review');
 
 export function useRuntime(): FormRuntime {
     const runtime = inject(RuntimeKey);

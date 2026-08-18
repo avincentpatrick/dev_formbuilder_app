@@ -119,6 +119,43 @@ final class TenantIsolation
     }
 
     /**
+     * The NARROWED super-admin carve-out (Increment I7b): identical to {@see applySuperAdminBypass()}
+     * except that the gate carries a second conjunct, `<tenantColumn> IS NULL`, so the elevated role
+     * reaches the PLATFORM slice of a table and nothing else.
+     *
+     * ── WHY THIS EXISTS AS A SEPARATE SHAPE ─────────────────────────────────────────────────────────
+     * The gate {@see superAdminBypassSql()} emits is a DEFAULT, NOT A CONTRACT. It is correct on a table
+     * whose base shape is {@see nullableGlobalSql()} — the platform slice is already readable by every
+     * tenant there, so widening the elevated role to "all rows" adds nothing the operator could not
+     * already reach. It is WRONG on a table whose base shape is strict or append-only, where "all rows"
+     * means every tenant's complete history. `audits` is the first such table: the unrestricted form
+     * would have handed the platform operator every form title, every reviewer's returned_reason and
+     * every membership change in the deployment, bought to display a handful of platform-settings rows.
+     *
+     * The conjunct is the entire difference between a platform ledger viewer and a cross-tenant
+     * surveillance tool, so it is generated rather than hand-written per table (ADR-0002 §D2: policies
+     * come from a reusable helper, "not hand-written per table — reducing the chance any single
+     * migration author forgets a policy"). `tests/Unit/TenantIsolationSqlTest.php` pins the emitted
+     * string, which is the mechanical guard a hand-written CREATE POLICY would not have had.
+     *
+     * The policy name is `{table}_platform_{command}`, deliberately NOT `{table}_superadmin_*`:
+     *   - the existing bypass migrations sweep `LIKE '{table}_superadmin_%'` in their `down()`, so a
+     *     shared prefix would let an unrelated rollback drop this policy while its GRANT survived —
+     *     leaving the reading page rendering ZERO ROWS WITH NO ERROR, the worst failure available on a
+     *     compliance surface;
+     *   - every `*_superadmin_*` policy in the schema carries the unrestricted gate, so keeping the
+     *     names distinct means `SELECT policyname FROM pg_policies WHERE policyname LIKE '%_superadmin_%'`
+     *     stays an honest answer to "where does the operator hold an unrestricted read".
+     *
+     * @param  list<string>  $commands
+     */
+    public static function platformRowsBypass(string $table, array $commands = ['SELECT'], string $tenantColumn = 'tenant_id'): void
+    {
+        $role = config('database.connections.pgsql_superadmin.username');
+        self::execute(self::platformRowsBypassSql($table, is_string($role) ? $role : 'meridian_superadmin', $commands, $tenantColumn));
+    }
+
+    /**
      * The `form_versions` shape (Increment D, form-versioning-schema-migration.md §2): strict tenant
      * isolation for SELECT/INSERT/UPDATE — UPDATE stays strict so the publish transaction can perform
      * every legitimate status transition (draft→published, published→superseded) — PLUS a DELETE
@@ -306,10 +343,17 @@ final class TenantIsolation
     /**
      * Companion write policies for the `users` visibility shape (RBAC §6: user writes are app-layer
      * authorized, not tenant-scoped — but FORCE RLS still needs *some* write policy or all writes are
-     * denied). INSERT permissive (registration/invite-placeholder run with no user context); UPDATE
-     * and DELETE own-row (a user modifies only their own account). When $authRole is given, add
-     * `TO <authRole>` permissive SELECT/UPDATE so the pre-auth login/reset path (which runs with no
-     * context) can resolve and write a user — scoped to that role only, never the app role.
+     * denied). All three are PERMISSIVE. When $authRole is given, add `TO <authRole>` permissive SELECT
+     * so the pre-auth login/reset path (which runs with no context) can resolve a user — scoped to that
+     * role only, never the app role.
+     *
+     * ⚠️ THIS DOCBLOCK USED TO SAY "UPDATE and DELETE own-row (a user modifies only their own account)",
+     * WHICH DESCRIBES A POLICY THAT HAS NEVER EXISTED HERE — both are emitted `USING (true)`, as
+     * `TenantIsolationSqlTest` has always asserted verbatim. The restriction is real but it lives in the
+     * SELECT policy, and the difference is not academic: it is why a write with no user context fails
+     * SILENTLY rather than being refused, and anyone debugging it by looking for an own-row UPDATE
+     * policy finds nothing wrong. Corrected in J3b, after the claim below had propagated the same wrong
+     * diagnosis into a second lane's notes.
      *
      * @return list<string>
      */
@@ -320,9 +364,22 @@ final class TenantIsolation
         // Writes on the global `users` identity table are governed by APPLICATION-LAYER authorization,
         // not tenant RLS (RBAC §6: user writes are "a user's own account", not a tenant operation).
         // FORCE RLS still needs a policy per command, so these are permissive — the SELECT visibility
-        // policy is what enforces read isolation. Permissive writes also let central account-management
-        // (Fortify profile/password/2FA, which run with no tenant context) update the user's own row,
-        // and let the password-reset save succeed on the pre-auth connection.
+        // policy is what enforces read isolation.
+        //
+        // ⚠️ THE SENTENCE THAT USED TO FOLLOW WAS THE FALSE PREMISE THE J3b DEFECT RESTED ON, AND IT
+        // SURVIVED HERE FOR THE WHOLE OF PHASE 0. It read: "Permissive writes also let central
+        // account-management (Fortify profile/password/2FA, which run with no tenant context) update the
+        // user's own row." They do not, and could not: **PostgreSQL applies SELECT policies to an UPDATE
+        // whose WHERE reads a column**, so `users_users_visibility` runs first and, with no
+        // `app.current_user_id` and no active co-tenant, matches nothing. A permissive UPDATE policy is
+        // never reached, because there is no row to reach it with — the write affects ZERO rows and
+        // throws nothing. Six Fortify endpoints wrote nothing at all until `config/fortify.php` was given
+        // `EstablishTenantDatabaseContext`; `tests/Feature/Auth/FortifyRouteContextTest.php` pins them.
+        //
+        // The other half of the old sentence IS true and is the reason these stay permissive: the
+        // password-reset save runs on the pre-auth connection, whose `users_auth_select` policy is
+        // `USING (true)`, so the row IS visible to that session and the permissive UPDATE then applies.
+        // That asymmetry is exactly why `/reset-password` worked while `/user/password` did not.
         $statements = [
             self::policy($table, 'app_insert', 'INSERT', check: 'true'),
             self::policy($table, 'app_update', 'UPDATE', using: 'true', check: 'true'),
@@ -366,6 +423,51 @@ final class TenantIsolation
                 'INSERT' => self::policy($table, 'superadmin_insert', 'INSERT', check: $gate, role: $superAdminRole),
                 'UPDATE' => self::policy($table, 'superadmin_update', 'UPDATE', using: $gate, check: $gate, role: $superAdminRole),
                 'DELETE' => self::policy($table, 'superadmin_delete', 'DELETE', using: $gate, role: $superAdminRole),
+                default => throw new InvalidArgumentException("Unsupported RLS command: {$command}"),
+            };
+        }
+
+        return $statements;
+    }
+
+    /**
+     * SQL for the {@see platformRowsBypass()} shape — the super-admin carve-out narrowed to the rows
+     * that belong to no tenant. Same additive, role-scoped, GUC-gated, no-ENABLE/FORCE construction as
+     * {@see superAdminBypassSql()}; the only difference is the `AND <tenantColumn> IS NULL` conjunct,
+     * and it is the whole point (see {@see platformRowsBypass()} for why it is a separate shape).
+     *
+     * `IS NULL` on a plain column is leakproof, so the planner may push it below the security barrier
+     * and use it as an index condition — which matters, because the base tenant SELECT policy has no
+     * `TO` clause and therefore also applies to the elevated role, and Postgres OR-composes same-command
+     * permissive policies. A caller that adds the same predicate at the ORM level gets an ordered index
+     * scan instead of an OR-over-two-branches plan.
+     *
+     * @param  list<string>  $commands
+     * @return list<string>
+     */
+    public static function platformRowsBypassSql(
+        string $table,
+        string $superAdminRole,
+        array $commands = ['SELECT'],
+        string $tenantColumn = 'tenant_id',
+    ): array {
+        self::assertIdentifier($table);
+        self::assertIdentifier($superAdminRole);
+        self::assertIdentifier($tenantColumn);
+
+        $gate = sprintf(
+            "current_setting(%s, true) = 'true' AND %s IS NULL",
+            self::quote(self::SUPERADMIN_SETTING),
+            $tenantColumn,
+        );
+
+        $statements = [];
+        foreach ($commands as $command) {
+            $statements[] = match (strtoupper($command)) {
+                'SELECT' => self::policy($table, 'platform_select', 'SELECT', using: $gate, role: $superAdminRole),
+                'INSERT' => self::policy($table, 'platform_insert', 'INSERT', check: $gate, role: $superAdminRole),
+                'UPDATE' => self::policy($table, 'platform_update', 'UPDATE', using: $gate, check: $gate, role: $superAdminRole),
+                'DELETE' => self::policy($table, 'platform_delete', 'DELETE', using: $gate, role: $superAdminRole),
                 default => throw new InvalidArgumentException("Unsupported RLS command: {$command}"),
             };
         }

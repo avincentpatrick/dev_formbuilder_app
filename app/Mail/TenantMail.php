@@ -47,6 +47,28 @@ use Illuminate\Queue\SerializesModels;
  * branded email — is H23's branding work, not a receipt. What is NOT true any more is that H9/H10 or H17
  * will be the consumer that proves it.
  *
+ * ── AMENDMENT (H23a4): THE BRANDING WORK ARRIVED, AND IT DECLINED TOO. THIS CLASS HAS NO CONSUMER LEFT ──
+ * H23a4 is "H23's branding work", named above as the case that would finally justify a Mailable — and it
+ * built the branded mail layer without one. The paragraph above turned out to be right about the COST and
+ * wrong about who would pay it: `resources/views/mail/{meridian,notification}.blade.php` and the single
+ * published `vendor/mail/html/header.blade.php` ARE the Blade mail layer this class predicted, and they
+ * sit underneath the existing eight Notifications rather than beside a ninth Mailable.
+ *
+ * Why a Mailable still lost, with all eight emails already needing the template:
+ *   - The template layer is per-APPLICATION, the payload is per-MESSAGE. Publishing the theme once serves
+ *     all eight; a Mailable would have had to be written eight times to reach them.
+ *   - The two auth emails subclass the framework's own notifications to reuse `Lang::get()` wording. A
+ *     Mailable cannot inherit that, so they would have had to be rewritten wholesale — for a translation
+ *     the platform did not author and does not maintain.
+ *   - The R2/R3 argument above is unchanged and now matters MORE, not less: H23a4 adds an `array $brand`
+ *     to every notification's payload. On a ShouldQueue Notification that shape is at least assertable;
+ *     on a TenantMail nothing statically sees it.
+ *
+ * So the honest status is: **no predicted consumer of this class has ever materialised, across four
+ * increments that were each expected to be the one.** It is kept because a genuinely multi-section
+ * transactional email (an export digest, a scheduled report) is still a plausible future need and the
+ * decision record above is worth more than the file — but a fifth prediction is not made here.
+ *
  * Subclasses implement envelope()/content()/attachments() (the Laravel 11 Mailable API) and, because they
  * are constructed inside a job, carry only scalars/arrays as public properties.
  */

@@ -10,8 +10,6 @@
  */
 import { computed, inject, onBeforeUnmount, onMounted, provide, ref } from 'vue';
 import RuntimeShell from './RuntimeShell.vue';
-import OfflineIndicator from './OfflineIndicator.vue';
-import SyncStatus from './SyncStatus.vue';
 import PageView from './PageView.vue';
 import StepView from './StepView.vue';
 import WelcomeBackBanner from './WelcomeBackBanner.vue';
@@ -33,7 +31,7 @@ import {
 import { ApiError } from '../lib/error-normalizer';
 import { acceptanceForReasonCode, hasScheduleConstraint } from '../lib/schedule';
 import { openDb } from '../lib/db';
-import { discardRow, enqueue, markSynced } from '../lib/outbox';
+import { discardRow, enqueue } from '../lib/outbox';
 import { attachToSubmission, collectLocalMediaIds } from '../lib/media-queue';
 import { getDeviceId } from '../lib/device';
 import { APP_VERSION } from '../lib/app-version';
@@ -58,6 +56,10 @@ const props = defineProps<{
         stepKey: string | null;
         completeness: number | null;
         note: string | null;
+        /** Increment P3a — the SERVER draft's lost-update baseline, which is deliberately not affected by
+         *  which tier reconcileDraft chose: it describes the state on the server that the next save will
+         *  write over, not the answers being shown. Same rule reconcile.ts already records for the uuid. */
+        contentChecksum: string | null;
     } | null;
     /** Increment H7 — the raw `location.search` to prefill `url`-sourced hidden fields from. App.vue reads
      *  the DOM once and threads it here so the store itself stays DOM-free. */
@@ -73,7 +75,9 @@ const emit = defineEmits<{
     // this session the instant it flips to the confirmation phase (they are mutually exclusive branches),
     // so the store — and with it the locale, the source map and the submitted answers — does not outlive
     // the emit. See {@link authoredConfirmation}.
-    submitted: [id: string, confirmation: string | null];
+    // Increment J2e — the SERVER-issued reference rides along, so App.vue prints the code the tenant can
+    // find rather than one derived on the device from the id.
+    submitted: [id: string, reference: string, confirmation: string | null];
     queued: [clientUuid: string];
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
     discard: [];
@@ -237,6 +241,9 @@ async function submit(): Promise<SubmitOutcome> {
         locale: runtime.locale.value,
         device_id: deviceId,
         app_version: APP_VERSION,
+        // Increment P3a — freeze the baseline INTO the queued row, so a replay hours from now makes the same
+        // claim this submit would have made live. Null on an ordinary fill that never created a server draft.
+        base_content_checksum: draftBaseline.value,
     });
     void sync?.refresh();
 
@@ -256,11 +263,24 @@ async function submit(): Promise<SubmitOutcome> {
             locale: runtime.locale.value,
             deviceId,
             appVersion: APP_VERSION,
+            // Increment P3a — the same claim the queued row above carries. A submit against an existing
+            // server draft saves before it promotes, so without this a stale device finalizes over another
+            // device's answers.
+            baseContentChecksum: draftBaseline.value,
         });
-        await markSynced(db, uuid);
+        // I10d — discardRow, NOT markSynced. This is the path where the submission went straight out while
+        // ONLINE, so the outbox row is only the crash-safe intent record and its job is done: outbox.ts's own
+        // docblock for discardRow says exactly that ("an online submit resolved the intent without queuing").
+        //
+        // Retaining here would be actively wrong, not merely redundant. markSynced() now KEEPS the row so it
+        // can appear in the list, and the list derives its reference from the CLIENT uuid — while the
+        // confirmation screen this path routes to derives its reference from the SERVER id (App.vue). The
+        // respondent would be looking at two different codes for the same submission, on the same screen.
+        // Discarding also makes the list mean what UX §7.1 says it means: submissions finalized while OFFLINE.
+        await discardRow(db, uuid);
         void sync?.refresh();
         await autosave.clear();
-        emit('submitted', result.id, authoredConfirmation());
+        emit('submitted', result.id, result.reference, authoredConfirmation());
         return 'success';
     } catch (error) {
         return await handleSubmitError(error, uuid);
@@ -303,6 +323,11 @@ provide(SubmitFlowKey, flow);
 const draftSaving = ref(false);
 const draftCompleteness = ref<number | null>(props.resume?.completeness ?? null);
 
+// Increment P3a — this device's lost-update baseline, seeded from the resume read and advanced by every
+// successful save. A fresh (non-resumed) session starts null, which is the honest claim: it has read nothing,
+// so its first save creates the draft rather than overwriting one.
+const draftBaseline = ref<string | null>(props.resume?.contentChecksum ?? null);
+
 async function saveDraftAction(options: { email?: string | null; finishLater: boolean }): Promise<DraftSaveResult | null> {
     draftSaving.value = true;
     try {
@@ -315,8 +340,12 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
             deviceId,
             appVersion: APP_VERSION,
             finishLater: options.finishLater,
+            baseContentChecksum: draftBaseline.value,
         });
         draftCompleteness.value = result.completenessPercent;
+        // Advance the baseline to what the server just wrote, so the NEXT save from this device is based on
+        // it. Skipping this would make every save after the first look like a second device.
+        draftBaseline.value = result.contentChecksum;
         const email = (options.email ?? '').trim();
         return { resumeUrl: result.resumeUrl, emailed: options.finishLater && email !== '' };
     } catch (error) {
@@ -354,8 +383,6 @@ const description = computed(() => runtime.renderModel.form.description);
                 :step-title="resumeStepTitle"
                 :note="resume.note"
             />
-            <OfflineIndicator v-if="!online" />
-            <SyncStatus v-if="!resolving" />
             <div
                 v-if="notice"
                 class="session-notice"

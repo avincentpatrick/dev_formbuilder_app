@@ -18,10 +18,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
+use App\Notifications\Connectors\ConnectorRulePausedNotification;
 use App\Services\Connectors\ConnectionService;
+use App\Services\Connectors\ConnectionTokenRefresher;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
 use App\Services\Webhooks\WebhookPayloadArchive;
+use App\Support\Branding\BrandPalette;
 use App\Support\Connectors\ConnectorDeliveryResult;
 use App\Support\Connectors\ConnectorRegistry;
 use App\Support\Webhooks\RetryLadder;
@@ -105,6 +108,37 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         // envelope is well under the threshold today, so this is the inline payload.
         $payload = app(WebhookPayloadArchive::class)->read($delivery);
 
+        // PRE-FLIGHT REFRESH (H16a) — ADR-0009 §D6's own named revisit trigger, fired. §D6 made refresh
+        // proactive-and-scheduled precisely to keep a second outbound call out of the delivery path, and that
+        // still holds for Slack, whose bot tokens do not expire at all. Google's do, in about an hour, against
+        // an HOURLY sweep: a grant minted just after a sweep and delivered against before the next one is
+        // dead on arrival, and retuning the sweep cannot close a window that one missed run reopens.
+        //
+        // It is a GUARD, not a policy: `ensureFresh()` returns immediately unless the token is already expired
+        // or inside `connectors.delivery_refresh_lead_seconds` (120s), so a healthy connection is still
+        // renewed by the sweep and never reaches this call. The stampede §D6 warns about therefore needs the
+        // sweep to have failed first, rather than being one provider outage away at all times.
+        //
+        // A refusal here marks the grant dead by the same path the sweep uses, so this must run BEFORE the
+        // status re-read below would matter — hence the fresh instance check.
+        app(ConnectionTokenRefresher::class)->ensureFresh($connection, Carbon::now());
+
+        if ($connection->status !== ConnectionStatus::Active) {
+            // ensureFresh() found the grant revoked at the provider and marked it dead. Nothing was sent, so
+            // this is not a delivery failure to retry — the owner has already been notified once by the
+            // refresher, and re-notifying from finishCredentialRejected() would tell them twice.
+            $this->finishBlocked(
+                $delivery,
+                $subscription,
+                $attemptNumber,
+                ConnectorDeliveryResult::blocked(null, '[grant_expired] The connection needs to be reconnected before this rule can deliver.'),
+                (int) round((microtime(true) - $startedAt) * 1000),
+                notify: false,
+            );
+
+            return;
+        }
+
         $provider = app(ConnectorRegistry::class)->for($connection->provider);
         $result = $provider->deliver($connection, $subscription, $payload);
 
@@ -118,6 +152,12 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
 
         if ($result->credentialRejected) {
             $this->finishCredentialRejected($delivery, $connection, $attemptNumber, $result, $elapsedMs);
+
+            return;
+        }
+
+        if ($result->blocked) {
+            $this->finishBlocked($delivery, $subscription, $attemptNumber, $result, $elapsedMs);
 
             return;
         }
@@ -169,6 +209,53 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
     }
 
     /**
+     * The DESTINATION is unusable and the credential is fine (H16a) — column drift, a deleted spreadsheet, a
+     * file this grant cannot reach.
+     *
+     * Terminal for this RULE and nothing wider: the subscription is paused, this delivery is dead-lettered
+     * rather than retried, and the connection plus every other rule on it is left running. Pausing rather than
+     * disabling is deliberate — `disabled` is the admin's word (see {@see ConnectorSubscriptionStatus}), and
+     * overwriting it here would lose the distinction between "we stopped this" and "you stopped this".
+     *
+     * The owner is told once, on the same edge-triggered recipe the breaker and the revoked-grant path use:
+     * only a human can re-map the columns, and a paused rule with no notification is a rule that silently
+     * stopped working. `notify: false` is for the one caller that has ALREADY notified — the pre-flight
+     * refresh, which marks the grant dead through the refresher's own path.
+     */
+    private function finishBlocked(
+        WebhookDelivery $delivery,
+        ConnectionSubscription $subscription,
+        int $attempt,
+        ConnectorDeliveryResult $result,
+        int $ms,
+        bool $notify = true,
+    ): void {
+        $delivery->forceFill([
+            'status' => WebhookDeliveryStatus::DeadLettered,
+            'attempt_count' => $attempt,
+            'last_attempted_at' => Carbon::now(),
+            'next_retry_at' => null,
+            'response_status_code' => $result->responseStatus,
+            'response_body_excerpt' => $result->responseExcerpt,
+            'response_time_ms' => $ms,
+        ])->save();
+
+        $alreadyPaused = $subscription->status === ConnectorSubscriptionStatus::Paused;
+
+        $subscription->forceFill([
+            'status' => ConnectorSubscriptionStatus::Paused,
+            'last_failure_at' => Carbon::now(),
+        ])->save();
+
+        // Edge-triggered: a rule that is already paused has already told them. Without this, every queued
+        // delivery for a drifted sheet would email the owner — the exact "no bell, no polling" over-notification
+        // H17 argued against, arrived at from the other direction.
+        if ($notify && ! $alreadyPaused) {
+            $this->notifyBlocked($subscription, $result->responseExcerpt);
+        }
+    }
+
+    /**
      * The provider disowned the credential (ADR-0009 §D6/§D7). Terminal by construction: mark the grant dead
      * (which also pauses its rules and clears the tokens), dead-letter this delivery rather than scheduling
      * retries that can only fail identically, and tell the tenant owner once so a human can re-connect.
@@ -212,8 +299,35 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             return;
         }
 
+        // Inside handleForTenant(), where the GUC is live (H23a4) — see BrandPalette.
         Notification::route('mail', $email)
-            ->notify(new ConnectionRevokedNotification($providerLabel, $accountLabel));
+            ->notify(
+                (new ConnectionRevokedNotification($providerLabel, $accountLabel))
+                    ->withBrand(BrandPalette::forTenantId($this->tenantId))
+            );
+    }
+
+    /**
+     * Tell the tenant owner one RULE is paused and why (H16a) — same on-demand-notifiable, best-effort recipe
+     * as {@see notifyOwner()}, different message, because "reconnect your Google account" would be wrong
+     * advice for a spreadsheet that grew a column.
+     */
+    private function notifyBlocked(ConnectionSubscription $subscription, string $reason): void
+    {
+        $ownerId = Tenant::query()->whereKey($this->tenantId)->value('owner_user_id'); // RLS-exempt central table
+
+        if (! is_string($ownerId) || $ownerId === '') {
+            return;
+        }
+
+        $email = User::query()->whereKey($ownerId)->value('email');
+
+        if (! is_string($email) || $email === '') {
+            return;
+        }
+
+        Notification::route('mail', $email)
+            ->notify(new ConnectorRulePausedNotification((string) $subscription->name, $reason));
     }
 
     private function deadLetterForQuota(WebhookDelivery $delivery): void

@@ -33,6 +33,8 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
  * @property ?string $primary_color The brand hex the tenant TYPED (#RRGGBB); null ⇒ no brand colour (H23a2).
  * @property mixed $brand_ramp Derived ramp payload (jsonb); read through brandRamp(), never raw.
  * @property ?string $logo_attachment_id FK to attachments; null ⇒ no brand logo (H23a2).
+ * @property bool $maintenance_mode Guest runtime paused for this tenant (I5, PRD #10); the admin app is unaffected.
+ * @property ?string $maintenance_message Respondent-facing notice while paused; null ⇒ the product's generic copy.
  */
 class Tenant extends BaseTenant
 {
@@ -51,12 +53,32 @@ class Tenant extends BaseTenant
         // 'status' MUST stay in this list. It is what makes scopeActive() below a real SQL predicate;
         // remove it and stancl silently relocates the value into the `data` json column, at which
         // point `where('status', …)` matches NOTHING and every tenant vanishes from every fan-out —
-        // with no error. TenantCustomColumnsTest pins this.
+        // with no error. `JobContractTest` pins this one specifically (ADR-0007 §D3/§D13 depend on the
+        // predicate being real SQL); `TenantColumnWhitelistTest` pins the whole list by set equality.
+        // ⚠️ This comment used to cite `TenantCustomColumnsTest`, and so do three migrations — that file has
+        // never existed in this repository. The claim was true; only the name was wrong.
         //
         // primary_color / brand_ramp / logo_attachment_id (H23a2, 2026_08_05_000003) are the same shape
         // again. Their failure mode is quieter than 'status' but no less real: branding would appear to
         // save, read back null, and simply never apply — with a green write path the whole way.
-        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days', 'primary_color', 'brand_ramp', 'logo_attachment_id'];
+        //
+        // maintenance_mode / maintenance_message (I5, 2026_08_06_000004) are columns rather than `settings`
+        // rows precisely so the guest runtime can read them off the already-resolved tenant with no extra
+        // query — which is exactly the property that omitting them here would destroy, silently and in the
+        // fail-OPEN direction (a null flag reads as "not in maintenance" and every form keeps serving).
+        //
+        // created_at / updated_at (P2a) were MISSING until the set-equality guard in
+        // TenantColumnWhitelistTest found them, and the omission was not harmless. VirtualColumn's
+        // encodeAttributes() moves every non-custom attribute into `data` on save, and decodeVirtualColumn()
+        // then setAttribute()s every `data` key back OVER the real column on read — so `updated_at` read back
+        // a STALE snapshot taken at the previous save while the column held the true value. Measured on the
+        // dev database before the fix: column 19:54:38, `data` 19:54:11. `created_at` escaped notice only
+        // because it never changes, so its two copies always agreed.
+        //
+        // stancl's own default is ['id'] — the library expects EVERY real column to be listed, and Laravel's
+        // timestamps are real columns here. 2026_08_16_000001 strips the stale keys from rows written before
+        // this line existed; without it the decode loop keeps overwriting from `data` whatever this list says.
+        return ['id', 'name', 'slug', 'owner_user_id', 'status', 'default_locale', 'supported_locales', 'draft_ttl_days', 'primary_color', 'brand_ramp', 'logo_attachment_id', 'maintenance_mode', 'maintenance_message', 'created_at', 'updated_at'];
     }
 
     /**
@@ -95,6 +117,41 @@ class Tenant extends BaseTenant
     public function isActive(): bool
     {
         return TenantStatus::tryFrom((string) $this->status) === TenantStatus::Active;
+    }
+
+    /**
+     * Whether this tenant's PUBLIC form runtime is paused (I5, PRD Feature #10).
+     *
+     * Scoped to respondents on purpose: the authenticated app stays fully usable while this is true, because
+     * the person who switched it on has to be able to switch it off. {@see App\Http\Middleware\EnforceTenantMaintenance}
+     * is the only enforcement site.
+     *
+     * **A method rather than a bare property read, even though `pdo_pgsql` hands this column back as a real
+     * PHP bool** (verified against the running database rather than assumed, because this model carries no
+     * casts at all — stancl's virtual-column machinery intercepts attribute access, so `status` above is a
+     * plain uncast `?string`). The two ways it reads NULL are the ones {@see self::isActive()} documents: a
+     * partial `->select()` upstream, and a just-created unrefreshed instance whose DB-default `false` has
+     * not been back-filled. Both land on false here, which is the right direction — an unreadable flag must
+     * fail OPEN and keep serving, never take a tenant's forms offline by accident.
+     */
+    public function isUnderMaintenance(): bool
+    {
+        return $this->maintenance_mode === true;
+    }
+
+    /**
+     * The respondent-facing notice, falling back to the product's own copy.
+     *
+     * The fallback lives here rather than in the view so the blade, the JSON arm of the guest API and any
+     * later surface cannot render three different sentences for one state.
+     */
+    public function maintenanceNotice(): string
+    {
+        $message = $this->maintenance_message;
+
+        return is_string($message) && trim($message) !== ''
+            ? trim($message)
+            : 'This form is temporarily unavailable while its organisation performs maintenance. Please try again later.';
     }
 
     /**

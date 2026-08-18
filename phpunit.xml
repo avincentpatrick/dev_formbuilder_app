@@ -24,6 +24,23 @@
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <!--
+            Pin the queue fairness retry window (Increment I10b), for the same reason CENTRAL_DOMAIN below
+            is pinned: it is an invariant of the suite, not a knob.
+
+            `TenantAwareJob::retryUntil()` stamps `now() + retry_window_hours` into every job payload at
+            DISPATCH, and `Worker::markJobAsFailedIfAlreadyExceedsMaxAttempts()` compares that to wall-clock
+            BEFORE `fire()` runs. At a 0-hour window the two reads must land in the same second or the
+            worker fails the job without ever executing it — which is precisely the load-dependent flake
+            I10b removed from `ExplodingTenantJob`. `config/queue-fairness.php` reads
+            QUEUE_FAIRNESS_RETRY_WINDOW_HOURS from env with no floor, and `.env.example` advertises it as
+            tunable, so an ops-side change (draining a stuck queue, a CI image tweak) could reintroduce that
+            flake across the whole suite WITHOUT touching a line of PHP, and nothing would catch it.
+
+            `force` because a stray `docker exec -e` must not be able to reintroduce it either. NO
+            BEHAVIOUR CHANGE: 6 is already the config default.
+        -->
+        <env name="QUEUE_FAIRNESS_RETRY_WINDOW_HOURS" value="6" force="true"/>
+        <!--
             Pin the tenancy central domain for the test suite, the same way DB_DATABASE below pins the
             database. Every host-based test drives `http://{slug}.meridian.test/...`, and stancl's
             identification middleware rejects any host that does not end with a `tenancy.central_domains`
@@ -38,6 +55,28 @@
             line, so config already defaulted to meridian.test there.
         -->
         <env name="CENTRAL_DOMAIN" value="meridian.test" force="true"/>
+        <!--
+            Pin APP_URL to agree with the CENTRAL_DOMAIN pinned directly above (H16b). Until now the
+            suite forced the central domain to meridian.test while APP_URL inherited whatever the
+            environment said — `http://localhost:8080` from a developer's `.env`, and the same again in
+            CI, which does `cp .env.example .env`. So the test environment contradicted itself: the
+            app's own absolute-URL base named a host the suite had just declared was not the central
+            one, and a relative `get('/login')` resolved against a different host from every explicit
+            `http://{slug}.meridian.test/...` in the same file.
+
+            This is a CONSISTENCY fix and deliberately not a load-bearing one.
+            `ConnectorRedirector::centralPort()` adds `app.url`'s port to the OAuth URLs only when
+            `app.url`'s HOST is the central domain, so with or without this line the suite's redirects
+            are byte-identical — the mismatched host already made the port null. Pinning it means the
+            two agree for the reason they should, rather than the fix depending on them disagreeing.
+
+            NO PORT here, deliberately: one would flow into every asserted callback and return URL. A
+            test that needs the port-carrying shape sets `config(['app.url' => ...])` itself, which is
+            what the ConnectorRedirector cases do. `force` for the same reason as CENTRAL_DOMAIN — the
+            suite's central origin is an invariant, not a knob, and it must survive both a `.env` and a
+            stray `docker exec -e`.
+        -->
+        <env name="APP_URL" value="http://meridian.test" force="true"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="meridian_testing"/>
         <env name="DB_URL" value=""/>

@@ -17,6 +17,7 @@ use App\Models\SubmissionAnswer;
 use App\Services\Attachments\AttachmentReferenceValidator;
 use App\Services\Validation\SemanticError;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Submissions\FinalizedStatus;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,13 @@ final class SubmissionDraftService
      * and passes it as {@see SubmissionPayload::$ttlDays}, and this constant is the fallback when none is set. */
     public const DRAFT_TTL_DAYS = 30;
 
+    /**
+     * How many times {@see createDraft()} is re-run after a `submissions.reference` collision (J2e). The twin
+     * of {@see SubmissionPipeline::MAX_REFERENCE_ATTEMPTS}, kept separate because the two services share no
+     * base class and a shared constant would be the only thing coupling them.
+     */
+    private const int MAX_REFERENCE_ATTEMPTS = 3;
+
     public function __construct(
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
@@ -58,8 +66,15 @@ final class SubmissionDraftService
 
     /**
      * Create or update a draft submission from a partial answer set. Runs Stage-1 + integrity (Stage-2a
-     * version guard); skips Stage-3 and the 409 content-conflict rule. Idempotent under one
+     * version guard); skips Stage-3 and the 409 CONTENT-conflict rule. Idempotent under one
      * `client_submission_uuid`: the first save creates a `status=draft` row, every later save overwrites it.
+     *
+     * ⚠️ "SKIPS THE 409" IS TRUE OF THE *CONTENT* RULE ONLY, SINCE INCREMENT P3a. A save that carries a
+     * baseline (`$payload->checkBaseline`) is additionally checked for a LOST UPDATE — the stored answers
+     * having moved since the saving device read them, which since H9b/H10 means a second device wrote to the
+     * same draft. That is a different comparison (base-vs-stored, not incoming-vs-stored) and so does not
+     * reinstate what this line says is suspended: a same-device autosave loop always matches its own base and
+     * never sees it. A save with no baseline behaves exactly as it did before P3a.
      */
     public function saveDraft(SubmissionPayload $payload): SubmissionResult
     {
@@ -77,17 +92,25 @@ final class SubmissionDraftService
         // key / type mismatch; a draft rejects MALFORMED input, not INCOMPLETE input). Stage 3 is NOT run.
         $normalized = $this->normalizer->normalize($fields, $sections, $payload->answers);
 
-        // The content checksum is recomputed + stored on every save, but the 409 conflict rule is SUSPENDED
-        // for a draft (it re-arms automatically on promotion — see promote()).
+        // The content checksum is recomputed + stored on every save, but the 409 CONTENT rule is SUSPENDED
+        // for a draft (it re-arms automatically on promotion — see promote()). The same value doubles as
+        // P3a's lost-update token on the way back out, which is why nothing here needed a new column.
         $checksum = AnswersContentChecksum::of($normalized);
         $completeness = DraftCompleteness::of($fields, $sections, $normalized);
 
         if ($payload->clientSubmissionUuid !== null) {
-            $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+            $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
             if ($existing !== null) {
                 // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
                 // so a respondent mid-fill is never stranded — no start guard on this branch.
-                return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+                //
+                // Increment P3a — the ONE site that carries the lost-update baseline, because it is the only
+                // one where the caller genuinely read this draft before writing to it.
+                return $this->updateDraft(
+                    $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
+                    checkBaseline: $payload->checkBaseline,
+                    baseline: $payload->baseContentChecksum,
+                );
             }
         }
 
@@ -132,6 +155,10 @@ final class SubmissionDraftService
         $this->acceptance->assertCanPromote($form, $draft);
 
         $fields = $version->fields()->get();
+        // Loaded for {@see FinalizedStatus} (I9a) — and it is load-bearing rather than tidy. `StepProjection`
+        // walks SECTIONS; hand it an empty collection and every projection is empty, so every promoted draft
+        // would be classified `screened_out` and no promote would ever consume a capacity slot again.
+        $sections = $version->sections()->get();
 
         $stored = SubmissionAnswer::query()->where('submission_id', $draft->id)->firstOrFail();
         /** @var array<string, mixed> $answers */
@@ -152,7 +179,7 @@ final class SubmissionDraftService
         // submit() would store for an equivalent raw submission (submit() hashes its Stage-1 output).
         $checksum = AnswersContentChecksum::of($answers);
 
-        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $final, $checksum, $actorId, $semantic): SubmissionResult {
+        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $sections, $final, $checksum, $actorId, $semantic): SubmissionResult {
             $row = Submission::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             // Already finalized (double-promote, or a concurrent promote won under the lock) — idempotent
@@ -162,7 +189,10 @@ final class SubmissionDraftService
             }
 
             $row->forceFill([
-                'status' => SubmissionStatus::Submitted,
+                // The same determination `SubmissionPipeline::persist()` makes, from the same object, so the
+                // two finalize doors cannot disagree about whether a response consumed a paid slot. It is
+                // written BEFORE `finalize()` runs `assertCapacity()`, which counts this very row.
+                'status' => FinalizedStatus::for($sections, $fields, $semantic),
                 'submitted_at' => now(),
                 'draft_expires_at' => null,
             ])->save();
@@ -187,12 +217,53 @@ final class SubmissionDraftService
      *
      * @param  array<string, mixed>  $normalized
      */
-    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness, ?string $currentStep = null): SubmissionResult
+    private function updateDraft(Submission $existing, FormVersion $version, array $normalized, string $checksum, int $completeness, ?string $currentStep = null, bool $checkBaseline = false, ?string $baseline = null): SubmissionResult
     {
-        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness, $currentStep): SubmissionResult {
+        return DB::transaction(function () use ($existing, $version, $normalized, $checksum, $completeness, $currentStep, $checkBaseline, $baseline): SubmissionResult {
             $row = Submission::query()->whereKey($existing->id)->lockForUpdate()->first();
             if ($row === null || $row->status !== SubmissionStatus::Draft) {
                 throw SubmissionConflictException::draftAlreadyFinalized();
+            }
+
+            // ── ⚠️ THE LOST-UPDATE GUARD (Increment P3a) — WITHOUT IT TWO DEVICES SILENTLY OVERWRITE ────────
+            // The write below is a WHOLE-DOCUMENT replace, so a save based on a state another device has since
+            // moved past reverts every answer that device saved, with no error to either of them. This was
+            // reproduced before it was fixed: seed {age}, device A adds {country}, device B saves from the
+            // pre-A state, and `country` is simply gone with `created: false` and no exception.
+            //
+            // ⚠️ THIS ONLY BECAME REACHABLE WHEN H9b/H10 SHIPPED CROSS-DEVICE RESUME. `saveDraft()`'s written
+            // suspension of the content 409 was authored for the same-device draft, where the only writer is
+            // the one autosave loop, and is still correct for it — a NO-BASELINE save behaves exactly as
+            // before. The resume link (`GuestDraftResumeController`) carries the SAME
+            // `client_submission_uuid` to a second device, which is what created a second writer.
+            //
+            // ⚠️ THE TOKEN COMES FROM THE CLIENT, AND A SERVER-SIDE RE-READ CANNOT SUBSTITUTE — the sibling
+            // channel already learned this and wrote it down ({@see SubmissionAnswerEditService::edit()},
+            // which notes its first attempt compared two reads inside ONE request and was therefore always
+            // equal). The lost update spans two REQUESTS, so only the base the device actually holds can
+            // detect it.
+            //
+            // ⚠️ ONE CHECK, NOT THE SIBLING'S TWO, AND THE DIFFERENCE IS LOAD-BEARING RATHER THAN AN
+            // OMISSION. `SubmissionAnswerEditService` reads its `$stored` BEFORE opening the transaction, so
+            // it needs a second check under the lock. Here the row lock is already held (line above) and the
+            // read below happens after it: under READ COMMITTED a query issued after the lock is granted sees
+            // the winner's committed write, so this single check is itself the authoritative one. Adding a
+            // second would be dead code, and a redundant partner is exactly what P1e's mutation pass found
+            // masking real gaps.
+            if ($checkBaseline) {
+                $storedChecksum = SubmissionAnswer::query()
+                    ->where('submission_id', $row->id)
+                    ->value('answers_content_checksum');
+
+                // Strict, though a LOOSE comparison survives the mutation pass (M11) and is provably
+                // equivalent over today's domain: the value is a 64-hex string or null, pinned by the
+                // requests' `size:64` rule and their accessors mapping '' to null, so no juggling case is
+                // reachable. It stays strict because that equivalence is a property of the DOMAIN, not of the
+                // comparison — widen the column or relax the rule and loose equality starts admitting pairs
+                // this must refuse.
+                if ($storedChecksum !== $baseline) {
+                    throw SubmissionConflictException::draftConcurrentlyModified();
+                }
             }
 
             // The draft's answer document holds the NORMALIZED (un-pruned) answers; attachment_refs is left at
@@ -210,13 +281,34 @@ final class SubmissionDraftService
 
             // The resume cursor moves with each save; `draft_expires_at` is deliberately NOT restamped (a
             // draft's expiry is fixed at creation — the H9a/H10 stamp-once contract the reaper depends on).
+            //
+            // ── I9b CONSIDERED RESTAMPING ON EVERY SAVE AND DECIDED AGAINST IT ─────────────────────────────
+            // The case for restamping is real: `docs/ux/form-filling-ux-flow.md` describes the window as
+            // "inactivity", a keyer or guest actively working on day 29 loses everything on day 30, and
+            // restamping cannot immortalise an ABANDONED draft, because this method is only reached when
+            // somebody is actively saving. I9b makes it likelier to bite, since staff drafts will be more
+            // numerous and longer-lived than guest ones.
+            //
+            // It was rejected on scope, not on merit. Stamp-once is not an unwritten reading here — it is a
+            // deliberate contract with a test named after it ("does not restamp the draft expiry on a later
+            // save (stamp-once)", `GuestDraftRuntimeTest`). Flipping it is a behaviour change to a SHIPPED
+            // GUEST path, made inside an increment about the encode path, and it would land as an amended
+            // assertion in a file I9b otherwise does not touch. Instead I9b makes the deletion VISIBLE rather
+            // than silent — the resume banner names the expiry date — which addresses the failure mode that
+            // actually harms someone (work vanishing without warning) without redefining the window.
+            //
+            // Revisit deliberately, with the guest channel in scope, if a real draft is ever reaped from
+            // under an active keyer. That is the increment where the assertion should be rewritten.
             $row->forceFill([
                 'completeness_percent' => $completeness,
                 'last_saved_at' => now(),
-                'draft_current_step' => $currentStep,
+                // Preserved when the caller sends none (I9b). The submit path builds its payload without a
+                // step, and force-filling null there wiped the resume cursor of any draft whose Submit then
+                // failed Stage 3 — so the keyer was bounced back to step 1 of their own half-finished work.
+                'draft_current_step' => $currentStep ?? $row->draft_current_step,
             ])->save();
 
-            return new SubmissionResult($row, created: false);
+            return new SubmissionResult($row, created: false, contentChecksum: $checksum);
         });
     }
 
@@ -230,58 +322,121 @@ final class SubmissionDraftService
     {
         $version = $payload->version;
 
-        try {
-            return DB::transaction(function () use ($payload, $version, $normalized, $checksum, $completeness): SubmissionResult {
-                $submission = Submission::create([
-                    'form_id' => $version->form_id,
-                    'form_version_id' => $version->id,
-                    'respondent_user_id' => $payload->respondentUserId,
-                    'status' => SubmissionStatus::Draft,
-                    'source' => $payload->source,
-                    'client_submission_uuid' => $payload->clientSubmissionUuid,
-                    'guest_token' => $payload->guestToken,
-                    'guest_ip' => $payload->guestIp,
-                    'guest_user_agent' => $payload->guestUserAgent,
-                    'guest_contact_email' => $payload->guestContactEmail,
-                    'device_id' => $payload->deviceId,
-                    'app_version' => $payload->appVersion,
-                    'locale' => $payload->locale,
-                    'completeness_percent' => $completeness,
-                    'last_saved_at' => now(),
-                    // Stamp-once: the tenant-configured TTL (H10) resolved by the caller, falling back to the
-                    // 30-day default. A later save never restamps this — see updateDraft().
-                    'draft_expires_at' => now()->addDays($payload->ttlDays ?? self::DRAFT_TTL_DAYS),
-                    'draft_current_step' => $payload->draftCurrentStep,
-                ]);
+        // ⚠️ THE LOOP IS THE REFERENCE-COLLISION RECOVERY (J2e) — the twin of the one in
+        // {@see SubmissionPipeline::submit()}, and it exists for the same reason: `submissions` now carries
+        // TWO unique constraints, the insert happens INSIDE `DB::transaction`, and a 23505 leaves that
+        // transaction in ERROR state, so re-minting in place is impossible (25P02). Re-running the closure
+        // builds a fresh `Submission::create()` whose `creating` hook mints a new code.
+        //
+        // The arms are ORDERED rather than told apart by the constraint name, so this keeps catching the
+        // error CODE and never matches the driver's message text: resolve the client-uuid race first —
+        // unchanged behaviour — and treat only an unexplained 23505 as a reference collision.
+        $attempt = 0;
 
-                SubmissionAnswer::create([
-                    'submission_id' => $submission->id,
-                    'form_version_id' => $version->id,
-                    'answers' => $normalized,
-                    'answers_schema_checksum' => $version->checksum,
-                    'answers_content_checksum' => $checksum,
-                    'last_saved_at' => now(),
-                ]);
+        while (true) {
+            $attempt++;
 
-                return new SubmissionResult($submission, created: true);
-            });
-        } catch (QueryException $e) {
-            // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
-            // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
-            if ($payload->clientSubmissionUuid !== null && (string) $e->getCode() === '23505') {
-                $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
-                if ($existing !== null) {
-                    return $this->updateDraft($existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep);
+            try {
+                return DB::transaction(function () use ($payload, $version, $normalized, $checksum, $completeness): SubmissionResult {
+                    $submission = Submission::create([
+                        'form_id' => $version->form_id,
+                        'form_version_id' => $version->id,
+                        'respondent_user_id' => $payload->respondentUserId,
+                        'status' => SubmissionStatus::Draft,
+                        'source' => $payload->source,
+                        'client_submission_uuid' => $payload->clientSubmissionUuid,
+                        'guest_token' => $payload->guestToken,
+                        'guest_ip' => $payload->guestIp,
+                        'guest_user_agent' => $payload->guestUserAgent,
+                        'guest_contact_email' => $payload->guestContactEmail,
+                        'device_id' => $payload->deviceId,
+                        'app_version' => $payload->appVersion,
+                        'locale' => $payload->locale,
+                        'completeness_percent' => $completeness,
+                        'last_saved_at' => now(),
+                        // Stamp-once: the tenant-configured TTL (H10) resolved by the caller, falling back to the
+                        // 30-day default. A later save never restamps this — see updateDraft().
+                        'draft_expires_at' => now()->addDays($payload->ttlDays ?? self::DRAFT_TTL_DAYS),
+                        'draft_current_step' => $payload->draftCurrentStep,
+                    ]);
+
+                    SubmissionAnswer::create([
+                        'submission_id' => $submission->id,
+                        'form_version_id' => $version->id,
+                        'answers' => $normalized,
+                        'answers_schema_checksum' => $version->checksum,
+                        'answers_content_checksum' => $checksum,
+                        'last_saved_at' => now(),
+                    ]);
+
+                    return new SubmissionResult($submission, created: true, contentChecksum: $checksum);
+                });
+            } catch (QueryException $e) {
+                if ((string) $e->getCode() !== '23505') {
+                    throw $e;
+                }
+
+                // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent first-save
+                // won. DB::transaction has already rolled back; fold into the update path (last-writer-wins).
+                //
+                // ⚠️ P3a DELIBERATELY DOES NOT CARRY THE BASELINE THROUGH THIS FOLD, and the reason is
+                // retry idempotency rather than tidiness. A device reaching createDraft() is claiming
+                // "nothing exists here", so its baseline is null by construction — and the winner of the race
+                // has just written a non-null checksum. Checking would therefore 409 EVERY lost insert race,
+                // including the commonest one by far: a plain network retry of a device's own first save,
+                // where both requests carry identical content and nothing was lost at all. The documented
+                // last-writer-wins recovery is left exactly as it was.
+                // ⚠️ `checkBaseline: false` IS PASSED EXPLICITLY RATHER THAN LEFT TO THE DEFAULT, and that is
+                // the mutation pass earning its keep: adding the check here survives every test in this
+                // repository (M12), because reaching this line needs a genuine insert race — findByClientUuid
+                // must return null and then non-null — which no deterministic test can stage. The omission is
+                // therefore enforced by this argument and the comment above it, not by a red test. Say so
+                // rather than let the next reader assume a gate exists.
+                if ($payload->clientSubmissionUuid !== null) {
+                    $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
+                    if ($existing !== null) {
+                        return $this->updateDraft(
+                            $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
+                            checkBaseline: false,
+                        );
+                    }
+                }
+
+                // Nothing to fold into, so this was the reference index. Retry with a fresh code, then give up
+                // loudly — at 32^8 codes a second collision on one insert is a symptom, not chance.
+                if ($attempt >= self::MAX_REFERENCE_ATTEMPTS) {
+                    throw $e;
                 }
             }
-
-            throw $e;
         }
     }
 
-    private function findByClientUuid(string $uuid): ?Submission
+    /**
+     * Resolve the draft this uuid names, WITHIN one form and one author.
+     *
+     * ⚠️ THE SCOPING IS AUTHORIZATION, NOT TIDINESS (added in I9b). The lookup used to be
+     * `where('client_submission_uuid', $uuid)` alone, which is safe only while every caller's form is pinned
+     * by something the caller cannot choose — true of the guest channel, where the share token fixes the form
+     * and there is no author. It stopped being true the moment an AUTHENTICATED endpoint took the form from
+     * the URL and the uuid from the request body: those are two independent inputs, so a member authorized on
+     * form A could send form B's uuid and have the write land on B's draft, on a form they may hold no grant
+     * on at all. RLS bounds the blast radius to the tenant and no further.
+     *
+     * `$respondentUserId` narrows it again on the encode channel, where a draft genuinely belongs to the
+     * person keying it. Null is the guest case and matches guest rows (`respondent_user_id IS NULL`) — hence
+     * `whereNull`, because `where(col, null)` compiles to `= NULL` and never matches anything.
+     */
+    private function findByClientUuid(string $uuid, string $formId, ?string $respondentUserId): ?Submission
     {
-        return Submission::query()->where('client_submission_uuid', $uuid)->first();
+        return Submission::query()
+            ->where('client_submission_uuid', $uuid)
+            ->where('form_id', $formId)
+            ->when(
+                $respondentUserId === null,
+                fn ($q) => $q->whereNull('respondent_user_id'),
+                fn ($q) => $q->where('respondent_user_id', $respondentUserId),
+            )
+            ->first();
     }
 
     /**

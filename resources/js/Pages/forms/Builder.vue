@@ -8,9 +8,17 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCheckbox, MdsModal, MdsSegmentedControl } from '@meridian/design-system';
+import {
+    MdsAlert,
+    MdsBreadcrumb,
+    MdsButton,
+    MdsCheckbox,
+    MdsEmptyState,
+    MdsModal,
+    MdsSegmentedControl,
+} from '@meridian/design-system';
 import FieldPalette from '@/components/builder/FieldPalette.vue';
 import LibraryPicker from '@/components/builder/LibraryPicker.vue';
 import BuilderCanvas from '@/components/builder/BuilderCanvas.vue';
@@ -20,13 +28,20 @@ import ConflictDialog from '@/components/builder/ConflictDialog.vue';
 import ConfirmationModal from '@/components/builder/ConfirmationModal.vue';
 import ScheduleModal from '@/components/builder/ScheduleModal.vue';
 import SaveAsTemplateModal from '@/components/forms/SaveAsTemplateModal.vue';
+import ShareModal from '@/components/forms/ShareModal.vue';
 import { useBuilderStore } from '@/components/builder/useBuilderStore';
+import { saveLabel } from '@/components/builder/save-label';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { useEntitlements } from '@/composables/useEntitlements';
 
 const props = defineProps<BuilderPageProps>();
 const store = useBuilderStore(props);
-const { selection, saving, canUndo, canRedo, conflict, library } = store;
+const { selection, saving, saveState, canUndo, canRedo, conflict, library, saveError } = store;
+
+// The toolbar's polite live region. Reads the store's EXPLICIT verdict rather than inferring success
+// from an idle queue -- see `save-label.ts` for why the failed state renders a string at all.
+const saveStatusLabel = computed(() => saveLabel(saveState.value));
+
 
 // Hide the plan-gated builder affordances (H5c) — XLSForm import/export, the field library, save-as-template.
 // Each is server-gated on its route; this only spares a 402 click.
@@ -44,6 +59,55 @@ const centreViews = [
     { value: 'structure', label: 'Structure', icon: 'layout' as const },
     { value: 'logic', label: 'Logic', icon: 'filter' as const },
 ];
+
+// JR5 — which pane is on screen when the builder is COMPACT (`@container (max-width: 60em)` of the page's
+// own box). The state exists at EVERY width and NOTHING IN JS EVER READS A WIDTH: above the threshold the
+// three `--show-*` rules do not exist, all three panes keep their unconditional display, and this ref is
+// inert. That is what lets `personalization-axe` pick a pane at 1440px and still have it selected after
+// `extra_large` pushes the same viewport below the threshold — with no watcher, no matchMedia and no
+// ResizeObserver.
+//
+// ⚠️ NEVER GATE A PANE'S RENDERING ON THIS. The panes are hidden with `display: none`, never `v-if` —
+// see the @container block's own warning for the three gates that depend on it.
+//
+// Labels are `Add` · `Form` · `Settings` rather than the panes' own names: "Fields" already labels the
+// LEFT PANE'S INNER toggle below, so at 375px the word would appear twice, six pixels apart, meaning two
+// different things. None of these three collides with that toggle (Fields/Library), the centre control
+// (Structure/Logic) or the config tablist. `layout` and `settings` are avoided as icons for the same
+// reason — the centre control's Structure option and the sidebar's nav item already use them.
+const pane = ref<'fields' | 'canvas' | 'settings'>('canvas');
+const paneOptions = [
+    { value: 'fields', label: 'Add', icon: 'plus' as const },
+    { value: 'canvas', label: 'Form', icon: 'forms' as const },
+    { value: 'settings', label: 'Settings', icon: 'sliders' as const },
+];
+function onPaneChange(value: string): void {
+    if (value === 'fields' || value === 'canvas' || value === 'settings') pane.value = value;
+}
+
+// ⚠️ THE ONE THING ALLOWED TO OVERRIDE THE AUTHOR'S PANE CHOICE, AND IT IS A CORRECTNESS FIX RATHER THAN
+// A CONVENIENCE. `saveError` is rendered in exactly ONE place in the entire client — ConfigPanel's
+// `<p v-if="saveError" role="alert">` — which lives inside the CONFIG pane. Without this watcher, a write
+// that fails while the author is on Add or Form mounts that alert inside a `display: none` subtree, where
+// it is neither painted nor placed in the accessibility tree, so it is never announced and never seen. The
+// rule this increment replaced only linearized the panes, so the alert was reachable at every width before
+// it: the silence would be new, and it would be new on exactly the paths most likely to fail — deleting or
+// duplicating a field, adding a section, inserting from the library, and undo/redo from the toolbar.
+// (WCAG 3.3.1 Error Identification, 4.1.3 Status Messages.)
+//
+// ⚠️ WHY THIS WATCHER IS ACCEPTABLE WHERE A `watch(selection, …)` WAS NOT. That one was rejected because
+// `onMounted` below auto-selects the first field, so it would fire on load and override the default pane.
+// `saveError` starts null and only becomes truthy on a real failure, so nothing fires on mount. And above
+// the threshold all three panes are on screen and `pane` is inert, so this is a no-op on desktop rather
+// than a layout surprise.
+//
+// ✅ FIXED IN J7, and this watcher is why the fix had to reach the store rather than the template. The
+// toolbar's status line now reads `saveState`, and `saveError` is a COMPUTED mirror of the same field the
+// verdict tests — so the polite region cannot say "All changes saved" while this watcher is dragging the
+// assertive alert on screen. The two channels are one source of truth by construction. (WCAG 4.1.3.)
+watch(saveError, (message) => {
+    if (message) pane.value = 'settings';
+});
 
 const readOnly = computed(() => props.draft === null);
 
@@ -111,6 +175,11 @@ const scheduleOpen = ref(false);
 // guarded PATCH route, ungated by plan. ──
 const confirmationOpen = ref(false);
 
+// ── Share (Increment I1, PRD Feature #3) — the public link, its QR and its embed snippet. Same shape again:
+// a modal over its own guarded PATCH route, ungated by plan. It lives on the toolbar rather than beside
+// Publish because sharing is not a step in publishing — an author revisits the link long after. ──
+const shareOpen = ref(false);
+
 // ── Save as template (G9a) — flush queued builder writes first, so the server snapshots the draft the
 // author sees (the modal traps focus, so no further canvas edits can race the POST while it is open). ──
 const templateOpen = ref(false);
@@ -175,59 +244,102 @@ function submitImport(): void {
         <Head :title="`Edit · ${form.title}`" />
 
         <header class="builder__toolbar">
+            <!--
+                J2b. The hand-rolled "← Forms" link became a real trail so the builder can reach the form's
+                HUB and not only the list — one of the six pages that hand-rolled the same back link before
+                `MdsBreadcrumb` existed.
+
+                ⚠️ THREE CRUMBS, and the middle one is the load-bearing addition: `MdsBreadcrumb` renders the
+                LAST item as text whatever it carries, so a two-crumb trail ending in the form's title would
+                print the hub's name with no way to click it.
+
+                The builder deliberately does NOT get the tab strip (user decision, J2b), unlike the hub and
+                the analytics page. This is a three-pane workspace on a `height: 100%` grid; a second ~44px
+                header row costs the one screen in the product that cannot spare the vertical space, and the
+                trail already provides the way out. DSR §3.4 records it.
+            -->
             <div class="builder__title-group">
-                <Link href="/forms" class="builder__back" aria-label="Back to forms">
-                    <span aria-hidden="true">←</span> Forms
-                </Link>
-                <h1 class="builder__title">{{ form.title }}</h1>
-                <span v-if="draft" class="builder__version">Draft v{{ draft.version_number }}</span>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+                <div class="builder__title-row">
+                    <h1 class="builder__title">{{ form.title }}</h1>
+                    <span v-if="draft" class="builder__version">Draft v{{ draft.version_number }}</span>
+                </div>
             </div>
+            <!--
+                JR5. The eight SECONDARY actions carry a permanent `aria-label` + `title` and wrap their
+                word in `.builder__label`, which the @container block hides below 60em — nine buttons that
+                wrapped to ~4 rows / ~250px at 375px become ~1 row of glyphs. Publish is deliberately NOT
+                one of them: it keeps its word at every width, and `templates-axe.spec.ts` asserts its name
+                comes from that slot text.
+
+                ⚠️ ONE ELEMENT, NOT A TEXT/ICON PAIR TOGGLED BY `display: none`. A pair would duplicate
+                sixteen `v-if="feature(…)"` / `:disabled` / `@click` declarations (the J1e "second caller
+                lies" shape), let the two label strings drift invisibly, and drop five outlined buttons to
+                MdsIconButton's tertiary-only 32×32 ghost. One element is exactly-one-in-the-a11y-tree BY
+                CONSTRUCTION rather than by a CSS rule continuing to hold.
+
+                ⚠️ THE `aria-label` AND THE SPAN TEXT MUST STAY IDENTICAL. Below the threshold the label is
+                the ONLY name left, `aria-label` outranks `title` in name computation (so axe and
+                `getByRole` see exactly "Share" — `builder-axe.spec.ts` depends on that), and WCAG 2.5.3
+                Label-in-Name holds only while the two strings match. `builder-layout.test.ts` pins all
+                three spellings equal — keep these one attribute per line or its regex stops matching.
+            -->
             <div class="builder__actions">
-                <span class="builder__save" role="status" aria-live="polite">
-                    {{ saving ? 'Saving…' : 'All changes saved' }}
-                </span>
+                <!-- Always PRESENT and never empty: a live region inserted with its content already in it is
+                     not reliably announced, and an empty span collapses a row that already wraps at 375px. -->
+                <span class="builder__save" role="status" aria-live="polite">{{ saveStatusLabel }}</span>
                 <MdsButton
                     variant="tertiary"
                     icon-left="undo"
+                    aria-label="Undo"
+                    title="Undo"
                     :disabled="!canUndo || readOnly"
                     @click="store.undo()"
                 >
-                    Undo
+                    <span class="builder__label">Undo</span>
                 </MdsButton>
                 <MdsButton
                     variant="tertiary"
                     icon-left="redo"
+                    aria-label="Redo"
+                    title="Redo"
                     :disabled="!canRedo || readOnly"
                     @click="store.redo()"
                 >
-                    Redo
+                    <span class="builder__label">Redo</span>
                 </MdsButton>
                 <MdsButton
                     v-if="feature('xlsform_export')"
                     variant="secondary"
                     icon-left="download"
+                    aria-label="Export XLSForm"
+                    title="Export XLSForm"
                     :disabled="readOnly"
                     @click="exportXlsform"
                 >
-                    Export XLSForm
+                    <span class="builder__label">Export XLSForm</span>
                 </MdsButton>
                 <MdsButton
                     v-if="feature('xlsform_export')"
                     variant="secondary"
                     icon-left="upload"
+                    aria-label="Import XLSForm"
+                    title="Import XLSForm"
                     :disabled="readOnly"
                     @click="openImport"
                 >
-                    Import XLSForm
+                    <span class="builder__label">Import XLSForm</span>
                 </MdsButton>
                 <MdsButton
                     v-if="feature('form_templates')"
                     variant="secondary"
                     icon-left="copy"
+                    aria-label="Save as template"
+                    title="Save as template"
                     :disabled="readOnly"
                     @click="openSaveAsTemplate"
                 >
-                    Save as template
+                    <span class="builder__label">Save as template</span>
                 </MdsButton>
                 <!-- Per-form save-and-resume opt-in (H10) — only when the tenant plan includes it (Starter+). -->
                 <MdsCheckbox
@@ -238,12 +350,36 @@ function submitImport(): void {
                     @update:model-value="onToggleSaveResume"
                 />
                 <!-- Scheduled-form config (H12b) — ungated, all tiers; enforcement is server-side. -->
-                <MdsButton variant="secondary" icon-left="calendar" @click="scheduleOpen = true">
-                    Schedule
+                <MdsButton
+                    variant="secondary"
+                    icon-left="calendar"
+                    aria-label="Schedule"
+                    title="Schedule"
+                    @click="scheduleOpen = true"
+                >
+                    <span class="builder__label">Schedule</span>
                 </MdsButton>
                 <!-- Confirmation message (H6a) — ungated, all tiers; references are checked at publish. -->
-                <MdsButton variant="secondary" icon-left="message-check" @click="confirmationOpen = true">
-                    Confirmation
+                <MdsButton
+                    variant="secondary"
+                    icon-left="message-check"
+                    aria-label="Confirmation"
+                    title="Confirmation"
+                    @click="confirmationOpen = true"
+                >
+                    <span class="builder__label">Confirmation</span>
+                </MdsButton>
+                <!-- Share (I1) — ungated, all tiers. Not disabled on `readOnly`: a form with no editable
+                     draft still has a live link worth copying, and the panel is where an author goes to
+                     turn responses OFF, which matters most exactly when they cannot edit. -->
+                <MdsButton
+                    variant="secondary"
+                    icon-left="share"
+                    aria-label="Share"
+                    title="Share"
+                    @click="shareOpen = true"
+                >
+                    <span class="builder__label">Share</span>
                 </MdsButton>
                 <MdsButton variant="primary" icon-left="check" :disabled="readOnly" @click="publish">
                     Publish
@@ -251,52 +387,101 @@ function submitImport(): void {
             </div>
         </header>
 
-        <div
+        <!--
+            J4a — TWO NEAR-IDENTICAL BANNERS BECOME ONE COMPONENT USED TWICE. The markup below was
+            duplicated verbatim in this file apart from its copy and its dismiss ref: the same wrapper, the
+            same title/list body, the same hand-rolled Dismiss button. That is what MdsAlert is for.
+
+            ⚠️ THE TONE CHANGES WHAT THE BUILDER LOOKS LIKE, DELIBERATELY. `.builder__warnings` painted
+            `--mds-color-bg-sunken` with a bottom border — a NEUTRAL GREY strip announcing a warning, which
+            is one of the thirty individually-safe choices the re-skin diagnosis names. It is amber now.
+
+            ⚠️ `flex-shrink: 0` ON THE CALL-SITE CLASS IS LOAD-BEARING AND MUST SURVIVE. JR5 records this as
+            the child that used to steal the panes' flexible row and fill the page while the panes collapsed
+            into an implicit one. The class stays on the MdsAlert root, where Vue puts this component's
+            scope-id, together with the full-bleed geometry the chrome needs (square corners, the wider
+            horizontal padding, the bottom rule) — the component's own radius and padding are for an in-flow
+            panel, and this is a strip spanning the workspace.
+
+            Not `assertive`: an import warning is true from the moment the page renders. `role="status"` and
+            `aria-live="polite"` came free — MdsAlert's default IS `role="status"`, which is what the
+            hand-rolled version had spelled out.
+        -->
+        <MdsAlert
             v-if="importWarnings.length > 0 && !warningsDismissed"
             class="builder__warnings"
-            role="status"
-            aria-live="polite"
+            tone="warning"
+            :title="`Imported with ${importWarnings.length} ${importWarnings.length === 1 ? 'warning' : 'warnings'}`"
+            dismissible
+            dismiss-label="Dismiss import warnings"
+            @dismiss="warningsDismissed = true"
         >
-            <div class="builder__warnings-body">
-                <strong class="builder__warnings-title">
-                    Imported with {{ importWarnings.length }}
-                    {{ importWarnings.length === 1 ? 'warning' : 'warnings' }}
-                </strong>
-                <ul class="builder__warnings-list">
-                    <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
-                </ul>
-            </div>
-            <MdsButton variant="tertiary" icon-left="close" @click="warningsDismissed = true">
-                Dismiss
-            </MdsButton>
-        </div>
+            <ul class="builder__warnings-list">
+                <li v-for="(warning, i) in importWarnings" :key="i">{{ warning }}</li>
+            </ul>
+        </MdsAlert>
 
-        <div
+        <MdsAlert
             v-if="publishWarnings.length > 0 && !publishWarningsDismissed"
             class="builder__warnings"
-            role="status"
-            aria-live="polite"
+            tone="warning"
+            :title="`Published, with ${publishWarnings.length} ${publishWarnings.length === 1 ? 'note' : 'notes'} about your conditions`"
+            dismissible
+            dismiss-label="Dismiss publish notes"
+            @dismiss="publishWarningsDismissed = true"
         >
-            <div class="builder__warnings-body">
-                <strong class="builder__warnings-title">
-                    Published, with {{ publishWarnings.length }}
-                    {{ publishWarnings.length === 1 ? 'note' : 'notes' }} about your conditions
-                </strong>
-                <ul class="builder__warnings-list">
-                    <li v-for="(warning, i) in publishWarnings" :key="i">{{ warning }}</li>
-                </ul>
+            <ul class="builder__warnings-list">
+                <li v-for="(warning, i) in publishWarnings" :key="i">{{ warning }}</li>
+            </ul>
+        </MdsAlert>
+
+        <!-- J4a: this replaces all three panes rather than sitting beside them, so it is a page STATE and
+             `MdsEmptyState` is the shared pattern for one — not an alert. It also had no `role` and no
+             illustration: a centred grey paragraph was the entire read-only experience of this page. -->
+        <MdsEmptyState
+            v-if="readOnly"
+            class="builder__blocked"
+            illustration="default"
+            headline="This form has no editable draft"
+            description="Restore or publish a version from the forms list to start editing again."
+        >
+            <template #action>
+                <MdsButton as="a" href="/forms" variant="primary" icon-left="forms">Go to forms</MdsButton>
+            </template>
+        </MdsEmptyState>
+
+        <div v-else class="builder__panes" :class="`builder__panes--show-${pane}`">
+            <!--
+                JR5 — THE COMPACT PANE SWITCHER. In the DOM at every width; DISPLAYED only below 60em of
+                the builder's own container. Above that, all three panes are on screen and this control is
+                `display: none`, so it costs exactly zero vertical pixels on the desktop workspace the J2b
+                decision refused a header row from (DSR §3.4's as-built note, which JR5 explains rather
+                than contradicts: that was a NAVIGATION strip of links with routes and gates; this is a
+                radiogroup switching already-mounted panes of the same page).
+
+                ⚠️ `MdsSegmentedControl`, i.e. a RADIOGROUP — DELIBERATELY NOT A TABLIST. **`MdsTabs` NOW
+                EXISTS (J4c) AND THIS IS STILL NOT A CANDIDATE FOR IT — the prohibition survived the
+                component's arrival rather than expiring with it**, and J4c adopted the primitive into
+                `ConfigPanel` on this same page without touching this control. Thirteen locators across
+                builder-axe,
+                responsive-axe and personalization-axe walk `[role="tab"]` on this page — four of them
+                loops that CLICK every match — and a second tablist would join ConfigPanel's in all of
+                them, clicking pane tabs mid-scan. It is also the wrong ARIA: the panes are this control's
+                SIBLINGS, not its `tabpanel` children, so there is no aria-controls relationship to state.
+
+                ⚠️ THE `ariaLabel` MUST CONTAIN NO OPTION WORD. It renders as the fieldset's visually
+                hidden <legend>, inside the element `showBuilderPane()` scopes its getByText to — a legend
+                containing "Form" resolves two nodes and fails strict mode on every call at once.
+            -->
+            <div class="builder__pane-switch">
+                <MdsSegmentedControl
+                    :model-value="pane"
+                    :options="paneOptions"
+                    ariaLabel="Builder pane"
+                    compact
+                    @update:model-value="onPaneChange"
+                />
             </div>
-            <MdsButton variant="tertiary" icon-left="close" @click="publishWarningsDismissed = true">
-                Dismiss
-            </MdsButton>
-        </div>
-
-        <div v-if="readOnly" class="builder__blocked">
-            This form has no editable draft. Restore or publish a version from the
-            <Link href="/forms">forms list</Link> first.
-        </div>
-
-        <div v-else class="builder__panes">
             <div class="builder__pane builder__pane--left">
                 <!-- The Fields⇄Library toggle only appears when field_library is in the plan (H5c). Without it
                      the left pane is the field palette alone (leftTab stays 'fields', its default). -->
@@ -383,6 +568,13 @@ function submitImport(): void {
         <!-- Confirmation message (H6a) — the post-submit thank-you copy, over PATCH /forms/{form}/confirmation. -->
         <ConfirmationModal v-model:open="confirmationOpen" :form-id="form.id" :form="form" />
 
+        <!-- Share (I1) — the public link, QR and embed snippet, over PATCH /forms/{form}/share. -->
+        <ShareModal
+            v-model:open="shareOpen"
+            :form-id="form.id"
+            :form-title="form.title"
+            :share="share"
+        />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">
             <p class="builder__prose">
@@ -418,16 +610,44 @@ function submitImport(): void {
 </template>
 
 <style scoped>
+/* JR5 — THE PAGE IS ITS OWN QUERY CONTAINER, and it is `.builder` rather than `.builder__panes` for the
+   reason DataTable.vue:324-330 states: a container query never matches the container ITSELF, and the
+   compact layout has to rewrite `.builder__panes`'s own `grid-template-columns`. Declare it there and that
+   declaration is unreachable. The toolbar is keyed on the same threshold and is a SIBLING of the panes, so
+   `.builder` is also the only element that contains both.
+
+   ⚠️ THE `font-size` IS NOT DECORATION — IT PINS WHAT `em` MEANS BELOW. A container query's font-relative
+   units resolve against the CONTAINER's own computed font size. `app.css` already puts this exact token on
+   `body` and nothing between body and `.builder` sets one, so this is a no-op today and a guarantee
+   afterwards: 60em resolves to 960 / 1080 / 1200px across §2.9's three type scales. It reaches no painted
+   text — the toolbar, the panes and every child set their own size.
+
+   ⚠️ `container-type: inline-size` COMPUTES TO `contain: layout style inline-size`, which makes this
+   element a containing block for `position: fixed` AND `position: absolute` descendants and opens a new
+   stacking context. Audited before it was declared: there is no `position: fixed` anywhere in this page or
+   in components/builder/; the one `position: absolute` (BuilderCanvas.vue's `.canvas__sr`) is the sr-only
+   clip pattern with every offset `auto` and cannot move; and all six dialogs below are MdsModal, which
+   `<Teleport to="body">`s outside `.builder` entirely. Block size is NOT contained, so `height: 100%`
+   still resolves.
+
+   ⚠️ FLEX, NOT `grid-template-rows: auto 1fr` — THAT ASSUMED TWO CHILDREN AND THIS PAGE HAS THREE WHEN A
+   WARNINGS BANNER IS UP. The banner then took the `1fr` row and, having a sunken background and a border,
+   visibly filled the page while `.builder__panes` fell into an implicit `auto` row. Today's linearized
+   panes are `height: auto` and survived it; JR5's single-pane mode needs that row to be the flexible one,
+   so it is fixed here rather than filed. A column flex container is correct for any number of banners. */
 .builder {
-    display: grid;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
     height: 100%;
     min-height: 0;
     background-color: var(--mds-color-bg-canvas);
+    container-type: inline-size;
+    font-size: var(--mds-type-body-lg-font-size);
 }
 
 .builder__toolbar {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
     gap: var(--mds-space-4);
@@ -437,27 +657,21 @@ function submitImport(): void {
     background-color: var(--mds-color-bg-surface);
 }
 
+/* A column since J2b: the trail sits above the title rather than inline beside it, which is where a
+   breadcrumb belongs and is also the only arrangement that does not push the title off a narrow toolbar. */
 .builder__title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+.builder__title-row {
     display: flex;
     align-items: center;
     gap: var(--mds-space-3);
     min-width: 0;
-}
-
-.builder__back {
-    color: var(--mds-color-text-secondary);
-    font-size: var(--mds-type-body-sm-font-size);
-    text-decoration: none;
-    white-space: nowrap;
-}
-.builder__back:hover {
-    color: var(--mds-color-text-body);
-    text-decoration: underline;
-}
-.builder__back:focus-visible {
-    outline: 2px solid var(--mds-color-focus-ring);
-    outline-offset: 2px;
-    border-radius: var(--mds-radius-sm);
 }
 
 .builder__title {
@@ -501,29 +715,40 @@ function submitImport(): void {
     white-space: nowrap;
 }
 
+/* MdsEmptyState brings its own centring, medallion and type; only the breathing room around it in the
+   builder's flex column is this page's business. */
 .builder__blocked {
     padding: var(--mds-space-8);
-    color: var(--mds-color-text-secondary);
-    text-align: center;
 }
 
-/* Post-import warnings banner (Increment G7b) — dismissible, above the panes. */
-.builder__warnings {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--mds-space-4);
+/* Post-import warnings banner (Increment G7b) — dismissible, above the panes. `flex-shrink: 0` since JR5:
+   this is the child that used to steal the panes' flexible row. */
+/* ⚠️ `flex-shrink: 0` IS LOAD-BEARING AND PREDATES THE COMPONENT — JR5 records this as the child that
+   used to steal the panes' flexible row, filling the page while the panes collapsed into an implicit one.
+   The rest is full-bleed CHROME geometry the shared component correctly does not provide: a strip spanning
+   the workspace has square corners and a rule under it, where an in-flow panel has neither. Tint, type and
+   the dismiss control now come from MdsAlert. */
+/*
+ * ⚠️ THE DOUBLED CLASS IS NOT A TYPO — IT IS THE POINT, AND THE ADVERSARIAL PASS IS WHAT FOUND IT.
+ *
+ * Two of these declarations CONTRADICT the component's own: `MdsAlert` sets `border-radius: md` and a
+ * uniform `space-3` padding, which are right for an in-flow panel and wrong for a strip spanning the
+ * workspace. Vue puts the CHILD's scope-id and the PARENT's scope-id on the same root element, so the two
+ * rules compile to `.mds-alert[data-v-child]` and `.builder__warnings[data-v-parent]` — **identical
+ * specificity, (0,2,0) each**. Which one wins is then decided by injection order in the bundle, i.e. by
+ * whichever module Vite happened to evaluate last. That is a coin flip, and it is invisible to every gate
+ * here: this banner only renders after an import produces warnings, so the visual sweep never drew it.
+ *
+ * Repeating the class takes this to (0,3,0) and settles it. Cheaper than the alternative — a `--full-bleed`
+ * variant on the shared component — for a shape exactly one page needs.
+ */
+.builder__warnings.builder__warnings {
+    flex-shrink: 0;
     padding: var(--mds-space-3) var(--mds-space-6);
+    border-radius: 0;
     border-bottom: 1px solid var(--mds-color-border-default);
-    background-color: var(--mds-color-bg-sunken);
 }
 
-.builder__warnings-title {
-    display: block;
-    margin-bottom: var(--mds-space-1);
-    color: var(--mds-color-text-heading);
-    font-size: var(--mds-type-body-sm-font-size);
-}
 
 .builder__warnings-list {
     margin: 0;
@@ -552,7 +777,17 @@ function submitImport(): void {
 .builder__panes {
     display: grid;
     grid-template-columns: 260px minmax(0, 1fr) 340px;
+    flex: 1;
     min-height: 0;
+}
+
+/* JR5 — the compact pane switcher's bar. Same shape as `.builder__centre-tabs` below (a fixed header over
+   a scrolling body), and every token here is copied from that rule rather than recalled. */
+.builder__pane-switch {
+    display: none;
+    padding: var(--mds-space-2) var(--mds-space-3);
+    border-bottom: 1px solid var(--mds-color-border-default);
+    background-color: var(--mds-color-bg-surface);
 }
 
 .builder__pane {
@@ -639,19 +874,79 @@ function submitImport(): void {
     min-height: 0;
 }
 
-/* Below the tablet ceiling the three panes linearize into one scrolling column (no horizontal
-   overflow anywhere in the 481–1024px range). Each pane grows to its natural height. */
-@media (max-width: 1024px) {
+/* ── JR5 — COMPACT: ONE PANE AT A TIME ────────────────────────────────────────────────────────────────
+   REPLACES the `@media (max-width: 1024px)` linearization this increment deletes. That rule was not
+   broken — nothing was hidden, nothing was off-screen, nothing scrolled sideways — it was wrong twice
+   over. ERGONOMICALLY: all three panes stacked into one scrolling column, so reaching the canvas at 375px
+   meant scrolling past ~31 palette buttons and reaching the config panel meant scrolling past the whole
+   canvas. ARITHMETICALLY: 1024 is not a width this page ever has. The builder is the app's only fluid
+   page, so its box is `viewport − sidebar`, and the sidebar is 240px above 1024px and a 64px rail at or
+   below it — so the box is 785px at a 1025px VIEWPORT and 960px at a 1024px one, NARROWER ON THE WIDER
+   SCREEN. The three-column grid therefore stayed on through 1025–1200 with a canvas track of
+   785 − 260 − 340 = 185px, and Playwright's projects are 375/834/1440, so no gate in this repo has
+   ever rendered that state.
+
+   60em = 960px, and it is the answer to two independent questions that agree: 260 (palette) + 340 (config)
+   + 360 (the smallest canvas worth having); and 1024 − 64, the widest box that can
+   exist while the sidebar is still a rail. The second is what makes the transition CONTINUOUS across the
+   sidebar swap — compact at 1024, compact at 1025, three panes from 1201 up.
+
+   ⚠️ THE INCLUSIVITY OF `max-width` IS LOAD-BEARING. At 59.9375em a 1024px viewport (box exactly 960)
+   would flip to the WIDE layout while 1025px (box 785) stayed compact — the inversion, reintroduced from
+   the other side. Do not "tidy" this to an exclusive bound.
+
+   ⚠️ THIS BLOCK MUST STAY LAST IN THE STYLESHEET. `display: none` on `.builder__pane` and `display: flex`
+   on `.builder__pane--left` above are both single-class specificity; only source order makes the
+   containment rule win. (Vue's scoped-CSS rewriting adds one attribute selector to both, so the tie
+   survives compilation — but not a reordering.)
+
+   ⚠️ `display: none`, NEVER `v-if`. `field-library-axe.spec.ts` runs axe with
+   `.include('.builder__pane--left')`, which THROWS when the selector matches nothing, and
+   `builder-axe.spec.ts` calls `.evaluate()` on that same element at all three viewports; nine
+   `[role="tab"]` locators need ConfigPanel mounted at every width. All of them need the pane in the DOM;
+   none of them needs it painted. JR4's rule arriving on a page instead of a component.
+
+   ⚠️ AND NOTE WHAT IS *NOT* HERE: `.builder__pane`'s `height: 100%; overflow: hidden` is left alone,
+   unlike the old media query which set `height: auto; overflow: visible`. Keeping it is what makes this a
+   single-pane WORKSPACE rather than a stack — the shown pane fills the row and its child scrolls inside
+   itself, which `.palette`, `.library`, `.canvas`, `.rail` and `.config` are all already built for. */
+@container (max-width: 60em) {
     .builder__panes {
-        grid-template-columns: 1fr;
-        overflow-y: auto;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
     }
+
+    .builder__pane-switch {
+        display: block;
+    }
+
     .builder__pane {
-        height: auto;
-        overflow: visible;
+        display: none;
         border-right: 0;
         border-left: 0;
-        border-bottom: 1px solid var(--mds-color-border-default);
+    }
+
+    .builder__panes--show-fields .builder__pane--left {
+        display: flex;
+    }
+
+    .builder__panes--show-canvas .builder__pane--canvas {
+        display: flex;
+    }
+
+    .builder__panes--show-settings .builder__pane--config {
+        display: block;
+    }
+
+    /* The toolbar's eight secondary actions go icon-only — see the template's block comment. The `gap`
+       does not close up around a hidden label: a `display: none` child is not a flex item at all. */
+    .builder__label {
+        display: none;
+    }
+
+    /* Flush-left once the row is glyphs rather than words; ragged-right reads as a mistake at 375px. */
+    .builder__actions {
+        justify-content: flex-start;
     }
 }
 </style>

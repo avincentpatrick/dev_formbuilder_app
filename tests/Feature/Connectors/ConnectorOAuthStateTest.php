@@ -141,3 +141,74 @@ it('derives its key with domain separation from APP_KEY by default', function ()
     expect($service->verify($state, ConnectorProviderKey::Slack)->provider)->toBe(ConnectorProviderKey::Slack)
         ->and(fn () => stateService($expectedKey)->verify($state, ConnectorProviderKey::Slack))->not->toThrow(InvalidConnectorStateException::class);
 });
+
+/*
+|--------------------------------------------------------------------------
+| The PKCE verifier (H16c / ADR-0009 §D3 as extended). Derived from the state rather than stored, because the
+| authorize and the exchange happen in different requests on different hosts and there is nowhere to remember
+| it. These cases pin the three properties Airtable's token endpoint actually depends on.
+*/
+
+it('derives the same code verifier for a given state every time', function (): void {
+    // The whole design rests on this: the authorize half and the exchange half are separate REQUESTS, and the
+    // only thing they share is the state string. If the derivation were not a pure function of it, the
+    // challenge published at the consent screen and the verifier sent at the exchange would not match, and
+    // Airtable would refuse with an error indistinguishable from a replayed code.
+    $service = stateService();
+    $state = $service->mint((string) Str::uuid(), (string) Str::uuid(), ConnectorProviderKey::Airtable);
+
+    expect($service->codeVerifierFor($state))->toBe($service->codeVerifierFor($state))
+        // Across INSTANCES too, not just calls — the two halves resolve the service independently.
+        ->and(stateService()->codeVerifierFor($state))->toBe($service->codeVerifierFor($state));
+});
+
+it('derives a different code verifier for every flow', function (): void {
+    $service = stateService();
+    $tenantId = (string) Str::uuid();
+    $userId = (string) Str::uuid();
+
+    $first = $service->mint($tenantId, $userId, ConnectorProviderKey::Airtable);
+    $second = $service->mint($tenantId, $userId, ConnectorProviderKey::Airtable);
+
+    // Two flows for the SAME tenant, user and provider — the nonce is what makes the states differ, and the
+    // verifier has to inherit that. A verifier shared across a tenant's flows would let a code intercepted
+    // from one be redeemed against another, which is the whole thing PKCE is for.
+    expect($service->codeVerifierFor($first))->not->toBe($service->codeVerifierFor($second));
+});
+
+it('derives a code verifier under the signing key, not from the state alone', function (): void {
+    // The state travels in a URL and is visible to anyone who sees the redirect. What makes the verifier a
+    // secret is the KEY, so two deployments must not derive the same verifier from the same state.
+    $state = stateService()->mint((string) Str::uuid(), (string) Str::uuid(), ConnectorProviderKey::Airtable);
+
+    expect(stateService('another-deployment-key')->codeVerifierFor($state))
+        ->not->toBe(stateService()->codeVerifierFor($state));
+});
+
+it('derives a code verifier RFC 7636 accepts', function (): void {
+    $service = stateService();
+    $verifier = $service->codeVerifierFor(
+        $service->mint((string) Str::uuid(), (string) Str::uuid(), ConnectorProviderKey::Airtable)
+    );
+
+    // §4.1: 43–128 characters from the unreserved set. Airtable enforces both bounds, and a verifier that is
+    // one character short fails at the token endpoint with an opaque error — after the tenant has already
+    // consented, which is the most expensive place to discover a formatting bug.
+    expect(mb_strlen($verifier))->toBe(43)
+        ->and($verifier)->toMatch('/^[A-Za-z0-9\-._~]+$/');
+});
+
+it('separates the verifier derivation from the state signature under one key', function (): void {
+    // Both hang off the same secret, so the prefix is what stops the service answering two questions with one
+    // computation. Asserted against the signature bytes of the same token rather than "they differ", which
+    // would pass for the wrong reason if the prefix were dropped and the inputs merely happened to differ.
+    $service = stateService();
+    $state = $service->mint((string) Str::uuid(), (string) Str::uuid(), ConnectorProviderKey::Airtable);
+
+    [$version, $payload] = explode('.', $state);
+    $signature = rtrim(strtr(base64_encode(
+        hash_hmac('sha256', $version.'.'.$payload, 'unit-test-state-key', true)
+    ), '+/', '-_'), '=');
+
+    expect($service->codeVerifierFor($state))->not->toBe($signature);
+});

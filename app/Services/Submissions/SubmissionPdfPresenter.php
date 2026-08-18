@@ -17,6 +17,7 @@ use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\LocaleVariant;
+use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
 
 /**
@@ -108,6 +109,11 @@ final class SubmissionPdfPresenter
             'version_number' => $version?->version_number,
             'submission' => [
                 'id' => $submission->id,
+                // The short handle (J2e). ⚠️ THE `id` STAYS IN THE PAYLOAD DELIBERATELY even though the
+                // template no longer prints it: this artefact is what a tenant treats as evidence, and the
+                // full id is the thing support falls back to when a quoted reference is illegible. Removing
+                // it is a separate decision from changing what the Reference row shows.
+                'reference' => SubmissionReference::format($submission->reference),
                 'status_label' => $submission->status->label(),
                 'source_label' => $submission->source->label(),
                 'respondent' => $this->respondentLabel($submission),

@@ -5,19 +5,53 @@
  * with status Badges, filters (form / status / source), server pagination, and a per-form streamed export.
  * Export is enabled only once a single form is chosen (its columns are that form's fields). Assembled entirely
  * from shared design-system components (no page-local styling beyond layout).
+ *
+ * ── J1e NORMALISED THIS PAGE'S FILTER BAR, AND IT WAS THE ODD ONE OUT ────────────────────────────────────
+ * It used to be three bare `aria-label` selects in a plain `<div>` — no visible labels, no `<h2>`, and an
+ * empty state whose "did you filter?" branch was inferred on the CLIENT. That inference was already wrong:
+ * it could not see `countable()`, the server's own display default that hides in-progress drafts, so an
+ * inbox holding nothing but drafts told a reviewer that responses "appear here as forms are filled out".
+ * All six list pages now share `MdsFilterBar` + a server-computed `empty_reason`.
+ *
+ * ── ONE COMPONENT, TWO ROUTES (Increment J2c) ────────────────────────────────────────────────────────────
+ * This page serves BOTH `/submissions` (every form) and `/forms/{form}/submissions` (the form hub's
+ * Responses tab). The per-form mode is keyed off the PRESENCE of the `form` prop, which the server omits
+ * entirely on the global route — the same absent-not-empty rule the hub's `share` block follows.
+ *
+ * A second component was the obvious alternative and is the wrong one: the filter bar, the URL builder, the
+ * export link and the empty-state branching would all have been spelled twice, and J1e's audit-export defect
+ * is precisely what two copies of a filter surface do to each other. `SubmissionInboxPresenter::list()` is
+ * shared for the same reason one layer down.
+ *
+ * ⚠️ EVERY INERTIA VISIT THIS PAGE MAKES GOES THROUGH `baseUrl` — and note the scope of that claim, because
+ * an earlier version of this sentence overstated it. `visit()` is the single call site (the filter round-trip
+ * and "Clear filters" both route through it), and on the per-form page a hard-coded `/submissions` there
+ * would have thrown the reader back onto the global inbox, which is the dead end this row exists to remove.
+ * The other outbound URLs are deliberately NOT `baseUrl`-derived and must not be "tidied" into it: the export
+ * href is a different endpoint (`/forms/{id}/submissions/export`, which never contained `/submissions`
+ * alone), the row form-link targets `/forms/{id}`, and the two row actions target `/submissions/{id}` in
+ * BOTH modes — a submission's detail page is not nested under the form.
  */
-import { reactive } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
 import {
+    MdsAvatar,
     MdsBadge,
+    MdsBreadcrumb,
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
+    MdsFormField,
     MdsIconButton,
     MdsPagination,
+    MdsSearchField,
     MdsSelect,
+    MdsTabNav,
     statusVariant,
+    type BreadcrumbItem,
     type DataTableColumn,
+    type TabNavItem,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 
@@ -25,6 +59,12 @@ type Option = { value: string; label: string };
 
 type SubmissionRow = {
     id: string;
+    // Increment J2e — the short handle, already grouped by the server (`7K4M-2QXB`). No page spells the
+    // separator, so a re-grouping is one line in SubmissionReference rather than a sweep.
+    reference: string;
+    // Increment J2c — the id as well as the title, so the global inbox can LINK a row to its form. Present
+    // in both modes (the per-form page simply has no Form column to put it in).
+    form_id: string;
     form_title: string;
     status: string;
     source: string;
@@ -36,6 +76,12 @@ type SubmissionRow = {
     completeness_percent: number | null;
     last_saved_at: string | null;
     draft_expires_at: string | null;
+    // Increment I9b — whether THIS viewer may pick the draft up. False on every non-draft row by
+    // construction, so the button is not merely hidden by CSS on rows it would 404 on.
+    // Increment J2c — `open_form` is whether they may open the row's FORM, which is NOT implied by the row
+    // being listed: the visibility scope has a respondent arm the form policy has no counterpart for, and a
+    // soft-deleted form binds to nothing.
+    can: { resume: boolean; open_form: boolean };
 };
 
 type Meta = { current_page: number; last_page: number; total: number; per_page: number };
@@ -44,54 +90,128 @@ const props = defineProps<{
     data: SubmissionRow[];
     meta: Meta;
     filters: {
-        forms: Option[];
+        /** ABSENT on the per-form route — the dropdown is meaningless there. See the docblock. */
+        forms?: Option[];
         statuses: Option[];
         sources: Option[];
-        applied: { form_id: string | null; status: string | null; source: string | null };
+        applied: { form_id: string | null; status: string | null; source: string | null; q: string | null };
     };
     can: { export: boolean };
+    empty_reason: 'no_matches' | 'no_rows' | null;
+    /** Present only on `/forms/{form}/submissions` — its presence IS the per-form mode switch (J2c). */
+    form?: { id: string; title: string };
+    /** The form's tab strip, resolved server-side by `FormTabSet`. Present exactly when `form` is. */
+    tabs?: TabNavItem[];
+    /**
+     * The trail, resolved server-side by `CrumbTrail` (J2d). Present exactly when `form` is — the GLOBAL
+     * inbox is a root page and its controller emits no `crumbs` key at all, which is why this is optional
+     * rather than an empty array: absence is the honest encoding of "this page has no trail", and it keeps
+     * `inbox.test.ts`'s "renders no Breadcrumb and no TabNav" case meaningful.
+     */
+    crumbs?: BreadcrumbItem[];
 }>();
 
-const columns: DataTableColumn[] = [
-    { key: 'form_title', header: 'Form', sortable: true },
+/**
+ * Every route this page builds. On the per-form page the reader must stay on the form: a "Clear filters"
+ * that navigated to `/submissions` would silently widen the list to every form in the tenant while the
+ * breadcrumb still named one.
+ */
+const baseUrl = computed(() => (props.form ? `/forms/${props.form.id}/submissions` : '/submissions'));
+
+
+/**
+ * The Form column is dropped on the per-form page — every row would carry the same value, and it is already
+ * the page's heading, its breadcrumb and its tab strip's accessible name.
+ */
+const columns = computed<DataTableColumn[]>(() => [
+    // Increment J2e — the row's own identity, and it LEADS. It stays on the per-form page (unlike Form it is
+    // not constant per row), and it is the first text link this list has ever had to a submission: before
+    // J2e the only way in was the `View submission` row-action icon, which is the dead-end shape J2 exists
+    // to remove. DSR §3.3 already makes `#cell-<key>` where a row's first cell is linked.
+    { key: 'reference', header: 'Reference' },
+    ...(props.form ? [] : [{ key: 'form_title', header: 'Form', sortable: true }]),
     { key: 'status', header: 'Status' },
     { key: 'source_label', header: 'Source' },
     { key: 'respondent', header: 'Respondent' },
     { key: 'submitted_at', header: 'Submitted', sortable: true },
-];
+]);
 
 // Local filter state, seeded from what the server applied. Each change re-queries (page resets to 1).
 const selected = reactive({
     form_id: props.filters.applied.form_id ?? '',
     status: props.filters.applied.status ?? '',
     source: props.filters.applied.source ?? '',
+    q: props.filters.applied.q ?? '',
 });
 
-const formOptions = [{ value: '', label: 'All forms' }, ...props.filters.forms];
+const formOptions = [{ value: '', label: 'All forms' }, ...(props.filters.forms ?? [])];
 const statusOptions = [{ value: '', label: 'All statuses' }, ...props.filters.statuses];
 const sourceOptions = [{ value: '', label: 'All sources' }, ...props.filters.sources];
 
+/** Marks the table busy while a filter round-trip is in flight — the audit viewer's contract. */
+const busy = ref(false);
+
 function queryParams(extra: Record<string, string | number> = {}): Record<string, string | number> {
     const params: Record<string, string | number> = {};
-    if (selected.form_id) params.form_id = selected.form_id;
+    // Never as a query param on the per-form page: the route already carries the form, and echoing it would
+    // let a hand-edited URL disagree with the breadcrumb (the server ignores it, but the address bar lies).
+    if (selected.form_id && !props.form) params.form_id = selected.form_id;
     if (selected.status) params.status = selected.status;
     if (selected.source) params.source = selected.source;
+    if (selected.q) params.q = selected.q;
     return { ...params, ...extra };
 }
 
+function visit(params: Record<string, string | number>, replace: boolean): void {
+    router.get(baseUrl.value, params, {
+        preserveState: true,
+        preserveScroll: true,
+        ...(replace ? { replace: true } : {}),
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
 function applyFilters(): void {
-    router.get('/submissions', queryParams(), { preserveState: true, preserveScroll: true, replace: true });
+    visit(queryParams(), true);
 }
 
 function goToPage(page: number): void {
-    router.get('/submissions', queryParams({ page }), { preserveState: true, preserveScroll: true });
+    visit(queryParams({ page }), false);
 }
+
+function clearFilters(): void {
+    // `form_id` is cleared in BOTH modes and that is correct in both: on the per-form page it is seeded from
+    // the route rather than chosen, `queryParams()` never emits it, and `visit({})` returns to this form's
+    // own unfiltered list — not to the global inbox.
+    selected.form_id = '';
+    selected.status = '';
+    selected.source = '';
+    selected.q = '';
+    visit({}, true);
+}
+
+/**
+ * ⚠️ THE KEYWORD GOES INTO THE EXPORT URL, AND OMITTING IT WOULD BE THE DEFECT RATHER THAN THE SAFE CHOICE.
+ * This button reads "export what I am looking at"; a `?q` the page applied and the download ignored would
+ * stream rows the reviewer cannot see on screen. `ExportSubmissionsRequest` carries `q` for this reason.
+ */
+/**
+ * The form whose responses Export would stream, or `null` when the reader has not narrowed to one.
+ *
+ * ⚠️ THE ROUTE-BOUND FORM FIRST, AND THIS IS LOAD-BEARING RATHER THAN TIDY. The export endpoint is
+ * per-form (`/forms/{form}/submissions/export` — its columns are that form's fields), and this used to read
+ * `selected.form_id` alone. On the per-form page `clearFilters()` blanks that ref, so an Export taken after
+ * clearing would have built `/forms//submissions/export` — a 404 from a button that looked live.
+ */
+const exportFormId = computed(() => props.form?.id ?? (selected.form_id || null));
 
 function download(format: 'csv' | 'xlsx'): void {
     const params = new URLSearchParams({ format });
     if (selected.status) params.set('status', selected.status);
     if (selected.source) params.set('source', selected.source);
-    window.location.href = `/forms/${selected.form_id}/submissions/export?${params.toString()}`;
+    if (selected.q) params.set('q', selected.q);
+    window.location.href = `/forms/${exportFormId.value}/submissions/export?${params.toString()}`;
 }
 
 function formatDate(iso: string | null): string {
@@ -108,46 +228,149 @@ function formatDate(iso: string | null): string {
 
 <template>
     <div>
-        <Head title="Submissions" />
+        <Head :title="form ? `Responses · ${form.title}` : 'Submissions'" />
 
-        <PageHeader title="Submissions" icon="submissions">
+        <PageHeader :title="form ? 'Responses' : 'Submissions'" icon="submissions">
+            <!-- The form's own name is the middle crumb and the strip's accessible name, so the h1 stays the
+                 PAGE's name — the `forms/Analytics.vue` split, not the hub's (where the title IS the form). -->
+            <template v-if="form" #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs ?? []" :link-component="Link" />
+            </template>
             <template #actions>
-                <template v-if="can.export && selected.form_id">
+                <!-- On the per-form page Export needs no form to be chosen: the route already is one. -->
+                <template v-if="can.export && exportFormId">
                     <MdsButton variant="secondary" icon-left="download" @click="download('csv')">Export CSV</MdsButton>
                     <MdsButton variant="secondary" icon-left="download" @click="download('xlsx')">Export XLSX</MdsButton>
                 </template>
             </template>
         </PageHeader>
 
-        <div class="inbox__filters">
-            <MdsSelect
-                v-model="selected.form_id"
-                :options="formOptions"
-                aria-label="Filter by form"
-                @update:model-value="applyFilters"
+        <!-- `:ariaLabel` in camelCase deliberately — `vue-tsc` treats the kebab spelling as a real HTML
+             attribute and then reports the required prop as missing, a gate failure with no obvious cause.
+             Named for the RESOURCE because axe's `landmark-unique` distinguishes navigation landmarks by
+             their accessible name, and this page now carries two of them. -->
+        <MdsTabNav
+            v-if="tabs && form"
+            :items="tabs"
+            current="submissions"
+            :ariaLabel="form.title"
+            :link-component="Link"
+        />
+
+        <MdsFilterBar>
+            <!--
+                The keyword box is FIRST and carries no `:disabled` — see MdsSearchField for why disabling a
+                focused text input mid-round-trip eats the caret. The three selects keep `:disabled="busy"`,
+                which is right for a one-shot control.
+            -->
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search submissions"
+                placeholder="Remarks, form title or reference"
+                @submit="applyFilters"
             />
-            <MdsSelect
-                v-model="selected.status"
-                :options="statusOptions"
-                aria-label="Filter by status"
-                @update:model-value="applyFilters"
-            />
-            <MdsSelect
-                v-model="selected.source"
-                :options="sourceOptions"
-                aria-label="Filter by source"
-                @update:model-value="applyFilters"
-            />
-        </div>
+            <!-- Absent on the per-form page: the form is the route, not a choice. Absent rather than
+                 disabled — ADR-0011 §D9's absent-not-locked doctrine; a disabled control is a claim that
+                 there is something here you may not have. -->
+            <MdsFormField v-if="!form" label="Form" input-id="inbox-form">
+                <MdsSelect
+                    id="inbox-form"
+                    v-model="selected.form_id"
+                    :options="formOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Status" input-id="inbox-status">
+                <MdsSelect
+                    id="inbox-status"
+                    v-model="selected.status"
+                    :options="statusOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+            <MdsFormField label="Source" input-id="inbox-source">
+                <MdsSelect
+                    id="inbox-source"
+                    v-model="selected.source"
+                    :options="sourceOptions"
+                    :disabled="busy"
+                    @update:model-value="applyFilters"
+                />
+            </MdsFormField>
+        </MdsFilterBar>
 
         <p v-if="!selected.status" class="inbox__hint">
             In-progress drafts are hidden. Choose the <strong>Draft</strong> status to see them.
         </p>
 
-        <MdsDataTable :columns="columns" :rows="data" caption="Submissions" row-key="id">
+        <MdsDataTable
+            :columns="columns"
+            :rows="data"
+            :loading="busy"
+            :caption="form ? `Responses to ${form.title}` : 'Submissions'"
+            row-key="id"
+        >
+            <!-- Increment J2e — the row's identity, and its link to itself.
+
+                 ⚠️ UNCONDITIONAL, AND THAT IS PROVABLE RATHER THAN HOPEFUL. Unlike the form link below,
+                 which needs `can.open_form` because the row set is strictly wider than form readability,
+                 this destination is the row itself: the `View submission` row-action beneath already
+                 navigates here with NO `v-if`, so the product has always asserted every listed row is
+                 openable by its reader. An unconditional link is exactly as safe as that button.
+
+                 ⚠️ AND THE BUTTON STAYS. `responsive-axe.spec.ts:362` NAVIGATES by
+                 getByRole('button', { name: 'View submission' }); deleting it as "now redundant" is J2d's
+                 do-not-move-the-row-action lesson one surface over. -->
+            <template #cell-reference="{ row }">
+                <Link :href="`/submissions/${(row as SubmissionRow).id}`" class="inbox__reference">
+                    {{ (row as SubmissionRow).reference }}
+                </Link>
+            </template>
+            <!-- Increment J2c — the submission→form link. Before this, the inbox printed a form's name on
+                 every row and linked none of them, which `FormHubController`'s docblock names as one of the
+                 three dead ends the hub was built to end. Rendered only in global mode, because the per-form
+                 page drops the column entirely. -->
+            <template #cell-form_title="{ row }">
+                <!-- ⚠️ GATED ON `can.open_form`, NEVER ON THE PRESENCE OF `form_id`. The inbox lists rows a
+                     reader may see; it does not follow that they may open the FORM behind one. An
+                     unconditional link here 403s for a keyer whose grant was revoked (the visibility
+                     scope's respondent arm) and 404s on a soft-deleted form — whose title renders as an em
+                     dash, so it would have shipped "—" as a live hyperlink. -->
+                <Link
+                    v-if="(row as SubmissionRow).can?.open_form"
+                    :href="`/forms/${(row as SubmissionRow).form_id}`"
+                    class="inbox__form-link"
+                >
+                    {{ (row as SubmissionRow).form_title }}
+                </Link>
+                <span v-else>{{ (row as SubmissionRow).form_title }}</span>
+            </template>
+            <!-- J4a. ⚠️ TWO CALL-SITE GUARDS, BOTH OF THEM THIS PAGE'S KNOWLEDGE RATHER THAN THE CHIP'S.
+                 `SubmissionInboxPresenter::respondentLabel()` returns exactly three shapes: a real person's
+                 name, the literal "Guest", or an em dash. The dash means no respondent is recorded, so there
+                 is nobody to draw. "Guest" DOES get a chip, in the neutral tone — and the distinction from
+                 the audit log's `is_system` rows, which get none, is deliberate rather than inconsistent: a
+                 guest is a real human who happens to be unidentified, whereas "System" is the platform
+                 acting on its own, and a machine wearing a person's initials is a lie. A magic-string list
+                 inside MdsAvatar would put this page's vocabulary in the design system. -->
+            <template #cell-respondent="{ row }">
+                <span v-if="(row as SubmissionRow).respondent === '—'">—</span>
+                <span v-else class="inbox__respondent">
+                    <MdsAvatar
+                        :name="(row as SubmissionRow).respondent"
+                        :tone="(row as SubmissionRow).respondent === 'Guest' ? 'neutral' : 'brand'"
+                    />
+                    <span>{{ (row as SubmissionRow).respondent }}</span>
+                </span>
+            </template>
             <template #cell-status="{ row }">
                 <div class="inbox__status">
-                    <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" />
+                    <!-- `dot` (JR2): the inbox status column, the second of the two scannable status
+                         columns in the product. See forms/Index.vue for the reasoning. -->
+                    <MdsBadge v-bind="statusVariant((row as SubmissionRow).status)" dot />
                     <span
                         v-if="(row as SubmissionRow).status === 'draft' && (row as SubmissionRow).completeness_percent !== null"
                         class="inbox__progress"
@@ -165,6 +388,16 @@ function formatDate(iso: string | null): string {
                 </template>
             </template>
             <template #row-actions="{ row }">
+                <!-- Increment I9b. Leftmost and primary on a draft row, because on the Draft-filtered view
+                     "continue this" is the only thing a keyer came here to do — the detail page for a draft
+                     shows an answer document nobody has finished writing. -->
+                <MdsIconButton
+                    v-if="(row as SubmissionRow).can?.resume"
+                    icon="edit"
+                    label="Continue this draft"
+                    size="sm"
+                    @click="router.visit(`/submissions/${(row as SubmissionRow).id}/resume`)"
+                />
                 <MdsIconButton
                     icon="external-link"
                     label="View submission"
@@ -174,7 +407,24 @@ function formatDate(iso: string | null): string {
             </template>
             <template #empty>
                 <MdsEmptyState
-                    :illustration="selected.form_id || selected.status || selected.source ? 'search' : 'default'"
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching submissions"
+                    description="Try a different keyword, or clear the filters to see everything."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear filters</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else-if="form"
+                    illustration="default"
+                    headline="No responses yet"
+                    description="Responses appear here as this form is filled out through any channel. Share the link or add one by hand to get started."
+                />
+                <MdsEmptyState
+                    v-else
+                    illustration="default"
                     headline="No submissions"
                     description="Responses appear here as forms are filled out through any channel."
                 />
@@ -192,17 +442,6 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.inbox__filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--mds-space-3);
-    margin-bottom: var(--mds-space-5);
-}
-
-.inbox__filters :deep(.mds-select) {
-    min-width: 12rem;
-}
-
 .inbox__hint {
     margin: 0 0 var(--mds-space-3);
     font-size: var(--mds-type-body-sm-font-size);
@@ -223,5 +462,41 @@ function formatDate(iso: string | null): string {
 
 .inbox__saved {
     color: var(--mds-color-text-secondary);
+}
+
+.inbox__form-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.inbox__form-link:hover {
+    text-decoration: underline;
+}
+
+/*
+    Increment J2e. Mirrors `.inbox__form-link` rather than styling a bare anchor: there is NO global `a`
+    reset in this app, so an unstyled link renders browser-default blue — which was the most user-visible
+    defect J2d's review turned up, across four pages at once.
+
+    Tabular figures and the mono stack because a reference is a CODE: a column of them should align digit
+    over digit so a mis-typed character is visible by shape, and `--mds-font-family-mono` is what
+    `webhooks/Show.vue` already uses for the same reason.
+*/
+.inbox__reference {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+    font-family: var(--mds-font-family-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.inbox__reference:hover {
+    text-decoration: underline;
+}
+.inbox__respondent {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--mds-space-2);
+    min-width: 0;
 }
 </style>

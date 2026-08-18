@@ -8,7 +8,17 @@
  */
 import { computed, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { MdsBadge, MdsButton, MdsCard, MdsFormField, MdsModal, MdsTextarea, statusVariant } from '@meridian/design-system';
+import {
+    MdsBadge,
+    MdsBreadcrumb,
+    MdsButton,
+    MdsCard,
+    MdsFormField,
+    MdsModal,
+    MdsTextarea,
+    statusVariant,
+    type BreadcrumbItem,
+} from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 
 type FieldRow = { key: string; label: string; value: string };
@@ -24,6 +34,8 @@ type PdfArtifact = { id: string; generated_at: string | null; size_bytes: number
 
 type Submission = {
     id: string;
+    // Increment J2e — the short handle, already grouped by the server (`7K4M-2QXB`).
+    reference: string;
     form_id: string;
     form_title: string;
     version_number: number | null;
@@ -46,8 +58,33 @@ type Submission = {
 const props = defineProps<{
     submission: Submission;
     blocks: Block[];
-    can: { review: boolean };
+    // `update` is I9c's `SubmissionPolicy::update()` — a SEPARATE permission from `review`, held by
+    // Owner/Admin (`submissions.edit.any`) and Form Editor (`.own`), and NOT by Reviewer. Folding it into
+    // `can.review` would hand every Reviewer the power to rewrite the answers they are meant to be judging.
+    can: { review: boolean; update: boolean };
     pdf: PdfArtifact | null;
+    /**
+     * The trail back, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * ⚠️ THIS PAGE IS WHY J2d EXISTS. THE TWO MIDDLE CRUMBS WERE BOTH LIVE DEFECTS.
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * J2c built them here as hard-coded `/forms/${form_id}` and `/forms/${form_id}/submissions`, on a route
+     * gated ONLY by `can:view,submission`:
+     *
+     *  • `SubmissionPolicy::view()` admits a RESPONDENT (`respondent_user_id = me`), an arm
+     *    `FormPolicy::viewOverview()` has no counterpart for. A keyer whose grant was revoked, or whose form
+     *    was re-scoped, opened this page and got a **403 with no way back** from both crumbs.
+     *  • A SOFT-DELETED form makes `form_title` render `—` and excludes the row from route-model binding,
+     *    so an unguarded trail prints an em dash as a live hyperlink to a 404. ⚠️ FAIL-CLOSED RATHER THAN
+     *    LIVE: nothing in the product soft-deletes a form today (no delete route; `FormService::archive()`
+     *    sets `status`, never `deleted_at`), so this half is a guard for the feature that adds one. An
+     *    archived form's hub resolves 200 and stays linked.
+     *
+     * Neither was visible to any gate: `MdsBreadcrumb` renders an href-less crumb as text, so broken and
+     * correct look identical to vue-tsc, to axe and to every snapshot. Do not rebuild this client-side.
+     */
+    crumbs: BreadcrumbItem[];
 }>();
 
 /**
@@ -77,6 +114,14 @@ function formatBytes(bytes: number): string {
 }
 
 // Which transitions are offered, from the current status (the service also guards server-side).
+//
+// `archive` is a POSITIVE list, mirroring `SubmissionReviewService::archive()`'s `$from` exactly. It used to
+// be the negative `s !== 'archived' && s !== 'draft'`, which agreed with the server only by accident: the
+// server refuses what it does not name, the client offered whatever it did not exclude, so every new
+// SubmissionStatus silently became archivable in the UI and 500-adjacent on click. I9a's `screened_out` was
+// the case that would have shipped that — and archiving it would have been worse than a dead button, because
+// `archived` CONSUMES a capacity slot and `screened_out` deliberately does not, so the transition would have
+// retroactively overfilled a paid cap. Keep this list positive; a future status must be added on purpose.
 const actions = computed(() => {
     if (!props.can.review) return { review: false, approve: false, return: false, archive: false };
     const s = props.submission.status;
@@ -84,8 +129,27 @@ const actions = computed(() => {
         review: s === 'submitted',
         approve: s === 'submitted' || s === 'under_review',
         return: s === 'submitted' || s === 'under_review',
-        archive: s !== 'archived' && s !== 'draft',
+        archive: s === 'submitted' || s === 'under_review' || s === 'approved' || s === 'returned',
     };
+});
+
+/**
+ * "Edit answers" (Increment I9c) — a POSITIVE list for the same reason `archive` above is one, and gated on a
+ * DIFFERENT permission (`can.update`, not `can.review`), so it is computed separately rather than folded into
+ * the block above.
+ *
+ * The four states mirror `SubmissionAnswerEditService::EDITABLE` exactly. `SubmissionAnswerEditTest` drives `EDITABLE` against
+ * `SubmissionStatus::cases()`, so the SERVER's set is pinned to the enum itself; `show.test.ts` pins this
+ * client gate against a hand-transcribed copy of it. Two locks, one of them soft — NOT one assertion
+ * spanning both, which an earlier draft of this sentence claimed. `draft` is excluded here even though the controller redirects it to the
+ * resume page: this button belongs to a detail view the inbox only reaches for finalized rows, and offering
+ * "Edit answers" as a synonym for "Resume draft" would be two names for one thing.
+ */
+const canEditAnswers = computed(() => {
+    if (!props.can.update) return false;
+    const s = props.submission.status;
+
+    return s === 'submitted' || s === 'under_review' || s === 'approved' || s === 'returned';
 });
 
 const hasReviewInfo = computed(() => {
@@ -135,10 +199,33 @@ function formatDate(iso: string | null): string {
     <div>
         <Head :title="`Submission · ${submission.form_title}`" />
 
-        <Link href="/submissions" class="detail__back">← Back to submissions</Link>
-
         <PageHeader :title="submission.form_title" icon="submissions">
+            <!--
+                Increment J2c. This was a hand-rolled `← Back to submissions` link sitting OUTSIDE
+                `PageHeader` — one of the four back-links DSR §3.4 names as owing this migration, and the
+                only navigation off this page. It went to the global inbox, so a reviewer who arrived from a
+                form had no way back to that form: the h1 above prints the form's TITLE, unlinked, which
+                `FormHubController`'s docblock names as one of the three dead ends the hub was built to end.
+                Four crumbs rather than three because this page genuinely is four deep, and the last is never
+                a link — so ending at "Responses" would print the per-form list's name unreachable.
+            -->
+            <template #breadcrumbs>
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
             <template #actions>
+                <!-- I9c. Tertiary and FIRST, ahead of the review verbs: correcting a record is a different
+                     kind of act from deciding its outcome, and the primary action on this page stays the
+                     decision.
+                     ⚠️ `<Link>` WRAPPING A BUTTON, not `MdsButton as="a"`. Both render an anchor, but the
+                     bare `as="a"` form does a FULL BROWSER RELOAD — it remounts the persistent app shell and
+                     loses client state — and every `as="a"` elsewhere in this tree points at something that
+                     is deliberately not an Inertia page (a `mailto:`, an OAuth redirect, a file stream).
+                     `forms/Index.vue` is the pattern for a button that navigates to another Inertia page.
+                     Getting this wrong would have made navigation INTO the edit page hard while every route
+                     out of it stayed soft. -->
+                <Link v-if="canEditAnswers" :href="`/submissions/${submission.id}/edit`">
+                    <MdsButton variant="tertiary" icon-left="edit">Edit answers</MdsButton>
+                </Link>
                 <MdsButton v-if="actions.review" variant="tertiary" @click="oneClick('under_review')">
                     Mark under review
                 </MdsButton>
@@ -155,9 +242,16 @@ function formatDate(iso: string | null): string {
         <div class="detail__grid">
             <MdsCard>
                 <dl class="detail__meta">
+                    <!-- Increment J2e — FIRST, because it is what this page is ABOUT. Until now the detail
+                         view showed no identifier at all: a respondent quoting a code had nothing on screen
+                         to match it against. Not a link (this IS that page) and not truncated. -->
+                    <div class="detail__meta-row">
+                        <dt>Reference</dt>
+                        <dd class="detail__reference">{{ submission.reference }}</dd>
+                    </div>
                     <div class="detail__meta-row">
                         <dt>Status</dt>
-                        <dd><MdsBadge v-bind="statusVariant(submission.status)" /></dd>
+                        <dd><MdsBadge v-bind="statusVariant(submission.status)" dot /></dd>
                     </div>
                     <div class="detail__meta-row">
                         <dt>Version</dt>
@@ -290,17 +384,9 @@ function formatDate(iso: string | null): string {
 </template>
 
 <style scoped>
-.detail__back {
-    display: inline-block;
-    margin-bottom: var(--mds-space-4);
-    font-size: var(--mds-type-body-sm-font-size);
-    color: var(--mds-color-action-primary-fg);
-    text-decoration: none;
-}
-
-.detail__back:hover {
-    text-decoration: underline;
-}
+/* `.detail__back` was deleted with its markup in J2c — the hand-rolled back link became `MdsBreadcrumb`
+   inside `PageHeader`'s slot, which brings its own styling. Left behind it would be dead rules that read as
+   an element still on the page. */
 
 .detail__grid {
     display: grid;

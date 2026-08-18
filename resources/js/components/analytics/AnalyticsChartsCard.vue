@@ -24,9 +24,27 @@ import {
 } from '@meridian/design-system';
 import { breakdownBars, breakdownTableRows } from './breakdown-bars';
 import { bucketFormatter, categoryLabel } from './bucket-label';
-import type { Report } from './types';
+import type { ChartsReport } from './types';
 
-const props = defineProps<{ report: Report }>();
+// `ChartsReport` (I10c), not `Report`: this card reads only range/series/breakdown, and narrowing the prop
+// lets a surface with no workspace-wide accepting count reuse it. Type-only — /analytics still passes a
+// full Report, which is structurally assignable, so nothing changes at runtime.
+const props = withDefaults(
+    defineProps<{
+        report: ChartsReport;
+        /**
+         * Copy for the breakdown's empty state.
+         *
+         * Overridable because the default names two remediations — widening the range, clearing a filter —
+         * that only /analytics can offer. `/forms/{form}/analytics` has neither control and structurally
+         * never will (its window and axis are literals in FormAnalyticsPresenter), so telling its user to
+         * reach for them would send them hunting for affordances that do not exist. Caught by I10c's
+         * adversarial review, which is the kind of thing reusing a component wholesale gets you.
+         */
+        breakdownEmptyDescription?: string;
+    }>(),
+    { breakdownEmptyDescription: 'Widen the date range, or clear a filter, to see a breakdown here.' },
+);
 
 const label = computed(() => bucketFormatter(props.report.range.granularity));
 
@@ -88,11 +106,7 @@ const columns = computed<DataTableColumn[]>(() => [
                 :category-label="axisName"
                 value-label="Responses"
             />
-            <MdsEmptyState
-                v-else
-                headline="No responses in this period"
-                description="Widen the date range, or clear a filter, to see a breakdown here."
-            />
+            <MdsEmptyState v-else headline="No responses in this period" :description="breakdownEmptyDescription" />
 
             <div v-if="tableRows.length > 0" class="analytics__breakdown-table">
                 <MdsDataTable

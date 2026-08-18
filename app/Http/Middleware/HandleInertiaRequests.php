@@ -2,12 +2,11 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Form;
-use App\Models\SavedReportView;
-use App\Models\ScopeNode;
 use App\Models\User;
 use App\Services\Branding\TenantBrandingService;
 use App\Services\Entitlements\EntitlementService;
+use App\Support\Audit\ImpersonationContext;
+use App\Support\Authorization\ShellAbilities;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -51,52 +50,29 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                 ] : null,
-                // Ability gates the shell/pages need (e.g. the Members nav item + its row actions).
-                // Computed FAIL-CLOSED: on tenant routes EstablishTenantDatabaseContext has set the
-                // Spatie permissions team by the time this share() renders (and resets it in
-                // terminate()), so can() resolves against the active tenant; off-tenant (central/guest)
-                // no team is set, so every ability resolves to false — exactly the gating we want.
-                'can' => [
-                    'manageMembers' => (bool) $user?->can('tenant.members.invite'),
-                    'transferOwnership' => (bool) $user?->can('tenant.ownership.transfer'),
-                    // Gates the Forms nav item + the list page (viewAny composes forms.create/.edit.* — FormPolicy).
-                    'manageForms' => (bool) $user?->can('viewAny', Form::class),
-                    // Gates the Submissions inbox nav item + list page (F7). All five roles that hold
-                    // submissions.view; the presenter then scopes rows (tenant-wide vs own-forms).
-                    'viewSubmissions' => (bool) $user?->can('submissions.view'),
-                    // Gates the Scopes nav item + the /scopes page + the form scope picker (G10b2).
-                    // ScopeNodePolicy::viewAny is exactly `scopes.manage` — Owner/Admin only. Deliberately
-                    // NOT reused for the grant surface inside the page: `forms.collaborators.manage` is a
-                    // separate catalog entry, and the page gates that block on its own presenter flag.
-                    'manageScopes' => (bool) $user?->can('viewAny', ScopeNode::class),
-                    // Gates the Webhooks nav item + the /webhooks management pages (H14). Exactly
-                    // WebhookEndpointPolicy::viewAny — the `webhooks.manage` permission, Owner/Admin only. The
-                    // nav item ALSO combines this with the `webhooks` plan feature (Sidebar.vue) so a tier
-                    // without the feature never sees a destination it would only bounce off.
-                    'manageWebhooks' => (bool) $user?->can('webhooks.manage'),
-                    // Gates the Integrations nav item + the /integrations pages (H15b). Exactly
-                    // ConnectionPolicy::viewAny — the `integrations.manage` permission, Owner/Admin only. Like
-                    // manageWebhooks the nav item ALSO requires the `native_connectors` plan feature
-                    // (Sidebar.vue), so a tier without it never sees a destination it would only bounce off.
-                    'manageIntegrations' => (bool) $user?->can('integrations.manage'),
-                    // Gates the Analytics nav item, the /analytics page and the Dashboard's view-switcher
-                    // (H24b2). The POLICY, not a bare permission string: SavedReportViewPolicy::viewAny is
-                    // the `dashboard.org.view || dashboard.form.view` composition, and re-spelling that here
-                    // would put a second definition of "may read analytics" in a second file. Like the two
-                    // above, every consumer ALSO requires the `advanced_analytics` plan feature, so a tier
-                    // without it never sees a destination it would only bounce off (ADR-0011 §D9 — hidden,
-                    // never locked-with-upsell, because Business is held from sale).
-                    'viewAnalytics' => (bool) $user?->can('viewAny', SavedReportView::class),
-                    // Gates the Domains nav item + the /domains page (H22b). The BARE PERMISSION, not a
-                    // policy: `domains` is RLS-exempt and has no model policy at all (ADR-0012 — there is no
-                    // per-instance authorization question, and a policy over an unscoped table would invite
-                    // one), so `tenant.settings.manage` is the whole authorization. It is the same
-                    // permission the Drafts card on /settings uses; the two surfaces are both Owner/Admin
-                    // tenant administration. The nav item ALSO requires the `custom_domain` plan feature
-                    // (Sidebar.vue) — but the PAGE deliberately does not, because ADR-0012 §D9 keeps reads
-                    // and deletes open so a tenant downgraded off Business can still remove a live host.
-                    'manageDomains' => (bool) $user?->can('tenant.settings.manage'),
+                /*
+                 * I11b — is this session being driven by platform staff? Null on every ordinary request,
+                 * which is all but a handful in the deployment's lifetime.
+                 *
+                 * ⚠️ A BOOLEAN AND A URL, NEVER THE OPERATOR'S IDENTITY. The whole of I11a's S2 finding was
+                 * that the operator's real name must not reach a tenant surface — `actingAsLabel()` returns
+                 * the fixed string "Platform operator" unconditionally for that reason, and this prop
+                 * renders on EVERY page in the application, which would make it the widest possible place
+                 * to undo it. The banner needs to say THAT it is happening and offer the way out; it does
+                 * not need to say who.
+                 *
+                 * Shared rather than passed per-page because the banner belongs to the app shell: a page
+                 * that forgot to send it would silently render an impersonated session as a normal one,
+                 * which is the one failure mode this surface cannot have.
+                 */
+                'impersonating' => ImpersonationContext::operatorId() === null ? null : [
+                    'exit_url' => route('impersonate.exit'),
                 ],
+                // Ability gates the shell/pages need (e.g. the Members nav item + its row actions).
+                // The map itself lives in ShellAbilities so that global search's destination catalog
+                // (J1c) consumes the SAME definition rather than a second copy of it — the prop shape here
+                // is byte-identical to what this block produced inline.
+                'can' => ShellAbilities::for($user),
             ],
             // Drives the app shell's theme toggle (C2), the Settings → Appearance panel (G11) and the
             // <html> attribute emission in app.blade.php. Guests resolve to the product defaults, every

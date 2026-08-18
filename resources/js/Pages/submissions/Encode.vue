@@ -32,8 +32,9 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { MdsButton, MdsCard } from '@meridian/design-system';
+import { MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { createServerAutosave } from '@/composables/useServerAutosave';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import {
     createFormRuntime,
@@ -90,7 +91,83 @@ const props = defineProps<{
     };
     blocks: Block[];
     steps: ServerStep[];
+    /**
+     * The saved draft being resumed, or null on the blank keying form (Increment I9b). Its presence is the
+     * single test for "am I in resume mode" — one nullable object rather than five scalars, so this block
+     * grows by exactly one entry.
+     */
+    draft: {
+        id: string;
+        client_submission_uuid: string;
+        answers: Record<string, unknown>;
+        current_step: string | null;
+        completeness_percent: number | null;
+        last_saved_at: string | null;
+        expires_at: string | null;
+        /**
+         * Increment P3a — the optimistic-concurrency token this page was rendered from, the same one
+         * `editing.baseline` has carried since I9c. It rides back on every autosave tick so the server can
+         * tell a stale tab from a fresh one; without it two tabs on one draft silently overwrite each other.
+         */
+        baseline: string | null;
+    } | null;
+    /**
+     * The FINALIZED submission being corrected, or null (Increment I9c). Mutually exclusive with `draft` by
+     * construction — `EncodeFormPresenter` derives both from one `?Submission`, branching on its status — so
+     * "which of the three modes am I in" is answerable without the two ever contradicting each other.
+     */
+    editing: {
+        id: string;
+        answers: Record<string, unknown>;
+        status: string;
+        /**
+         * The optimistic-concurrency token: the checksum of the document THIS page was rendered from. Sent
+         * back on the PATCH so the server can refuse a stale page instead of silently reverting whatever
+         * another editor saved in the meantime — which also covers browser-Back-then-Save.
+         */
+        baseline: string | null;
+        demotes_on_save: boolean;
+    } | null;
+    /** The PATCH target in edit mode; null otherwise. */
+    update_url: string | null;
+    /** The autosave endpoint. NULL IN EDIT MODE — an edit must never reach the draft channel. */
+    draft_url: string | null;
+    /**
+     * The trail back, resolved SERVER-SIDE by `CrumbTrail` (Increment J2d).
+     *
+     * ⚠️ THE THREE-OR-FIVE BRANCH IS GONE, and its absence is the improvement. This page rebuilt the trail
+     * from `isEditing` / `draft === null` — re-deriving on the client a mode each of the three controllers
+     * already knows by construction, with three hard-coded URL expressions that could disagree with the
+     * route that rendered them.
+     */
+    crumbs: BreadcrumbItem[];
+    /**
+     * Where Cancel leaves TO — `CrumbTrail::exitFrom()`, the crumb immediately BEFORE the tail.
+     *
+     * ⚠️ NOT THE TAIL: the tail is where you ARE ("Edit answers", "New response"); Cancel is where you leave
+     * to — the submission in edit mode, the form otherwise. An earlier note here said the tail must agree
+     * with Cancel, which is false in both modes. Deriving it server-side from the same trail is what makes
+     * the agreement structural rather than a docblock asking the next author to remember; the invariant is
+     * asserted in `CrumbTrailReachabilityTest`.
+     *
+     * ⚠️ NULL IS A REAL OUTCOME — a reader refused that destination must not be offered a Cancel that 403s,
+     * so both call sites below are `v-if`-guarded rather than defaulting to a URL.
+     */
+    cancel_url: string | null;
 }>();
+
+/**
+ * Increment I9c. Read this instead of `editing !== null` at each site so the three modes stay one question
+ * with one answer.
+ *
+ * ⚠️ `!= null`, NOT `!== null`, and the difference is not pedantry. `undefined !== null` is TRUE, so a strict
+ * check puts the page into EDIT mode whenever the prop is merely ABSENT — with `editing` undefined, which the
+ * template then dereferences. The presenter always sends the key, so production never hits it; every existing
+ * encode test omits it, and all seventeen of them failed on the strict form. Absent and null mean the same
+ * thing here — "there is no submission being corrected" — and the predicate has to say so.
+ */
+const isEditing = computed(() => props.editing != null);
+
 
 const page = usePage();
 
@@ -101,10 +178,20 @@ const page = usePage();
 //
 // `now` comes from the SERVER (`version.now`), not from `isoClock(new Date())` as the guest does — see
 // `EncodeFormPresenter::clock()`. Same clock in, same step list out.
+// On a RESUME (Increment I9b) the store is seeded from the draft rather than started empty, and the uuid is
+// adopted rather than re-minted. Re-minting is the subtle half: the uuid is the idempotency key, so a fresh
+// one would make Submit look like a brand-new response and leave the draft row behind, unpromoted, until the
+// reaper deleted it.
 const runtime = createFormRuntime(props as unknown as SchemaResponse, {
     now: props.version.now,
     initialLocale: props.form.default_locale,
     search: '',
+    // I9c seeds from `editing` on the same footing: the store does not care which kind of stored document it
+    // restores, only that there is one. No uuid is adopted in edit mode — the submission is identified by its
+    // id in the PATCH URL, and minting or adopting an idempotency key here would be a second identifier for a
+    // request that already has an authorized one.
+    initialAnswers: (props.draft?.answers ?? props.editing?.answers) as Record<string, never> | undefined,
+    initialClientSubmissionUuid: props.draft?.client_submission_uuid,
 });
 
 // Seed each repeatable section's `min_instances` starter rows. The GUEST deliberately opens a repeat group
@@ -245,6 +332,13 @@ function formatInstant(iso: string): string {
 }
 
 const scheduleNotice = computed<{ title: string; body: string } | null>(() => {
+    // I9c — the schedule says nothing about an EDIT. A correction consumes no capacity slot and is not a new
+    // response, so `assertCapacity`/`assertCanStart` never run on this path; telling an editor "this form is
+    // full" over a working Save button is the same defect the resume branch below fixed, in a louder form.
+    if (isEditing.value) {
+        return null;
+    }
+
     const schedule = props.form.schedule;
     switch (schedule.acceptance) {
         case 'opens_soon':
@@ -255,12 +349,21 @@ const scheduleNotice = computed<{ title: string; body: string } | null>(() => {
                     : 'Submissions are blocked until it opens.',
             };
         case 'closed':
-            return {
-                title: 'This form is closed',
-                body: schedule.closes_at
-                    ? `It closed on ${formatInstant(schedule.closes_at)}. New submissions are no longer accepted.`
-                    : 'New submissions are no longer accepted.',
-            };
+            // On a RESUMED draft the copy must not contradict the enabled Submit button beside it (I9b).
+            // H12a's grace window lets a draft STARTED before the close still be finalized, so "new
+            // submissions are no longer accepted" is true and "you cannot submit this" is not — an alert
+            // saying the latter over a working button is how a keyer learns to distrust the banners.
+            return props.draft !== null
+                ? {
+                      title: 'This form has closed',
+                      body: 'You can still submit this draft, because it was started before the form closed. New responses cannot be started.',
+                  }
+                : {
+                      title: 'This form is closed',
+                      body: schedule.closes_at
+                          ? `It closed on ${formatInstant(schedule.closes_at)}. New submissions are no longer accepted.`
+                          : 'New submissions are no longer accepted.',
+                  };
         case 'capacity_reached':
             return {
                 title: 'This form is full',
@@ -285,6 +388,7 @@ function flatValue(fieldKey: string): AnswerValue {
 function setFlatValue(fieldKey: string, value: AnswerValue): void {
     runtime.setAnswer(fieldKey, value as never);
     runtime.markTouched(fieldKey);
+    armAutosave();
 }
 
 function fieldError(fieldKey: string): string | undefined {
@@ -312,9 +416,27 @@ function instanceValue(sectionKey: string, index: number, fieldKey: string): Ans
     return runtime.instanceValue(sectionKey, index, fieldKey) as AnswerValue;
 }
 
+/**
+ * Adding or removing a repeat instance IS an edit, and routing both through here is what makes autosave see
+ * it. Wired straight from the template, `runtime.addInstance`/`removeInstance` mutate the answer map without
+ * ever arming autosave — so a session whose only change was structural (a keyer deleting the two seeded roster
+ * rows a household does not need) was silently never persisted, and the page showed no save indicator at all
+ * because none had ever run.
+ */
+function addInstance(sectionKey: string): void {
+    runtime.addInstance(sectionKey);
+    armAutosave();
+}
+
+function removeInstance(sectionKey: string, index: number): void {
+    runtime.removeInstance(sectionKey, index);
+    armAutosave();
+}
+
 function setInstanceValue(sectionKey: string, index: number, fieldKey: string, value: AnswerValue): void {
     runtime.setInstanceAnswer(sectionKey, index, fieldKey, value as never);
     runtime.markInstanceTouched(sectionKey, index, fieldKey);
+    armAutosave();
 }
 
 function boundsHint(block: Block): string | null {
@@ -386,14 +508,126 @@ async function jumpTo(item: { address: string; stepKey: string }): Promise<void>
     target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]')?.focus();
 }
 
+// ── Autosave (Increment I9b) ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ ARMED ON THE FIRST REAL EDIT, NOT AT SETUP, and this is not defensive politeness. The min-instance
+// seeding loop above calls `addInstance()`, which MUTATES `runtime.answers` during mount — so a deep watcher
+// armed here would fire on every page view of any form with a repeatable section and create an empty
+// `status = draft` row, with a 30-day TTL, for a keyer who never typed a character.
+const autosaveArmed = ref(false);
+
+const autosave = createServerAutosave({
+    // Empty string in edit mode, where `enabled` is false forever and no request is ever built. The presenter
+    // sends null there deliberately (see `EncodeFormPresenter::present`): an edit autosaved down the draft
+    // channel would overwrite a respondent's answers with no policy check for `update` and no audit row.
+    url: props.draft_url ?? '',
+    clientSubmissionUuid: runtime.clientSubmissionUuid,
+    answers: runtime.answers,
+    currentStepKey: runtime.currentStepKey,
+    // Increment P3a — the baseline this page was rendered from; null on the blank keying form, which has read
+    // nothing and so claims nothing. The composable advances it from each save response thereafter.
+    baseContentChecksum: props.draft?.baseline ?? null,
+    // Also gated on the schedule: `saveDraft()` runs `assertCanStart()` on the CREATE branch, so on a closed
+    // form the first tick would 403 while later ones (once a draft exists) succeed — one red flash, then
+    // silence. Erring one case strict (`capacity_reached` would actually allow a draft create) is the right
+    // side to err on.
+    //
+    // ⚠️ AND NEVER IN EDIT MODE (I9c). An edit is an explicit, audited act with a demotion consequence — a
+    // background tick that silently sends an approved submission back for re-review is the opposite of what
+    // autosave is for. This is the belt to the presenter's null-URL braces; either alone would look
+    // sufficient, which is why both are here.
+    enabled: computed(() => autosaveArmed.value && !isEditing.value && (isOpen.value || props.draft !== null)),
+});
+
+function armAutosave(): void {
+    autosaveArmed.value = true;
+}
+
+/** The header indicator. Null before the first save, so a fresh page carries no stale "Saved" claim. */
+const autosaveLabel = computed<string | null>(() => {
+    switch (autosave.state.value) {
+        case 'saving':
+            return 'Saving…';
+        case 'saved':
+            return autosave.completeness.value === null
+                ? 'Draft saved'
+                : `Draft saved · ${autosave.completeness.value}% complete`;
+        case 'error':
+            return 'Not saved — retrying';
+        case 'stopped':
+            return 'Not saved';
+        default:
+            return null;
+    }
+});
+
+function formatDay(iso: string | null): string | null {
+    if (iso === null) {
+        return null;
+    }
+    const date = new Date(iso);
+
+    return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+}
+
+const draftSavedLabel = computed(() => {
+    const day = formatDay(props.draft?.last_saved_at ?? null);
+
+    return day === null ? '' : ` from ${day}`;
+});
+
+const draftExpiryLabel = computed(() => {
+    const day = formatDay(props.draft?.expires_at ?? null);
+
+    return day === null ? '' : ` If you do not come back to it, it is removed on ${day}.`;
+});
+
+// Restore the resume cursor. After mount, so the store's own step reconciliation has settled first; a key
+// that no longer resolves (the schema moved, or the step is no longer relevant under the restored answers)
+// is a guarded no-op in the store rather than an error here.
+if (props.draft?.current_step != null && props.draft.current_step !== '') {
+    void nextTick(() => runtime.goToStep(props.draft!.current_step as string));
+}
+
 // ── Submit ───────────────────────────────────────────────────────────────────────────────────────────────
 const submitting = ref(false);
 
+/**
+ * Increment I9b — a RESUMED draft may be submitted after the form has closed.
+ *
+ * The old gate was `isOpen` alone, which blocked exactly the grace window `FormAcceptanceGuard::assertCanPromote()`
+ * exists to allow: a draft STARTED before the close may still be promoted after it, so a keyer mid-transcription
+ * when the window shuts is not stranded. This read as correct defensive UI and was the opposite — the client
+ * refusing what the server would have accepted. `capacity_reached` deliberately still blocks: the cap is
+ * enforced transactionally at finalize and would 403 anyway.
+ */
+const canSubmit = computed(
+    () =>
+        // I9c — an EDIT is never schedule-gated. It creates no submission, consumes no capacity slot, and the
+        // service runs neither `assertCanStart()` nor `assertCapacity()`. Blocking Save on a closed or full
+        // form would make every historical submission on a finished survey permanently uncorrectable, which
+        // is exactly the population most likely to need a correction.
+        isEditing.value || isOpen.value || (props.draft !== null && props.form.schedule.acceptance === 'closed'),
+);
+
 function submit(): void {
     // Increment H12b — never POST a submission the schedule guard will 403 (the button is disabled too).
-    if (!isOpen.value) {
+    if (!canSubmit.value) {
         return;
     }
+
+    if (isEditing.value) {
+        submitEdit();
+
+        return;
+    }
+
+    // ⚠️ STOP AUTOSAVING BEFORE THE SUBMIT GOES OUT. A debounce timer armed within the last 1500 ms would
+    // otherwise fire while the promote is in flight: the draft POST blocks on the promoted row's
+    // `lockForUpdate`, comes back 409 `draft_already_finalized`, and the composable — correctly, by its own
+    // rules — renders the red "Your changes are no longer being saved" alert over a submission that in fact
+    // succeeded. Disposing here is not merely cosmetic: `dispose()` flushes any pending edit first, so the
+    // last keystroke before Submit is still captured, and Submit itself posts the full answer map anyway.
+    autosave.dispose();
     runtime.markSubmitAttempted();
     // The FULL answer map, not `effectiveAnswers`. The guest posts the pruned set; this channel deliberately
     // posts everything so the server's own prune stays observable — that is what keeps `prunedAnswers` above
@@ -405,7 +639,13 @@ function submit(): void {
 
     router.post(
         `/forms/${props.form.id}/submissions`,
-        { answers },
+        // The uuid routes a resumed draft to `promote()` (flipping the SAME row) instead of `submit()`
+        // (creating a second one), and makes a double-clicked Submit resolve to one submission via Stage 2b.
+        // Increment P3a — the CURRENT baseline from the autosave loop, not `props.draft?.baseline`, which is
+        // stale the moment this tab has saved once. Submit saves-then-promotes, so without it a tab whose
+        // base went stale would finalize over another tab's answers — and the autosave banner would have
+        // just told the keyer that saving stopped precisely to avoid that.
+        { answers, client_submission_uuid: runtime.clientSubmissionUuid, base_content_checksum: autosave.baseline.value },
         {
             preserveScroll: true,
             onStart: () => {
@@ -424,24 +664,153 @@ function submit(): void {
         },
     );
 }
+
+/**
+ * Increment I9c — apply a correction to an already-finalized submission.
+ *
+ * A PATCH to the submission's own route, never the encode POST: that endpoint's whole job is to CREATE a
+ * submission, and reaching it with an existing row's answers would produce a second response rather than
+ * correct the first.
+ *
+ * No `client_submission_uuid` in the body. The submission is identified by the URL, which the policy has
+ * already authorized; adding a caller-chosen second identifier is the two-independent-inputs shape that
+ * produced I9b's cross-form draft hole.
+ *
+ * ⚠️ `preserveState` IS THE OPPOSITE OF THE SUBMIT PATH'S, and deliberately. There, a success remounts the
+ * page so the next entry starts clean. Here, a success REDIRECTS to the detail view, so nothing is preserved
+ * either way — and a 422 must keep every edit the user made, which is what the errors-length check does.
+ * Getting this backwards would silently discard a page of corrections on one failed constraint.
+ */
+function submitEdit(): void {
+    runtime.markSubmitAttempted();
+
+    // Detached from the reactive proxy for the same reason the submit path detaches: Inertia serialises
+    // whatever it is handed, and a keystroke landing mid-flight would change the body under the request.
+    //
+    // The FULL answer map, including the media keys the server is about to discard. Filtering them here
+    // would be the client asserting a rule the server owns — `mergeMedia()` takes media from the STORED
+    // document regardless of what arrives, so sending them changes nothing and omitting them proves nothing.
+    const answers = JSON.parse(JSON.stringify(runtime.answers)) as Record<string, never>;
+
+    router.patch(
+        props.update_url as string,
+        // `baseline` is the whole of this channel's concurrency story — see the prop's docblock. It is sent
+        // even when null so the server's `required` rule rejects a page too old to have one, rather than
+        // letting a blind whole-document write through.
+        { answers, baseline: props.editing?.baseline },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                submitting.value = true;
+            },
+            onFinish: () => {
+                submitting.value = false;
+            },
+            preserveState: (page) => Object.keys(page.props.errors ?? {}).length > 0,
+        },
+    );
+}
 </script>
 
 <template>
     <div class="encode">
-        <Head :title="`Encode — ${form.title}`" />
+        <Head :title="isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`" />
 
-        <PageHeader title="New submission" icon="submissions">
+        <PageHeader
+            :title="isEditing ? 'Edit answers' : draft === null ? 'New submission' : 'Continue submission'"
+            icon="submissions"
+        >
             <template #breadcrumbs>
-                <Link href="/forms" class="encode__crumb">← Forms</Link>
+                <!--
+                    Increment J2c — a real trail rather than a single hand-rolled back link, and the
+                    destination changed as well as the markup. It used to be a bare `← Forms`, which threw a
+                    keyer who arrived from ONE form back to the list of all of them; the trail now passes
+                    through that form's hub. In edit mode the tail is the submission, because the editor
+                    arrived from the detail page and that is where Save returns them — the crumb and the
+                    Cancel action below must keep naming the same place.
+                -->
+                <MdsBreadcrumb :items="crumbs" :link-component="Link" />
             </template>
             <template #actions>
-                <Link href="/forms" class="encode__cancel">Cancel</Link>
+                <!-- The autosave indicator lives in the header, beside Cancel, because that is where a keyer
+                     looks before leaving the page. `aria-live="polite"` and not `assertive`: it changes on
+                     every debounce tick, and an assertive region would interrupt a screen reader mid-question
+                     on a page whose whole job is uninterrupted typing. -->
+                <!-- Always PRESENT, empty until there is something to say. A live region inserted into the
+                     DOM with its content already in it is not reliably announced — the assistive technology
+                     has to be observing the node before the text changes — so `v-if` here would silently
+                     swallow the first "Draft saved". -->
+                <span class="encode__autosave" role="status" aria-live="polite">{{ autosaveLabel ?? '' }}</span>
+                <!-- ONE destination, derived from the trail (J2d): `cancel_url` is the crumb immediately
+                     before the tail. It was two hard-coded branches here and two more in the sticky footer,
+                     kept in step with the trail by hand. `v-if` rather than a fallback URL — a reader the
+                     destination refuses is offered no Cancel at all, which is the whole point of the sweep. -->
+                <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
             </template>
         </PageHeader>
 
         <p class="encode__intro">
-            Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            <template v-if="isEditing">
+                Correcting a recorded response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            </template>
+            <template v-else>
+                Encoding a response for <strong>{{ form.title }}</strong> (v{{ version.version_number }}).
+            </template>
         </p>
+
+        <!-- Edit banner (I9c). The demotion is announced BEFORE any typing, not discovered at Save: an
+             editor fixing one character in an approved response is entitled to know that saving withdraws
+             the approval.
+             ⚠️ `role="status"`, NOT `role="alert"`, EVEN FOR THE WARNING — and the reason is written twenty
+             lines above this in the autosave note: a live region that is inserted into the DOM with its
+             content already in it is not reliably announced, because assistive tech has to be observing the
+             node before the text changes. This banner is present at first paint and never changes (
+             `demotes_on_save` is a server prop), so `alert` buys nothing on the readers that ignore
+             load-time alerts and INTERRUPTS on the ones that do not. The warning is carried by the heading
+             text and the accent, which is where it belongs. -->
+        <div
+            v-if="isEditing"
+            class="encode__editing"
+            :class="{ 'encode__editing--warning': editing!.demotes_on_save }"
+            role="status"
+        >
+            <strong class="encode__editing-title">
+                {{ editing!.demotes_on_save ? 'This response has been approved' : 'Editing a recorded response' }}
+            </strong>
+            <span class="encode__editing-body">
+                <template v-if="editing!.demotes_on_save">
+                    <!-- ⚠️ "under review", not "the review queue". The service sets `under_review`, not
+                         `submitted` — a reviewer filtering the inbox on Submitted will NOT see it come back,
+                         and an earlier draft of this sentence promised exactly that. -->
+                    Saving a change withdraws the approval and moves this response back to
+                    <strong>under review</strong>, so a reviewer has to decide it again. Every change is
+                    recorded in the audit log.
+                </template>
+                <template v-else>
+                    You are changing answers that have already been submitted. Every change is recorded in the
+                    audit log, with your name against it.
+                </template>
+            </span>
+        </div>
+
+        <!-- Resume banner (I9b). Two jobs: confirm that what is on screen is the keyer's own saved work
+             rather than a blank form, and name the expiry, because the reaper HARD-deletes an expired draft
+             and a silent disappearance is the worst version of this feature. -->
+        <div v-if="draft !== null" class="encode__resume" role="status">
+            <strong class="encode__resume-title">Continuing a saved draft</strong>
+            <span class="encode__resume-body">
+                Your answers were restored{{ draftSavedLabel }}. This draft is saved as you type and is not
+                submitted until you press Submit.{{ draftExpiryLabel }}
+            </span>
+        </div>
+
+        <!-- The one autosave failure a keyer must act on rather than wait out (a submitted-elsewhere draft or
+             an expired session). `role="alert"` because unlike the indicator above, continuing to type after
+             this is wasted work. -->
+        <div v-if="autosave.state.value === 'stopped'" class="encode__degraded" role="alert">
+            <strong class="encode__degraded-title">Your changes are no longer being saved</strong>
+            <span class="encode__degraded-body">{{ autosave.message.value }}</span>
+        </div>
 
         <!-- Pruned-answer report (H21c): the previous submission WAS recorded — the copy must say so while
              naming what relevance removed from it. -->
@@ -516,6 +885,7 @@ function submit(): void {
                                 :field="field"
                                 :model-value="flatValue(field.key)"
                                 :error="fieldError(field.key)"
+                                :read-only="isEditing"
                                 @update:model-value="setFlatValue(field.key, $event)"
                             />
                         </div>
@@ -581,6 +951,7 @@ function submit(): void {
                                                         :field="field"
                                                         :model-value="instanceValue(step.sectionKey, index, field.key)"
                                                         :error="instanceError(step.sectionKey, index, field.key)"
+                                                        :read-only="isEditing"
                                                         @update:model-value="setInstanceValue(step.sectionKey, index, field.key, $event)"
                                                     />
                                                 </div>
@@ -593,7 +964,7 @@ function submit(): void {
                                                 size="sm"
                                                 icon-left="trash"
                                                 :aria-label="`Remove ${instanceLegend(blockFor(step)!, index)}`"
-                                                @click="runtime.removeInstance(step.sectionKey, index)"
+                                                @click="removeInstance(step.sectionKey, index)"
                                             >
                                                 Remove
                                             </MdsButton>
@@ -612,7 +983,7 @@ function submit(): void {
                                     variant="secondary"
                                     icon-left="plus"
                                     :disabled="!runtime.canAddInstance(step.sectionKey)"
-                                    @click="runtime.addInstance(step.sectionKey)"
+                                    @click="addInstance(step.sectionKey)"
                                 >
                                     Add {{ blockFor(step)?.label ?? 'entry' }}
                                 </MdsButton>
@@ -629,6 +1000,7 @@ function submit(): void {
                                     :field="field"
                                     :model-value="flatValue(field.key)"
                                     :error="fieldError(field.key)"
+                                    :read-only="isEditing"
                                     @update:model-value="setFlatValue(field.key, $event)"
                                 />
                             </div>
@@ -638,7 +1010,8 @@ function submit(): void {
             </template>
 
             <div class="encode__actions">
-                <Link href="/forms" class="encode__cancel">Cancel</Link>
+                <!-- The sticky footer's Cancel — the same `cancel_url` as the header's, which is the point. -->
+                <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isFirstStep.value"
                     type="button"
@@ -648,24 +1021,32 @@ function submit(): void {
                 >
                     Back
                 </MdsButton>
+                <!-- ⚠️ IN EDIT MODE, NEXT IS SECONDARY AND SAVE IS ALWAYS PRESENT.
+                     Creating a response is a sequence — you fill step 1, then step 2, and Submit belongs at
+                     the end. CORRECTING one is not: the editor came here to fix a known field, they land on
+                     step 1 because edit mode restores no cursor, and with Save gated behind `isLastStep`
+                     they would have to click Next through every remaining step to commit a one-character fix
+                     on step 6 of 8 — with nothing on screen explaining why Save is missing. Save is
+                     therefore rendered on every step, and Next stays available beside it for reading
+                     through. -->
                 <MdsButton
                     v-if="!form.single_page_mode && !runtime.isTerminal.value && !runtime.isLastStep.value"
                     type="button"
-                    variant="primary"
+                    :variant="isEditing ? 'secondary' : 'primary'"
                     icon-right="chevron-right"
                     @click="goNext"
                 >
                     Next
                 </MdsButton>
                 <MdsButton
-                    v-else
+                    v-if="isEditing || form.single_page_mode || runtime.isTerminal.value || runtime.isLastStep.value"
                     type="submit"
                     variant="primary"
                     icon-left="check"
                     :loading="submitting"
-                    :disabled="!isOpen"
+                    :disabled="!canSubmit"
                 >
-                    Submit response
+                    {{ isEditing ? 'Save changes' : 'Submit response' }}
                 </MdsButton>
             </div>
         </form>
@@ -677,19 +1058,18 @@ function submit(): void {
     max-width: 720px;
 }
 
-.encode__crumb,
+/* `.encode__crumb` went with its markup in J2c — the hand-rolled crumb became `MdsBreadcrumb`, which brings
+   its own styling. `.encode__cancel` keeps these rules: it is a Link styled as text, not a crumb. */
 .encode__cancel {
     color: var(--mds-color-action-primary-fg);
     font-size: var(--mds-type-body-sm-font-size);
     text-decoration: none;
 }
 
-.encode__crumb:hover,
 .encode__cancel:hover {
     text-decoration: underline;
 }
 
-.encode__crumb:focus-visible,
 .encode__cancel:focus-visible {
     outline: 2px solid var(--mds-color-focus-ring);
     outline-offset: 2px;
@@ -768,6 +1148,74 @@ function submit(): void {
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
     line-height: var(--mds-type-body-sm-line-height);
+}
+
+/* Autosave state + resume banner (I9b). */
+.encode__autosave {
+    font-size: var(--mds-type-caption-font-size);
+    color: var(--mds-color-text-secondary);
+    align-self: center;
+}
+
+.encode__resume {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    margin-bottom: var(--mds-space-4);
+    border-radius: var(--mds-radius-md);
+    background: var(--mds-color-status-info-bg);
+    color: var(--mds-color-status-info-fg);
+}
+
+.encode__resume-title {
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.encode__resume-body {
+    font-size: var(--mds-type-caption-font-size);
+}
+
+/* Edit banner (I9c). Shares the resume banner's shape — same job, different sentence — and takes the
+   border-accent treatment for its warning variant rather than colour alone (WCAG 1.4.1, the rule the
+   schedule banner below records). The accent is what distinguishes "this is a consequence" from "this is
+   context" for a reader who cannot tell the two backgrounds apart. */
+.encode__editing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    padding: var(--mds-space-3) var(--mds-space-4);
+    margin-bottom: var(--mds-space-4);
+    border-radius: var(--mds-radius-md);
+    background: var(--mds-color-status-info-bg);
+    color: var(--mds-color-status-info-fg);
+}
+
+/* The warning variant follows THIS PAGE'S existing banner convention rather than inventing a fourth one:
+   `.encode__pruned`, `.encode__degraded` and `.encode__schedule-banner` all sit on `bg-surface` with a
+   coloured left accent. An earlier draft tinted the whole background AND added a red rule beside an amber
+   fill — two accent systems at once, on a page that already had one. */
+.encode__editing--warning {
+    background: var(--mds-color-bg-surface);
+    color: var(--mds-color-text-body);
+    border: 1px solid var(--mds-color-border-default);
+    border-left: 4px solid var(--mds-color-status-warning-fg);
+}
+
+.encode__editing--warning .encode__editing-title {
+    color: var(--mds-color-text-heading);
+}
+
+.encode__editing--warning .encode__editing-body {
+    color: var(--mds-color-text-secondary);
+}
+
+.encode__editing-title {
+    font-weight: var(--mds-font-weight-semibold);
+}
+
+.encode__editing-body {
+    font-size: var(--mds-type-caption-font-size);
 }
 
 /* Scheduled-form pre-warning (H12b) — an alert banner, border-accent (never color alone, WCAG 1.4.1). */

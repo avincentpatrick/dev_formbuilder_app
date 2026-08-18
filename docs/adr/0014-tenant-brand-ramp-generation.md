@@ -35,7 +35,9 @@
 
 **§D3 — Snap, do not refuse (the "B-snap" fork).** Where the requested chroma cannot survive at the lightness a role requires, the gamut mapper gives up **chroma**, holding lightness and hue. Giving up lightness instead would silently invalidate the contrast the search just solved for; giving up hue would discard the only thing the tenant actually chose. This is what makes the product able to say "here is your colour, adjusted, and here is by how much" instead of "your brand colour is not allowed" — a sentence no paying customer should receive.
 
-**§D4 — Targets are RATIOS, not ramp steps, and they are the midpoint of the two ratified accents.** The shipped accents disagree about steps: in dark mode Blueprint darkens on hover (6.14 → 9.14 → 13.00) while Teal lightens then darkens (6.68 → 4.82 → 9.40, itself recorded as exceptions-log #6 because it is odd). They agree about ratios. Targeting ratios yields one rule that works for every hue and is monotone in both themes — hover and active always move toward *more* contrast with the white text they carry. **The evidence that these targets encode the system rather than an author's taste: fed Teal's own hue, the engine independently re-derives `--mds-accent-teal-600` (`#1B5E5E`) and `--mds-accent-teal-50` (`#E6F2F2`) byte-identically, and reproduces §4.1 rows 1–3 to two decimals.** That is asserted by a test, not claimed here.
+**§D4 — Targets are RATIOS, not ramp steps, and they are the midpoint of the two ratified accents.** The shipped accents disagree about steps: in dark mode Blueprint darkens on hover (6.14 → 9.14 → 13.00) while Teal lightens then darkens (6.68 → 4.82 → 9.40, itself recorded as exceptions-log #6 because it is odd). They agree about ratios. Targeting ratios yields one rule that works for every hue and is monotone in both themes — hover and active always move toward *more* contrast with the white text they carry. **The evidence that these targets encode the system rather than an author's taste: fed Teal's own hue, the engine independently re-derives `--mds-accent-teal-600` (`#1B5E5E`) byte-identically, and reproduces §4.1 rows 1–3 to two decimals.** That is asserted by a test, not claimed here.
+
+⚠️ **Amended by JR1 (2026-08-12): this claim used to cover the TINT as well, and half of it did not survive the first ground change — which is the more useful fact.** `bg` is searched against `ON_PRIMARY` = `#FFFFFF`, a ground that cannot move, so that half is byte-identical forever. `tint` is searched against the light `ink` ground, i.e. `neutral-900`; JR1 moved the neutral ramp, so the engine now derives `#EBF7F7` where G11's human hand-picked `#E6F2F2`. `--mds-accent-teal-50` was deliberately **not** updated to match: that would leave the assertion comparing the engine against a number copied *from* the engine, which is precisely the independence being claimed. A circular assertion that reads like corroboration is worse than an honest divergence, so the divergence is asserted instead.
 
 **§D5 — Deny by default, and be honest that it is a guard rather than a gate.** A generated ramp is measured against all seventeen pairings and refused if any fails. But the construction makes failure unreachable: contrast against a fixed ground is monotone in lightness, and the search sweeps the whole lightness range, so a compliant answer exists for every hue (exercised at 5° steps around the wheel by a test, not asserted). `BrandRampException::pairingFailed` therefore indicates an **engine defect** — a mistyped target, a ground token that moved underneath the generator, a role added without a pairing — and is a 500 by design, on the H25 precedent: mapping an integrity guard to a friendly error normalises exactly the condition the guard exists to surface.
 
@@ -69,11 +71,60 @@ The fixture lives in `tests/fixtures/`, deliberately **not** `tests/golden/`: it
 - a stored ramp is immutable — nothing re-derives on read, so a ramp that was compliant when written stays the ramp that renders;
 - the engine reproduces the design system's own hand-verified accent byte-identically, which is the strongest available evidence that its judgment matches the human one it replaces.
 
-**What is now load-bearing that was not.** The H-map's *"user personalization wins over tenant branding"* rule stops being vacuous the moment tenant branding reaches the admin app (H23a3), and must be enforced by CSS specificity rather than source order — `:root` for the tenant layer at (0,1,0), losing to `:root[data-accent='…']` at (0,2,0). G11 already shipped a bug where two selectors tied at (0,2,0) and source order silently decided; that is the failure mode being designed against.
+**What is now load-bearing that was not.** The H-map's *"user personalization wins over tenant branding"* rule stops being vacuous the moment tenant branding reaches the admin app (H23a3). ~~It must be enforced by CSS specificity rather than source order — `:root` for the tenant layer at (0,1,0), losing to `:root[data-accent='…']` at (0,2,0).~~ **CORRECTED BY H23a3 (2026-08-05): it is enforced ON THE SERVER, and the CSS route was rejected on inspection.** The tenant ramp needs three blocks — `:root`, `[data-theme-mode='dark']` and a `prefers-color-scheme` twin, at (0,1,0), (0,2,0) and (0,3,0) — so the user's teal rule at (0,2,0) would have **tied** with the tenant's dark block, leaving source order to decide, which is precisely the G11 bug this paragraph names. `app.blade.php` instead emits the tenant ramp **only when the member has expressed no accent opinion**, so personalization never enters a specificity contest at all. The prediction is struck through rather than deleted because the reasoning that produced it is the reasoning a future reader is most likely to repeat.
 
-**A defect this creates downstream, recorded now so H23a3 does not rediscover it.** §2.9 makes "the product default is the ABSENCE of the attribute" an invariant across all four personalization axes. Once a tenant ramp occupies `:root`, absence stops meaning *product default* and starts meaning *inherit my organisation's brand* — so a member who wants the product blue back has no way to say so. H23a3 closes it by emitting an explicit `data-accent="blueprint"` when, and only when, the tenant has a ramp. The invariant survives everywhere a tenant has no brand.
+**A defect this creates downstream, recorded now so H23a3 does not rediscover it.** §2.9 makes "the product default is the ABSENCE of the attribute" an invariant across all four personalization axes. Once a tenant ramp occupies `:root`, absence stops meaning *product default* and starts meaning *inherit my organisation's brand* — so a member who wants the product blue back has no way to say so. ~~H23a3 closes it by emitting an explicit `data-accent="blueprint"` when, and only when, the tenant has a ramp.~~ **CORRECTED BY H23a3: an explicit `data-accent="blueprint"` would have needed a `:root[data-accent='blueprint']` restoring rule at (0,2,0), which outranks the tenant's `:root` block at (0,1,0) in EVERY case — the tenant's colour would never have applied at all.** What ships instead widens the STORED domain, not the attribute: `user_ui_preferences.accent_token` moves from `{NULL,'teal'}` to `{NULL,'blueprint','teal'}`, **NULL now means "no opinion" and nothing else**, and `<html>` still emits `data-accent` only for Teal — so §2.9's absence-as-default convention survives at the attribute level unchanged.
 
-**Not addressed here.** Per-form branding overrides (`forms.theme`, built and unread since Increment F — data-dictionary §218); custom typefaces; logo placement; full white-label. The `branding` entitlement stays at Starter+ per ADR-0008 §D7 and is not revisited.
+**Not addressed here.** Per-form branding overrides (`forms.theme`, built and unread since Increment F — data-dictionary §218); custom typefaces; ~~logo placement~~ (**decided by H23a4 — see below**); full white-label, including per-tenant `From` addresses, which would need per-domain DKIM/SPF. The `branding` entitlement stays at Starter+ per ADR-0008 §D7 and is not revisited.
+
+---
+
+## Addendum — the two surfaces §D8 was written for (H23a4, 2026-08-05)
+
+§D8 argues the ramp must be STORED because mail and dompdf cannot resolve a custom property. Until H23a4
+that was a prediction about consumers that did not exist. Both now exist, and building them settled three
+questions the ADR had left open.
+
+**1. Logo placement — mail yes, PDF no.** The logo reaches email as a **hosted absolute URL** on the
+tenant's app host (`GET /branding/logo`, in the unauthenticated subdomain group), and does **not** reach
+the PDF at all. Two facts forced the split:
+
+- The only logo-serving route H23a2 left behind is `GET /attachments/{id}`, behind `auth` +
+  `can:view,attachment`. A mail client has no session, so that is a 302 to login — a broken image in every
+  branded email. Hence a new route, and hence it is **unsigned**: an email is read days later and
+  forwarded, so any expiry guarantees the image breaks. The asset is public by nature (it is the logo
+  every respondent of every branded form sees) and the row is already `is_pii = false`. Safety comes from
+  the route resolving `tenants.logo_attachment_id` and nothing else — it is not a public read primitive
+  over `attachments` — plus the `isActive()` gate, the scan-status gate, `nosniff`, and the fact that
+  H23a2's content-sniffed allowlist means SVG cannot reach storage in the first place.
+- dompdf needs `ext-gd` for PNG and WebP (JPEG is the only GD-free path), and GD is absent from the app
+  container **and from all four CI jobs**. A logo would have rendered on a developer's machine and thrown
+  in the pipeline. The PDF's existing no-external-references contract is left intact and branding there is
+  colour only.
+
+**2. Light theme only, on both surfaces.** The stored ramp carries two themes; these surfaces take one.
+`CssToInlineStyles` deletes `@media` from the theme before inlining; a rule moved into a `<style>` tag
+would lose to the inline declarations the inliner has just written onto every element; the framework's
+mail layout hard-codes `color-scheme: light`; and the dark ramp's contrast was measured against
+Meridian's own dark grounds (`#1A2130` / `#0F131C` since JR1), not against whatever ground a client invents when it
+inverts a message. Shipping it would assert a guarantee the engine never made. Paper, for its part, is
+white.
+
+**3. The palette is resolved at DISPATCH, never in `toMail()`, and this is the sharpest edge in the
+increment.** A queued `Notification` is delivered by the framework's `SendQueuedNotifications`, **not** by
+`TenantAwareJob`, so on the worker `TenantContext::currentTenantId()` is null — and
+`TenantBrandingService::isActive()` reads its entitlement half from exactly that static, not from its
+`$tenant` argument. Branding read inside `toMail()` therefore fails closed and sends **every** tenant an
+unbranded email, with a green suite. `sharedRamp()` is worse: it resolves a container binding no worker
+makes and returns null unconditionally. So `App\Support\Branding\BrandPalette` resolves the palette where
+the tenant is known and it rides the notification payload as a scalar array — the same discipline every
+`TenantUrl`-built link already follows. `BrandPalette::forTenant()` additionally **refuses to answer**
+when its argument is not the ambient tenant, which turns that latent cross-tenant entitlement read into
+defined, fail-closed behaviour rather than a silent wrong answer.
+
+The two Fortify emails (verification, password reset) are deliberately the only unbranded ones: those
+routes carry no tenancy middleware, so no tenant is resolved — and a user may belong to several, so
+"whose brand" has no correct answer either. They still render through the Meridian template.
 
 **As built — the guest runtime (H23b), the fifth and last consuming surface.** Three things are worth recording because none of them is predicted above.
 
@@ -88,6 +139,10 @@ The fixture lives in `tests/fixtures/`, deliberately **not** `tests/golden/`: it
 ## When to Revisit
 
 - **A sixth consuming surface appears that can resolve `var()`.** §D8's storage argument is grounded in mail and dompdf being unable to; it does not become wrong, but it becomes worth restating.
+- **`ext-gd` is added to the app image for some other reason.** The PDF's colour-only branding is a consequence of its absence, not a preference — see the Addendum. Adding GD would also make `UploadedFile::fake()->image()` usable, which several tests currently work around with real PNG bytes.
+- **A tenant asks to send from their own domain.** That is the full white-label line above; it needs per-domain DKIM/SPF and would change what the mail footer's "Sent via" attribution is for.
 - **A target or ground token changes.** That is a `BrandRampGenerator::VERSION` bump plus a deliberate re-derivation pass over stored ramps — never a silent repaint. The version exists to make that moment visible.
+
+  **This happened for the first time in JR1 (VERSION 1 → 2, 2026-08-12)** and is worth recording as a worked example, because the trigger was not what this bullet's phrasing suggests. Nobody edited a ground: a *re-skin* moved the neutral ramp, and four of the six grounds are copies of neutral primitives. The engine would have gone on certifying ratios against a canvas and an ink the product no longer painted, with no test failing and no screenshot looking wrong. Two consequences were adopted: `2026_08_12_000100_rederive_tenant_brand_ramps_for_engine_v2` re-derives every stored ramp from the tenant's saved `primary_color` (the input is what survives a bump — the tokens are the output of a search and have no v1→v2 mapping), and `BrandRampGroundParityTest` now pins all six literals to the token sources so the next re-skin fails a test instead of going quiet.
 - **WCAG 3 / APCA becomes the standard the product tests against.** The whole engine is built on WCAG 2.x relative luminance, which APCA replaces rather than refines; §4.1 and this ADR would move together.
 - **The first evidence that a generated ramp reads worse than a curated one in real use.** The structural→procedural trade in Consequences is the thing to re-examine, and a real screenshot beats every argument in this document.

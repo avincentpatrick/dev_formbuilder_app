@@ -1,69 +1,273 @@
 <script setup lang="ts">
 /**
- * Primary sidebar navigation. Enabled items are real Inertia <Link>s (standard navigation — a list
- * of links, not a roving menu widget); the active item shows three non-color signifiers (left accent
- * bar + bold + tint). Disabled Phase-1 destinations render as inert "Soon" rows. Responsive: full
- * (>1024) → icon-only (≤1024) → off-canvas drawer (≤480) toggled from the top nav.
+ * Primary sidebar navigation. Items are real Inertia <Link>s (standard navigation — a list of links, not
+ * a roving menu widget); the active item shows three non-colour signifiers (left accent bar + bold + tint).
+ * Responsive: full (>1024) → icon-only rail with tooltips (≤1024) → off-canvas drawer (≤480) toggled from
+ * the top nav.
+ *
+ * ⚠️ THE RAIL'S TOOLTIP IS A REAL COMPONENT NOW, NOT A `title` (J4b). The native attribute never appeared
+ * on keyboard focus at all, which is half of what DSR §3.4 asks for — and it cannot be dismissed, cannot be
+ * hovered, and cannot be styled. It is gone from both branches rather than left alongside `MdsTooltip`,
+ * because two tooltips on one element render one under the other.
+ *
+ * ⚠️ THE TOOLTIP MUST STAY TELEPORTED HERE, WHICH IS WHY IT IS A PACKAGE COMPONENT AND NOT A LOCAL DIV.
+ * `.sidebar` is `overflow-y: auto`, and per CSS Overflow 3 that drags `overflow-x` to `auto` too — so an
+ * in-flow bubble in a 64px rail is clipped and silently adds an internal scrollbar. Nothing in CI could
+ * see that: the shell clips its own horizontal axis, so the document-level overflow assertion reads flat.
+ *
+ * ⚠️ AND THE DRAWER TAKES THE PAGE, WITHOUT BECOMING A DIALOG. This root wraps the primary navigation
+ * landmark at ALL THREE breakpoints; stamping `role="dialog"` on it below 480px would make the landmark's
+ * identity depend on the viewport, which is exactly what DSR §6 promises it never does. `useInertBackground`
+ * marks everything outside inert instead — which is a stronger guarantee than a Tab trap, because `inert`
+ * also covers the virtual cursor and browser-chrome round trips that a keydown handler never sees.
  */
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { MdsIcon } from '@meridian/design-system';
-import { navItems } from './nav-model';
+import { MdsIcon, MdsTooltip, useInertBackground } from '@meridian/design-system';
+import { navGroups, type NavItem } from './nav-model';
+import { useMemberStreak } from '@/composables/useMemberStreak';
 
-defineProps<{ drawerOpen: boolean }>();
+/** The one destination that carries a count badge. See `badgeFor()` for why this is a literal. */
+const ACHIEVEMENTS_KEY = 'achievements';
+
+const props = defineProps<{ drawerOpen: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const page = usePage();
+const wrap = ref<HTMLElement | null>(null);
 
 // Hide permission-gated items (e.g. Members) from users who lack the ability, AND plan-gated items
 // (e.g. Webhooks = Starter+) from tenants whose plan lacks the feature. Both gates resolve fail-closed
 // off-tenant (auth.can.* false, entitlements null), so central/guest chrome never shows a tenant-only
 // destination — and a plan-gated item never appears where its `feature:` route guard would only bounce.
-const visibleItems = computed(() =>
-    navItems.filter(
-        (item) =>
-            (!item.gate || page.props.auth.can[item.gate]) &&
-            (!item.feature || page.props.entitlements?.features?.[item.feature] === true),
-    ),
+function isVisible(item: NavItem): boolean {
+    return (!item.gate || page.props.auth.can[item.gate])
+        && (!item.feature || page.props.entitlements?.features?.[item.feature] === true);
+}
+
+/**
+ * ⚠️ A GROUP WHOSE ITEMS ARE ALL GATED AWAY RENDERS NOTHING — no label, no empty list, no separator. This
+ * is not defensive: the filter above is aggressive enough that the floor is TWO items (Dashboard and
+ * Settings are the only ungated ones, so off-tenant chrome shows just those), a viewer on any plan below
+ * Business sees three, and an Owner on Free loses the whole Connections run because all three of its items
+ * are plan-gated. An unconditional heading would print a category over nothing in every one of those cases.
+ */
+const visibleGroups = computed(() =>
+    navGroups
+        .map((group) => ({ ...group, items: group.items.filter(isVisible) }))
+        .filter((group) => group.items.length > 0),
 );
 
-function isActive(href?: string): boolean {
-    if (!href) return false;
+/**
+ * The Achievements count badge (K1e) — this member's current activity streak.
+ *
+ * ⚠️ CALLED ONCE, HERE, AND THIS IS THE ONLY PLACE IT MAY BE. `useMemberStreak` registers a router
+ * subscription; that is safe exclusively because `AppLayout` is a PERSISTENT Inertia layout, so the sidebar
+ * mounts once per session and survives every visit. The `useNotificationFeed` contract one file over.
+ *
+ * ⚠️ AND IT IS HANDED THE DESTINATION'S OWN VISIBILITY RATHER THAN FETCHING UNCONDITIONALLY. The sidecar
+ * route is `module:gamification`-gated, and a refusal on a web path is a `back()` WITH A SESSION FLASH —
+ * so a tenant that switched the module off would collect a "switched off" toast on a random page once per
+ * navigation, provoked by nothing they did. Passing the same predicate the item is rendered under means
+ * this never asks. The composable re-reads it per attempt, so switching the module back on recovers at the
+ * next navigation.
+ */
+const showsAchievements = computed(() =>
+    visibleGroups.value.some((group) => group.items.some((item) => item.key === ACHIEVEMENTS_KEY)),
+);
+
+const { current: streakDays } = useMemberStreak(() => showsAchievements.value);
+
+/**
+ * The number to paint on an item, or null for no badge at all.
+ *
+ * ⚠️ A LITERAL KEY RATHER THAN A NEW `badge?:` FIELD ON `NavItem`, DELIBERATELY. There is exactly one
+ * badged destination and no second candidate; a generic field would be an unconsumed API on a shared model
+ * two other files parse — including `ShellAbilityParityTest`, which reads this file's array literal as
+ * text. DSR §3.4's own rule: add the prop in the same PR as the second consumer, not before.
+ *
+ * Null at zero as well as at unknown, and the two are different facts kept deliberately apart upstream:
+ * `null` means the sidecar has not answered yet (or its last attempt failed, in which case the last known
+ * value stands), while `0` means the streak is genuinely broken. Neither earns a bubble — "0" beside a nav
+ * item reads as a defect, and a badge that appears the instant a page loads and then vanishes is worse
+ * than one that arrives late.
+ */
+function badgeFor(item: NavItem): number | null {
+    if (item.key !== ACHIEVEMENTS_KEY) return null;
+
+    return streakDays.value !== null && streakDays.value > 0 ? streakDays.value : null;
+}
+
+/**
+ * The accessible name, when there is a badge (WCAG 1.4.1 — a visual-only count is the same defect as a
+ * colour-only status). `undefined` otherwise, so the link keeps the name its own visible text gives it
+ * rather than carrying a redundant duplicate.
+ *
+ * The visible label survives verbatim at the front, which is what keeps speech input working: somebody
+ * saying "Achievements" still matches (WCAG 2.5.3, label in name). The bell resolves the identical
+ * question the identical way.
+ */
+function accessibleName(item: NavItem): string | undefined {
+    const days = badgeFor(item);
+
+    return days === null ? undefined : `${item.label}, ${days}-day streak`;
+}
+
+function labelId(key: string): string {
+    return `nav-group-${key}`;
+}
+
+function isActive(href: string): boolean {
     const path = page.url.split('?')[0];
     return path === href || path.startsWith(`${href}/`);
+}
+
+// ── The drawer's own breakpoint ──────────────────────────────────────────────────────────────────────
+// §6: components carry their own responsive behaviour and pages never add breakpoint logic. The layout
+// owns only the boolean.
+const MOBILE_QUERY = '(max-width: 480px)';
+/**
+ * The rail band, and it is a BAND rather than a maximum — 481px to 1024px, the only widths at which an
+ * item's label is hidden.
+ *
+ * ⚠️ THE TOOLTIP IS OFF EVERYWHERE ELSE, AND LEAVING IT ON WAS A REAL DEFECT RATHER THAN A TIDINESS
+ * QUESTION. Above 1024px the label sits in the item, so a bubble repeating it is pure noise. Below 480px
+ * the drawer restores the label AND there is no hover to summon a tooltip with — but focus still fires, and
+ * `useInertBackground` moves focus into the drawer programmatically the moment it opens. So on mobile the
+ * drawer would open, silently show a tooltip nobody asked for, and then EAT THE FIRST ESCAPE: the tooltip's
+ * capture-phase handler dismisses itself and stops the key before the drawer's own handler ever sees it.
+ * The user presses Escape on a drawer and nothing appears to happen. Found by the drawer's own test.
+ */
+const RAIL_QUERY = '(min-width: 481px) and (max-width: 1024px)';
+const isMobile = ref(false);
+const isRail = ref(false);
+let mobileMql: MediaQueryList | null = null;
+let railMql: MediaQueryList | null = null;
+
+function onMobileChange(event: MediaQueryListEvent): void {
+    isMobile.value = event.matches;
+
+    // ⚠️ CLOSING ON THE WAY UP IS NOT TIDINESS. Above 480px `.is-open` styles nothing, so a live
+    // `drawerOpen` is invisible but real — and it would leave `<main>` marked inert at desktop, where there
+    // is no drawer and no scrim to explain why the page has stopped responding. Releasing also clears the
+    // inline z-index the stack wrote.
+    if (!event.matches) emit('close');
+}
+
+function onRailChange(event: MediaQueryListEvent): void {
+    isRail.value = event.matches;
+}
+
+onMounted(() => {
+    mobileMql = window.matchMedia(MOBILE_QUERY);
+    isMobile.value = mobileMql.matches;
+    mobileMql.addEventListener('change', onMobileChange);
+
+    railMql = window.matchMedia(RAIL_QUERY);
+    isRail.value = railMql.matches;
+    railMql.addEventListener('change', onRailChange);
+});
+
+onBeforeUnmount(() => {
+    mobileMql?.removeEventListener('change', onMobileChange);
+    railMql?.removeEventListener('change', onRailChange);
+});
+
+// The seam is viewport-agnostic, so this is the gate: above 480px the drawer is not a drawer, and taking
+// the page there would inert a shell that has no overlay covering it.
+const takesPage = computed(() => props.drawerOpen && isMobile.value);
+
+useInertBackground({ active: takesPage, root: wrap, initialFocus: '.sidebar__item' });
+
+function onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && props.drawerOpen) emit('close');
 }
 </script>
 
 <template>
-    <div class="sidebar-wrap" :class="{ 'is-open': drawerOpen }">
+    <div
+        id="app-drawer"
+        ref="wrap"
+        class="sidebar-wrap"
+        :class="{ 'is-open': drawerOpen }"
+        tabindex="-1"
+        @keydown="onKeydown"
+    >
         <div class="sidebar-scrim" @click="emit('close')" />
         <nav class="sidebar" aria-label="Primary">
-            <ul class="sidebar__list">
-                <li v-for="item in visibleItems" :key="item.key">
-                    <Link
-                        v-if="item.enabled && item.href"
-                        :href="item.href"
-                        class="sidebar__item"
-                        :class="{ 'is-active': isActive(item.href) }"
-                        :aria-current="isActive(item.href) ? 'page' : undefined"
-                        :title="item.label"
-                        @click="emit('close')"
-                    >
-                        <MdsIcon :name="item.icon" size="md" />
-                        <span class="sidebar__label">{{ item.label }}</span>
-                    </Link>
-                    <span
-                        v-else
-                        class="sidebar__item sidebar__item--disabled"
-                        aria-disabled="true"
-                        :title="`${item.label} — coming soon`"
-                    >
-                        <MdsIcon :name="item.icon" size="md" />
-                        <span class="sidebar__label">{{ item.label }}</span>
-                        <span class="sidebar__soon">Soon</span>
-                    </span>
-                </li>
-            </ul>
+            <!--
+                ⚠️ THE DRAWER OWES A REACHABLE CLOSE CONTROL, AND THE ADVERSARIAL PASS IS WHAT ESTABLISHED
+                THAT. Taking the page marks the top nav inert, and the hamburger with it — so the one
+                control whose accessible name is "Close navigation" leaves the accessibility tree the
+                moment it would be needed. The original reasoning here was that Escape and the scrim were
+                enough "exactly as MdsModal treats its opener", and that comparison was FALSE: MdsModal
+                ships a labelled close button INSIDE its panel for precisely this reason. The scrim is a
+                bare div with no role, no name and no tab stop, so screen-reader swipe navigation never
+                lands on it and a switch-access user cannot reach it at all. Without this button the only
+                way out of an open drawer on touch is to navigate somewhere else.
+
+                It is hidden above 480px with `display: none` rather than `v-if`, so it is absent from the
+                accessibility tree at the widths where there is no drawer, and the markup does not depend
+                on a media query having been evaluated in JavaScript before first paint.
+            -->
+            <button type="button" class="sidebar__close" aria-label="Close navigation" @click="emit('close')">
+                <MdsIcon name="close" size="md" aria-hidden="true" />
+            </button>
+            <div v-for="group in visibleGroups" :key="group.key" class="sidebar__group">
+                <!--
+                    ⚠️ A <div>, AND THE ELEMENT TYPE IS PINNED BY THREE SEPARATE THINGS.
+                    (1) It sits OUTSIDE the <ul>: axe's `list` rule is WCAG-tagged and therefore inside the
+                        e2e scan's tag set, so a heading between a list and its items would redden roughly
+                        forty cases at once — the sidebar is scanned on every whole-page assertClean.
+                    (2) NOT a <span>: `Sidebar.test.ts`'s label helper selects `nav a, nav span` and asserts
+                        four item names are ABSENT for gated-away users. A span here joins that text.
+                    (3) NOT an <h2>: this nav renders ahead of every page's own <h1>, so headings here would
+                        lead each page's outline with shell chrome. `aria-labelledby` on the list announces
+                        the group when the reader enters it, which is where the information is wanted, and
+                        costs no outline at all.
+                -->
+                <div v-if="group.label" :id="labelId(group.key)" class="sidebar__group-label">
+                    {{ group.label }}
+                </div>
+                <!--
+                    `role="list"` survives `list-style: none`, which Safari/VoiceOver otherwise strips list
+                    semantics for — the same note MdsBreadcrumb, MdsTabNav and this directory's own
+                    NotificationBell already carry. Load-bearing rather than tidy now that grouping exists,
+                    since a stripped list would take the group's name with it.
+                -->
+                <ul
+                    class="sidebar__list"
+                    role="list"
+                    :aria-labelledby="group.label ? labelId(group.key) : undefined"
+                >
+                    <li v-for="item in group.items" :key="item.key">
+                        <MdsTooltip :text="item.label" placement="right" block :disabled="!isRail">
+                            <template #default="{ trigger }">
+                                <Link
+                                    v-bind="trigger"
+                                    :href="item.href"
+                                    class="sidebar__item"
+                                    :class="{ 'is-active': isActive(item.href) }"
+                                    :aria-current="isActive(item.href) ? 'page' : undefined"
+                                    :aria-label="accessibleName(item)"
+                                    @click="emit('close')"
+                                >
+                                    <MdsIcon :name="item.icon" size="md" />
+                                    <span class="sidebar__label">{{ item.label }}</span>
+                                    <!-- aria-hidden: the count is already in the link's accessible name
+                                         above, and announcing it twice is worse than not at all. The bell's
+                                         bubble carries the same attribute for the same reason. -->
+                                    <span
+                                        v-if="badgeFor(item) !== null"
+                                        class="sidebar__badge"
+                                        aria-hidden="true"
+                                    >{{ badgeFor(item) }}</span>
+                                </Link>
+                            </template>
+                        </MdsTooltip>
+                    </li>
+                </ul>
+            </div>
         </nav>
     </div>
 </template>
@@ -84,6 +288,25 @@ function isActive(href?: string): boolean {
     background-color: var(--mds-color-bg-surface);
     border-right: 1px solid var(--mds-color-border-default);
     overflow-y: auto;
+}
+
+.sidebar__close {
+    display: none;
+}
+
+.sidebar__group + .sidebar__group {
+    margin-top: var(--mds-space-5);
+}
+
+.sidebar__group-label {
+    padding: 0 var(--mds-space-3) var(--mds-space-1);
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    font-weight: var(--mds-font-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--mds-color-text-secondary);
 }
 
 .sidebar__list {
@@ -125,7 +348,13 @@ a.sidebar__item:focus-visible {
     font-weight: var(--mds-font-weight-semibold);
 }
 
-/* Left-edge accent bar — a non-color signifier of the active item, paired with the bold weight. */
+/* Left-edge accent bar — a non-colour signifier of the active item, paired with the bold weight.
+   ⚠️ `-fg`, NOT `-bg`, AND THE DIFFERENCE IS A CONTRAST GUARANTEE RATHER THAN A SHADE. DSR §3.4 states the
+   rule for every coloured rule, edge or indicator in the system: the only contrast `-bg` guarantees is
+   against the text printed ON it, because the brand ramp pairs it solely with `on_primary`. This bar is
+   painted on the active item's tint and is a non-text UI component owing 3:1 against it — a guarantee only
+   `-fg` carries, and for every tenant brand rather than the two shipped accents. Same defect J4a fixed on
+   the capacity meter; axe checks no border or indicator contrast, so no gate here can see it. */
 .sidebar__item.is-active::before {
     content: '';
     position: absolute;
@@ -135,28 +364,42 @@ a.sidebar__item:focus-visible {
     width: 3px;
     height: 60%;
     border-radius: var(--mds-radius-full);
-    background-color: var(--mds-color-action-primary-bg);
-}
-
-.sidebar__item--disabled {
-    color: var(--mds-color-text-secondary);
-    cursor: default;
+    background-color: var(--mds-color-action-primary-fg);
 }
 
 .sidebar__label {
     flex: 1;
 }
 
-.sidebar__soon {
+/* The Achievements streak count (K1e). No positioning in the FULL sidebar: `.sidebar__label` is `flex: 1`,
+   so this lands at the trailing edge on its own — which is also why it must be re-positioned in the rail
+   below, where that label is clipped out of the flow. */
+.sidebar__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* ⚠️ MIN-size, never a fixed one, and the bell's badge carries this note for the same measured reason:
+       `--mds-type-caption-font-size` is 12px at `standard` and 15px under `[data-font-size="extra_large"]`
+       (§2.9 scales the whole type scale ×1.25), and theme-overrides.css records what a pinned box costs
+       there — text clipped at the descenders, a WCAG 1.4.12 failure. A badge that grows is a slightly
+       larger badge; a badge that clips is a number nobody can read. `--mds-radius-full` keeps it a pill if
+       it does grow, which a three-digit streak eventually will. */
+    min-inline-size: 18px;
+    min-block-size: 18px;
     padding: 0 var(--mds-space-1);
-    border-radius: var(--mds-radius-sm);
-    background-color: var(--mds-color-bg-sunken);
-    color: var(--mds-color-text-secondary);
+    border-radius: var(--mds-radius-full);
+    /* The ratified on-primary pair, as the bell uses — `-bg` with `text-on-primary` is contrast-checked in
+       both themes and for every tenant brand ramp. Never a `-fg` token on a filled surface. */
+    background-color: var(--mds-color-action-primary-bg);
+    color: var(--mds-color-text-on-primary);
     font-size: var(--mds-type-caption-font-size);
-    font-weight: var(--mds-font-weight-medium);
+    font-weight: var(--mds-font-weight-semibold);
+    line-height: 1;
+    /* The number changes daily in place; proportional digits make it jitter as the width changes. */
+    font-variant-numeric: tabular-nums;
 }
 
-/* ── Tablet (≤1024): icon-only, labels available to AT via sr-only + tooltip ─────────── */
+/* ── Tablet (≤1024): icon-only, labels to AT via the clip idiom and to sight via MdsTooltip ─────────── */
 @media (max-width: 1024px) {
     .sidebar {
         width: 64px;
@@ -176,8 +419,27 @@ a.sidebar__item:focus-visible {
         clip: rect(0 0 0 0);
         white-space: nowrap;
     }
-    .sidebar__soon {
+    /* The label is out of the flow here, so the badge would otherwise sit beside the glyph and push the
+       centred icon off-centre. Over the glyph's trailing corner instead — `.sidebar__item` is already
+       `position: relative` for the active accent bar, so this needs no new containing block (the
+       containment defect class this repo has now paid for five times). */
+    .sidebar__badge {
+        position: absolute;
+        top: var(--mds-space-1);
+        right: var(--mds-space-1);
+    }
+    /* ⚠️ `display: none`, NOT the clip idiom, and the reason is JR4's rule rather than convenience: a
+       clipped control is still a focus stop the user cannot see. There is no information loss either way —
+       §6 and the two glyph-uniqueness notes in nav-model.ts all say the mark is the sole signifier at this
+       width — and the group's accessible NAME survives regardless, because `aria-labelledby` traverses a
+       hidden referent. A 1px rule carries the boundary visually in the label's place. */
+    .sidebar__group-label {
         display: none;
+    }
+    .sidebar__group + .sidebar__group {
+        margin-top: var(--mds-space-2);
+        padding-top: var(--mds-space-2);
+        border-top: 1px solid var(--mds-color-border-default);
     }
 }
 
@@ -186,7 +448,7 @@ a.sidebar__item:focus-visible {
     .sidebar-wrap {
         position: fixed;
         inset: 0;
-        z-index: 40;
+        z-index: var(--mds-z-index-drawer, 40);
         pointer-events: none;
         visibility: hidden;
     }
@@ -219,7 +481,8 @@ a.sidebar__item:focus-visible {
     .sidebar-wrap.is-open .sidebar {
         transform: translateX(0);
     }
-    /* Labels return inside the open drawer. */
+    /* Labels and group headings return inside the open drawer — there is room, and no tooltip fires on a
+       touch device to supply them. */
     .sidebar__item {
         justify-content: flex-start;
         gap: var(--mds-space-3);
@@ -231,8 +494,42 @@ a.sidebar__item:focus-visible {
         margin: 0;
         clip: auto;
     }
-    .sidebar__soon {
-        display: inline;
+    /* Labels are back in the flow, so `flex: 1` puts the badge at the trailing edge again — the overlay
+       above has to be undone explicitly, or the open drawer would paint the pill on top of the icon in a
+       row that has plenty of room for it. */
+    .sidebar__badge {
+        position: static;
+    }
+    /* The drawer's own dismiss control — see the template comment. 44px to satisfy the touch-target
+       minimum §4.4 applies at every breakpoint, not only this one. */
+    .sidebar__close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        margin-left: auto;
+        margin-bottom: var(--mds-space-2);
+        border: none;
+        border-radius: var(--mds-radius-md);
+        background-color: transparent;
+        color: var(--mds-color-text-secondary);
+        cursor: pointer;
+    }
+    .sidebar__close:hover {
+        background-color: var(--mds-color-bg-sunken);
+    }
+    .sidebar__close:focus-visible {
+        outline: 2px solid var(--mds-color-focus-ring);
+        outline-offset: -2px;
+    }
+    .sidebar__group-label {
+        display: block;
+    }
+    .sidebar__group + .sidebar__group {
+        margin-top: var(--mds-space-5);
+        padding-top: 0;
+        border-top: none;
     }
 }
 </style>

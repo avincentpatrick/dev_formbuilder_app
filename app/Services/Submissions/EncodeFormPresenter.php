@@ -56,7 +56,8 @@ use Illuminate\Support\Collection;
  *    mounts the SAME `createFormRuntime()` on it, so the two channels' step lists are equal BY CONSTRUCTION
  *    rather than by a hand-copied predicate list.
  *  - `version.now`, the session clock, stamped ONCE by the server (see {@see clock()}).
- *  - `steps`, this version's projection under an EMPTY answer document, via {@see StepProjection}. Doc #27 §9
+ *  - `steps`, this version's projection under the answer document being presented — EMPTY on the create page,
+ *    the draft's own answers on a resume (Increment I9b) — via {@see StepProjection}. Doc #27 §9
  *    and the `StepProjection` docblock both name `EncodeFormPresenter` as the class that must consume it.
  *
  * `blocks` STAYS, and the duplication it carries is recorded rather than quietly tolerated: `geo()`,
@@ -107,26 +108,52 @@ final class EncodeFormPresenter
     ) {}
 
     /**
+     * `$subject` hydrates the page from an EXISTING submission. It is an OPTIONAL THIRD PARAMETER WITH A
+     * DEFAULT on purpose: every existing caller and every existing test compiles unchanged, which is what
+     * kept the resume feature from being a rewrite of the create page. Pass null (or omit) for the blank
+     * keying form.
+     *
+     * ── THREE MODES, ONE PARAMETER (I9b added the second, I9c the third) ────────────────────────────────
+     *   - `$subject === null`            → CREATE: a blank keying form.
+     *   - `$subject->status === Draft`   → RESUME (I9b): autosave on, `draft` block populated.
+     *   - any other status               → EDIT (I9c): autosave OFF, `editing` block populated.
+     *
+     * ⚠️ THE MODE IS DERIVED FROM THE ROW'S STATUS, never passed alongside it as a flag. A `bool $editing`
+     * second argument could disagree with `$subject`, and the failure would be silent in the worst direction:
+     * a finalized submission presented in resume mode gets `draft_url`, so the page would autosave a
+     * correction into the draft channel instead of the audited edit one — no exception, no audit row, and the
+     * respondent's original answers overwritten by a path with no ledger entry. The parameter was named
+     * `$draft` until I9c; it is `$subject` now because it is no longer always one.
+     *
      * @return array<string, mixed>
      */
-    public function present(Form $form, FormVersion $version): array
+    public function present(Form $form, FormVersion $version, ?Submission $subject = null): array
     {
+        $isDraft = $subject !== null && $subject->status === SubmissionStatus::Draft;
+        $draft = $isDraft ? $subject : null;
+        $editing = $isDraft ? null : $subject;
         $sections = $version->sections()->orderBy('sequence')->get();
         $allFields = $version->fields()->orderBy('sequence')->get();
         $fields = $allFields
             ->reject(fn (FormField $f): bool => in_array($f->field_type, self::OMITTED, true));
 
-        // Increment H6a — piping (Doc #26 §3.4). This page serves a BLANK keying form: there is no
-        // submission and therefore no answer document, so every hole renders as the empty string. That is
-        // the contract, not a shortfall — a hole is never emitted as the raw `${key}` token, and §8 records
-        // the same narrowing for a printed OCR form ("prose with a gap", not a substitution).
+        // Increment H6a — piping (Doc #26 §3.4). ~~This page serves a BLANK keying form: there is no
+        // submission and therefore no answer document, so every hole renders as the empty string.~~
+        // AMENDED IN I9b, because the premise stopped being true rather than the rule changing: the page now
+        // ALSO serves a saved draft, and when it does, the stored answers are what the piping renderer reads,
+        // exactly as `SubmissionInboxPresenter` reads them for the detail view. On the blank form the
+        // behaviour is unchanged and every hole still renders as the empty string. In both cases a hole is
+        // never emitted as the raw `${key}` token, and §8 records the same narrowing for a printed OCR form
+        // ("prose with a gap", not a substitution).
         //
         // Note that `OMITTED` still drops `calculated`, which IS a pipeable SOURCE per §3.1. That is fine:
         // a source need not have a row on this page for its consumer's label to be correct, and the source
         // map is built from EVERY field for exactly that reason — including the ones with no row.
         // (Increment H7 un-omitted `hidden`; `calculated` remains omitted.)
         $sources = TemplateSources::fromFields($allFields);
-        $answers = [];
+        $stored = data_get($subject, 'answers.answers');
+        /** @var array<string, mixed> $answers */
+        $answers = is_array($stored) ? $stored : [];
 
         /** @var Collection<string, Collection<int, FormField>> $bySection */
         $bySection = $fields->groupBy(fn (FormField $f): string => $f->form_section_id ?? '');
@@ -170,7 +197,7 @@ final class EncodeFormPresenter
             ];
         }
 
-        $now = $this->clock();
+        $now = $this->clock($editing);
 
         return [
             'form' => [
@@ -203,9 +230,54 @@ final class EncodeFormPresenter
                 'now' => $now,
             ],
             'blocks' => $blocks,
-            // Increment H21c — the step list under an EMPTY answer document: the first paint, and the value
-            // the parity suite and the PDF cross-check compare.
-            'steps' => $this->steps($version, $sections, $allFields, $now),
+            // Increment H21c — the step list at first paint, and the value the parity suite and the PDF
+            // cross-check compare. I9b threads `$answers` through: under an empty document this is byte-
+            // identical to before, but on a RESUME the projection must be computed under the draft's own
+            // answers or the server's first paint shows the empty-document step list while the store
+            // immediately recomputes a different one — a visible one-frame flip on every resume, and a
+            // silent divergence from the parity contract.
+            'steps' => $this->steps($version, $sections, $allFields, $now, $answers),
+            // The draft being resumed, or null on the blank keying form. ONE nullable object rather than
+            // five scalars, so the Vue prop block grows by exactly one entry and `draft === null` is the
+            // single test for "am I in create mode".
+            'draft' => $draft === null ? null : [
+                'id' => $draft->id,
+                'client_submission_uuid' => $draft->client_submission_uuid,
+                'answers' => $answers,
+                'current_step' => $draft->draft_current_step,
+                'completeness_percent' => $draft->completeness_percent,
+                'last_saved_at' => $draft->last_saved_at?->toIso8601String(),
+                'expires_at' => $draft->draft_expires_at?->toIso8601String(),
+                // Increment P3a — the SAME optimistic-concurrency token `editing` carries below, now on the
+                // resume arm too. It was missing here for the whole of I9b/I9c, which is precisely why two
+                // tabs on one draft overwrote each other while two editors on one submission could not.
+                // Read off the already-loaded relation, exactly as `$answers` above is, so the two cannot
+                // disagree about which row version they describe.
+                'baseline' => data_get($draft, 'answers.answers_content_checksum'),
+            ],
+            // The submission being CORRECTED (I9c), or null in create/resume mode. Parallel in shape to
+            // `draft` above and mutually exclusive with it by construction — the two can never both be
+            // non-null, which is what lets the page treat "which mode am I in" as a single question.
+            'editing' => $editing === null ? null : [
+                'id' => $editing->id,
+                'answers' => $answers,
+                'status' => $editing->status->value,
+                // The optimistic-concurrency token: the checksum of the document THIS page was rendered
+                // from. It rides back on the PATCH so the server can tell a stale page from a fresh one —
+                // see SubmissionAnswerEditService::edit()'s `$baseline`. Without it two editors, or one
+                // editor pressing browser-Back and re-saving, silently overwrite each other.
+                'baseline' => data_get($editing, 'answers.answers_content_checksum'),
+                // Named on the page so the editor is told BEFORE they start typing that saving will send an
+                // approved submission back for re-review. A consequence discovered at Save is a surprise.
+                'demotes_on_save' => $editing->status === SubmissionStatus::Approved,
+            ],
+            'update_url' => $editing === null ? null : route('submissions.answers.update', $editing),
+            // ⚠️ NULL IN EDIT MODE, and that is a safety property rather than tidiness. This is the autosave
+            // endpoint; an edit must never reach it. If a future refactor left the autosave composable
+            // mounted on the edit page, a null URL makes the mistake a loud client-side failure instead of a
+            // silent write down the draft channel — which has no audit row, no policy check for `update`, and
+            // would overwrite the respondent's answers with no ledger entry that it happened.
+            'draft_url' => $editing === null ? route('forms.submissions.draft', $form) : null,
         ];
     }
 
@@ -219,16 +291,35 @@ final class EncodeFormPresenter
      * `visibleSteps` evaluate `today()`/`now()` against ONE clock. Let the client stamp its own and a keyer
      * working near midnight — or on a machine with a skewed clock — gets a step list that disagrees with the
      * one the server just rendered, on a page whose entire purpose is that the two agree.
+     *
+     * ── ⚠️ EDITING REPLAYS THE SUBMISSION'S OWN CLOCK (I9c), AND OMITTING THIS BREAKS THE AGREEMENT ──────
+     * {@see SubmissionAnswerEditService::edit()} runs Stage 3 under `$submission->submitted_at`, for the
+     * replay reason {@see SemanticValidator::validate()}'s `$now` parameter exists: a `constraint: . <=
+     * today()` must be judged against the day the response was filled, not the day a typo was fixed. This
+     * page therefore has to hand the client the SAME instant, or the two engines disagree by however long
+     * ago the submission was made — the editor would see a field the server prunes, or type a date the
+     * client accepts and the server rejects, on the one page whose entire purpose is that they agree. The
+     * paragraph above is about a keyer near midnight; this is the same failure measured in months.
+     *
+     * Falls back to now() when `submitted_at` is null, which no EDITABLE status should ever have (all four
+     * are finalized) — a defensive default rather than a reachable branch.
      */
-    private function clock(): string
+    private function clock(?Submission $editing = null): string
     {
-        return Carbon::now()->toIso8601String();
+        return $editing?->submitted_at?->toIso8601String() ?? Carbon::now()->toIso8601String();
     }
 
     /**
-     * This version's step projection under an empty answer document — the recipe
+     * This version's step projection under `$answers` — the recipe
      * {@see StepGraphInspector::emptyAtOpen()} already uses, reused rather than
      * re-derived.
+     *
+     * `$answers` defaults to `[]`, which is the create page and the pre-I9b behaviour byte for byte, so
+     * `EncodeStepPayloadTest`/`EncodeStepParityTest` are untouched. On a RESUME it carries the draft's own
+     * document, and that is not cosmetic: the store recomputes `visibleSteps` from the restored answers the
+     * instant it mounts, so a server first paint computed under an empty document would flip the step rail
+     * in the first frame and would put the two engines' step lists out of agreement on the one page whose
+     * entire purpose is that they agree.
      *
      * `$allFields` rather than the OMITTED-filtered `$fields`, and the reason is a CONTRACT rather than an
      * observable difference — recorded that way because a mutation proved it. The projection's emptiness
@@ -251,11 +342,12 @@ final class EncodeFormPresenter
      *
      * @param  Collection<int, FormSection>  $sections
      * @param  Collection<int, FormField>  $fields
+     * @param  array<string, mixed>  $answers
      * @return list<array{key: string, section_key: ?string, field_keys: list<string>, is_repeat: bool}>
      */
-    private function steps(FormVersion $version, Collection $sections, Collection $fields, string $now): array
+    private function steps(FormVersion $version, Collection $sections, Collection $fields, string $now, array $answers = []): array
     {
-        $normalized = $this->normalizer->normalize($fields, $sections, []);
+        $normalized = $this->normalizer->normalize($fields, $sections, $answers);
         $result = $this->semantic->validate($version, $normalized, null, $now);
 
         return array_map(
@@ -277,24 +369,28 @@ final class EncodeFormPresenter
 
     /**
      * The scheduled-form runtime block (Increment H12b) — the same wire shape the guest presenter emits, via
-     * the shared {@see FormScheduleView}. The live finalized COUNT is read only when a cap exists.
+     * the shared {@see FormScheduleView}. The live COUNT is read only when a cap exists.
      *
      * @return array{opens_at: ?string, closes_at: ?string, timezone: string, max_responses: ?int, acceptance: string, remaining: ?int}
      */
     private function schedule(Form $form): array
     {
         $cap = $form->max_responses;
-        $finalizedCount = $cap === null ? null : $this->finalizedCount($form);
+        $consumedCount = $cap === null ? null : $this->capacityCount($form);
 
-        return FormScheduleView::present($form, $finalizedCount);
+        return FormScheduleView::present($form, $consumedCount);
     }
 
-    /** The live count of finalized (non-draft) submissions for this form, RLS-scoped to the tenant. */
-    private function finalizedCount(Form $form): int
+    /**
+     * The live count of submissions that consumed one of this form's paid slots, RLS-scoped to the tenant.
+     * Textually identical to `PublicFormPresenter::capacityCount()` on purpose — the two are display twins of
+     * `FormAcceptanceGuard::assertCapacity()` and must not drift. See {@see Submission::scopeConsumesCapacity()}.
+     */
+    private function capacityCount(Form $form): int
     {
         return Submission::query()
             ->where('form_id', $form->id)
-            ->where('status', '!=', SubmissionStatus::Draft->value)
+            ->consumesCapacity()
             ->count();
     }
 

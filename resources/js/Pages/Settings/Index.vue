@@ -15,23 +15,36 @@ import { useForm } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsCard,
-    MdsCheckbox,
     MdsFormField,
     MdsIcon,
     MdsNumberInput,
     MdsPasswordInput,
+    MdsPasswordStrength,
+    describedByWithStrength,
+    type PasswordRequirement,
     MdsSegmentedControl,
+    MdsSwitch,
     MdsTextInput,
     type IconName,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 import BrandingCard from '@/components/settings/BrandingCard.vue';
+import NotificationPreferencesCard from '@/components/settings/NotificationPreferencesCard.vue';
+import AccessCard from '@/components/settings/AccessCard.vue';
+import MaintenanceCard from '@/components/settings/MaintenanceCard.vue';
+import ModulesCard from '@/components/settings/ModulesCard.vue';
+import AboutCard from '@/components/settings/AboutCard.vue';
+import type { NotificationPreferenceRow } from '@/components/notifications/types';
+import type { SsoSettingsCard } from '@/components/sso/types';
 import type { AccentToken, FontSizeScale, ThemeMode } from '@/types/inertia';
 import { useAppearancePreference } from '@/composables/useTheme';
 
 const props = defineProps<{
-    twoFactor: { enabled: boolean; confirmed: boolean };
+    // `needs_password_confirmation` is what stops the enrolment panel rendering a blank QR when the
+    // session's password confirmation has lapsed — see TwoFactorSetup.vue's docblock (I8a).
+    twoFactor: { enabled: boolean; confirmed: boolean; needs_password_confirmation: boolean };
+    passwordPolicy: PasswordRequirement[];
     // Increment H10 — tenant-level draft settings. `can_manage` is Owner/Admin (tenant.settings.manage); the
     // card is hidden otherwise. `is_default` means the effective value is the 30-day fallback (column unset).
     draftSettings: { draft_ttl_days: number; is_default: boolean; can_manage: boolean };
@@ -43,6 +56,28 @@ const props = defineProps<{
     // branding is three inputs and a preview, which does not earn a page of its own. The card owns
     // its own shape; see BrandingCard.vue.
     branding: InstanceType<typeof BrandingCard>['$props']['branding'];
+    // Increment I4 — the seven NotificationType cases with this user's RESOLVED channels (§23 is sparse,
+    // so absence means default and the server fills the gaps). Typed from the shared contract file rather
+    // than through InstanceType like `branding` above: `components/notifications/types.ts` exists so the
+    // card's own test fixtures type-check against the same shape the server sends.
+    notificationPreferences: NotificationPreferenceRow[];
+    // Increment I5 — App Settings (PRD Feature #10). ONE prop from ONE presenter rather than four, because
+    // the four panels answer one question ("how is this workspace configured") and share one gate.
+    // `can_manage` hides Access/Maintenance/Modules from a non-admin; About is for everyone (a support aid,
+    // and the person filing a bug report is rarely an Owner).
+    appSettings: {
+        can_manage: boolean;
+        access: InstanceType<typeof AccessCard>['$props']['access'];
+        maintenance: InstanceType<typeof MaintenanceCard>['$props']['maintenance'];
+        modules: InstanceType<typeof ModulesCard>['$props']['modules'];
+        about: InstanceType<typeof AboutCard>['$props']['about'];
+    };
+    // P1a (ADR-0016) — a LINK to /settings/sso, and note the condition is NOT `configured` alone the way
+    // customDomains above is `count > 0`. SSO has no sidebar entry at all (§D6: `sso_saml` is Enterprise-only
+    // and Enterprise is seeded is_active:false, so a feature-gated nav row would be invisible in every
+    // environment), which makes this card the ONLY way in — so it must also render for an entitled tenant
+    // that has configured nothing yet. The server folds both halves into `visible`.
+    sso: SsoSettingsCard;
 }>();
 
 const page = usePage();
@@ -218,13 +253,32 @@ function savePassword(): void {
                         Switches body text to OpenDyslexic. Headings and code stay as they are.
                     </p>
                 </div>
-                <MdsCheckbox
+                <!-- A switch since I5. DSR §3.2 argued for a checkbox here while no switch existed; now
+                     that one does, this is the only on/off preference on the page that would have looked
+                     different from the eighteen around it. -->
+                <MdsSwitch
                     :model-value="dyslexiaFont"
                     label="Use a dyslexia-friendly font"
                     @update:model-value="setDyslexiaFont"
                 />
             </div>
         </MdsCard>
+
+        <!-- Notifications (Increment I4, PRD Feature #13b) — placed here, after Appearance and before
+             Drafts, because Appearance and Notifications are the two PERSONAL preference cards, while
+             Drafts, Branding and Custom domains below are org-wide Owner/Admin settings. -->
+        <NotificationPreferencesCard :preferences="notificationPreferences" />
+
+        <!-- App Settings (Increment I5, PRD Feature #10). PRD #10 asks for the area to be "organized by
+             section (Access, Maintenance, Modules) rather than as one long unstructured list of switches",
+             so the three stay CONTIGUOUS and in that order, and they open the org-wide block: everything
+             above is a personal preference, everything from here down is a decision for the whole
+             workspace. About is deliberately not among them — see the bottom of the page. -->
+        <template v-if="appSettings.can_manage">
+            <AccessCard :access="appSettings.access" />
+            <MaintenanceCard :maintenance="appSettings.maintenance" />
+            <ModulesCard :modules="appSettings.modules" />
+        </template>
 
         <!-- Drafts (Increment H10) — Owner/Admin only tenant-level setting -->
         <MdsCard v-if="draftSettings.can_manage" class="settings-card">
@@ -285,6 +339,33 @@ function savePassword(): void {
             </div>
         </MdsCard>
 
+        <!-- Single sign-on (P1a) — a signpost, not a control, exactly like custom domains above. The
+             condition is deliberately WIDER than that card's: `visible` is entitled OR configured, because
+             SSO has no sidebar entry to cover the entitled-but-empty case (ADR-0016 §D6). It still never
+             advertises an unbuyable plan, since an unentitled tenant with nothing configured sees nothing. -->
+        <MdsCard v-if="sso.visible" class="settings-card">
+            <template #header>
+                <div class="settings-card__head">
+                    <MdsIcon name="shield" size="sm" aria-hidden="true" />
+                    <h2 class="settings-card__title">Single sign-on</h2>
+                </div>
+            </template>
+            <div class="settings-row">
+                <div class="settings-row__text">
+                    <p class="settings-row__label">
+                        {{ sso.configured ? `SAML 2.0 · ${sso.status_label}` : 'Not set up' }}
+                    </p>
+                    <p class="settings-row__hint">
+                        Let members sign in with your organisation’s own identity provider instead of an email
+                        address and password.
+                    </p>
+                </div>
+                <MdsButton variant="secondary" icon-left="shield" @click="router.visit('/settings/sso')">
+                    {{ sso.configured ? 'Manage single sign-on' : 'Set up single sign-on' }}
+                </MdsButton>
+            </div>
+        </MdsCard>
+
         <!-- Security -->
         <MdsCard class="settings-card">
             <template #header>
@@ -323,8 +404,13 @@ function savePassword(): void {
                             v-model="password.password"
                             name="password"
                             autocomplete="new-password"
-                            :describedby="describedby"
+                            :describedby="describedByWithStrength(id, describedby)"
                             :invalid="invalid"
+                        />
+                        <MdsPasswordStrength
+                            :input-id="id"
+                            :password="password.password"
+                            :requirements="props.passwordPolicy"
                         />
                     </MdsFormField>
                     <MdsFormField label="Confirm new password" required v-slot="{ id, describedby, invalid }">
@@ -352,9 +438,17 @@ function savePassword(): void {
 
             <section class="settings-sub">
                 <h3 class="settings-sub__title">Two-factor authentication</h3>
-                <TwoFactorSetup :enabled="twoFactor.enabled" :confirmed="twoFactor.confirmed" />
+                <TwoFactorSetup
+                    :enabled="twoFactor.enabled"
+                    :confirmed="twoFactor.confirmed"
+                    :needs-password-confirmation="twoFactor.needs_password_confirmation"
+                />
             </section>
         </MdsCard>
+
+        <!-- About (Increment I5, PRD Feature #10). Last, and OUTSIDE the can_manage block above: it is a
+             support aid rather than a control, and the person who files a bug report is rarely the Owner. -->
+        <AboutCard :about="appSettings.about" />
     </div>
 </template>
 

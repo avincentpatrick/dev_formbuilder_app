@@ -11,7 +11,6 @@ use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Support\Analytics\AnalyticsQuery;
 use Carbon\CarbonImmutable;
-use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -48,8 +47,12 @@ final class AnalyticsReportRequest extends FormRequest
             'from' => ['required', 'date_format:Y-m-d'],
             'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
             // Bound into date_trunc's zone argument, so it is checked against the real IANA list rather than
-            // by pattern.
-            'timezone' => ['sometimes', 'string', Rule::in(DateTimeZone::listIdentifiers())],
+            // by pattern. The framework `timezone` rule, NOT `Rule::in(DateTimeZone::listIdentifiers())` —
+            // they validate against the identical list, but Scramble materializes Rule::in as a ~419-entry
+            // enum PER ENDPOINT in openapi.json (~20% of the whole spec), and that list is owned by PHP's
+            // bundled tzdata: local PHP and CI's floating 8.4 are different builds, so any timelib bump
+            // would redden contract-tests on a diff nobody authored (feature-backlog "openapi ↔ tz" row).
+            'timezone' => ['sometimes', 'string', 'timezone'],
             'granularity' => ['sometimes', Rule::enum(AnalyticsGranularity::class)],
 
             'selection' => ['sometimes', Rule::enum(AnalyticsFormSelection::class)],

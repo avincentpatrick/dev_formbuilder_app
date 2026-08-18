@@ -8,6 +8,7 @@ use App\Enums\DomainEventType;
 use App\Events\DomainEvent;
 use App\Models\Form;
 use App\Services\Connectors\ConnectorRedirector;
+use App\Support\Forms\FormHubLink;
 
 /**
  * Turns a {@see DomainEvent} envelope into the display context a connector message needs
@@ -35,13 +36,18 @@ final class ConnectorEventContextResolver
         $formId = isset($data['form_id']) && is_string($data['form_id']) ? $data['form_id'] : null;
         $submissionId = isset($data['submission_id']) && is_string($data['submission_id']) ? $data['submission_id'] : null;
 
-        $formName = $formId === null
+        // ⚠️ THE MODEL, NOT `->value('title')` (J2d). `Form::query()` under the default scope excludes
+        // soft-deleted rows — which is the same question route-model binding asks — so `$form !== null` IS
+        // the liveness check the deep link needs, at no extra query. A link built from `$formId` alone would
+        // 404 whenever the form was deleted between the event and the click, and a delivery is retried for
+        // hours, so that window is real rather than theoretical.
+        $form = $formId === null
             ? null
-            : Form::query()->whereKey($formId)->value('title');
+            : Form::query()->whereKey($formId)->first(['id', 'title']);
 
         return new ConnectorEventContext(
-            is_string($formName) ? $formName : null,
-            $this->deepLink($envelope, $formId, $submissionId),
+            is_string($form?->title) ? $form->title : null,
+            $this->deepLink($envelope, $form, $submissionId),
         );
     }
 
@@ -49,9 +55,13 @@ final class ConnectorEventContextResolver
      * A submission event links to the submission; every form-lifecycle event links to the form. Null when
      * the tenant has no resolvable host (a data state that should not occur, but must not break a delivery).
      *
+     * `member.invited` deliberately resolves to null: the only page it could point at is the members list,
+     * and an invitation is not yet a member — the row a recipient would arrive to look for is not there
+     * until they accept. The Slack message says what happened and stops.
+     *
      * @param  array<string, mixed>  $envelope
      */
-    private function deepLink(array $envelope, ?string $formId, ?string $submissionId): ?string
+    private function deepLink(array $envelope, ?Form $form, ?string $submissionId): ?string
     {
         $tenantId = isset($envelope['tenant_id']) && is_string($envelope['tenant_id']) ? $envelope['tenant_id'] : null;
 
@@ -60,10 +70,21 @@ final class ConnectorEventContextResolver
         }
 
         $path = match (DomainEventType::tryFrom((string) ($envelope['event_type'] ?? ''))) {
-            DomainEventType::SubmissionCreated => $submissionId === null ? null : "/submissions/{$submissionId}",
+            DomainEventType::SubmissionCreated,
+            DomainEventType::SubmissionApproved,
+            DomainEventType::SubmissionReturned,
+            // I9c — the detail page, NOT the edit page. A Slack link is followed by whoever is watching the
+            // channel, and `submissions.edit.any/.own` is held by Owner/Admin/Form Editor only; pointing a
+            // Reviewer at an edit URL they cannot open turns an informative message into a 403.
+            DomainEventType::SubmissionUpdated => $submissionId === null ? null : "/submissions/{$submissionId}",
+            // J2d — the HUB, not the builder, and it is the note two lines above applied to the arm that
+            // never got it. `/forms/{id}/builder` is `can:view,form` → `canEdit()`, so a Reviewer or Viewer
+            // watching the Slack channel clicked "Form published" and got a 403; `viewOverview` admits all
+            // five roles. There is no user to resolve here — a queue worker has no actor — which is exactly
+            // why the destination must be the one page every role can open.
             DomainEventType::FormPublished,
             DomainEventType::FormOpened,
-            DomainEventType::FormClosed => $formId === null ? null : "/forms/{$formId}/builder",
+            DomainEventType::FormClosed => $form === null ? null : FormHubLink::path($form->getKey()),
             default => null,
         };
 

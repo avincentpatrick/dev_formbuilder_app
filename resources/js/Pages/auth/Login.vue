@@ -1,8 +1,25 @@
 <script setup lang="ts">
 // Design-system-styled sign-in page (Increment C1). Posts to Fortify's session-auth route.
 import { useForm } from '@inertiajs/vue3';
-import { MdsButton, MdsFormField, MdsTextInput, MdsPasswordInput } from '@meridian/design-system';
+import {
+  MdsButton,
+  MdsCheckbox,
+  MdsFormField,
+  MdsTextInput,
+  MdsPasswordInput,
+} from '@meridian/design-system';
 import AuthLayout from '@/Layouts/AuthLayout.vue';
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton.vue';
+
+// I5 — whether /register is reachable from HERE, on THIS host. The server answers it from the same
+// RegistrationGate the route middleware uses, precisely so the link and the route cannot disagree: a
+// visible "Create an account" that leads to a 404 is the exact failure that sharing one gate prevents.
+//
+// J3c2 — `canUseGoogle` is the same idea against a different gate: GoogleSignInGate, which is also what
+// /auth/google/redirect itself asks, so the button and the route it points at are one answer. It is
+// deliberately NOT RegistrationGate — see that class for why a workspace closed to strangers still shows
+// this button to its own members.
+defineProps<{ canRegister: boolean; canUseGoogle: boolean }>();
 
 const form = useForm({ email: '', password: '', remember: false });
 
@@ -12,7 +29,7 @@ function submit(): void {
 </script>
 
 <template>
-  <AuthLayout title="Sign in">
+  <AuthLayout title="Sign in" variant="split">
     <form class="auth-form" @submit.prevent="submit">
       <MdsFormField
         label="Email"
@@ -43,17 +60,20 @@ function submit(): void {
         />
       </MdsFormField>
 
-      <label class="auth-remember">
-        <input v-model="form.remember" type="checkbox" />
-        <span>Remember me</span>
-      </label>
+      <!-- J3b: the shared control, not a raw checkbox under a page-owned class. `MdsCheckbox`
+           carries the 44px touch target (§4.4) and the check GLYPH as the state signifier, which
+           the 16px `accent-color` version had neither of. The accessible name is unchanged, which
+           matters less here than for the two fields either side of it but is still the rule. -->
+      <MdsCheckbox v-model="form.remember" label="Remember me" />
 
       <MdsButton type="submit" :loading="form.processing">Sign in</MdsButton>
     </form>
 
+    <GoogleSignInButton v-if="canUseGoogle" />
+
     <nav class="auth-links">
       <a href="/forgot-password">Forgot your password?</a>
-      <a href="/register">Create an account</a>
+      <a v-if="canRegister" href="/register">Create an account</a>
     </nav>
   </AuthLayout>
 </template>

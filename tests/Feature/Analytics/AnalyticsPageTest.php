@@ -11,6 +11,7 @@ use App\Models\Form;
 use App\Models\User;
 use App\Support\Analytics\AnalyticsQuery;
 use App\Support\Tenancy\TenantContext;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,6 +132,23 @@ it('defaults to a range the draft metrics are NOT suppressed at', function (): v
 
 it('round-trips every filter through the query string into the resolved declaration', function (): void {
     $this->withoutVite();
+
+    // ⚠️ THE CLOCK IS PINNED BECAUSE THE WEEKLY-BUCKET ASSERTION BELOW IS CALENDAR-DEPENDENT, and this
+    // test failed in CI on 2026-08-09 having passed every day before it. 28 days is EXACTLY four weeks, so
+    // `date_trunc('week', …)` (Monday-start) returns FIVE partial weeks on six weekdays out of seven and
+    // exactly FOUR when the window opens on a Monday — which `now()->subDays(27)` did that morning. The
+    // assertion hard-coded the maximum while the comment beside it correctly said "at most 5", so the test
+    // was green by calendar luck one day in seven away from being red.
+    //
+    // Pinned rather than computed: deriving the expected count here would re-implement the very bucketing
+    // this case exists to prove reached the database. 2026-03-18 opens the window on a Thursday.
+    //
+    // `travelTo()` rather than a bare `Carbon::setTestNow()` paired with a reset at the end of the body: a
+    // reset written as the last STATEMENT only runs while the test PASSES, so the first failing assertion
+    // above it would leave the clock pinned for whatever ran next in the process. This restores in
+    // tearDown, on every exit path.
+    $this->travelTo(Carbon::parse('2026-03-18T09:00:00+00:00'));
+
     publishedInboxForm($this->tenant, $this->owner, 'Clinic Intake');
 
     $from = CarbonImmutable::now()->subDays(27)->toDateString();
@@ -160,7 +178,7 @@ it('round-trips every filter through the query string into the resolved declarat
             ->where('applied.locales', ['es'])
             ->where('applied.top_n', 3)
             // The proof that `granularity` reached date_trunc and is not merely echoed: a 28-day window is
-            // 28 daily buckets but at most 5 weekly ones.
+            // 28 daily buckets but at most 5 weekly ones — 5 exactly, given the pinned Thursday open above.
             ->where('report.range.granularity', 'week')
             ->has('report.series', 5));
 });

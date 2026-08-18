@@ -6,13 +6,15 @@
  * (disabled at the plan cap — the server also hard-blocks). Selecting an endpoint opens its detail + delivery
  * log. Assembled entirely from shared design-system components.
  */
-import { computed, ref } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { computed, reactive, ref } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
 import {
     MdsButton,
     MdsDataTable,
     MdsEmptyState,
+    MdsFilterBar,
     MdsIconButton,
+    MdsSearchField,
     MdsStatTile,
     MdsBadge,
     statusVariant,
@@ -33,6 +35,8 @@ type EndpointRow = {
     event_types: string[];
     form_id: string | null;
     form_title: string | null;
+    /** The form's hub path, server-resolved; null when the reader cannot open it or it no longer exists. */
+    form_url: string | null;
     secret_masked: string;
     disabled_reason: string | null;
     consecutive_failure_count: number;
@@ -47,6 +51,8 @@ const props = defineProps<{
     forms: Option[];
     eventTypes: Option[];
     can: { create: boolean };
+    filters: { applied: { q: string | null } };
+    empty_reason: 'no_matches' | 'no_rows' | null;
 }>();
 
 const columns: DataTableColumn[] = [
@@ -62,6 +68,25 @@ const atCap = computed(
 );
 
 const createOpen = ref(false);
+
+// ── Keyword filter (J1e) ────────────────────────────────────────────────
+const selected = reactive({ q: props.filters.applied.q ?? '' });
+const busy = ref(false);
+
+function applyFilters(): void {
+    router.get('/webhooks', selected.q ? { q: selected.q } : {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => (busy.value = true),
+        onFinish: () => (busy.value = false),
+    });
+}
+
+function clearFilters(): void {
+    selected.q = '';
+    applyFilters();
+}
 
 function formatQuota(q: Quota): string {
     const used = q.used.toLocaleString();
@@ -79,12 +104,15 @@ function openEndpoint(id: string): void {
 
         <PageHeader title="Webhooks" icon="activity">
             <template #actions>
+                <!-- J4a — the `title` naming the plan limit is DELETED rather than turned into a tooltip:
+                     a natively disabled button is not focusable, so it was unreachable by keyboard and by
+                     screen reader. `.webhooks__hint` below already says the same sentence in the page, on
+                     the same `atCap` condition, which is the answer DSR §3.4a prescribes. -->
                 <MdsButton
                     v-if="can.create"
                     variant="primary"
                     icon-left="plus"
                     :disabled="atCap"
-                    :title="atCap ? 'You’ve reached your plan’s endpoint limit.' : undefined"
                     @click="createOpen = true"
                 >
                     Add endpoint
@@ -103,18 +131,34 @@ function openEndpoint(id: string): void {
 
         <ZapierRecipe class="webhooks__recipe" />
 
-        <MdsDataTable :columns="columns" :rows="data" caption="Webhook endpoints" row-key="id">
+        <MdsFilterBar>
+            <MdsSearchField
+                v-model="selected.q"
+                :applied="filters.applied.q ?? ''"
+                label="Search endpoints"
+                placeholder="Name or URL"
+                @submit="applyFilters"
+            />
+        </MdsFilterBar>
+
+        <MdsDataTable :columns="columns" :rows="data" :loading="busy" caption="Webhook endpoints" row-key="id">
             <template #cell-url="{ row }">
                 <span class="webhooks__url">{{ (row as EndpointRow).url }}</span>
             </template>
             <template #cell-status="{ row }">
-                <MdsBadge v-bind="statusVariant((row as EndpointRow).status)" />
+                <MdsBadge v-bind="statusVariant((row as EndpointRow).status)" dot />
             </template>
             <template #cell-event_types="{ row }">
                 {{ (row as EndpointRow).event_types.length }}
             </template>
+            <!-- J2d — the Scope column names a form and now reaches it. `form_url` is server-resolved and
+                 absent whenever the reader could not open the hub (or the form is gone), so this is a link
+                 iff the destination exists; the text fallback is exactly what this cell rendered before. -->
             <template #cell-form_title="{ row }">
-                {{ (row as EndpointRow).form_title ?? 'All forms' }}
+                <Link v-if="(row as EndpointRow).form_url" :href="(row as EndpointRow).form_url!" class="scope-link">
+                    {{ (row as EndpointRow).form_title }}
+                </Link>
+                <template v-else>{{ (row as EndpointRow).form_title ?? 'All forms' }}</template>
             </template>
             <template #row-actions="{ row }">
                 <MdsIconButton
@@ -126,6 +170,17 @@ function openEndpoint(id: string): void {
             </template>
             <template #empty>
                 <MdsEmptyState
+                    v-if="empty_reason === 'no_matches'"
+                    illustration="search"
+                    headline="No matching endpoints"
+                    description="Endpoints are matched on their name and URL — the Scope column is not searched."
+                >
+                    <template #action>
+                        <MdsButton variant="secondary" @click="clearFilters">Clear search</MdsButton>
+                    </template>
+                </MdsEmptyState>
+                <MdsEmptyState
+                    v-else
                     illustration="default"
                     headline="No webhook endpoints"
                     description="Add an endpoint to receive real-time events when submissions arrive or forms change."
@@ -178,5 +233,23 @@ function openEndpoint(id: string): void {
     font-family: var(--mds-font-family-mono);
     font-size: var(--mds-type-body-sm-font-size);
     color: var(--mds-color-text-secondary);
+}
+
+/* J2d — the Scope column's form link. `-fg`, never `-bg`: the J2a WCAG 1.4.11 finding, and the same token
+   `inbox__form-link` and `forms__title-link` already use. There is no global `a` reset in this app, so an
+   unclassed link renders in browser-default #0000EE — the one-design-system rule caught by review. */
+.scope-link {
+    color: var(--mds-color-action-primary-fg);
+    text-decoration: none;
+}
+
+.scope-link:hover {
+    text-decoration: underline;
+}
+
+.scope-link:focus-visible {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
 }
 </style>

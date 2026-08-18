@@ -48,6 +48,48 @@ class ConnectionFactory extends Factory
         ]);
     }
 
+    /**
+     * A Google Sheets grant (H16a) — and unlike the Slack default it is REFRESHABLE and EXPIRING, because
+     * that is what a real one is: Google issues an access token that lives about an hour plus a refresh token
+     * on the first authorization. A Google grant with a null expiry does not occur in production, so a factory
+     * that produced one would let a test pass over a code path the sweep and the pre-flight both skip.
+     */
+    public function googleSheets(int $expiresInSeconds = 3600): static
+    {
+        return $this->state(fn (): array => [
+            'provider' => ConnectorProviderKey::GoogleSheets,
+            'external_account_id' => 'google-drive',
+            'external_account_label' => 'Google Sheets',
+            'scopes' => ['https://www.googleapis.com/auth/drive.file'],
+            'access_token' => 'ya29.'.Str::random(40),
+            'refresh_token' => '1//'.Str::random(40),
+            'token_expires_at' => Carbon::now()->addSeconds($expiresInSeconds),
+        ]);
+    }
+
+    /**
+     * An Airtable grant (H16c). Refreshable and expiring like the Google state above, and for the same reason
+     * that docblock gives — but Airtable is the stronger case: it ROTATES the refresh token on every renewal
+     * and invalidates the previous pair, so a state with a null expiry would model a grant that cannot exist
+     * and would skip the one path where getting this wrong kills the connection 60 minutes after connecting.
+     *
+     * `external_account_id` is a real-shaped Airtable user id (`usr…`) rather than the constant the Google
+     * state carries: `whoami` needs no scope, so two Airtable accounts under one tenant are genuinely
+     * distinguishable by `connections_tenant_provider_account_unique`.
+     */
+    public function airtable(int $expiresInSeconds = 3600): static
+    {
+        return $this->state(fn (): array => [
+            'provider' => ConnectorProviderKey::Airtable,
+            'external_account_id' => 'usr'.Str::random(14),
+            'external_account_label' => 'Airtable',
+            'scopes' => ['schema.bases:read', 'data.records:write'],
+            'access_token' => 'oaa'.Str::random(40),
+            'refresh_token' => 'oar'.Str::random(40),
+            'token_expires_at' => Carbon::now()->addSeconds($expiresInSeconds),
+        ]);
+    }
+
     public function revoked(): static
     {
         return $this->state(fn (): array => ['status' => ConnectionStatus::Revoked]);

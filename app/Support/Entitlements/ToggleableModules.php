@@ -1,0 +1,124 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Entitlements;
+
+use App\Enums\NotificationType;
+use App\Services\Entitlements\EntitlementService;
+
+/**
+ * The capability keys a tenant may switch OFF for itself (PRD Feature #10, "per-module toggles") —
+ * Increment I5.
+ *
+ * PRD #10 requires the module panel to reuse "the same capability-flag mechanism that already gates
+ * per-form OCR eligibility… not a second flagging system", so these are literally
+ * `Database\Seeders\Data\PlanCatalog::FEATURE_KEYS` entries and the toggle composes into
+ * {@see EntitlementService::feature()} as a third layer: **effective = (legacy override ∥ plan flag) AND
+ * NOT tenant-disabled.** One-directional by construction — a tenant can silence a capability its plan
+ * grants, and can never grant itself one its plan denies.
+ *
+ * ── WHY THIS IS A CURATED SUBSET RATHER THAN THE WHOLE CATALOG ──────────────────────────────────────────
+ * Two exclusions are about not stranding live state, and they are the ones worth arguing:
+ *   - `branding` and `custom_domain` — ADR-0012 §D9's escape hatch says a tenant that loses a paid feature
+ *     must retain a path to UNDO what the paid tier let it create. Switching `custom_domain` off here would
+ *     hide the /domains surface while a hostname is still resolving to the platform, which is the exact
+ *     state that escape hatch exists to prevent; `branding` is the same shape one step down.
+ * The rest are excluded because a toggle would be theatre: `sso_saml`, `dedicated_db`, `data_residency` and
+ * `embedded_payments` are provisioning/commercial arrangements, not features a tenant turns off on a
+ * Tuesday. ⚠️ This sentence used to end "and none of them is built yet", which stopped being true when SSO
+ * shipped (P1a–P1c) and nothing noticed — `sso_saml` now has a full vertical behind it and is excluded on
+ * the argument above alone, which is the durable half. `dedicated_db` and `data_residency` remain
+ * unbuilt AND unprovisioned (ADR-0017 §D5); `embedded_payments` is held.
+ *
+ * ── WHY `gamification` IS INCLUDED, WHICH IS THE INVERSE OF THE BRANDING ARGUMENT (K1a) ────────────────
+ * The exclusions above are all about not stranding live state. Gamification cannot strand any: `point_awards`
+ * is `append_only` under RLS, so switching the module off stops the listeners awarding and hides the
+ * surfaces, and there is no policy on the table that would let anything already earned be deleted — by this
+ * toggle or by anything else. That is why {@see self::hint()} can promise "nothing already earned is
+ * deleted" as a fact about the schema rather than as an intention. Switching it back on resumes awarding
+ * with the history intact; only the acts that happened while it was off are missing, which is what "off"
+ * should mean. ⚠️ Unlike every other key here it is granted on EVERY plan tier including Free (user
+ * decision 2026-08-17), so this toggle — not the plan — is the only control anyone has over it.
+ *
+ * Adding a key here is a one-line change with no migration — `modules.<key>` is an open namespace in the
+ * sparse `settings` table — but it MUST also exist in the plan catalog, which `ToggleableModulesTest` pins.
+ */
+final class ToggleableModules
+{
+    /**
+     * @var list<string>
+     */
+    public const array KEYS = [
+        'ocr_single',
+        'ocr_linelist',
+        'webhooks',
+        'native_connectors',
+        'api_access',
+        'offline_sync',
+        'save_and_resume',
+        'xlsform_export',
+        'form_templates',
+        'field_library',
+        'advanced_analytics',
+        'gamification',
+    ];
+
+    /** The settings key a module toggle is stored under. */
+    public static function settingKey(string $module): string
+    {
+        return 'modules.'.$module;
+    }
+
+    public static function isToggleable(string $module): bool
+    {
+        return in_array($module, self::KEYS, true);
+    }
+
+    /**
+     * Human labels for the Modules card. Kept beside the list so a new key cannot ship label-less —
+     * the same argument {@see NotificationType::label()} makes for its own vocabulary.
+     */
+    public static function label(string $module): string
+    {
+        return match ($module) {
+            'ocr_single' => 'OCR — single forms',
+            'ocr_linelist' => 'OCR — line lists',
+            'webhooks' => 'Webhooks',
+            'native_connectors' => 'Integrations (Slack, Sheets, Airtable)',
+            'api_access' => 'REST API',
+            'offline_sync' => 'Offline collection',
+            'save_and_resume' => 'Save & resume for respondents',
+            'xlsform_export' => 'XLSForm import/export',
+            'form_templates' => 'Form templates',
+            'field_library' => 'Question library',
+            'advanced_analytics' => 'Advanced analytics',
+            'gamification' => 'Points, badges and streaks',
+            default => $module,
+        };
+    }
+
+    /**
+     * What turning this module off actually stops, in one line, for the card's hint text.
+     *
+     * A toggle whose consequence is unstated is a toggle nobody dares touch — and the consequences here
+     * genuinely differ (some hide a surface, one stops respondents mid-form).
+     */
+    public static function hint(string $module): string
+    {
+        return match ($module) {
+            'ocr_single', 'ocr_linelist' => 'Hides scanned-form capture from the builder and the inbox.',
+            'webhooks' => 'Existing endpoints stop receiving deliveries and the page is hidden.',
+            'native_connectors' => 'Connected destinations stop receiving new submissions.',
+            'api_access' => 'Existing API keys stop working until this is switched back on.',
+            'offline_sync' => 'Respondents lose offline collection; queued responses still upload.',
+            'save_and_resume' => 'Respondents can no longer save a partly-filled form and come back.',
+            'xlsform_export' => 'Hides XLSForm import and export from the builder.',
+            'form_templates' => 'Hides the template gallery when creating a form.',
+            'field_library' => 'Hides the saved-question library in the builder.',
+            'advanced_analytics' => 'Hides the analytics workspace; the dashboard and per-form statistics are unaffected.',
+            'gamification' => 'Stops awarding points and badges, and hides the leaderboard. Nothing already earned is deleted.',
+            default => '',
+        };
+    }
+}

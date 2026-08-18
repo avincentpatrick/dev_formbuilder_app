@@ -28,6 +28,13 @@ watch(
 const links = [
     { label: 'Tenants', href: '/admin/tenants' },
     { label: 'Users', href: '/admin/users' },
+    // I7a — the feedback support queue (PRD Feature #11). Read-and-triage, so it sits with the other
+    // read surfaces rather than beside the destructive one.
+    { label: 'Feedback', href: '/admin/feedback' },
+    // I7b — the platform ledger (PRD Feature #12). A read surface, so it sits with the others.
+    { label: 'Audit log', href: '/admin/audit-log' },
+    // I5 — platform settings (PRD Feature #10). Last, because it is the only destructive one here.
+    { label: 'Platform', href: '/admin/settings' },
 ];
 
 function isActive(href: string): boolean {
@@ -184,6 +191,10 @@ function logout(): void {
     flex: 1;
 }
 
+/* Deliberately NOT the tenant shell's 1600px wide class (JR4, `AppLayout.vue`'s `--wide`): the console
+   has no sidebar, so its gutter grows more slowly, and its own ≤900px bar-wrap block is measured against
+   these numbers. If this ever moves, re-derive `DataTable.vue`'s 56em collapse threshold with it — the
+   console at 834px (an 802px content box) is one of the two edges that pinned it. */
 .admin__inner {
     max-width: 1100px;
     margin: 0 auto;
@@ -215,16 +226,51 @@ function logout(): void {
     font-size: var(--mds-type-heading-1-font-size);
     line-height: var(--mds-type-heading-1-line-height);
     font-weight: var(--mds-type-heading-1-font-weight);
-    letter-spacing: -0.01em;
+    letter-spacing: var(--mds-type-heading-1-letter-spacing); /* JR1: was -0.01em */
     color: var(--mds-color-text-heading);
 }
 
-@media (max-width: 480px) {
+/*
+ * ⚠️ 900px, not 480px, and I7b is what forced the measurement. `.admin__bar` is a fixed-height 56px flex
+ * ROW with no wrap, so once brand + nav + email + logout exceed the viewport the bar overflows
+ * horizontally rather than reflowing. At 768px the content box is ~720px while five nav links, the brand
+ * and a real email address measure ~860px — and with the four pre-I7b links it was ~767px, i.e. already
+ * marginally over. Raising the existing breakpoint (which already wraps the bar, frees its height and
+ * drops the email) is the whole fix at tablet width.
+ *
+ * ⚠️ THE BAR WRAPPING IS NOT ENOUGH AT PHONE WIDTH, and I10e is what finally measured that. The claim this
+ * comment used to end on — "nothing in CI would ever have caught it: /admin/* is excluded from the
+ * Playwright responsive sweep because `superadmin.mfa` needs a TOTP" — no longer holds. `responsive-axe`
+ * still does not cover /admin/*, but the reason given was wrong (the MFA gate needs no TOTP at all — see
+ * `E2eSeeder::seedSuperAdmin()`), and a separate spec, `admin-console-axe.spec.ts`, now scans this shell at
+ * all three viewports. Its first run at 375px was RED on both pages in both themes.
+ *
+ * The offender was measured, not guessed: `.admin__nav` is 369px of links starting at x=16, so it runs to
+ * 385 against a 375px viewport — a 10px document overflow, identical on /admin/settings and
+ * /admin/feedback, which is the tell that it is the SHELL and not either page. (The feedback DataTable's
+ * 415px row is wider still but sits in its own `overflow-x: auto` container and never reaches
+ * `documentElement.scrollWidth`.) Five links simply do not fit one phone-width row.
+ *
+ * `flex-wrap` on `.admin__nav` is safe HERE and only here: this block has already set the bar to
+ * `height: auto`, so a second row of links grows it. Do NOT lift this to the unscoped rule above — against
+ * the fixed 56px the second row would be clipped instead, which is the trap the original comment warned
+ * about and the reason it was left off in the first place. The explicit `row-gap` is because the 4px
+ * `gap` above was only ever a horizontal one; once the nav wraps it becomes the space BETWEEN two rows of
+ * tap targets, and 4px there reads as a rendering fault rather than as a layout.
+ *
+ * 375px is the tested floor — the Playwright `mobile` project's width. Narrower phones should hold (the
+ * right-hand group wraps to its own line) but nothing measures them.
+ */
+@media (max-width: 900px) {
     .admin__bar {
         flex-wrap: wrap;
         height: auto;
         gap: var(--mds-space-3);
         padding: var(--mds-space-3) var(--mds-space-4);
+    }
+    .admin__nav {
+        flex-wrap: wrap;
+        row-gap: var(--mds-space-2);
     }
     .admin__email {
         display: none;

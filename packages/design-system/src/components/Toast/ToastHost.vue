@@ -5,6 +5,12 @@
  * (`--mds-shadow-4`). Stacked top-right on desktop, full-width top-anchored on mobile (§6). The
  * container is always present, so it is a stable live-region host for the toasts inserted into it.
  * The consuming app owns the toast list + timers; this just presents them.
+ *
+ * `data-mds-inert-exempt` is the DOM half of that same promise (Increment I10a). Because this host is a
+ * body-level sibling of an open modal's backdrop, the modal's inert walk would otherwise mark it — and
+ * `inert` removes a subtree from the accessibility tree, so every toast raised while a dialog is open
+ * would be announced to nobody and clickable by nobody. Being outside the modal is the point; being
+ * unreachable is not.
  */
 import Toast from './Toast.vue';
 import type { ToastItem } from './toast';
@@ -16,7 +22,7 @@ defineEmits<{ dismiss: [id: ToastItem['id']] }>();
 
 <template>
     <Teleport to="body" :disabled="!teleport">
-        <div class="mds-toast-host">
+        <div class="mds-toast-host" data-mds-inert-exempt>
             <TransitionGroup name="mds-toast">
                 <Toast
                     v-for="toast in toasts"
@@ -36,7 +42,7 @@ defineEmits<{ dismiss: [id: ToastItem['id']] }>();
     position: fixed;
     top: var(--mds-space-4);
     right: var(--mds-space-4);
-    z-index: 1100;
+    z-index: var(--mds-z-index-toast, 1100);
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-3);

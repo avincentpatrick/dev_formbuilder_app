@@ -70,6 +70,26 @@ export const Empty: Story = { args: { data: [] } };
 
 export const WithVisibleTable: Story = { args: { tableVisible: true } };
 
+/**
+ * J2a — linked categories. The plot drops `role="img"` in this shape and the summary moves to a
+ * visually-hidden paragraph; see the component docblock for why leaving links inside `role="img"` would
+ * have made them unreachable rather than merely unlabelled. The aggregated bucket stays inert.
+ */
+export const LinkedCategories: Story = {
+    args: {
+        data: [
+            { key: 'a', label: 'Clinic Intake', value: 42, href: '#clinic-intake' },
+            { key: 'b', label: 'Household Roster', value: 18, href: '#household-roster' },
+            { key: 'c', label: 'Other (3 categories)', value: 9, neutral: true },
+        ],
+    },
+};
+
+export const LinkedCategoriesDark: Story = {
+    args: LinkedCategories.args,
+    decorators: [dark],
+};
+
 export const WithOtherBucketDark: Story = {
     args: WithOtherBucket.args,
     decorators: [dark],

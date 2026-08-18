@@ -3345,3 +3345,51 @@ had already merged — the git ref is the authority, never the CLI's exit status
 hold on `docs/feature-backlog.md`. The architecture doc promises resumable multipart upload with per-chunk
 retry; G8b shipped whole-file with per-file retry. Filed with both remedies costed and with the part that is
 not free stated — R4 names resumable retry as its own mitigation, so narrowing the promise re-opens the risk.
+
+## 2026-08-18 — J7 (Lane A): the builder's save indicator stops lying, and the parity test two docblocks already promised
+
+Merged as **PR #174** (`922ecef`), 6/6 on the first attempt. Taken under Rule 7(f)'s *"waiting on the other lane"* state: Lane A's named queue is
+empty, gamification is Lane B's and the final integration PR is Lane B's — which is a reason to say so, not a reason to idle.
+
+**Two defects, both verified against the code before planning.** (1) `.builder__save` is a polite live region that read an in-flight COUNTER as a
+verdict; `guard()` catches the throw, so the decrement in the `.finally()` ran on the failure path exactly as on the success path, and the page
+announced *"All changes saved"* beside an assertive alert saying the opposite — at every width including 1440px. WCAG 4.1.3. The store now carries
+an explicit `SaveState`. (2) `ShellAbilityParityTest` was cited by `ShellAbilities:26` and `DestinationCatalog:22` as the guard holding the sidebar and
+the command palette together, and **did not exist**; seven other `*ParityTest` files did. The twelve rows agree today, so it is the drift guard those
+docblocks already advertise rather than a repair.
+
+**The hand-off's own named candidate was misframed — nineteen-for-nineteen.** It named `DestinationCatalog::visibleTo()`'s `feature()` sign
+flip. Real, but wrong on three of four load-bearing claims: `Sidebar.vue` cannot be "moved too" (it gates client-side off a prop that is `null` in
+exactly the disputed state, so the fix there is a shared-prop contract change), the `/domains` argument is a different AXIS (which key) from the sign
+flip (null-plan semantics), and the current behaviour is deliberately test-pinned with prose while two OTHER test files pin the opposite convention
+just as deliberately. The real finding — the codebase holds two contradictory conventions for an unseeded plan catalog — is now a backlog row
+replacing the misframed one.
+
+**Fixing one defect found three more; the row named one site and the fix reached four.** Two `saveError` clears sat on the SUCCESS path of
+`persistField`/`persistSection`, so a later write succeeding erased an earlier row's real failure — an indicator-only fix ships that untouched.
+A 409 also read as saved (it sets `conflict` without setting `saveError`, so the burst drained clean). And `ConfigPanel`'s `role="alert"` lived
+inside its `v-else`, rendering only when something was SELECTED — and selection goes null on exactly the failure-adjacent paths, so a failed write
+with nothing selected was reported nowhere in the client. That is also why the failed toolbar string is *Not saved* rather than empty.
+
+**Gates.** CI Pest **4329 / 18,235**, a delta of +17 tests / +49 assertions on K1c's green run — exactly the new parity test's locally-measured
+17/49, predicted before the run and matched to the digit. E2E 542 passed / 10 skipped = 552, unchanged. Vitest **122 files / 2,108** (+2 files / +17
+tests). PHPStan 18 = baseline, delta 0. Four lint gates **95 · 106 · 30 · 106/119/0** — the job count moved 29→30 and that +1 was
+Lane B's K1c backfill job, not J7's: measure the delta against your own base, never against a number written before another lane merged.
+`openapi.json` byte-identical. Visual sweep 11/11 in the running app with the failure forced via `page.route()` abort.
+
+**The mutation passes corrected the design twice, and both defects were J7's own.** `toBe` on an associative array is `===`, which compares KEY
+ORDER, so three parity "map" cases were silently asserting order as well and a pure reorder reddened four cases instead of one — destroying the
+legibility that was the entire argument for separating them. And an anti-vacuity case pinned the production strings `manageForms` /
+`advanced_analytics`, so a legitimate consistent rename would have reddened it. Both fixed; a parser guard has no business having an opinion about
+which abilities exist. Totals: parity 8 killed / 2 controls survived, store 7 killed / 2 controls survived, all files byte-identical afterwards.
+
+**Environment facts established this run.** Docker Desktop died mid-session and its containers do not all come back with it (five of seven needed an
+explicit start). The host CANNOT run Vitest at all — the rolldown win32 binding is missing, so it dies on startup rather than failing green. But
+the host CAN run Pest for a test needing no database: `ShellAbilityParityTest` ran host-side while Docker was down, a direct dividend of placing it in
+`tests/Unit` with no container dependency. **A gate that needs nothing is a gate you can still run when the stack is gone.**
+
+**Three findings that lived in `PROGRESS.md` prose and nowhere else are now backlog rows** — JR4's TopNav overlap at 834px with `extra_large`
+(every increment named as its owner has since merged without touching it), I2's two server-paginated tables carrying `sortable: true` (filed with its
+fork stated, not resolved), and the unseeded-catalog conflict. Four more rows record what J7 deliberately did not take: the verdict is batch-scoped
+rather than per-row, an identical repeated failure does not re-announce, the read-only form still claims saved, and the failed indicator is not toned.
+Nothing was spent from either shared namespace — `0021` still the next free ADR, `0010` still reserved for H1d, `#16` still free.

@@ -3436,6 +3436,8 @@ behind `feature:api_access`. Measured the hard way: the API suite's first run fa
 that, having chosen Free precisely to prove no plan withholds gamification. K1e's web surface is a Free
 tenant's only door to the feature.
 
+**Merged as PR #175 (`1b92405`), 6/6 with every job's `conclusion` AND `steps` count parsed individually (11 · 12 · 11 · 16 · 20 · 18, none empty).** CI **Pest 4366 / 18,381** — **+37 tests / +146 assertions on J7's own green run (4329 / 18,235)**, which is exactly the sum of the three locally-measured directory deltas. ⚠️ Measured against **J7's** base, not K1c's: Lane A merged J7 (#174) mid-build, and comparing to a number written before another lane merged is how a clean delta reads as a discrepancy. **E2E 541 + 1 flaky + 10 skipped = 552**, identical to K1c.
+
 **Gates.** Test deltas measured per file: Unit/Gamification 47→58, Feature/Gamification 98→108,
 Feature/Api 95→111; every other baseline leaf directory unchanged (Seeders 16, Queue 50, Tenancy 284,
 Dashboard+Onboarding 31). `openapi.json` regenerated, diffed, promoted and verified byte-identical on a

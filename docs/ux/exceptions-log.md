@@ -575,6 +575,32 @@ full-screen sheet — and none of those moved.
    375px under `extra_large` + OpenDyslexic; `personalization-axe.spec.ts` asserts the element's own
    `scrollWidth` rather than trusting that arithmetic.
 
+   ⚠️ **UPDATED 2026-08-18 BY J8 — THE HAZARD THIS NOTE DESCRIBES WAS ALREADY LIVE ON ANOTHER SURFACE, AND
+   IT WAS NOT THE BUILDER.** The note above reasons about the builder's pane switcher, where the assertion
+   holds. The *top bar's* theme toggle had the identical shape and no assertion at all: it is the only child
+   of `.topnav__right` declaring `min-width: 0`, so it absorbed the whole of that bar's squeeze while its
+   content refused to reflow, and the three labels painted straight across the Feedback trigger. Measured on
+   the running dashboard, spill past the fieldset's own right edge:
+
+   | type scale | 960px | 900px | 860px | 834px | 800px | 700px | 601px |
+   |---|---|---|---|---|---|---|---|
+   | `standard` | — | — | — | **8.5** | 27.6 | 83.9 | 139.5 |
+   | `large` | — | 3.5 | 25.7 | 40.1 | 58.9 | 114.3 | 169.1 |
+   | `extra_large` | — | 31.0 | 52.7 | 66.8 | 85.2 | 139.4 | 193.1 |
+
+   **Two things in that table are worth more than the fix.** First, it is **not** an `extra_large` defect —
+   it bites at the DEFAULT type scale from 834px down, which is exactly where the backlog row that scheduled
+   the work said it did not. Second, **834px is one of the three e2e viewport projects**, so the overlap was
+   rendered in every tablet run this suite has ever made and no gate could see it, for the reason this cost
+   already states.
+
+   ⚠️ **AND THE COMPONENT IS NOT AT FAULT FOR ITS OTHER CONSUMERS, WHICH IS THE OPPOSITE OF WHAT THIS COST
+   IMPLIES.** J8 measured every consumer at every width and both extremes of the type scale: `forms/Index`'s
+   Layout switcher and `analytics`'s Dashboard-view switcher never spill, at 375px under `extra_large`
+   included. The missing wrap/overflow handling is a real latent property, but it is only *reached* where the
+   control is a flex item in a `space-between` bar with `min-width: 0` competing against five siblings — which
+   is the top bar and nowhere else. So J8's fix is shell-only and this component was deliberately not touched.
+
 **Disposition:** accepted. If the sidebar widths, the pane widths, or `body`'s font-size token ever change,
 re-derive 60em from the same two edges rather than adjusting it by eye.
 

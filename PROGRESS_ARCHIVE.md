@@ -3452,3 +3452,103 @@ through `grep '^  Tests:'` **before** stripping ANSI, so nothing ever matched an
 silence; and a `grep -qE 'FAIL|failed'` guard on the same transcript reported failures in two green
 directories because it matched the word inside **test names**. Judge on the summary line, and strip escapes
 before matching, not after.
+
+---
+
+## 🅰️ LANE A — `J8`, the TopNav theme-toggle overlap (2026-08-18)
+
+**The row was real and its title was wrong, which is the twenty-first consecutive time verifying a row
+against the code changed what the row was.** `docs/feature-backlog.md` called it *"the theme-toggle labels
+overlap the Feedback link at 834px with `extra_large`"*. Measured on the running dashboard before touching
+anything, the labels spilled their fieldset at **every** type scale — **8.5px at 834px on the DEFAULT
+scale**, 4.5px of it across the Feedback trigger — rising to 40.1px at `large`, 66.8px at `extra_large`,
+and 139–193px by 601px. So it was never an `extra_large` defect, and **834px is one of the three e2e
+viewport projects**: the overlap has been rendered in every tablet run this suite has ever made.
+
+**Why nothing caught it.** `MdsSegmentedControl` is `inline-flex` with no wrap and no overflow handling
+(exceptions-log #13 cost 5), and this instance is the **only** child of `.topnav__right` declaring
+`min-width: 0` — so it absorbed the entire squeeze while its content refused to reflow. The fieldset
+collapsed from 217px to 43px; the content stayed 214–236px. `.app-shell { overflow-x: clip }` then
+swallowed the evidence, exactly as that cost predicts. `search-nav.spec.ts` already ran at `extra_large`
+plus OpenDyslexic and still missed it, because its non-overlap case pairs the SEARCH against the wordmark
+and the bell — the theme toggle and the Feedback trigger are both inside `.topnav__right`, so neither is
+the search and the pair was never compared.
+
+**⛔ THE APPROVED PLAN'S CENTRAL PREMISE WAS FALSE, AND MEASURING IT IS WHAT KEPT LANE A OUT OF K1e's
+FILES.** The row and the plan both held that the defect belonged to `MdsSegmentedControl` and that *"nine
+consumers spill the same way"*. They do not. Every consumer was measured at every width and both extremes
+of the type scale: `forms/Index`'s Layout switcher and `analytics`'s Dashboard-view switcher never spill,
+375px under `extra_large` included. Only the topnav's instance is a flex item in a `space-between` bar
+competing against five siblings. **So the fix is shell-only and `packages/design-system/` was never
+touched** — which is also why Storybook axe is unchanged on structural rather than hopeful grounds, and
+why Lane B's `K1e` finds that directory exactly as it left it.
+
+**What shipped: three states, every threshold measured.** Labels where they fit; glyphs where they do not
+(**visually hidden, never removed** — `MdsIcon` is `aria-hidden` unless given a `label` and this control
+passes none, so that span is each radio's only accessible name); and not rendered at all below the width
+where even the glyphs stop fitting, where Settings → Appearance still carries the same `setMode` control
+and `/settings` is in the nav model at every width — verified, not assumed.
+
+⚠️ **COLLAPSING TO ICONS WAS NOT SUFFICIENT, AND THE SECOND MEASUREMENT IS THE ONE THAT MATTERED.** With
+labels hidden the content is 139px, and the box keeps being squeezed below it — the spill returned at 760
+(standard) / 800 (`large`) / 834 (`extra_large`). There was no third thing to give up: `.fb`, the bell and
+the account menu all keep their automatic minimum size, and the only remaining source of width was the
+search field, which is **not available** — global search is a standing product principle and this toggle is
+a beyond-spec convenience by its own docblock. Wrapping was foreclosed too: `.topnav` is a fixed 64px with
+`flex-shrink: 0`, so a wrapped control trades a horizontal defect for a vertical one.
+
+### Three findings that were not the row
+
+🔴 **(1) THE FIX RE-CREATED A DEFECT CLASS THIS REPO HAS PAID FOR FOUR TIMES, AND AN EXISTING GATE CAUGHT
+IT MID-BUILD.** `clipped-node-containment.test.ts` walks the whole app tree for the visually-hidden idiom
+in a file that positions nothing, and the new label rule matched. The runtime was in fact safe — the
+segment is positioned by `MdsSegmentedControl` — but that is precisely the latent shape: correct only for
+as long as another component keeps a line this file cannot see. Fixed by stating the containing block
+locally rather than adding the file to `KNOWN_UNGUARDED`, so **the list did not grow**. First instance of
+that class caught while it was being written rather than increments later.
+
+🔴 **(2) THE DYSLEXIA FACE DOES NOT LOAD IN DEV, SO THE OBVIOUS "I MEASURED IT" WOULD HAVE BEEN VACUOUS.**
+`data-dyslexia-font` re-points `--mds-font-family-body` to OpenDyslexic, which is substantially wider. The
+attribute applies — the computed `font-family` changes — but `document.fonts` reports the face `error`,
+`fonts.check()` is false, and the label width is **identical to the fallback's**. Cause: Vite serves the
+stylesheet from `:5173` while the document is on `:8080`, so the `/fonts/*.woff2` fetch is cross-origin and
+`artisan serve` sends no CORS header. Built assets are same-origin, so it very likely **does** load in CI
+and production. The thresholds were therefore widened rather than pinned to what this machine could see —
+959→**1024** (§6's tablet boundary) and 859→**899** — which is close to free, because the collapsed state
+is face-independent: the labels are gone and the glyphs are SVG.
+
+🔴 **(3) `/tmp` IS SHARED BETWEEN THE TWO LANES, AND IT PRODUCED A GATE RESULT THAT WAS NOT MINE.** A Pint
+run written to `/tmp/pint.json` came back `result: "fail"` naming three files — all of them in
+`app/Services/Sso/` and `app/Support/Sso/`, i.e. **Lane B's subtree**, in an increment that changed zero
+PHP. `/tmp` resolves to `C:/Users/DOH/AppData/Local/Temp`, which both lanes' shells share, and nothing this
+lane ran rewrote that file before it later read `passed`. Acting on it would have meant "fixing" three of
+the other lane's files for no reason — a cross-lane trespass caused purely by a scratch-filename collision.
+**Write gate output to the session scratchpad, never to a bare `/tmp/<name>`.**
+
+### Gate notes worth keeping
+
+⚠️ **A Vitest chunk exited `137` — SIGKILL, an OOM — while a Playwright browser was running beside it**, and
+it printed no summary line at all. Read the exit code echoed into the file, not the pass line: a chunk that
+never finishes looks like a chunk that was never counted. Re-run serialised.
+
+⚠️ **`--reporter=basic` is not valid in this Vitest** and dies as `ERR_LOAD_URL … Does the file exist?` —
+a harness failure that reads like a test failure.
+
+⚠️ **The mutation harness refused a mutation and was right to.** `html[data-font-size]` appeared **4×**, not
+the 3 the plan predicted: the fourth is inside the docblock explaining it. Narrowed the find-string to
+`html[data-font-size] .theme-quick` — the standing *"assert the find-string count, a docblock will match
+too"* rule, now on its second lane.
+
+⚠️ **And one assertion of mine was too strong before it was ever committed.** A control case asserted that
+no media block reaches 960px; widening the collapse threshold to 1024 made that false **on a correct
+file**. Replaced with the real invariant — *collapse before you hide, compared WITHIN a type scale*, since
+the enlarged hide (899) and the default collapse (899) legitimately coincide.
+
+**Gates on the merged tree.** Vitest **123 files / 2,115** (`packages/design-system` 35/545 ·
+`resources/public-runtime` 32/720 · `resources/js` 56/850 — +1 file / +7 tests, all mine, and the +7 rather than the +6 forecast is the control case being split in two mid-build). Mutation pass
+**8 killed + 1 control survived**, bytes identical after restore. `vue-tsc` clean on both projects; the two
+files `tsconfig.json` does not cover type-checked by hand. Four host linters **96 · 106 · 30 · 106/119/0** —
+⚠️ controllers is 96 and the hand-off said 95, because **K1d merged mid-increment**; the +1 is Lane B's API
+controller, not this row's. PHPStan **18 = baseline, delta 0**. Pint `result: "passed"`. `openapi.json`
+untouched (zero PHP). Storybook axe **42 suites / 299** asserted unchanged on the structural ground that
+Storybook globs `packages/design-system/src/**` only and this increment touched no file under it.

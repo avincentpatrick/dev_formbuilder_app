@@ -3647,3 +3647,100 @@ no exceptions-log entry.
 
 ⚠️ **`LANE B QUEUE EMPTY — 2026-08-18`. BOTH QUEUES ARE NOW EMPTY**, so Rule 7(f) checkpoint 2 applies to Lane
 B as the lane that emptied last: the final integration PR to `main` is **recommended, not performed**.
+
+---
+
+## 2026-08-18 — LANE B: the merge-gate review, `M1` (PR #178), and the FINAL INTEGRATION PR to `main` (#179)
+
+**The session Rule 7(f) checkpoint 2 exists for.** `main` had received nothing since 2026-08-05 (`b3a7971`),
+so this was the highest-consequence action in the project and it was **recommended, not performed**: the plan
+was approved first, the fix set was the user's choice, and the PR was opened only after both.
+
+**THE REVIEW WAS A FULL-COVERAGE FAN-OUT OVER THE DIFF, NOT A RUBBER STAMP ON 419 GREEN RUNS.** 18 shards,
+**1,073 of 1,073 changed files**, and the coverage was **proven by arithmetic before any agent ran** — the
+shard lists sum to 1,073, contain zero duplicates, and are set-identical to `git diff --name-only`. That
+proof is the point: 149k added lines is roughly 2M tokens, more than any single context holds, so "read the
+whole diff" is only literally true with fan-out; one reviewer would have sampled and called it coverage.
+
+⚠️ **THE ADVERSARIAL PASS WENT THREE FOR THREE — EVERY CODE BLOCKER WAS DOWNGRADED, EACH ON A FACT THE
+FINDER HAD NOT CHECKED.** The 2FA gap on the `/api/v1` mint → **minor**: the middleware is an *enrolment
+nudge* by its own docblock, and Fortify's own 2FA-enrolment routes sit outside the same gate behind
+`password.confirm`, so a password-only attacker already had a strictly better path, and minted abilities are
+capped at the issuer. The SSO account-takeover → **major**: all six links hold, including the email-change
+finale, but `sso_saml` comes only from Enterprise, which is seeded `active: false` and assignable only by the
+super-admin console — **deployment state, not a code control**, which is precisely why it was fixed anyway.
+The guest draft 409 → **major**: the P3a guard is *not* undone, because the service throws before the write,
+and "fresh uuid after a 409 → a second row" is the pre-existing documented G8c recovery shape. **A finding
+is a hypothesis. Never act on a severity nobody has tried to refute.**
+
+🔴 **AND THE FINDING THAT JUSTIFIED THE WHOLE EXERCISE WAS NOT CODE.** `docs/ACCESS-MATRIX.md` added a
+**real personal email address** to a table headed *"every account below uses the same password"*, on a
+**public** repository, and the line is absent from `main` — so the integration merge would have created a
+**new** public exposure by the act of finishing. No gate here looks for that: gitleaks scans for credentials,
+not identities. It was a one-line fix and nothing else in the review came close to it in value.
+
+**`M1` (PR #178, `4abbb0e`) — what was fixed rather than filed.** The email line · `SsoUserProvisioner`
+adopting an existing central account (**JIT may create an account, never adopt one**; narrow by construction,
+since a membership row of *any* status still passes) · `Settings/Sso.vue` addressing a `#footer` slot
+`MdsModal` does not declare, so Vue silently discarded both buttons and **`DELETE /settings/sso` was
+unreachable from the UI** · `NotificationType::BadgeEarned->pathFor()`, a K1b→K1e hand-off documented in the
+enum *and* in a test written to fail on the flip, which K1e never came back for · plus the documentation that
+was false about its own branch (README's *"Phase 0 walking skeleton"* front page, the RBAC design's
+*"impersonation IS NOT BUILT YET"* in the branch that ships it, TESTING-GUIDE's *"not built yet: step-up +
+org 2FA"*, two stale sidebar lists) and the integrator-facing one: **`X-Webhook-Signature` carries two
+comma-joined `sha256=` values during a rotation window** and both documents described only the single-value
+form, so an integrator implementing `hash_equals` from the docs would have had every delivery silently
+rejected from the first rotation — in production only, after an unrelated admin action, looking like an
+attack.
+
+⚠️ **`CENTRAL_DOMAIN` WAS SETTABLE NOWHERE** while `config/tenancy.php` defaults it to `meridian.test`, so
+the documented `cp .env.example .env` produced a stack whose `/admin/*` console 404s **after** a successful
+sign-in. Three documents referenced the variable; none defined it.
+
+⚠️ **THE SSO FIX WAS DESCRIBED AS A ONE-LINER AND WAS NOT** — verifying the row against the code moved it,
+as it has every time. The refusal needs its own `SsoFailureReason`, and `sso_auth_failures.reason` is
+CHECK-constrained to `SsoFailureReason::values()`, so it needs **migration `2026_08_17_000104`** on the K1b
+`badge_earned` precedent. Without it the new guard would raise a **23514 while being recorded** — throwing on
+the one endpoint anyone on the internet can post to. The failure-log test is therefore also the migration's
+test: asserting the row exists asserts the widened CHECK accepts the value, which no unit test over the enum
+could do.
+
+**FILED, NOT FIXED: 50 rows in `docs/feature-backlog.md`**, grouped by subsystem, each with `file:line`, a
+concrete failure scenario and a live-vs-latent marker. The three that matter most: **the e2e
+horizontal-overflow assertion is structurally INERT on every `AppLayout` page** (`.app-shell { overflow-x:
+clip }`) while three separate files claim it works — a gate the project has been trusting measures nothing;
+**an expired IdP signing certificate authenticates assertions forever** while `/settings/sso` renders it as
+expired (a recorded threat-model residual whose first ship to `main` is this merge); and
+**`WebhookEventDispatcher::fanOut()` picks endpoints by ambient RLS alone**, latent only because that
+listener is synchronous today.
+
+✅ **THE `/achievements` VISUAL SWEEP WAS RUN — the one thing K1e recorded as NOT done.** 375/834/1440,
+zero horizontal overflow, zero console errors, both `auto-fit` grids collapsing to a single 343px column.
+⚠️ **And it survived the trap the review itself uncovered:** `scrollWidth`-vs-`clientWidth` is **inert**
+under `overflow-x: clip`, so the sweep also measured every descendant with `getBoundingClientRect()` —
+clipping does not move layout rects — and asserted the landing page explicitly (H1, 10 badge marks, 6 ladder
+rows), which the e2e loop does not.
+
+**GATES (M1, PR #178, 6/6 with every job's `conclusion` AND `steps` parsed individually — 11 · 12 · 20 · 18 ·
+16 · 11, none empty):** CI Pest **4404 / 18,617**, +3 on 4401 and matching the local prediction to the digit
+(same 2 pre-existing warnings) · E2E **551 + 10 skipped = 561** · Vitest **125 / 2,143** · Storybook axe
+**42 / 299** · PHPStan **18 = baseline, delta 0** · host linters **97 · 107 · 30 · 107/119/0** (+1 migration
+on both counts; constraints stay 119 because a CHECK *recreate* is not a new constraint) · Pint **PASS,
+1,392 files** · `openapi.json` **byte-identical**.
+
+⚠️ **TWO HARNESS TRAPS FIRED AND BOTH READ AS GREEN.** A full local Vitest run printed `77 passed` and
+**exited 0** while 48 workers timed out — 77 + 48 = 125, the whole baseline; `--no-file-parallelism` per
+directory recovered it (design-system 35/545 exactly). And `pint --format=json` returned `files: []` with
+`time 0` and `memory 0`, **indistinguishable from having scanned nothing** — only the verbose run's 1,392
+proved otherwise. **Read the count, never the colour.**
+
+⚠️ **WHAT MADE THE MERGE SAFE TO CLICK, VERIFIED RATHER THAN ASSUMED:** `deploy.yml` is gated on
+`vars.DEPLOY_ENABLED == 'true'` **and** `runs-on: self-hosted`, and `gh variable list` / `gh secret list` are
+both **empty** — re-checked immediately before the PR was opened. Track-B deployment stays held
+**structurally**, not by convention. The intended side effect: `ci.yml`'s `workflow_dispatch` + nightly
+`schedule` triggers, inert for the entire I-map because GitHub reads them from the default branch only, arm
+themselves the moment this lands.
+
+**NAMESPACES:** ADR `0021` still free · `0010` still reserved for H1d · `#16` still free · **migration
+`2026_08_17_000104` SPENT**, so Lane B's block resumes at **`2026_08_17_000105`**. K1e's claim was **released**
+here — it was still open when the session began, and a claim that is not released is a leak.

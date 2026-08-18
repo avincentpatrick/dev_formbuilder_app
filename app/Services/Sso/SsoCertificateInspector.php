@@ -14,16 +14,22 @@ use Illuminate\Support\Carbon;
  * the {@see AuditableTypes} posture. Separate from the presenter rather than private to it so that a second
  * implementation of "is this key inside its validity window right now?" never has to be written.
  *
- * ── ⚠️ CORRECTED IN P1d: THE ACS DOES NOT ASK THIS QUESTION, AND THIS DOCBLOCK USED TO SAY IT DID ────
- * The previous wording claimed "P1b's ACS asks the same question of the same bytes". It does not. This
- * class has exactly one consumer — {@see SsoConnectionPresenter} — and php-saml verifies an assertion's
- * signature against the stored certificate WITHOUT parsing its validity window, so **an expired IdP signing
- * certificate keeps authenticating assertions indefinitely** while `/settings/sso` renders it as expired.
+ * ── ✅ CLOSED IN M2: THE LOGIN PATH NOW ASKS THIS QUESTION, AND THE ANSWER CAN REFUSE A SIGN-IN ──────
+ * This class had exactly one consumer — {@see SsoConnectionPresenter} — while php-saml verified a
+ * signature against the stored certificate WITHOUT parsing its validity window, so an expired IdP signing
+ * certificate authenticated assertions indefinitely while `/settings/sso` rendered it as expired. That was
+ * a Residual in `docs/security-threat-model.md` §8 and §9 item 18, and M2 is the increment it was owed.
  *
- * That is recorded as a Residual in `docs/security-threat-model.md` §8 and §9 item 18 rather than fixed
- * here, because refusing at the ACS turns a rollover an admin has not finished into a total outage for that
- * workspace; the correct shape is §D11's roll-up rule — refuse only when NO certificate in the set is
- * currently valid — applied on the login path, which is a behaviour change owed its own increment.
+ * The second consumer is {@see SsoLoginService::consumeAssertion()}, which calls {@see signingState()}
+ * ahead of the whole sequence and refuses with `SsoFailureReason::IdpCertificateUnusable` when the answer
+ * is outside {@see USABLE_STATES}. It is the §D11 roll-up rule applied on the login path: refuse only when
+ * NO certificate in the set is currently usable, so an admin's unfinished rollover is never a total outage.
+ *
+ * ⚠️ AND THE RESIDUAL THIS NARROWS RATHER THAN ERASES, STATED HERE SO NOBODY READS IT AS ABSENT: while at
+ * least one stored certificate is valid, an EXPIRED sibling in the same set can still verify a signature —
+ * php-saml is handed the whole set, and §D31 records why filtering it was rejected (a not-yet-valid
+ * successor is minutes away by design during a rollover, so filtering on our clock would make skew into an
+ * availability control). §D10's atomic whole-half import is what keeps that set from accumulating dead keys.
  *
  * A false claim about a control is worse than a missing one: it stops the next reader looking.
  *
@@ -39,6 +45,28 @@ final class SsoCertificateInspector
 {
     /** How far ahead of `notAfter` the screen starts asking for a re-import. */
     public const int EXPIRY_WARNING_DAYS = 30;
+
+    /**
+     * The {@see rollup()} states meaning "at least one stored key can verify a signature right now".
+     *
+     * ⚠️ PUBLIC BECAUSE THE LOGIN PATH DECIDES WITH IT (M2), and a second lane of code deciding what
+     * "usable" means is exactly how the settings screen and the ACS came to disagree in the first place.
+     * `expiring_soon` is usable and that is the point: it is a WARNING, not a refusal.
+     *
+     * @var list<string>
+     */
+    public const array USABLE_STATES = ['ok', 'expiring_soon'];
+
+    /**
+     * The PER-ROW states meaning that one certificate can verify a signature right now.
+     *
+     * Deliberately a different vocabulary from {@see USABLE_STATES}: a row is `valid`, a whole connection
+     * is `ok`. Naming them the same would invite a comparison across the two, which is a set membership
+     * test against the wrong set.
+     *
+     * @var list<string>
+     */
+    private const array LIVE_ROW_STATES = ['valid', 'expiring_soon'];
 
     /**
      * One row per stored certificate, in stored order.
@@ -68,6 +96,13 @@ final class SsoCertificateInspector
     /**
      * The one word the page leads with, across the whole certificate set.
      *
+     * ⚠️ THREE OF THESE WARNINGS NOW OPEN WITH "Sign-in is refused" (M2), AND THAT IS A CORRECTION RATHER
+     * THAN A TONE CHANGE. Until M2 the expired warning read as an errand — re-import to pick up the
+     * replacement — because sign-in genuinely kept working. It no longer does, and a warning that
+     * understates an outage sends an admin to the bottom of their queue with members locked out.
+     * `expiring_soon` is untouched: that tenant can still sign in, and telling them otherwise would be the
+     * same error in the other direction.
+     *
      * ⚠️ THIS IS NOT "WORST STATE WINS", AND THAT IS THE DECISION. A rollover pair — one live key plus a
      * successor whose `notBefore` is in the future — is an IdP doing exactly the right thing, and flagging
      * it red is how an indicator becomes noise an admin learns to scroll past. So: if ANY certificate is
@@ -87,7 +122,7 @@ final class SsoCertificateInspector
         // Any currently-usable key ⇒ the connection works. The only question left is how soon it stops.
         $live = array_values(array_filter(
             $rows,
-            static fn (array $row): bool => in_array($row['state'], ['valid', 'expiring_soon'], true),
+            static fn (array $row): bool => in_array($row['state'], self::LIVE_ROW_STATES, true),
         ));
 
         if ($live !== []) {
@@ -113,9 +148,9 @@ final class SsoCertificateInspector
             return [
                 'state' => 'expired',
                 'warning' => $latest === null
-                    ? 'The signing certificate has expired. Re-import your identity provider’s metadata to pick up the replacement.'
+                    ? 'Sign-in is refused: the signing certificate has expired. Re-import your identity provider’s metadata to pick up the replacement.'
                     : sprintf(
-                        'The signing certificate expired on %s. Your identity provider has almost certainly published a replacement — re-import its metadata to pick it up.',
+                        'Sign-in is refused: the signing certificate expired on %s. Your identity provider has almost certainly published a replacement — re-import its metadata to pick it up.',
                         Carbon::parse($latest)->format('j F Y'),
                     ),
             ];
@@ -124,14 +159,33 @@ final class SsoCertificateInspector
         if (in_array('not_yet_valid', $states, true)) {
             return [
                 'state' => 'not_yet_valid',
-                'warning' => 'The stored signing certificate is not valid yet. Sign-in will fail until it becomes active, or until you import the certificate your provider is currently using.',
+                'warning' => 'Sign-in is refused: the stored signing certificate is not valid yet. It will keep being refused until that certificate becomes active, or until you import the one your provider is currently using.',
             ];
         }
 
         return [
             'state' => 'unreadable',
-            'warning' => 'We can no longer read the stored signing certificate. Re-import your identity provider’s metadata.',
+            'warning' => 'Sign-in is refused: we can no longer read the stored signing certificate. Re-import your identity provider’s metadata.',
         ];
+    }
+
+    /**
+     * The one word the LOGIN path decides on — {@see rollup()} run over a raw certificate set (M2).
+     *
+     * The whole of this class's second consumer. Kept here rather than composed at the call site so that
+     * "can this connection still authenticate anybody?" has exactly one implementation, which is the same
+     * reason {@see inspect()} was never private to the presenter.
+     *
+     * ⚠️ AN EMPTY SET CANNOT REACH THIS FROM THE ACS, and no guard is owed for it here.
+     * `SsoConnection::servesProtocol()` is `status->servesProtocol() && $this->idp_certificates !== []`, so
+     * `SsoGate::activeConnectionOrAbort()` has already answered 404 before the login service runs. The
+     * `$rows === []` arm of {@see rollup()} is a settings-screen concern, and it stays one.
+     *
+     * @param  list<string>  $certificates  bare base64 DER, exactly as `sso_connections.idp_certificates` holds it
+     */
+    public function signingState(array $certificates, ?Carbon $now = null): string
+    {
+        return $this->rollup($this->inspect($certificates, $now))['state'];
     }
 
     /**

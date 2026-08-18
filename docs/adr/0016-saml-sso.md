@@ -156,6 +156,76 @@ Two CHECKs keep the bad states unrepresentable. The first keeps a resolved subje
 
 ⚠️ The corrected shape is the Google request store's, which had been ported FORWARD to the sibling table when J3c2 hit this defect and never back to the table it came from.
 
+### The M2 sub-decision (2026-08-18)
+
+**§D31 — §D11's roll-up rule is applied on the LOGIN PATH, and §D11's own sentence was true about the
+settings screen while being silent about the thing that mattered.** §D11 settled that certificate expiry is
+"a settings-screen concern, not an import refusal", and it was right about the import: an IdP legitimately
+publishes a not-yet-active successor during a rotation, so refusing the document would make a correct
+rollover fail at the SP. What nobody drew from it is that **nothing then checked validity at sign-in
+either.** `SsoCertificateInspector` had exactly one consumer — the settings presenter — while php-saml
+verifies an XML signature against a stored certificate **without ever parsing its `notBefore`/`notAfter`**.
+So an expired trust anchor kept minting sessions indefinitely, and `/settings/sso` displayed it as expired
+the whole time: **the one surface an admin would consult said the control was failing while the control was
+in fact absent.** A tenant's IdP rotates, nobody re-imports (and nothing prompts them to, because sign-in
+keeps working), and the retired private key — recovered from an HSM backup, a key-escrow archive or a
+departed administrator's copy — mints an assertion for any address. Recorded as a Residual in
+`docs/security-threat-model.md` §8 and §9 item 18 from P1a, with the correct shape already named there;
+M2 is the increment that owed shape was waiting for.
+
+**THE RULE IS THE ROLL-UP, NOT "ANY EXPIRED KEY REFUSES", AND THE DIFFERENCE IS AN OUTAGE.**
+`SsoLoginService::consumeAssertion()` calls `SsoCertificateInspector::signingState()` and refuses when the
+answer is outside `USABLE_STATES` — that is, only when **no** certificate in the set is currently usable.
+A rollover pair is a live key beside a successor and stays fully functional, which is §D11's own reasoning
+about noise applied to availability instead of to an indicator. `expiring_soon` is usable on purpose: it is
+a warning, and a warning that refused would be a refusal.
+
+**WHERE THE CHECK SITS, AND THE THREE PLACES IT DELIBERATELY DOES NOT.** It is **step 0** in
+`SsoLoginService`'s numbered sequence — a precondition of the sequence rather than a step in it, since
+there is nothing to gain by parsing a document, or consulting either replay ledger, on behalf of a
+connection that cannot vouch for anything; it is also the cheapest available answer to an anonymous POST,
+allocating no DOM. **Not at the mint** (`SsoLoginController`): refusing there reaches the same 404 by a
+second route and puts a second copy of one rule in a second file. **Not in `SsoGate::activeConnection()`**:
+a dead anchor answering "no connection" would hand `RequireRecentPassword` a tidy password fallback and
+404 the ACS **with nothing recorded**, destroying the failures-panel row that is the whole point of
+noticing. **And not by filtering `x509certMulti.signing` in `SsoSamlSettings::for()`** — see below.
+It covers **both intents**, because `consumeAssertion()` is shared: an assertion signed by an anchor nobody
+can vouch for is no more trustworthy for a re-authentication than for a login.
+
+**⚠️ THE REJECTED ALTERNATIVE IS RECORDED BECAUSE IT IS THE STRICTLY STRONGER ONE, AND THE REASON IT LOSES
+IS A CLOCK.** Narrowing the certificate set handed to php-saml to its currently-valid members would also
+stop an *expired sibling* signing while a valid one is present — the residual this decision keeps. It is
+rejected on two grounds. **(a) It makes clock skew into an availability control.** During a rotation a
+successor's `notBefore` is legitimately minutes away, so filtering on *this SP's* clock would refuse
+signatures the identity provider considers current — precisely the rollover-is-not-a-fault principle §D11
+exists to state. **(b) The exposure it closes is already closed by §D10.** Metadata is imported as a whole
+half, atomically, so a re-import *removes* the retired certificate rather than adding beside it; the
+dangerous state is "nobody re-imported at all", which is an expired-**only** set, which this decision
+refuses outright. The surviving residual is written into the threat model with its own revisit trigger —
+the first tenant observed holding a mixed set — rather than left implied, and
+`SsoAcsWebTest` asserts it as a passing sign-in so that narrowing it later shows up as a failing test.
+
+**TWO CONSEQUENCES THAT ARE NOT THE REFUSAL ITSELF.** A new `SsoFailureReason::IdpCertificateUnusable`
+covers all three unusable states — `expired`, `not_yet_valid`, `unreadable` — because the admin's action is
+identical in every one (re-import the metadata) and the certificate card beside the row already shows which
+key and when; the specific state goes to the operator's log line instead. It carries a **null**
+`subject_email`, which is the §D26 disclosure rule holding under a case that tempts otherwise: the assertion
+does name an address and its signature may well be valid, but nothing has verified it at the moment this
+refusal fires, and an unverified address on an admin's screen is attacker-chosen text. And the new case
+needs `2026_08_17_000105`, because `2026_08_15_000002` CHECK-constrains the column to
+`SsoFailureReason::values()` — without it the guard would raise a 23514 **while being recorded**, turning
+the uniform 404 into a 500 on the one endpoint anyone on the internet can post to, which is itself the §D4
+disclosure that posture exists to prevent.
+
+**AND ONE PIECE OF COPY IS A CORRECTION RATHER THAN A POLISH.** The settings card's expired warning read
+*"Your identity provider has almost certainly published a replacement — re-import its metadata to pick it
+up"*: true, and an errand, because sign-in genuinely kept working. It no longer does, so that warning and
+the two other unusable states now open with **"Sign-in is refused"**. `expiring_soon` is deliberately
+untouched — that tenant can still sign in, and telling them otherwise is the same error pointing the other
+way. The `invalid_assertion` hint was narrowed for the same reason: it claimed to be what "an expired or
+rotated signing certificate looks like", and the expired half was never true, since an expired anchor
+produced a session rather than that row.
+
 ---
 
 ## Consequences

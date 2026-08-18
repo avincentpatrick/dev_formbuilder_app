@@ -3744,3 +3744,66 @@ themselves the moment this lands.
 **NAMESPACES:** ADR `0021` still free · `0010` still reserved for H1d · `#16` still free · **migration
 `2026_08_17_000104` SPENT**, so Lane B's block resumes at **`2026_08_17_000105`**. K1e's claim was **released**
 here — it was still open when the session began, and a claim that is not released is a leak.
+
+---
+
+## 2026-08-18 — `M2` (Lane B): an expired IdP signing certificate no longer authenticates assertions — PR #180
+
+**The first row after the merge, and the first increment branched from and PR'd into `main` as trunk**
+(user decision 2026-08-18). Not a queue row: both named queues are empty, so this is a Rule 7(f) claim from
+`docs/feature-backlog.md`, whose merge-gate section the integration review left holding 49 rows.
+
+**THE DEFECT.** php-saml verifies an XML signature against a stored certificate **without ever parsing its
+validity window**, and `SsoCertificateInspector` — the one class that reads `notBefore`/`notAfter` — had
+exactly one consumer, the settings presenter. So an expired trust anchor minted sessions indefinitely while
+`/settings/sso` rendered it as expired: the one surface an admin would consult said the control was failing
+while the control was in fact absent. A recorded residual from P1a (`security-threat-model.md` §8, §9 item
+18), shipping to `main` for the first time with the integration merge — which is why the review filed it.
+
+**THE FIX.** `SsoLoginService::consumeAssertion()` calls `SsoCertificateInspector::signingState()` as **step
+0**, ahead of the whole sequence, and refuses with a new `SsoFailureReason::IdpCertificateUnusable` when no
+stored certificate is currently usable. That is ADR-0016 §D11's roll-up rule applied on the login path, so a
+rollover pair still signs in. Both intents inherit it, since `consumeAssertion()` is shared.
+
+**REPRODUCED BEFORE ANYTHING WAS FIXED, AND IT PAID TWICE.** A throwaway case drove the real login → ACS
+round trip against an expired-only anchor whose own private key signed the assertion; it landed on
+`/dashboard` authenticated, then failed with `received 404` once the guard landed. Its second payment was a
+trap: an `unreadable` anchor is refused by the *same* guard, so a helper that wrote the certificate badly
+would produce an identical 404 and an identical failure row — the case would pass for the wrong reason.
+Pinned by asserting the stored state is exactly `expired`, and cross-checked by two positive cases that can
+only pass if the helper writes a decryptable, verifiable set.
+
+**LESSONS.** ⚠️ **A correct component with no caller is indistinguishable from a correct control** — a unit
+test over the inspector was green throughout, because it always knew the certificate was dead and nothing
+asked it. Only an end-to-end case separates the two. ⚠️ **`openssl_csr_sign($csr, null, $key, 0)` is the
+only way to mint an already-dead certificate here** (a negative count returns `false`, and PHP's OpenSSL API
+cannot set `notBefore`), and **not `travelTo()`** — php-saml validates timestamps against `time()`, which
+Carbon does not move, so a travelled clock fails the assertion on its `Conditions` and certifies the wrong
+refusal. ⚠️ **`pint --test` ignores `--format` when stdout is not a TTY** and always emits JSON, so the
+scanned-file count the *read the count, never the colour* rule wants is unavailable — what replaced it is
+stronger: the first run FAILED on `SsoLoginService.php` and passed only after the fix, which a run that
+scanned nothing could not have done. ⚠️ **The stronger fix was rejected and the residual asserted as a
+PASSING test**: filtering the trust set to currently-valid members would make clock skew into an
+availability control during a rotation, so the expired-sibling case is written into `SsoAcsWebTest` as a
+successful sign-in, and narrowing it later shows up as a failing test rather than a surprise.
+
+**VERIFYING THE ROW FOUND FOUR THINGS — 23-for-23.** The row's "one call from `SsoLoginService`" was right
+and dragged `2026_08_17_000105` behind it (the `sso_auth_failures.reason` CHECK would have raised a 23514
+*while recording the refusal*, on the one endpoint anyone can post to — third instance after M1 and K1b);
+the empty-set arm is already unreachable via `servesProtocol()`; the parse-at-import half must not be
+"fixed"; and `data-dictionary.md`'s `subject_email` list had been stale since M1. Three things the row did
+not name were fixed with it: a hint that had been covering for the absent control, warning copy that read as
+an errand rather than an outage, and that stale list.
+
+**GATES.** SSO suite 180 → **193 (1,110 assertions)** · PHPStan **delta zero** (18 pre-existing
+`property.notFound` phantoms, none in an M2 file) · Pint green · four lint gates green, migrations 107 → 108
+· migration up + rollback + re-migrate proven against a real database · `openapi.json` byte-identical ·
+**zero `.vue`/`.ts`/design-system/e2e files touched**, so Lane A's baselines cannot have moved.
+
+**NAMESPACES:** ADR `0021` still free (ADR-0016 amended in place with §D31) · `0010` still reserved for H1d ·
+`#16` still free · **migration `2026_08_17_000105` SPENT**, so Lane B's block resumes at
+**`2026_08_17_000106`**. The M2 claim was released in the same session it was taken.
+
+**THE HELD LIST WAS PRESENTED AT 7(f) CHECKPOINT 3 AND DECLINED FOR NOW.** The user asked whether anything
+remained besides the held rows; the answer is 60 open backlog rows needing no user input. Their decision:
+**not yet — ask again later**, so the held list is not surfaced, counted or scheduled again until they signal.

@@ -29,6 +29,13 @@ use RuntimeException;
  * without. The two share the memoization discipline instead — `openssl_pkey_new(2048)` costs ~100 ms and
  * this is mounted by every ACS case.
  *
+ * ── THREE KEYPAIRS, AND THE THIRD IS THE ONE THAT LOOKS LIKE A CONTRADICTION ─────────────────────────
+ * `primary` is the tenant's trust anchor; `foreign` is a well-formed signature from a key nobody trusts;
+ * `expired` (M2) is a **trusted** key whose certificate is already dead. That third case is the one worth
+ * stating, because a signature made with it still VERIFIES — xmlseclibs never parses a validity window —
+ * so before M2 it produced a real session on a connection `/settings/sso` was rendering as expired.
+ * See {@see VALIDITY_DAYS} for why zero days is the only way to mint it.
+ *
  * ── THE DOCUMENT IS BUILT WITH DOM, AND ELEMENT ORDER IS LOAD-BEARING ───────────────────────────────
  * `SsoSamlSettings` sets `wantXMLValidation`, so php-saml validates the response against
  * `saml-schema-protocol-2.0.xsd` before anything else — and the schema's sequences are strict. Response is
@@ -52,6 +59,24 @@ final class FakeIdp
     private const STATUS_SUCCESS = 'urn:oasis:names:tc:SAML:2.0:status:Success';
 
     private const CM_BEARER = 'urn:oasis:names:tc:SAML:2.0:cm:bearer';
+
+    /**
+     * How long each keypair's certificate is valid for, in days from the moment it is generated.
+     *
+     * ⚠️ `expired` IS ZERO DAYS, AND THAT IS THE ONLY WAY TO MINT AN ALREADY-DEAD CERTIFICATE HERE.
+     * PHP's OpenSSL API cannot set `notBefore`, so a certificate always starts now; zero days makes
+     * `notAfter` equal to it, which {@see SsoCertificateInspector::state()} reads as `expired` on the very
+     * next call and forever after. Measured rather than assumed: `openssl_csr_sign()` returns `false` for a
+     * negative count, so this is the boundary, not a preference.
+     *
+     * ⚠️ AND DO NOT REACH FOR `travelTo()` INSTEAD. php-saml validates every timestamp against `time()`,
+     * which Carbon does not move — a travelled clock would fail an assertion on its `Conditions` window
+     * and the case would certify the wrong refusal. {@see SsoConnectionFactory::certificate()} records the
+     * same asymmetry from the other side; this is one convention, not two.
+     *
+     * @var array<string, int>
+     */
+    private const VALIDITY_DAYS = ['primary' => 365, 'foreign' => 365, 'expired' => 0];
 
     /** @var array<string, array{private: string, certificate: string}> */
     private static array $material = [];
@@ -191,6 +216,21 @@ final class FakeIdp
     public function signedByAnUntrustedKey(): self
     {
         $this->signWith = 'foreign';
+
+        return $this;
+    }
+
+    /**
+     * A structurally perfect signature made with a TRUSTED key whose certificate has expired (M2).
+     *
+     * Distinct from {@see signedByAnUntrustedKey()} in the one way that matters: xmlseclibs verifies
+     * against a certificate's public key without ever parsing its validity window, so this signature
+     * VERIFIES. Until M2 it produced a real session — which is the whole of the defect, and the reason
+     * this knob exists rather than a shorter test that asserts the inspector in isolation.
+     */
+    public function signedByAnExpiredCertificate(): self
+    {
+        $this->signWith = 'expired';
 
         return $this;
     }
@@ -584,7 +624,13 @@ final class FakeIdp
             throw new RuntimeException('Could not generate the fake identity provider signing key.');
         }
 
-        $signed = openssl_csr_sign($csr, null, $key, 365);
+        // An unknown name would otherwise silently mint a certificate valid for zero days and send a case
+        // hunting for a signature bug, so it throws rather than defaulting.
+        if (! array_key_exists($which, self::VALIDITY_DAYS)) {
+            throw new RuntimeException("No validity is declared for the '{$which}' fake identity provider key.");
+        }
+
+        $signed = openssl_csr_sign($csr, null, $key, self::VALIDITY_DAYS[$which]);
 
         if ($signed === false || openssl_x509_export($signed, $certificatePem) === false) {
             throw new RuntimeException('Could not sign the fake identity provider certificate.');

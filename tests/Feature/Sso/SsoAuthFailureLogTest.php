@@ -10,6 +10,7 @@ use App\Models\SsoConnection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
+use App\Services\Sso\SsoMetadataParser;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -193,6 +194,66 @@ it('records the adoption refusal under its own reason, which the CHECK must acce
         ->and($failures[0]->subject_email)->toBe($stranger->email)
         ->and($failures[0]->reason->label())->not->toBe('')
         ->and($failures[0]->reason->hint())->not->toBe('');
+});
+
+it('records the trust-anchor refusal under its own reason, which the CHECK must accept', function (): void {
+    // ⚠️ THIS TEST IS ALSO THE MIGRATION'S TEST — the third time this file has carried one, after M1's
+    // `2026_08_17_000104` and K1b's `2026_08_17_000103`. `sso_auth_failures.reason` is CHECK-constrained to
+    // `SsoFailureReason::values()`, so M2's new case needs `2026_08_17_000105` to widen it; without that
+    // migration the guard would raise a 23514 *while being recorded*, turning the uniform 404 into a 500 on
+    // the one endpoint anyone on the internet can post to — which is itself the §D4 disclosure the uniform
+    // response exists to prevent. Asserting the row exists asserts the constraint accepts the value, which
+    // no unit test over the enum could do.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $expired = FakeIdp::certificate('expired');
+    SsoConnection::query()->firstOrFail()->forceFill([
+        'idp_certificates' => [$expired],
+        'idp_certificates_fingerprint' => SsoMetadataParser::fingerprint([$expired]),
+    ])->save();
+
+    $request = startFailureLogin($this->tenant, $this->admin);
+
+    $this->post(FAILURE_LOG_ACS, [
+        'SAMLResponse' => (new FakeIdp(FAILURE_LOG_ACS, FAILURE_LOG_SP, $request->request_id))
+            ->signedByAnExpiredCertificate()
+            ->as('grace@acme.test')
+            ->response(),
+    ])->assertNotFound();
+
+    $failures = recordedFailures($this->tenant, $this->admin);
+
+    expect($failures[0]->reason)->toBe(SsoFailureReason::IdpCertificateUnusable)
+        // ⚠️ NULL, AND THE ASSERTION IS THE POINT RATHER THAN A DETAIL. The assertion DID carry a valid
+        // signature and DID name an address — but this refusal fires before any of it is read, so nothing
+        // has vouched for that address and it must not reach a tenant's database or an admin's screen.
+        ->and($failures[0]->subject_email)->toBeNull()
+        ->and($failures[0]->reason->label())->not->toBe('')
+        ->and($failures[0]->reason->hint())->not->toBe('');
+
+    // ⚠️⚠️ AND THE SAME RENDER CARRIES BOTH HALVES, WHICH IS THE WHOLE ROW IN ONE ASSERTION.
+    // The defect M2 closes was not "expiry is unchecked" on its own — it was that `/settings/sso` said the
+    // control was FAILING while the control was in fact ABSENT. So the page that shows the expired
+    // certificate must now also show the refusal it actually caused, and its warning must say sign-in is
+    // refused rather than reading as an errand. Asserting them on one response is what ties the surface an
+    // admin consults to the behaviour they are consulting it about.
+    $this->actingAs($this->admin)
+        ->withoutVite()
+        ->get(FAILURE_LOG_HOST.'/settings/sso')
+        ->assertOk()
+        // `false` disables Inertia's page-file-exists check — see the panel case below for why omitting it
+        // is green here and red on CI.
+        ->assertInertia(fn ($page) => $page
+            ->component('Settings/Sso', false)
+            ->where('data.certificates_state', 'expired')
+            ->where('failures.0.reason', SsoFailureReason::IdpCertificateUnusable->value)
+            ->where('failures.0.reason_label', SsoFailureReason::IdpCertificateUnusable->label())
+            ->where('failures.0.hint', SsoFailureReason::IdpCertificateUnusable->hint())
+            ->where('failures.0.subject_email', null)
+            ->where(
+                'data.certificate_warning',
+                fn (string $warning): bool => str_starts_with($warning, 'Sign-in is refused'),
+            )
+        );
 });
 
 it('records nothing at all for a successful sign-in', function (): void {

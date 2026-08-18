@@ -16,6 +16,8 @@ use App\Models\User;
 use App\Services\Entitlements\EntitlementService;
 use App\Services\Settings\TenantSettingRegistry;
 use App\Services\Sso\SsoAuthnRequestBuilder;
+use App\Services\Sso\SsoCertificateInspector;
+use App\Services\Sso\SsoMetadataParser;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -122,6 +124,29 @@ function startLogin(Tenant $tenant, User $actor, string $slug = 'acme'): SsoAuth
 function answering(SsoAuthRequest $request, string $acs = ACME_ACS, string $sp = ACME_SP): FakeIdp
 {
     return new FakeIdp($acs, $sp, $request->request_id);
+}
+
+/**
+ * Replace this tenant's trust anchor with the given certificate set (M2).
+ *
+ * ⚠️ `forceFill()->save()` ON THE MODEL, NEVER `SsoConnection::query()->update([...])`. `idp_certificates`
+ * is an `encrypted:array` cast, and a query-builder update writes the raw PHP array straight past the
+ * cast — the column would then hold something the reader cannot decrypt, and the case would measure a
+ * broken connection rather than an expired one.
+ *
+ * The fingerprint is recomputed through the same static the parser and the service use, so a re-trusted
+ * row and an imported one stay indistinguishable to anything that compares fingerprints.
+ *
+ * @param  list<string>  $certificates  bare base64 DER
+ */
+function retrustWith(Tenant $tenant, User $actor, array $certificates): void
+{
+    enterTenant($tenant->id, $actor->id);
+
+    SsoConnection::query()->firstOrFail()->forceFill([
+        'idp_certificates' => $certificates,
+        'idp_certificates_fingerprint' => SsoMetadataParser::fingerprint($certificates),
+    ])->save();
 }
 
 /** Re-enter the tenant and hand back the stored connection — the GUC teardown guard. */
@@ -452,6 +477,78 @@ it('refuses a structurally perfect signature made with a key this tenant never t
         ->assertNotFound();
 
     $this->assertGuest();
+});
+
+/*
+|--------------------------------------------------------------------------
+| Trust-anchor validity (M2 — ADR-0016 §D31)
+|--------------------------------------------------------------------------
+|
+| ⚠️ THE FIRST CASE BELOW PASSED AS A SIGN-IN BEFORE M2, AND THAT IS WHY IT IS WRITTEN AS A ROUND TRIP
+| RATHER THAN AS AN ASSERTION ABOUT THE INSPECTOR. xmlseclibs verifies a signature against a stored
+| certificate without ever parsing its validity window, so an expired anchor authenticated indefinitely
+| while `/settings/sso` rendered it as expired. A unit test over `SsoCertificateInspector` would have
+| been green throughout — it always knew the certificate was dead; nothing asked it.
+|
+| ⚠️ AND THE SECOND AND THIRD CASES ARE THE RULE'S TWO HALVES, WHICH IS NOT "ANY EXPIRED KEY REFUSES".
+| §D11's roll-up is that ANY currently-valid certificate means the connection works, so a rollover pair
+| still signs in — and, as the third case records, an expired sibling in that set can still carry the
+| signature. That residual is deliberate (§D31 rejects filtering the set, because a not-yet-valid
+| successor is minutes away by design during a rotation) and it is asserted here rather than described,
+| so that narrowing the trust set later shows up as a failing test rather than as a surprise.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses an assertion signed by a trusted key whose certificate has expired', function (): void {
+    retrustWith($this->tenant, $this->admin, [FakeIdp::certificate('expired')]);
+
+    // ⚠️ ASSERTED BEFORE THE ROUND TRIP, BECAUSE WITHOUT IT THIS CASE COULD PASS FOR THE WRONG REASON:
+    // an `unreadable` anchor is refused by the same guard, so a helper that wrote the certificate badly
+    // would produce an identical 404 and an identical failure row. This pins the state to EXPIRED.
+    $stored = storedSsoConnection($this->tenant, $this->admin);
+    expect(app(SsoCertificateInspector::class)->signingState($stored->idp_certificates))->toBe('expired');
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, [
+        'SAMLResponse' => answering($request)->signedByAnExpiredCertificate()->as('grace@acme.test')->response(),
+    ])->assertNotFound();
+
+    $this->assertGuest();
+
+    // The request row survives unconsumed: step 0 refuses before the consume, so an admin who re-imports
+    // metadata has not also had to tell everybody to start their sign-in again.
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(SsoAuthRequest::query()->where('request_id', $request->request_id)->value('consumed_at'))->toBeNull();
+
+    // And nobody was provisioned on the way past — the refusal is ahead of the whole sequence.
+    expect(User::query()->where('email', 'grace@acme.test')->exists())->toBeFalse();
+});
+
+it('still signs in on a rollover pair, because one live key is enough', function (): void {
+    retrustWith($this->tenant, $this->admin, [FakeIdp::certificate('expired'), FakeIdp::certificate()]);
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    completeSamlLogin($request, answering($request)->as('grace@acme.test')->response())
+        ->assertRedirect('/dashboard');
+
+    $this->assertAuthenticated();
+});
+
+it('accepts the expired half of a rollover pair, which is the residual §D31 keeps on purpose', function (): void {
+    retrustWith($this->tenant, $this->admin, [FakeIdp::certificate('expired'), FakeIdp::certificate()]);
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    // php-saml is handed the WHOLE set, so the dead key still verifies. Refusing it would mean filtering
+    // the set on our own clock, which §D31 rejects: during a rotation a successor is legitimately
+    // not-yet-valid by minutes, and skew would become an availability control. §D10's atomic whole-half
+    // import is what stops a set accumulating dead keys in the first place.
+    completeSamlLogin($request, answering($request)->signedByAnExpiredCertificate()->as('grace@acme.test')->response())
+        ->assertRedirect('/dashboard');
+
+    $this->assertAuthenticated();
 });
 
 it('refuses a signature-wrapping attempt that hides the signed assertion in an Advice element', function (): void {

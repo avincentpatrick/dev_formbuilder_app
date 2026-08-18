@@ -6,6 +6,7 @@ namespace App\Services\Sso;
 
 use App\Enums\SsoAuthIntent;
 use App\Http\Controllers\Tenant\Sso\SsoAcsController;
+use App\Http\Middleware\RequireRecentPassword;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +19,10 @@ use Illuminate\Support\Facades\Cache;
  * security, and an order stated across two files is an order that drifts.
  *
  * ── THE SEQUENCE, AND WHY EACH STEP IS WHERE IT IS ──────────────────────────────────────────────────
+ *  0. Refuse outright if NO stored signing certificate is currently usable (M2 — ADR-0016 §D31). Not a
+ *     step in the sequence so much as a precondition of it: there is nothing to be gained by parsing a
+ *     document, or consulting either replay ledger, on behalf of a connection that cannot vouch for
+ *     anything. It is also the cheapest possible answer to an anonymous POST — no DOM is allocated.
  *  1. Read `InResponseTo` from the unvalidated document. Nothing is trusted yet; this is a lookup key.
  *  2. FIND (do not consume) the live request row. A read, so a garbage POST carrying a guessed id cannot
  *     invalidate somebody's pending sign-in — a denial of service that would cost the attacker one request.
@@ -29,6 +34,22 @@ use Illuminate\Support\Facades\Cache;
  *  7. MARK the row with what was established, because this request cannot act on it. Neither arm finishes
  *     here: both hand the browser back to a same-site GET on the tenant's own host, which is the only leg of
  *     the flow that carries a cookie. Everything this step writes is what that hop has to read.
+ *
+ * ── ⚠️ STEP 0 IS HERE RATHER THAN AT THE MINT, THE GATE, OR INSIDE php-saml (M2) ────────────────────
+ * php-saml verifies a signature against a stored certificate WITHOUT parsing its validity window, so an
+ * expired trust anchor authenticated indefinitely while `/settings/sso` rendered it as expired — the one
+ * surface an admin would consult saying a control was failing while the control was in fact absent.
+ *
+ * Not at {@see SsoLoginController} (the mint): refusing there reaches the same 404 by a second route and
+ * puts a second copy of the rule in a second file, which is how two answers to one question start.
+ * Not in {@see SsoGate::activeConnection()}: a dead anchor answering "no connection" would hand
+ * {@see RequireRecentPassword} a tidy password fallback and 404 this endpoint with
+ * NOTHING RECORDED — destroying the failures-panel row that is the whole point of noticing.
+ * And not inside {@see SsoSamlSettings::for()} by filtering the certificate set: §D31 records why.
+ *
+ * ⚠️ THE RULE IS §D11's ROLL-UP, NOT "ANY EXPIRED KEY REFUSES": a rollover pair — one live key plus a
+ * successor whose `notBefore` is in the future — is an identity provider doing exactly the right thing,
+ * and refusing it would turn an unfinished rotation into a total outage for that workspace.
  *
  * ── ⚠️ THE FORK IS AFTER THE CONSUME, DELIBERATELY (P1c) ────────────────────────────────────────────
  * A step-up that fails its subject check has still had a real, signed, single-use assertion presented
@@ -53,6 +74,7 @@ use Illuminate\Support\Facades\Cache;
 final class SsoLoginService
 {
     public function __construct(
+        private readonly SsoCertificateInspector $certificates,
         private readonly SsoAssertionValidator $validator,
         private readonly SsoAuthRequestService $requests,
         private readonly SsoIdentityResolver $identities,
@@ -65,6 +87,14 @@ final class SsoLoginService
      */
     public function consumeAssertion(Tenant $tenant, SsoConnection $connection, string $samlResponse): SsoAuthOutcome
     {
+        $signingState = $this->certificates->signingState($connection->idp_certificates);
+
+        if (! in_array($signingState, SsoCertificateInspector::USABLE_STATES, true)) {
+            // Both intents, and that is deliberate rather than incidental: an assertion signed by an
+            // anchor nobody can vouch for is no more trustworthy for a re-authentication than for a login.
+            throw SsoAuthenticationException::idpCertificateUnusable($signingState);
+        }
+
         $inResponseTo = $this->validator->inResponseTo($samlResponse);
         $authRequest = $this->requests->findLive($inResponseTo);
 

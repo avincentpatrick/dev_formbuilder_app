@@ -702,7 +702,7 @@ are still in place.
   **"Sign-in is refused"**; `expiring_soon` is deliberately untouched, because that tenant can still sign in.
   (3) `docs/data-dictionary.md`'s `subject_email` "populated only by" list had been **stale since M1** —
   `existing_account_not_member` populates it and was not listed.
-  **Gates:** SSO suite **180 → 193 (1,090 assertions)**, PHPStan delta **zero** (all 18 are pre-existing
+  **Gates:** SSO suite **180 → 193 (1,110 assertions)**, PHPStan delta **zero** (all 18 are pre-existing
   `property.notFound` phantoms, none in a file M2 touches), four lint gates green (migrations 107 → 108),
   `openapi.json` byte-identical, zero `.vue` / `.ts` / e2e-selector movement.
 

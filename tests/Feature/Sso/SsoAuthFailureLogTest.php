@@ -229,6 +229,31 @@ it('records the trust-anchor refusal under its own reason, which the CHECK must 
         ->and($failures[0]->subject_email)->toBeNull()
         ->and($failures[0]->reason->label())->not->toBe('')
         ->and($failures[0]->reason->hint())->not->toBe('');
+
+    // ⚠️⚠️ AND THE SAME RENDER CARRIES BOTH HALVES, WHICH IS THE WHOLE ROW IN ONE ASSERTION.
+    // The defect M2 closes was not "expiry is unchecked" on its own — it was that `/settings/sso` said the
+    // control was FAILING while the control was in fact ABSENT. So the page that shows the expired
+    // certificate must now also show the refusal it actually caused, and its warning must say sign-in is
+    // refused rather than reading as an errand. Asserting them on one response is what ties the surface an
+    // admin consults to the behaviour they are consulting it about.
+    $this->actingAs($this->admin)
+        ->withoutVite()
+        ->get(FAILURE_LOG_HOST.'/settings/sso')
+        ->assertOk()
+        // `false` disables Inertia's page-file-exists check — see the panel case below for why omitting it
+        // is green here and red on CI.
+        ->assertInertia(fn ($page) => $page
+            ->component('Settings/Sso', false)
+            ->where('data.certificates_state', 'expired')
+            ->where('failures.0.reason', SsoFailureReason::IdpCertificateUnusable->value)
+            ->where('failures.0.reason_label', SsoFailureReason::IdpCertificateUnusable->label())
+            ->where('failures.0.hint', SsoFailureReason::IdpCertificateUnusable->hint())
+            ->where('failures.0.subject_email', null)
+            ->where(
+                'data.certificate_warning',
+                fn (string $warning): bool => str_starts_with($warning, 'Sign-in is refused'),
+            )
+        );
 });
 
 it('records nothing at all for a successful sign-in', function (): void {

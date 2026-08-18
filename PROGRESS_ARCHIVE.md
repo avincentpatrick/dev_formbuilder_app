@@ -3795,7 +3795,7 @@ the empty-set arm is already unreachable via `servesProtocol()`; the parse-at-im
 not name were fixed with it: a hint that had been covering for the absent control, warning copy that read as
 an errand rather than an outage, and that stale list.
 
-**GATES.** SSO suite 180 → **193 (1,090 assertions)** · PHPStan **delta zero** (18 pre-existing
+**GATES.** SSO suite 180 → **193 (1,110 assertions)** · PHPStan **delta zero** (18 pre-existing
 `property.notFound` phantoms, none in an M2 file) · Pint green · four lint gates green, migrations 107 → 108
 · migration up + rollback + re-migrate proven against a real database · `openapi.json` byte-identical ·
 **zero `.vue`/`.ts`/design-system/e2e files touched**, so Lane A's baselines cannot have moved.

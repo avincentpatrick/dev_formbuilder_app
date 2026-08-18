@@ -2958,6 +2958,69 @@
                 }
             }
         },
+        "/gamification/me": {
+            "get": {
+                "operationId": "v1.gamification.me",
+                "description": "Readable by any member of the workspace, with no permission: ADR-0020 \u00a7D7 gives everyone their own\nnumbers and gates only the named list. `standing.rank` is a competition rank \u2014 one plus the number of\nmembers strictly ahead \u2014 so a tie shares a place and the next one skips it, and `standing.of` counts\nACTIVE MEMBERS rather than the members who have scored, so somebody who has earned nothing is last\nrather than absent. `rank` is null when the caller holds no active membership here.\n\n`streak.current` decays to zero after a full missed day while `streak.longest` only ever rises; they\nare different measurements and neither substitutes for the other. Days are cut at UTC midnight, stated\nas a literal rather than inherited from any configuration (ADR-0020 \u00a7D10(b)).",
+                "summary": "Fetch the calling member's own points, badges, streak and standing",
+                "tags": [
+                    "Gamification"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`MemberProgressResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MemberProgressResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/gamification/leaderboard": {
+            "get": {
+                "operationId": "v1.gamification.leaderboard",
+                "description": "Gated on `dashboard.org.view` \u2014 the existing permission, not a new one (ADR-0020 \u00a7D7). Entries cover\nevery ACTIVE member, including those who have earned nothing, ranked last rather than omitted.\n\n\u26a0\ufe0f `team` and `entries` answer different questions and will not reconcile, by design, in three places.\n`team.responses` exceeds the responses credited across `entries` by exactly the GUEST submissions: a\nresponse collected through a public link is one the workspace collected and one that credits nobody,\nbecause crediting the form's owner would make the ladder a contest between public links rather than\nbetween people (\u00a7D8). And `team.points` and `team.contributors` both count members who have since\nLEFT the workspace \u2014 the award ledger is append-only, so their history outlives their membership \u2014\nwhile `entries` names active members only (\u00a7D11). None of the three is an error; a client showing them\ntogether should say which is which.",
+                "summary": "Fetch the workspace leaderboard and the team's collective totals",
+                "tags": [
+                    "Gamification"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ScoreboardResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ScoreboardResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
         "/public/f/{shareToken}/attachments": {
             "post": {
                 "operationId": "v1.public.attachments.store",
@@ -5986,6 +6049,95 @@
                 ],
                 "title": "GuestSubmissionRequest"
             },
+            "LeaderboardEntryResource": {
+                "type": "object",
+                "properties": {
+                    "rank": {
+                        "type": "integer",
+                        "description": "Competition rank \u2014 ties share a place and the next one skips it."
+                    },
+                    "user_id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "points": {
+                        "type": "integer"
+                    },
+                    "badges": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "rank",
+                    "user_id",
+                    "name",
+                    "points",
+                    "badges"
+                ],
+                "title": "LeaderboardEntryResource"
+            },
+            "MemberProgressResource": {
+                "type": "object",
+                "properties": {
+                    "points": {
+                        "type": "integer"
+                    },
+                    "badges": {
+                        "type": "integer"
+                    },
+                    "standing": {
+                        "type": "object",
+                        "properties": {
+                            "rank": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "description": "Competition rank: one plus the number of members strictly ahead, so a tie skips the next\nplace. Null when the caller holds no active membership here."
+                            },
+                            "of": {
+                                "type": "integer",
+                                "description": "Active members, NOT the number of people who have scored \u2014 see MemberStanding."
+                            }
+                        },
+                        "required": [
+                            "rank",
+                            "of"
+                        ]
+                    },
+                    "streak": {
+                        "type": "object",
+                        "properties": {
+                            "current": {
+                                "type": "integer"
+                            },
+                            "longest": {
+                                "type": "integer"
+                            },
+                            "last_active_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "current",
+                            "longest",
+                            "last_active_on"
+                        ]
+                    }
+                },
+                "required": [
+                    "points",
+                    "badges",
+                    "standing",
+                    "streak"
+                ],
+                "title": "MemberProgressResource"
+            },
             "MoveScopeNodeRequest": {
                 "type": "object",
                 "description": "Re-parent a scope node (Increment G10b). A null `parent_id` re-roots it.\n\n`present` rather than `required`: null is a meaningful value here (move to the top level), and\n`required` rejects it. The key must still appear, so a caller cannot omit it and silently re-root.",
@@ -6213,6 +6365,61 @@
                 ],
                 "title": "ScopeNodeResource"
             },
+            "ScoreboardResource": {
+                "type": "object",
+                "properties": {
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LeaderboardEntryResource"
+                        }
+                    },
+                    "member_count": {
+                        "type": "integer",
+                        "description": "The ladder's own size \u2014 the denominator in \"4th of 12\" \u2014 so a client rendering a standing\nneeds only this object. ACTIVE members, including those who have earned nothing and are\nranked last rather than omitted. \u26a0\ufe0f IT IS `<= team.active_members`, NOT EQUAL TO IT, AND THE INEQUALITY IS THE HONEST FORM.\n`active_members` counts `tenant_users` rows with an active status and nothing else, while\nthis counts the ones whose IDENTITY also resolves \u2014 the roster read carries no\n`withTrashed()`, so a soft-deleted account holding a live membership is a member of the\nworkspace and not a row on the ladder. They agree on every tenant that has never\ndeactivated an account, which is exactly what would make \"equal by construction\" a\ncomfortable thing to write and a false thing to rely on."
+                    },
+                    "team": {
+                        "type": "object",
+                        "properties": {
+                            "points": {
+                                "type": "integer",
+                                "description": "Every point in the tenant's ledger, INCLUDING members who have since left. See the note."
+                            },
+                            "responses": {
+                                "type": "integer",
+                                "description": "Every finalized submission, INCLUDING guest ones that credited nobody. See the note."
+                            },
+                            "published_forms": {
+                                "type": "integer"
+                            },
+                            "active_members": {
+                                "type": "integer"
+                            },
+                            "badges": {
+                                "type": "integer"
+                            },
+                            "contributors": {
+                                "type": "integer",
+                                "description": "Members who have earned anything at all \u2014 again including departures."
+                            }
+                        },
+                        "required": [
+                            "points",
+                            "responses",
+                            "published_forms",
+                            "active_members",
+                            "badges",
+                            "contributors"
+                        ]
+                    }
+                },
+                "required": [
+                    "entries",
+                    "member_count",
+                    "team"
+                ],
+                "title": "ScoreboardResource"
+            },
             "StoreApiTokenRequest": {
                 "type": "object",
                 "description": "Validation for minting an API key (Increment E). The requested `abilities` must be members of the\ncatalog ({@see ApiAbilities}); the controller then intersects them against the issuer's RBAC, so the\nrequested set is an upper bound, never a grant. Authorization (an authenticated member) is the route's\nsession `auth` middleware.",
@@ -6245,7 +6452,8 @@
                                 "manage:scopes",
                                 "manage:integrations",
                                 "read:analytics",
-                                "manage:domains"
+                                "manage:domains",
+                                "read:gamification"
                             ]
                         },
                         "minItems": 1

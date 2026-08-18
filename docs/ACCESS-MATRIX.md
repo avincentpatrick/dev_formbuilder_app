@@ -362,6 +362,20 @@ Holding **any one** of the listed permissions grants the ability.
 | `manage:scopes` | `scopes.manage` ∨ `forms.collaborators.manage` | ✅ | ✅ | — | — | — |
 | `manage:settings` | `tenant.settings.manage` | ✅ | ✅ | — | — | — |
 | `manage:domains` | `tenant.settings.manage` | ✅ | ✅ | — | — | — |
+| `read:gamification` *(K1d)* | `dashboard.org.view` ∨ `dashboard.form.view` | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+⚠️ **`read:gamification` is the one row above whose ability and whose ACCESS are not the same shape,
+and the table cannot show it.** Every role can mint it, because every role may see their **own** points,
+streak and standing — that is ADR-0020 §D7, which mints no thirtieth permission. What the ability does
+not decide is the **named** ladder: `GET /gamification/leaderboard` additionally carries
+`can:viewAny,PointAward`, whose single arm is `dashboard.org.view`, so **Owner / Admin / Viewer see
+colleagues by name and Form Editor / Reviewer see only themselves.** The ability scopes the token; the
+policy decides which half of the feature the caller gets.
+
+⚠️ **And a Free tenant reaches neither route**, because the whole `/api/v1` group carries
+`feature:api_access`, which the Free tier does not grant — while `gamification` itself is granted on
+every tier (§5.1). So on Free the feature exists and its API does not; the in-app surface is the only
+door. Recorded because the two facts sit in different tables and read as a contradiction otherwise.
 
 ---
 

@@ -3393,3 +3393,60 @@ the host CAN run Pest for a test needing no database: `ShellAbilityParityTest` r
 fork stated, not resolved), and the unseeded-catalog conflict. Four more rows record what J7 deliberately did not take: the verdict is batch-scoped
 rather than per-row, an identical repeated failure does not re-announce, the read-only form still claims saved, and the failed indicator is not toned.
 Nothing was spent from either shared namespace — `0021` still the next free ADR, `0010` still reserved for H1d, `#16` still free.
+---
+
+## 2026-08-18 — 🅱️ LANE B — `K1d`: the gamification leaderboard and its API
+
+**Built.** Two read-only `/api/v1` routes (`gamification/me`, `gamification/leaderboard`), a
+`LeaderboardService` with five value objects, `RequireModule` + `ModuleDisabledException` as a new
+`module:<key>` route gate, `PointAwardPolicy`, three API resources, and `read:gamification` as the
+fourteenth Sanctum ability. **No table, no migration, no ADR number, no thirtieth permission key** — the
+ladder is a `SUM` and a `COUNT` grouped over an index `point_awards` already carried, which is what
+ADR-0020's Consequences said a rollup should wait for.
+
+**The row's premises held; what was underneath them did not.** ADR-0020 §D7 settles who may *see* the named
+list and never says **who is on it**, and the two available answers differ: group the ledger, or read the
+membership. The ledger is append-only, so a departed member's rows outlive their membership — grouping it
+names ex-colleagues forever. The roster is `tenant_users` at `status = 'active'`, recorded as §D11, which
+also tabulates the **three** places the workspace totals and the ladder now deliberately fail to reconcile:
+guest submissions (§D8, already known) plus departed members in two forms (`team.points` and
+`team.contributors`, both new).
+
+⚠️ **The sharpest finding was a predicate I had written off as decorative.** `LeaderboardService`'s
+`whereExists` over `tenant_users` looked redundant with the `users_visibility` RLS policy, and I documented
+it as an expected mutation survivor on `MemberSearchArm`'s precedent. Asking what *could* kill it showed the
+policy's first arm is `id = app.current_user_id`, **unconditional** — so a caller whose own membership has
+been removed still sees their own row and would be seated on the ladder as a ghost. Every other member is
+filtered identically by both mechanisms, which is exactly why the caller is the only case that separates
+them. The documented survivor became a killed mutant and a new test.
+
+⚠️ **Three defects in the increment's own new code, found by an adversarial read BEFORE any test existed —
+and none of the three was test-catchable.** A comment claiming `member_count` equals `team.active_members`
+"by construction" when it is `<=` (the roster read has no `withTrashed()`); a dead `ORDER BY` on the roster
+that the value object's `usort` discards, reading as though tie ordering depended on it; and a
+fully-qualified `{@see \App\…}` inside a docblock, which is the recorded Pint `fully_qualified_strict_types`
+trap that turns a comment into a real import.
+
+⚠️ **A plan-catalog property that makes the module gate nearly untestable, and a Free-tier consequence
+nobody had noticed.** Every tier granting `api_access` also grants `gamification`, so **no plan fixture can
+separate the two gates** — a wrongly-mounted `feature:gamification` would pass every tier-based test, and
+the only discriminating state is a self-disabled tenant, where it produces the wrong sentence. Meanwhile a
+**Free** tenant has gamification and cannot reach it over the API at all, because the whole group sits
+behind `feature:api_access`. Measured the hard way: the API suite's first run failed 14 of 15 on exactly
+that, having chosen Free precisely to prove no plan withholds gamification. K1e's web surface is a Free
+tenant's only door to the feature.
+
+**Gates.** Test deltas measured per file: Unit/Gamification 47→58, Feature/Gamification 98→108,
+Feature/Api 95→111; every other baseline leaf directory unchanged (Seeders 16, Queue 50, Tenancy 284,
+Dashboard+Onboarding 31). `openapi.json` regenerated, diffed, promoted and verified byte-identical on a
+**second** export; Redocly clean. ⚠️ The first export typed `entries` as an untyped array because an
+`array_map` over a closure gives Scramble nothing to infer — a `LeaderboardEntryResource` turns it into a
+`$ref`. PHPStan read **20 against a baseline of 18 and both were real**, fixed to 18. Four host linters
+green, controllers 95→96. Pint flagged one unused import, fixed by naming the class the docblock was
+contrasting with. gitleaks 901,175 bytes / 27 files, count confirmed inside the container, 0 leaks.
+
+⚠️ **Two harness lessons, both of the "the check measured the wrong thing" shape.** A sweep piped Pest
+through `grep '^  Tests:'` **before** stripping ANSI, so nothing ever matched and seven directories reported
+silence; and a `grep -qE 'FAIL|failed'` guard on the same transcript reported failures in two green
+directories because it matched the word inside **test names**. Judge on the summary line, and strip escapes
+before matching, not after.

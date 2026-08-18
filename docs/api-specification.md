@@ -93,6 +93,7 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 | `manage:scopes` *(G10b)* | `scopes.manage` / `forms.collaborators.manage` |
 | `manage:integrations` *(H15a)* | `integrations.manage` |
 | `read:analytics` *(H24a)* | `dashboard.org.view` / `dashboard.form.view` |
+| `read:gamification` *(K1d)* | `dashboard.org.view` / `dashboard.form.view` |
 
 > **Increment G10b note.** `manage:scopes` covers both authoring the `scope_nodes` hierarchy and granting
 > access on it. It is a **new** ability rather than a reuse of `manage:settings`, which preserves the
@@ -139,6 +140,41 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > zone, form list over 100) returns **422 `invalid_analytics_query`** with a machine-readable `reason`. The
 > bounds live in the query object's constructor rather than only in validator rules, so the saved-view and
 > export paths inherit them.
+
+> **ADR-0020 note (K1d) — `read:gamification`, minted 2026-08-18.** A **new** ability rather than serving
+> the ladder under `read:analytics`, for the same reason as the three notes above and with the sharpest
+> subject matter yet: folding it in would retroactively hand every already-issued analytics token a
+> **named, per-person productivity ranking of the tenant's staff**. Issuers of those tokens agreed to
+> aggregates. Like `read:analytics` it needs **no new RBAC permission** — ADR-0020 §D7 is a product
+> decision of record that the 29-key catalog stays closed, because *"who may see workspace-wide numbers
+> about other people"* is a question `dashboard.org.view` already answers for the dashboard and the inbox.
+>
+> **As built.** Two read-only routes. `GET /gamification/me` returns the caller's own points, badges,
+> streak and standing and **carries no `can:` gate at all** — every member may see their own numbers, and
+> the payload names nobody else. `GET /gamification/leaderboard` returns the named ladder plus workspace
+> totals and adds `can:viewAny,PointAward`, whose single arm is `dashboard.org.view`. So the ability is
+> mintable by all five roles while the *list* is Owner/Admin/Viewer only. ⚠️ The `manage:scopes` rule above
+> — that a route in this group without a `can:` gate breaks the token-scope argument — is deliberately
+> excepted for `me`, because the gap it closes does not exist there: the resource IS the caller.
+>
+> **Neither route carries `feature:gamification`, and that is a requirement rather than an omission.**
+> ADR-0020 §D6 grants that key on every plan tier, so `RequireFeature` could only ever fire on a tenant
+> that switched the module off itself — and would answer *"Upgrade your plan to use it"*, pointing at a
+> purchase that would change nothing. Both routes carry **`module:gamification`** instead
+> (`RequireModule`), which refuses with **403 `module_disabled`** and `details.module` — distinct from the
+> entitlement family's 402 because nothing is owed and the state is undoable from inside the workspace.
+>
+> ⚠️ **A Free tenant cannot reach either route**, since the whole group carries `feature:api_access` which
+> Free does not grant, even though `gamification` is granted on every tier. The feature exists there; its
+> API does not.
+>
+> ⚠️ **The workspace totals in the leaderboard payload do not reconcile with the entries beside them, in
+> three places, by design** — guest submissions credit nobody, and departed members keep their ledger
+> history while leaving the ladder. ADR-0020 §D11(c) tabulates all three, and each endpoint's OpenAPI
+> description repeats it. **There are no write routes**: the ledger is append-only under RLS with no
+> UPDATE or DELETE policy, so an endpoint that awarded points by hand is the one thing the substrate
+> exists to prevent.
+
 
 | `read:audit_log` | `audit_log.view` |
 

@@ -11,6 +11,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\Notification;
 use App\Models\PersonalAccessToken;
+use App\Models\PointAward;
 use App\Models\ResourceGrant;
 use App\Models\SavedReportView;
 use App\Models\ScopeNode;
@@ -23,6 +24,7 @@ use App\Policies\ConnectionPolicy;
 use App\Policies\ConnectionSubscriptionPolicy;
 use App\Policies\FormPolicy;
 use App\Policies\NotificationPolicy;
+use App\Policies\PointAwardPolicy;
 use App\Policies\ResourceGrantPolicy;
 use App\Policies\SavedReportViewPolicy;
 use App\Policies\ScopeNodePolicy;
@@ -312,6 +314,12 @@ class AppServiceProvider extends ServiceProvider
         // the policies above; without the mapping `can:markRead,notification` would fall through to Gate
         // closures and allow a co-tenant to mark a colleague's notification read.
         Gate::policy(Notification::class, NotificationPolicy::class);
+
+        // The gamification ladder (K1d, ADR-0020 §D7). `viewAny` gates ONLY the NAMED list — a member's own
+        // standing needs no permission and its route carries no `can:` gate at all, which is where §D7's
+        // org/own split actually lives. No thirtieth permission key is minted; this reuses
+        // `dashboard.org.view`. Registered explicitly for the same fail-OPEN reason as the policies above.
+        Gate::policy(PointAward::class, PointAwardPolicy::class);
 
         // Polymorphic morph map — `attachments.attachable` (Increment G6, the repo's first `morphTo`) plus
         // `resource_grants.scopeable` (Increment G10a, the second). Store stable short aliases in the

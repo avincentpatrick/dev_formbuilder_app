@@ -668,7 +668,7 @@ are still in place.
 
 ### SSO, auth & session
 
-- ✅ **CLOSED BY `M2` (2026-08-18) — `major` · ~~AN EXPIRED IdP SIGNING CERTIFICATE KEEPS AUTHENTICATING
+- ✅ **CLOSED BY `M2` (2026-08-18, PR #180 `0028ea1`, CI 6/6) — `major` · ~~AN EXPIRED IdP SIGNING CERTIFICATE KEEPS AUTHENTICATING
   ASSERTIONS FOREVER, WHILE THE SETTINGS PAGE RENDERS IT AS EXPIRED.~~** The first row taken from this
   section, and the first increment cut from `main` as trunk. `SsoLoginService::consumeAssertion()` now calls
   `SsoCertificateInspector::signingState()` as **step 0**, ahead of the whole sequence, and refuses with a new

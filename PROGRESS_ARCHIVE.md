@@ -3747,7 +3747,7 @@ here — it was still open when the session began, and a claim that is not relea
 
 ---
 
-## 2026-08-18 — `M2` (Lane B): an expired IdP signing certificate no longer authenticates assertions — PR #180
+## 2026-08-18 — `M2` (Lane B): an expired IdP signing certificate no longer authenticates assertions — PR #180 (`0028ea1`)
 
 **The first row after the merge, and the first increment branched from and PR'd into `main` as trunk**
 (user decision 2026-08-18). Not a queue row: both named queues are empty, so this is a Rule 7(f) claim from
@@ -3799,6 +3799,8 @@ an errand rather than an outage, and that stale list.
 `property.notFound` phantoms, none in an M2 file) · Pint green · four lint gates green, migrations 107 → 108
 · migration up + rollback + re-migrate proven against a real database · `openapi.json` byte-identical ·
 **zero `.vue`/`.ts`/design-system/e2e files touched**, so Lane A's baselines cannot have moved.
+
+**CI 6/6 GREEN ON THE FIRST ATTEMPT** (`0e2a996`, run 32153711305), with every job's `conclusion` **and** `steps` count parsed individually — 20 · 12 · 18 · 11 · 16 · 11, none empty. **CI Pest 4417 / 18,689**, a delta of **+13 tests / +72 assertions** on `main`'s own post-merge run (4404 / 18,617) — and **+13 was predicted before the run**, counted mechanically off the diff (11 `it()` blocks, one of them a three-row dataset) rather than estimated.
 
 **NAMESPACES:** ADR `0021` still free (ADR-0016 amended in place with §D31) · `0010` still reserved for H1d ·
 `#16` still free · **migration `2026_08_17_000105` SPENT**, so Lane B's block resumes at

@@ -3624,9 +3624,16 @@ its place: 12 component cases, 15 feature cases, the Storybook axe run, and `/ac
 horizontal-overflow assertion. **Two `auto-fit` grids, a badge card carrying a meter and a four-child ladder
 row have never been seen rendered at 375px outside CI.** Named rather than left to be discovered.
 
-**GATES.** Pest per leaf dir: Gamification **129** (+21) · Unit/Gamification **70** (+12) · Unit/Navigation
-**17** (+1) · Search **123** (+2) · Api 111 · Dashboard+Onboarding 31 · Tenancy 284 · Seeders 16 · Queue 50 ·
-Forms 390 · Submissions 399 · Analytics 107 — **local delta +36**. Vitest **125 files / 2,143** (35/545 ·
+**GATES.** Pest per leaf dir: Gamification **129** (+21) · Unit/Gamification **70** (+12) · Search **123** (+2) ·
+Unit/Navigation **17** (unchanged) · Api 111 · Dashboard+Onboarding 31 · Tenancy 284 · Seeders 16 · Queue 50 ·
+Forms 390 · Submissions 399 · Analytics 107 — **local delta +35**, which CI matched to the digit: **4401 /
+18,594** against J8's **4366 / 18,381**, both carrying the same 2 pre-existing warnings.
+⚠️ **IT WAS FIRST RECORDED AS +36, AND THE ERROR IS THE ONE THIS FILE KEEPS WARNING ABOUT — THE WRONG BASE.**
+`tests/Unit/Navigation` reported *"1 failed, 16 passed"* on the run where the new nav item first broke its
+count guard, and I read the **16** as the baseline. The total was **17 both before and after**: the
+`withFeatureOnly` case is a new ASSERTION inside an existing test, not a new test. Caught only because CI
+disagreed by exactly one and the base run's own summary line was pulled rather than the hand-off's number.
+**A per-directory baseline read off a RED run is not a baseline.** Vitest **125 files / 2,143** (35/545 ·
 32/720 · 58/878). **Storybook axe 42 / 299, unchanged and MEASURED rather than argued structurally** — the
 design-system package ships without Storybook installed, so `npm install` there was a prerequisite and this is
 the first increment in four to actually run that gate. PHPStan **18 = baseline, delta 0**. Four host linters

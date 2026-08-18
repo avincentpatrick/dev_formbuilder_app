@@ -123,6 +123,56 @@ test.describe('nav search geometry', () => {
         }
     });
 
+    /**
+     * J8 — the OTHER pair in this bar, and the one that was actually colliding.
+     *
+     * ⚠️ THIS SPEC ALREADY RAN AT `extra_large` + OpenDyslexic AND STILL MISSED IT FOR SEVEN INCREMENTS,
+     * which is the part worth recording. The case above pairs the SEARCH against the wordmark and the
+     * bell — the two things that can collide with *it*. The theme toggle and the Feedback trigger are
+     * both inside `.topnav__right`, so neither is the search and neither was ever compared.
+     *
+     * `MdsSegmentedControl` is `inline-flex` with no wrap and no overflow handling, and the toggle is the
+     * only child of that group declaring `min-width: 0` — so it absorbed the whole squeeze and its labels
+     * painted straight across the Feedback trigger. Measured before the fix: 62.8px of overlap at 834px
+     * under `extra_large`, and 4.5px at the DEFAULT type scale, where nobody had thought to look.
+     *
+     * The invariant is conditional because the control has three states by design: it keeps its labels
+     * where they fit, collapses to glyphs where they do not, and is not rendered at all below the width
+     * where even the glyphs stop fitting (Settings → Appearance still covers it there). So: IF it is on
+     * screen, it must be inside its own box and clear of its neighbour.
+     */
+    test('the theme toggle never spills its box or reaches the Feedback trigger', async ({ page }) => {
+        await forceTheme(page, 'dark');
+        await forcePersonalization(page, { accent: 'teal', fontSize: 'extra_large', dyslexia: true });
+
+        const toggle = page.locator('.topnav__right .theme-quick');
+
+        // Not rendered at this width is a PASS, not a skip — it is one of the three intended states.
+        if (!(await toggle.isVisible())) {
+            return;
+        }
+
+        const box = await boxOf(toggle, 'theme toggle');
+        const feedback = await boxOf(page.locator('.topnav__right .fb__trigger'), 'Feedback trigger');
+
+        // The segments are laid out inside the fieldset; if the fieldset has been squeezed below them they
+        // paint outside it, and `.app-shell { overflow-x: clip }` hides that from every other assertion.
+        const spill = await toggle.evaluate((el) => {
+            const right = Math.max(
+                ...[...el.querySelectorAll('.mds-segmented__seg')].map((s) => s.getBoundingClientRect().right),
+            );
+
+            return right - el.getBoundingClientRect().right;
+        });
+
+        expect(spill, `${describe('theme toggle', box)} paints its segments outside its own box`).toBeLessThanOrEqual(1);
+
+        expect(
+            intersects(box, feedback),
+            `${describe('theme toggle', box)} overlaps ${describe('Feedback trigger', feedback)}`,
+        ).toBe(false);
+    });
+
     test('keeps the search control reachable and correctly labelled', async ({ page }) => {
         // Geometry is only half of "usable". A control contained in the viewport but underneath another
         // element is still unreachable, and Playwright's actionability check is what proves it is not.

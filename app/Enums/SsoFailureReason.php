@@ -65,6 +65,7 @@ enum SsoFailureReason: string
     */
     case NoEmail = 'no_email';
     case JitDisabled = 'jit_disabled';
+    case ExistingAccountNotMember = 'existing_account_not_member';
     case MembershipSuspended = 'membership_suspended';
     case SeatQuotaExhausted = 'seat_quota_exhausted';
 
@@ -98,6 +99,7 @@ enum SsoFailureReason: string
             self::AssertionOutsideConditions => 'Response was outside its validity window',
             self::NoEmail => 'No email address in the response',
             self::JitDisabled => 'Not a member, and automatic provisioning is off',
+            self::ExistingAccountNotMember => 'Address already has an account elsewhere',
             self::MembershipSuspended => 'Membership is suspended',
             self::SeatQuotaExhausted => 'No seat available',
             self::StepUpNotForced => 'Re-authentication was not forced',
@@ -127,6 +129,7 @@ enum SsoFailureReason: string
             self::AssertionOutsideConditions => 'The identity provider’s clock is out by more than the allowance. Check time synchronisation on that server.',
             self::NoEmail => 'The response carried no usable email address. Map an email attribute on the policy card, or set the NameID format to emailAddress.',
             self::JitDisabled => 'Nobody here matches that address and automatic provisioning is off. Invite them, or turn on just-in-time provisioning.',
+            self::ExistingAccountNotMember => 'That address already has an account on this platform but no membership here, so single sign-on will not adopt it. Invite them by email instead — an invitation is an administrator naming them, which is what makes a claim on somebody else’s address safe.',
             self::MembershipSuspended => 'Their membership was suspended by an administrator. Single sign-on deliberately does not reverse that.',
             self::SeatQuotaExhausted => 'The workspace has no free seat. Remove a member or raise the plan’s seat limit.',
             self::StepUpNotForced => 'A re-authentication request reached the identity provider without ForceAuthn. Report this — it should not be possible.',

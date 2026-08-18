@@ -153,6 +153,31 @@ final class SsoAuthenticationException extends RuntimeException
     }
 
     /**
+     * ⚠️ JIT MAY CREATE AN ACCOUNT; IT MAY NEVER ADOPT ONE — and that distinction is the whole control.
+     *
+     * Nothing requires that the email an IdP asserts belongs to a domain the asserting workspace controls,
+     * and `TenantMembershipService::resolveUserByEmail()` runs on `pgsql_auth`, which sees EVERY account in
+     * the deployment. Without this refusal an admin of any SSO-entitled workspace could point a connection
+     * at an IdP they own, assert a stranger's address, have that stranger's CENTRAL account attached to
+     * their own workspace, and be signed in as them — with no personal-2FA challenge, because the SAML door
+     * does not run the password pipeline that would have issued one.
+     *
+     * The refusal is deliberately narrow. It fires only when an account already exists AND this workspace
+     * has no membership row for it at all. `Invited` passes because an administrator named that person by
+     * address, which is a stronger statement than any assertion; `Declined` and `Removed` pass because a row
+     * exists, so the workspace has already made a decision about this person; a genuinely new address still
+     * provisions exactly as before.
+     */
+    public static function existingAccountNotMember(string $email): self
+    {
+        return new self(
+            SsoFailureReason::ExistingAccountNotMember,
+            "{$email} already has an account and is not a member of this workspace; single sign-on will not adopt it.",
+            subject: $email,
+        );
+    }
+
+    /**
      * An explicit administrative sanction, and SSO must not launder it.
      *
      * `Declined` and `Removed` mean "not currently a member", which is exactly what JIT is for, so those

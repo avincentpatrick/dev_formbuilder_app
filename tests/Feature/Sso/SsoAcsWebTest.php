@@ -702,6 +702,49 @@ it('refuses an unknown subject when the tenant has turned just-in-time provision
     expect(TenantUser::query()->count())->toBe(1);
 });
 
+it('refuses to adopt an existing account that is not a member of this workspace', function (): void {
+    // ⚠️ THIS IS AN ACCOUNT-TAKEOVER TEST, NOT A PROVISIONING-POLICY ONE, AND JIT IS LEFT **ON** ON PURPOSE.
+    // Nothing requires that the address an IdP asserts belongs to a domain this workspace controls, and
+    // `resolveUserByEmail()` reads on `pgsql_auth`, which sees every account in the deployment. So without
+    // the guard in `SsoUserProvisioner`, an admin of any SSO-entitled workspace could point a connection at
+    // an IdP they own, assert a stranger's address, have that stranger's CENTRAL account attached here, and
+    // be signed in as them — with no personal-2FA challenge, because the SAML door never runs the password
+    // pipeline that would have issued one. Found by the final integration review; `sso_saml` being an
+    // unpurchasable tier today is deployment state, not a control, and it expires when Enterprise ships.
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    // COMMITTED **and deliberately given no membership** — both halves matter. Uncommitted, the row is
+    // invisible to `pgsql_auth` and the provisioner would take the JIT-create branch, so the case would
+    // silently measure the wrong path (the suite header explains this at length). With a membership of any
+    // status it would be a different, allowed case: a row means this workspace already decided about them.
+    $stranger = committedTenantIdentity('Ada Lovelace');
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($stranger->email)->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    // The observable fact that matters: nobody was attached. Only the admin's own membership exists, so the
+    // stranger's account was neither adopted here nor altered.
+    expect(TenantUser::query()->count())->toBe(1)
+        ->and(TenantUser::query()->where('user_id', $stranger->id)->exists())->toBeFalse();
+});
+
+it('still provisions a genuinely new address, so the refusal above is narrow', function (): void {
+    // The guard's blast radius, pinned. It fires only on an address that ALREADY has an account; a new one
+    // is the ordinary JIT path and must be untouched, or the fix would have broken single sign-on outright.
+    $request = startLogin($this->tenant, $this->admin);
+
+    completeSamlLogin($request, answering($request)->as('newcomer@acme.test')->response())
+        ->assertRedirect('/dashboard');
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(User::query()->where('email', 'newcomer@acme.test')->exists())->toBeTrue();
+});
+
 it('refuses a suspended member, because SSO must not launder an administrative sanction', function (): void {
     // ⚠️ THE ONE STATUS `joinViaSso()` WOULD HAPPILY REACTIVATE. `Declined` and `Removed` mean "not
     // currently a member", which is what JIT is for; `Suspended` is somebody deciding this person should

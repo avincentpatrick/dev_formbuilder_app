@@ -124,7 +124,16 @@ function remove(): void {
                 To set it up again you will need to import your provider’s metadata and add this workspace on
                 their side once more.
             </p>
-            <template #footer>
+            <!--
+                ⚠️ `actions`, NOT `footer` — MdsModal exposes exactly one named slot and it is this one
+                (Modal.vue: `<slot name="actions" />`). Vue discards content addressed to a slot a component
+                does not declare, silently and without a warning in production, so `#footer` rendered the
+                dialog with its two paragraphs and NO CONTROLS — making `DELETE /settings/sso` unreachable
+                from the UI and breaking this file's own guarantee that a tenant can always undo what a paid
+                tier let them create. admin/TenantDetail.vue warns about this exact mistake in prose; this
+                was the only file in the tree that still made it.
+            -->
+            <template #actions>
                 <MdsButton variant="secondary" @click="removeOpen = false">Cancel</MdsButton>
                 <MdsButton variant="destructive" :loading="busy" @click="remove">Remove</MdsButton>
             </template>

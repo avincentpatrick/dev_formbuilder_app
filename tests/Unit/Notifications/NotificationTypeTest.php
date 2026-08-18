@@ -155,16 +155,20 @@ it('returns no path rather than a broken one when the payload lacks its identifi
         ->and(NotificationType::SubmissionReceived->pathFor(['submission_id' => 42]))->toBeNull();
 });
 
-it('points a badge nowhere until K1e builds somewhere for it to point', function (): void {
-    // ⚠️ A DIFFERENT KIND OF NULL FROM THE TEST ABOVE, AND PINNED SEPARATELY FOR THAT REASON. Every null up
-    // there is a payload that lacked its identifier; this one is UNCONDITIONAL — a complete payload with
-    // nowhere to go, because the achievements surface is K1e's and K1e cannot start until Lane A's J5
-    // releases the files it needs. Asserted with a FULL payload so it cannot be mistaken for the thin-data
-    // case, and it exists so that K1e re-pointing this arm is a deliberate edit against a failing test
-    // rather than a silent behaviour change nobody prompted.
-    expect(NotificationType::BadgeEarned->pathFor(['badge' => 'collector']))->toBeNull();
+it('points a badge at the achievements surface, unconditionally', function (): void {
+    // ⚠️ THIS TEST USED TO PIN THE OPPOSITE, AND THE FLIP IS THE POINT. K1b left `pathFor()` returning null
+    // for this case and wrote "K1e replaces this arm" into both the enum and this test, precisely so that
+    // re-pointing it would be a deliberate edit against a failing test rather than a silent change. K1e then
+    // shipped `/achievements` and never came back, so the arm survived the increment that was supposed to
+    // discharge it — every badge-earned bell row unclickable, every badge email without its action button —
+    // until the final integration review found it. M1 makes the edit K1e owed.
+    //
+    // UNCONDITIONAL, like `members`: the destination is a surface, not a row, so there is no payload id that
+    // could be missing. Asserted with a full payload AND an empty one so both readings are pinned.
+    expect(NotificationType::BadgeEarned->pathFor(['badge' => 'collector']))->toBe('achievements')
+        ->and(NotificationType::BadgeEarned->pathFor([]))->toBe('achievements');
 
-    // The action label is still required and still non-empty: the match is exhaustive, and the words are
-    // written to survive K1e giving them a destination.
+    // The action label was written to survive being given a destination; now that it has one, it must not be
+    // empty — the email renders a button around these words.
     expect(NotificationType::BadgeEarned->actionLabel())->not->toBe('');
 });

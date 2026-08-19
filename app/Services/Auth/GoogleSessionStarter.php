@@ -20,9 +20,9 @@ use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
  * and the tenant completion hop signs in after redeeming its handoff — and every line below is a decision
  * that a second copy would eventually get wrong in only one of them.
  *
- * ── ⚠️ PERSONAL TWO-FACTOR STILL APPLIES, AND THIS DIVERGES FROM ADR-0016 §D22 ON PURPOSE ────────────
- * *User decision of record, 2026-08-14, argued in ADR-0019 §D11.* SAML decided the opposite — "the IdP is
- * the authentication authority; a workspace whose IdP performs MFA turns the setting off" — and that
+ * ── ⚠️ PERSONAL TWO-FACTOR STILL APPLIES, AND THIS DIVERGES FROM ADR-0016 §D32 ON PURPOSE ────────────
+ * *User decision of record, 2026-08-14, argued in ADR-0019 §D11.* SAML decided the opposite in ADR-0016
+ * §D32 — the identity provider is the authentication authority at that door — and that
  * reasoning does not transfer: **SAML is an enterprise trust anchor a workspace administrator chose and
  * configured; a Google account is a consumer credential the end user chose**, and this product has no way
  * to know whether it is protected by anything at all. Someone who deliberately enrolled a TOTP would

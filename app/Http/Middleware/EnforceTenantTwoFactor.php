@@ -17,9 +17,19 @@ use Symfony\Component\HttpFoundation\Response;
  * all tenant members; unenrolled members are prompted to complete enrolment before continuing."*
  *
  * Mounted on the AUTHENTICATED TENANT GROUP ONLY, and shaped after {@see EnsureSuperAdminMfa}: it checks
- * the ENROLLMENT FLAG (`two_factor_confirmed_at`), never a live TOTP. Fortify already challenges an
- * enrolled user at login, so re-challenging per request would be theatre; what this closes is the gap
- * where a workspace has decided everyone must enrol and someone simply has not.
+ * the ENROLLMENT FLAG (`two_factor_confirmed_at`), never a live TOTP. What it closes is the gap where a
+ * workspace has decided everyone must enrol and someone simply has not; re-challenging per request would
+ * be theatre on the doors that already challenge.
+ *
+ * ⚠️ AND "the doors that already challenge" IS NOT ALL OF THEM, WHICH IS WHAT THIS PARAGRAPH USED TO GET
+ * WRONG. It read "Fortify already challenges an enrolled user at login" — false for the SSO door, which
+ * is one this gate stands behind. The password form challenges, and so does
+ * {@see App\Services\Auth\GoogleSessionStarter} by ADR-0019 §D11; a SAML sign-in deliberately does NOT
+ * (ADR-0016 §D32 — the identity provider is the authentication authority at that door). So in a
+ * workspace with `security.require_two_factor` on, an ENROLLED member arriving through SAML clears this
+ * gate on the flag alone and never presents the factor.
+ * That is the residual §D32 records rather than a defect here: enrolment is precisely what this middleware
+ * checks, and the escape hatch below is why it can only ever be a nudge.
  *
  * ── ⚠️ THE ESCAPE HATCH IS THE WHOLE DESIGN ────────────────────────────────────────────────────────────
  * A gate that redirects everywhere redirects to itself. `GET /two-factor/required` is registered OUTSIDE

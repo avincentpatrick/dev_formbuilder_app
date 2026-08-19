@@ -20,12 +20,15 @@
 
 ## Status
 
-**Proposed — 2026-08-14.** Increment J3c2 adds "Continue with Google" to the two front doors. The product
+**Accepted — 2026-08-14.** ⚠️ The label read `Proposed` until M7 corrected it, and it was the only one
+in the directory: every decision below shipped in J3c2, `routes/google-auth.php:64,68` have been merged
+since, and both `0018:49` and `0016:133` were already citing this document as settled precedent.
+Increment J3c2 adds "Continue with Google" to the two front doors. The product
 already has three doors into a workspace — self-registration, invitation, and SAML JIT provisioning
 (ADR-0016) — and this is the fourth. It differs from all three in one way that drives every decision
 below: **the identity is asserted by a consumer account the end user chose, not by a trust anchor a
 workspace administrator configured.** That is why this ADR exists rather than an amendment to ADR-0016,
-and why §D11 below deliberately diverges from ADR-0016 §D22's answer to the same question.
+and why §D11 below deliberately diverges from ADR-0016 §D32's answer to the same question.
 **Decision: take one central callback and a signed stateless `state` from ADR-0009 §D2/§D3, add a
 hashed single-use DB handoff for the leg that creates a session, key the local identity on Google's `sub`
 with the email as a one-time joining hint that may only link onto an already-verified account, reuse
@@ -34,7 +37,7 @@ keep personal two-factor authentication in force.**
 
 - **Deciders:** product owner (the three decisions of record dated 2026-08-14), engineering
 - **Related ADRs:** **ADR-0009** (its §D2/§D3/§D4 are taken and its Socialite rejection is carved out
-  there, not here) · **ADR-0016** (§D20's membership outcomes are reused; §D22's second-factor answer is
+  there, not here) · **ADR-0016** (§D20's membership outcomes are reused; §D32's second-factor answer is
   deliberately NOT) · **ADR-0002** (the RLS shape that makes the central arm row-free)
 - **Related docs:** `docs/multi-tenancy-rbac-design.md` §5 · `docs/security-threat-model.md` §8
 
@@ -83,7 +86,7 @@ seriously while refusing to widen either the session cookie's scope or the meani
 | Workspace membership | ADR-0016 §D20 verbatim, gated by `RegistrationGate` (§D8) |
 | What a refusal looks like | One indistinguishable bounce; the log, never `audits` (§D9) |
 | The Google client | Socialite behind `GoogleIdentityProvider` (§D10, carve-out in ADR-0009) |
-| A user's own second factor | Still enforced — diverges from ADR-0016 §D22 (§D11) |
+| A user's own second factor | Still enforced — diverges from ADR-0016 §D32 (§D11) |
 | The central host | Same flow, no handoff, no row (§D12) |
 
 ### The twelve sub-decisions
@@ -244,10 +247,10 @@ seriously while refusing to widen either the session cookie's scope or the meani
   is exercised against a recording fake. **Accepted cost:** Socialite pulls four transitive packages, three
   of which serve OAuth1 providers this product will never use.
 
-- **D11 — A user's own second factor still applies, and this DIVERGES FROM ADR-0016 §D22 ON PURPOSE.**
+- **D11 — A user's own second factor still applies, and this DIVERGES FROM ADR-0016 §D32 ON PURPOSE.**
   *User decision of record, 2026-08-14.* A member with confirmed 2FA who signs in with Google is handed
-  to `/two-factor-challenge` rather than logged straight in. ADR-0016 decided the opposite for SAML —
-  "the IdP is the authentication authority; a workspace whose IdP performs MFA turns the setting off" —
+  to `/two-factor-challenge` rather than logged straight in. ADR-0016 §D32 decides the opposite for SAML,
+  because the identity provider is the authentication authority at that door —
   and that reasoning does not transfer: **SAML is an enterprise trust anchor a workspace administrator
   chose and configured; a Google account is a consumer credential the end user chose**, and the product
   has no way to know whether it is protected by anything. A user who deliberately enrolled a TOTP would
@@ -255,6 +258,12 @@ seriously while refusing to widen either the session cookie's scope or the meani
   shape — write `login.id`, redirect to the challenge — which is why J3c1 had to make that page reachable
   first. **Revisit trigger:** a per-workspace setting expressing "our IdP already performs MFA", which
   would make this a policy rather than a constant.
+  ⚠️ **THIS SUB-DECISION CITED §D22 UNTIL M7, AND §D22 IS ABOUT STEP-UP.** The sentence quoted here was
+  *"a workspace whose IdP already performs MFA turns the setting off"* — a **Consequences** bullet about
+  the ORG-LEVEL control, which ADR-0016 pointedly does *not* exempt for SSO, so the quotation argued the
+  opposite of what it was offered for. The personal-factor decision this one diverges from had no §
+  heading at all until §D32 gave it one, and eleven citations across six other files had inherited the
+  attribution — including a docblock justifying live behaviour by it.
 
 - **D12 — The central host runs the same flow with no handoff and no row.** Callback and session share a
   host there, so the hop has nothing to carry. It also *cannot* have a row:
@@ -317,7 +326,7 @@ seven fail-closed shapes are asserted in tests, not argued.
   rejected it: a permanent cross-host cookie to solve a problem that arises once per sign-in.
 - **Per-tenant Google OAuth clients** — rejected: Google requires exact pre-registered redirect URIs, and
   it would make every workspace configure a Google Cloud project to use a consumer sign-in button.
-- **Treating a Google sign-in as satisfying two-factor** — rejected per §D11, against the SAML precedent
+- **Treating a Google sign-in as satisfying two-factor** — rejected per §D11, against ADR-0016 §D32
   and with the reason for the divergence stated.
 
 ## When to Revisit
@@ -331,7 +340,7 @@ seven fail-closed shapes are asserted in tests, not argued.
 
 ## Related Decisions
 ADR-0002 (RLS, and §D12's write-strictness) · ADR-0009 (topology, and the Socialite carve-out) ·
-ADR-0016 (§D20 reused, §D22 diverged from)
+ADR-0016 (§D20 reused, §D32 diverged from)
 
 ## References
 - `app/Support/Auth/GoogleIdentity.php` — §D3's strict claim check and its fallback rules.

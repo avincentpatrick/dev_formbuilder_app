@@ -270,14 +270,21 @@ it('treats a 401 as retryable, never as a dead grant', function (): void {
         ->and($delivery->next_retry_at)->not->toBeNull();
 });
 
-it('retries a rate limit rather than pausing the rule', function (): void {
+it('retries a rate limit rather than pausing the rule, and KEEPS the provider body for it', function (): void {
     fakeAirtable(writeResponse: fn () => Http::response(['error' => ['type' => 'RATE_LIMIT_REACHED']], 429));
 
     [, $subscription, $delivery] = runAirtableDelivery();
 
     expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
         ->and($delivery->next_retry_at)->not->toBeNull()
-        ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Active);
+        ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Active)
+        // ⚠️ M4's RESIDUAL, ASSERTED AS A PASSING TEST RATHER THAN DESCRIBED. M4 stopped the SUCCESS path
+        // echoing the provider body, because Airtable's create-record response repeats the answers just
+        // written. The retryable fall-through still stores the body verbatim, ON PURPOSE: a 429 or 5xx body
+        // is the only diagnostic an operator has for an outage, and these statuses do not echo a payload.
+        // Every arm a TENANT reads already replaces Airtable's copy with ours. If that fall-through is ever
+        // sanitised wholesale, this fails and its author has to read why it was left.
+        ->and($delivery->response_body_excerpt)->toContain('RATE_LIMIT_REACHED');
 });
 
 it('pauses the rule when the table is no longer in the base', function (): void {

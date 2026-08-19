@@ -606,15 +606,30 @@ are still in place.
   `docs/webhook-integration-design.md` §5 and `docs/architecture/technical-architecture.md` §7.2 now state
   the two-value form, that the current secret is first, and that a receiver must split on `,` and accept if
   any element matches.
-- **`major` · A successful Airtable delivery writes the respondent's answers into the delivery ledger.**
-  `app/Support/Connectors/Providers/AirtableConnector.php:353` passes 2000 characters of the create-record
-  response — which echoes the `fields` object just written — as the success excerpt, landing in
-  `webhook_deliveries.response_body_excerpt` (`app/Jobs/Connectors/DeliverConnectorMessageJob.php:176`).
-  The sibling adapter deliberately sends `'ok'` (`GoogleSheetsConnector.php:270-272`) and says why. There
-  is **no `webhook_deliveries` retention job**, and deleting the submission does not touch the row, so an
-  erasure request leaves answers behind — falsifying `docs/data-privacy-gdpr-compliance.md:83`
-  (*"the delivery ledger is not a second copy"*). **Live**, Owner/Admin-visible only, not cross-tenant.
-  One line: `delivered($response->status(), 'ok')`.
+- ✅ **CLOSED BY `M4` (2026-08-19) — `major` · ~~A SUCCESSFUL AIRTABLE DELIVERY WRITES THE RESPONDENT'S
+  ANSWERS INTO THE DELIVERY LEDGER.~~** The row was right about the fix — `delivered($response->status(),
+  'ok')`, matching `GoogleSheetsConnector.php:270-272`, whose class docblock states the property this broke:
+  the shared ledger stores only the metadata envelope and never becomes a second copy of answer content.
+  ⚠️ **REPRODUCED FIRST, AND THE REPRODUCTION FOUND WHY NO TEST HAD EVER SEEN IT — IT WAS THE STUB, NOT THE
+  COVERAGE.** `fakeAirtable()`'s default write response returns a record **id only**, while Airtable's real
+  create-record response **echoes the `fields` object just written**, so all twelve existing cases exercised
+  a body with nothing to leak. Driven with the provider's real shape, the unfixed adapter wrote
+  `{"records":[{"id":"recNEW0000000001","createdTime":"…","fields":{"Full name":"Ana Reyes","Colour":"b",
+  "Submission ID":"sub-1"}}]}` straight into `response_body_excerpt`. The new case asserts a **control**
+  first — that the response genuinely carries the answer — so a clean excerpt afterwards is the adapter's
+  doing and not the stub's.
+  ⚠️ **THE GDPR DOC'S CLAIM WAS NARROWER THAN THE PROPERTY IT SELLS, AND THAT IS WHY THE BREACH FITTED
+  THROUGH IT.** §7's bullet (a) named **`webhook_deliveries.payload`** — which was always true — while the
+  leak was in the sibling column `response_body_excerpt`, so the literal sentence stayed accurate the whole
+  time the heading above it (*"the delivery ledger is not a second copy"*) was false. The clause now names
+  the whole row rather than one column, which is what makes it checkable.
+  ⚠️ **WHAT IS NARROWED RATHER THAN CLOSED, STATED SO NOBODY READS THIS AS FULLY DISCHARGED:** the
+  retryable fall-through (`classifyFailure()`'s last line) still stores the provider body verbatim, **on
+  purpose** — a 429 or 5xx body is the only diagnostic an operator has for an outage, and those statuses do
+  not echo a payload; every arm a TENANT reads already replaces Airtable's copy with ours. **The residual is
+  asserted as a PASSING test** in the 429 case, so sanitising that arm wholesale later fails loudly.
+  **`excerpt()` is not orphaned** — `:391` and `:431` still call it, checked before the edit rather than
+  discovered by a linter.
 - **`major` · Both tabular adapters do a non-idempotent write and the retry ladder re-drives it.**
   `GoogleSheetsConnector.php:252` / `AirtableConnector.php:338` send no idempotency token; a response lost
   *after* the provider committed becomes `ConnectorDeliveryResult::failed()` (`:327-331`), and

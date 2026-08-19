@@ -270,14 +270,21 @@ it('treats a 401 as retryable, never as a dead grant', function (): void {
         ->and($delivery->next_retry_at)->not->toBeNull();
 });
 
-it('retries a rate limit rather than pausing the rule', function (): void {
+it('retries a rate limit rather than pausing the rule, and KEEPS the provider body for it', function (): void {
     fakeAirtable(writeResponse: fn () => Http::response(['error' => ['type' => 'RATE_LIMIT_REACHED']], 429));
 
     [, $subscription, $delivery] = runAirtableDelivery();
 
     expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
         ->and($delivery->next_retry_at)->not->toBeNull()
-        ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Active);
+        ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Active)
+        // ⚠️ M4's RESIDUAL, ASSERTED AS A PASSING TEST RATHER THAN DESCRIBED. M4 stopped the SUCCESS path
+        // echoing the provider body, because Airtable's create-record response repeats the answers just
+        // written. The retryable fall-through still stores the body verbatim, ON PURPOSE: a 429 or 5xx body
+        // is the only diagnostic an operator has for an outage, and these statuses do not echo a payload.
+        // Every arm a TENANT reads already replaces Airtable's copy with ours. If that fall-through is ever
+        // sanitised wholesale, this fails and its author has to read why it was left.
+        ->and($delivery->response_body_excerpt)->toContain('RATE_LIMIT_REACHED');
 });
 
 it('pauses the rule when the table is no longer in the base', function (): void {
@@ -338,4 +345,33 @@ it('refuses a rule whose stored mapping cannot be read', function (): void {
         ->and($delivery->response_body_excerpt)->toStartWith('[invalid_mapping]');
 
     Http::assertNothingSent();
+});
+
+it('does not write the respondent answers into the shared delivery ledger', function (): void {
+    // ⚠️ THE STUB ABOVE IS WHY NO TEST EVER SAW THIS. Airtable's real create-record response ECHOES the
+    // `fields` object just written; `fakeAirtable()`'s default returns an id only, so every existing success
+    // case exercised a body that carried nothing to leak. This one uses the provider's real shape.
+    $body = [
+        'records' => [[
+            'id' => 'recNEW0000000001',
+            'createdTime' => '2026-08-19T09:00:00.000Z',
+            'fields' => ['Full name' => 'Ana Reyes', 'Colour' => 'b', 'Submission ID' => 'sub-1'],
+        ]],
+    ];
+
+    // The control, asserted before the delivery runs: the provider's response really does carry the
+    // respondent's answer, so a clean excerpt below is the adapter's doing and not the stub's.
+    expect(json_encode($body))->toContain('Ana Reyes');
+
+    fakeAirtable(writeResponse: fn () => Http::response($body, 200));
+
+    [, , $delivery] = runAirtableDelivery();
+
+    // `docs/data-privacy-gdpr-compliance.md` §7 offers "the delivery ledger is not a second copy" as a
+    // STRUCTURAL property, and `webhook_deliveries` has no retention job — deleting the submission does not
+    // touch this row, so anything landing here outlives an erasure request. The sibling adapter sends 'ok'
+    // for exactly this reason (GoogleSheetsConnector's class docblock, bullet 1).
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok')
+        ->and($delivery->response_body_excerpt)->not->toContain('Ana Reyes');
 });

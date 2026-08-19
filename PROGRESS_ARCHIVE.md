@@ -3809,3 +3809,117 @@ an errand rather than an outage, and that stale list.
 **THE HELD LIST WAS PRESENTED AT 7(f) CHECKPOINT 3 AND DECLINED FOR NOW.** The user asked whether anything
 remained besides the held rows; the answer is 60 open backlog rows needing no user input. Their decision:
 **not yet — ask again later**, so the held list is not surfaced, counted or scheduled again until they signal.
+
+## 2026-08-19 — `M3` (Lane B): the webhook/connector fan-out takes its tenant scope from the event — PR #182 (`1b4c945`)
+
+A Rule 7(f) claim from `docs/feature-backlog.md`, the top unclaimed row in Lane B's column and the first of
+the two the hand-off named. 6/6 with each job's `conclusion` **and** `steps` parsed individually
+(18 · 11 · 16 · 12 · 20 · 11). **CI Pest 4427 / 18,726**, predicted to the digit twice — +10 tests /
++36 assertions on the first push, then +1 when the adversarial pass tightened a test — by running the new
+cases in isolation rather than counting `expect()` calls. E2E **551 passed / 10 skipped**, Storybook axe
+**299**, both identical to a docs-only run on the same base.
+
+**THE DEFECT.** `WebhookEventDispatcher::fanOut()` computed `$tenantId` from the event and used it only for
+a null check and to stamp the delivery row; the query deciding *which* endpoints receive the event was a
+bare `WebhookEndpoint::query()` scoped only by the ambient RLS GUC. The precondition was stated in the class
+docblock and enforced nowhere. Both dispatchers now wrap their body in a new
+`TenantContext::runFor(string $tenantId, callable $work)`.
+
+**THE ROW WAS TWO DEFECTS WEARING ONE NAME, AND ONLY ONE WAS SILENT.** Reproducing first produced two
+different failures from the same code: with **no** ambient context — a worker's state exactly, since
+`applyLocal()` dies at its transaction's commit and `ScopeTenantContextToJob` flushes the mirror — the
+fan-out created **zero rows, threw nothing and logged nothing**; with a **different** ambient tenant it
+raised **42501**, the SELECT having returned the other tenant's endpoints before the INSERT stamped the
+event's `tenant_id`. The mismatch case was already loud and needed no fix. Both are now pinned.
+
+**FOUR THINGS VERIFYING THE ROW FOUND — twenty-four-for-twenty-four.** (1) It named one dispatcher and there
+are two; `ConnectorEventDispatcher` is identical and is the twin carrying every Slack / Sheets / Airtable
+delivery the row blamed on the webhook class (user decision 2026-08-19: fix both). (2) Both dispatcher
+docblocks said "four thin auto-discovered listeners"; there are **eight per channel** since I3 and I9c.
+(3) The 42501 finding. (4) The fix falsified a sentence repeated in **seven** listener docblocks.
+
+**WHY `runFor()` HAS THREE EXITS AND NOT A `finally`.** *Apply → work → restore in a `finally`* issues SQL
+on the way out of a failure, where Postgres refuses every further statement on an aborted transaction — so
+the restore throws **25P02** and becomes the exception the caller sees. Instead: on a **throw**, restore the
+PHP mirror only (the database has already reverted itself); on a **nested** success re-issue the GUC,
+because a `SET LOCAL` inside a savepoint survives its release and would hand the rest of the enclosing
+transaction a tenant it never asked for (the H12a sweep is exactly that); on an **outermost** success the
+COMMIT has already discarded it. Rejected in writing: *assert and throw* (a loud total outage is still a
+total outage, and the one-line `ShouldQueue` landmine survives) and *skip the wrapper when the mirror
+matches* (the mirror is not a sound proxy for the GUC — that divergence is what `ScopeTenantContextToJob`
+exists to contain).
+
+**THE ADVERSARIAL PASS RAN AFTER 6/6 AND CHANGED THE INCREMENT — five corrections, one a live test hole.**
+The case pinning the increment's most-argued decision was **vacuous**: it asserted only the exception class,
+and Laravel wraps every PDO failure in `QueryException`, so the masking error (25P02) and the real one
+(42P01) are the same class — it passed on the exact mutation its own docblock spends nine lines forbidding.
+It now asserts the **message**, proven by applying the forbidden shape (that one case fails, the other five
+pass) and restoring the file **byte-identically**. The other four: `runFor`'s docblock said "five hand-rolled
+sites" (measured: **twelve across seven classes**); it asserted "each is correct" about code it had never
+counted; the new backlog row said "seven synchronous dispatch listeners" (there are **sixteen** — seven is
+only how many carried the retired sentence); and the sweep matched a **string**, leaving two listeners
+carrying the same claim by reference ("Never `ShouldQueue` — see the twin").
+
+**THE PASS'S BEST FIND IS A FILED ROW, NOT A CLAIM.** All twelve hand-rolled tenant-context sites
+(`SendWelcomeEmail`, `ImpersonationService` ×2, `SuperAdminService` ×5, `GoogleAuthRequestService`,
+`TenantSettingRegistry`, `TenantMembershipService`, `TenantExtractService`) restore in a `finally` inside
+their transaction — the shape `runFor()` avoids — so each carries the same masking hazard. Latent, not
+live. **Two of the twelve cannot simply become `runFor()` calls**: they apply a specific user under a
+switched tenant, which `runFor()` deliberately nulls.
+
+**DELIBERATELY NOT DONE.** The sixteen listeners are not flipped to `ShouldQueue` — now safe, but a
+latency/locking trade nobody has weighed (fan-out inside the sweep's transaction holds `lockForUpdate()`
+locks). Filed as its own row at the moment the decision was taken. `docs/webhook-integration-design.md` and
+ADR-0007 were claimed so the option to amend existed, re-read, and needed none.
+
+**A BASELINE IN THE HAND-OFF WAS STALE.** It recorded E2E 545 passed / 555 total; `main` stands at 551 /
+561, proven by PR #181 — a docs-only change reporting the same 551. M3 moved nothing. The
+measure-against-your-own-base rule applies to a lane's own earlier numbers too.
+
+**PROCESS.** PR #181 (the M2 tracker addendum) was merged first: its E2E had stalled twice on
+*Install Playwright (chromium)*, and `gh run rerun --failed` cleared it in 20 real steps — infrastructure,
+not the change. ⚠️ **A `docker exec` Pest run that hits the Bash tool's 600s cap is left ORPHANED inside
+the container with its output lost**; long suites go to `run_in_background`, and `pkill -f vendor/bin/pest`
+before starting another. ⚠️ **The adversarial workflow capped findings at three per lens and silently
+dropped three real ones** — all three checked by hand afterwards and all three were true.
+
+**NAMESPACES: nothing spent.** `0021` free · `0010` reserved for H1d · `#16` free · migration block stays at
+`2026_08_17_000106` · `openapi.json` byte-identical · zero `.vue` / `.ts` / `packages/design-system/` /
+`tests/e2e/` files touched. The M3 claim was released in the same session it was taken, and **`M4` (the
+Airtable success excerpt) is claimed in the same commit that closes M3.**
+
+## 2026-08-19 — `M4` (Lane B): an Airtable success excerpt is `'ok'`, not the provider's echo — PR #183
+
+The second of the two rows the hand-off named, taken in order, and shipped in the same PR as M3's
+close-out. `AirtableConnector.php:353` passed 2000 characters of the create-record response — which echoes
+the `fields` object just written — into `webhook_deliveries.response_body_excerpt`. That table has no
+retention job and a submission delete does not touch it, so the copy outlived an erasure request. One line,
+matching `GoogleSheetsConnector.php:270-272`, whose class docblock states the property this broke.
+
+**THE REPRODUCTION FOUND WHY NO TEST HAD EVER SEEN IT, AND IT WAS THE STUB RATHER THAN THE COVERAGE.**
+`fakeAirtable()`'s default write response returns a record **id only**; Airtable's real response echoes the
+fields. All twelve existing success cases therefore exercised a body with nothing to leak. Driven with the
+provider's real shape, the unfixed adapter wrote
+`{"records":[{"id":"recNEW0000000001","createdTime":"…","fields":{"Full name":"Ana Reyes","Colour":"b",
+"Submission ID":"sub-1"}}]}` into the ledger. The new case asserts a control first — that the response
+genuinely carries the answer — so a clean excerpt afterwards is the adapter's doing and not the stub's.
+**M3's lesson (c) in a second shape: a passing test can be a property of the FIXTURE, not of the code.**
+
+**THE GDPR DOC'S CLAIM WAS NARROWER THAN THE PROPERTY IT SELLS.** §7 bullet (a) named
+`webhook_deliveries.payload` — always true — while the leak was in the sibling column
+`response_body_excerpt`, so the literal sentence stayed accurate the whole time the heading above it ("the
+delivery ledger is not a second copy") was false. The clause now binds the whole row. `M4`'s claim had said
+that document would need no edit, *checked rather than assumed*; checking moved it, and the claim was
+extended mid-build.
+
+**NARROWED RATHER THAN CLOSED, AND ASSERTED AS A PASSING TEST.** `classifyFailure()`'s retryable
+fall-through still stores the provider body verbatim, on purpose — a 429 or 5xx body is the only diagnostic
+an operator has for an outage, those statuses do not echo a payload, and every arm a tenant reads already
+replaces Airtable's copy with ours. The 429 case pins it. `excerpt()` is not orphaned (`:391`, `:431`).
+
+**Gates:** Connectors 228 passed / 847 assertions · PHPStan 18, delta zero · four lint gates 97 / 108 / 30 /
+119 · Pint `passed` · `openapi.json` byte-identical · zero `.vue` / `.ts` / `packages/design-system/` /
+`tests/e2e/` files. Predicted CI Pest **4428 / 18,731**, measured by running the new case in isolation.
+
+**NAMESPACES: nothing spent.** `0021` free · `0010` reserved for H1d · `#16` free · migration block stays at
+`2026_08_17_000106`. Both the M3 and M4 claims were released in the session they were taken.

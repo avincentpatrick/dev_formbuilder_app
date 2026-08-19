@@ -349,8 +349,18 @@ final class AirtableConnector implements ConnectorProvider
             return $response;
         }
 
+        // ⚠️ `'ok'`, NOT THE BODY, AND THE SIBLING ADAPTER'S DOCBLOCK IS THE REASON (M4). Airtable's
+        // create-record response ECHOES the `fields` object just written, so passing an excerpt of it put the
+        // RESPONDENT'S ANSWERS into `webhook_deliveries.response_body_excerpt` -- a table with no retention
+        // job, which a submission delete does not touch, so the copy outlived an erasure request.
+        // {@see GoogleSheetsConnector} bullet 1 states the property this broke: the shared ledger stores only
+        // the metadata envelope, and never becomes a second copy of answer content
+        // (`docs/data-privacy-gdpr-compliance.md` §7 offers it as STRUCTURAL rather than promised).
+        // The FAILURE paths keep their excerpt on purpose: those bodies are Airtable's error copy, an admin
+        // needs them to fix a rule, and `classifyFailure()` already replaces the provider's wording with ours
+        // wherever it reaches a person.
         return $response->successful()
-            ? ConnectorDeliveryResult::delivered($response->status(), $this->excerpt($response->body()))
+            ? ConnectorDeliveryResult::delivered($response->status(), 'ok')
             : $this->classifyFailure($response);
     }
 

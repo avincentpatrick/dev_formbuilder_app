@@ -4016,3 +4016,65 @@ merges, not only after the other lane's. Corrected in both places, with the corr
 **Narrowed rather than closed:** the provider-commits-to-we-commit window is one UPDATE wide, not zero;
 closing it needs a two-phase protocol no provider offers. Filed with its revisit trigger, in the backlog and
 in ADR-0009 §D6's amendment.
+
+## 2026-08-20 — LANE B / `M7`: the SAML second-factor decision that lived in code and in no ADR (PR #188, `a8e380c`)
+
+Rule 7(f) row, claimed in the 7(g) ledger before any file it named. 6/6. **CI Pest 4447 / 18,835** (+1 test / +13 assertions, exactly as predicted from the isolation run — seven-for-seven), E2E **551 passed + 10 skipped, ZERO flaky** (the triple read, not the conclusion — and the known `builder-axe` 4.45 contrast failure did not manifest in this run, which is not the same as fixed),
+axe **42 / 299**, lint **97 / 109 / 31 / 119**, PHPStan **18**, `openapi.json` byte-identical. **All three PHP
+changes proved comment-only by diff** — the increment's only executable line is one new test.
+
+**THE DEFECT.** ADR-0019 §D11 explained why Google challenges a member's personal TOTP by quoting ADR-0016
+§D22 for the SAML answer. The quoted sentence is not in §D22 — it is a *Consequences* bullet about the
+**org-level** control, which ADR-0016 pointedly does **not** exempt for SSO, i.e. the opposite polarity. And
+`grep -i` for `2FA|second factor|two.factor|TOTP` across all of ADR-0016 returned **exactly one line**: that
+same bullet. **The document had never decided anything about a member's personal second factor**, while the
+code had been making that decision since P1b. **User decision 2026-08-20: ratify as-built**, on the evidence
+— §D22 already gives an SSO session's *re-authentication* to the IdP via `ForceAuthn` rather than to a local
+credential, so login is that principle one step earlier; the threat model already called the SAML side "a
+deliberate divergence"; and the 2026-08-14 Google decision was itself framed as a divergence **from** this.
+
+**THE ROW'S OWN EVIDENCE HAD GONE STALE, IN EXACTLY THE WAY THE ROW IS ABOUT.** It cited `0016:168`; M2's
+§D31 had pushed that sentence seventy lines down. A row about an unstable citation, carried by an unstable
+citation — which is why the fix is a **§ heading**, not a corrected number.
+
+**TWELVE MIS-CITING PASSAGES ACROSS SIX FILES, NOT THE FIVE THE ROW NAMED — AND EIGHT CORRECT §D22
+CITATIONS IN THE SAME GREP.** Decided by reading each line, never by sweeping a pattern (PR #153's shape in
+miniature). `PROGRESS_ARCHIVE.md` keeps what was believed at the time. A correct § number alone would not
+have fixed §D11 either: the quotation argued the opposite of what it was offered for, so §D11 was requoted.
+
+**THE PIN, AND THE MUTATION PROOF INVERTED.** The SAML polarity was asserted **nowhere** — `tests/Feature/Sso/`
+grepped zero for `two_factor_confirmed_at` — while Google's has been pinned since J3c2, so a later
+"make the doors consistent" change would have flipped a decision of record with the suite green. A docs
+increment has no `app/` fix to stash, so lesson (b) ran **backwards**: the `GoogleSessionStarter`-shaped fork
+was ADDED to `SsoLoginCompletionController`, the new case went red on `/two-factor-challenge`, and the file
+was restored byte-identical to HEAD. **A ratification test that survives the opposite behaviour is worth
+nothing**, and that was the one way this could have shipped dead.
+
+**⚠️⚠️ AND THE ADVERSARIAL PASS OVERTURNED THE INCREMENT'S OWN DOOR SURVEY — A LIVE `major` THIS INCREMENT
+HAD WRITTEN OFF.** M7's `Auth::login(` shape-grep found `InvitationController` and cleared it: *"an
+already-verified invitee must already be authenticated; a placeholder has no confirmed factor"*. Both halves
+true, neither is the branch — `prepareAcceptingUser()` forks on **`email_verified_at`**, and
+enrolled-but-unverified is ordinary: an email change nulls `email_verified_at`, **nothing in `app/` ever
+clears `two_factor_confirmed_at`** (all twelve occurrences are reads or the cast), Fortify's enrolment routes
+carry `auth` + `password.confirm` but not `verified`, and the invite reuses the existing identity rather than
+creating a placeholder. The unverified arm skips the file's only identity check, force-fills a token-holder's
+password and `Auth::login()`s — **strictly weaker than password reset**, which at least lands on
+`/two-factor-challenge`. Reproduced before it was believed. Filed as its own `major`; the clearance was
+**corrected in place, not deleted**. ⚠️ **A DOOR SURVEY IS ONLY AS GOOD AS THE PREDICATE IT CHECKS EACH DOOR
+AGAINST, AND "checked, not a defect" IN THE PERMANENT RECORD IS WHAT MAKES A WRONG PREDICATE DURABLE.**
+
+**⚠️⚠️ AND M7 REPRODUCED THE DEFECT CLASS IT CLOSES, FOUR TIMES, IN ITS OWN PROSE.** A +59-line §D32 and a
++10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` / `ACCESS-MATRIX.md:397` evidence
+list, **and two LIVE backlog rows M7 never read** — one of them the sole evidence for the *enrolment-nudge*
+argument §D32 leans on twice. M7 had explicitly asked which citations its insertion would move and answered
+**"nothing else moves"**: true of the citations that already existed, **silent about the ones the same commit
+was adding**. Re-anchored on quoted text and symbol names. **"Which citations does my edit invalidate" must
+include the ones the edit is adding.**
+
+**Also caught before merge:** the increment's own arithmetic disagreed with itself in five places (the true
+shape is twelve passages, one source and eleven inheritors); the new lint-gate row was justifying itself with
+an example the gate would not catch; and §D32 was leaning on a docblock sentence M7 had written in the same
+commit.
+
+**`Install Playwright (chromium)` HUNG AGAIN** — fifth occurrence, ~1h on the first run. Cancelled as
+superseded rather than rerun, because a push had already started a newer run.

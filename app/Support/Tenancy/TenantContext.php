@@ -6,6 +6,7 @@ namespace App\Support\Tenancy;
 
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Establishes the per-request/per-transaction Postgres session variables that RLS policies read
@@ -95,8 +96,10 @@ final class TenantContext
      * would issue two session-scoped `set_config` round-trips, which is both wasteful per job and
      * wrong (it would leave a session-scoped GUC behind on a worker's long-lived connection).
      *
-     * Sole caller is App\Listeners\Queue\ScopeTenantContextToJob (ADR-0007 §D4), which saves the
-     * ambient mirror before a job runs and restores it after. That matters under the `sync` driver —
+     * Callers: App\Listeners\Queue\ScopeTenantContextToJob (ADR-0007 §D4), which saves the ambient mirror
+     * before a job runs and restores it after, and {@see runFor()} on the two paths where the database has
+     * already reverted itself and only the mirror is left stale. It read "sole caller" until M3 added the
+     * second — recorded because a docblock that names its only caller goes stale the moment it gains another. That matters under the `sync` driver —
      * every current CI job — where the queue events fire INLINE in the caller's stack, so a blind
      * flush would wipe the surrounding request's context mid-request.
      */
@@ -104,6 +107,81 @@ final class TenantContext
     {
         self::$tenantId = $tenantId;
         self::$userId = $userId;
+    }
+
+    /**
+     * Run $work under $tenantId's own context, transaction-scoped, and restore whatever was there
+     * before — so a caller does not have to have established the right context first.
+     *
+     * THE COMPOSITION THIS CLASS WAS MISSING. Every caller that needs "act for THIS tenant regardless
+     * of what the ambient request or worker left behind" has had to hand-roll four steps in the right
+     * order: save the mirror, open a transaction (because applyLocal() is `SET LOCAL` and a SILENT
+     * NO-OP outside one), apply, and restore in a `finally`. {@see \App\Listeners\Auth\SendWelcomeEmail}
+     * (`isMemberOf`), {@see \App\Services\Admin\ImpersonationService} and
+     * {@see \App\Services\Admin\SuperAdminService} each write it out by hand; the two fan-out
+     * dispatchers (M3) are the first callers of the extraction. The five hand-rolled sites are
+     * DELIBERATELY NOT retrofitted here — each is correct, and rewriting a correct tenant-boundary
+     * call site is its own increment with its own gate run.
+     *
+     * ⚠️ THE USER ID IS CARRIED THROUGH ONLY WHEN THE TENANT IS UNCHANGED, and is null otherwise. A
+     * user belongs to a workspace, so carrying an id across a tenant switch would assert a membership
+     * that may not exist; null is the fail-closed value, since an unset `app.current_user_id` makes a
+     * user-keyed policy match zero rows rather than all rows. A caller whose work needs a specific user
+     * under a DIFFERENT tenant must say which — and none does today.
+     *
+     * ⚠️ THE RESTORE IS AFTER THE TRANSACTION, NOT IN A `finally` INSIDE IT, AND THAT IS DELIBERATE.
+     * The obvious shape — apply, work, restore in a `finally` — issues SQL on the way out of a FAILURE,
+     * where the connection may be in Postgres' aborted-transaction state; the restore would then throw
+     * and REPLACE the exception that caused it, destroying the diagnostic. So the three exits are
+     * separated: on a throw only the PHP mirror is put back (the database has already reverted itself,
+     * by rollback or by ROLLBACK TO SAVEPOINT); on a NESTED success the GUC really must be re-issued,
+     * because a `SET LOCAL` inside a savepoint SURVIVES its release and would otherwise hand the rest of
+     * the enclosing transaction a tenant it never asked for — the H12a sweep is exactly that case; and on
+     * an outermost success the COMMIT has already discarded the LOCAL values, so the mirror is all that
+     * is left and two round-trips are saved on the request path.
+     *
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $work
+     * @return TReturn
+     */
+    public static function runFor(string $tenantId, callable $work): mixed
+    {
+        $savedTenant = self::$tenantId;
+        $savedUser = self::$userId;
+
+        try {
+            $result = DB::transaction(static function () use ($tenantId, $savedTenant, $savedUser, $work) {
+                self::applyLocal($tenantId, $savedTenant === $tenantId ? $savedUser : null);
+
+                return $work();
+            });
+        } catch (Throwable $e) {
+            // The DATABASE has already put itself right: a rollback discards this transaction's `SET LOCAL`,
+            // and a ROLLBACK TO SAVEPOINT reverts it to what the enclosing transaction had. Only the PHP
+            // mirror is left stale, and restoring it touches no connection — which is the point. Issuing SQL
+            // here would run against a connection that may be in Postgres' aborted-transaction state, where
+            // every statement fails, and THAT failure would replace the real exception. It is the hazard
+            // {@see \App\Listeners\Queue\ScopeTenantContextToJob} solves by never touching the database on
+            // the way out.
+            self::restoreMirror($savedTenant, $savedUser);
+
+            throw $e;
+        }
+
+        if (DB::transactionLevel() > 0) {
+            // NESTED, and this is the branch the whole method exists for: DB::transaction() opened a
+            // SAVEPOINT, and a `SET LOCAL` issued inside one SURVIVES its release — so without this the
+            // enclosing transaction would silently continue under a tenant it never asked for.
+            self::applyLocal($savedTenant, $savedUser);
+        } else {
+            // Outermost: COMMIT already discarded the LOCAL values, so any session-scoped context the HTTP
+            // middleware set is back by itself and only the mirror needs putting right. Two `set_config`
+            // round-trips saved on the request path, where this runs once per submission.
+            self::restoreMirror($savedTenant, $savedUser);
+        }
+
+        return $result;
     }
 
     private static function set(?string $tenantId, ?string $userId, bool $local, ?string $connection): void

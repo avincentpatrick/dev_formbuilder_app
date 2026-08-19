@@ -238,3 +238,56 @@ it('sends member.invited only to tenant-wide endpoints, since an invitation has 
     enterTenant($this->tenant->id);
     expect(WebhookDelivery::query()->count())->toBe(0);
 });
+
+/*
+|--------------------------------------------------------------------------
+| M3 — the fan-out must select endpoints by the EVENT's tenant, not by whatever context the caller left
+| behind. Every case above seeds ONE tenant and calls fanOut() under an enterTenant() for that same
+| tenant, so the event's id and the ambient id are indistinguishable in all ten of them: the dispatcher
+| could ignore $event->tenantId() entirely and they would still pass. These two make them distinguishable.
+*/
+
+it('fans out with NO ambient tenant context — the state a queue worker leaves behind', function (): void {
+    $endpoint = WebhookEndpoint::factory()->create(['form_id' => null]);
+    $event = subEvent($this->tenant->id, $this->formId);
+
+    // The positive control, asserted BEFORE the context is torn down. Without it a zero-row result below
+    // reads as "the fix is needed" when it could equally be a mis-seeded factory or a wrong event type.
+    expect(WebhookEndpoint::query()->count())->toBe(1);
+
+    // A worker's state, reproduced rather than approximated: TenantAwareJob's applyLocal() is SET LOCAL
+    // and dies at its transaction's commit, and ScopeTenantContextToJob::entering() flushes the PHP
+    // mirror before the next job runs — so BOTH the GUC and the mirror are null when a queued listener
+    // reaches the dispatcher. This is the state the feature-backlog row is about.
+    TenantContext::applyLocal(null);
+    expect(TenantContext::currentTenantId())->toBeNull();
+
+    app(WebhookEventDispatcher::class)->fanOut($event);
+
+    enterTenant($this->tenant->id);
+    $delivery = WebhookDelivery::query()->firstOrFail();
+    expect($delivery->webhook_endpoint_id)->toBe($endpoint->id)
+        ->and($delivery->tenant_id)->toBe($this->tenant->id);
+
+    Queue::assertPushed(DeliverWebhookJob::class, 1);
+});
+
+it('fans out to the event tenant while a DIFFERENT tenant is ambient', function (): void {
+    $ours = WebhookEndpoint::factory()->create(['form_id' => null]);
+
+    $other = Tenant::create(['name' => 'Globex', 'slug' => 'globex', 'default_locale' => 'en']);
+    enterTenant($other->id);
+    $theirs = WebhookEndpoint::factory()->create(['form_id' => null]);
+    expect($theirs->tenant_id)->toBe($other->id); // control: the other tenant really does have a matching endpoint
+
+    // Ambient context is Globex; the event belongs to Acme. On the unfixed dispatcher the endpoint SELECT
+    // returns Globex's row and the delivery INSERT then stamps Acme's tenant_id, which RLS rejects as
+    // 42501 — so the MISMATCH case was already loud. It is the unset case above that was silent.
+    app(WebhookEventDispatcher::class)->fanOut(subEvent($this->tenant->id, $this->formId));
+
+    enterTenant($this->tenant->id);
+    expect(WebhookDelivery::query()->pluck('webhook_endpoint_id')->all())->toBe([$ours->id]);
+
+    enterTenant($other->id);
+    expect(WebhookDelivery::query()->count())->toBe(0);
+});

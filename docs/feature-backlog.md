@@ -522,19 +522,80 @@ are still in place.
 
 ### Connectors & webhooks
 
-- **`major` · The `webhook_deliveries` fan-out picks its endpoints by ambient RLS alone.**
-  `app/Services/Webhooks/WebhookEventDispatcher.php:49-59` computes `$tenantId` from `$event->tenantId()`
-  and uses it only to stamp the delivery row at `:68`; the query deciding *which endpoints receive the
-  event* is a bare `WebhookEndpoint::query()->where('status', …)` resolved by the global scope. The class
-  docblock (`:28-30`) names the precondition — *"Runs with tenant context established in BOTH call
-  contexts"* — and nothing enforces it. **Latent**: the four `App\Listeners\Webhooks` listeners are
-  synchronous today. Add `ShouldQueue` (one line — the delivery job already is queued), or call `fanOut()`
-  from a console sweep that tears the GUC down between tenants, and this repo's own read-side RLS trap
-  returns **zero endpoints with no exception and no log line**: every tenant's webhooks *and* every Slack /
-  Sheets / Airtable delivery stop firing, silently and totally, with the suite green.
-  The test cannot see it — `tests/Feature/Webhooks/WebhookFanOutTest.php:38-61` seeds one tenant and all
-  ten cases pass `$this->tenant->id` under an `enterTenant()` for that same tenant, so the event's id and
-  the ambient id are indistinguishable in every case.
+- ✅ **CLOSED BY `M3` (2026-08-19) — `major` · ~~THE `webhook_deliveries` FAN-OUT PICKS ITS ENDPOINTS BY
+  AMBIENT RLS ALONE.~~** Both dispatchers now take the scope from the event and establish it themselves,
+  via a new `TenantContext::runFor()`. ⚠️ **THE ROW NAMED ONE CLASS AND THERE WERE TWO.**
+  `ConnectorEventDispatcher` is the identical shape (`:39-63`) and is the twin that actually carries every
+  Slack / Sheets / Airtable delivery this row blames on the webhook class — so fixing only the named file
+  would have left the row's own sentence false. Both are fixed here (user decision 2026-08-19).
+  ⚠️ **REPRODUCED BEFORE IT WAS FIXED, AND THE REPRODUCTION SPLIT THE ROW IN TWO.** Four new cases, two per
+  channel, run against the unfixed dispatchers produced **two different failures**: with no ambient context
+  (a worker's state exactly — `applyLocal()` dies at its transaction's commit and `ScopeTenantContextToJob`
+  flushes the mirror) the fan-out created **zero rows, threw nothing and logged nothing**; with a *different*
+  ambient tenant it raised **42501**, because the SELECT returned the other tenant's endpoints and the INSERT
+  then stamped the event's `tenant_id`. **So the mismatch case was already loud and needed no fix — it is
+  the UNSET case that was silent**, and the fix is aimed there rather than at the shape the row describes.
+  Each case asserts a positive control *before* tearing the context down, so a zero-row result cannot be a
+  mis-seeded factory.
+  ⚠️ **THE OBVIOUS IMPLEMENTATION WOULD HAVE MASKED THE NEXT REAL EXCEPTION.** An *apply → work → restore-in-a-`finally`* shape issues SQL on the way
+  out of a **failure**, where the connection may be in Postgres'
+  aborted-transaction state and every statement fails — so the restore would throw and REPLACE the exception
+  that caused it. `runFor()` separates the three exits instead: on a throw only the PHP mirror is put back
+  (the database has already reverted itself); on a **nested** success the GUC is re-issued, because a
+  `SET LOCAL` inside a savepoint SURVIVES its release and would otherwise hand the rest of the enclosing
+  transaction a tenant it never asked for — the H12a sweep is exactly that; on an outermost success the
+  COMMIT has already discarded it. It is the hazard `ScopeTenantContextToJob` avoids by never touching the
+  database on the way out, met by a method that has to.
+  ➕ **THREE THINGS THE ROW DID NOT NAME, ALL FIXED WITH IT.** (1) **Seven dispatch-listener docblocks gave
+  *"a queued listener would run under a null tenant GUC"* as the reason they are not `ShouldQueue`** — a
+  sentence this increment falsifies, so it is swept; after it, that phrase survives only at the two sites
+  where it is still true (`FormOpened`'s `SerializesModels` note and `NotifyOnSubmissionCreated`).
+  ⚠️ **AND A GREP FOR THE PHRASE IS NOT A CENSUS OF THE CLAIM** — an adversarial pass found two further
+  listeners (`DispatchConnectorsForSubmissionApproved`, `…Updated`) asserting *"Never `ShouldQueue` — see
+  the twin"*, which carries the retired reason by REFERENCE rather than by wording. Both are corrected in
+  the same increment. This is the repo's own *name the thing, never quote it* lesson, met from the other
+  side: the sweep matched a string and the claim outlived it. (2) Both
+  dispatcher docblocks said **"four thin auto-discovered listeners"** where there are **eight** since I3 and
+  I9c — the same drift, in the file that defines the behaviour. (3) `TenantContext::restoreMirror()`'s
+  docblock named `ScopeTenantContextToJob` as its **sole** caller, which stopped being true here.
+  ⛔ **THE LISTENERS ARE DELIBERATELY NOT FLIPPED TO `ShouldQueue`** — that is a behaviour change owed its
+  own increment, and it is filed as its own row below rather than left invisible.
+  **Gates:** four lint gates unchanged at **97 / 108 / 30 / 119** (M3 adds no controller, migration or job),
+  Pint `passed`, `openapi.json` byte-identical, zero `.vue` / `.ts` / `packages/design-system/` / e2e movement.
+
+- **`minor` · All sixteen synchronous dispatch listeners could now be `ShouldQueue`, and nothing has
+  decided whether they should be.** ⚠️ **The count is SIXTEEN, not the seven this row first said** — eight
+  per channel, all synchronous; seven is merely how many carried the docblock sentence M3 retired. Filed by **M3 (2026-08-19)** at the moment the decision was taken, because a
+  deliberately-unfixed finding that lives only in a commit message is invisible to any later backlog search.
+  Until M3 the answer was forced: a queued listener found no tenant context and the fan-out silently matched
+  nothing. `WebhookEventDispatcher` and `ConnectorEventDispatcher` now establish the event's own context, so
+  queueing any of the sixteen is **safe** — the question is whether it is *wanted*. Arguments both ways, neither yet
+  weighed: fan-out is two queries and an enqueue, so a synchronous listener costs a submission request very
+  little and keeps delivery-row creation inside the request that caused it; against that, `form.opened` and
+  `form.closed` fire inside the H12a sweep's per-tenant transaction, where a slow fan-out holds row locks
+  taken by `lockForUpdate()`. **Nothing is broken either way** — this is a latency/locking trade, not a
+  correctness one, which is why M3 declined to make it while fixing a correctness bug.
+
+- **`minor` · Twelve existing tenant-context call sites restore in a `finally` INSIDE their transaction,
+  which is the shape `TenantContext::runFor()` was deliberately built to avoid.** Filed by **M3
+  (2026-08-19)**, and found by the adversarial pass on M3 rather than by writing it — the increment's own
+  docblock had asserted *"each is correct"* about code it had not counted, let alone read. The shape:
+  `$saved = currentTenantId()` → `DB::transaction(fn () => { applyLocal($target); try { … } finally {
+  applyLocal($saved); } })`. If the work inside raises a **QueryException**, Postgres refuses every further
+  statement on that transaction, so the `finally`'s own `set_config` fails **25P02** and becomes the
+  exception the caller sees; the real error survives only as `getPrevious()`, and every top-level inspection
+  — class, message, SQLSTATE — reads the wrong one. `runFor()` avoids it by restoring the PHP mirror only
+  on the throw path, where the database has already reverted itself.
+  **The twelve, measured rather than estimated** (`grep -rn "savedTenant = TenantContext::currentTenantId()\|previousTenant = TenantContext::currentTenantId()" app/`):
+  `SendWelcomeEmail.php:109` · `ImpersonationService.php:119,241` · `SuperAdminService.php:125,162,257,702,748`
+  · `GoogleAuthRequestService.php:82` · `TenantSettingRegistry.php:98` · `TenantMembershipService.php:314` ·
+  `TenantExtractService.php:64`. **Latent, not live**: it needs the enclosed work to fail at the database,
+  and each site's work is a narrow read or write that does not today. ⚠️ **Two of the twelve cannot simply
+  become `runFor()` calls** — `SendWelcomeEmail:109` and `ImpersonationService:119` apply a specific user
+  under a switched tenant, which `runFor()` deliberately nulls, so a retrofit needs a user-carrying variant
+  or must stay hand-rolled. That is why this is filed rather than swept: it is twelve tenant-boundary call
+  sites, and rewriting a working one is its own increment with its own gate run.
+
 - ✅ **FIXED ON THIS BRANCH, recorded because it was the review's only surviving non-documentation-hygiene
   `blocker` and because it is the contract an integrator builds against.** The docs described a single
   `sha256=<hex>` in `X-Webhook-Signature` while `WebhookSigner::signatureHeaderFor()` comma-joins the new

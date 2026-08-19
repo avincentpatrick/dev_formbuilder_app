@@ -195,3 +195,50 @@ it('never matches another tenant subscription, even for the same event type', fu
     expect(WebhookDelivery::query()->count())->toBe(0);
     Bus::assertNothingDispatched();
 });
+
+/*
+|--------------------------------------------------------------------------
+| M3 — the same defect as the webhook twin, in the class that actually carries the Slack / Sheets /
+| Airtable deliveries. Every case above seeds ONE tenant and calls fanOut() under an enterTenant() for
+| that same tenant, so the event's id and the ambient id are indistinguishable. These two separate them.
+*/
+
+it('fans out with NO ambient tenant context — the state a queue worker leaves behind', function (): void {
+    $subscription = ConnectionSubscription::factory()->forConnection($this->connection)->create();
+    $event = connectorSubmissionEvent();
+
+    // The control, asserted while the context still stands: the subscription really is there, really is
+    // active and really does have a live grant, so a zero-row result below has only one explanation left.
+    expect(ConnectionSubscription::query()->count())->toBe(1);
+
+    TenantContext::applyLocal(null);
+    expect(TenantContext::currentTenantId())->toBeNull();
+
+    app(ConnectorEventDispatcher::class)->fanOut($event);
+
+    enterTenant($this->tenant->id);
+    $delivery = WebhookDelivery::query()->firstOrFail();
+    expect($delivery->connection_subscription_id)->toBe($subscription->id)
+        ->and($delivery->webhook_endpoint_id)->toBeNull()
+        ->and($delivery->tenant_id)->toBe($this->tenant->id);
+
+    Bus::assertDispatched(DeliverConnectorMessageJob::class, 1);
+});
+
+it('fans out to the event tenant while a DIFFERENT tenant is ambient', function (): void {
+    $ours = ConnectionSubscription::factory()->forConnection($this->connection)->create();
+
+    $other = Tenant::create(['name' => 'Globex', 'slug' => 'globex', 'default_locale' => 'en']);
+    enterTenant($other->id);
+    $theirConnection = Connection::factory()->create();
+    $theirs = ConnectionSubscription::factory()->forConnection($theirConnection)->create();
+    expect($theirs->tenant_id)->toBe($other->id); // control: the other tenant has a matching subscription too
+
+    app(ConnectorEventDispatcher::class)->fanOut(connectorSubmissionEvent());
+
+    enterTenant($this->tenant->id);
+    expect(WebhookDelivery::query()->pluck('connection_subscription_id')->all())->toBe([$ours->id]);
+
+    enterTenant($other->id);
+    expect(WebhookDelivery::query()->count())->toBe(0);
+});

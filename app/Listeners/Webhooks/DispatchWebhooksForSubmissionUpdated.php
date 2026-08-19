@@ -20,8 +20,10 @@ use App\Services\Webhooks\WebhookEventDispatcher;
  * site is worse than a missing one — it is subscribable and can never fire." An adversarial review found it;
  * no test did, which is why `WebhookFanOutTest` now drives this case alongside I3's.
  *
- * Auto-discovered from the `handle()` type-hint and never `ShouldQueue`: it only creates delivery rows and
- * enqueues jobs, and a queued listener would run under a null tenant GUC.
+ * Auto-discovered from the `handle()` type-hint and not `ShouldQueue`: it only creates delivery rows and
+ * enqueues jobs, so there is nothing worth deferring. The second reason recorded here until M3 — that a
+ * queued listener would find no tenant context — is retired; {@see DispatchWebhooksForSubmissionCreated}
+ * carries the correction.
  */
 final class DispatchWebhooksForSubmissionUpdated
 {

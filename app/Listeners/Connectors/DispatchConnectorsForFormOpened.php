@@ -14,9 +14,13 @@ use App\Services\Connectors\ConnectorEventDispatcher;
  *
  * A SEPARATE listener rather than a second call inside the webhook one: the two channels then fail
  * independently (a connector query error cannot suppress webhook delivery, or vice versa), and adding the
- * channel touched no shipped file. Like its twin it must not be `ShouldQueue` — it only creates ledger rows
- * and enqueues jobs (no outbound I/O), and a queued listener would run under a null tenant GUC. This event is
- * emitted from inside the H12a schedule sweep's tenant transaction, where that context is established.
+ * channel touched no shipped file. Like its twin it is not `ShouldQueue` — it only creates ledger rows
+ * and enqueues jobs (no outbound I/O), so there is nothing worth deferring. ⚠️ THE SECOND REASON
+ * RECORDED HERE UNTIL M3 IS RETIRED — it said a queued listener would find no tenant context, and
+ * {@see ConnectorEventDispatcher} now establishes the event's own. Queueing these is therefore safe: it
+ * is a behaviour change owed its own increment, not a correctness fix, and it is filed as one. This event is
+ * emitted from inside the H12a schedule sweep's tenant transaction, so the fan-out runs as a SAVEPOINT
+ * within it rather than as a transaction of its own.
  */
 final class DispatchConnectorsForFormOpened
 {

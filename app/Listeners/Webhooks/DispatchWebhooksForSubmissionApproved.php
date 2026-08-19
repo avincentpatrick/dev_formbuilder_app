@@ -17,8 +17,9 @@ use App\Services\Webhooks\WebhookEventDispatcher;
  * began accepting it. An event a tenant can subscribe to but which never delivers is precisely the defect
  * that kept `review.requested` out of the catalog — it must not be introduced by the back door.
  *
- * Auto-discovered and never `ShouldQueue`: it only creates delivery rows and enqueues jobs, and a queued
- * listener would run under a null tenant GUC.
+ * Auto-discovered and not `ShouldQueue`: it only creates delivery rows and enqueues jobs, so there is
+ * nothing worth deferring. The second reason recorded here until M3 — that a queued listener would find
+ * no tenant context — is retired; {@see DispatchWebhooksForSubmissionCreated} carries the correction.
  */
 final class DispatchWebhooksForSubmissionApproved
 {

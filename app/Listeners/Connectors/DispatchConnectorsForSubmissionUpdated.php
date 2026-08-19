@@ -16,7 +16,8 @@ use App\Support\Connectors\ConnectorEventContextResolver;
  * unreachable code.
  *
  * A SEPARATE listener rather than a second call inside the webhook one, so the two channels fail
- * independently. Never `ShouldQueue` — see the twin.
+ * independently. Not `ShouldQueue` — see the twin, whose reason M3 corrected (the fan-out now
+ * establishes the event's own tenant context, so queueing is safe but unweighed).
  */
 final class DispatchConnectorsForSubmissionUpdated
 {

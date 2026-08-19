@@ -705,22 +705,53 @@ are still in place.
   channel it arrived in, where a repeated spreadsheet row silently biases every count taken over the tenant's
   dataset. And the fix would not be M5's — asking Slack "did my message land?" means reading channel history,
   a scope this connector does not request and should not acquire to dedupe its own retries.
-- **`major` · An irreversible provider-side token rotation is committed inside a rollback-able
-  transaction.** `app/Services/Connectors/ConnectionTokenRefresher.php:127` writes each refreshed grant
-  inside the transaction `app/Jobs/TenantAwareJob.php:132-136` opens, and `sweep()` (`:53-72`) batches
-  every due connection for a tenant into it with no partial-commit seam. Airtable invalidates the previous
-  refresh token on every renewal (`AirtableConnector.php:54-61`), so a 60s job timeout or any later throw
-  rolls back the writes while the tokens stay rotated — the next sweep gets `invalid_grant`, which is
-  terminal, and `markDead()` clears both tokens, pauses every rule and emails the owner. **Live** and
-  Airtable-specific (Google returns no new refresh token; Slack never refreshes). ADR-0009 §D6 named the
-  hazard in two halves; the H16a amendment answered only the stampede half.
-- **`major` · `ensureFresh()` takes no lock, so two concurrent deliveries destroy a healthy Airtable
-  grant.** `app/Services/Connectors/ConnectionTokenRefresher.php:86` is a plain read-check-then-refresh —
-  no `Cache::lock`, no `FOR UPDATE`, no `WithoutOverlapping` — so two workers exchange the same rotating
-  refresh token, the loser gets `invalid_grant`, and `markFailed()` runs. **Latent, and the precondition is
-  undeclared**: `docker-compose.yml:39` and `docs/deployment-infrastructure.md:120` run exactly **one**
-  `queue:work`, and that same line names adding worker processes as the scaling path. The scheduled sweep
-  *is* protected by `WithoutOverlapping`; the lazy guard H16a added beside it inherited none of it.
+- ✅ **CLOSED BY `M6` (2026-08-19) — `major` · ~~AN IRREVERSIBLE PROVIDER-SIDE TOKEN ROTATION IS COMMITTED
+  INSIDE A ROLLBACK-ABLE TRANSACTION~~ AND `major` · ~~`ensureFresh()` TAKES NO LOCK~~.** Taken together
+  because they are **one mechanism, not two**: both are answered by making "refresh one grant" a single
+  locked, immediately-committed critical section, and shipping them apart would have meant rewriting the same
+  code twice. Every cited link held.
+  ⚠️ **THE ROW NAMED ONE PATH AND THERE WERE TWO — M3's SHAPE EXACTLY.** It blamed `sweep()`, but
+  `ensureFresh()` ran inside **`DeliverConnectorMessageJob`'s** transaction as well, and that one is worse:
+  the sweep does nothing after a rotation but rotate the next grant, while the delivery job goes on to make up
+  to three more outbound calls, any of which can throw or eat the 60s `$timeout`. Fixing only the named path
+  would have left the row's own sentence true and the defect live.
+  ⚠️ **AND THE TRANSACTION COULD NOT SIMPLY BE REMOVED**: `TenantContext::applyLocal()` issues `SET LOCAL`,
+  so RLS scoping dies with it. The fix is a per-connection commit **seam** — `RefreshOneConnectionJob`, whose
+  transaction body is nothing but its own write — rather than "move the write out".
+  ⚠️ **REPRODUCED BEFORE IT WAS FIXED, AND THE MUTATION IS THE ABSENCE OF THE FIX.** Two cases drove
+  `TenantAwareJob`'s exact transaction shape, rotated two Airtable tokens, threw, and showed the database
+  rolled back to credentials Airtable had already destroyed — then showed the next sweep killing the
+  connection, clearing its tokens and pausing its rules. Kept and inverted as the guards. `git stash push --
+  app/` turns **six** of them red, including all three of M6's claims.
+  ➡ **TWO THINGS THE TESTS CAUGHT IN THE FIX ITSELF.** (1) The new dead-connection branch was **unreachable**:
+  `markDead()` pauses every rule on the connection, so the paused-rule guard always fired first — the very
+  dead-code-that-looks-live shape this increment was replacing. The grant is now checked **before** the rule,
+  because they are different kinds of thing: a dead grant is terminal and is settled, a paused rule is
+  reversible and stays silent so an un-pause resumes its queued deliveries. (2) That ordering also fixed a
+  **latent loop nobody had named** — see the row below.
+  **Gates:** connector suite **228 → 246** (847 → 930 assertions), PHPStan **18**, delta zero and none of its
+  nine files touched here; lint **97 / 109 / 31 / 119** (the new job moves the job count alone);
+  `openapi.json` byte-identical. ADR-0009 **§D6 amended in place** — no new ADR number spent.
+
+- ✅ **CLOSED BY `M6` (2026-08-19), AND IT WAS NEVER FILED — `major` · a delivery against a REVOKED grant was
+  re-dispatched every five minutes forever.** Found by following M6's own change through rather than by
+  looking for it. `DeliverConnectorMessageJob::handleForTenant()` returned silently for a dead grant, leaving
+  the row `failed` with its `next_retry_at` set and `attempt_count` untouched — so `WebhookRetrySweeper`'s
+  `attempt_count < max_attempts` predicate stayed true and the sweep re-queued the same delivery every five
+  minutes for the life of the row. **Masked, not absent**: the pre-flight refresh used to catch the revocation
+  one attempt earlier and dead-letter it, so the loop had never been reachable in practice. Moving that
+  refresh into its own job would have made it the only path — which is how a fix for one defect surfaced
+  another. Now settled with `[grant_expired]`, asserted by its own case.
+
+- **`minor` · A rotated token can still be lost in the one-UPDATE window M6 left.** Filed by **M6
+  (2026-08-19)** at the moment the decision was taken. The gap between the provider committing a rotation and
+  us committing the write is now one UPDATE wide instead of a whole batch, but it is not zero: a database
+  failure in exactly that gap still leaves Airtable holding a pair we never stored. Closing it entirely needs
+  a two-phase protocol **no provider here offers** — a rotation the client can confirm, or a grace period in
+  which the previous refresh token still works. **Revisit trigger: the first provider that offers either.**
+  Recorded in ADR-0009 §D6's M6 amendment as well, so the residual is visible from the decision and not only
+  from the backlog.
+
 - **`minor` · The setup-time directory has no pre-flight refresh**, so an ordinary token expiry tells the
   tenant to reconnect a healthy account — `app/Services/Connectors/TabularDestinationDirectory.php:46,68`,
   the one place H16a's guard was not applied. **Latent** on a missed sweep (H16a's own premise).

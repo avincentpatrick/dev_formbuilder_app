@@ -7,6 +7,7 @@ namespace App\Services\Connectors;
 use App\Enums\ConnectionStatus;
 use App\Exceptions\Connectors\ConnectorOAuthException;
 use App\Exceptions\Connectors\UnknownConnectorProviderException;
+use App\Jobs\Connectors\RefreshOneConnectionJob;
 use App\Models\Connection;
 use App\Models\Tenant;
 use App\Models\User;
@@ -49,11 +50,27 @@ final class ConnectionTokenRefresher
         private readonly ConnectionService $connections,
     ) {}
 
-    /** @return int the number of grants refreshed successfully */
+    /**
+     * Hand every due grant to its own {@see RefreshOneConnectionJob} (M6).
+     *
+     * ⚠️ THIS USED TO ROTATE THEM INLINE, AND THAT WAS THE DEFECT. The caller is a {@see TenantAwareJob}, so
+     * the whole loop ran in ONE transaction: a throw anywhere in it — including the 60s `$timeout`, which a
+     * tenant with several due Airtable grants can genuinely reach at 5s connect + 10s read apiece — rolled
+     * back EVERY token written so far, while every one of them stayed rotated at the provider. Airtable
+     * invalidates the previous refresh token on each renewal, so the next sweep presented a dead credential,
+     * got `invalid_grant`, and that is terminal: `markDead()` cleared the tokens, paused every rule and
+     * emailed the owner. The batch is what made it plural.
+     *
+     * Dispatching per connection gives each rotation a transaction whose entire body is its own write, so one
+     * slow or failing grant can no longer take its neighbours with it.
+     *
+     * @return int the number of grants HANDED OFF — not the number refreshed, which is now settled
+     *             asynchronously by the jobs this dispatches
+     */
     public function sweep(Carbon $now): int
     {
         $leadSeconds = (int) config('connectors.refresh_lead_seconds', 7200);
-        $refreshed = 0;
+        $dispatched = 0;
 
         $due = Connection::query()
             ->where('status', ConnectionStatus::Active->value)
@@ -63,12 +80,34 @@ final class ConnectionTokenRefresher
             ->get();
 
         foreach ($due as $connection) {
-            if ($this->refresh($connection)) {
-                $refreshed++;
-            }
+            RefreshOneConnectionJob::dispatch((string) $connection->tenant_id, (string) $connection->getKey());
+            $dispatched++;
         }
 
-        return $refreshed;
+        return $dispatched;
+    }
+
+    /**
+     * Refresh ONE grant, now, on the caller's own transaction (M6) — the body
+     * {@see RefreshOneConnectionJob} exists to give a transaction of its own.
+     *
+     * It re-checks the lead window rather than trusting the sweep's read: a grant queued as due can have been
+     * renewed by the delivery path (or by an earlier duplicate of this job) between the two, and re-rotating
+     * a healthy Airtable grant would burn a perfectly good refresh token for nothing.
+     *
+     * @return bool whether a refresh was performed — `false` covers "not due", "no refresh token" and "the
+     *              refresh was refused"; a refusal also flips `$connection->status` away from Active, which
+     *              is how callers tell the last case from the first two
+     */
+    public function refreshNow(Connection $connection, Carbon $now): bool
+    {
+        $leadSeconds = (int) config('connectors.refresh_lead_seconds', 7200);
+
+        if ($connection->status !== ConnectionStatus::Active || ! $connection->needsRefresh($now, $leadSeconds)) {
+            return false;
+        }
+
+        return $this->refresh($connection);
     }
 
     /**

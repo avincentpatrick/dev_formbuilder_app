@@ -19,8 +19,8 @@ use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
 use App\Notifications\Connectors\ConnectorRulePausedNotification;
+use App\Services\Connectors\ConnectionPresenter;
 use App\Services\Connectors\ConnectionService;
-use App\Services\Connectors\ConnectionTokenRefresher;
 use App\Services\Entitlements\QuotaGuard;
 use App\Services\Entitlements\UsageMeter;
 use App\Services\Webhooks\WebhookPayloadArchive;
@@ -78,9 +78,30 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         // subscription or connection won't load, which is the same refusal by another route.
         if ($subscription === null
             || $connection === null
-            || $subscription->status !== ConnectorSubscriptionStatus::Active
-            || $connection->status !== ConnectionStatus::Active
             || ! in_array($delivery->status, [WebhookDeliveryStatus::Pending, WebhookDeliveryStatus::Failed], true)) {
+            return;
+        }
+
+        // ⚠️⚠️ THE GRANT IS CHECKED BEFORE THE RULE, AND THE ORDER IS THE WHOLE POINT (M6). Both used to sit
+        // in the guard above, which returns without touching the row — and `markDead()` PAUSES EVERY RULE ON
+        // THE CONNECTION, so the paused-rule arm always fired first and the dead-grant arm was unreachable in
+        // practice. The delivery then kept its `failed` status, its `next_retry_at` and its `attempt_count`,
+        // so `WebhookRetrySweeper`'s `attempt_count < max_attempts` predicate stayed true and it re-dispatched
+        // the same row every five minutes for as long as it existed. Nothing surfaced it because the
+        // pre-flight refresh used to catch the revocation ONE ATTEMPT EARLIER and dead-letter it there; M6
+        // moved that refresh into its own job, which would have left the silent loop as the only path.
+        //
+        // The two conditions are not the same kind of thing, which is why they now answer differently:
+        //   • a DEAD GRANT is terminal — only a human re-running OAuth fixes it, so the delivery is settled;
+        //   • a PAUSED RULE is reversible — an admin un-pauses it and the queued deliveries resume, which is
+        //     exactly what makes `paused` worth distinguishing from `disabled`, so it stays silent.
+        if ($connection->status !== ConnectionStatus::Active) {
+            $this->attempt($delivery, $subscription, $connection);
+
+            return;
+        }
+
+        if ($subscription->status !== ConnectorSubscriptionStatus::Active) {
             return;
         }
 
@@ -108,6 +129,29 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         // envelope is well under the threshold today, so this is the inline payload.
         $payload = app(WebhookPayloadArchive::class)->read($delivery);
 
+        if ($connection->status !== ConnectionStatus::Active) {
+            // ⚠️ M6 MOVED WHAT REACHES THIS, AND IT WOULD HAVE BECOME DEAD CODE IF LEFT ALONE. It used to be
+            // the pre-flight `ensureFresh()` marking the grant dead mid-attempt; that no longer happens here,
+            // and `handleForTenant()`'s own guard would have caught a dead connection first — by RETURNING
+            // SILENTLY, which leaves the delivery `failed` with a `next_retry_at` and no attempt consumed, so
+            // the sweep re-dispatches it forever. The guard there now routes a dead CONNECTION here instead,
+            // which preserves exactly the outcome the pre-flight used to produce.
+            //
+            // Nothing was sent, so this is not a delivery failure to retry — and the owner has already been
+            // told once by whichever path marked the grant dead ({@see RefreshOneConnectionJob} now), so
+            // re-notifying from here would tell them twice.
+            $this->finishBlocked(
+                $delivery,
+                $subscription,
+                $attemptNumber,
+                ConnectorDeliveryResult::blocked(null, '[grant_expired] The connection needs to be reconnected before this rule can deliver.'),
+                (int) round((microtime(true) - $startedAt) * 1000),
+                notify: false,
+            );
+
+            return;
+        }
+
         // PRE-FLIGHT REFRESH (H16a) — ADR-0009 §D6's own named revisit trigger, fired. §D6 made refresh
         // proactive-and-scheduled precisely to keep a second outbound call out of the delivery path, and that
         // still holds for Slack, whose bot tokens do not expire at all. Google's do, in about an hour, against
@@ -119,22 +163,18 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         // renewed by the sweep and never reaches this call. The stampede §D6 warns about therefore needs the
         // sweep to have failed first, rather than being one provider outage away at all times.
         //
-        // A refusal here marks the grant dead by the same path the sweep uses, so this must run BEFORE the
-        // status re-read below would matter — hence the fresh instance check.
-        app(ConnectionTokenRefresher::class)->ensureFresh($connection, Carbon::now());
+        // ⚠️⚠️ AMENDED IN M6: IT HANDS THE ROTATION OFF INSTEAD OF PERFORMING IT. H16a's reasoning above is
+        // unchanged and still right — a grant minted just after a sweep IS dead on arrival without a
+        // pre-flight — but performing the refresh HERE put an IRREVERSIBLE provider-side effect inside a
+        // transaction with three more outbound calls after it. Airtable invalidates the previous refresh
+        // token on every renewal, so any later throw (or the 60s `$timeout`) rolled our write back while the
+        // provider stayed rotated, and the next sweep got `invalid_grant` — terminal, killing the whole
+        // connection. {@see RefreshOneConnectionJob} carries the rotation in a transaction of its own; this
+        // delivery defers one ladder step and arrives with a token that is real.
+        if ($connection->needsRefresh(Carbon::now(), (int) config('connectors.delivery_refresh_lead_seconds', 120))) {
+            RefreshOneConnectionJob::dispatch($this->tenantId, (string) $connection->getKey());
 
-        if ($connection->status !== ConnectionStatus::Active) {
-            // ensureFresh() found the grant revoked at the provider and marked it dead. Nothing was sent, so
-            // this is not a delivery failure to retry — the owner has already been notified once by the
-            // refresher, and re-notifying from finishCredentialRejected() would tell them twice.
-            $this->finishBlocked(
-                $delivery,
-                $subscription,
-                $attemptNumber,
-                ConnectorDeliveryResult::blocked(null, '[grant_expired] The connection needs to be reconnected before this rule can deliver.'),
-                (int) round((microtime(true) - $startedAt) * 1000),
-                notify: false,
-            );
+            $this->finishDeferredForRefresh($delivery, $attemptNumber, (int) round((microtime(true) - $startedAt) * 1000));
 
             return;
         }
@@ -341,6 +381,36 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
 
         Notification::route('mail', $email)
             ->notify(new ConnectorRulePausedNotification((string) $subscription->name, $reason));
+    }
+
+    /**
+     * The grant needs renewing, so this attempt stands aside for one ladder step (M6).
+     *
+     * ⚠️ IT IS NOT A FAILURE AND MUST NOT BE COUNTED AS ONE. `consecutive_failure_count` drives the circuit
+     * breaker that pauses a RULE after 20 consecutive failures, and the rule is not the thing that is wrong
+     * here — the credential is, briefly, and by the time the ladder comes round it will have been renewed by
+     * a job whose only work is renewing it. Counting deferrals would let an ordinary hourly token expiry pause
+     * a healthy rule, which is the H16a classification trap in a third costume.
+     *
+     * `attempt_count` IS incremented, deliberately: without it a grant that never refreshes would sit at the
+     * ladder's 1-minute first step forever instead of walking to a dead letter, and an endless quiet retry is
+     * worse than a loud one. The excerpt is ours and carries a `[marker]`, so
+     * {@see ConnectionPresenter::pausedReasons()} can surface it.
+     */
+    private function finishDeferredForRefresh(WebhookDelivery $delivery, int $attempt, int $ms): void
+    {
+        $nextRetryAt = RetryLadder::nextRetryAt($attempt, $delivery->max_attempts);
+
+        $delivery->forceFill([
+            'status' => $nextRetryAt === null ? WebhookDeliveryStatus::DeadLettered : WebhookDeliveryStatus::Failed,
+            'attempt_count' => $attempt,
+            'last_attempted_at' => Carbon::now(),
+            'next_retry_at' => $nextRetryAt,
+            'response_status_code' => null,
+            'response_body_excerpt' => '[token_refreshing] The connection’s access token is being renewed; this message will be sent on the next attempt.',
+            'response_time_ms' => $ms,
+            'unconfirmed_write_at' => null, // M5 — nothing was sent, so nothing is unconfirmed
+        ])->save();
     }
 
     private function deadLetterForQuota(WebhookDelivery $delivery): void

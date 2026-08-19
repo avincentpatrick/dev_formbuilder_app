@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ConnectionStatus;
 use App\Enums\ConnectorSubscriptionStatus;
+use App\Jobs\Connectors\RefreshOneConnectionJob;
 use App\Jobs\Connectors\RefreshTenantConnectorTokensJob;
 use App\Jobs\Maintenance\RefreshConnectorTokensJob;
 use App\Models\Connection;
@@ -11,11 +12,15 @@ use App\Models\ConnectionSubscription;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\Connectors\ConnectionRevokedNotification;
+use App\Services\Connectors\ConnectionTokenRefresher;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\PermissionRegistrar;
@@ -55,14 +60,30 @@ afterEach(function (): void {
     app(PermissionRegistrar::class)->setPermissionsTeamId(null);
 });
 
-/** Run the per-tenant refresh child through the worker and re-enter the tenant. */
-function runRefreshSweep(): void
+/**
+ * Run the per-tenant refresh child, THEN the per-connection jobs it dispatches, and re-enter the tenant.
+ *
+ * ⚠️ THE SECOND HALF IS NEW IN M6 AND IS THE WHOLE POINT OF THE CHANGE. `sweep()` no longer rotates anything
+ * itself — it hands each due grant to a {@see RefreshOneConnectionJob} so that the irreversible provider-side
+ * rotation lands in a transaction containing nothing but its own write. A helper that ran only the parent
+ * would therefore observe NOTHING happening and every assertion below would be about an empty sweep.
+ *
+ * `$expected` is asserted rather than inferred: draining "however many jobs happen to be queued" would keep
+ * passing if the sweep silently dispatched none, which is precisely the failure this helper must not hide.
+ */
+function runRefreshSweep(int $expectedDispatches = 1): void
 {
     /** @var Tenant $tenant */
     $tenant = test()->tenant;
 
     RefreshTenantConnectorTokensJob::dispatch($tenant->id);
     workOneJob('scheduled-maintenance');
+
+    expect(DB::table('jobs')->count())->toBe($expectedDispatches);
+
+    for ($i = 0; $i < $expectedDispatches; $i++) {
+        workOneJob('scheduled-maintenance');
+    }
 
     enterTenant($tenant->id);
 }
@@ -114,7 +135,7 @@ it('skips a grant that cannot expire', function (): void {
     // Slack's default bot token: no expiry, no refresh token. The sweep must leave it alone, not fail on it.
     $connection = Connection::factory()->create(['access_token' => 'xoxb-permanent']);
 
-    runRefreshSweep();
+    runRefreshSweep(expectedDispatches: 0); // nothing is due, so the sweep must hand off NOTHING
 
     expect($connection->fresh()->access_token)->toBe('xoxb-permanent')
         ->and($connection->fresh()->last_refreshed_at)->toBeNull();
@@ -127,7 +148,7 @@ it('skips a grant whose expiry is beyond the lead window', function (): void {
 
     $connection = Connection::factory()->expiringIn(86400)->create();
 
-    runRefreshSweep();
+    runRefreshSweep(expectedDispatches: 0); // nothing is due, so the sweep must hand off NOTHING
 
     expect($connection->fresh()->last_refreshed_at)->toBeNull();
     Http::assertNothingSent();
@@ -159,7 +180,7 @@ it('does not retry a grant it already marked dead', function (): void {
 
     Connection::factory()->expiringIn(60)->refreshFailed()->create();
 
-    runRefreshSweep();
+    runRefreshSweep(expectedDispatches: 0); // nothing is due, so the sweep must hand off NOTHING
 
     Http::assertNothingSent();
 });
@@ -173,4 +194,103 @@ it('fans out one child per active tenant and holds no tenant context itself', fu
     (new RefreshConnectorTokensJob)->handle();
 
     Bus::assertDispatchedTimes(RefreshTenantConnectorTokensJob::class, 2);
+});
+
+// ── M6 — an irreversible rotation is never left inside a transaction that can undo it ────────────────────
+//
+// These two were written as a REPRODUCTION and passed against the unfixed code: driven at the old
+// inline-rotating sweep, the first showed both tokens rotated at Airtable while the database rolled back to
+// the ones Airtable had just destroyed, and the second showed the next sweep then killing the connection
+// outright. They are kept, inverted, because the mutation that proves them is the absence of the fix — and
+// `git stash push -- app/` reproduces exactly that in one command.
+
+it('commits each rotated token before anything else in the sweep can throw', function (): void {
+    // Airtable ROTATES: every refresh returns a new pair and INVALIDATES the previous one, so the provider's
+    // half of this exchange cannot be rolled back and ours must not be either.
+    Http::fake(['airtable.com/oauth2/v1/token' => Http::response([
+        'access_token' => 'oaa-rotated',
+        'refresh_token' => 'oar-rotated',
+        'expires_in' => 3600,
+        'token_type' => 'Bearer',
+    ], 200)]);
+
+    /** @var Tenant $tenant */
+    $tenant = test()->tenant;
+
+    $a = Connection::factory()->airtable()->create(['token_expires_at' => Carbon::now()->addSeconds(60)]);
+    $b = Connection::factory()->airtable()->create(['token_expires_at' => Carbon::now()->addSeconds(60)]);
+
+    $storedA = $a->refresh_token;
+    $storedB = $b->refresh_token;
+
+    // EXACTLY `TenantAwareJob::handle()`'s body -- transaction, applyLocal, the work -- plus the thing this
+    // row is about: something throws afterwards. The 60s `$timeout` is the likeliest real instance of it, and
+    // a tenant with several due Airtable grants can genuinely reach it at 5s connect + 10s read apiece.
+    try {
+        DB::transaction(function () use ($tenant): void {
+            TenantContext::applyLocal($tenant->id, null);
+            app(ConnectionTokenRefresher::class)->sweep(Carbon::now());
+
+            throw new RuntimeException('the job dies after the sweep has handed its work off');
+        });
+    } catch (RuntimeException) {
+        // swallowed: the worker would fail or release the job here, and the transaction is already gone
+    }
+
+    enterTenant($tenant->id);
+
+    // THE CONTROL, and it is what makes the assertions below mean anything: the rollback took the DISPATCHES
+    // with it, so nothing has rotated yet. Before M6 this read "two tokens already rotated and lost".
+    expect(DB::table('jobs')->count())->toBe(0);
+    Http::assertNothingSent();
+
+    expect($a->fresh()->refresh_token)->toBe($storedA)
+        ->and($b->fresh()->refresh_token)->toBe($storedB);
+
+    // And when the sweep is NOT interrupted, each rotation lands in a transaction of its own and survives.
+    runRefreshSweep(expectedDispatches: 2);
+
+    expect($a->fresh()->refresh_token)->toBe('oar-rotated')
+        ->and($b->fresh()->refresh_token)->toBe('oar-rotated');
+});
+
+it('rotates one grant at a time, so a concurrent refresh cannot burn the same token twice', function (): void {
+    // The sibling defect, same cure. `ensureFresh()` was a plain read-check-then-refresh with no lock, so two
+    // workers could exchange the SAME rotating refresh token: the first wins and the second is answered
+    // `invalid_grant`, killing a perfectly healthy grant. Latent only because docker-compose.yml runs exactly
+    // one queue:work -- and that same line names more workers as the scaling path.
+    Http::fake(['airtable.com/oauth2/v1/token' => Http::response([
+        'access_token' => 'oaa-rotated',
+        'refresh_token' => 'oar-rotated',
+        'expires_in' => 3600,
+        'token_type' => 'Bearer',
+    ], 200)]);
+
+    /** @var Tenant $tenant */
+    $tenant = test()->tenant;
+
+    $connection = Connection::factory()->airtable()->create(['token_expires_at' => Carbon::now()->addSeconds(60)]);
+
+    // Hold the grant's lock, exactly as a concurrent worker mid-exchange would.
+    $held = Cache::lock('connector-refresh:'.$connection->getKey(), 30);
+    expect($held->get())->toBeTrue();
+
+    RefreshOneConnectionJob::dispatch($tenant->id, (string) $connection->getKey());
+    workOneJob('scheduled-maintenance');
+
+    enterTenant($tenant->id);
+
+    // The loser sends NOTHING rather than exchanging a token another worker is already spending.
+    Http::assertNothingSent();
+    expect($connection->fresh()->refresh_token)->not->toBe('oar-rotated');
+
+    $held->release();
+
+    // Released, the same job does its work -- proving the guard is the lock and not a broken job.
+    RefreshOneConnectionJob::dispatch($tenant->id, (string) $connection->getKey());
+    workOneJob('scheduled-maintenance');
+
+    enterTenant($tenant->id);
+
+    expect($connection->fresh()->refresh_token)->toBe('oar-rotated');
 });

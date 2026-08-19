@@ -667,12 +667,29 @@ are still in place.
   the durable fix is in the rule EDITOR rather than the adapter.** Filed by **M5 (2026-08-19)** at the moment
   the decision was taken. `__submission_id` is offered by `MappableColumnCatalog` and is **optional**, so a
   rule that does not bind it writes nothing identifying the submission and there is nothing for M5's probe to
-  search for; the write proceeds and can duplicate exactly as before. **Asserted as a passing test in both
+  search for; the write proceeds and can duplicate exactly as before. ⚠️ **AND ONE SUB-CASE THE
+  ADVERSARIAL PASS ADDED: the column can be MAPPED and still unfindable on Airtable.** `typecast: true`
+  coerces a written value into the destination field’s type, so a tenant who mapped Submission ID onto
+  a Number or Date field stores something that is no longer the uuid, and `filterByFormula` then matches
+  nothing. Sheets has no symmetric hazard — `valueInputOption=RAW` lands the id verbatim. **Asserted as a passing test in both
   delivery suites**, so narrowing it later shows up as a failing test rather than as a surprise. Matching the
   whole projected row instead was **rejected on the merits**: two respondents answering a short form
   identically is ordinary, and a false match is a row that never arrives and nobody notices — trading a
   visible duplicate for an invisible loss. The fix is to make the editor pre-bind that column for a new
   tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**.
+
+- **`minor` · M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in
+  the destination", so two rules writing one submission to one table can collapse to a single row.** Filed by
+  **M5 (2026-08-19)**, found by its own adversarial pass rather than by writing it, and **unfixable from the
+  adapter rather than overlooked**: nothing we write identifies the DELIVERY — the row carries the mapped
+  columns and nothing else — so there is no delivery-shaped thing to search for. Reachable only when two
+  rules on one connection target the SAME table with `__submission_id` mapped (a `submission.created` rule
+  and a `submission.updated` one, say). That tenant gets two rows by design today; if the second rule's write
+  then loses its answer, its retry finds the FIRST rule's row and settles, so the pair collapses to one.
+  **Narrow, and in the safe direction** — one row too few beats an unbounded ladder of duplicates — but it is
+  a behaviour change beyond the one M5 exists for. The fix would be a column carrying the delivery id, which
+  means writing into a column the tenant did not map, so it is a rule-editor question rather than an adapter
+  one. Revisit if a tenant reports a missing row on a table fed by two rules.
 
 - **`minor` · A 5xx that arrives AFTER the provider committed is still re-driven.** Filed by **M5
   (2026-08-19)**. M5 treats a received HTTP status as determinate, because both providers' contracts say a

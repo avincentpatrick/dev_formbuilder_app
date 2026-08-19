@@ -200,8 +200,11 @@ final readonly class ColumnMapping
      * the position into a column letter. Handing back the normalized header instead would invite exactly the
      * casefolded-name write `AirtableConnector::fieldsFor()` exists to prevent.
      *
-     * `author()` already refuses to bind one field key to two columns, so "the" column is well defined here
-     * rather than a first-match convention.
+     * ⚠️ IT IS A FIRST-MATCH, AND SAYING "author() ALREADY FORBIDS DUPLICATES" WOULD BE AN OVERCLAIM. It does
+     * — but {@see fromArray()} is what rehydrates a STORED mapping and deliberately performs no such check
+     * (its own docblock: "tolerates nothing", about shape rather than about semantics), so a payload written
+     * by hand or by an older writer can bind one key twice. First-match is the right answer anyway: both
+     * columns would carry the same projected value, so any of them settles the question this is asked for.
      */
     public function indexOfFieldKey(string $fieldKey): ?int
     {

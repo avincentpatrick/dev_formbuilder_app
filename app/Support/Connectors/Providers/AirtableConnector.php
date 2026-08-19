@@ -238,6 +238,18 @@ final class AirtableConnector implements ConnectorProvider
      * free of anything a formula could misread, and adding a second identity would double the escaping surface
      * for no reach the first does not already give.
      *
+     *
+     * ⚠️ AND THE QUESTION IT ASKS IS "IS THIS SUBMISSION IN THE TABLE", NOT "IS THIS DELIVERY'S RECORD IN
+     * THE TABLE" — found by M5's own adversarial pass, and unfixable from here rather than overlooked.
+     * Nothing we write identifies the DELIVERY: the record carries the mapped columns and nothing else, so
+     * there is no delivery-shaped thing to search for. The difference is only reachable when TWO rules on
+     * one connection write the SAME submission to the SAME table (a `submission.created` rule and a
+     * `submission.updated` one, say). That tenant gets two records by design today; if the second rule's
+     * create then loses its answer, its retry finds the FIRST rule's record and settles — so the pair
+     * collapses to one. Narrow, and in the safe direction (a record too few beats an unbounded ladder of
+     * duplicates), but it is a behaviour change beyond the one this fix is for, so it is filed rather than
+     * left to be discovered.
+     *
      * @param  list<string>  $fieldNames  the destination's VERBATIM field names, index-aligned with $mapping
      */
     private function reconcile(

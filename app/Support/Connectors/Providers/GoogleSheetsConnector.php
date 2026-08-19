@@ -235,6 +235,15 @@ final class GoogleSheetsConnector implements ConnectorProvider
      * ONE COLUMN, NOT THE SHEET. The read is `<letter>:<letter>` rather than the whole grid, so its size is
      * the destination's row count and not its area, and it carries no answer content out of Google at all —
      * only the ids we put there ourselves, which is the M4 property held on the READ side for free.
+     *
+     * ⚠️ AND THE QUESTION IT ASKS IS "IS THIS SUBMISSION IN THE SHEET", NOT "IS THIS DELIVERY'S ROW IN THE
+     * SHEET" — found by M5's own adversarial pass, and unfixable from here rather than overlooked. Nothing
+     * we append identifies the DELIVERY: the row carries the mapped columns and nothing else. The
+     * difference is only reachable when TWO rules on one connection write the SAME submission to the SAME
+     * tab (a `submission.created` rule and a `submission.updated` one, say). That tenant gets two rows by
+     * design today; if the second rule's append then loses its answer, its retry finds the FIRST rule's row
+     * and settles — so the pair collapses to one. Narrow, and in the safe direction, but it is a behaviour
+     * change beyond the one this fix is for, so it is filed rather than left to be discovered.
      */
     private function reconcile(
         Connection $connection,

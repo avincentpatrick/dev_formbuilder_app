@@ -74,6 +74,7 @@ class WebhookDelivery extends Model implements TenantScoped
         'response_status_code',
         'response_body_excerpt',
         'response_time_ms',
+        'unconfirmed_write_at',
         'signature',
     ];
 
@@ -92,6 +93,7 @@ class WebhookDelivery extends Model implements TenantScoped
             'last_attempted_at' => 'datetime',
             'response_status_code' => 'integer',
             'response_time_ms' => 'integer',
+            'unconfirmed_write_at' => 'datetime',
         ];
     }
 

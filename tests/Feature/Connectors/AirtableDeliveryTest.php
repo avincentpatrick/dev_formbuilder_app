@@ -16,6 +16,7 @@ use App\Support\Mapping\ColumnMapping;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Spatie\Permission\PermissionRegistrar;
@@ -374,4 +375,276 @@ it('does not write the respondent answers into the shared delivery ledger', func
     expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
         ->and($delivery->response_body_excerpt)->toBe('ok')
         ->and($delivery->response_body_excerpt)->not->toContain('Ana Reyes');
+});
+
+// ── M5 — the create is non-idempotent, so an unconfirmed one is never re-driven blind ────────────────────
+//
+// The defect these cover was REPRODUCED before it was fixed, with this exact fixture: driven against the
+// unfixed adapter the reconciliation case below reads `[$writes, $probes] === [2, 0]` -- two identical
+// records in the tenant's own base for one submission -- and against the fixed one it reads `[1, 1]`.
+//
+// ⚠️ AND THE FIXTURE ITSELF NEARLY TOLD THE WRONG STORY, TWICE.
+// (1) `Http::fake()` INVOKES EVERY STUB FOR EVERY REQUEST and keeps the first non-null answer
+//     (`Factory::handler()` maps, then filters), so a counter inside one stub counts requests that stub
+//     never answered -- the schema read inflated the probe count until `scriptedAirtable()` skipped `/meta/`
+//     explicitly. A probe count that is really "every GET" would have read as a reconciliation that never
+//     happened.
+// (2) The default `airtableMapping()` binds `__submission_id`, so EVERY case here would have exercised the
+//     reconcilable path and none the other one. That is M4's stub-shaped-green in a new costume, and it is
+//     why the unmapped case below builds its own mapping and asserts the duplicate it still permits.
+
+/**
+ * An Airtable stub whose record-create answers are SCRIPTED per attempt, with the probe answered separately.
+ *
+ * @param  list<mixed>  $writeAnswers  one per create, in order: a Response, or a callable to throw from
+ * @param  callable|null  $probeAnswer  the answer to a reconciliation GET (default: the record is present)
+ */
+function scriptedAirtable(array $writeAnswers, ?callable $probeAnswer = null, array $fieldNames = ['Full name', 'Colour', 'Reviewer notes', 'Submission ID']): callable
+{
+    $writes = 0;
+    $probes = 0;
+
+    Http::fake([
+        'api.airtable.com/v0/meta/bases/*/tables' => Http::response([
+            'tables' => [[
+                'id' => 'tblRESPONSES00001',
+                'name' => 'Responses',
+                'fields' => array_map(
+                    static fn (string $name): array => ['id' => 'fld'.md5($name), 'name' => $name, 'type' => 'singleLineText'],
+                    $fieldNames,
+                ),
+            ]],
+        ], 200),
+        'api.airtable.com/v0/*' => function (Request $request) use (&$writes, &$probes, $writeAnswers, $probeAnswer) {
+            // See note (1) above: this stub is called for the schema read too, and must decline it.
+            if (str_contains($request->url(), '/meta/')) {
+                return null;
+            }
+
+            if ($request->method() === 'GET') {
+                $probes++;
+
+                return $probeAnswer === null
+                    ? Http::response(['records' => [['id' => 'recNEW0000000001', 'fields' => []]]], 200)
+                    : $probeAnswer();
+            }
+
+            $answer = $writeAnswers[$writes] ?? Http::response(['records' => [['id' => 'recTAIL']]], 200);
+            $writes++;
+
+            return is_callable($answer) ? $answer() : $answer;
+        },
+    ]);
+
+    // BY REFERENCE, and this is not a style choice: an arrow function captures by VALUE at the moment it
+    // is created, so `fn () => ['writes' => $writes]` would answer 0 forever and every count below would be a
+    // property of the closure rather than of the run.
+    return function () use (&$writes, &$probes): array {
+        return ['writes' => $writes, 'probes' => $probes];
+    };
+}
+
+/**
+ * Seed an Airtable grant, rule and pending delivery WITHOUT running it, so a case can drive several attempts.
+ *
+ * @return array{0: ConnectionSubscription, 1: WebhookDelivery}
+ */
+function seedAirtableDelivery(?ColumnMapping $mapping = null): array
+{
+    $submission = seedInboxSubmission(test()->form, test()->owner, SubmissionStatus::Submitted, [
+        'full_name' => 'Ana Reyes',
+        'color' => 'b',
+    ]);
+
+    test()->m5AirtableSubmissionId = (string) $submission->id;
+
+    $connection = Connection::factory()->airtable()->create();
+    $subscription = ConnectionSubscription::factory()->forConnection($connection)->create([
+        'config' => airtableConfig($mapping),
+    ]);
+    $delivery = WebhookDelivery::factory()->forSubscription($subscription)->create([
+        'payload' => [
+            'event_type' => 'submission.created',
+            'occurred_at' => '2026-08-19T09:00:00Z',
+            'data' => ['submission_id' => (string) $submission->id, 'form_id' => (string) test()->form->id],
+        ],
+    ]);
+
+    return [$subscription, $delivery];
+}
+
+/** One more attempt on an existing delivery — exactly what `WebhookRetrySweeper::sweep()` re-dispatches. */
+function attemptAirtableDelivery(WebhookDelivery $delivery): WebhookDelivery
+{
+    /** @var Tenant $tenant */
+    $tenant = test()->tenant;
+
+    DeliverConnectorMessageJob::dispatch($tenant->id, (string) $delivery->id);
+    workOneJob('webhooks');
+
+    enterTenant($tenant->id);
+
+    return $delivery->fresh();
+}
+
+it('records a create whose answer was lost as UNCONFIRMED, not merely failed', function (): void {
+    $counts = scriptedAirtable([fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+
+    // THE CONTROL: the schema read succeeded and the POST was genuinely issued, so the outcome under test is
+    // the WRITE's lost answer and not some earlier refusal that never reached Airtable at all.
+    expect($counts()['writes'])->toBe(1)
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->next_retry_at)->not->toBeNull()
+        ->and($delivery->unconfirmed_write_at)->not->toBeNull();
+});
+
+it('does NOT call a create unconfirmed when Airtable answered with a status', function (): void {
+    // The control that the flag is not simply "the attempt failed". A 503 is a RESPONSE: Airtable answered
+    // rather than silently committing, so the ladder may re-drive it and the next attempt needs no probe.
+    scriptedAirtable([Http::response(['error' => ['type' => 'SERVICE_UNAVAILABLE']], 503)]);
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('clears the unconfirmed mark once a later attempt gets a real answer', function (): void {
+    // Without this, a THIRD attempt would probe -- and a probe that found the record from attempt 2's
+    // successful-looking write would be right, but one that found nothing after a 503 would still skip.
+    // The flag has to describe the immediately preceding attempt or it is worse than not having it.
+    scriptedAirtable([
+        fn () => throw new ConnectionException('timeout'),
+        Http::response(['error' => ['type' => 'SERVICE_UNAVAILABLE']], 503),
+    ], probeAnswer: fn () => Http::response(['records' => []], 200));
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+
+    expect($delivery->unconfirmed_write_at)->not->toBeNull();
+
+    $delivery = attemptAirtableDelivery($delivery);
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('reconciles instead of adding a second record when the first attempt may have landed', function (): void {
+    $counts = scriptedAirtable([fn () => throw new ConnectionException('timeout')]);
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+    $delivery = attemptAirtableDelivery($delivery);
+
+    // ONE create for one submission, and the delivery is settled. Against the unfixed adapter this same
+    // fixture produced two creates and no probe at all.
+    expect($counts())->toBe(['writes' => 1, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok (already present)')
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+
+    // And the probe asked the right question: the submission id, against the destination's VERBATIM field
+    // name -- `ColumnFingerprint` stores `submission id`, and Airtable would answer an unknown-field error.
+    Http::assertSent(function (Request $request) use ($delivery): bool {
+        // Parsed off the URL rather than through `Request::data()`: a GET carries no form or JSON body, so
+        // that accessor answers `[]` here and the assertion would be vacuously false-then-fixed-by-loosening.
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        $formula = $query['filterByFormula'] ?? null;
+
+        return $request->method() === 'GET'
+            && is_string($formula)
+            && str_starts_with($formula, '{Submission ID}=')
+            && str_contains($formula, (string) ($delivery->payload['data']['submission_id'] ?? 'missing'));
+    });
+});
+
+it('writes exactly once more when the reconciliation proves the record is absent', function (): void {
+    $counts = scriptedAirtable(
+        [fn () => throw new ConnectionException('timeout'), Http::response(['records' => [['id' => 'recNEW2']]], 200)],
+        probeAnswer: fn () => Http::response(['records' => []], 200),
+    );
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+    $delivery = attemptAirtableDelivery($delivery);
+
+    // The other half of the trade, and the one that matters more: refusing to write when we cannot confirm
+    // would turn every lost answer into a submission that never arrives, which nobody would ever notice.
+    expect($counts())->toBe(['writes' => 2, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok')
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('still duplicates when the rule maps no Submission ID column, and that residual is the row', function (): void {
+    // ⛔ ASSERTED AS A PASSING TEST SO IT CANNOT BE MISTAKEN FOR COVERAGE. Nothing we write identifies the
+    // submission unless the tenant bound that column, so there is nothing to search for and the write goes
+    // ahead -- today's behaviour exactly. Matching the whole record instead was rejected: two respondents
+    // giving identical answers is ordinary, and a false match is a row that never arrives.
+    $counts = scriptedAirtable([fn () => throw new ConnectionException('timeout')]);
+
+    [, $delivery] = seedAirtableDelivery(ColumnMapping::author(
+        ['Full name', 'Colour', 'Reviewer notes', 'Submission ID'],
+        ['Full name' => 'full_name', 'Colour' => 'color'],
+    ));
+
+    $delivery = attemptAirtableDelivery($delivery);
+
+    // The mark is still recorded -- the write really was unconfirmed -- and the probe is simply unavailable.
+    expect($delivery->unconfirmed_write_at)->not->toBeNull();
+
+    $delivery = attemptAirtableDelivery($delivery);
+
+    expect($counts())->toBe(['writes' => 2, 'probes' => 0])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded);
+});
+
+it('retries the reconciliation rather than gambling on a create when the probe fails', function (): void {
+    $counts = scriptedAirtable(
+        [fn () => throw new ConnectionException('timeout')],
+        probeAnswer: fn () => Http::response(['error' => ['type' => 'SERVICE_UNAVAILABLE']], 503),
+    );
+
+    [, $delivery] = seedAirtableDelivery();
+    $delivery = attemptAirtableDelivery($delivery);
+    $delivery = attemptAirtableDelivery($delivery);
+
+    // "The probe failed" says nothing about whether the record is there, and a blind create is the one move
+    // that cannot be taken back -- so the ladder retries the QUESTION and the mark survives to ask it again.
+    expect($counts())->toBe(['writes' => 1, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->response_body_excerpt)->toStartWith('[unconfirmed_write]')
+        ->and($delivery->unconfirmed_write_at)->not->toBeNull();
+});
+
+it('keeps the unconfirmed mark on a delivery that dead-letters while still unconfirmed', function (): void {
+    // The one deliberate exception to "clear it wherever the outcome is settled", and it is documented in
+    // three places, so it needs a guard rather than three sentences agreeing with each other. A dead-lettered
+    // delivery is never retried, so nothing can act on the mark -- and it is then the ONLY record anyone has
+    // that this record may or may not be sitting in the tenant's base.
+    $counts = scriptedAirtable([fn () => throw new ConnectionException('timeout')]);
+
+    [$subscription] = seedAirtableDelivery();
+
+    // `max_attempts = 1` makes the FIRST failure terminal, which is the state this pins without walking the
+    // whole seven-day ladder.
+    $delivery = WebhookDelivery::factory()->forSubscription($subscription)->create([
+        'max_attempts' => 1,
+        'payload' => [
+            'event_type' => 'submission.created',
+            'occurred_at' => '2026-08-19T09:00:00Z',
+            'data' => ['submission_id' => (string) test()->m5AirtableSubmissionId, 'form_id' => (string) test()->form->id],
+        ],
+    ]);
+
+    $delivery = attemptAirtableDelivery($delivery);
+
+    expect($counts()['writes'])->toBe(1)
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::DeadLettered)
+        ->and($delivery->next_retry_at)->toBeNull()
+        ->and($delivery->unconfirmed_write_at)->not->toBeNull();
 });

@@ -456,3 +456,261 @@ it('blocks a rule whose event carries no submission to write', function (): void
         ->and($delivery->response_body_excerpt)->toContain('unsupported_event')
         ->and($subscription->status)->toBe(ConnectorSubscriptionStatus::Paused);
 });
+
+// ── M5 — the append is non-idempotent, so an unconfirmed one is never re-driven blind ────────────────────
+//
+// The twin of the Airtable block, and deliberately the same seven cases: the two adapters share a mapping
+// engine, a ledger and a retry ladder, so a property that holds for one and not the other is a defect
+// wearing a coincidence. Reproduced the same way before it was fixed -- driven against the unfixed adapter
+// the reconciliation case appends TWICE for one submission and never reads anything back.
+//
+// ⚠️ TWO FIXTURE HAZARDS, BOTH LIVE HERE TOO.
+// (1) `Http::fake()` INVOKES EVERY STUB FOR EVERY REQUEST and keeps the first non-null answer, so the
+//     values stub below must DECLINE the `:append` URL explicitly or it counts the writes as probes.
+// (2) The header-row read and the reconciliation read share one URL shape (`.../values/<range>`); they are
+//     told apart by the range itself, `!1:1` versus the identity column's `!D:D`.
+
+/**
+ * A Sheets stub whose appends are SCRIPTED per attempt, with the reconciliation read answered separately.
+ *
+ * @param  list<mixed>  $appendAnswers  one per append, in order: a Response, or a callable to throw from
+ * @param  callable|null  $probeAnswer  the answer to a reconciliation read (default: the row is present)
+ */
+function scriptedSheets(
+    array $appendAnswers,
+    ?callable $probeAnswer = null,
+    array $headerRow = ['Full name', 'Colour', 'Reviewer notes', 'Submission ID'],
+): callable {
+    $writes = 0;
+    $probes = 0;
+
+    Http::fake([
+        'sheets.googleapis.com/v4/spreadsheets/*/values/*:append*' => function () use (&$writes, $appendAnswers) {
+            $answer = $appendAnswers[$writes] ?? Http::response(['updates' => ['updatedRows' => 1]], 200);
+            $writes++;
+
+            return is_callable($answer) ? $answer() : $answer;
+        },
+        'sheets.googleapis.com/v4/spreadsheets/*/values/*' => function (Request $request) use (&$probes, $probeAnswer, $headerRow) {
+            // See hazard (1): this stub is called for the append too, and must decline it.
+            if (str_contains($request->url(), ':append')) {
+                return null;
+            }
+
+            // See hazard (2): `!1:1` is the header row every delivery reads before it writes.
+            if (str_contains($request->url(), rawurlencode('!1:1'))) {
+                return Http::response(['values' => [$headerRow]], 200);
+            }
+
+            $probes++;
+
+            return $probeAnswer === null
+                ? Http::response(['values' => [[test()->m5SubmissionId]]], 200)
+                : $probeAnswer();
+        },
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.refreshed', 'expires_in' => 3600], 200),
+    ]);
+
+    // BY REFERENCE, and this is not a style choice: an arrow function captures by VALUE at the moment it
+    // is created, so `fn () => ['writes' => $writes]` would answer 0 forever and every count below would be a
+    // property of the closure rather than of the run.
+    return function () use (&$writes, &$probes): array {
+        return ['writes' => $writes, 'probes' => $probes];
+    };
+}
+
+/**
+ * Seed a Google grant, rule and pending delivery WITHOUT running it, so a case can drive several attempts.
+ *
+ * The submission id is stashed on the test instance because `scriptedSheets()` has to be able to answer a
+ * reconciliation read with the very value the adapter will look for — a probe fixture that answered with
+ * some other id would make every "already present" case pass for the wrong reason.
+ *
+ * @return array{0: ConnectionSubscription, 1: WebhookDelivery}
+ */
+function seedSheetsDelivery(?ColumnMapping $mapping = null): array
+{
+    $submission = seedInboxSubmission(test()->form, test()->owner, SubmissionStatus::Submitted, [
+        'full_name' => 'Ana Reyes',
+        'color' => 'b',
+    ]);
+
+    test()->m5SubmissionId = (string) $submission->id;
+
+    $connection = Connection::factory()->googleSheets()->create();
+    $subscription = ConnectionSubscription::factory()->forConnection($connection)->create([
+        'config' => sheetsConfig($mapping),
+    ]);
+    $delivery = WebhookDelivery::factory()->forSubscription($subscription)->create([
+        'payload' => [
+            'event_type' => 'submission.created',
+            'occurred_at' => '2026-08-19T09:00:00Z',
+            'data' => ['submission_id' => (string) $submission->id, 'form_id' => (string) test()->form->id],
+        ],
+    ]);
+
+    return [$subscription, $delivery];
+}
+
+/** One more attempt on an existing delivery — exactly what `WebhookRetrySweeper::sweep()` re-dispatches. */
+function attemptSheetsDelivery(WebhookDelivery $delivery): WebhookDelivery
+{
+    /** @var Tenant $tenant */
+    $tenant = test()->tenant;
+
+    DeliverConnectorMessageJob::dispatch($tenant->id, (string) $delivery->id);
+    workOneJob('webhooks');
+
+    enterTenant($tenant->id);
+
+    return $delivery->fresh();
+}
+
+it('records an append whose answer was lost as UNCONFIRMED, not merely failed', function (): void {
+    $counts = scriptedSheets([fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+
+    // THE CONTROL: the header read succeeded and the append was genuinely issued, so the outcome under test
+    // is the WRITE's lost answer and not some earlier refusal that never reached Google at all.
+    expect($counts()['writes'])->toBe(1)
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->next_retry_at)->not->toBeNull()
+        ->and($delivery->unconfirmed_write_at)->not->toBeNull();
+});
+
+it('does NOT call an append unconfirmed when Google answered with a status', function (): void {
+    // The control that the flag is not simply "the attempt failed". A 503 is a RESPONSE: Google answered
+    // rather than silently committing the row, so the ladder may re-drive it with no probe.
+    scriptedSheets([Http::response(['error' => ['code' => 503, 'status' => 'UNAVAILABLE']], 503)]);
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('clears the unconfirmed mark once a later append gets a real answer', function (): void {
+    // The flag has to describe the IMMEDIATELY PRECEDING attempt. A stale one would let a third attempt skip
+    // a write that the second attempt never made.
+    scriptedSheets([
+        fn () => throw new ConnectionException('timeout'),
+        Http::response(['error' => ['code' => 503, 'status' => 'UNAVAILABLE']], 503),
+    ], probeAnswer: fn () => Http::response(['values' => [[]]], 200));
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($delivery->unconfirmed_write_at)->not->toBeNull();
+
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('reconciles instead of appending a second row when the first attempt may have landed', function (): void {
+    $counts = scriptedSheets([fn () => throw new ConnectionException('timeout')]);
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($counts())->toBe(['writes' => 1, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok (already present)')
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+
+    // And it read ONE COLUMN, quoted for A1, rather than the sheet: the identity column is the fourth, so
+    // `D:D`. A whole-grid read would carry the tenant's answer content back out of Google for no reason.
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && str_contains($request->url(), rawurlencode("'Responses'!D:D")));
+});
+
+it('appends exactly once more when the reconciliation proves the row is absent', function (): void {
+    $counts = scriptedSheets(
+        [fn () => throw new ConnectionException('timeout'), Http::response(['updates' => ['updatedRows' => 1]], 200)],
+        probeAnswer: fn () => Http::response(['values' => [[]]], 200),
+    );
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+    $delivery = attemptSheetsDelivery($delivery);
+
+    // The other half of the trade, and the one that matters more: refusing to write when we cannot confirm
+    // would turn every lost answer into a submission that never arrives, which nobody would ever notice.
+    expect($counts())->toBe(['writes' => 2, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok')
+        ->and($delivery->unconfirmed_write_at)->toBeNull();
+});
+
+it('still duplicates when the rule maps no Submission ID column, and that residual is the row', function (): void {
+    // ⛔ ASSERTED AS A PASSING TEST SO IT CANNOT BE MISTAKEN FOR COVERAGE. Nothing we append identifies the
+    // submission unless the tenant bound that column, so there is nothing to search for and the append goes
+    // ahead -- today's behaviour exactly. Matching the whole projected row instead was rejected: two
+    // respondents giving identical answers is ordinary on a short form, and a false match is a lost row.
+    $counts = scriptedSheets([fn () => throw new ConnectionException('timeout')]);
+
+    [, $delivery] = seedSheetsDelivery(ColumnMapping::author(
+        ['Full name', 'Colour', 'Reviewer notes', 'Submission ID'],
+        ['Full name' => 'full_name', 'Colour' => 'color'],
+    ));
+
+    $delivery = attemptSheetsDelivery($delivery);
+
+    // The mark is still recorded -- the write really was unconfirmed -- and the probe is simply unavailable.
+    expect($delivery->unconfirmed_write_at)->not->toBeNull();
+
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($counts())->toBe(['writes' => 2, 'probes' => 0])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded);
+});
+
+it('retries the reconciliation rather than gambling on an append when the probe fails', function (): void {
+    $counts = scriptedSheets(
+        [fn () => throw new ConnectionException('timeout')],
+        probeAnswer: fn () => Http::response(['error' => ['code' => 503, 'status' => 'UNAVAILABLE']], 503),
+    );
+
+    [, $delivery] = seedSheetsDelivery();
+    $delivery = attemptSheetsDelivery($delivery);
+    $delivery = attemptSheetsDelivery($delivery);
+
+    // "The probe failed" says nothing about whether the row is there, and a blind append is the one move
+    // that cannot be taken back -- so the ladder retries the QUESTION and the mark survives to ask it again.
+    expect($counts())->toBe(['writes' => 1, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->response_body_excerpt)->toStartWith('[unconfirmed_write]')
+        ->and($delivery->unconfirmed_write_at)->not->toBeNull();
+});
+
+it('addresses the identity column past Z, where spreadsheet lettering stops being base-26', function (): void {
+    // ⚠️ A CLAIM VERIFIED IN A SCRATCH HARNESS IS NOT A CLAIM THE REPO HOLDS. `columnLetter()` is private and
+    // every other case here maps a four-column sheet, so the only exercised answer is `D` -- and the ordinary
+    // intdiv/modulo pair anyone would write returns `A@` at index 26 and `BA` at 27. Column lettering is
+    // BIJECTIVE base-26: there is no zero digit. This drives index 26 through the real delivery path so the
+    // off-by-one that hides until a tenant maps a 27-column sheet fails here instead.
+    $headers = array_map(static fn (int $i): string => 'Col '.$i, range(1, 26));
+    $headers[] = 'Submission ID';
+
+    $counts = scriptedSheets([fn () => throw new ConnectionException('timeout')], headerRow: $headers);
+
+    [, $delivery] = seedSheetsDelivery(ColumnMapping::author($headers, [
+        'Col 1' => 'full_name',
+        'Submission ID' => '__submission_id',
+    ]));
+
+    $delivery = attemptSheetsDelivery($delivery);
+    $delivery = attemptSheetsDelivery($delivery);
+
+    expect($counts())->toBe(['writes' => 1, 'probes' => 1])
+        ->and($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded);
+
+    // The 27th column is `AA`, not `A@` and not `BA`.
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+        && str_contains($request->url(), rawurlencode("'Responses'!AA:AA")));
+});

@@ -140,7 +140,12 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
         }
 
         $provider = app(ConnectorRegistry::class)->for($connection->provider);
-        $result = $provider->deliver($connection, $subscription, $payload);
+
+        // M5. The one thing this attempt knows that the adapter cannot work out for itself: whether the
+        // PREVIOUS attempt issued a write and never learned its outcome. Read as a boolean rather than passed
+        // as the timestamp, because the adapter's question is "may the destination already hold this?" and
+        // nothing it does depends on when.
+        $result = $provider->deliver($connection, $subscription, $payload, $delivery->unconfirmed_write_at !== null);
 
         $elapsedMs = (int) round((microtime(true) - $startedAt) * 1000);
 
@@ -175,6 +180,9 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             'response_status_code' => $result->responseStatus,
             'response_body_excerpt' => $result->responseExcerpt,
             'response_time_ms' => $ms,
+            // M5. Cleared wherever the outcome is SETTLED, so the flag can only ever describe the attempt
+            // before this one. A stale one would make a LATER retry skip a write that was never issued.
+            'unconfirmed_write_at' => null,
         ])->save();
 
         $subscription->forceFill([
@@ -195,6 +203,9 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             'response_status_code' => $result->responseStatus,
             'response_body_excerpt' => $result->responseExcerpt,
             'response_time_ms' => $ms,
+            // M5. The ONLY path that sets it, and it is set from the result rather than from the absence of a
+            // status: a `blocked` outcome also carries a null status and must not arm the next attempt's probe.
+            'unconfirmed_write_at' => $result->writeUnconfirmed ? Carbon::now() : null,
         ])->save();
 
         // Circuit breaker: pause the rule after N consecutive failures, mirroring the webhook endpoint's.
@@ -238,6 +249,7 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             'response_status_code' => $result->responseStatus,
             'response_body_excerpt' => $result->responseExcerpt,
             'response_time_ms' => $ms,
+            'unconfirmed_write_at' => null, // M5 — terminal, so nothing downstream may act on it
         ])->save();
 
         $alreadyPaused = $subscription->status === ConnectorSubscriptionStatus::Paused;
@@ -270,6 +282,7 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             'response_status_code' => $result->responseStatus,
             'response_body_excerpt' => $result->responseExcerpt,
             'response_time_ms' => $ms,
+            'unconfirmed_write_at' => null, // M5 — terminal, so nothing downstream may act on it
         ])->save();
 
         $providerLabel = $connection->provider->label();
@@ -336,6 +349,7 @@ final class DeliverConnectorMessageJob extends TenantAwareJob
             'status' => WebhookDeliveryStatus::DeadLettered,
             'next_retry_at' => null,
             'response_body_excerpt' => '[quota_exceeded] Monthly delivery quota reached; this message was not sent.',
+            'unconfirmed_write_at' => null, // M5 — terminal, so nothing downstream may act on it
         ])->save();
     }
 

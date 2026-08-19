@@ -144,7 +144,7 @@ final class AirtableConnector implements ConnectorProvider
         return $this->grantFrom($body, $refreshToken, '', 'Airtable');
     }
 
-    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope): ConnectorDeliveryResult
+    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope, bool $priorWriteUnconfirmed = false): ConnectorDeliveryResult
     {
         $config = $subscription->config;
         $baseId = is_string($config['spreadsheet_id'] ?? null) ? $config['spreadsheet_id'] : '';
@@ -201,7 +201,112 @@ final class AirtableConnector implements ConnectorProvider
             return ConnectorDeliveryResult::blocked(null, '[submission_gone] That submission no longer exists, so nothing was written.');
         }
 
+        // M5. The previous attempt issued a create and never learned its outcome, so this table may ALREADY
+        // hold this submission. Ask before adding a second one. Placed after every refusal above so a gone
+        // submission or a drifted table still answers exactly what it answered before — the probe is a cost
+        // paid only on the one path that can duplicate.
+        if ($priorWriteUnconfirmed) {
+            $reconciled = $this->reconcile($connection, $baseId, $table, $fieldNames, $mapping, $submissionId);
+
+            if ($reconciled instanceof ConnectorDeliveryResult) {
+                return $reconciled;
+            }
+        }
+
         return $this->createRecord($connection, $baseId, $table, self::fieldsFor($row, $fieldNames));
+    }
+
+    /**
+     * Whether this submission is already in the table after an unconfirmed create (M5).
+     *
+     * THREE ANSWERS, AND THE NULL IS THE INTERESTING ONE:
+     *   - {@see ConnectorDeliveryResult::delivered()} — found it. The record exists, so writing again would be
+     *     the duplicate this whole mechanism exists to prevent; the delivery succeeds without a write.
+     *   - {@see ConnectorDeliveryResult::unconfirmed()} — could not ask. The ladder retries the RECONCILIATION
+     *     rather than gambling on a write, because "the probe failed" says nothing about whether the record
+     *     is there and a blind create is the one move that cannot be taken back. It is `unconfirmed` rather
+     *     than `failed` SO THE MARK SURVIVES — a plain failure would clear `unconfirmed_write_at` and hand
+     *     the attempt AFTER this one a blind write, which a test caught the first cut of this doing.
+     *   - `null` — either provably absent, or **not reconcilable at all**. Both fall through to the write, and
+     *     they are the same answer on purpose: the second is today's behaviour, which is never worse than
+     *     today, whereas guessing would trade a visible duplicate for an invisible missing row.
+     *
+     * ⚠️ NOT RECONCILABLE MEANS THE TENANT DID NOT MAP `__submission_id`, AND THAT IS A PROPERTY OF THE ROW
+     * RATHER THAN A HOLE IN THE FIX. Nothing we write identifies the submission unless they bound that column
+     * (it is offered by `MappableColumnCatalog` and optional), so there is nothing to search on. `__reference`
+     * is deliberately NOT accepted as a second key: a submission id is a UUID, which is unique, opaque and
+     * free of anything a formula could misread, and adding a second identity would double the escaping surface
+     * for no reach the first does not already give.
+     *
+     *
+     * ⚠️ AND THE QUESTION IT ASKS IS "IS THIS SUBMISSION IN THE TABLE", NOT "IS THIS DELIVERY'S RECORD IN
+     * THE TABLE" — found by M5's own adversarial pass, and unfixable from here rather than overlooked.
+     * Nothing we write identifies the DELIVERY: the record carries the mapped columns and nothing else, so
+     * there is no delivery-shaped thing to search for. The difference is only reachable when TWO rules on
+     * one connection write the SAME submission to the SAME table (a `submission.created` rule and a
+     * `submission.updated` one, say). That tenant gets two records by design today; if the second rule's
+     * create then loses its answer, its retry finds the FIRST rule's record and settles — so the pair
+     * collapses to one. Narrow, and in the safe direction (a record too few beats an unbounded ladder of
+     * duplicates), but it is a behaviour change beyond the one this fix is for, so it is filed rather than
+     * left to be discovered.
+     *
+     * @param  list<string>  $fieldNames  the destination's VERBATIM field names, index-aligned with $mapping
+     */
+    private function reconcile(
+        Connection $connection,
+        string $baseId,
+        string $table,
+        array $fieldNames,
+        ColumnMapping $mapping,
+        string $submissionId,
+    ): ?ConnectorDeliveryResult {
+        $index = $mapping->indexOfFieldKey(SubmissionRowProjector::META_SUBMISSION_ID);
+        $field = $index === null ? null : ($fieldNames[$index] ?? null);
+
+        // A field name containing a brace cannot be referenced as `{Name}` in a formula and Airtable offers no
+        // escape for one, so the probe is skipped rather than sent malformed — a 422 here would read as the
+        // rule being broken when the only thing wrong is that we cannot phrase the question.
+        if (! is_string($field) || $field === '' || str_contains($field, '{') || str_contains($field, '}')) {
+            return null;
+        }
+
+        $response = $this->send(self::API_BASE, fn (): Response => $this->request($connection)
+            ->get(self::API_BASE.'/'.rawurlencode($baseId).'/'.rawurlencode($table), [
+                'filterByFormula' => '{'.$field.'}='.self::formulaString($submissionId),
+                'maxRecords' => 1,
+                // ⛔ NO `fields` PROJECTION, AND THE OMISSION IS THE DECISION. Narrowing the response to the id
+                // field alone would be tidier, but `fields` is Airtable's one ARRAY query parameter and this
+                // client would send it as `fields[0]=`, an encoding nothing here can verify against the live
+                // API. Getting it wrong returns 422 — which this method reads as "could not check", so the
+                // delivery would ride the whole ladder to a dead letter for a parameter that bought nothing.
+                // The property it looked like it was protecting is already held elsewhere: every arm below
+                // writes OUR excerpt, so no part of this response reaches the ledger (M4).
+            ]));
+
+        if ($response instanceof ConnectorDeliveryResult || ! $response->successful()) {
+            return ConnectorDeliveryResult::unconfirmed(
+                $response instanceof ConnectorDeliveryResult ? null : $response->status(),
+                '[unconfirmed_write] A previous attempt may already have added this record, and we could not check. Nothing was written.',
+            );
+        }
+
+        $records = $response->json('records');
+
+        return is_array($records) && $records !== []
+            ? ConnectorDeliveryResult::delivered(null, 'ok (already present)')
+            : null;
+    }
+
+    /**
+     * One value as an Airtable formula string literal.
+     *
+     * The only value ever passed here is a submission UUID, so the escaping is belt-and-braces rather than
+     * load-bearing — which is exactly why it is written out: the day someone reaches for a second identity
+     * column, the quoting is already correct instead of being discovered to be missing.
+     */
+    private static function formulaString(string $value): string
+    {
+        return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], $value)."'";
     }
 
     /**
@@ -343,7 +448,7 @@ final class AirtableConnector implements ConnectorProvider
             ->post($url, [
                 'records' => [['fields' => (object) $fields]],
                 'typecast' => true,
-            ]));
+            ]), write: true);
 
         if ($response instanceof ConnectorDeliveryResult) {
             return $response;
@@ -375,9 +480,16 @@ final class AirtableConnector implements ConnectorProvider
     /**
      * Run one API call, converting a transport error into a retryable outcome.
      *
+     * ⚠️ `$write` IS THE DIFFERENCE BETWEEN "IT FAILED" AND "WE DO NOT KNOW" (M5). A lost answer on a READ is
+     * just a failure — nothing changed at Airtable and re-reading costs nothing. A lost answer on the RECORD
+     * CREATE is the one case that cannot be re-driven blind: the request left, Airtable had every chance to
+     * commit it, and the create endpoint accepts no idempotency token that would make a second attempt safe.
+     * The SSRF refusal above is deliberately NOT affected — nothing left this process, so there is nothing to
+     * be unsure about even for a write.
+     *
      * @param  callable(): Response  $call
      */
-    private function send(string $host, callable $call): Response|ConnectorDeliveryResult
+    private function send(string $host, callable $call, bool $write = false): Response|ConnectorDeliveryResult
     {
         try {
             $this->guard->assertPublic($host);
@@ -388,7 +500,11 @@ final class AirtableConnector implements ConnectorProvider
         try {
             return $call();
         } catch (ConnectionException $e) {
-            return ConnectorDeliveryResult::failed(null, $this->excerpt('[transport_error] '.$e->getMessage()));
+            $excerpt = $this->excerpt('[transport_error] '.$e->getMessage());
+
+            return $write
+                ? ConnectorDeliveryResult::unconfirmed(null, $excerpt)
+                : ConnectorDeliveryResult::failed(null, $excerpt);
         }
     }
 

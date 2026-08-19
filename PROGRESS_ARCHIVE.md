@@ -3923,3 +3923,56 @@ replaces Airtable's copy with ours. The 429 case pins it. `excerpt()` is not orp
 
 **NAMESPACES: nothing spent.** `0021` free · `0010` reserved for H1d · `#16` free · migration block stays at
 `2026_08_17_000106`. Both the M3 and M4 claims were released in the session they were taken.
+
+## 2026-08-19 — LANE B / `M5`: a tabular write that may already have landed is never re-driven blind (PR #184, `64e5bbf`)
+
+Rule 7(f) row, taken from `docs/feature-backlog.md` as the top unclaimed `major` in Lane B's column and
+claimed in the 7(g) ledger before any file it names. **6/6 with every job's `conclusion` read individually. **CI Pest 4444 / 18,788** — predicted to the digit by running the new cases in isolation (+16 tests, +57 assertions on 4428 / 18,731), which is now four-for-four on that method. **E2E 551 passed / 10 skipped = 561** and **Storybook axe 42 suites / 299**, both unchanged because this increment renders nothing. Four lint gates **97 / 109 / 30 / 119** (only migrations moved), PHPStan **18** across the same four files it always reports, `openapi.json` byte-identical. ⚠️ **THE AXE JOB HUNG TWICE ON `Install Playwright (chromium)` — ONCE FOR 4h17m** — while the E2E job cleared the identical step in the same run; cancel + `gh run rerun --failed` cleared it on the third attempt, and the five green jobs survive a cancel, so only the stuck one re-runs.**
+
+**THE ROW'S OWN FIX DID NOT EXIST.** *"Both tabular adapters send no idempotency token"* presumes a provider
+that accepts one; neither Google Sheets `values.append` nor Airtable's create-record endpoint does. A header
+both providers ignore would have looked like a fix and changed nothing. Rescoped on the evidence to a
+**read-back reconciliation on the retry**, with the rescope as the claim's first item.
+
+**THE TRIGGER IS THE LOST ANSWER ALONE.** A 429/403/422/5xx is a *response* — the provider answered rather
+than silently committing — so those keep re-driving. Only the `ConnectionException` arm is indeterminate, and
+it alone sets `webhook_deliveries.unconfirmed_write_at` (migration `2026_08_17_000106`). The next attempt
+then asks before it writes: Airtable by `filterByFormula` on the mapped Submission ID field, Sheets by
+reading that one column. Present ⇒ delivered with no write; absent ⇒ write; **probe fails ⇒ keep the mark and
+retry the question**, never gamble.
+
+**REPRODUCED BY STASHING THE FIX RATHER THAN BY EDITING A GUARD.** `git stash push -- app/` → the same
+fixture reads `[$writes, $probes] === [2, 0]`; `git stash pop` → `[1, 1]`. Nothing about the test changed
+between the runs, so the number is a property of the code — a stronger mutation proof than an edited
+assertion, and one command.
+
+**TWO FIXTURE HAZARDS, BOTH M4's SHAPE.** `Http::fake()` invokes **every** stub for **every** request
+(`Factory::handler()` maps, then keeps the first non-null), so a counter inside one stub counted the schema
+read as a probe until it declined `/meta/` explicitly. And both default mappings bind `__submission_id`, so
+every case would have exercised the reconcilable path — the unmapped case builds its own mapping and asserts
+the duplicate it still permits.
+
+**THE LAST TEST CAUGHT A DEFECT IN THE FIX.** A failed probe returned a plain `failed()`, which *cleared*
+the mark, so the attempt after it would have written blind — the same duplicate, two attempts later and much
+harder to see. `unconfirmed()` therefore means *"the uncertainty persists"*, not *"a write was just issued"*,
+which is why it takes a status at all.
+
+**THREE THINGS THE ROW DID NOT NAME.** A `columnLetter()` correctness claim verified only in a scratch
+harness got a real case (columns are **bijective** base-26; the obvious `intdiv`/`%` returns `A@` at index
+26). Four documents said the mark is *"cleared by every terminal path"* and the code deliberately keeps it on
+a dead-lettered delivery — all four corrected to the code, with a passing case pinning the exception. And
+`TenantExtractColumnDriftTest`'s census reddens by design on any new column: `unconfirmed_write_at` is
+**extracted, not withheld**.
+
+**NARROWED RATHER THAN CLOSED, EACH FILED AS ITS OWN ROW:** a rule mapping no Submission ID column still
+duplicates (the durable fix is the rule editor — Lane A's column), asserted as a passing test; a 5xx after a
+committed write is still re-driven; Slack shares the shape and is out of scope on the merits. Matching the
+whole projected row was rejected — two respondents answering a short form identically is ordinary, and a
+false match is a row that never arrives.
+
+**AND ONE PROCESS LESSON: RUN PINT LAST.** It passed locally, then three later edits made CI's *Static
+analysis* job fail on `no_unused_imports` — an import Pint's own earlier `fully_qualified_strict_types` pass
+had introduced and a docblock rewrite orphaned. Pint is a function of the final tree.
+
+**Namespaces:** `2026_08_17_000106` spent (Lane B resumes at `…000107`); ADR `0021` still free; `0010` still
+reserved for H1d; `#16` free; `openapi.json` byte-identical.

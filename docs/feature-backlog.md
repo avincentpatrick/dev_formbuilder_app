@@ -630,13 +630,81 @@ are still in place.
   asserted as a PASSING test** in the 429 case, so sanitising that arm wholesale later fails loudly.
   **`excerpt()` is not orphaned** — `:391` and `:431` still call it, checked before the edit rather than
   discovered by a linter.
-- **`major` · Both tabular adapters do a non-idempotent write and the retry ladder re-drives it.**
-  `GoogleSheetsConnector.php:252` / `AirtableConnector.php:338` send no idempotency token; a response lost
-  *after* the provider committed becomes `ConnectorDeliveryResult::failed()` (`:327-331`), and
-  `SweepWebhookRetriesJob` re-appends the same submission. With `max_attempts` = 10
-  (`config/webhooks.php:39`) the ceiling is ten identical rows in the tenant's own sheet, nothing marking
-  either as a retry. **Live.** Not a blocker: `insertDataOption=INSERT_ROWS` means it is additive, so the
-  shape of their data is corrupted, not its content.
+- ✅ **CLOSED BY `M5` (2026-08-19) — `major` · ~~BOTH TABULAR ADAPTERS DO A NON-IDEMPOTENT WRITE AND THE
+  RETRY LADDER RE-DRIVES IT.~~** Every link in the row held. ⚠️ **BUT THE FIX THE ROW NAMED DOES NOT EXIST,
+  AND THAT IS THE FIRST THING THIS INCREMENT ESTABLISHED.** *"Send no idempotency token"* presumes a provider
+  that accepts one: **neither does** — not Google Sheets `values.append`, not Airtable's create-record
+  endpoint. A header both providers ignore would have *looked* like a fix and changed nothing, which is the
+  same shape as the e2e overflow assertion three files describe as working. So the row was **rescoped on the
+  evidence**: the only thing that can settle *did the first attempt land?* is a read of the destination, and
+  the fix is a **read-back reconciliation on the retry** rather than a token on the write.
+  ⚠️ **THE TRIGGER IS ALSO NARROWER THAN THE ROW SAYS, AND THAT NARROWNESS IS WHAT MAKES THE FIX SAFE.** A
+  duplicate needs an *indeterminate* outcome — the request left, the provider had every chance to commit, no
+  answer came back — which is only the `ConnectionException` arm. A 429, 403, 422 or 5xx is a **response**:
+  the provider answered rather than silently committing. Until now all of them collapsed into one `failed()`
+  and the ladder re-drove them alike. **Ten** duplicates would need ten consecutive committed-but-unanswered
+  writes; the realistic count is **two**, because the retry that duplicates is usually the one that succeeds.
+  ⚠️ **REPRODUCED BEFORE IT WAS FIXED, WITH THE FIXTURE THAT NOW GUARDS IT.** Driven against the unfixed
+  adapter the reconciliation case reads `[$writes, $probes] === [2, 0]` — two identical records in the
+  tenant's own base for one submission, no read-back attempted — and against the fixed one, `[1, 1]`. The
+  guard is therefore proven by the mutation being the *absence of the fix*, not by an assertion count.
+  ⚠️⚠️ **AND THE FIXTURE NEARLY TOLD THE WRONG STORY TWICE, BOTH TIMES IN M4's SHAPE.** (1) `Http::fake()`
+  **invokes every stub for every request** and keeps the first non-null answer (`Factory::handler()` maps,
+  then filters), so a counter inside one stub counts requests that stub never answered — the schema read
+  inflated the probe count until the stub declined `/meta/` explicitly, and a probe count that is really
+  "every GET" reads as a reconciliation that never happened. (2) `airtableMapping()` / `sheetsMapping()` both
+  bind `__submission_id` by default, so **every** case would have exercised the reconcilable path and none
+  the other one; the unmapped case builds its own mapping and asserts the duplicate it still permits.
+  ➕ **AND ONE DEFECT IN THE FIX ITSELF, CAUGHT BY ITS OWN LAST TEST.** A probe that fails returned a plain
+  `failed()`, which **cleared** `unconfirmed_write_at` — so the attempt *after* that one would have written
+  blind, reproducing the very duplicate two attempts later and much harder to see. A failed probe now returns
+  `unconfirmed()`, whose meaning is therefore *"the uncertainty persists"* rather than *"a write was just
+  issued"* — the reason that factory takes a status at all.
+  **Gates:** migration lint **108 → 109** (`2026_08_17_000106`), the other three unchanged at **97 / 30 /
+  119**, `openapi.json` byte-identical, zero `.vue` / `.ts` / e2e movement.
+
+- **`minor` · A tabular rule that maps no Submission ID column still duplicates on an unconfirmed retry, and
+  the durable fix is in the rule EDITOR rather than the adapter.** Filed by **M5 (2026-08-19)** at the moment
+  the decision was taken. `__submission_id` is offered by `MappableColumnCatalog` and is **optional**, so a
+  rule that does not bind it writes nothing identifying the submission and there is nothing for M5's probe to
+  search for; the write proceeds and can duplicate exactly as before. ⚠️ **AND ONE SUB-CASE THE
+  ADVERSARIAL PASS ADDED: the column can be MAPPED and still unfindable on Airtable.** `typecast: true`
+  coerces a written value into the destination field’s type, so a tenant who mapped Submission ID onto
+  a Number or Date field stores something that is no longer the uuid, and `filterByFormula` then matches
+  nothing. Sheets has no symmetric hazard — `valueInputOption=RAW` lands the id verbatim. **Asserted as a passing test in both
+  delivery suites**, so narrowing it later shows up as a failing test rather than as a surprise. Matching the
+  whole projected row instead was **rejected on the merits**: two respondents answering a short form
+  identically is ordinary, and a false match is a row that never arrives and nobody notices — trading a
+  visible duplicate for an invisible loss. The fix is to make the editor pre-bind that column for a new
+  tabular rule (and say why), which lands in `resources/js/Pages/` — **Lane A's column**.
+
+- **`minor` · M5's reconciliation asks "is this SUBMISSION in the destination", not "is THIS DELIVERY's row in
+  the destination", so two rules writing one submission to one table can collapse to a single row.** Filed by
+  **M5 (2026-08-19)**, found by its own adversarial pass rather than by writing it, and **unfixable from the
+  adapter rather than overlooked**: nothing we write identifies the DELIVERY — the row carries the mapped
+  columns and nothing else — so there is no delivery-shaped thing to search for. Reachable only when two
+  rules on one connection target the SAME table with `__submission_id` mapped (a `submission.created` rule
+  and a `submission.updated` one, say). That tenant gets two rows by design today; if the second rule's write
+  then loses its answer, its retry finds the FIRST rule's row and settles, so the pair collapses to one.
+  **Narrow, and in the safe direction** — one row too few beats an unbounded ladder of duplicates — but it is
+  a behaviour change beyond the one M5 exists for. The fix would be a column carrying the delivery id, which
+  means writing into a column the tenant did not map, so it is a rule-editor question rather than an adapter
+  one. Revisit if a tenant reports a missing row on a table fed by two rules.
+
+- **`minor` · A 5xx that arrives AFTER the provider committed is still re-driven.** Filed by **M5
+  (2026-08-19)**. M5 treats a received HTTP status as determinate, because both providers' contracts say a
+  5xx means the write was not applied, and routing the far more common arm through an extra read to guard the
+  exception would cost every transient error a round trip. **Latent, and strictly narrower than what M5
+  closed**: it needs the provider to commit and *then* answer 5xx. Revisit if a tenant ever reports a
+  duplicate whose delivery row carries a 5xx rather than a `[transport_error]` excerpt.
+
+- **`minor` · `SlackConnector::deliver()` has the same non-idempotent shape and is deliberately not covered.**
+  Filed by **M5 (2026-08-19)**, and named in the adapter's own docblock rather than left to be discovered.
+  `chat.postMessage` accepts no idempotency key either, so a lost answer followed by a retry posts the
+  message twice. Out of scope **on the merits**: a repeated chat message is noise a human dismisses in the
+  channel it arrived in, where a repeated spreadsheet row silently biases every count taken over the tenant's
+  dataset. And the fix would not be M5's — asking Slack "did my message land?" means reading channel history,
+  a scope this connector does not request and should not acquire to dedupe its own retries.
 - **`major` · An irreversible provider-side token rotation is committed inside a rollback-able
   transaction.** `app/Services/Connectors/ConnectionTokenRefresher.php:127` writes each refreshed grant
   inside the transaction `app/Jobs/TenantAwareJob.php:132-136` opens, and `sweep()` (`:53-72`) batches
@@ -817,6 +885,21 @@ are still in place.
   docblock justifying the omission is now stale. A malformed uuid 500s instead of 404ing. **Live.**
 
 ### Design system
+
+- **`major` · The builder's share-panel live link fails WCAG AA contrast at 4.45, and the e2e gate reports it
+  as FLAKY rather than red.** Observed by **M5's final CI run (2026-08-19, run 32250476088)**: the
+  `builder-axe.spec.ts` case *"Builder — share panel live link"* (light, mobile) failed axe
+  `color-contrast` — *"insufficient color contrast of 4.45 (foreground #ffffff, background #1674e9, font
+  size 10.5pt (14px))"* — then passed on Playwright's retry, so the summary read **550 passed + 1 flaky +
+  10 skipped** instead of 551 + 10, and the run went green.
+  ⚠️ **TWO DEFECTS, AND THE SECOND IS THE WORSE ONE.** (1) 4.45 is below the 4.5 AA floor for normal text,
+  so white-on-`#1674e9` at 14px is a real violation wherever it renders. (2) **A gate that retries turns a
+  deterministic failure into an intermittent one** — the passed count drops by one while the TOTAL is
+  unchanged, which reads exactly like a test having been silently dropped, and a "flaky" line is easy to
+  dismiss as noise. Whoever fixes (1) should also decide whether an axe violation may be retryable at all.
+  **Not M5's**: that increment changed zero `.vue` / `.ts` / `packages/design-system/` files (checked with
+  `git diff --name-only origin/main...HEAD`), so it is pre-existing and sits in **Lane A's column**. Filed
+  here rather than left in a CI log, where no later search would find it.
 
 - **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
   brought back.** `packages/design-system/src/components/Combobox/Combobox.vue:353-358` —

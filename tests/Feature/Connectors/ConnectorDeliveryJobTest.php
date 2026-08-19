@@ -175,8 +175,27 @@ it('does not deliver through a paused rule or a dead grant', function (array $co
     Http::assertNothingSent();
 })->with([
     'paused rule' => [[], ['status' => ConnectorSubscriptionStatus::Paused]],
-    'revoked grant' => [['status' => ConnectionStatus::Revoked], []],
 ]);
+
+it('dead-letters a delivery whose GRANT is dead, rather than leaving it to be re-swept forever', function (): void {
+    // ⚠️ SPLIT OUT OF THE CASE ABOVE IN M6, BECAUSE THE TWO STOPPED BEING THE SAME OUTCOME — and the
+    // difference is a latent loop, not a nicety. Leaving the row `pending`/`failed` with its `next_retry_at`
+    // intact and `attempt_count` untouched means `WebhookRetrySweeper`'s `attempt_count < max_attempts`
+    // predicate stays true forever, so the delivery is re-dispatched every five minutes for the life of the
+    // row. It never surfaced because the pre-flight refresh used to catch a revocation one attempt earlier
+    // and dead-letter it; M6 moved that refresh into its own job, which would have left the loop as the only
+    // path. A PAUSED RULE is deliberately still the silent case — an admin un-pauses it and the queued
+    // deliveries resume, which is the whole point of `paused` being distinct from `disabled`.
+    Http::fake(['slack.com/api/chat.postMessage' => Http::response(['ok' => true], 200)]);
+
+    [, , $delivery] = runConnectorDelivery(['status' => ConnectionStatus::Revoked], []);
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::DeadLettered)
+        ->and($delivery->next_retry_at)->toBeNull()
+        ->and($delivery->response_body_excerpt)->toContain('[grant_expired]');
+
+    Http::assertNothingSent();
+});
 
 it('fails a rule with no destination without sending', function (): void {
     Http::fake(['slack.com/api/chat.postMessage' => Http::response(['ok' => true], 200)]);

@@ -21,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\PermissionRegistrar;
@@ -277,16 +278,34 @@ it('accepts a header row that differs only cosmetically', function (): void {
 
 // ── Token expiry vs a dead grant — the classification trap ──────────────────────────────────────────────
 
-it('pre-flight refreshes an already-expired access token and still delivers', function (): void {
-    // ADR-0009 §D6's revisit trigger, fired: Google's tokens live ~1h against an hourly sweep, so a grant can
-    // be dead on arrival through no fault of the sweep.
+it('hands an expired token to its own refresh job and delivers on the next attempt', function (): void {
+    // ADR-0009 §D6's revisit trigger, fired in H16a: Google's tokens live ~1h against an hourly sweep, so a
+    // grant can be dead on arrival through no fault of the sweep. That reasoning is unchanged.
+    //
+    // ⚠️ WHAT CHANGED IN M6 IS WHERE THE ROTATION HAPPENS, NOT WHETHER IT DOES. Performing it here put an
+    // IRREVERSIBLE provider-side effect inside this job's transaction, with three more outbound calls after
+    // it — so any later throw, or the 60s `$timeout`, rolled our token write back while the provider stayed
+    // rotated. On Airtable, which invalidates the previous refresh token on every renewal, the next sweep
+    // then got `invalid_grant` and killed the whole connection. The delivery now DEFERS one ladder step and
+    // arrives with a token that is real.
     fakeSheets();
 
     [$connection, , $delivery] = runSheetsDelivery(['token_expires_at' => Carbon::now()->subMinute()]);
 
-    expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
-        ->and($connection->status)->toBe(ConnectionStatus::Active)
-        ->and($connection->access_token)->toBe('ya29.refreshed');
+    // Nothing was sent to Google by THIS attempt — not the token endpoint, not the sheet.
+    Http::assertNothingSent();
+
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($delivery->next_retry_at)->not->toBeNull()
+        ->and($delivery->response_body_excerpt)->toContain('[token_refreshing]')
+        ->and($connection->status)->toBe(ConnectionStatus::Active);
+
+    // The refresh was handed off rather than dropped, and running it renews the grant.
+    expect(DB::table('jobs')->count())->toBe(1);
+    workOneJob('scheduled-maintenance');
+    enterTenant(test()->tenant->id);
+
+    expect($connection->fresh()->access_token)->toBe('ya29.refreshed');
 
     Http::assertSent(fn (Request $r): bool => str_contains($r->url(), 'oauth2.googleapis.com/token')
         && ($r->data()['grant_type'] ?? null) === 'refresh_token');
@@ -336,11 +355,30 @@ it('DOES kill the grant when the token endpoint says invalid_grant', function ()
 
     [$connection, , $delivery] = runSheetsDelivery(['token_expires_at' => Carbon::now()->subMinute()]);
 
+    // ⚠️ M6 SPLIT THIS ACROSS TWO JOBS, AND THE REFUSAL NOW BELONGS TO THE ONE THAT ASKED. The delivery
+    // defers; the refresh job makes the call, is told `invalid_grant`, and marks the grant dead — which is
+    // the whole reason the rotation was moved somewhere it cannot be rolled back.
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Failed)
+        ->and($connection->status)->toBe(ConnectionStatus::Active);
+
+    workOneJob('scheduled-maintenance');
+    enterTenant(test()->tenant->id);
+
+    $connection->refresh();
+
     expect($connection->status)->not->toBe(ConnectionStatus::Active)
-        ->and($connection->access_token)->toBe('')
-        ->and($delivery->status)->toBe(WebhookDeliveryStatus::DeadLettered);
+        ->and($connection->access_token)->toBe('');
 
     Notification::assertSentOnDemand(ConnectionRevokedNotification::class);
+
+    // And the delivery is settled rather than left to be re-swept forever: the next attempt finds a dead
+    // grant and dead-letters it with our own copy.
+    DeliverConnectorMessageJob::dispatch(test()->tenant->id, (string) $delivery->id);
+    workOneJob('webhooks');
+    enterTenant(test()->tenant->id);
+
+    expect($delivery->fresh()->status)->toBe(WebhookDeliveryStatus::DeadLettered)
+        ->and($delivery->fresh()->response_body_excerpt)->toContain('[grant_expired]');
 });
 
 it('does NOT kill the grant when the token endpoint merely times out', function (): void {

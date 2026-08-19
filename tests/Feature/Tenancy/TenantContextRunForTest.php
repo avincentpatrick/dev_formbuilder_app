@@ -85,12 +85,19 @@ it('does not mask a QUERY exception, which is the case a finally-inside-the-tran
     // The reason the restore sits after the transaction rather than in a `finally` inside it. A failed
     // statement leaves Postgres refusing every further command on that transaction, so a restore issued on
     // the way out would throw its own error and replace this one.
+    //
+    // ⚠️ THE MESSAGE IS ASSERTED, NOT JUST THE CLASS, AND THAT IS THE WHOLE CASE. Laravel wraps EVERY
+    // PDO failure in a QueryException, so the masking error (25P02, "current transaction is aborted",
+    // raised by the restore's own `set_config`) has the SAME CLASS as the real one (42P01). Asserting
+    // the class alone passes on the forbidden implementation — an adversarial pass found this case green
+    // against the very mutation the method's docblock spends nine lines forbidding. The table name
+    // appears only in the genuine message; the masked one names `set_config`.
     TenantContext::applyLocal($this->globex->id, $this->userId);
 
     expect(fn (): mixed => TenantContext::runFor(
         $this->acme->id,
         fn () => DB::statement('select * from a_table_that_does_not_exist'),
-    ))->toThrow(QueryException::class);
+    ))->toThrow(QueryException::class, 'a_table_that_does_not_exist');
 
     expect(TenantContext::currentTenantId())->toBe($this->globex->id);
 });

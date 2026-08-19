@@ -126,9 +126,17 @@ final class TenantContext
      * NO-OP outside one), apply, and restore in a `finally`. {@see SendWelcomeEmail}
      * (`isMemberOf`), {@see ImpersonationService} and
      * {@see SuperAdminService} each write it out by hand; the two fan-out
-     * dispatchers (M3) are the first callers of the extraction. The five hand-rolled sites are
-     * DELIBERATELY NOT retrofitted here — each is correct, and rewriting a correct tenant-boundary
-     * call site is its own increment with its own gate run.
+     * dispatchers (M3) are the first callers of the extraction. ⚠️ THE HAND-ROLLED SITES ARE **TWELVE,
+     * ACROSS SEVEN CLASSES** — the three named above plus GoogleAuthRequestService, TenantSettingRegistry,
+     * TenantMembershipService and TenantExtractService. This sentence said "five" until an adversarial
+     * pass counted them; the {@see} list is illustrative, never a census.
+     *
+     * They are DELIBERATELY NOT retrofitted here — rewriting a working tenant-boundary call site is its
+     * own increment with its own gate run. ⚠️ AND THEY ARE NOT ASSERTED TO BE CORRECT, WHICH THIS
+     * PARAGRAPH ALSO CLAIMED UNTIL THAT PASS: every one of the twelve restores in a `finally` INSIDE its
+     * transaction, which is precisely the shape the next paragraph forbids, so each carries the same
+     * exception-masking hazard should its work ever raise a QueryException. That is filed in
+     * `docs/feature-backlog.md` rather than asserted away.
      *
      * ⚠️ THE USER ID IS CARRIED THROUGH ONLY WHEN THE TENANT IS UNCHANGED, and is null otherwise. A
      * user belongs to a workspace, so carrying an id across a tenant switch would assert a membership

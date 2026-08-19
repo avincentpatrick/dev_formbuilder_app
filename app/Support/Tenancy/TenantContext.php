@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support\Tenancy;
 
+use App\Listeners\Auth\SendWelcomeEmail;
 use App\Models\Concerns\BelongsToTenant;
+use App\Services\Admin\ImpersonationService;
+use App\Services\Admin\SuperAdminService;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -13,7 +16,7 @@ use Throwable;
  * (ADR-0002 §D2/§D3). This is the bridge between "the app resolved a tenant" and "the database
  * will enforce it" — without it, every tenant-scoped table fails closed (zero rows).
  *
- * Two setters, one hazard:
+ * Two setters and one composition, one hazard:
  *   - applyLocal() uses set_config(..., is_local = true): the value lives only for the current
  *     TRANSACTION and is discarded on commit/rollback. This is leak-proof under connection pooling
  *     (a reused connection cannot carry a stale value into the next request) and is what tests and
@@ -22,6 +25,9 @@ use Throwable;
  *     not wrap the request in a transaction. It MUST be paired with forget() on request termination
  *     so a value never survives onto a pooled/persistent connection. See ADR-0002 §D2 for the
  *     pooled-connection sharp edge this guards against.
+ *   - runFor() is the safe COMPOSITION of applyLocal(): act for a named tenant whatever the caller's
+ *     ambient context is, and put that context back. Reach for it rather than hand-rolling the four
+ *     steps, and read its docblock for why its restore is not a `finally`.
  *
  * set_config() is used rather than `SET LOCAL app.current_tenant_id = '…'` so the value binds as a
  * parameter (no string interpolation of the uuid) and so is_local is a first-class argument.
@@ -96,12 +102,13 @@ final class TenantContext
      * would issue two session-scoped `set_config` round-trips, which is both wasteful per job and
      * wrong (it would leave a session-scoped GUC behind on a worker's long-lived connection).
      *
-     * Callers: App\Listeners\Queue\ScopeTenantContextToJob (ADR-0007 §D4), which saves the ambient mirror
-     * before a job runs and restores it after, and {@see runFor()} on the two paths where the database has
-     * already reverted itself and only the mirror is left stale. It read "sole caller" until M3 added the
-     * second — recorded because a docblock that names its only caller goes stale the moment it gains another. That matters under the `sync` driver —
-     * every current CI job — where the queue events fire INLINE in the caller's stack, so a blind
-     * flush would wipe the surrounding request's context mid-request.
+     * Two callers. App\Listeners\Queue\ScopeTenantContextToJob (ADR-0007 §D4) saves the ambient mirror
+     * before a job runs and restores it after — which matters under the `sync` driver, every current CI
+     * job, where the queue events fire INLINE in the caller's stack, so a blind flush would wipe the
+     * surrounding request's context mid-request. {@see runFor()} is the second, on its two exits where the
+     * database has already reverted itself and only the mirror is left stale. ⚠️ This paragraph read "SOLE
+     * caller" until M3 added that second one — a docblock that names its only caller goes stale the moment
+     * it gains another, so it now names the shape (never touches the database) rather than a census.
      */
     public static function restoreMirror(?string $tenantId, ?string $userId): void
     {
@@ -116,9 +123,9 @@ final class TenantContext
      * THE COMPOSITION THIS CLASS WAS MISSING. Every caller that needs "act for THIS tenant regardless
      * of what the ambient request or worker left behind" has had to hand-roll four steps in the right
      * order: save the mirror, open a transaction (because applyLocal() is `SET LOCAL` and a SILENT
-     * NO-OP outside one), apply, and restore in a `finally`. {@see \App\Listeners\Auth\SendWelcomeEmail}
-     * (`isMemberOf`), {@see \App\Services\Admin\ImpersonationService} and
-     * {@see \App\Services\Admin\SuperAdminService} each write it out by hand; the two fan-out
+     * NO-OP outside one), apply, and restore in a `finally`. {@see SendWelcomeEmail}
+     * (`isMemberOf`), {@see ImpersonationService} and
+     * {@see SuperAdminService} each write it out by hand; the two fan-out
      * dispatchers (M3) are the first callers of the extraction. The five hand-rolled sites are
      * DELIBERATELY NOT retrofitted here — each is correct, and rewriting a correct tenant-boundary
      * call site is its own increment with its own gate run.

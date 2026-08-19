@@ -522,19 +522,54 @@ are still in place.
 
 ### Connectors & webhooks
 
-- **`major` · The `webhook_deliveries` fan-out picks its endpoints by ambient RLS alone.**
-  `app/Services/Webhooks/WebhookEventDispatcher.php:49-59` computes `$tenantId` from `$event->tenantId()`
-  and uses it only to stamp the delivery row at `:68`; the query deciding *which endpoints receive the
-  event* is a bare `WebhookEndpoint::query()->where('status', …)` resolved by the global scope. The class
-  docblock (`:28-30`) names the precondition — *"Runs with tenant context established in BOTH call
-  contexts"* — and nothing enforces it. **Latent**: the four `App\Listeners\Webhooks` listeners are
-  synchronous today. Add `ShouldQueue` (one line — the delivery job already is queued), or call `fanOut()`
-  from a console sweep that tears the GUC down between tenants, and this repo's own read-side RLS trap
-  returns **zero endpoints with no exception and no log line**: every tenant's webhooks *and* every Slack /
-  Sheets / Airtable delivery stop firing, silently and totally, with the suite green.
-  The test cannot see it — `tests/Feature/Webhooks/WebhookFanOutTest.php:38-61` seeds one tenant and all
-  ten cases pass `$this->tenant->id` under an `enterTenant()` for that same tenant, so the event's id and
-  the ambient id are indistinguishable in every case.
+- ✅ **CLOSED BY `M3` (2026-08-19) — `major` · ~~THE `webhook_deliveries` FAN-OUT PICKS ITS ENDPOINTS BY
+  AMBIENT RLS ALONE.~~** Both dispatchers now take the scope from the event and establish it themselves,
+  via a new `TenantContext::runFor()`. ⚠️ **THE ROW NAMED ONE CLASS AND THERE WERE TWO.**
+  `ConnectorEventDispatcher` is the identical shape (`:39-63`) and is the twin that actually carries every
+  Slack / Sheets / Airtable delivery this row blames on the webhook class — so fixing only the named file
+  would have left the row's own sentence false. Both are fixed here (user decision 2026-08-19).
+  ⚠️ **REPRODUCED BEFORE IT WAS FIXED, AND THE REPRODUCTION SPLIT THE ROW IN TWO.** Four new cases, two per
+  channel, run against the unfixed dispatchers produced **two different failures**: with no ambient context
+  (a worker's state exactly — `applyLocal()` dies at its transaction's commit and `ScopeTenantContextToJob`
+  flushes the mirror) the fan-out created **zero rows, threw nothing and logged nothing**; with a *different*
+  ambient tenant it raised **42501**, because the SELECT returned the other tenant's endpoints and the INSERT
+  then stamped the event's `tenant_id`. **So the mismatch case was already loud and needed no fix — it is
+  the UNSET case that was silent**, and the fix is aimed there rather than at the shape the row describes.
+  Each case asserts a positive control *before* tearing the context down, so a zero-row result cannot be a
+  mis-seeded factory.
+  ⚠️ **THE OBVIOUS IMPLEMENTATION WOULD HAVE MASKED THE NEXT REAL EXCEPTION.** An *apply → work → restore-in-a-`finally`* shape issues SQL on the way
+  out of a **failure**, where the connection may be in Postgres'
+  aborted-transaction state and every statement fails — so the restore would throw and REPLACE the exception
+  that caused it. `runFor()` separates the three exits instead: on a throw only the PHP mirror is put back
+  (the database has already reverted itself); on a **nested** success the GUC is re-issued, because a
+  `SET LOCAL` inside a savepoint SURVIVES its release and would otherwise hand the rest of the enclosing
+  transaction a tenant it never asked for — the H12a sweep is exactly that; on an outermost success the
+  COMMIT has already discarded it. It is the hazard `ScopeTenantContextToJob` avoids by never touching the
+  database on the way out, met by a method that has to.
+  ➕ **THREE THINGS THE ROW DID NOT NAME, ALL FIXED WITH IT.** (1) **Seven dispatch-listener docblocks gave
+  *"a queued listener would run under a null tenant GUC"* as the reason they are not `ShouldQueue`** — a
+  sentence this increment falsifies, so it is swept; after it, that phrase survives only at the two sites
+  where it is still true (`FormOpened`'s `SerializesModels` note and `NotifyOnSubmissionCreated`). (2) Both
+  dispatcher docblocks said **"four thin auto-discovered listeners"** where there are **eight** since I3 and
+  I9c — the same drift, in the file that defines the behaviour. (3) `TenantContext::restoreMirror()`'s
+  docblock named `ScopeTenantContextToJob` as its **sole** caller, which stopped being true here.
+  ⛔ **THE LISTENERS ARE DELIBERATELY NOT FLIPPED TO `ShouldQueue`** — that is a behaviour change owed its
+  own increment, and it is filed as its own row below rather than left invisible.
+  **Gates:** four lint gates unchanged at **97 / 108 / 30 / 119** (M3 adds no controller, migration or job),
+  Pint `passed`, `openapi.json` byte-identical, zero `.vue` / `.ts` / `packages/design-system/` / e2e movement.
+
+- **`minor` · The seven synchronous dispatch listeners could now be `ShouldQueue`, and nothing has decided
+  whether they should be.** Filed by **M3 (2026-08-19)** at the moment the decision was taken, because a
+  deliberately-unfixed finding that lives only in a commit message is invisible to any later backlog search.
+  Until M3 the answer was forced: a queued listener found no tenant context and the fan-out silently matched
+  nothing. `WebhookEventDispatcher` and `ConnectorEventDispatcher` now establish the event's own context, so
+  queueing them is **safe** — the question is whether it is *wanted*. Arguments both ways, neither yet
+  weighed: fan-out is two queries and an enqueue, so a synchronous listener costs a submission request very
+  little and keeps delivery-row creation inside the request that caused it; against that, `form.opened` and
+  `form.closed` fire inside the H12a sweep's per-tenant transaction, where a slow fan-out holds row locks
+  taken by `lockForUpdate()`. **Nothing is broken either way** — this is a latency/locking trade, not a
+  correctness one, which is why M3 declined to make it while fixing a correctness bug.
+
 - ✅ **FIXED ON THIS BRANCH, recorded because it was the review's only surviving non-documentation-hygiene
   `blocker` and because it is the contract an integrator builds against.** The docs described a single
   `sha256=<hex>` in `X-Webhook-Signature` while `WebhookSigner::signatureHeaderFor()` comma-joins the new

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -89,7 +90,7 @@ it('does not mask a QUERY exception, which is the case a finally-inside-the-tran
     expect(fn (): mixed => TenantContext::runFor(
         $this->acme->id,
         fn () => DB::statement('select * from a_table_that_does_not_exist'),
-    ))->toThrow(Illuminate\Database\QueryException::class);
+    ))->toThrow(QueryException::class);
 
     expect(TenantContext::currentTenantId())->toBe($this->globex->id);
 });

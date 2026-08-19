@@ -3887,3 +3887,39 @@ dropped three real ones** — all three checked by hand afterwards and all three
 `2026_08_17_000106` · `openapi.json` byte-identical · zero `.vue` / `.ts` / `packages/design-system/` /
 `tests/e2e/` files touched. The M3 claim was released in the same session it was taken, and **`M4` (the
 Airtable success excerpt) is claimed in the same commit that closes M3.**
+
+## 2026-08-19 — `M4` (Lane B): an Airtable success excerpt is `'ok'`, not the provider's echo — PR #183
+
+The second of the two rows the hand-off named, taken in order, and shipped in the same PR as M3's
+close-out. `AirtableConnector.php:353` passed 2000 characters of the create-record response — which echoes
+the `fields` object just written — into `webhook_deliveries.response_body_excerpt`. That table has no
+retention job and a submission delete does not touch it, so the copy outlived an erasure request. One line,
+matching `GoogleSheetsConnector.php:270-272`, whose class docblock states the property this broke.
+
+**THE REPRODUCTION FOUND WHY NO TEST HAD EVER SEEN IT, AND IT WAS THE STUB RATHER THAN THE COVERAGE.**
+`fakeAirtable()`'s default write response returns a record **id only**; Airtable's real response echoes the
+fields. All twelve existing success cases therefore exercised a body with nothing to leak. Driven with the
+provider's real shape, the unfixed adapter wrote
+`{"records":[{"id":"recNEW0000000001","createdTime":"…","fields":{"Full name":"Ana Reyes","Colour":"b",
+"Submission ID":"sub-1"}}]}` into the ledger. The new case asserts a control first — that the response
+genuinely carries the answer — so a clean excerpt afterwards is the adapter's doing and not the stub's.
+**M3's lesson (c) in a second shape: a passing test can be a property of the FIXTURE, not of the code.**
+
+**THE GDPR DOC'S CLAIM WAS NARROWER THAN THE PROPERTY IT SELLS.** §7 bullet (a) named
+`webhook_deliveries.payload` — always true — while the leak was in the sibling column
+`response_body_excerpt`, so the literal sentence stayed accurate the whole time the heading above it ("the
+delivery ledger is not a second copy") was false. The clause now binds the whole row. `M4`'s claim had said
+that document would need no edit, *checked rather than assumed*; checking moved it, and the claim was
+extended mid-build.
+
+**NARROWED RATHER THAN CLOSED, AND ASSERTED AS A PASSING TEST.** `classifyFailure()`'s retryable
+fall-through still stores the provider body verbatim, on purpose — a 429 or 5xx body is the only diagnostic
+an operator has for an outage, those statuses do not echo a payload, and every arm a tenant reads already
+replaces Airtable's copy with ours. The 429 case pins it. `excerpt()` is not orphaned (`:391`, `:431`).
+
+**Gates:** Connectors 228 passed / 847 assertions · PHPStan 18, delta zero · four lint gates 97 / 108 / 30 /
+119 · Pint `passed` · `openapi.json` byte-identical · zero `.vue` / `.ts` / `packages/design-system/` /
+`tests/e2e/` files. Predicted CI Pest **4428 / 18,731**, measured by running the new case in isolation.
+
+**NAMESPACES: nothing spent.** `0021` free · `0010` reserved for H1d · `#16` free · migration block stays at
+`2026_08_17_000106`. Both the M3 and M4 claims were released in the session they were taken.

@@ -155,6 +155,43 @@ it('signs the member in on the same-site hop the ACS hands back, and lands them 
         ->and(SsoConnection::query()->value('last_login_at'))->not->toBeNull();
 });
 
+it('signs an enrolled member straight in, because the identity provider is the authentication authority', function (): void {
+    // ⚠️ THE DECISION THIS CASE EXISTS FOR IS ADR-0016 §D32, AND UNTIL M7 NOTHING IN THIS SUITE ASSERTED IT.
+    // A member with a confirmed personal TOTP who arrives through the identity provider is NOT handed to
+    // `/two-factor-challenge` — the workspace administrator chose and configured that trust anchor and can
+    // require whatever factors they like at it, which is §D22's position (an SSO session re-proves at the
+    // IdP with `ForceAuthn`, never against a local credential) one step earlier in the same flow.
+    // `GoogleSessionStarter` deliberately does the opposite, because a Google account is a CONSUMER
+    // credential the end user chose and this product cannot know whether anything protects it (ADR-0019
+    // §D11). Two doors, two answers.
+    //
+    // ⚠️ AND THE REASON A RATIFICATION TEST IS WORTH ITS LINES: the Google polarity has been pinned since
+    // J3c2 (`GoogleSignInWebTest`), this one was pinned nowhere, so a later "make the doors consistent"
+    // change would have flipped a decision of record with the whole suite green.
+    User::on('pgsql_privileged')->whereKey($this->member->getKey())->update([
+        'two_factor_secret' => encrypt('JBSWY3DPEHPK3PXP'),
+        'two_factor_confirmed_at' => now(),
+    ]);
+
+    $request = beginLogin($this->tenant, $this->admin);
+    $location = handOffFor($request, $this->member->email);
+
+    $this->get($location)->assertRedirect('/dashboard');
+
+    // ⚠️ ASSERTED AS AN OUTCOME, NEVER AS "the fork was not taken". A session on `/dashboard` is what the
+    // person experiences; that Fortify's handoff was never written is the same fact stated positively, and
+    // `login.id` is the one key that would exist if this door had challenged — `GoogleSignInWebTest`'s
+    // twin case asserts its PRESENCE for exactly this reason, so the two read as a pair.
+    $this->assertAuthenticatedAs($this->member);
+
+    expect(session()->has('login.id'))->toBeFalse()
+        ->and(session()->has('login.remember'))->toBeFalse()
+        // The identity-source marker still lands, so `RequireRecentPassword` sends this member to the
+        // protocol step-up rather than to a password they may not have (§D22/§D25). Refusing the challenge
+        // at login is NOT refusing it at re-authentication, and this line is what keeps those separable.
+        ->and(session()->has(SsoSession::AUTHENTICATED_AT))->toBeTrue();
+});
+
 /*
 |--------------------------------------------------------------------------
 | The binding — what P1e exists for

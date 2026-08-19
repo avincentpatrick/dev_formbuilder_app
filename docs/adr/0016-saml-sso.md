@@ -226,6 +226,66 @@ way. The `invalid_assertion` hint was narrowed for the same reason: it claimed t
 rotated signing certificate looks like", and the expired half was never true, since an expired anchor
 produced a session rather than that row.
 
+### The M7 sub-decision (2026-08-20)
+
+**§D32 — a SAML sign-in does not challenge a member's PERSONAL second factor, and until now that was
+a decision this document had never made.** *User decision of record, 2026-08-20, ratifying what P1b built.*
+A member with a confirmed TOTP who arrives through the identity provider is signed in on the spot:
+`SsoLoginCompletionController` calls `Auth::login()` with no `hasEnabledTwoFactorAuthentication()` fork,
+where `GoogleSessionStarter` deliberately does fork. **The IdP is the authentication authority for this
+door.** A workspace administrator chose that trust anchor, configured it, and can require whatever factors
+they want at it — which is exactly the property ADR-0019 §D11 says a *consumer* Google account lacks, and
+why these two doors are allowed to answer differently.
+
+**THIS IS NOT A NEW POSITION; IT IS §D22's POSITION AT THE OTHER END OF THE SAME FLOW.** §D22 already gives
+an SSO session's **re-authentication** to the identity provider — `ForceAuthn="true"` against the anchor,
+never a local credential — on the reasoning that only one authority can re-prove an SSO member and it is
+not this application. Login is that principle at the same door one step earlier. Reading the two together
+is what makes the as-built behaviour coherent rather than an omission somebody forgot to close.
+
+**⚠️ WHAT THIS DECIDES AND WHAT IT DOES NOT, WRITTEN OUT BECAUSE A *CONSEQUENCES* BULLET HAS ALREADY BEEN
+READ AS DECIDING IT ONCE.** There are **two** second-factor controls in this product and they are answered
+in opposite directions:
+
+- **The WORKSPACE's control** — `security.require_two_factor`, enforced by `EnforceTenantTwoFactor`. **Not
+  exempted for SSO arrivals**, and untouched by this decision. That is the Consequences bullet below, and it
+  is the one carrying the sentence *"a workspace whose IdP already performs MFA turns the setting off"*.
+- **The PERSON's control** — their own enrolled TOTP. **Not challenged at this door**, which is this
+  section, and which had no home in this document before it.
+
+**THE CONFUSION WAS REAL AND IT REACHED THE CODE.** ADR-0019 §D11 explained its Google divergence by
+quoting that Consequences bullet and attributing it to **§D22** — a section about step-up which says the
+opposite, that step-up *"is never exempted"*. Eleven further citations across six files inherited the
+attribution, including a docblock in `SsoLoginCompletionController` justifying live behaviour by it. The
+bullet was never wrong; it was answering the *other* control, and nothing in this document answered this
+one. **A decision with no § heading cannot be cited, so it gets cited by proxy and the proxy drifts** —
+7(g)'s "cite the FILENAME, never the bare number" one level further down, and the reason this section
+exists as a numbered decision rather than as a comment.
+
+**THE RESIDUAL, STATED RATHER THAN LEFT TO BE REDISCOVERED A THIRD TIME.** In a workspace that has switched
+`security.require_two_factor` **on**, an enrolled member arriving through SAML satisfies the gate on the
+**enrolment flag alone** and never presents the factor at this door. That is not new and not a defect: the
+middleware is an enrolment nudge structurally — it tests the enrolment FLAG and its single escape hatch
+is a route left outside its own group — which is also why the `/api/v1` token-mint row in
+`docs/feature-backlog.md` was downgraded from `blocker` to `minor` on the identical reasoning. It is written
+here so the next reader gets it from the decision rather than from re-deriving it.
+
+**THE DECISION IS PINNED BY A TEST, WHICH IS WHAT MAKES IT FALSIFIABLE.** Before M7 the SAML polarity was
+asserted **nowhere** — `tests/Feature/Sso/` greps zero for `two_factor_confirmed_at` — while the Google
+polarity has been pinned since J3c2. A later "consistency fix" flipping this door would have passed the
+whole suite green. `SsoLoginCompletionWebTest`'s *"signs an enrolled member straight in, because the
+identity provider is the authentication authority"* asserts what the system **ends up doing** — authenticated
+on `/dashboard`, with Fortify's `login.id` handoff absent from the session — rather than that a fork was
+skipped.
+
+**REJECTED: making this door fork like `GoogleSessionStarter`.** It reads as the consistent choice and is
+the wrong one twice over — it overrides an enterprise trust anchor with a factor the administrator who owns
+that anchor did not configure, and it contradicts §D22's mechanism at the same door one step later.
+**Revisit trigger:** a per-workspace *"our IdP already performs MFA"* setting, which is the same trigger
+ADR-0019 §D11 and this document's own revisit list already name, and which would turn this constant into a
+policy. Building it was considered here and rejected as scope: a new `SettingKey`, a migration and a
+settings control, for a row filed as a documentation defect.
+
 ---
 
 ## Consequences
@@ -235,7 +295,7 @@ produced a session rather than that row.
 - **Enterprise cannot be bought**, so no tenant can reach any of this in production until Track B (ADR-0008 §D6). Built and gated, as with custom domains before it.
 - ~~**A tenant can activate SSO before the login path exists** (§D14). Stated in the UI, the ADR and a test; unreachable by any user-facing route.~~ **Closed by P1b** — both endpoints are routed and the canary is now the round trip itself.
 - ~~**A failed sign-in tells the person nothing, and tells their admin nothing in-app** (§D19). The 404 is deliberate and the log line is the only record. This is the sharpest edge P1b ships, and it is a UX cost accepted for a security property rather than an omission.~~ **HALF-CLOSED BY P1c (§D26): the admin's half is answered by the failures panel; the PERSON still sees a bare 404, and always will, because they are the unauthenticated caller §D19 is about.**
-- **A member who signs in through SSO is still subject to org-level 2FA enforcement.** `EnforceTenantTwoFactor` guards the authenticated group and is not exempted here: "require 2FA for all tenant members" is a policy an admin switched on, and inferring an exemption from the presence of SSO would silently drop it. A workspace whose IdP already performs MFA turns the setting off — that is their decision to make, not this controller's.
+- **A member who signs in through SSO is still subject to org-level 2FA enforcement.** `EnforceTenantTwoFactor` guards the authenticated group and is not exempted here: "require 2FA for all tenant members" is a policy an admin switched on, and inferring an exemption from the presence of SSO would silently drop it. A workspace whose IdP already performs MFA turns the setting off — that is their decision to make, not this controller's. ⚠️ **THIS IS THE WORKSPACE'S CONTROL, AND THE PERSON'S OWN SECOND FACTOR IS §D32** — the two are answered in OPPOSITE directions, and this sentence was quoted as deciding the other one for six increments (ADR-0019 §D11 and eleven citations behind it, repaired in M7). Nothing here says anything about an enrolled member's own TOTP.
 - **The only user-facing entry point is a URL on the settings screen** (§D21). Deliberate lane hygiene, not a design preference; the login-page affordance is owed by the auth vertical.
 - **An admin whose SSO is broken cannot step up through SSO, and the escape hatch is `/user/confirm-password`** (§D22). Fortify routes it on the tenant subdomain (`domain => null` plus `RequirePlatformHost`, which admits subdomains), and a member with no usable password reaches it through password reset — which is why `SsoUserProvisioner` creates a real account rather than a special case. Two things make this survivable rather than a lockout: the fork falls back to the password prompt whenever SSO cannot serve at all (disabled, draft, downgraded), and `GET /settings/sso` carries no step-up gate, so the admin can still read the failures panel that tells them what broke. **A LINK to the confirm-password page from the step-up flow is owed by the auth vertical** — `auth/ConfirmPassword.vue` is being rebuilt in the design lane (J3) and shipping into it from here is how two lanes lose an afternoon.
 - **A session established before P1c deployed carries no identity-source marker**, so an SSO member on one gets the password prompt — the pre-P1c behaviour. It heals on their next sign-in. Nothing backfills it, because the fact was never recorded.
@@ -266,3 +326,4 @@ produced a session rather than that row.
 - ~~**P1c — protocol-aware step-up.** `RequireRecentPassword` compares `auth.password_confirmed_at`, which an SSO user with no usable password can never stamp, so it must fork on identity source.~~ ✅ **BUILT (§D22–§D25).** The one thing the row did not anticipate: the third condition could not be evaluated where the row assumed, because `SameSite=Lax` means the ACS has no session — see §D23.
 - **`SESSION_SAME_SITE` ever being set to `none`.** §D23's completion hop exists solely because the ACS receives no cookie, and since P1e there are TWO such hops (§D27). Loosening that setting would make them look redundant, and removing either would silently drop the only place its arm asks who is holding the browser — `user_id` against the signed-in member on the step-up arm, the pending flow id against the arriving browser on the login arm. If the setting changes, this ADR is the reason both hops stay. ⚠️ Note the login hop would still be needed even then: it is also where `resolved_user_id` is turned into a session, and the ACS deliberately creates none (§D29).
 - **Anything that gives `TenantUserStatus::Suspended` a producer.** P1c added the refusal in `attachMember()` as a latent guard; the day an admin can actually suspend a member, that guard becomes live and both doors (self-registration and SSO JIT) need a test that exercises the real surface rather than the service directly.
+- **A workspace asking for "our IdP already performs MFA", or for its opposite.** §D32 is a constant today: the identity provider is the authentication authority at this door and a member's own TOTP is not challenged. A tenant that wants either half configurable turns it into a per-workspace setting — the same trigger ADR-0019 §D11 names from the other side, so the two doors would become one policy with two defaults rather than two decisions.

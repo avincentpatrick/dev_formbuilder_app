@@ -49,11 +49,19 @@ use Illuminate\Support\Facades\Log;
  * -level two-factor is not evaluated here either and must not be: it guards the authenticated group, so the
  * redirect below walks straight into it on the very next request, exactly as P1b's `/dashboard` did.
  *
- * ⚠️ AND NO PERSONAL 2FA CHALLENGE, WHICH DIVERGES FROM `GoogleSessionStarter` ON PURPOSE. ADR-0016 §D22
- * decided that for SAML the identity provider is the authentication authority and a workspace whose IdP
- * performs MFA turns the setting off; ADR-0019 §D11 decided the opposite for Google, because a consumer
- * account is chosen by the end user rather than configured by an administrator. Two doors, two answers, and
- * copying the wrong one here would silently change a decision of record.
+ * ⚠️ AND NO PERSONAL 2FA CHALLENGE, WHICH DIVERGES FROM `GoogleSessionStarter` ON PURPOSE. ADR-0016 §D32
+ * decides that for SAML the identity provider is the authentication authority at this door — which is
+ * §D22's own position one step later, where an SSO session re-proves at the IdP with `ForceAuthn` rather
+ * than against a local credential. ADR-0019 §D11 decided the opposite for Google, because a consumer
+ * account is chosen by the end user rather than configured by an administrator. Two doors, two answers,
+ * and copying the wrong one here would silently change a decision of record.
+ *
+ * ⚠️ §D32 EXISTS BECAUSE OF THIS COMMENT. Until M7 these lines cited §D22, which is about STEP-UP, and
+ * the sentence they paraphrased is a Consequences bullet about the ORG-LEVEL setting that decides the
+ * opposite polarity. The behaviour was never in doubt; the decision behind it had no § heading, so the
+ * comment reached for the nearest thing that looked like one. ADR-0019 §D11 made the attribution first
+ * and ten other citations followed it, this docblock among them.
+ * Pinned now by `SsoLoginCompletionWebTest`'s "signs an enrolled member straight in".
  */
 final class SsoLoginCompletionController extends Controller
 {

@@ -836,10 +836,14 @@ it('sends an enrolled member to the second factor instead of logging them straig
     enterTenant($this->tenant->id, $member->id);
     makeActiveMember($member, 'admin');
 
-    // ⚠️ THE DELIBERATE DIVERGENCE FROM ADR-0016 §D22 (ADR-0019 §D11). SAML treats the IdP as the
+    // ⚠️ THE DELIBERATE DIVERGENCE FROM ADR-0016 §D32 (ADR-0019 §D11). SAML treats the IdP as the
     // authentication authority; a Google account is a CONSUMER credential the end user chose, and this
     // product cannot know whether anything protects it. Someone who enrolled a TOTP must not find it
     // bypassed by a button on the same page.
+    //
+    // ⚠️ THE SAML TWIN OF THIS CASE IS `SsoLoginCompletionWebTest`'s "signs an enrolled member straight
+    // in", and M7 had to write it: until then only ONE side of a two-sided decision was pinned, so the
+    // other could have moved without a gate saying anything.
     $this->get(googleWalkToCompletion('acme.meridian.test', '/forms/archive'))
         ->assertRedirect('http://acme.meridian.test/two-factor-challenge');
 

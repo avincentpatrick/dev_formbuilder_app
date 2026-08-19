@@ -889,23 +889,121 @@ are still in place.
   broken. **Live.** ⚠️ **Pre-existing since PR #6 and present on `main`**, but the correct twin ships one
   file over (`auth/TwoFactorRequired.vue:42`, `<Link method="post" as="button">`) and this diff rewrites
   the page immediately above it, explicitly to remove a lockout.
-- **`major` · ADR-0019 §D11 attributes a SAML 2FA decision to ADR-0016 §D22, which decides the opposite
-  polarity — and the as-built behaviour is recorded in no ADR at all.**
-  `docs/adr/0019-first-party-google-sign-in.md:247` (also `:28`, `:86`, `:320`, `:334`) quotes a sentence
-  that lives at `0016:168` under a different control; `0016:101` §D22 is about step-up and says it *"is
-  never exempted"*. The as-built bypass is real: `SsoLoginCompletionController.php:134` calls
-  `Auth::login($user)` with no `hasEnabledTwoFactorAuthentication()` fork, where
-  `app/Services/Auth/GoogleSessionStarter.php:57-68` does fork — and
-  `app/Http/Middleware/EnforceTenantTwoFactor.php:20-22` asserts *"Fortify already challenges an enrolled
-  user at login"*, which is **untrue for the SSO door**. **Live** as a documentation defect; the SAML
-  behaviour may well be the intended design, but it is currently recorded nowhere and mis-cited into code
-  at `SsoLoginCompletionController.php:52-54`.
+- ✅ **CLOSED BY `M7` (2026-08-20) — `major` · ~~ADR-0019 §D11 ATTRIBUTES A SAML 2FA DECISION TO ADR-0016
+  §D22, WHICH DECIDES THE OPPOSITE POLARITY — AND THE AS-BUILT BEHAVIOUR IS RECORDED IN NO ADR AT ALL.~~**
+  **ADR-0016 gains §D32**, which states what P1b built and this repository had never decided: a SAML
+  sign-in does not challenge a member's PERSONAL second factor, because the identity provider is the
+  authentication authority at that door. **User decision of record, 2026-08-20**, taken on the evidence
+  rather than as a new position — §D22 already gives an SSO session's *re-authentication* to the IdP via
+  `ForceAuthn` rather than to a local credential, so login is that principle one step earlier in the same
+  flow; `docs/security-threat-model.md:192` already called the SAML side *"a deliberate divergence"*; and
+  the 2026-08-14 Google decision was itself framed as a divergence **from** this.
+  ⚠️ **THE ROW'S OWN EVIDENCE HAD GONE STALE, IN EXACTLY THE WAY THE ROW IS ABOUT.** It cited `0016:168`;
+  M2's §D31 had since pushed that sentence down by seventy lines (`git show 0028ea1~1:docs/adr/0016-saml-sso.md`
+  puts it back). A row about an unstable citation, carried by an unstable citation — which is the argument
+  for the fix that was taken: **the sentence needed its own § heading so it could be cited stably**, which
+  is 7(g)'s *"cite the FILENAME, never the bare number"* one level further down.
+  ⚠️ **AND A CORRECT § NUMBER ALONE WOULD NOT HAVE FIXED §D11, BECAUSE THE QUOTATION WAS WRONG TOO.** The
+  sentence §D11 quoted is a **Consequences** bullet about the **org-level** control (`EnforceTenantTwoFactor`),
+  which ADR-0016 pointedly does *not* exempt for SSO — so it argued the opposite of what it was offered
+  for. §D11 is requoted as well as repointed, and now records that it was the source of the attribution.
+  The bullet itself gains a clause naming which of the two controls it answers.
+  ⚠️ **THE ROW NAMED FIVE MIS-CITING PASSAGES AND THERE WERE TWELVE, ACROSS SIX FILES — ONE THE SOURCE
+  (§D11 ITSELF) AND ELEVEN THAT INHERITED IT.** The six it did not name, given as
+  anchors rather than line numbers because **this diff moved four of them**: ADR-0019's *Related ADRs*
+  entry; both second-factor rows in `security-threat-model.md`; `ACCESS-MATRIX.md`'s *"Personal 2FA still
+  applies"* bullet; `GoogleSessionStarter`'s *"PERSONAL TWO-FACTOR STILL APPLIES"* docblock; and
+  `GoogleSignInWebTest`'s *"THE DELIBERATE DIVERGENCE"* comment. ⛔ **AND EIGHT *CORRECT* §D22 CITATIONS SIT IN THE SAME
+  GREP** — `SsoStepUpController`, `SsoStepUpService`, `SsoAuthOutcome`, the step-up migration,
+  `routes/tenant.php:357`, `SsoStepUpWebTest` and ADR-0016's own two — so this was decided by **reading
+  each line, never by sweeping a pattern**, which is PR #153's 133-reference shape in miniature.
+  `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
+  ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
+  A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
+  `ACCESS-MATRIX.md:397` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
+  leans on twice. M7 had explicitly checked which citations its insertion would move and answered
+  *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
+  commit was adding. **"Which citations does my edit invalidate" must include the ones the edit is
+  adding**, and the durable fix is the one applied here: **anchor on quoted text and symbol names, not on
+  line numbers.**
+  ➕ **THREE THINGS THE ROW DID NOT NAME, ALL DEALT WITH.** (1) `EnforceTenantTwoFactor`'s opening docblock stated
+  *"Fortify already challenges an enrolled user at login"* — **false for the SSO door**, and load-bearing
+  for its own "re-challenging per request would be theatre" argument. Rewritten to name which doors
+  challenge and which does not; the middleware's behaviour is untouched, because checking the enrolment
+  flag is right regardless. (2) **The SAML polarity was asserted by no test at all** — `tests/Feature/Sso/`
+  grepped zero for `two_factor_confirmed_at` while the Google side has been pinned since J3c2, so a later
+  "make the doors consistent" change would have flipped a decision of record with the suite green.
+  `SsoLoginCompletionWebTest`'s *"signs an enrolled member straight in"* now pins it, **and the pin was
+  proved by inverting the code**: adding the `GoogleSessionStarter`-shaped fork turned the case red on
+  `/two-factor-challenge`, after which the controller was restored byte-identical to HEAD. (3) The
+  shape-grep for `Auth::login(` found two more session-minting doors. `ImpersonationSessionController` is
+  correctly exempt (the operator's own unconditional MFA plus step-up is the authority).
+  ⛔⛔ **AND `InvitationController` WAS CLEARED AGAINST THE WRONG PREDICATE — THIS INCREMENT'S OWN
+  ADVERSARIAL PASS OVERTURNED IT, AND THE CORRECTION IS LEFT VISIBLE RATHER THAN QUIETLY DELETED.** The
+  reasoning recorded here was *"an already-verified invitee must already be authenticated; a placeholder
+  has no confirmed factor"*. Both halves are true and neither is the branch: `prepareAcceptingUser()`
+  forks on **`email_verified_at`**, not on "is a placeholder", and an **enrolled-but-unverified** account
+  is an ordinary reachable state. It is a live `major`, filed as its own row below and **reproduced
+  before it was believed**. **A door survey is only as good as the predicate it checks each door
+  against** — and writing "checked, not a defect" into the permanent record is what would have made the
+  wrong predicate durable. The `Auth::login(` grep did its job; the reading of one result did not.
+  ⚠️ **WHAT IS RATIFIED RATHER THAN CLOSED, STATED SO NOBODY READS THIS AS "2FA IS FULLY ENFORCED":** in a
+  workspace with `security.require_two_factor` **on**, an enrolled member arriving through SAML clears the
+  gate on the **enrolment flag alone** and never presents the factor. Not new and not a defect — the
+  middleware is an enrolment nudge, the same reasoning that downgraded the `/api/v1` token-mint row below
+  from `blocker` to `minor`. §D32 records it as the residual with its revisit trigger (a per-workspace
+  *"our IdP already performs MFA"* setting), so a later reader gets it from the decision.
+  **Gates:** SSO suite **193 → 194 (1,110 → 1,123 assertions)**, the new case **+1 / +13 in isolation**;
+  PHPStan delta **zero**; four lint gates unchanged at **97 / 109 / 31 / 119** (no controller, migration or
+  job added); `openapi.json` byte-identical; **zero `.vue`, zero `tests/e2e/` selector movement.**
+- **`major` · Accepting an invitation as an ENROLLED-BUT-UNVERIFIED account mints a session with neither
+  the password nor the second factor, and silently overwrites the password.** `InvitationController.php`'s
+  `prepareAcceptingUser()` forks on **`email_verified_at !== null`**, and only that arm carries the file's
+  sole identity check (`abort_unless(Auth::id() === $user->id, 403)`). The other arm validates a name and
+  password from an **unauthenticated** request, force-fills them onto the existing `users` row together
+  with `email_verified_at => now()`, and `accept()` then calls `Auth::login($user)` with no second-factor
+  fork. The route group carries no `auth` and no `verified`, by design.
+  ⚠️ **THE STATE THAT MAKES IT REACHABLE IS ORDINARY, NOT EXOTIC — "unverified" IS NOT "never registered".**
+  `UpdateUserProfileInformation::updateVerifiedUser()` force-fills `email_verified_at => null` on **any**
+  email change and touches nothing 2FA-related, and **no writer anywhere in `app/` ever clears
+  `two_factor_confirmed_at`** (all twelve occurrences are reads or the model cast). So a fully enrolled
+  member who fixes a typo in their own address is durably enrolled-and-unverified — a state
+  `FortifyServiceProvider`'s own docblock already describes as expected. A second path reaches it too:
+  Fortify's enrolment routes carry `auth` + `password.confirm` and **not** `verified`, so a never-verified
+  account can confirm a TOTP. `TenantMembershipService::resolveOrCreateUser()` then **reuses that existing
+  global identity** rather than creating a placeholder, so the invite row points at the real account.
+  **Whoever holds the emailed token** — a shared alias, a forwarded message, mailbox read access — gets a
+  full authenticated session as that member, across every workspace they belong to, with a password of the
+  holder's choosing written over the member's own. **Live.**
+  ⛔ **IT IS STRICTLY WEAKER THAN PASSWORD RESET, WHICH IS THE COMPARISON THAT SETTLES THE SEVERITY.**
+  Reset is also mailbox-only, but it lands on the login form and an enrolled member is then sent to
+  `/two-factor-challenge`. This path skips that entirely. It is therefore **not** an instance of ADR-0016
+  §D32 (which decides that an *identity provider* is an authentication authority); nothing here has
+  authenticated anybody.
+  ⚠️⚠️ **M7 CHECKED THIS DOOR AND CLEARED IT AGAINST THE WRONG PREDICATE — the clearance is corrected in
+  the row above rather than quietly deleted.** M7's `Auth::login(` shape-grep found the call site and
+  reasoned *"a placeholder has no confirmed factor"*. True of placeholders, and the branch is not keyed on
+  placeholders — it is keyed on `email_verified_at`. **A door survey is only as good as the predicate it
+  checks each door against, and stating "checked, not a defect" in the permanent record is what made the
+  wrong predicate durable.** Found by M7's own adversarial pass, and **reproduced before it was believed**:
+  an unauthenticated `POST /invitations/{token}` for a seeded enrolled-and-unverified member answered a
+  redirect to `/dashboard` with that member authenticated and no challenge anywhere.
+  **The fix is a design decision, not a one-liner**, which is why it is filed rather than folded into a
+  documentation increment: the unverified arm exists so a genuinely new invitee can set a password, and it
+  has to keep doing that while refusing an account that already has credentials. The obvious shape is to
+  fork on *"has this identity ever been used"* — a set password, a confirmed factor, or any prior
+  membership — rather than on `email_verified_at`, and to send anyone who has to the sign-in-then-accept
+  hand-off the `prepareAcceptingUser()` docblock already calls "Increment C". **Needs a test that a
+  password is not overwritten and a second factor is not skipped**, and `docs/security-threat-model.md`
+  gains a row: it has none for invitation takeover today.
 - **`minor` · `EnforceTenantTwoFactor` is absent from the `/api/v1` token-mint group.**
   `routes/api.php:73-89` — an unenrolled member under `security.require_two_factor`, bounced from every
   page, can still `POST /api/v1/auth/tokens` from the same session and use the bearer against Group B,
   which carries no 2FA gate either. **Live.** ⛔ **DOWNGRADED FROM `blocker` TO `minor` ON VERIFICATION,
   AND THE REASON IS THE ROW**: all six links hold, but the middleware is an **enrolment nudge by its own
-  docblock** (`app/Http/Middleware/EnforceTenantTwoFactor.php:33-52`), Fortify's own 2FA-enrolment routes
+  docblock** — *"re-challenging per request would be theatre on the doors that already challenge"*,
+  and its one escape hatch is a route deliberately left outside its own group — Fortify's own 2FA-enrolment routes
   sit outside the same gate behind `password.confirm` — so the attacker already had a better path — and
   the token's abilities are capped at the issuer's own RBAC. It is a defence-in-depth and consistency gap.
   The code edit and the test edit are the same edit: mount it on Group A, and add a
@@ -1097,12 +1195,30 @@ are still in place.
 - **`minor` · §20's `settings.key` catalog omits `security.require_two_factor`.**
   `docs/data-dictionary.md:838`, rewritten in this branch — the key is live
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,
-  enforced by `EnforceTenantTwoFactor.php:91`). Anyone inventorying tenant configuration from the
+  enforced by `EnforceTenantTwoFactor`'s `settings->get(SettingKey::SecurityRequireTwoFactor)` read). Anyone inventorying tenant configuration from the
   dictionary omits a tenant-scoped security policy. **Live.**
-- **`minor` · ADR-0019 is the sole `Proposed` ADR in the directory, for a decision that is ratified and
-  fully built.** `docs/adr/0019-first-party-google-sign-in.md:23` against its own `:271`/`:282` and the
-  merged routes at `routes/google-auth.php:64,68`. 0014–0018 and 0020 are all `Accepted`, and both
-  `0018:49` and `0016:133` already treat 0019 as settled precedent. **Live**, one word.
+- ✅ **CLOSED BY `M7` (2026-08-20) — `minor` · ~~ADR-0019 is the sole `Proposed` ADR in the directory, for
+  a decision that is ratified and fully built.~~** Now **Accepted**, with the correction stated in the
+  Status block rather than silently applied: every decision in it shipped in J3c2,
+  `routes/google-auth.php:64,68` have been merged since, and `0018:49` and `0016:133` were already citing
+  it as settled precedent. Folded into the row above because it is one word in a file that diff already
+  rewrote at `:23` and `:28`, and because it is the same defect one level up — **ADR-0019 did not
+  accurately record what had been decided.**
+- **`minor` · Nothing checks that a `§D<n>` citation names a section whose text supports it.** The defect
+  the row above closed was invisible to every gate: `docs/adr/0019:247` cited `ADR-0016 §D22` for six
+  increments, eleven further citations inherited it — one of them a docblock justifying live
+  authentication behaviour — and the only thing that surfaced it was a human reading both documents.
+  A gate could catch the cheap half mechanically: **a cited `§D<n>` that does not exist in the target
+  ADR at all** — worth having, because a renumbering or a deleted section produces exactly that, and
+  because it costs one script. ⛔ **BUT IT WOULD HAVE CAUGHT NEITHER KNOWN INSTANCE, AND THAT IS THE
+  HONEST ARGUMENT FOR THE SEVERITY**: §D22 exists, and so does ADR-0019 §D7 (the by-line cluster row below
+  records `docs/adr/0016` citing it where §D6b is meant). Both fall in the expensive half — **a section
+  that exists but says something else** — which is not mechanically checkable and stays a review concern.
+  A gate that catches the case nobody has hit is still worth its script, but it must not be sold as the
+  answer to the case that keeps happening.
+  ⛔ **DELIBERATELY NOT BUILT IN M7 AND FILED HERE THE MOMENT THAT WAS DECIDED**: it lands in `scripts/`,
+  adds a fifth lint gate and moves a gate baseline, which is a tooling row rather than the documentation
+  row that found it. **Not live** — this is a missing gate, not a defect.
 - **`minor` · A cluster of by-line citations went stale, several of them inside this branch.** Cheap
   individually, listed together so one pass closes them: `docs/adr/0007:88,:106,:112` (six citations into
   `TenantIsolation.php`, `Tenant.php`, `migration-lint.php`, `config/queue.php` — every one lands on

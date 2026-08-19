@@ -394,8 +394,12 @@ door. Recorded because the two facts sit in different tables and read as a contr
 
 Other things that will look like bugs and are not:
 
-- **Personal 2FA still applies to a Google-linked account.** This diverges from ADR-0016 §D22 on
-  purpose (the J3c decision). Google linking happens only onto an already-verified account.
+- **Personal 2FA still applies to a Google-linked account, and deliberately does NOT after a SAML
+  sign-in.** Two doors, two decisions: ADR-0019 §D11 for Google (the J3c decision — a consumer
+  credential the end user chose, which this product cannot know is protected by anything), ADR-0016
+  §D32 for SAML (an enterprise trust anchor the workspace administrator configured, so the identity
+  provider is the authentication authority at that door). Google linking happens only onto an
+  already-verified account.
 - **`invited@demo.test` cannot sign in** — it is a pending invitation with a random discarded password.
 - **`CENTRAL_DOMAIN=localhost`** in `.env`, diverging from `meridian.test`, because the super-admin
   console is pinned to `config('tenancy.central_domain')` and `meridian.test` has no DNS on this box.

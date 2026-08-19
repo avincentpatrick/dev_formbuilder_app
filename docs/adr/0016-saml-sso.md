@@ -265,7 +265,8 @@ exists as a numbered decision rather than as a comment.
 **THE RESIDUAL, STATED RATHER THAN LEFT TO BE REDISCOVERED A THIRD TIME.** In a workspace that has switched
 `security.require_two_factor` **on**, an enrolled member arriving through SAML satisfies the gate on the
 **enrolment flag alone** and never presents the factor at this door. That is not new and not a defect: the
-middleware is an enrolment nudge by its own docblock, which is also why the `/api/v1` token-mint row in
+middleware is an enrolment nudge structurally — it tests the enrolment FLAG and its single escape hatch
+is a route left outside its own group — which is also why the `/api/v1` token-mint row in
 `docs/feature-backlog.md` was downgraded from `blocker` to `minor` on the identical reasoning. It is written
 here so the next reader gets it from the decision rather than from re-deriving it.
 

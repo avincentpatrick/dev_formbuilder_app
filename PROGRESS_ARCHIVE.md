@@ -3976,3 +3976,43 @@ had introduced and a docblock rewrite orphaned. Pint is a function of the final 
 
 **Namespaces:** `2026_08_17_000106` spent (Lane B resumes at `…000107`); ADR `0021` still free; `0010` still
 reserved for H1d; `#16` free; `openapi.json` byte-identical.
+
+## 2026-08-19 — LANE B / `M6`: a token rotation owns a transaction that contains nothing else (PR #186, `06ac41c`)
+
+Rule 7(f) row, claimed in the 7(g) ledger before any file it named. 6/6. **CI Pest 4446 / 18,822** (+2 tests
+/ +34 assertions), E2E **551 + 10 skipped**, axe **42 / 299**, lint **97 / 109 / 31 / 119**, PHPStan **18**,
+`openapi.json` byte-identical.
+
+**THE DEFECT.** Airtable invalidates the previous refresh token on every renewal, so a rotation is
+irreversible at the provider the instant its token endpoint answers. Both callers performed that exchange
+inside a `TenantAwareJob` transaction that went on to do more work — the sweep batched every due connection
+for a tenant into one, the delivery job refreshed then made three more outbound calls — so any later throw,
+including the 60s `$timeout`, rolled our write back while the provider stayed rotated. The next sweep got
+`invalid_grant`, which is terminal: tokens cleared, every rule paused, owner emailed. **The batching is what
+made it plural** — one slow run could kill every Airtable grant a tenant had.
+
+**THE ROW NAMED ONE PATH AND THERE WERE TWO** (M3's shape again): `ensureFresh()` ran inside the DELIVERY
+job's transaction too, and that path is worse. **The transaction could not simply be removed** —
+`applyLocal()` uses `SET LOCAL`, so RLS dies with it — which is why the fix is a per-connection commit seam:
+`RefreshOneConnectionJob`, one grant, one transaction whose body is its own write, under a per-connection
+lock taken without waiting. That lock is also the whole of the sibling row.
+
+**REPRODUCED BY STASHING THE FIX, AGAIN.** `git stash push -- app/` turns six guards red, including all three
+claims. Nothing about the tests changes between runs, so the result is a property of the code.
+
+**THE TESTS CAUGHT TWO THINGS IN THE FIX.** The new dead-connection branch was unreachable, because
+`markDead()` pauses every rule and the paused-rule guard fired first — the exact dead-code-that-looks-live
+shape being replaced, reintroduced and caught only because the test asserted an outcome rather than a call.
+Checking the grant before the rule fixed it and turned out to be principled: a dead grant is terminal and is
+settled, a paused rule is reversible and stays silent. That ordering also closed a `major` **never filed
+anywhere** — deliveries against a revoked grant were re-queued every five minutes forever, masked because
+the pre-flight caught revocation one attempt earlier.
+
+**AND A NUMBER WAS PUBLISHED WRONG.** The PR and backlog first said the connector suite went 228 → 246; 228
+predated M5's own merge, so it credited M6 with M5's sixteen cases. Real delta **+2 / +34**. **A baseline
+taken at the start of a session stops being your base the moment you merge** — re-measure after your OWN
+merges, not only after the other lane's. Corrected in both places, with the correction stated.
+
+**Narrowed rather than closed:** the provider-commits-to-we-commit window is one UPDATE wide, not zero;
+closing it needs a two-phase protocol no provider offers. Filed with its revisit trigger, in the backlog and
+in ADR-0009 §D6's amendment.

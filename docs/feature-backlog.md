@@ -729,7 +729,7 @@ are still in place.
   because they are different kinds of thing: a dead grant is terminal and is settled, a paused rule is
   reversible and stays silent so an un-pause resumes its queued deliveries. (2) That ordering also fixed a
   **latent loop nobody had named** — see the row below.
-  **Gates:** connector suite **228 → 246** (847 → 930 assertions), PHPStan **18**, delta zero and none of its
+  **Gates:** CI Pest **4444 / 18,788 → 4446 / 18,822**; the connector suite alone **244 → 246** (930 assertions). ⚠️ **The first draft of this line said 228 → 246, which was wrong: 228 was measured on `origin/main` BEFORE M5 merged, so it credited M6 with M5’s sixteen cases.** Measure against a run of your own base — the delta is small because most of M6’s test work REWROTE existing cases to the new contract rather than adding new ones. PHPStan **18**, delta zero and none of its
   nine files touched here; lint **97 / 109 / 31 / 119** (the new job moves the job count alone);
   `openapi.json` byte-identical. ADR-0009 **§D6 amended in place** — no new ADR number spent.
 

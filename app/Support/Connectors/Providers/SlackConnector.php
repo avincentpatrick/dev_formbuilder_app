@@ -102,7 +102,19 @@ final class SlackConnector implements ConnectorProvider
         return $this->grantFrom($body);
     }
 
-    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope): ConnectorDeliveryResult
+    /**
+     * ⚠️ `$priorWriteUnconfirmed` IS ACCEPTED AND IGNORED HERE, DELIBERATELY AND WITH A REASON RATHER THAN A
+     * SHRUG (M5). `chat.postMessage` is every bit as non-idempotent as the two tabular writes, so a lost
+     * answer followed by a retry does post the message twice — that residual is real and is filed in
+     * `docs/feature-backlog.md` rather than left invisible.
+     *
+     * It is out of scope on the merits, not by oversight. A repeated Slack message is noise a human reads and
+     * dismisses in the channel it arrived in; a repeated spreadsheet row silently biases every count taken
+     * over the tenant's own dataset, which is the thing M5 exists to stop. And the fix would not be this one:
+     * Slack offers no way to ask "did my message land?" that does not read the channel's recent history —
+     * a scope this connector does not request and should not acquire to dedupe its own retries.
+     */
+    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope, bool $priorWriteUnconfirmed = false): ConnectorDeliveryResult
     {
         $channel = $subscription->config['channel_id'] ?? null;
 

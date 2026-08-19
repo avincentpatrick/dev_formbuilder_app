@@ -136,7 +136,7 @@ final class GoogleSheetsConnector implements ConnectorProvider
         return $this->grantFrom($body, $refreshToken);
     }
 
-    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope): ConnectorDeliveryResult
+    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope, bool $priorWriteUnconfirmed = false): ConnectorDeliveryResult
     {
         $config = $subscription->config;
         $spreadsheetId = is_string($config['spreadsheet_id'] ?? null) ? $config['spreadsheet_id'] : '';
@@ -196,7 +196,105 @@ final class GoogleSheetsConnector implements ConnectorProvider
             return ConnectorDeliveryResult::blocked(null, '[submission_gone] That submission no longer exists, so nothing was written.');
         }
 
+        // M5. The previous attempt issued an append and never learned its outcome, so this sheet may ALREADY
+        // hold this submission. Ask before adding a second row. Placed after every refusal above so a gone
+        // submission or a drifted header still answers exactly what it answered before — the probe is a cost
+        // paid only on the one path that can duplicate.
+        if ($priorWriteUnconfirmed) {
+            $reconciled = $this->reconcile($connection, $spreadsheetId, $sheetName, $mapping, $submissionId);
+
+            if ($reconciled instanceof ConnectorDeliveryResult) {
+                return $reconciled;
+            }
+        }
+
         return $this->append($connection, $spreadsheetId, $sheetName, $row);
+    }
+
+    /**
+     * Whether this submission is already in the sheet after an unconfirmed append (M5).
+     *
+     * THREE ANSWERS, AND THE NULL IS THE INTERESTING ONE:
+     *   - {@see ConnectorDeliveryResult::delivered()} — found it. The row exists, so appending again would be
+     *     the duplicate this whole mechanism exists to prevent; the delivery succeeds without a write.
+     *   - {@see ConnectorDeliveryResult::unconfirmed()} — could not ask. The ladder retries the RECONCILIATION
+     *     rather than gambling on an append, because "the probe failed" says nothing about whether the row is
+     *     there and a blind append is the one move that cannot be taken back. It is `unconfirmed` rather than
+     *     `failed` SO THE MARK SURVIVES — a plain failure would clear `unconfirmed_write_at` and hand the
+     *     attempt AFTER this one a blind write, which a test caught the first cut of this doing.
+     *   - `null` — either provably absent, or **not reconcilable at all**. Both fall through to the append,
+     *     and they are the same answer on purpose: the second is today's behaviour, which is never worse than
+     *     today, whereas guessing would trade a visible duplicate for an invisible missing row.
+     *
+     * ⚠️ NOT RECONCILABLE MEANS THE TENANT DID NOT MAP `__submission_id`, AND THAT IS A PROPERTY OF THE ROW
+     * RATHER THAN A HOLE IN THE FIX. Nothing we append identifies the submission unless they bound that
+     * column (it is offered by `MappableColumnCatalog` and optional), so there is nothing to search for.
+     * Matching the whole projected row instead was rejected: two respondents giving identical answers is
+     * ordinary on a short form, and a false match here is a row that never arrives and nobody notices.
+     *
+     * ONE COLUMN, NOT THE SHEET. The read is `<letter>:<letter>` rather than the whole grid, so its size is
+     * the destination's row count and not its area, and it carries no answer content out of Google at all —
+     * only the ids we put there ourselves, which is the M4 property held on the READ side for free.
+     */
+    private function reconcile(
+        Connection $connection,
+        string $spreadsheetId,
+        string $sheetName,
+        ColumnMapping $mapping,
+        string $submissionId,
+    ): ?ConnectorDeliveryResult {
+        $index = $mapping->indexOfFieldKey(SubmissionRowProjector::META_SUBMISSION_ID);
+
+        if ($index === null) {
+            return null;
+        }
+
+        $letter = self::columnLetter($index);
+        $url = self::SHEETS_BASE.'/'.rawurlencode($spreadsheetId).'/values/'
+            .rawurlencode(self::a1Range($sheetName, '!'.$letter.':'.$letter));
+
+        $response = $this->send($connection, fn (): Response => Http::withToken($connection->access_token)
+            ->withOptions(['allow_redirects' => false])
+            ->connectTimeout((int) config('webhooks.connect_timeout', 5))
+            ->timeout((int) config('webhooks.delivery_timeout', 10))
+            ->get($url, ['majorDimension' => 'COLUMNS']));
+
+        if ($response instanceof ConnectorDeliveryResult || ! $response->successful()) {
+            return ConnectorDeliveryResult::unconfirmed(
+                $response instanceof ConnectorDeliveryResult ? null : $response->status(),
+                '[unconfirmed_write] A previous attempt may already have added this row, and we could not check. Nothing was written.',
+            );
+        }
+
+        $values = $response->json('values');
+        $column = is_array($values) && is_array($values[0] ?? null) ? $values[0] : [];
+
+        foreach ($column as $cell) {
+            if (is_scalar($cell) && (string) $cell === $submissionId) {
+                return ConnectorDeliveryResult::delivered(null, 'ok (already present)');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A zero-based column index as its A1 letter — 0 ⇒ `A`, 25 ⇒ `Z`, 26 ⇒ `AA`.
+     *
+     * Spreadsheet columns are bijective base-26 and NOT ordinary base-26: there is no zero digit, so the
+     * familiar `intdiv`/`%` pair is wrong at every multiple of 26 (it yields `A@` and then `BA` where the
+     * answers are `Z` and `AA`). The `- 1` before each step is what makes it bijective, and it is written out
+     * because "off by one at column 26" is a bug that hides until a tenant maps a 27-column sheet.
+     */
+    private static function columnLetter(int $index): string
+    {
+        $letter = '';
+
+        for ($n = $index + 1; $n > 0; $n = intdiv($n - 1, 26)) {
+            $letter = chr(65 + (($n - 1) % 26)).$letter;
+        }
+
+        return $letter;
     }
 
     /**
@@ -261,7 +359,7 @@ final class GoogleSheetsConnector implements ConnectorProvider
             ->post($url.'?'.http_build_query([
                 'valueInputOption' => 'RAW',
                 'insertDataOption' => 'INSERT_ROWS',
-            ]), ['values' => [$row]]));
+            ]), ['values' => [$row]]), write: true);
 
         if ($response instanceof ConnectorDeliveryResult) {
             return $response;
@@ -314,9 +412,16 @@ final class GoogleSheetsConnector implements ConnectorProvider
     /**
      * Run one Sheets call, converting a transport error into a retryable outcome.
      *
+     * ⚠️ `$write` IS THE DIFFERENCE BETWEEN "IT FAILED" AND "WE DO NOT KNOW" (M5). A lost answer on a READ is
+     * just a failure — nothing changed in the spreadsheet and re-reading costs nothing. A lost answer on the
+     * APPEND is the one case that cannot be re-driven blind: the request left, Google had every chance to
+     * commit the row, and `values.append` accepts no idempotency token that would make a second attempt safe.
+     * The SSRF refusal above is deliberately NOT affected — nothing left this process, so there is nothing to
+     * be unsure about even for a write.
+     *
      * @param  callable(): Response  $call
      */
-    private function send(Connection $connection, callable $call): Response|ConnectorDeliveryResult
+    private function send(Connection $connection, callable $call, bool $write = false): Response|ConnectorDeliveryResult
     {
         try {
             $this->guard->assertPublic(self::SHEETS_BASE);
@@ -327,7 +432,11 @@ final class GoogleSheetsConnector implements ConnectorProvider
         try {
             return $call();
         } catch (ConnectionException $e) {
-            return ConnectorDeliveryResult::failed(null, $this->excerpt('[transport_error] '.$e->getMessage()));
+            $excerpt = $this->excerpt('[transport_error] '.$e->getMessage());
+
+            return $write
+                ? ConnectorDeliveryResult::unconfirmed(null, $excerpt)
+                : ConnectorDeliveryResult::failed(null, $excerpt);
         }
     }
 

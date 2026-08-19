@@ -120,6 +120,52 @@ No integration beyond this list is committed to a phase — consistent with the 
 
   **A receiver must therefore split on `,` and accept the delivery if ANY value matches** — comparing the whole header against one computed digest works perfectly until the first rotation and then silently rejects every delivery, which is the worst possible failure shape: it appears only in production, only after an unrelated admin action, and looks like an attack. Compare in constant time, and verify against the raw body plus the `X-Webhook-Timestamp` value exactly as signed.
 
+### 5.1 Re-driving a NON-IDEMPOTENT delivery — the tabular connectors (M5, 2026-08-19)
+
+⚠️ **THE LADDER IN §1 IS AN AT-LEAST-ONCE MECHANISM, AND FOR TWO OF THE FIVE CHANNELS THAT IS NOT SAFE
+BY ITSELF.** A webhook receiver is handed `X-Webhook-Event-Id` and is told (§5, `docs/api-specification.md`
+§2.4) to dedupe on it, so a repeated delivery is the receiver's problem to absorb and they have the key to do
+it with. **Google Sheets `values.append` and Airtable's create-record endpoint accept no such key** — verified
+against both APIs at implementation time — so a retry after a *lost answer* appends a **second row for the
+same submission** into the tenant's own analysable dataset, with nothing in it marking which one is the
+artefact. With `max_attempts` = 10 the ceiling is ten; the realistic count is two, because the retry that
+duplicates is usually also the one that succeeds.
+
+**Sending an idempotency token was the obvious fix and it does not exist.** A header neither provider reads
+would have looked like a fix and changed nothing. The only thing that can settle *did the first attempt
+land?* is a read of the destination.
+
+**So the ladder now carries one extra bit and one extra step.**
+
+1. **The bit.** A write whose answer never arrived is recorded as
+   `webhook_deliveries.unconfirmed_write_at` (§15) — and **only** that case. A 429, 403, 422 or 5xx is a
+   *response*: the provider answered rather than silently committing, so those keep re-driving exactly as
+   before. Every path that SETTLES the outcome clears the mark, so a set value only ever describes the
+   immediately preceding attempt -- with one deliberate exception: a delivery **dead-lettered while
+   unconfirmed keeps it**, because it is then the only record anyone has that the row may or may not be in
+   the destination, and a terminal delivery is never retried so nothing can act on it.
+2. **The step.** When the mark is set, the next attempt **asks before it writes**: Airtable by
+   `filterByFormula` on the mapped Submission ID field, Sheets by reading that one column (`D:D`, not the
+   grid). Present ⇒ the delivery succeeds with **no write**. Absent ⇒ the write proceeds. **The probe itself
+   failing keeps the mark and retries the question** rather than gambling on a write, because "the probe
+   failed" says nothing about whether the row is there.
+
+**THREE THINGS THIS DELIBERATELY DOES NOT DO, EACH WITH ITS REASON, SO NOBODY READS IT AS FULLY DISCHARGED:**
+
+- **It does not dead-letter the uncertain delivery.** That never duplicates, and it trades a rare duplicate
+  for a rare **silent loss** — there is no manual redeliver for the connector channel yet, so the row would
+  simply never arrive, and nobody would ever know to look. A duplicate is visible in the tenant's own sheet
+  and they can delete it.
+- **It does not match on anything but `__submission_id`.** Comparing the whole projected row would cover the
+  rules that map no identity column, at the price of a false match whenever two respondents answer a short
+  form identically — and a false match is a row that never arrives. **A rule that maps no Submission ID
+  column therefore still duplicates**, exactly as it did before; the durable fix is the rule editor binding
+  that column by default, filed in `docs/feature-backlog.md`.
+- **It does not cover Slack.** `chat.postMessage` is equally non-idempotent, but a repeated chat message is
+  noise a human dismisses in the channel it arrived in, and asking Slack "did my message land?" means reading
+  channel history — a scope this connector does not request and should not acquire to dedupe its own retries.
+  Filed rather than left invisible.
+
 ---
 
 ## 6. Out of Scope / Deferred

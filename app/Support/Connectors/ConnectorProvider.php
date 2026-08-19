@@ -8,6 +8,7 @@ use App\Enums\ConnectorProviderKey;
 use App\Exceptions\Connectors\ConnectorOAuthException;
 use App\Models\Connection;
 use App\Models\ConnectionSubscription;
+use App\Services\Connectors\ConnectorTester;
 use App\Support\Webhooks\OutboundUrlGuard;
 
 /**
@@ -71,7 +72,15 @@ interface ConnectorProvider
      * the outcome (including a dead credential) is the returned value, mirroring how `DeliverWebhookJob`
      * records rather than throws (a customer-side failure is a business condition, not a job defect).
      *
+     * `$priorWriteUnconfirmed` says the PREVIOUS attempt on this same delivery issued a write and never
+     * learned its outcome (M5) — `webhook_deliveries.unconfirmed_write_at` was set by
+     * {@see ConnectorDeliveryResult::unconfirmed()}. An adapter whose write is naturally idempotent, or whose
+     * destination cannot be searched, may ignore it; one that appends a row to a table the tenant analyses
+     * must not, because re-driving blind is how a submission becomes two records. It defaults to `false` so
+     * the one caller that is never a retry — {@see ConnectorTester}, which sends a fresh sample on demand —
+     * says nothing rather than saying something it would have to keep true.
+     *
      * @param  array<string, mixed>  $envelope  the `DomainEvent` envelope
      */
-    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope): ConnectorDeliveryResult;
+    public function deliver(Connection $connection, ConnectionSubscription $subscription, array $envelope, bool $priorWriteUnconfirmed = false): ConnectorDeliveryResult;
 }

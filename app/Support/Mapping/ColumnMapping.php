@@ -191,6 +191,29 @@ final readonly class ColumnMapping
         )));
     }
 
+    /**
+     * Which column carries one particular field key, or null if the tenant bound it to none (M5).
+     *
+     * The index is the answer rather than the header, because both directions of this class are POSITIONAL:
+     * a caller that has the artifact's own header list — the verbatim one, which this class deliberately does
+     * not keep (see {@see MappedColumn}) — can index straight into it, and one writing A1 notation can turn
+     * the position into a column letter. Handing back the normalized header instead would invite exactly the
+     * casefolded-name write `AirtableConnector::fieldsFor()` exists to prevent.
+     *
+     * `author()` already refuses to bind one field key to two columns, so "the" column is well defined here
+     * rather than a first-match convention.
+     */
+    public function indexOfFieldKey(string $fieldKey): ?int
+    {
+        foreach ($this->columns as $index => $column) {
+            if ($column->fieldKey === $fieldKey) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
     public function columnCount(): int
     {
         return count($this->columns);

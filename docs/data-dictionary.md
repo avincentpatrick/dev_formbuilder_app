@@ -687,6 +687,7 @@ Individual delivery attempts — queue-first ingestion, mandatory idempotency, e
 | `response_status_code` | `integer` | Yes | `NULL` | No | — |
 | `response_body_excerpt` | `text` | Yes | `NULL` | No | Truncated response body for delivery-observability debugging. |
 | `response_time_ms` | `integer` | Yes | `NULL` | No | — |
+| `unconfirmed_write_at` | `timestamptz` | Yes | `NULL` | No | **M5 — connector channel only.** Set when the immediately preceding attempt issued a **non-idempotent provider write** and never learned its outcome (a lost answer, never a refusal that carried a status). It arms one thing and nothing else: the next attempt asks the destination whether this submission is already there before writing again, so a lost answer cannot become a second row in the tenant's own sheet or base. **Cleared wherever the outcome is settled**, so a set value only ever describes the attempt immediately before -- except on a delivery DEAD-LETTERED while unconfirmed, which keeps it deliberately: that row is then the only record that the write may or may not have landed, and it is terminal so nothing can act on it. The webhook channel never sets it — its receiver dedupes on the `X-Webhook-Event-Id` header, which is an idempotency key the two tabular providers do not offer. |
 | `signature` | `varchar(255)` | Yes | `NULL` | No | The HMAC signature actually sent, retained for support/debugging reproducibility. |
 | `created_at` | `timestamptz` | No | `now()` | No | — |
 | `updated_at` | `timestamptz` | No | `now()` | No | — |

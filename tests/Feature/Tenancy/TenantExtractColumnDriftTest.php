@@ -85,7 +85,7 @@ const EXTRACTED_COLUMN_CENSUS = [
     'tenants' => 'brand_ramp created_at data default_locale draft_ttl_days id logo_attachment_id maintenance_message maintenance_mode name owner_user_id primary_color slug status supported_locales updated_at',
     'usage_counters' => 'created_at id last_incremented_at limit_snapshot metric period_end period_start subscription_id tenant_id updated_at value',
     'users' => 'created_at deleted_at email email_verified_at google_id id is_super_admin last_active_tenant_id name password privacy_policy_accepted_at remember_token tos_accepted_at two_factor_confirmed_at two_factor_recovery_codes two_factor_secret updated_at',
-    'webhook_deliveries' => 'attempt_count connection_subscription_id created_at event_id event_type id last_attempted_at max_attempts next_retry_at payload payload_attachment_id response_body_excerpt response_status_code response_time_ms signature status tenant_id updated_at webhook_endpoint_id',
+    'webhook_deliveries' => 'attempt_count connection_subscription_id created_at event_id event_type id last_attempted_at max_attempts next_retry_at payload payload_attachment_id response_body_excerpt response_status_code response_time_ms signature status tenant_id unconfirmed_write_at updated_at webhook_endpoint_id',
     'webhook_endpoints' => 'consecutive_failure_count created_at created_by deleted_at disabled_reason event_types form_id id last_failure_at last_success_at name secret secret_previous secret_previous_expires_at signing_algorithm status tenant_id updated_at url',
 ];
 

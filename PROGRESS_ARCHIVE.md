@@ -3924,7 +3924,7 @@ replaces Airtable's copy with ours. The 429 case pins it. `excerpt()` is not orp
 **NAMESPACES: nothing spent.** `0021` free · `0010` reserved for H1d · `#16` free · migration block stays at
 `2026_08_17_000106`. Both the M3 and M4 claims were released in the session they were taken.
 
-## 2026-08-19 — LANE B / `M5`: a tabular write that may already have landed is never re-driven blind (PR #184, `64e5bbf`)
+## 2026-08-19 — LANE B / `M5`: a tabular write that may already have landed is never re-driven blind (PR #184, `eb73fa5`)
 
 Rule 7(f) row, taken from `docs/feature-backlog.md` as the top unclaimed `major` in Lane B's column and
 claimed in the 7(g) ledger before any file it names. **6/6 with every job's `conclusion` read individually. **CI Pest 4444 / 18,788** — predicted to the digit by running the new cases in isolation (+16 tests, +57 assertions on 4428 / 18,731), which is now four-for-four on that method. **E2E 551 passed / 10 skipped = 561** and **Storybook axe 42 suites / 299**, both unchanged because this increment renders nothing. Four lint gates **97 / 109 / 30 / 119** (only migrations moved), PHPStan **18** across the same four files it always reports, `openapi.json` byte-identical. ⚠️ **THE AXE JOB HUNG TWICE ON `Install Playwright (chromium)` — ONCE FOR 4h17m** — while the E2E job cleared the identical step in the same run; cancel + `gh run rerun --failed` cleared it on the third attempt, and the five green jobs survive a cancel, so only the stuck one re-runs.**

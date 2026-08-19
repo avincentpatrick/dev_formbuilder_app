@@ -339,3 +339,32 @@ it('refuses a rule whose stored mapping cannot be read', function (): void {
 
     Http::assertNothingSent();
 });
+
+it('does not write the respondent answers into the shared delivery ledger', function (): void {
+    // ⚠️ THE STUB ABOVE IS WHY NO TEST EVER SAW THIS. Airtable's real create-record response ECHOES the
+    // `fields` object just written; `fakeAirtable()`'s default returns an id only, so every existing success
+    // case exercised a body that carried nothing to leak. This one uses the provider's real shape.
+    $body = [
+        'records' => [[
+            'id' => 'recNEW0000000001',
+            'createdTime' => '2026-08-19T09:00:00.000Z',
+            'fields' => ['Full name' => 'Ana Reyes', 'Colour' => 'b', 'Submission ID' => 'sub-1'],
+        ]],
+    ];
+
+    // The control, asserted before the delivery runs: the provider's response really does carry the
+    // respondent's answer, so a clean excerpt below is the adapter's doing and not the stub's.
+    expect(json_encode($body))->toContain('Ana Reyes');
+
+    fakeAirtable(writeResponse: fn () => Http::response($body, 200));
+
+    [, , $delivery] = runAirtableDelivery();
+
+    // `docs/data-privacy-gdpr-compliance.md` §7 offers "the delivery ledger is not a second copy" as a
+    // STRUCTURAL property, and `webhook_deliveries` has no retention job — deleting the submission does not
+    // touch this row, so anything landing here outlives an erasure request. The sibling adapter sends 'ok'
+    // for exactly this reason (GoogleSheetsConnector's class docblock, bullet 1).
+    expect($delivery->status)->toBe(WebhookDeliveryStatus::Succeeded)
+        ->and($delivery->response_body_excerpt)->toBe('ok')
+        ->and($delivery->response_body_excerpt)->not->toContain('Ana Reyes');
+});

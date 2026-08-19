@@ -886,6 +886,21 @@ are still in place.
 
 ### Design system
 
+- **`major` · The builder's share-panel live link fails WCAG AA contrast at 4.45, and the e2e gate reports it
+  as FLAKY rather than red.** Observed by **M5's final CI run (2026-08-19, run 32250476088)**: the
+  `builder-axe.spec.ts` case *"Builder — share panel live link"* (light, mobile) failed axe
+  `color-contrast` — *"insufficient color contrast of 4.45 (foreground #ffffff, background #1674e9, font
+  size 10.5pt (14px))"* — then passed on Playwright's retry, so the summary read **550 passed + 1 flaky +
+  10 skipped** instead of 551 + 10, and the run went green.
+  ⚠️ **TWO DEFECTS, AND THE SECOND IS THE WORSE ONE.** (1) 4.45 is below the 4.5 AA floor for normal text,
+  so white-on-`#1674e9` at 14px is a real violation wherever it renders. (2) **A gate that retries turns a
+  deterministic failure into an intermittent one** — the passed count drops by one while the TOTAL is
+  unchanged, which reads exactly like a test having been silently dropped, and a "flaky" line is easy to
+  dismiss as noise. Whoever fixes (1) should also decide whether an axe violation may be retryable at all.
+  **Not M5's**: that increment changed zero `.vue` / `.ts` / `packages/design-system/` files (checked with
+  `git diff --name-only origin/main...HEAD`), so it is pre-existing and sits in **Lane A's column**. Filed
+  here rather than left in a CI log, where no later search would find it.
+
 - **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
   brought back.** `packages/design-system/src/components/Combobox/Combobox.vue:353-358` —
   `max-height: 22rem` + `overflow-y: auto`, with the highlight moved by `aria-activedescendant` only:

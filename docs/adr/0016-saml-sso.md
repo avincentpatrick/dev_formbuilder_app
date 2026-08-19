@@ -255,7 +255,7 @@ in opposite directions:
 
 **THE CONFUSION WAS REAL AND IT REACHED THE CODE.** ADR-0019 §D11 explained its Google divergence by
 quoting that Consequences bullet and attributing it to **§D22** — a section about step-up which says the
-opposite, that step-up *"is never exempted"*. Twelve citations across seven files inherited the
+opposite, that step-up *"is never exempted"*. Eleven further citations across six files inherited the
 attribution, including a docblock in `SsoLoginCompletionController` justifying live behaviour by it. The
 bullet was never wrong; it was answering the *other* control, and nothing in this document answered this
 one. **A decision with no § heading cannot be cited, so it gets cited by proxy and the proxy drifts** —

@@ -59,7 +59,7 @@ use Illuminate\Support\Facades\Log;
  * ⚠️ §D32 EXISTS BECAUSE OF THIS COMMENT. Until M7 these lines cited §D22, which is about STEP-UP, and
  * the sentence they paraphrased is a Consequences bullet about the ORG-LEVEL setting that decides the
  * opposite polarity. The behaviour was never in doubt; the decision behind it had no § heading, so the
- * comment reached for the nearest thing that looked like one and eleven other citations followed it.
+ * comment reached for the nearest thing that looked like one, and ten further citations followed it.
  * Pinned now by `SsoLoginCompletionWebTest`'s "signs an enrolled member straight in".
  */
 final class SsoLoginCompletionController extends Controller

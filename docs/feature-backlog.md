@@ -889,17 +889,56 @@ are still in place.
   broken. **Live.** ⚠️ **Pre-existing since PR #6 and present on `main`**, but the correct twin ships one
   file over (`auth/TwoFactorRequired.vue:42`, `<Link method="post" as="button">`) and this diff rewrites
   the page immediately above it, explicitly to remove a lockout.
-- **`major` · ADR-0019 §D11 attributes a SAML 2FA decision to ADR-0016 §D22, which decides the opposite
-  polarity — and the as-built behaviour is recorded in no ADR at all.**
-  `docs/adr/0019-first-party-google-sign-in.md:247` (also `:28`, `:86`, `:320`, `:334`) quotes a sentence
-  that lives at `0016:168` under a different control; `0016:101` §D22 is about step-up and says it *"is
-  never exempted"*. The as-built bypass is real: `SsoLoginCompletionController.php:134` calls
-  `Auth::login($user)` with no `hasEnabledTwoFactorAuthentication()` fork, where
-  `app/Services/Auth/GoogleSessionStarter.php:57-68` does fork — and
-  `app/Http/Middleware/EnforceTenantTwoFactor.php:20-22` asserts *"Fortify already challenges an enrolled
-  user at login"*, which is **untrue for the SSO door**. **Live** as a documentation defect; the SAML
-  behaviour may well be the intended design, but it is currently recorded nowhere and mis-cited into code
-  at `SsoLoginCompletionController.php:52-54`.
+- ✅ **CLOSED BY `M7` (2026-08-20) — `major` · ~~ADR-0019 §D11 ATTRIBUTES A SAML 2FA DECISION TO ADR-0016
+  §D22, WHICH DECIDES THE OPPOSITE POLARITY — AND THE AS-BUILT BEHAVIOUR IS RECORDED IN NO ADR AT ALL.~~**
+  **ADR-0016 gains §D32**, which states what P1b built and this repository had never decided: a SAML
+  sign-in does not challenge a member's PERSONAL second factor, because the identity provider is the
+  authentication authority at that door. **User decision of record, 2026-08-20**, taken on the evidence
+  rather than as a new position — §D22 already gives an SSO session's *re-authentication* to the IdP via
+  `ForceAuthn` rather than to a local credential, so login is that principle one step earlier in the same
+  flow; `docs/security-threat-model.md:192` already called the SAML side *"a deliberate divergence"*; and
+  the 2026-08-14 Google decision was itself framed as a divergence **from** this.
+  ⚠️ **THE ROW'S OWN EVIDENCE HAD GONE STALE, IN EXACTLY THE WAY THE ROW IS ABOUT.** It cited `0016:168`;
+  M2's §D31 had since pushed that sentence to **`:238`** (`git show 0028ea1~1:docs/adr/0016-saml-sso.md`
+  puts it back). A row about an unstable citation, carried by an unstable citation — which is the argument
+  for the fix that was taken: **the sentence needed its own § heading so it could be cited stably**, which
+  is 7(g)'s *"cite the FILENAME, never the bare number"* one level further down.
+  ⚠️ **AND A CORRECT § NUMBER ALONE WOULD NOT HAVE FIXED §D11, BECAUSE THE QUOTATION WAS WRONG TOO.** The
+  sentence §D11 quoted is a **Consequences** bullet about the **org-level** control (`EnforceTenantTwoFactor`),
+  which ADR-0016 pointedly does *not* exempt for SSO — so it argued the opposite of what it was offered
+  for. §D11 is requoted as well as repointed, and now records that it was the source of the attribution.
+  The bullet itself gains a clause naming which of the two controls it answers.
+  ⚠️ **THE ROW NAMED FIVE MIS-CITING PASSAGES AND THERE WERE TWELVE, ACROSS SIX FILES — ONE THE SOURCE
+  (§D11 ITSELF) AND ELEVEN THAT INHERITED IT.** The six it did not name: `docs/adr/0019:37`,
+  `security-threat-model.md:163` and `:192`, `ACCESS-MATRIX.md:397`, `GoogleSessionStarter.php:23,:25` and
+  `GoogleSignInWebTest.php:839`. ⛔ **AND EIGHT *CORRECT* §D22 CITATIONS SIT IN THE SAME
+  GREP** — `SsoStepUpController`, `SsoStepUpService`, `SsoAuthOutcome`, the step-up migration,
+  `routes/tenant.php:357`, `SsoStepUpWebTest` and ADR-0016's own two — so this was decided by **reading
+  each line, never by sweeping a pattern**, which is PR #153's 133-reference shape in miniature.
+  `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
+  ➕ **THREE THINGS THE ROW DID NOT NAME, ALL DEALT WITH.** (1) `EnforceTenantTwoFactor.php:20-22` stated
+  *"Fortify already challenges an enrolled user at login"* — **false for the SSO door**, and load-bearing
+  for its own "re-challenging per request would be theatre" argument. Rewritten to name which doors
+  challenge and which does not; the middleware's behaviour is untouched, because checking the enrolment
+  flag is right regardless. (2) **The SAML polarity was asserted by no test at all** — `tests/Feature/Sso/`
+  grepped zero for `two_factor_confirmed_at` while the Google side has been pinned since J3c2, so a later
+  "make the doors consistent" change would have flipped a decision of record with the suite green.
+  `SsoLoginCompletionWebTest`'s *"signs an enrolled member straight in"* now pins it, **and the pin was
+  proved by inverting the code**: adding the `GoogleSessionStarter`-shaped fork turned the case red on
+  `/two-factor-challenge`, after which the controller was restored byte-identical to HEAD. (3) The
+  shape-grep for `Auth::login(` found two more session-minting doors — `ImpersonationSessionController:63`
+  (correctly exempt) and `InvitationController:59` (an already-verified invitee must *already* be
+  authenticated, `abort_unless(Auth::id() === $user->id, 403)`; a placeholder has no confirmed factor).
+  **Neither is a defect, recorded because they were checked.**
+  ⚠️ **WHAT IS RATIFIED RATHER THAN CLOSED, STATED SO NOBODY READS THIS AS "2FA IS FULLY ENFORCED":** in a
+  workspace with `security.require_two_factor` **on**, an enrolled member arriving through SAML clears the
+  gate on the **enrolment flag alone** and never presents the factor. Not new and not a defect — the
+  middleware is an enrolment nudge, the same reasoning that downgraded the `/api/v1` token-mint row below
+  from `blocker` to `minor`. §D32 records it as the residual with its revisit trigger (a per-workspace
+  *"our IdP already performs MFA"* setting), so a later reader gets it from the decision.
+  **Gates:** SSO suite **193 → 194 (1,110 → 1,123 assertions)**, the new case **+1 / +13 in isolation**;
+  PHPStan delta **zero**; four lint gates unchanged at **97 / 109 / 31 / 119** (no controller, migration or
+  job added); `openapi.json` byte-identical; **zero `.vue`, zero `tests/e2e/` selector movement.**
 - **`minor` · `EnforceTenantTwoFactor` is absent from the `/api/v1` token-mint group.**
   `routes/api.php:73-89` — an unenrolled member under `security.require_two_factor`, bounced from every
   page, can still `POST /api/v1/auth/tokens` from the same session and use the bearer against Group B,
@@ -1099,10 +1138,24 @@ are still in place.
   (`app/Enums/SettingKey.php:42`, tenant-scoped at `:85`, written by `UpdateAccessSettingsRequest.php:60`,
   enforced by `EnforceTenantTwoFactor.php:91`). Anyone inventorying tenant configuration from the
   dictionary omits a tenant-scoped security policy. **Live.**
-- **`minor` · ADR-0019 is the sole `Proposed` ADR in the directory, for a decision that is ratified and
-  fully built.** `docs/adr/0019-first-party-google-sign-in.md:23` against its own `:271`/`:282` and the
-  merged routes at `routes/google-auth.php:64,68`. 0014–0018 and 0020 are all `Accepted`, and both
-  `0018:49` and `0016:133` already treat 0019 as settled precedent. **Live**, one word.
+- ✅ **CLOSED BY `M7` (2026-08-20) — `minor` · ~~ADR-0019 is the sole `Proposed` ADR in the directory, for
+  a decision that is ratified and fully built.~~** Now **Accepted**, with the correction stated in the
+  Status block rather than silently applied: every decision in it shipped in J3c2,
+  `routes/google-auth.php:64,68` have been merged since, and `0018:49` and `0016:133` were already citing
+  it as settled precedent. Folded into the row above because it is one word in a file that diff already
+  rewrote at `:23` and `:28`, and because it is the same defect one level up — **ADR-0019 did not
+  accurately record what had been decided.**
+- **`minor` · Nothing checks that a `§D<n>` citation names a section whose text supports it.** The defect
+  the row above closed was invisible to every gate: `docs/adr/0019:247` cited `ADR-0016 §D22` for six
+  increments, eleven further citations inherited it — one of them a docblock justifying live
+  authentication behaviour — and the only thing that surfaced it was a human reading both documents.
+  A gate could catch the cheap half mechanically: **a cited `§D<n>` that does not exist in the target
+  ADR at all** — the by-line cluster row below already records `docs/adr/0016:133,:135,:147` citing
+  ADR-0019 §D7 where §D6b is meant, the same class found the same way. The expensive half — a section
+  that exists but says something else — is not mechanically checkable and stays a review concern.
+  ⛔ **DELIBERATELY NOT BUILT IN M7 AND FILED HERE THE MOMENT THAT WAS DECIDED**: it lands in `scripts/`,
+  adds a fifth lint gate and moves a gate baseline, which is a tooling row rather than the documentation
+  row that found it. **Not live** — this is a missing gate, not a defect.
 - **`minor` · A cluster of by-line citations went stale, several of them inside this branch.** Cheap
   individually, listed together so one pass closes them: `docs/adr/0007:88,:106,:112` (six citations into
   `TenantIsolation.php`, `Tenant.php`, `migration-lint.php`, `config/queue.php` — every one lands on

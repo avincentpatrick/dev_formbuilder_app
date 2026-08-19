@@ -262,7 +262,7 @@ seriously while refusing to widen either the session cookie's scope or the meani
   *"a workspace whose IdP already performs MFA turns the setting off"* — a **Consequences** bullet about
   the ORG-LEVEL control, which ADR-0016 pointedly does *not* exempt for SSO, so the quotation argued the
   opposite of what it was offered for. The personal-factor decision this one diverges from had no §
-  heading at all until §D32 gave it one, and eleven citations across six other files had inherited the
+  heading at all until §D32 gave it one, and eleven further citations across six files had inherited the
   attribution — including a docblock justifying live behaviour by it.
 
 - **D12 — The central host runs the same flow with no handoff and no row.** Callback and session share a

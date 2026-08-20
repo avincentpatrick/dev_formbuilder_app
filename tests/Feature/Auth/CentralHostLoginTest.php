@@ -63,9 +63,9 @@ afterEach(function (): void {
  * `pgsql_auth` connection (its docblock argues why — the password-reset save needs that connection's
  * permissive UPDATE policy). Only `retrieveById()` resets it to the default, and in production that runs on
  * EVERY subsequent request. The test harness keeps one container alive, so the guard hands the next request
- * the same `pgsql_auth`-bound instance — and `meridian_auth` is granted `users` and nothing else, so the
- * first Spatie permission check on that model dies with `SQLSTATE[42501] permission denied for table
- * permissions`.
+ * the same `pgsql_auth`-bound instance — and `meridian_auth` is granted `users` plus (since M8) a SELECT on
+ * `tenant_users`, and nothing else, so the first Spatie permission check on that model still dies with
+ * `SQLSTATE[42501] permission denied for table permissions`.
  *
  * ⚠️ AND IT IS INVISIBLE IN A SINGLE-FILE RUN. With an empty catalog Spatie throws `PermissionDoesNotExist`
  * and `can()` swallows it before the relation is ever loaded; the query only happens once some EARLIER file

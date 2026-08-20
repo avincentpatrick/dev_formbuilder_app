@@ -178,8 +178,9 @@ it('completes the sign-in with a valid authentication code', function (): void {
 
     // ⚠️ NO ELEVATED CONNECTION MAY LEAK INTO REQUEST CODE. The fix resolves the pending user on
     // `pgsql_auth`, and RlsAwareUserProvider::retrieveById() resets the model to the default connection
-    // before returning it. That reset is what this asserts: `meridian_auth` holds grants on `users` alone,
-    // so an elevated model reaching Auth::user() would fail on the first relation the request touched.
+    // before returning it. That reset is what this asserts: `meridian_auth` holds grants on `users` and (since
+    // M8) a SELECT on `tenant_users`, and nothing else — so an elevated model reaching Auth::user() would still
+    // fail on the first relation the request touched.
     expect(auth()->user()?->getConnectionName())->toBe(config('database.default'));
 });
 
@@ -206,9 +207,10 @@ it('completes the sign-in with a recovery code AND rotates the code that was spe
     // HERE RATHER THAN ON THE TOTP CASE. That method is the one piece of this increment that deliberately
     // elevates the model to `pgsql_auth`, and it is never called on the TOTP path — so asserting the
     // connection there (as the first draft did) leaves the restore itself untested: deleting the whole
-    // `finally` block keeps every other assertion in this file green. `meridian_auth` holds grants on
-    // `users` alone, so a model left elevated at Auth::user() would fail on the first relation the next
-    // request code touched — and nothing else in the repository would notice.
+    // `finally` block keeps every other assertion in this file green. `meridian_auth` holds grants on `users`
+    // and (since M8) a SELECT on `tenant_users`, and nothing else — so a model left elevated at Auth::user()
+    // would still fail on the first relation the next request code touched, and nothing else in the
+    // repository would notice.
     expect(auth()->user()?->getConnectionName())->toBe(config('database.default'));
 
     $after = storedRecoveryCodes($user);

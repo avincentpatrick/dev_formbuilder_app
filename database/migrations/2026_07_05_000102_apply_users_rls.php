@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Schema;
  *   - usersVisibility(): SELECT = self OR active co-tenant membership.
  *   - usersWritePolicies(): permissive INSERT (registration), own-row UPDATE/DELETE, plus the
  *     `TO meridian_auth` permissive carve-out so the pre-auth login/reset path can resolve + write.
- *   - GRANT the least-privilege `meridian_auth` role SELECT/UPDATE on `users` only.
+ *   - GRANT the least-privilege `meridian_auth` role SELECT/UPDATE on `users`. (M8 later adds a second,
+ *     read-only grant on `tenant_users` in 2026_08_17_000107, so "only" is no longer this file's to claim.)
  *   - Add the deferred `users.last_active_tenant_id` FK now that `tenants` exists.
  *
  * `users` has no `tenant_id` column and this migration creates no table, so the migration linter

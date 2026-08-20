@@ -86,7 +86,8 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * Switch-call-restore rather than a GUC change, mirroring
      * {@see \App\Auth\RlsAwareUserProvider::updateRememberToken()}: the object this is called on becomes
-     * `Auth::user()` moments later, and `meridian_auth` holds grants on `users` alone, so leaving it
+     * `Auth::user()` moments later, and `meridian_auth` holds grants on `users` plus (since M8) a
+     * read-only `SELECT` on `tenant_users` and nothing else, so leaving it
      * elevated would fail on the first relation the request touched. `finally`, so a throw cannot strand it.
      * The restore is asserted by `TwoFactorChallengeTest`'s recovery-code case, which is the only path that
      * reaches this method at all.

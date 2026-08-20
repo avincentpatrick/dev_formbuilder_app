@@ -174,6 +174,36 @@ it('makes users write policies permissive, with a pre-auth SELECT carve-out for 
     ))->toBeEmpty();
 });
 
+it('emits the pre-auth read carve-out as ONE role-scoped SELECT policy and no ENABLE, FORCE or write', function (): void {
+    // Increment M8. `tenant_users` already carries the strict shape; this is layered ON TOP of it, so
+    // re-emitting ENABLE/FORCE here would be wrong and emitting any write policy would hand the pre-auth
+    // role the ability to author a membership. Both absences are asserted, because under FORCE RLS an
+    // absent policy IS the refusal and nothing else in the suite would notice one appearing.
+    $statements = TenantIsolation::authRoleReadSql('tenant_users', 'meridian_auth');
+    $sql = joined($statements);
+
+    expect($statements)->toHaveCount(1);
+    expect($sql)->toContain(
+        'CREATE POLICY tenant_users_auth_select ON tenant_users FOR SELECT TO meridian_auth USING (true)'
+    );
+
+    // ⚠️ The `TO` clause is the whole difference between an authorization lookup and a cross-tenant
+    // directory: without it the permissive policy OR-combines into the strict shape for EVERY role.
+    expect($sql)->toContain('TO meridian_auth');
+
+    foreach (['ENABLE ROW LEVEL SECURITY', 'FORCE ROW LEVEL SECURITY', 'FOR INSERT', 'FOR UPDATE', 'FOR DELETE'] as $forbidden) {
+        expect($sql)->not->toContain($forbidden);
+    }
+});
+
+it('rejects an unsafe table or auth role name in the pre-auth read carve-out', function (): void {
+    expect(fn () => TenantIsolation::authRoleReadSql('tenant_users; DROP TABLE tenants;--', 'meridian_auth'))
+        ->toThrow(InvalidArgumentException::class);
+
+    expect(fn () => TenantIsolation::authRoleReadSql('tenant_users', 'evil; DROP ROLE x'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('rejects an unsafe auth role name in users write policies', function (): void {
     expect(fn () => TenantIsolation::usersWritePoliciesSql('users', 'evil; DROP ROLE x'))
         ->toThrow(InvalidArgumentException::class);

@@ -16,7 +16,10 @@ use Illuminate\Contracts\Auth\Authenticatable;
  * membership is set — which is exactly the state during login, registration email-uniqueness, and
  * password reset. As the app role (`meridian_app`) those lookups would return zero rows. So every
  * provider query runs on `pgsql_auth` (via createModel below), which has a permissive `TO meridian_auth`
- * policy scoped to the `users` table only (never tenant data).
+ * policy scoped to the `users` table. ⚠️ It is no longer *only* `users`: M8's `2026_08_17_000107`
+ * adds a read-only, role-scoped `SELECT ON tenant_users` for the invitation identity check. This
+ * provider itself touches nothing but `users`; the bound applying to the connection as a whole is
+ * multi-tenancy-rbac-design.md §9's rule that no user-supplied predicate may run on it.
  *
  * Connection handoff — the important subtlety:
  *   - retrieveById / retrieveByToken rehydrate the AUTHENTICATED user on each request; their result is

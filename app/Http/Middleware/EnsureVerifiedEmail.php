@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Notifications\Auth\QueuedVerifyEmail;
+use App\Services\Tenancy\TenantMembershipService;
 use App\Support\Audit\ImpersonationContext;
 use Closure;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -68,8 +69,12 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * ── WHERE IT IS NOT MOUNTED, AND WHY EACH IS A DECISION ───────────────────────────────────────────────
  *  · `GET /two-factor/required` — its own group, outside this one, for the reason above.
  *  · the invitation-accept group and the impersonation-arrival group — neither carries `auth`, so there is
- *    no user to check; and `InvitationController::prepareAcceptingUser()` stamps `email_verified_at` itself,
- *    because clicking a link in an invitation email already proves control of that mailbox.
+ *    no user to check; and `InvitationController::registerInvitedPlaceholder()` stamps `email_verified_at`
+ *    itself, because clicking a link in an invitation email already proves control of that mailbox.
+ *    ⚠️ M8 narrowed WHO reaches that stamp: only an identity
+ *    {@see TenantMembershipService::identityIsEstablished()} answers FALSE for. An
+ *    account that already exists is now handed to the sign-in-then-accept hand-off instead, so the invite
+ *    link no longer verifies a mailbox on behalf of somebody who never asked it to.
  *  · the guest/public form runtime — a respondent has no account. The null-user early return is belt to
  *    that braces.
  *  · **the central super-admin console — deliberately.** It is already behind `superadmin` (a privileged

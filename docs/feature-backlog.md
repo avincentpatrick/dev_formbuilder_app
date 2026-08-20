@@ -896,7 +896,7 @@ are still in place.
   authentication authority at that door. **User decision of record, 2026-08-20**, taken on the evidence
   rather than as a new position — §D22 already gives an SSO session's *re-authentication* to the IdP via
   `ForceAuthn` rather than to a local credential, so login is that principle one step earlier in the same
-  flow; `docs/security-threat-model.md:192` already called the SAML side *"a deliberate divergence"*; and
+  flow; `docs/security-threat-model.md:193` already called the SAML side *"a deliberate divergence"*; and
   the 2026-08-14 Google decision was itself framed as a divergence **from** this.
   ⚠️ **THE ROW'S OWN EVIDENCE HAD GONE STALE, IN EXACTLY THE WAY THE ROW IS ABOUT.** It cited `0016:168`;
   M2's §D31 had since pushed that sentence down by seventy lines (`git show 0028ea1~1:docs/adr/0016-saml-sso.md`
@@ -957,8 +957,51 @@ are still in place.
   **Gates:** SSO suite **193 → 194 (1,110 → 1,123 assertions)**, the new case **+1 / +13 in isolation**;
   PHPStan delta **zero**; four lint gates unchanged at **97 / 109 / 31 / 119** (no controller, migration or
   job added); `openapi.json` byte-identical; **zero `.vue`, zero `tests/e2e/` selector movement.**
-- **`major` · Accepting an invitation as an ENROLLED-BUT-UNVERIFIED account mints a session with neither
-  the password nor the second factor, and silently overwrites the password.** `InvitationController.php`'s
+- ✅ **CLOSED BY `M8` (2026-08-20) — `major` · ~~ACCEPTING AN INVITATION AS AN ENROLLED-BUT-UNVERIFIED
+  ACCOUNT MINTS A SESSION WITH NEITHER THE PASSWORD NOR THE SECOND FACTOR, AND SILENTLY OVERWRITES THE
+  PASSWORD.~~**
+  **The fix is `TenantMembershipService::identityIsEstablished()`, asked at BOTH doors** — the rendered page
+  and the accept handler, which had agreed with each other consistently and wrongly. An identity is
+  established by any POSITIVE record: a verified address, a confirmed second factor, a linked `google_id`,
+  or a `tenant_users` row it actually joined. Anyone established is sent to sign in and returns to the
+  invitation; only a never-used placeholder still reaches the password-setting arm.
+  ⚠️ **THE PREDICATE THE ROW PROPOSED WAS PARTLY UNAVAILABLE, WHICH IS WHY THE FIX IS NOT WHAT IT SAYS
+  BELOW.** *"A set password"* cannot be asked: `resolveOrCreateUser()` writes `Hash::make(Str::random(48))`
+  into a NOT NULL column, so a placeholder's hash is indistinguishable from a real one — **the identical
+  indistinguishability ADR-0016 §D22 already records, which means this repository has now paid for that
+  fact twice.** `tos_accepted_at` is the tempting substitute and is worse: its only writer is
+  `InvitationController` itself, so a self-registered member has it NULL and SSO JIT leaves it NULL, and
+  using it would refuse exactly the people it appears to admit.
+  ⚠️ **AND *"any prior membership"* NEEDED A MIGRATION THE CLAIM SAID IT WOULD NOT NEED.** `tenant_users`
+  is the strict shape plus `unique(tenant_id, user_id)`, so inside the invited tenant that query is empty
+  **by construction** — the invite row is the only row — and `meridian_auth` held `SELECT, UPDATE` on
+  `users` and nothing else. `2026_08_17_000107` grants it `SELECT ON tenant_users` behind a role-scoped
+  policy (ADR-0002 §D3's M8 amendment records why that cost was worth paying, and reconciles it with
+  ADR-0019 §D1, which declined the same cost for a different benefit). **That clause is load-bearing, not
+  decorative:** SSO and Google provisioning both stamp `email_verified_at`, so the column signals already
+  cover those doors — what they miss is the ordinary case of a **verified member with no second factor who
+  changes their email address**, and only the membership clause catches them.
+  ⚠️ **THE CLAUSE CARRIES `joined_at IS NOT NULL`, AND THAT IS CORRECTNESS RATHER THAN CAUTION.** One
+  placeholder exists per email address, so somebody genuinely new who is invited to two workspaces holds
+  two `Invited` rows; a bare *"another row exists"* test would mark them established and lock them out of
+  **both** password-setting arms — a dead end manufactured by the fix. `InvitationIdentityTest` pins that
+  case, and pins it with a COMMITTED fixture, because `identityIsEstablished()` reads on `pgsql_auth` and an
+  in-transaction row is invisible there — the permissive version of this test would otherwise have passed
+  while proving nothing at all.
+  **Proved by the committed inverse:** `git stash push -- app/Http/Controllers/Tenant/InvitationController.php`
+  turns the five refusal cases red (the takeover POST answers `302 → /dashboard`) while both permissive
+  cases stay green. ⚠️ **Scoping that stash to the CONTROLLER is the point:** stashing all of `app/`
+  decapitated the migration's call to `TenantIsolation::authRoleRead()` and turned all seven cases into
+  setup `Error`s with **zero assertions** — seven reds that proved nothing. A whole-directory stash can
+  reproduce a *build* failure and read exactly like a reproduced *defect*.
+  **Also shipped:** a `docs/security-threat-model.md` §8 row (it had none for invitation takeover) with two
+  new residuals, the RBAC §7 lifecycle sentence that was the doc-level statement of the same bug, and nine
+  prose sites corrected because the new GRANT falsified them — including RBAC §9 and `MemberSearchArm`,
+  where *"granted `users` and nothing else"* was load-bearing in a mutation argument (see the new row
+  below). **The seeded fixtures and `tests/e2e/` did NOT move** — the claim expected them to, and that
+  expectation died with the predicate that produced it.
+  ── the original row, kept verbatim below ──
+  `InvitationController.php`'s
   `prepareAcceptingUser()` forks on **`email_verified_at !== null`**, and only that arm carries the file's
   sole identity check (`abort_unless(Auth::id() === $user->id, 403)`). The other arm validates a name and
   password from an **unauthenticated** request, force-fills them onto the existing `users` row together
@@ -997,6 +1040,85 @@ are still in place.
   hand-off the `prepareAcceptingUser()` docblock already calls "Increment C". **Needs a test that a
   password is not overwritten and a second factor is not skipped**, and `docs/security-threat-model.md`
   gains a row: it has none for invitation takeover today.
+- **`major` · SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
+  admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
+  adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
+  just closed on the invitation door, still live on the SSO one, and **stronger there** because it needs no
+  access to anybody's mailbox. `SsoUserProvisioner`'s adoption guard is
+  `if ($user !== null && $membership === null) { throw ...existingAccountNotMember(...) }` — so **any**
+  membership row disarms it, including an `Invited` one the attacker just created. Its own comment states
+  the premise: *"a membership row of ANY status means this workspace has already made a decision about that
+  person"*. **That premise is exactly what M8 disproved.** An `Invited` row is a statement a workspace made
+  about an ADDRESS; it says nothing about who is behind it — RBAC §7's *"an unaccepted invite grants
+  nothing"* is the same point from the other side.
+  **The chain, each link read rather than reasoned.** (1) `MemberController::invite()` validates
+  `['required', 'email', 'max:255']` and a role — **no domain-ownership check anywhere**, so an admin may
+  invite `victim@othercompany.com`. (2) `TenantMembershipService::resolveOrCreateUser()` resolves that
+  address on `pgsql_auth`, which sees every account in the deployment, so the invite row binds to the
+  victim's **existing global identity** rather than a placeholder. (3) The attacker signs in through the
+  IdP **their own workspace configured**, asserting the victim's address. (4) The guard above does not
+  fire, because step 1 created the membership row. (5) The JIT toggle is skipped too — *"an invited person
+  was authorized by an admin by name"* explicitly exempts `Invited`. (6) `joinViaSso()` activates the
+  membership and the completion controller calls `Auth::login($user)`. (7) **ADR-0016 §D32 is decision of
+  record that a SAML sign-in does not challenge a member's PERSONAL second factor**, so an enrolled victim
+  is not protected either. The attacker holds a session as the victim's global identity. **Live.**
+  ⛔ **PRE-EXISTING (P1b, narrowed by M1) AND DELIBERATELY NOT TAKEN BY M8** — `app/Services/Sso/` is Lane
+  B's column but was not in M8's claim, and the remedy is a decision rather than a patch, which is why it is
+  filed rather than folded in. **The obvious shape** is to apply M8's own predicate here: when
+  `resolveUserByEmail()` returns an EXISTING user whose membership is `Invited`/`Declined`/`Removed` and
+  `TenantMembershipService::identityIsEstablished()` is true, refuse — an established identity must complete
+  an invitation in its own browser. ⚠️ **Verify the alternative before building it:** narrowing the
+  exemption to *"a placeholder this workspace actually created"* needs a fact the schema does not record.
+  Needs a `docs/security-threat-model.md` §8 row either way — it has none for this today — and, if the
+  behaviour is judged intentional, an ADR-0016 sub-decision saying so.
+- **`minor` · `decline()` asks no identity question at all, so a token holder can destroy an established
+  member's pending invitation.** The one invitation door M8 deliberately did not touch.
+  `InvitationController::decline()` resolves the invite by token hash and calls
+  `TenantMembershipService::decline()` — no `Auth` check, no predicate. Whoever reads the mailbox (or a
+  forwarded link) can set the membership to `Declined`, and the invited person then sees nothing at all.
+  **Denial rather than takeover**, and re-sending fixes it, which is why M8 left it: the row M8 closed was
+  about a credential being overwritten and a session being minted, and neither happens here. Filed because
+  it is the same door and a later reader will ask. **Fix if taken:** ask the same predicate, and require an
+  established identity to be signed in to decline — the accept arm's hand-off already exists to route them.
+- **`nit` · `invitations/Show.vue` offers an Accept button to an authenticated visitor who is not the
+  invitee, and the POST always 403s.** `show()` publishes `needsRegistration`, which after M8 answers *"has
+  this identity ever been used"* — it does not answer *"are YOU the invitee"*, which is what `accept()`
+  additionally enforces. So a signed-in wrong user gets a button that cannot work. Harmless and pre-dating
+  M8 (the old code 403'd the same visitor), but the page could publish a second prop and say *"sign in as
+  ‹address› to accept"*. `resources/js/Pages/invitations/Show.vue` is **Lane A's column**, which is the
+  other reason it is filed rather than fixed. ⚠️ **And the prop name is now misleading in its own right:**
+  `needsRegistration` reads as *"this email is unverified"* and now means *"this identity has never been
+  used"*. Renaming it touches the Vue file, so it belongs with this row.
+- **`minor` · A self-registered account that was never verified is indistinguishable from an invite
+  placeholder, so a token holder can still overwrite its password.** The residual M8 deliberately left,
+  filed here the moment it was decided rather than left in a plan where no backlog search would reach it.
+  `CreateNewUser` does not stamp `email_verified_at`, central-host registration creates no membership, and
+  `google_id` / `two_factor_confirmed_at` are NULL — so every arm of `identityIsEstablished()` reads false
+  and such a person is still handed the password-setting arm. **Strictly narrower than what M8 closed**,
+  which also covered every verified-then-email-changed member and every 2FA-enrolled one. **The fix is one
+  column**, `users.password_set_at`, stamped wherever a person actually sets their own password
+  (`CreateNewUser`, `ResetUserPassword`, `UpdateUserPassword`, `InvitationController`) and NULL for a
+  placeholder — which would also retire ADR-0016 §D22's recorded indistinguishability for the whole
+  repository. **Priced and not taken in M8**: it edits `app/Actions/Fortify/` (in neither lane's column),
+  needs a backfill, and moves `E2eSeeder`'s invitation fixture, which is what `auth-axe.spec.ts` scans on a
+  suite that cannot run on this host. Recorded as residual 30 in `docs/security-threat-model.md`.
+- **`minor` · M8's GRANT removed an accidental backstop that a mutation argument was leaning on.**
+  `meridian_auth` used to hold `SELECT, UPDATE` on `users` **and nothing else**, and both
+  `MemberSearchArm`'s docblock and RBAC §9 cited that as the reason swapping the arm to `pgsql_auth`
+  *"fails LOUDLY (11 cases red) instead of silently returning every tenant's members"*. Since
+  `2026_08_17_000107` that swap would **succeed quietly**. Both prose sites are corrected rather than
+  deleted, and nothing is broken today — `SearchMemberConnectionTest`'s three STRUCTURAL pins never relied
+  on the database refusing anything. Filed so that **any future proposal to weaken one of those pins is
+  read against this**, not against the older belief that a wrong connection cannot execute the query.
+  Recorded as residual 31 in `docs/security-threat-model.md`.
+- **`minor` · `users.last_active_tenant_id` has no writer anywhere in `app/`.** Found while surveying
+  candidate signals for M8's identity predicate: the column reads exactly like *"this identity has been
+  used"* and would have been a fifth arm, but its only three references in the whole application are
+  description strings in `TenantExtractColumns`. Nothing sets it, so nothing can read it meaningfully. The
+  migration calls it *"UX convenience only (default tenant on next login); NOT authoritative for any
+  authorization decision"* — which is a description of a feature that was never wired. **Either wire it
+  (one write at session start, and the default-workspace convenience it promises becomes real) or drop the
+  column**; leaving it is how a future increment reaches for it as a signal and gets NULL for everybody.
 - **`minor` · `EnforceTenantTwoFactor` is absent from the `/api/v1` token-mint group.**
   `routes/api.php:73-89` — an unenrolled member under `security.require_two_factor`, bounced from every
   page, can still `POST /api/v1/auth/tokens` from the same session and use the bearer against Group B,
@@ -1142,7 +1264,7 @@ are still in place.
   `impersonation_ended` against that same alias. A SIEM forwarder or retention rule built from the section
   that exists to be exhaustive drops the highest-privilege events in the ledger. **Live.**
 - **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
-  in no document".** `docs/security-threat-model.md:100` (repeated `:216`; duplicated into
+  in no document".** `docs/security-threat-model.md:100` (repeated `:217`; duplicated into
   `docs/adr/0009:31,:83,:168,:290`). It is present on this branch at `.env.example:207-209` with an
   ADR-0009 §D9 warning attached, and discussed in two more documents — so the register is wrong at the
   moment it is ratified, and an operator planning an `APP_KEY` rotation is told not to look for the seam
@@ -1161,7 +1283,7 @@ are still in place.
   `pdo_pgsql`, no rolldown win32 binding). **Live**, on the platform the README explicitly documents.
 - **`major` · ADR-0017 says the threat model carries no SSO and no isolation-topology rows; it carries
   both.** `docs/adr/0017-tenant-isolation-tiering.md:73`, refuted by
-  `docs/security-threat-model.md:170-178` (the SAML table) and `:49-52` (four isolation/extraction rows
+  `docs/security-threat-model.md:171-179` (the SAML table) and `:49-52` (four isolation/extraction rows
   that cite this very ADR). A reviewer using the ADRs as the map of what has been threat-modelled blocks
   the merge on, or duplicates, work that already shipped. **Live** — the file was edited after P2b, so this
   bullet was left behind rather than never revisited.

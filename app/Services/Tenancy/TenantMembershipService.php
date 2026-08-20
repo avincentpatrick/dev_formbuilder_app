@@ -11,6 +11,7 @@ use App\Events\MemberInvited;
 use App\Events\MemberJoined;
 use App\Exceptions\Entitlements\QuotaExceededException;
 use App\Exceptions\Tenancy\MembershipException;
+use App\Models\Concerns\BelongsToTenant;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantUser;
@@ -100,7 +101,16 @@ final class TenantMembershipService
                 'invited_at' => now(),
                 'invite_expires_at' => now()->addDays(self::INVITE_TTL_DAYS),
                 'invite_token' => hash('sha256', $plainToken), // opaque + hashed at rest (§7)
-                'joined_at' => null,
+                // ⛔ `joined_at` IS DELIBERATELY NOT RESET, AND M8's ADVERSARIAL PASS IS WHY.
+                // This method REUSES a prior Declined/Removed row, and it used to force-fill
+                // `'joined_at' => null` here. That is not neutral bookkeeping: `joined_at` is the only
+                // durable record that this identity has ever actually been a member of anywhere, and
+                // {@see self::identityIsEstablished()} reads it to decide whether a token holder may set a
+                // password on an existing account. Nulling it handed a re-invited former member of their
+                // ONLY workspace straight back to the password-overwrite arm — the exact defect M8 exists
+                // to close, reached by a different route. `status` already says the membership is not
+                // current, and {@see self::accept()} overwrites `joined_at` with the new join date, so
+                // nothing downstream needed the null. **Do not reinstate it.**
                 'removed_at' => null,
                 'removed_by' => null,
             ])->save(); // BelongsToTenant fills tenant_id on create
@@ -760,6 +770,122 @@ final class TenantMembershipService
             'email' => $email,
             'password' => Hash::make(Str::random(48)), // unusable until they set one on accept
         ]);
+    }
+
+    /**
+     * Has this identity ever been used for anything other than the pending invitation in hand?
+     *
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * ⚠️ THIS IS AN AUTHORIZATION PREDICATE ON AN UNAUTHENTICATED PATH. READ THE WHOLE DOCBLOCK.
+     * ══════════════════════════════════════════════════════════════════════════════════════════════════
+     * `App\Http\Controllers\Tenant\InvitationController` serves `/invitations/{token}` with no `auth`
+     * middleware, and one arm of it sets a name + password on an existing `users` row and then mints a
+     * session. That arm is safe for a placeholder this workspace created when it invited a stranger, and it
+     * is an ACCOUNT TAKEOVER for anyone else: whoever holds the emailed token — a shared alias, a forwarded
+     * message, mailbox read access — would get a full session as that person, across every workspace they
+     * belong to, with a password of the holder's choosing written over their own. Increment M8 fixed that,
+     * and this method is the entire fix. **A false here opens the password-setting arm.**
+     *
+     * ── WHY IT IS NOT KEYED ON `email_verified_at`, WHICH IS THE BUG IT REPLACES ────────────────────────
+     * The controller used to fork on `email_verified_at !== null`, reading it as *"this identity does not
+     * exist yet"*. It does not mean that. `UpdateUserProfileInformation::updateVerifiedUser()` force-fills
+     * `email_verified_at => null` on ANY email change and touches nothing 2FA-related, so a fully enrolled
+     * member who fixes a typo in their own address is durably enrolled-and-unverified. Fortify's enrolment
+     * routes carry `auth` + `password.confirm` and **not** `verified`, so a never-verified account can also
+     * confirm a TOTP. Neither state is exotic; both were reachable, and both were being handed the
+     * placeholder arm. ⚠️ `\App\Services\Auth\GoogleSignInProvisioner` reads the SAME column and means
+     * something different and correct by it — ADR-0019 §D4's *"link only onto an already-verified account"*,
+     * i.e. *"do not trust this identity"*. That is why the fix is a new predicate here rather than a
+     * tree-wide sweep of a column that legitimately means different things in different places.
+     *
+     * ── EVERY SIGNAL IS A POSITIVE RECORD OF SOMETHING THAT HAPPENED ───────────────────────────────────
+     * That is the property being selected for, and it is what rules the obvious candidates out:
+     *   · `email_verified_at`        — they proved the mailbox, or an IdP asserted it. `SsoUserProvisioner`
+     *                                  and `GoogleSignInProvisioner` both stamp it, so every SSO and every
+     *                                  Google identity is covered by this line alone.
+     *   · `two_factor_confirmed_at`  — nothing in `app/` ever clears it (every occurrence is a read or the
+     *                                  model cast), so it survives the email change that clears the column
+     *                                  above. This is the row's headline case. ⚠️ Scoped to `app/` on purpose:
+     *                                  Fortify's own `DisableTwoFactorAuthentication` DOES null it, and
+     *                                  `config/fortify.php` enables that route — so the signal is revocable
+     *                                  by the person's own action, not monotonic. Harmless here because
+     *                                  these are OR'd, but do not build a monotonicity argument on it.
+     *   · `google_id`                — ADR-0019 §D1's identity anchor; set only by a verified Google sub.
+     *   · a joined membership        — see below. The only signal that needs a cross-tenant read.
+     *
+     * ⛔ `password` IS NOT AND CANNOT BE A SIGNAL, and this repository has now paid for that fact twice.
+     * {@see self::resolveOrCreateUser()} writes `Hash::make(Str::random(48))` into a NOT NULL column, so a
+     * placeholder's hash is indistinguishable from a real one — the identical indistinguishability
+     * ADR-0016 §D22 already records for its own fork. *"Has a usable password"* is the question everyone
+     * reaches for first and it is unanswerable from this schema.
+     *
+     * ⚠️ **AND HERE IS WHAT THIS PREDICATE STILL DOES NOT CATCH, SO NOBODY HAS TO REDISCOVER IT.** An account
+     * created by central-host registration and then never used reads FALSE on every arm: `CreateNewUser`
+     * does not stamp `email_verified_at`, that door creates no membership, and the other two columns are
+     * NULL. Such a person is still handed the password-setting arm. It is strictly narrower than what this
+     * method closed, it is filed as a `minor` in `docs/feature-backlog.md` and as residual 30 in
+     * `docs/security-threat-model.md`, and the fix is the one column this schema lacks — a positive
+     * `users.password_set_at`, which would also retire ADR-0016 §D22's indistinguishability for good.
+     *
+     * ⛔ `tos_accepted_at` LOOKS like an *"this account has been used"* stamp and is the trap. Its only
+     * writer in the entire application is `InvitationController` itself, so a self-registered member has it
+     * NULL and SSO JIT provisioning deliberately leaves it NULL. Using it would refuse precisely the people
+     * it appears to admit.
+     *
+     * ── `joined_at IS NOT NULL` IS A CORRECTNESS REQUIREMENT, NOT A NARROWING ──────────────────────────
+     * The tempting version of the last clause is *"any `tenant_users` row other than this invite"*. It is
+     * wrong, and it fails in the direction that hurts the innocent: {@see self::resolveOrCreateUser()}
+     * creates exactly ONE placeholder per email address, so a genuinely-new person invited to two
+     * workspaces holds TWO `Invited` rows — and the bare version would mark that placeholder "established"
+     * and lock them out of BOTH password-setting arms, a dead end manufactured by the fix itself.
+     * `joined_at` is the positive record of having actually BEEN a member somewhere, which is the question
+     * this method is asking. A declined or expired invitation proves nothing about the identity and must
+     * not count.
+     *
+     * ── WHY THE QUERY BUILDER RATHER THAN THE MODEL, AND WHY IT NEEDS `pgsql_auth` ─────────────────────
+     * {@see TenantUser} carries {@see BelongsToTenant}, whose global scope would
+     * silently re-add `tenant_id = <current>`. Combined with `unique(tenant_id, user_id)` that makes the
+     * clause **vacuous while looking completely correct** — the invite row is the only row this tenant has
+     * for this user, so an ORM version would return false for everybody, forever, and no test that did not
+     * cross a tenant boundary would notice. The connection is `pgsql_auth` for the same reason
+     * {@see self::resolveUserByEmail()} uses it: the question is about a GLOBAL identity, and the answer
+     * lives in another tenant's rows. `2026_08_17_000107` grants that role SELECT on `tenant_users` and
+     * layers the role-scoped `tenant_users_auth_select` policy; before it, this read was not merely blocked
+     * but silently empty.
+     *
+     * ⚠️ AND THE STANDING RULE APPLIES HERE VERBATIM — RBAC §9: **no user-supplied predicate may ever run
+     * on `pgsql_auth`.** Both bindings below are server-derived uuids compared with exact equality: one is
+     * the id the invite row points at, the other is the invite row's own primary key. Nothing a visitor
+     * typed reaches this query, and nothing may be added to it that does.
+     *
+     * @param  TenantUser  $excludingInvite  the pending invitation being acted on — excluded so it cannot
+     *                                       vouch for itself
+     */
+    public function identityIsEstablished(User $user, TenantUser $excludingInvite): bool
+    {
+        // ⚠️ THE EXCLUDED ROW IS EXCLUDED AS AN INVITATION, NOT AS A HISTORY — AND MISSING THAT WAS A HOLE
+        // IN THE FIRST VERSION OF THIS METHOD, FOUND BY M8's OWN ADVERSARIAL PASS. `unique(tenant_id,
+        // user_id)` means a re-invited former member has NO second row to fall back on: {@see self::invite()}
+        // reuses the one they already had. So the query below — which excludes that row by primary key —
+        // returned false for somebody who had demonstrably been a member, and the token holder got the
+        // password-overwrite arm. The row's own `joined_at` and `removed_at` are the evidence, and
+        // `invite()` no longer erases them.
+        if ($excludingInvite->joined_at !== null || $excludingInvite->removed_at !== null) {
+            return true;
+        }
+
+        if ($user->email_verified_at !== null
+            || $user->two_factor_confirmed_at !== null
+            || $user->google_id !== null) {
+            return true;
+        }
+
+        return DB::connection('pgsql_auth')
+            ->table('tenant_users')
+            ->where('user_id', $user->getKey())
+            ->where('id', '!=', $excludingInvite->getKey())
+            ->whereNotNull('joined_at')
+            ->exists();
     }
 
     /**

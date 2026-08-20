@@ -102,11 +102,18 @@ return [
         ],
 
         // Pre-authentication connection (Increment B1). A dedicated NON-superuser `meridian_auth`
-        // role — NOT an owner of `users`, granted SELECT/UPDATE on `users` ONLY — used solely by
+        // role — NOT an owner of `users`, granted SELECT/UPDATE on `users` — used by
         // App\Auth\RlsAwareUserProvider to resolve/update a user for login, password reset, and
         // remember-me BEFORE any tenant/user context exists (when the join-shape RLS on `users` would
-        // otherwise fail closed). It has no access to any tenant-domain table, so a bug here reaches
-        // only the identity table — never tenant data.
+        // otherwise fail closed).
+        //
+        // ⚠️ THIS USED TO PROMISE "no access to any tenant-domain table … never tenant data", AND M8
+        // MADE THAT FALSE. `2026_08_17_000107` adds a SECOND grant — `SELECT ON tenant_users`, read-only
+        // and role-scoped — so the invitation path can ask whether an identity has ever joined a
+        // workspace before anybody is authenticated. The role still cannot WRITE anything but `users`,
+        // and reaches no other tenant-scoped table. What bounds it now is a RULE rather than a
+        // privilege: multi-tenancy-rbac-design.md §9 — **no user-supplied predicate may ever run on this
+        // connection.** Adding a third grant means amending ADR-0002 §D3 first.
         'pgsql_auth' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

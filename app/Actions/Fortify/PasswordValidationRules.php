@@ -21,7 +21,8 @@ trait PasswordValidationRules
      * The same policy WITHOUT the confirmation field, for a single-field surface.
      *
      * ── WHY THIS METHOD EXISTS RATHER THAN A SECOND COPY ────────────────────────────────────────────────
-     * `InvitationController::prepareAcceptingUser()` declared its own `['required', 'string',
+     * `InvitationController::registerInvitedPlaceholder()` (named `prepareAcceptingUser()` until M8 split
+     * the identity fork out of it) declared its own `['required', 'string',
      * Password::default()]` because its accept page has ONE password box, so `'confirmed'` genuinely cannot
      * be inherited — a real difference, not an oversight. But an inline copy makes the divergence invisible:
      * a future `->max()`, a custom rule, or a `'string'` becoming something else reaches three surfaces and

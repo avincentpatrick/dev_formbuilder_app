@@ -101,6 +101,38 @@ final class TenantIsolation
     }
 
     /**
+     * The pre-auth role's read carve-out for a table it must consult BEFORE anybody is authenticated
+     * (Increment M8 — ADR-0002 §D3, multi-tenancy-rbac-design.md §9).
+     *
+     * ADDITIVE and role-scoped, like {@see applySuperAdminBypass()} and deliberately unlike every isolation
+     * shape above it: it emits no ENABLE/FORCE, because the table it layers onto already carries its own
+     * base shape. Postgres OR-combines same-command permissive policies, so this widens SELECT to "all
+     * rows" for the pre-auth role ALONE — the app role, the super-admin role and every future role are
+     * completely unaffected by it, and the base shape keeps governing every one of them.
+     *
+     * ⚠️ THE GRANT IS THE OTHER HALF, AND IT IS NOT DECORATION. Table privileges are checked BEFORE RLS, so
+     * without `GRANT SELECT ON <table> TO <authRole>` the query fails "permission denied" before any policy
+     * is consulted — and a test meant to prove the POLICY would pass for the wrong reason. The GRANT is
+     * issued in the migration beside the call to this method, mirroring `apply_users_rls.php`.
+     *
+     * ⚠️ AND THE RULE THAT MAKES THIS SAFE LIVES OUTSIDE THIS CLASS: RBAC §9's **"no user-supplied predicate
+     * may ever run on `pgsql_auth`"**. The policy is `USING (true)` by construction — it has to be, because
+     * the whole point is a read that works with no tenant context — so the only thing bounding what a caller
+     * sees is the predicate the CALLER writes. Exact equality on a server-derived id, nothing else. A LIKE,
+     * an `orWhere`, or a caller-chosen column turns this into a cross-tenant directory.
+     *
+     * `users` is not an adopter: its own carve-out is emitted by {@see usersWritePoliciesSql()}, because
+     * there it arrives together with that table's three permissive write policies. Both produce the SAME
+     * policy name — `{table}_auth_select` — so `SELECT policyname FROM pg_policies WHERE policyname LIKE
+     * '%\_auth\_select'` stays an honest answer to "where does the pre-auth role hold an unrestricted read".
+     */
+    public static function authRoleRead(string $table): void
+    {
+        $role = config('database.connections.pgsql_auth.username');
+        self::execute(self::authRoleReadSql($table, is_string($role) ? $role : 'meridian_auth'));
+    }
+
+    /**
      * Super-admin cross-tenant carve-out (ADR-0002 §D3, RBAC §9). An ADDITIVE permissive policy layered
      * on a table that already has its base RLS shape + FORCE — scoped `TO` the elevated
      * `meridian_superadmin` role and gated on the `app.is_superadmin_context` GUC the narrow
@@ -395,6 +427,28 @@ final class TenantIsolation
         }
 
         return $statements;
+    }
+
+    /**
+     * SQL for the {@see authRoleRead()} shape — ONE role-scoped permissive SELECT policy and nothing else.
+     *
+     * No ENABLE/FORCE (additive, layered onto an existing shape) and no write policy of any kind: the
+     * pre-auth role reads to make an authorization decision and must never author a row through this
+     * carve-out. Under FORCE RLS a command with no matching policy is denied, so the absence of an INSERT /
+     * UPDATE / DELETE policy IS the write refusal — the same load-bearing absence {@see appendOnlySql()}
+     * documents. **Do not add one "for symmetry."** If a pre-auth path ever genuinely needs to write, that
+     * is an argument to make on its own terms, in its own migration, with its own reasoning.
+     *
+     * @return list<string>
+     */
+    public static function authRoleReadSql(string $table, string $authRole): array
+    {
+        self::assertIdentifier($table);
+        self::assertIdentifier($authRole);
+
+        return [
+            self::policy($table, 'auth_select', 'SELECT', using: 'true', role: $authRole),
+        ];
     }
 
     /**

@@ -51,12 +51,16 @@ use Illuminate\Support\Facades\Gate;
  * line underneath. That is a recorded survivor, not a reason to delete it; the structural guard in
  * `SearchMemberConnectionTest` is what compensates.
  *
- * It also earns its keep in a way that only showed up under mutation, and is worth stating because it is
- * the opposite of belt-and-braces being redundant: `meridian_auth` is granted `SELECT, UPDATE` on `users`
- * **and nothing else**, so this `whereExists` over `tenant_users` cannot even execute on that connection.
- * Swapping this arm to `pgsql_auth` therefore fails LOUDLY (11 cases red) instead of silently returning
- * every tenant's members — which is precisely the failure mode a future arm written WITHOUT this predicate
- * would have. That asymmetry is the argument for keeping it.
+ * ⛔ IT USED TO EARN ITS KEEP A SECOND WAY, AND M8 TOOK THAT AWAY — READ THIS BEFORE TRUSTING A LOUD FAILURE.
+ * The argument here was: `meridian_auth` is granted `SELECT, UPDATE` on `users` and nothing else, so this
+ * `whereExists` over `tenant_users` could not even EXECUTE on that connection, and swapping this arm to
+ * `pgsql_auth` therefore failed LOUDLY (11 cases red) instead of silently returning every tenant's members.
+ * Migration `2026_08_17_000107` grants that role `SELECT ON tenant_users` — `InvitationController` must ask
+ * whether an invitee's identity has ever joined a workspace before anybody is authenticated — so **the same
+ * mistake now SUCCEEDS QUIETLY.** The predicate still belongs here for the reason above, but the only thing
+ * that would catch its removal is now `SearchMemberConnectionTest`'s three structural pins: the runtime
+ * `QueryExecuted` guard, the comment-stripped source assertion, and the namespace sweep. **Do not weaken any
+ * of the three on the belief that the database will refuse a wrong connection. It will not any more.**
  *
  * ── PENDING INVITES ARE NOT SEARCHABLE, AND THAT IS A DECISION WITH A MEASUREMENT BEHIND IT ──────────────
  * `users_visibility` admits only `tu.status = 'active'`, and RLS applies at EVERY reference to `users` —

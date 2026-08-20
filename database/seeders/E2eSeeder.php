@@ -193,11 +193,19 @@ class E2eSeeder extends Seeder
 
         $owner = $this->resolveOrCreateUser(self::OWNER_EMAIL, 'Demo Owner', self::OWNER_PASSWORD);
         // ⚠️ THE ONE IDENTITY THAT MUST STAY UNVERIFIED, AND IT IS NOT AN OVERSIGHT.
-        // `InvitationController::show()` reads `email_verified_at === null` as `needsRegistration`, so
-        // stamping this placeholder turns the invitation page from "set a name and a password" into "sign in
+        // Stamping this placeholder turns the invitation page from "set a name and a password" into "sign in
         // as the invited account" — silently breaking the invite fixture, and with it the invitation
         // accessibility scan J3b adds. It is also the only unverified user in the fixture, which makes it the
         // natural subject for the `verified` gate's own e2e coverage.
+        //
+        // ⚠️ M8 CHANGED THE REASON WITHOUT CHANGING THE REQUIREMENT, WHICH IS EXACTLY THE KIND OF NOTE THAT
+        // GOES STALE UNREAD. This used to say `InvitationController::show()` reads `email_verified_at === null`
+        // as `needsRegistration`. It no longer reads that column directly: it asks
+        // {@see \App\Services\Tenancy\TenantMembershipService::identityIsEstablished()}, for which a verified
+        // address is one of FOUR positive signals — the others being a confirmed second factor, a linked
+        // Google account, and a `tenant_users` row this person actually joined. This fixture has none of the
+        // other three, so it stays a registration case and the axe scan keeps scanning the password form.
+        // **Give it any of them and the page changes shape just as surely as verifying it would.**
         $pending = $this->resolveOrCreateUser(self::PENDING_EMAIL, 'Pending Teammate', self::PENDING_PASSWORD, verified: false);
         $reviewer = $this->resolveOrCreateUser(self::REVIEWER_EMAIL, 'Rita Reviewer', self::REVIEWER_PASSWORD);
 

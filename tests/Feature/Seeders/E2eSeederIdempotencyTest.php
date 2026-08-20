@@ -329,9 +329,15 @@ it('verifies every seeded identity except the invitation placeholder', function 
     expect($active['demo@meridian.test'])->not->toBeNull()
         ->and($active['reviewer@meridian.test'])->not->toBeNull();
 
-    // ⚠️ AND THE ONE THAT MUST STAY NULL. `InvitationController::show()` reads a null timestamp as
-    // `needsRegistration`, so stamping this placeholder turns the invitation page from "set a name and a
-    // password" into "sign in as the invited account" — silently breaking the fixture J3b's invitation
-    // accessibility scan depends on. Verifying everything is as wrong as verifying nothing.
+    // ⚠️ AND THE ONE THAT MUST STAY NULL. Stamping this placeholder turns the invitation page from "set a
+    // name and a password" into "sign in as the invited account" — silently breaking the fixture J3b's
+    // invitation accessibility scan depends on. Verifying everything is as wrong as verifying nothing.
+    //
+    // ⚠️ SINCE M8 THIS ASSERTION IS NECESSARY BUT NO LONGER SUFFICIENT, AND THE GAP IS WORTH KNOWING.
+    // `InvitationController::show()` used to read this null timestamp directly; it now asks
+    // `TenantMembershipService::identityIsEstablished()`, where a verified address is one of FOUR positive
+    // signals. A future seeder change that gave this placeholder a confirmed second factor, a `google_id`, or
+    // a joined membership in a second workspace would move the page just as surely — and this case would
+    // stay green while the axe scan quietly stopped scanning a password form.
     expect($pendingVerifiedAt)->toBeNull();
 });

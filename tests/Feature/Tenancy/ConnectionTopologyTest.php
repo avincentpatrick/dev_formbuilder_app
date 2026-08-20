@@ -12,8 +12,9 @@ uses(RefreshDatabase::class);
 | The connection topology, stated (Phase 4, P2a — ADR-0017 §D1).
 |--------------------------------------------------------------------------
 | This application has FOUR live PostgreSQL connections and they are a ROLE separation, not a database
-| separation: `pgsql` (meridian_app, owns the tables so FORCE RLS binds it), `pgsql_auth` (pre-auth, reads
-| `users` only), `pgsql_privileged` (superuser, platform rows), `pgsql_superadmin` (still RLS-subject,
+| separation: `pgsql` (meridian_app, owns the tables so FORCE RLS binds it), `pgsql_auth` (pre-auth; reads
+| `users`, and since M8 also reads `tenant_users` — SELECT-only, for the invitation identity check),
+| `pgsql_privileged` (superuser, platform rows), `pgsql_superadmin` (still RLS-subject,
 | reaches cross-tenant rows only through the role-scoped carve-out policies). All four point at the SAME
 | database and the SAME `public` schema.
 |

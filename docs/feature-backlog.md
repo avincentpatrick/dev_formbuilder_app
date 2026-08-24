@@ -761,15 +761,67 @@ are still in place.
 
 ### Submissions, drafts & the guest runtime
 
-- **`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
-  terminally lost.** `app/Services/Submissions/SubmissionDraftService.php:173` reads outside any
-  transaction, Stage-3 semantic validation and the DB attachment check run for tens of milliseconds
-  (`:177-185`), the lock is taken only at `:192-193`, and `:210` finalizes with the *pre-lock* values —
-  `SubmissionFinalizer.php:90` being a whole-document replace. A two-device resume (the flow the resume
-  link invites) drops the second device's field, and the row is then `submitted`, so no later save can
-  restore it. **Live.** The only in-lock guard is a status re-assert, which a concurrent autosave does not
-  move — the sibling `SubmissionAnswerEditService.php:186-203` already carries the two-check shape this
-  needs, verbatim. P3a closed the cross-request case and did not touch this path. ⚠️ **THE FOUR `SubmissionDraftService` LINE NUMBERS WERE RE-CITED BY M11 (+10 EACH), which moved that file — verified against the code on 2026-08-24, not arithmetic.** `SubmissionFinalizer.php:90` and `SubmissionAnswerEditService.php:186-203` are unmoved.
+- ~~**`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
+  terminally lost.**~~ ✅ **DONE — M12 (2026-08-25). The row was true verbatim in all seven of its claims, and
+  the reach it describes is not the reach the fix has.** `SubmissionDraftService::promote()` now captures the
+  answer document's `answers_content_checksum` off the SAME row it reads the answers from and re-compares it
+  **under the lock**, refusing with the `409 draft_conflict` the save door has raised since P3a — one code,
+  one sentence, both write doors, so no client contract moved and `openapi.json` stayed byte-identical.
+  It is the sibling's SECOND check (`SubmissionAnswerEditService::edit()`), unconditional because it compares
+  two SERVER reads inside one request rather than a client's claim. **The three services now hold one check
+  each, and each holds the one its own read/lock ordering makes authoritative.**
+  ⚠️ **WHAT THE ROW DID NOT NAME.** (1) **`promote()` has FOUR call sites, not the one the row describes** —
+  `GuestSubmissionController:88`, `SubmissionController:131` (draft branch), `SubmissionController:144` (the
+  R1 race backstop) and `Api\V1\SubmissionPromoteController:28`. (2) **The damage was never only a missing
+  answer.** `FinalizedStatus::for()` is handed the PRE-LOCK `SemanticResult`, and its own docblock demands
+  *"this finalize's OWN Stage-3 result — never a cached or borrowed one"*: a racing save that routes the
+  respondent into a section is the difference between `submitted` and `screened_out`, and therefore between
+  consuming a purchased `max_responses` slot and not — plus a row labelled *"was shown no questions"* about
+  somebody who answered some. (3) **Media too** — `attachment_refs` and the attachment ownership re-point
+  derive from the same pre-lock `$final`, so a file the second device uploaded stayed owned by its
+  `form_field` and unreferenced by the finalized submission. (4) The version-status check has the identical
+  pre-lock shape one field over — filed below rather than folded in. (5) A sweep of every `lockForUpdate()`
+  in `app/` found **no other pre-lock-read → whole-document-write site**: `SubmissionPipeline::persist()`
+  creates its row inside the transaction, and `PublishService`, `RestoreService`, `FormBuilderService`,
+  `FormService`, `ScopeNodeService` and `SubmissionReviewService` all read after their lock. `promote()` was
+  the last door.
+  ⚠️⚠️ **AND THE ADVERSARIAL PASS CORRECTED THE ROW'S OWN FRAMING, WHICH IS THE FINDING WORTH CARRYING.**
+  The row motivates the defect with the two-device resume, and **on that flow P3a's baseline check usually
+  fires first**: both DRAFT channels set `checkBaseline: true` unconditionally
+  (`GuestDraftRequest`/`EncodeDraftRequest` both say so in writing), so a second device saving from a stale
+  base is refused before it can move anything. The windows M12 **uniquely** closes are therefore narrower and
+  different: **(a) `/api/v1/submissions/{submission}/promote`, which runs no `saveDraft()` at all and so has
+  never had a first check** — and is the seam the OCR review-and-confirm flow is documented to reuse;
+  **(b) a SUBMIT that sends no baseline**, because the submit requests gate on `claimsBaseline()` rather than
+  unconditionally, which is the live shape of the already-filed 409-folding row (`App.vue` remounts with
+  `draftBaseline = null`); **(c) `createDraft()`'s 23505 fold**, which passes `checkBaseline: false`
+  explicitly and by design; and **(d) the genuine sub-window on any channel** — a device that read AFTER this
+  request's own `saveDraft()` holds a current base, so its autosave is accepted and lands in the tens of
+  milliseconds Stage 3 and the media check occupy. **A row can be true in every clause and still point at the
+  wrong flow.**
+  ⚠️ **MUTATION PASS: 7 MUTATIONS, ZERO UNDEFENDED, AND TWO OF THEM CHANGED THE TESTS.** M1 (delete the
+  guard — the defect reintroduced) reddens **exactly the seven refusal cases** and leaves both controls
+  green. M2 (run the checksum check BEFORE the status re-assert) reddens **exactly one**, the
+  idempotent-no-op case — so the ORDER is pinned: a concurrent promote moves the status and the checksum
+  alike, and that case is a documented 200 rather than a 409. M3 (compare the recomputed hash instead of the
+  stored value — the plausible-wrong token) reddens **two, one of them a PRE-EXISTING test**
+  (`EncodePromoteTest`'s R1 race case, whose planted row carries a null checksum). M6 (a semantically
+  identical read) survives, as a control must. ⚠️ **M4 (loose `!=`) SURVIVES BY CONSTRUCTION** — the domain
+  is 64-hex-or-null, exactly M11's finding, and it stays strict because that equivalence is a property of the
+  DOMAIN rather than of the operator. ⛔⛔ **M5 (hoist the guard out of the transaction) INITIALLY REDDENED
+  THE SAME SINGLE CASE AS M2, WHICH MEANT "the comparison reads UNDER THE LOCK" WAS ENFORCED BY A COMMENT
+  AND NOT BY A TEST** — every existing case stages its write during Stage 3, which a hoisted check still
+  sees. A case staging the write AFTER the lock is granted separates them, and it states what it cannot
+  measure: its writer takes no `submissions` lock, which no production path does, so it pins a property of
+  the code rather than a reachable race; and its write shares promote's own transaction, so the refusal rolls
+  it back and the *"the other device's answers survive"* assertion belongs to the pre-lock cases instead.
+  ⚠️ **AND ONE ASSERTION WAS WRONG BEFORE IT SHIPPED, IN THE DIRECTION THIS PROJECT KEEPS PAYING FOR**: two
+  channel cases compared the surviving document with `toBe()`, which is KEY-ORDER sensitive on arrays, and a
+  jsonb round-trip returns the database's order — the identical trap `SubmissionAnswerEditService::sameAnswer()`
+  documents for the audit diff. They ksort first and stay strict on the values.
+  Recorded in `docs/offline-first-sync-design.md` §8, whose P3a amendment claimed the hazard closed while
+  naming only one of the two write doors. **No ADR, no migration, no route: `openapi.json` byte-identical,
+  four lint gates unmoved at 97 · 111 · 31 · 111/119/0, PHPStan 18 = baseline with zero delta by file list.**
 - ~~**`major` · Two unscoped copies of `findByClientUuid()` survive the branch that declared the unscoped
   form an authorization defect.**~~ ✅ **DONE — M11 (2026-08-24). The row was true verbatim and named four
   fewer things than it should have.** As built there is now exactly ONE implementation —
@@ -820,6 +872,16 @@ are still in place.
   wants distinct codes, mint the new one here — the server side is one line in
   `SubmissionConflictException::clientUuidClaimed()`, and M11 left it sharing the code precisely so this row
   keeps the decision.
+  ➕ **AND M12 (2026-08-25) GAVE `draft_conflict` A SECOND RAISER, WHICH MOVES WHERE THIS ROW'S FIX HAS TO
+  LAND RATHER THAN WHAT IT IS.** `SubmissionDraftService::promote()` now raises the same code for the same
+  cause and the same remedy, so no new `ErrorKind` is owed for it — but it arrives on the **submit**
+  response, not the save response. This row's smallest fix is written against `RuntimeSession.vue:275-282`,
+  which is the SAVE path; the submit path folds its own 409 separately, so routing `draft_conflict` to a
+  draft re-read has to happen in both places or the respondent still sees *"This form was updated"* — now
+  for the one refusal whose remedy the server names exactly. ⚠️ **It is also why the no-baseline remount
+  matters more than it did**: on a client that sends no `base_content_checksum` the submit channel gates
+  P3a's check on `claimsBaseline()` and skips it, so M12's guard is the only thing left between two devices
+  and a terminal loss — see the closed `promote()` row for the four windows it uniquely covers.
 - **`major` · On the draft-save channel the same 409 is swallowed with no message at all.**
   `resources/public-runtime/components/RuntimeSession.vue:352-358` returns `null` into
   `components/SaveForLater.vue:38-43`, which just closes the panel — so a deliberate "Save and finish
@@ -865,6 +927,38 @@ are still in place.
   controller already keeps for every other failure. Not fixed in M11: it is a different defect on a
   different axis, and folding an authorization change into the uuid increment would have put two
   independent failure modes in one CI run.
+- **`minor` · `promote()` re-asserts the version is published BEFORE the lock and never again under it.**
+  Filed 2026-08-25 by M12, which closed the identical pre-lock shape one field over and deliberately did not
+  fold this in. `SubmissionDraftService::promote()` checks `$version->status !== FormVersionStatus::Published`
+  outside any transaction, and the in-lock block re-asserts only the row's own status and (since M12) the
+  answer document's checksum — so an admin republishing between that check and the lock lets a draft finalize
+  against a version the form has already moved past. **Live**, but narrow on purpose: the draft is pinned to
+  that version and its answer row already points at it, so nothing becomes inconsistent — what is lost is the
+  loud `409 submission_version_superseded` the check exists to produce, and the keyer re-renders one save
+  later instead. The same is true of `assertCanPromote()`'s grace-window check one line below, which the
+  grace window makes very nearly a no-op. Smallest fix is to move both re-assertions inside the transaction
+  alongside M12's; the reason to weigh it rather than do it is that neither `form_versions` nor `forms` is
+  locked there, so a re-read is a narrowing rather than a closure — unlike M12's, whose authority comes from
+  the `submissions` row lock every writer of that document holds.
+- **`minor` · `/api/v1/submissions/{submission}/promote` documents no 409 at all, and three causes reach it.**
+  Filed 2026-08-25 by M12. `openapi.json` lists `200/404/403` for that route, while
+  `SubmissionDraftService::promote()` can raise `submission_version_superseded` (H9b),
+  `max_responses_reached` (H12a, a 403 with a body the document does not describe either) and — since M12 —
+  `draft_conflict`. Scramble infers from the CONTROLLER's own returns, which is why a service-thrown
+  exception has never appeared there and why M12 could add a cause with the document staying byte-identical.
+  So an integrator building against the contract has no reason to handle a refusal that is a normal outcome.
+  **Live**, pre-existing, and deliberately not fixed in M12: `openapi.json` is a Standing-Rule-7(b) NEITHER
+  artefact, so moving it needs its own claim, and the honest fix is a `@response` annotation per cause rather
+  than a hand edit.
+- **`minor` · Four P3a refusal cases assert the exception CLASS and never the message.**
+  `tests/Feature/Submissions/SubmissionDraftServiceTest.php` — the P3a section's `toThrow(
+  SubmissionConflictException::class)` calls. Filed 2026-08-25 by M12, which is the second increment running
+  to be bitten by this: M11's mutation pass proved that assertion passes for `contentConflict()` too, and
+  `SubmissionConflictException` now carries FOUR causes of which two share the `submission_conflict` code —
+  so only the message separates them on the wire. Those four cases are safe **today** for a reason that is
+  not written down anywhere near them (the resolve finds the row, so `clientUuidClaimed()` is unreachable on
+  that path), which is precisely the shape that stops being true after an unrelated change. Not a live
+  defect; a live blind spot. M12's own seven refusal cases all assert the message.
 
 ### Gamification
 

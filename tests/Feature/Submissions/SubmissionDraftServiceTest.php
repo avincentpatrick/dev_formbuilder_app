@@ -524,7 +524,6 @@ it('refuses a stale client that omits the baseline once a checksum is stored', f
 | proved a bare toThrow(SubmissionConflictException::class) passes for a completely different cause.
 */
 
-
 it('HEADLINE: refuses a promote whose answer document moved between the pre-lock read and the lock', function (): void {
     // THE DEFECT, staged as the real interleaving rather than approximated. Before M12 this promote finalized
     // the document it read BEFORE device B's save, so `country` was gone from a row that was then `submitted`

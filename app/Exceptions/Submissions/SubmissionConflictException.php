@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Exceptions\Submissions;
 
 use App\Http\Controllers\Tenant\SubmissionDraftController;
+use App\Services\Submissions\SubmissionDraftService;
 use RuntimeException;
 
 /**
@@ -69,11 +70,10 @@ final class SubmissionConflictException extends RuntimeException
      * that helps.
      *
      * ⚠️ TWO RAISERS SINCE INCREMENT M12, AND THE SECOND IS THE DOOR P3a DID NOT REACH.
-     * {@see \App\Services\Submissions\SubmissionDraftService::updateDraft()} raises it for a save whose
-     * client-supplied base has moved; {@see \App\Services\Submissions\SubmissionDraftService::promote()}
-     * raises it for a save that lands between promotion's own read of the answer document and the lock it
-     * finalizes under — the finalize being a whole-document replace, and the row being `submitted`
-     * afterwards, so that loss is the one no later save can undo.
+     * {@see SubmissionDraftService::updateDraft()} raises it for a save whose client-supplied base has moved;
+     * {@see SubmissionDraftService::promote()} raises it for a save that lands between promotion's own read
+     * of the answer document and the lock it finalizes under — the finalize being a whole-document replace,
+     * and the row being `submitted` afterwards, so that loss is the one no later save can undo.
      *
      * ⚠️ ONE CODE, ONE WORDING, BOTH DOORS — DELIBERATELY, AND FOR M11'S RECORDED REASON. The cause is the
      * same sentence to a client (*another device wrote to this draft*) and the remedy is the same act

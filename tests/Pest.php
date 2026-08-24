@@ -1194,7 +1194,7 @@ function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string
  * @param  Closure():void  $write  the racing device's commit
  * @param  int  $skip  matching statements to let past before staging (0 for a direct service-level promote)
  * @param  string  $needle  the SQL fragment to stage on
- * @return Closure():bool  whether the interleave actually fired
+ * @return Closure():bool whether the interleave actually fired
  */
 function interleaveDuringPromote(Closure $write, int $skip = 0, string $needle = 'select * from "submission_answers"'): Closure
 {

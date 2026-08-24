@@ -173,6 +173,11 @@ final class SubmissionDraftService
         $stored = SubmissionAnswer::query()->where('submission_id', $draft->id)->firstOrFail();
         /** @var array<string, mixed> $answers */
         $answers = $stored->answers;
+        // The lost-update token (Increment M12), taken off the SAME row object as the answers rather than by
+        // a second query. One read gives both from one row version, so the token can never certify a document
+        // this method did not actually read — the identical reasoning `GuestDraftResumeController::show()`
+        // states for handing a resuming device its baseline. Re-compared under the lock below.
+        $readChecksum = $stored->answers_content_checksum;
 
         // Stage 3 (full, exactly once) — runs on promotion only. No transaction is open yet, so a semantic
         // failure leaves the draft row untouched and resumable.
@@ -189,13 +194,53 @@ final class SubmissionDraftService
         // submit() would store for an equivalent raw submission (submit() hashes its Stage-1 output).
         $checksum = AnswersContentChecksum::of($answers);
 
-        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $sections, $final, $checksum, $actorId, $semantic): SubmissionResult {
+        $result = DB::transaction(function () use ($draft, $form, $version, $fields, $sections, $final, $checksum, $readChecksum, $actorId, $semantic): SubmissionResult {
             $row = Submission::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
 
             // Already finalized (double-promote, or a concurrent promote won under the lock) — idempotent
             // no-op: do not re-project, re-audit, or re-fire the event.
             if ($row->status !== SubmissionStatus::Draft) {
                 return new SubmissionResult($row, created: false);
+            }
+
+            // ── ⚠️ THE PRE-LOCK LOST UPDATE (Increment M12) — THE SECOND WRITE DOOR P3a DID NOT CLOSE ───
+            // Everything this method is about to finalize was computed BEFORE the lock: the answers at the
+            // read above, Stage 3 and the media check over them, `$final`, `$checksum`, and the
+            // {@see FinalizedStatus} determination below. And the write is a WHOLE-DOCUMENT replace
+            // ({@see SubmissionFinalizer::finalize()}), so an autosave committing inside that window — tens of
+            // milliseconds of semantic validation plus a DB attachment check — is silently reverted, and the
+            // row is `submitted` afterwards, so no later save can restore it. P3a closed the save-vs-save
+            // case in {@see updateDraft()}; this is the save-vs-PROMOTE case, on the same document, through
+            // the door that was left open.
+            //
+            // ⚠️ THE DAMAGE IS NOT ONLY A MISSING ANSWER. {@see FinalizedStatus::for()} reads the pre-lock
+            // `$semantic`, and its own docblock demands "this finalize's OWN Stage-3 result — never a cached
+            // or borrowed one": a racing save that routes the respondent into a section is the difference
+            // between `submitted` and `screened_out`, which is the difference between consuming a
+            // `max_responses` slot and not ({@see Submission::scopeConsumesCapacity()}) — and it labels the
+            // row "was shown no questions" about somebody who answered some. `attachment_refs` and the
+            // attachment ownership re-point derive from the pre-lock `$final` too, so a file the other device
+            // uploaded stays owned by its form_field and is unreferenced by the finalized submission.
+            //
+            // ⚠️ ORDER IS LOAD-BEARING — THIS RUNS AFTER THE STATUS RE-ASSERT, NEVER BEFORE IT. A concurrent
+            // PROMOTE that won under the lock moved the status AND the checksum (finalize rewrites both), and
+            // that case is a documented idempotent no-op rather than a conflict. Compare the checksum first
+            // and a double-promote starts returning 409s where the contract promises an unchanged 200.
+            //
+            // ⚠️ UNCONDITIONAL, WITH NO `$checkBaseline` FLAG, AND THAT IS THE DIFFERENCE FROM updateDraft()
+            // RATHER THAN AN INCONSISTENCY WITH IT. That check compares a token the CLIENT supplied, so it
+            // must be opted into and must tolerate a legacy null. This one compares two SERVER reads inside
+            // one request: there is no contract to opt into, and a legacy draft's null compares equal to
+            // itself. It is the sibling's SECOND check ({@see SubmissionAnswerEditService::edit()}), which is
+            // ungated there for the same reason. The two services now hold one check each, and each holds the
+            // one its own read/lock ordering makes authoritative.
+            //
+            // An identical-content autosave in the window does NOT refuse: {@see AnswersContentChecksum::of()}
+            // is deterministic, so an unchanged document leaves the stored value where it was. Nothing was
+            // lost, so nothing is refused.
+            $current = SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers_content_checksum');
+            if ($current !== $readChecksum) {
+                throw SubmissionConflictException::draftConcurrentlyModified();
             }
 
             $row->forceFill([

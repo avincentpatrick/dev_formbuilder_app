@@ -25,6 +25,9 @@ use RuntimeException;
  * draft routes it carries its own `draft_already_finalized` code so a client can tell "this draft is already
  * submitted" from a genuine content conflict.
  *
+ * The {@see draftConcurrentlyModified()} cause (Increment P3a) is a DRAFT lost update, and since Increment
+ * M12 it has two raisers rather than one — the draft save and the draft PROMOTE. See its own docblock.
+ *
  * The {@see clientUuidClaimed()} cause (Increment M11) is the fourth and is about ENTITLEMENT rather than
  * content or timing: the uuid is already spent in this tenant on a row outside the caller's form/author
  * scope. It shares `submission_conflict` with {@see contentConflict()} deliberately — see its docblock.
@@ -64,6 +67,20 @@ final class SubmissionConflictException extends RuntimeException
      * The message names the action, because a respondent told only "conflict" will press Save again into
      * the same refusal — the copy they are looking at is stale, so re-reading the draft is the only move
      * that helps.
+     *
+     * ⚠️ TWO RAISERS SINCE INCREMENT M12, AND THE SECOND IS THE DOOR P3a DID NOT REACH.
+     * {@see \App\Services\Submissions\SubmissionDraftService::updateDraft()} raises it for a save whose
+     * client-supplied base has moved; {@see \App\Services\Submissions\SubmissionDraftService::promote()}
+     * raises it for a save that lands between promotion's own read of the answer document and the lock it
+     * finalizes under — the finalize being a whole-document replace, and the row being `submitted`
+     * afterwards, so that loss is the one no later save can undo.
+     *
+     * ⚠️ ONE CODE, ONE WORDING, BOTH DOORS — DELIBERATELY, AND FOR M11'S RECORDED REASON. The cause is the
+     * same sentence to a client (*another device wrote to this draft*) and the remedy is the same act
+     * (*re-read the draft, keep the uuid*), so a fifth factory would oblige every client to learn a second
+     * name for one refusal. Both HTTP arms already render this cause — bootstrap/app.php maps it to a 409
+     * for `/api/v1` and to a toast for the web — so M12 moved no client contract and `openapi.json` stayed
+     * byte-identical.
      */
     public static function draftConcurrentlyModified(): self
     {

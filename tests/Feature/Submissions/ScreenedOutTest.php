@@ -6,6 +6,7 @@ use App\Enums\FieldType;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
+use App\Exceptions\Submissions\SubmissionConflictException;
 use App\Exceptions\Submissions\SubmissionReviewException;
 use App\Models\Form;
 use App\Models\FormSection;
@@ -269,4 +270,45 @@ it('archives exactly the four statuses that consumed a slot, and no future one b
     }
 
     expect($archivable)->toBe(['submitted', 'under_review', 'approved', 'returned']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M12 — the pre-lock lost update reaches THIS predicate, not only the answer document.
+|--------------------------------------------------------------------------
+| FinalizedStatus::for() is handed promote()'s PRE-LOCK SemanticResult, and its own docblock demands "this
+| finalize's OWN Stage-3 result — never a cached or borrowed one". A save committing inside promote()'s
+| window made that result borrowed by TIMING rather than by wiring, and this predicate is the difference
+| between consuming a purchased `max_responses` slot and not.
+*/
+
+it('cannot stamp screened_out from a Stage-3 result the stored document has already moved past', function (): void {
+    // The sharpest form of the M12 defect. Device A resumes a bare router draft — nobody routed, so the
+    // pre-lock Stage 3 says `screened_out`. Device B supplies the gate inside promote()'s window. Before M12
+    // this finalized as `screened_out`: a row labelled "was shown no questions" over a document that answers
+    // two, consuming NO slot against a cap the tenant paid for, and unrecoverable because the row was final.
+    $form = screenedOutRouter($this->tenant, $this->user, ['max_responses' => 1]);
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->drafts->saveDraft(routerPayload($form, [], $uuid));
+    $id = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->id;
+
+    $fired = interleaveOnPromoteRead(function () use ($form, $uuid): void {
+        test()->drafts->saveDraft(routerPayload($form, ['role' => 'staff', 'staff_number' => 'A1'], $uuid));
+    });
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(SubmissionConflictException::class, 'This draft was updated on another device.');
+
+    expect($fired())->toBeTrue()
+        ->and(Submission::findOrFail($id)->status)->toBe(SubmissionStatus::Draft)
+        ->and(Submission::query()->where('form_id', $form->id)->consumesCapacity()->count())->toBe(0);
+
+    // ⚠️ AND THE REFUSAL IS NOT A DEAD END — the retry the message names is what produces the classification
+    // the stored document actually warrants. Without this half the case would be satisfied by a promote()
+    // that simply never worked.
+    $retried = $this->drafts->promote(Submission::findOrFail($id))->submission;
+
+    expect($retried->status)->toBe(SubmissionStatus::Submitted)
+        ->and(Submission::query()->where('form_id', $form->id)->consumesCapacity()->count())->toBe(1);
 });

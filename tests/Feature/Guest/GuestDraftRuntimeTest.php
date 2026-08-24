@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Notifications\ResumeLinkNotification;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Submissions\AnswersContentChecksum;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -805,4 +806,60 @@ it('refuses a uuid still reserved by a SOFT-DELETED row rather than failing on t
     enterTenant($f->tenant->id);
     expect(Submission::query()->count())->toBe(0)
         ->and(Submission::withTrashed()->count())->toBe(1);
+});
+
+// ── Increment M12 — the pre-lock lost update, on the unauthenticated arm ───────────────────────
+
+it('409s a guest submit whose draft moved inside promote’s pre-lock window (draft_conflict)', function (): void {
+    // The flow the resume link invites, and the reason this door mattered most here: two devices hold the
+    // SAME client_submission_uuid by design (H9b/H10), promote() read the answer document outside any
+    // transaction, and SubmissionFinalizer replaces the whole document — so the second device's answers were
+    // gone and the row was `submitted`, which no later save can undo.
+    //
+    // ⚠️ NO `base_content_checksum` IS SENT, WHICH IS WHAT MAKES THIS MEASURE M12 RATHER THAN P3a. With one,
+    // saveDraft()'s own guard fires first and returns the IDENTICAL code and sentence — the wrong-reason pass
+    // no envelope assertion could detect. It is also the live shape: `App.vue` remounts with
+    // `draftBaseline = null` (docs/feature-backlog.md's 409-folding row), and on such a client this guard is
+    // the only one there is.
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $save = $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'], 'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+    $draftId = $save->json('data.id');
+
+    // The tablet's autosave, committed inside promote()'s window. `skip: 1` steps past the saveDraft() the
+    // submit route runs first — see interleaveOnPromoteRead().
+    $moved = ['full_name' => 'Ada', 'age' => '31'];
+    $fired = interleaveOnPromoteRead(function () use ($draftId, $moved): void {
+        SubmissionAnswer::query()->where('submission_id', $draftId)->update([
+            'answers' => $moved,
+            'answers_content_checksum' => AnswersContentChecksum::of($moved),
+        ]);
+    }, skip: 1);
+
+    Event::fake([SubmissionCreated::class]);
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/submissions", [
+        'answers' => ['full_name' => 'Ada', 'age' => '30'], 'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'draft_conflict')
+        ->assertJsonPath('error.message', 'This draft was updated on another device. Reload it to pick up the newer answers before saving again.');
+
+    expect($fired())->toBeTrue();
+    Event::assertNotDispatched(SubmissionCreated::class);
+
+    enterTenant($f->tenant->id);
+
+    // Ksorted before comparing: `===` on arrays is KEY-ORDER sensitive and a jsonb round-trip returns the
+    // database's order. Normalising order keeps the comparison strict on the values.
+    $survived = SubmissionAnswer::query()->findOrFail($draftId)->answers;
+    ksort($survived);
+    ksort($moved);
+
+    expect(Submission::query()->count())->toBe(1)
+        ->and(Submission::findOrFail($draftId)->status)->toBe(SubmissionStatus::Draft)
+        ->and($survived)->toBe($moved);
 });

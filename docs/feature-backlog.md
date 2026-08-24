@@ -770,15 +770,35 @@ are still in place.
   restore it. **Live.** The only in-lock guard is a status re-assert, which a concurrent autosave does not
   move — the sibling `SubmissionAnswerEditService.php:186-203` already carries the two-check shape this
   needs, verbatim. P3a closed the cross-request case and did not touch this path.
-- **`major` · Two unscoped copies of `findByClientUuid()` survive the branch that declared the unscoped
-  form an authorization defect.** `app/Services/Submissions/SubmissionDraftService.php:414-427` documents
-  the invariant and `:429` implements it (uuid + form + respondent), while
-  `app/Http/Controllers/Public/GuestSubmissionController.php:112-122` filters on uuid + status only and
-  `app/Services/Submissions/SubmissionPipeline.php:216-219` on uuid alone. A guest holding form A's share
-  token and supplying a uuid from form B in the same tenant gets either a **repeatable unauthenticated
-  500** (the tenant-wide partial unique index raises 23505 that the recovery arm cannot classify) or, for a
-  finalized row, **form B's id, reference and status serialized back to them** with their own answers
-  silently discarded as an idempotent 200. RLS bounds it to the tenant and no further. **Live.**
+- ~~**`major` · Two unscoped copies of `findByClientUuid()` survive the branch that declared the unscoped
+  form an authorization defect.**~~ ✅ **DONE — M11 (2026-08-24). The row was true verbatim and named four
+  fewer things than it should have.** As built there is now exactly ONE implementation —
+  `app/Services/Submissions/ClientUuidResolver::resolve()`, scoped to `(tenant_id, form_id, respondent,
+  uuid)` — consumed by every channel, and `tests/Feature/Submissions/ClientUuidScopeTest.php` fails the
+  build if the predicate is ever written a second time anywhere under `app/`. A uuid spent inside the tenant
+  but outside the caller's scope is now an explicit `409 submission_conflict` (*"This submission identifier
+  already belongs to another response."*) — the code and message `SubmissionDraftController` has returned
+  for this exact cause since I9b, so no client contract moved and `openapi.json` stayed byte-identical.
+  ⚠️ **WHAT THE ROW DID NOT NAME.** (1) **The guest DRAFT route carried the identical unauthenticated 500**
+  (`GuestDraftController` → `saveDraft()` → `createDraft()` → an unclassifiable 23505 → three wasted
+  transactions → an escaped `QueryException`); the row named only the submit route. (2) **The unscoped
+  resolve had three consuming channels, not one** — guest submit, the authenticated encode page and
+  `/api/v1/sync` — so "three call sites" was a count of FILES. (3) **On the encode channel it was a WRITE:**
+  `SubmissionController::store()`'s race backstop promotes whatever Stage 2b returned, so a member entitled
+  to form A could FINALIZE form B's draft — audit row, capacity slot, `SubmissionCreated` and all — on a
+  form they may hold no grant on, because `promote()` is invoked directly and never re-runs
+  `SubmissionPolicy::promote()`. (4) **A soft-deleted row keeps its uuid reserved and is invisible to every
+  resolve**, because the partial unique index filters on `client_submission_uuid IS NOT NULL` and not on
+  `deleted_at IS NULL` — latent, not live (`ReapTenantDraftsJob` hard-deletes for exactly this reason), and
+  now closed by a `withTrashed()` probe whose premise is pinned against the live `pg_indexes` definition.
+  ⚠️ **AND TWO TESTS WERE PASSING FOR THE WRONG REASON.** `EncodePromoteTest`'s R1 race case STAGED THE
+  DEFECT — it planted the draft under a different user and relied on "the pipeline still resolves it by uuid
+  alone", i.e. it asserted that a member may promote a stranger's draft; it now stages the real interleaving
+  (the autosave commits between the two reads) via a one-shot `DB::listen`, and asserts the listener fired.
+  And the first draft of M11's own new cases asserted only `toThrow(SubmissionConflictException::class)`,
+  which the mutation pass proved passes for `contentConflict()` too — every refusal test now asserts the
+  MESSAGE, which is the only thing separating the two causes on the wire. Recorded in
+  `docs/offline-first-sync-design.md` §5 and `docs/security-threat-model.md` §4.
 - **`major` · The guest runtime folds P3a's `409 draft_conflict` into the generic `refresh` kind, so the
   refusal becomes a second submission.** `resources/public-runtime/lib/error-normalizer.ts:93` returns
   `'refresh'` for every 409; `components/RuntimeSession.vue:275-282` discards the outbox row and calls
@@ -792,6 +812,14 @@ are still in place.
   client discards. The authenticated twin already branches correctly
   (`resources/js/composables/useServerAutosave.ts:198-212`). Smallest fix: give `draft_conflict` its own
   `ErrorKind`, as I8b did for `challenge`, and route it to a draft re-read that keeps the uuid.
+  ➕ **AND M11 ADDED A SECOND CAUSE TO THE SAME 409 WITHOUT PRE-EMPTING THIS ROW, DELIBERATELY.**
+  `submission_conflict` now also means *"this identifier was never yours"* — a refusal the client CAN recover
+  from automatically, by minting a fresh uuid and resubmitting, rather than by re-reading a draft. So this
+  row's fix should split THREE ways, not two, and the normalizer cannot tell the new cause from the content
+  conflict by code alone: they share `submission_conflict` and differ only in `error.message`. If that split
+  wants distinct codes, mint the new one here — the server side is one line in
+  `SubmissionConflictException::clientUuidClaimed()`, and M11 left it sharing the code precisely so this row
+  keeps the decision.
 - **`major` · On the draft-save channel the same 409 is swallowed with no message at all.**
   `resources/public-runtime/components/RuntimeSession.vue:352-358` returns `null` into
   `components/SaveForLater.vue:38-43`, which just closes the panel — so a deliberate "Save and finish
@@ -816,6 +844,27 @@ are still in place.
   toast rather than a validation error, so `preserveState` evaluates false and the page reloads from the
   stored document. The docblock reasons only about the 422 path and gets the conflict path — the one the
   machinery exists for — backwards. **Live.**
+- **`major` · `/api/v1/sync/submissions` creates submissions against ANY form in the tenant, with no
+  per-form authorization at all.** Filed 2026-08-24 by M11's adversarial pass. The route carries the
+  token-ability gate `ability:write:submissions` and nothing else (`routes/api.php:250-252`);
+  `SyncSubmissionController::replayOne()` resolves the version straight from the caller's own
+  `form_version_id` (`:61`) and hands it to the pipeline (`:67`) without ever consulting
+  `SubmissionPolicy::create()`, which is the gate the equivalent web route uses (`can:create` on the bound
+  `{form}`) and which requires `submissions.create` **plus** either `forms.edit.any` or a per-form Editor
+  grant (`SubmissionPolicy.php:40-46`). So a member holding a token — a Viewer with `write:submissions`, or
+  an Editor collaborating on one form — can replay submissions into every other form in the workspace,
+  consuming their response caps, firing their notifications and their webhooks, and appearing in their
+  inbox. RLS bounds it to the tenant and no further. ⚠️ **THE SHAPE IS THE ONE THE ROUTE FILE ITSELF NAMES
+  TWO ROWS DOWN** — its comment on `SubmissionPromoteController` states the standing rule that *"a
+  resource-bound Group-B route carries an ability + a policy gate on the bound resource"*, and this route
+  slipped precisely because it is **not** resource-bound: the form arrives in the body, so there is nothing
+  for `can:` to bind to and the rule silently did not apply. That is the same body-versus-URL asymmetry M11
+  closed for `client_submission_uuid`, one level up. **Live.** Smallest honest fix is a per-item
+  `Gate::forUser($user)->allows('create', [Submission::class, $form])` inside `replayOne()`, reported as
+  that item's own `error` so a partial refusal never rolls back its siblings — the per-item contract the
+  controller already keeps for every other failure. Not fixed in M11: it is a different defect on a
+  different axis, and folding an authorization change into the uuid increment would have put two
+  independent failure modes in one CI run.
 
 ### Gamification
 

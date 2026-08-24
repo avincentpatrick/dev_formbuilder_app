@@ -19,6 +19,7 @@ use App\Models\Submission;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
+use App\Services\Submissions\ClientUuidResolver;
 use App\Services\Submissions\EncodeFormPresenter;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
@@ -105,13 +106,17 @@ final class SubmissionDraftController extends Controller
                 baseContentChecksum: $request->baseContentChecksum(),
             ));
         } catch (SubmissionConflictException $e) {
-            // ⚠️ TWO CAUSES SINCE P3a, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE.
+            // ⚠️ THREE CAUSES SINCE M11, AND THE COMPOSABLE MUST NOT TREAT THEM ALIKE.
             // `draft_already_finalized` — this uuid's row was promoted between the last tick and this one, so
             // updateDraft()'s lock re-assert refused. TERMINAL: the composable stops rather than retrying
             // forever against a row that will never be a draft again.
             // `draft_conflict` — another tab/device saved in between, so this tick is based on answers the
             // draft no longer holds. NOT terminal in the same way: the fix is to re-read the draft and carry
             // on, which is why the two carry distinct codes rather than one shared 409.
+            // `submission_conflict` — added in M11 and reachable here only as a RACE: resolveTarget() above
+            // already refuses a uuid spent outside this caller's scope, so reaching it through saveDraft()
+            // means the row was created between those two statements. Same envelope either way, which is why
+            // the code and the message are read off the exception rather than spelled out twice.
             return ApiErrorResponse::make(409, $e->code(), $e->getMessage());
         } catch (SubmissionValidationException $e) {
             // Structural (Stage 1) only — saveDraft() skips Stage 3 by design, so a half-filled document
@@ -198,7 +203,7 @@ final class SubmissionDraftController extends Controller
      * ⚠️ THE LOOKUP IS SCOPED TO THIS FORM AND THIS USER. On an authenticated endpoint the form comes from
      * the URL and the uuid from the body — two independent, caller-influenced inputs — so an unscoped resolve
      * lets a member authorized on form A write into form B's draft. See
-     * {@see SubmissionDraftService::findByClientUuid()} for the same argument at the service layer.
+     * {@see ClientUuidResolver::resolve()} for the same argument, now shared.
      *
      * ⚠️ AND THE UNIQUENESS DOMAIN IS THE TENANT: `submissions_tenant_client_uuid_unique` is
      * `(tenant_id, client_submission_uuid)`. So "this uuid is not mine" can never mean "create a new draft" —
@@ -212,15 +217,24 @@ final class SubmissionDraftController extends Controller
     {
         $uuid = $request->clientSubmissionUuid();
 
-        $existing = Submission::query()
-            ->where('client_submission_uuid', $uuid)
-            ->where('form_id', $form->id)
-            ->where('respondent_user_id', $user->id)
-            ->where('status', SubmissionStatus::Draft)
-            ->first();
+        // ⚠️ THE PREDICATE MOVED TO {@see ClientUuidResolver::resolve()} IN M11. It was already correct here
+        // and unscoped in {@see \App\Services\Submissions\SubmissionPipeline} and
+        // {@see \App\Http\Controllers\Public\GuestSubmissionController}, which is how a hand-copied invariant
+        // drifts — so there is now one copy and a test that fails if a second is written. The status test is
+        // read off the resolved row rather than pushed into the query, because "mine but already finalized"
+        // is one of the three answers this method exists to tell apart.
+        $mine = ClientUuidResolver::resolve($uuid, $form->id, (string) $user->id);
 
-        if ($existing !== null) {
-            $version = FormVersion::query()->whereKey($existing->form_version_id)->firstOrFail();
+        if ($mine !== null && $mine->status !== SubmissionStatus::Draft) {
+            return ApiErrorResponse::make(
+                409,
+                'draft_already_finalized',
+                'This draft has already been submitted and can no longer be saved as a draft.',
+            );
+        }
+
+        if ($mine !== null) {
+            $version = FormVersion::query()->whereKey($mine->form_version_id)->firstOrFail();
 
             // A superseded pin is terminal, and it is reported the way the GUEST channel reports it rather
             // than as a generic failure: `saveDraft()` would throw `SubmissionException::versionNotPublished()`,
@@ -235,25 +249,17 @@ final class SubmissionDraftController extends Controller
                 );
         }
 
-        $claimed = Submission::query()
-            ->where('client_submission_uuid', $uuid)
-            ->first(['id', 'form_id', 'respondent_user_id']);
+        // Not mine — but the uuid may still be spent, because the uniqueness domain is the TENANT. The
+        // refusal is BUILT from the exception factory rather than spelled out again: this route is a web
+        // route whose composable cannot read bootstrap/app.php's `back()` redirect, so it must return its own
+        // envelope, and reading the code and the message off the same factory is what keeps one wording.
+        if (ClientUuidResolver::isClaimed($uuid)) {
+            $refusal = SubmissionConflictException::clientUuidClaimed();
 
-        if ($claimed === null) {
-            return [$this->publishedVersion($form)];
+            return ApiErrorResponse::make(409, $refusal->code(), $refusal->getMessage());
         }
 
-        return $claimed->form_id === $form->id && $claimed->respondent_user_id === $user->id
-            ? ApiErrorResponse::make(
-                409,
-                'draft_already_finalized',
-                'This draft has already been submitted and can no longer be saved as a draft.',
-            )
-            : ApiErrorResponse::make(
-                409,
-                'submission_conflict',
-                'This draft identifier already belongs to another response.',
-            );
+        return [$this->publishedVersion($form)];
     }
 
     /**

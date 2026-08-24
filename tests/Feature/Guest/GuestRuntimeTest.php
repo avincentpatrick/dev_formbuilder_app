@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Enums\PlanTier;
+use App\Enums\RequiredMode;
 use App\Enums\SubmissionSource;
 use App\Enums\SubmissionStatus;
 use App\Models\Form;
@@ -13,7 +15,10 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserUiPreference;
 use App\Services\Branding\TenantBrandingService;
+use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Submissions\SubmissionDraftService;
+use App\Services\Submissions\SubmissionPayload;
 use App\Support\Guest\GuestShareTokenService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
@@ -388,7 +393,11 @@ it('409 submission_conflict when the same uuid replays with different content (I
         'client_submission_uuid' => $clientUuid,
     ])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict');
+        ->assertJsonPath('error.code', 'submission_conflict')
+        // ⚠️ THE MESSAGE, NOT ONLY THE CODE (M11). A second cause now shares `submission_conflict`, so a
+        // code-only assertion here would pass just as happily for "this uuid was never yours" — which is a
+        // DIFFERENT defect and would mean the content rule had stopped working.
+        ->assertJsonPath('error.message', 'This response conflicts with a copy already saved for the same submission.');
 
     enterTenant($tenant->id);
     expect(Submission::query()->count())->toBe(1);
@@ -468,4 +477,120 @@ it('rate-limits the guest submit endpoint', function (): void {
     $body = ['answers' => ['full_name' => 'Ada', 'age' => '36']];
     $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", $body)->assertCreated();
     $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", $body)->assertStatus(429);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M11 — a uuid from ANOTHER form is refused, not resolved.
+|--------------------------------------------------------------------------
+| The share token fixes the FORM; `client_submission_uuid` arrives in the BODY. Two independent inputs, and
+| the uniqueness domain of the index behind them is the whole TENANT — so before M11 a guest holding form
+| A's link who named a uuid from form B got either B's id/reference/status serialized back with their own
+| answers discarded, or a repeatable unauthenticated 500 from a 23505 no recovery arm could classify.
+*/
+
+/** A second guest-enabled form in the same tenant, with its own slug. */
+function otherGuestForm(Tenant $tenant, User $owner): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, 'Other Intake');
+    addFormField($form->draftVersion, $owner, 'full_name', FieldType::ShortText, 0, ['is_required' => RequiredMode::Required]);
+    app(PublishService::class)->publish($form->refresh(), $owner);
+    $form->update(['public_slug' => 'other', 'allow_guest_submissions' => true, 'save_and_resume' => true]);
+
+    return $form->refresh();
+}
+
+it('409s (not 500) a guest submit naming a uuid that belongs to ANOTHER form’s draft (M11)', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $mine = guestForm($tenant, $owner);
+    $theirs = otherGuestForm($tenant, $owner);
+    $uuid = Uuid::uuid7()->toString();
+
+    // Form B has a live guest DRAFT under this uuid.
+    app(SubmissionDraftService::class)->saveDraft(new SubmissionPayload(
+        version: $theirs->currentPublishedVersion,
+        answers: ['full_name' => 'Ada'],
+        source: SubmissionSource::Guest,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    $token = shareTokenFor($mine);
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", [
+        'answers' => ['full_name' => 'Mallory', 'age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+
+    // Form B's draft is untouched: still a draft, still Ada's answers, and no second row was created.
+    enterTenant($tenant->id);
+    $foreign = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+    expect($foreign->status)->toBe(SubmissionStatus::Draft)
+        ->and($foreign->form_id)->toBe($theirs->id)
+        ->and(SubmissionAnswer::query()->findOrFail($foreign->id)->answers['full_name'])->toBe('Ada')
+        ->and(Submission::query()->count())->toBe(1);
+});
+
+it('never serializes ANOTHER form’s finalized submission back to a guest who names its uuid (M11)', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $mine = guestForm($tenant, $owner);
+    $theirs = otherGuestForm($tenant, $owner);
+    $uuid = Uuid::uuid7()->toString();
+
+    $foreignToken = shareTokenFor($theirs);
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$foreignToken}/submissions", [
+        'answers' => ['full_name' => 'Ada'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    enterTenant($tenant->id);
+    $foreign = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail();
+
+    // The same uuid replayed against form A's token. Before M11 this was a 200 carrying B's id, reference
+    // and status whenever the stored checksum could not be compared or happened to match.
+    $response = $this->postJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($mine).'/submissions', [
+        'answers' => ['full_name' => 'Mallory', 'age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ]);
+
+    $response->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+    expect($response->getContent())->not->toContain($foreign->id)
+        ->and($response->getContent())->not->toContain((string) $foreign->reference);
+});
+
+it('409s a guest submit naming a uuid that belongs to a MEMBER’s draft on the same form (M11)', function (): void {
+    $tenant = guestTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    $form = guestForm($tenant, $owner);
+    $uuid = Uuid::uuid7()->toString();
+
+    // An encoder's own draft on THIS form — same form, but it has an author, so it is not a guest's to promote.
+    app(SubmissionDraftService::class)->saveDraft(new SubmissionPayload(
+        version: $form->currentPublishedVersion,
+        answers: ['full_name' => 'Ada'],
+        source: SubmissionSource::Manual,
+        respondentUserId: $owner->id,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    $this->postJson('http://acme.meridian.test/api/v1/public/f/'.shareTokenFor($form).'/submissions', [
+        'answers' => ['full_name' => 'Mallory', 'age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+
+    enterTenant($tenant->id);
+    expect(Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->status)
+        ->toBe(SubmissionStatus::Draft);
 });

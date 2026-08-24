@@ -739,3 +739,70 @@ it('promotes a submit that carries the CURRENT baseline, so the token is used an
     expect(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
         ->toBe('Ada');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment M11 — the draft channel refuses a uuid spent on another form.
+|--------------------------------------------------------------------------
+| This route is the one the M11 backlog row does NOT name, and it carried the identical defect: the scoped
+| resolve missed, createDraft() inserted into the tenant-wide `(tenant_id, client_submission_uuid)` index,
+| the 23505 could not be classified, the reference-retry budget was burned on an insert that could only fail
+| again, and the QueryException escaped as a 500 — on a route anyone on the internet can POST to.
+*/
+
+it('409s (not 500) a guest draft save naming a uuid spent on ANOTHER form (M11)', function (): void {
+    $f = draftFixture();
+    $theirs = draftForm($f->tenant, $f->owner, 'other');
+    $uuid = Uuid::uuid7()->toString();
+
+    // Form B claims the uuid first, on its own channel.
+    $this->postJson('http://acme.meridian.test/api/v1/public/f/'.draftShareToken($theirs).'/draft', [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '31'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+
+    // Exactly one row, still form B's, still its answers.
+    enterTenant($f->tenant->id);
+    $rows = Submission::query()->get();
+    expect($rows)->toHaveCount(1)
+        ->and($rows->first()->form_id)->toBe($theirs->id)
+        ->and(SubmissionAnswer::query()->findOrFail($rows->first()->id)->answers['age'])->toBe('30');
+});
+
+it('refuses a uuid still reserved by a SOFT-DELETED row rather than failing on the index (M11)', function (): void {
+    $f = draftFixture();
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '30'],
+        'client_submission_uuid' => $uuid,
+    ])->assertCreated();
+
+    // ⚠️ THE TOMBSTONE KEEPS THE UUID. `submissions_tenant_client_uuid_unique` filters on
+    // `client_submission_uuid IS NOT NULL` and NOT on `deleted_at IS NULL`, so a soft-deleted row still owns
+    // the index entry while the SoftDeletes global scope hides it from every resolve — which is exactly why
+    // ReapTenantDraftsJob hard-deletes. Nothing soft-deletes a submission today, so this asserts a LATENT
+    // failure stays closed rather than a live one.
+    enterTenant($f->tenant->id);
+    Submission::query()->firstOrFail()->delete();
+
+    $this->postJson("http://acme.meridian.test/api/v1/public/f/{$f->token}/draft", [
+        'answers' => ['age' => '31'],
+        'client_submission_uuid' => $uuid,
+    ])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+
+    enterTenant($f->tenant->id);
+    expect(Submission::query()->count())->toBe(0)
+        ->and(Submission::withTrashed()->count())->toBe(1);
+});

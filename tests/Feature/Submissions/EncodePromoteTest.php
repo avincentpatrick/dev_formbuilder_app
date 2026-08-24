@@ -16,6 +16,7 @@ use App\Services\Forms\PublishService;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Ramsey\Uuid\Uuid;
 
@@ -205,29 +206,84 @@ it('projects the answer index exactly once for a promoted draft', function (): v
 
 it('promotes a draft the pipeline itself resolved, closing the autosave/submit commit race', function (): void {
     // ⚠️ R1 SURVIVES THE DRAFT BRANCH THROUGH A RACE, and this is the backstop for it. The controller's
-    // `$draft` lookup and the pipeline's Stage 2b both read BEFORE a concurrent autosave commits, so both can
-    // miss; the insert then trips the (tenant_id, client_submission_uuid) unique index and the 23505 catch
-    // resolves the row — the freshly-committed DRAFT — returning it `created: false`. Simulated here by
-    // submitting a uuid whose draft exists but which the controller's own scoped lookup cannot see, because
-    // it belongs to a different user: the pipeline still resolves it by uuid alone.
-    $other = User::factory()->create();
-    enterTenant($this->tenant->id, $other->id);
-    makeActiveMember($other, 'owner');
-    encodeReenter();
-
+    // `$draft` lookup and the pipeline's Stage 2b both read BEFORE a concurrent autosave commits, so a
+    // Submit clicked ~1.5s after the last keystroke can find nothing, resolve the row a moment later, and
+    // return it `created: false` — a success toast over a row that would stay `draft` forever.
+    //
+    // ⚠️ THE STAGING CHANGED IN M11, AND THE OLD STAGING WAS THE DEFECT ITSELF. This case used to plant the
+    // draft under a DIFFERENT USER and rely on "the pipeline still resolves it by uuid alone" — i.e. it
+    // asserted that a member may promote a stranger's draft on a form they may hold no grant on, which is
+    // the authorization hole M11 closed. Now that the controller and Stage 2b share one scoped predicate, no
+    // sequentially-planted row can be visible to one and not the other: the ONLY remaining way in is the
+    // real interleaving. So it is staged as the real interleaving — the autosave commits between the two
+    // reads — rather than approximated by a row nobody was entitled to.
     $uuid = Uuid::uuid7()->toString();
-    $draft = Submission::factory()->forVersion(FormVersion::findOrFail($this->form->current_published_version_id))->create([
-        'status' => SubmissionStatus::Draft,
-        'source' => SubmissionSource::Manual,
-        'respondent_user_id' => $other->id,
-        'client_submission_uuid' => $uuid,
-        'submitted_at' => null,
-    ]);
-    SubmissionAnswer::factory()->forSubmission($draft)->create(['answers' => ['full_name' => 'Ada']]);
-    encodeReenter();
+    $version = FormVersion::findOrFail($this->form->current_published_version_id);
+    $planted = null;
+    $fired = false;
+
+    // Fire once, on the controller's own resolve, and create the draft the autosave would have committed a
+    // millisecond later. The listener runs INSIDE the request, so the row is written under the request's own
+    // tenant context — the same way the racing autosave would write it.
+    //
+    // ⚠️ THE FLAG IS SET BEFORE THE WRITE, NOT AFTER IT, AND THAT IS THE WHOLE DIFFERENCE. Guarding on
+    // `$planted !== null` re-enters: the factory's own INSERT names this same column, so the listener fires
+    // again while the first create is still in flight and plants uuid after uuid until one of them collides
+    // — and a 23505 inside RefreshDatabase's outer transaction poisons every later statement with 25P02,
+    // which reads as a tenancy failure three frames away from the cause.
+    DB::listen(function ($query) use (&$planted, &$fired, $uuid, $version): void {
+        if ($fired || ! str_contains($query->sql, 'client_submission_uuid')) {
+            return;
+        }
+
+        $fired = true;
+
+        $planted = Submission::factory()->forVersion($version)->create([
+            'status' => SubmissionStatus::Draft,
+            'source' => SubmissionSource::Manual,
+            'respondent_user_id' => test()->owner->id,
+            'client_submission_uuid' => $uuid,
+            'submitted_at' => null,
+        ]);
+        SubmissionAnswer::factory()->forSubmission($planted)->create(['answers' => ['full_name' => 'Ada']]);
+    });
 
     submitEncode($this->form, ['full_name' => 'Ada'], $uuid)->assertRedirect();
 
+    // ⚠️ NON-VACUITY: if the listener never fired there was no race to survive and the assertion below would
+    // pass for the wrong reason (no row, no draft, nothing to leave behind).
+    expect($planted)->not->toBeNull();
+
     // The row must NOT be left as a draft carrying a success toast.
-    expect(Submission::findOrFail($draft->id)->status)->toBe(SubmissionStatus::Submitted);
+    expect(Submission::findOrFail($planted->id)->status)->toBe(SubmissionStatus::Submitted)
+        ->and(Submission::query()->count())->toBe(1);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M11 — the promote backstop may never reach another form's draft.
+|--------------------------------------------------------------------------
+| `store()`'s race backstop promotes whatever Stage 2b returned. While Stage 2b resolved on the uuid ALONE
+| that was a write, not a read: a member entitled to form A could finalize form B's draft — a form they may
+| hold no grant on — because promote() is invoked directly and never re-runs SubmissionPolicy::promote().
+| Scoping Stage 2b is what makes the backstop safe by construction, and this asserts it stays that way.
+*/
+
+it('never promotes ANOTHER form’s draft when Submit names its uuid (M11)', function (): void {
+    $theirs = publishedInboxForm($this->tenant, $this->owner, 'Other Intake');
+    $uuid = Uuid::uuid7()->toString();
+
+    saveEncodeDraft($theirs, ['full_name' => 'Ada'], $uuid);
+    $foreignId = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->id;
+
+    // Submit against form A, naming form B's uuid. The refusal is the 409 cause rendered on the web arm as a
+    // toast; what matters is what did NOT happen to form B.
+    submitEncode($this->form, ['full_name' => 'Mallory'], $uuid)->assertSessionHas('toast');
+
+    $foreign = Submission::findOrFail($foreignId);
+    expect($foreign->status)->toBe(SubmissionStatus::Draft)          // NOT finalized by a stranger
+        ->and($foreign->form_id)->toBe($theirs->id)
+        ->and($foreign->submitted_at)->toBeNull()
+        ->and(SubmissionAnswer::query()->findOrFail($foreignId)->answers)->toBe(['full_name' => 'Ada'])
+        ->and(Submission::query()->count())->toBe(1);                // and no row was created for form A
 });

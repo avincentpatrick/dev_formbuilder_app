@@ -566,3 +566,96 @@ it('omits a hidden calculated field from the answer document (Increment G3)', fu
     $answerDoc = SubmissionAnswer::query()->findOrFail($result->submission->id);
     expect($answerDoc->answers)->not->toHaveKey('total');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Increment M11 — Stage 2b resolves WITHIN one form and one author.
+|--------------------------------------------------------------------------
+| The uniqueness domain of `submissions_tenant_client_uuid_unique` is the TENANT; the scope a caller may
+| resolve within is one form and one author. Everything below is the gap between those two, which used to be
+| a resolve (another form's row handed back as an idempotent no-op) or an unclassifiable 23505.
+*/
+
+it('refuses a uuid already spent on ANOTHER form instead of resolving it (M11)', function (): void {
+    $mine = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+    $theirs = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $uuid = Str::uuid()->toString();
+    $foreign = $this->pipeline->submit(new SubmissionPayload(
+        version: $theirs,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    expect(fn () => $this->pipeline->submit(new SubmissionPayload(
+        version: $mine,
+        answers: ['name' => 'Mallory'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    )))->toThrow(SubmissionConflictException::class, 'This submission identifier already belongs to another response.');
+
+    // No second row, and the foreign row was neither returned nor touched.
+    expect(Submission::query()->count())->toBe(1)
+        ->and($foreign->submission->fresh()->form_id)->toBe($theirs->form_id)
+        ->and(SubmissionAnswer::query()->findOrFail($foreign->submission->id)->answers)->toBe(['name' => 'Ada']);
+});
+
+it('refuses a uuid spent by ANOTHER author on the same form (M11)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $uuid = Str::uuid()->toString();
+    // A member's own submission — `respondent_user_id` is theirs.
+    $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::Manual,
+        respondentUserId: $this->user->id,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    // The same form, the same uuid, but no author (the guest channel) — a different row, not a replay.
+    expect(fn () => $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::Guest,
+        clientSubmissionUuid: $uuid,
+    )))->toThrow(SubmissionConflictException::class, 'This submission identifier already belongs to another response.');
+
+    expect(Submission::query()->count())->toBe(1);
+});
+
+it('refuses a uuid still reserved by a soft-deleted row rather than 23505ing on the index (M11)', function (): void {
+    $version = pipelinePublish($this->tenant, $this->user, function (FormVersion $draft, User $user): void {
+        addFormField($draft, $user, 'name', FieldType::ShortText, 0);
+    });
+
+    $uuid = Str::uuid()->toString();
+    $first = $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    ));
+
+    // The tombstone keeps the index entry (the index filters on the uuid being non-null, NOT on deleted_at),
+    // while the SoftDeletes global scope hides the row from every resolve. Latent today — ReapTenantDraftsJob
+    // hard-deletes for exactly this reason — and asserted so it cannot become live silently.
+    $first->submission->delete();
+
+    expect(fn () => $this->pipeline->submit(new SubmissionPayload(
+        version: $version,
+        answers: ['name' => 'Ada'],
+        source: SubmissionSource::ApiImport,
+        clientSubmissionUuid: $uuid,
+    )))->toThrow(SubmissionConflictException::class, 'This submission identifier already belongs to another response.');
+
+    expect(Submission::query()->count())->toBe(0)
+        ->and(Submission::withTrashed()->count())->toBe(1);
+});

@@ -88,7 +88,7 @@ it('creates a manual draft and returns its progress', function (): void {
 });
 
 it('overwrites one row across many autosave ticks instead of creating one per tick', function (): void {
-    // ⚠️ THE TEST THIS ENDPOINT EXISTS TO SURVIVE. `saveDraft()` consults `findByClientUuid()` only when the
+    // ⚠️ THE TEST THIS ENDPOINT EXISTS TO SURVIVE. `saveDraft()` consults `ClientUuidResolver::resolve()` only when the
     // uuid is non-null; make the field nullable "for convenience" and every debounce tick takes the
     // `createDraft()` branch, so an hour of typing leaves a hundred draft rows each with a 30-day TTL.
     $uuid = Uuid::uuid7()->toString();
@@ -495,4 +495,38 @@ it('submits when the encode tab carries the CURRENT baseline, so the token is co
     expect($row->status)->toBe(SubmissionStatus::Submitted)
         ->and(data_get(SubmissionAnswer::query()->where('submission_id', $row->id)->value('answers'), 'full_name'))
         ->toBe('Ada Lovelace');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M11 — the refusal arm that had no test at all.
+|--------------------------------------------------------------------------
+| `resolveTarget()` has returned a 409 `submission_conflict` for "this uuid was never yours" since I9b, and
+| grepping the repository for its message found the string in exactly one place: the controller that emits
+| it. The arm worked; nothing asserted it, so nothing would have noticed it stop. Found while scoping M11,
+| which routes the same refusal through `ClientUuidResolver::isClaimed()`.
+*/
+
+it('409s an autosave whose uuid belongs to another form, and creates nothing (M11)', function (): void {
+    $theirs = publishedInboxForm($this->tenant, $this->owner, 'Other Intake');
+    $uuid = Uuid::uuid7()->toString();
+
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($theirs), ['answers' => ['full_name' => 'Ada'], 'client_submission_uuid' => $uuid])
+        ->assertSuccessful();
+    reenter();
+
+    $this->actingAs($this->owner)
+        ->postJson(draftUrl($this->form), ['answers' => ['full_name' => 'Mallory'], 'client_submission_uuid' => $uuid])
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'submission_conflict')
+        // ⚠️ THE MESSAGE, NOT ONLY THE CODE — `contentConflict()` shares the code, so a code-only assertion
+        // cannot tell "never yours" from "your content moved".
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
+    reenter();
+
+    $rows = Submission::query()->get();
+    expect($rows)->toHaveCount(1)
+        ->and($rows->first()->form_id)->toBe($theirs->id)
+        ->and($rows->first()->status)->toBe(SubmissionStatus::Draft);
 });

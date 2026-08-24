@@ -90,7 +90,7 @@ The two mechanisms run database-first: `consumed_at` cannot be flushed, while th
 
 Refusals are written to the **log** with a stable machine token, never to `audits`: that table is append-only by RLS policy and never pruned, so an unauthenticated endpoint writing to it on every rejection is an amplification primitive. **The accepted cost, stated so it is not discovered later: a real employee whose IdP clock has drifted sees a bare 404, and their admin has no in-app view of why.** A tenant-facing "recent SSO sign-in failures" panel is owed work, not an oversight — see *When to Revisit*.
 
-**§D20 — the four membership outcomes, and the one that is not JIT's to decide.** `Active` → in, with no write at all. **`Suspended` → REFUSED**: an explicit administrative sanction, and a sign-in that silently reversed it would make the sanction unenforceable in exactly the workspaces most likely to rely on it. This is the one status `TenantMembershipService`'s shared attach path would happily reactivate, which is why the check sits in `SsoUserProvisioner` before the call. **`Invited` → activated at the INVITED role**, not at `default_role_name`, and *not* gated on the JIT toggle: an admin who invited somebody as an Admin expressed an intent about that person by name, which is a stronger statement than the toggle makes, and letting the directory's default silently demote them would make the invitation surface untrustworthy. **Absent / `Declined` / `Removed` → JIT territory**, gated on `jit_provisioning_enabled` and landed at `default_role_name`.
+**§D20 — the four membership outcomes, and the one that is not JIT's to decide.** `Active` → in, with no write at all. **`Suspended` → REFUSED**: an explicit administrative sanction, and a sign-in that silently reversed it would make the sanction unenforceable in exactly the workspaces most likely to rely on it. This is the one status `TenantMembershipService`'s shared attach path would happily reactivate, which is why the check sits in `SsoUserProvisioner` before the call. **`Invited` → activated at the INVITED role**, not at `default_role_name`, and *not* gated on the JIT toggle: an admin who invited somebody as an Admin expressed an intent about that person by name, which is a stronger statement than the toggle makes, and letting the directory's default silently demote them would make the invitation surface untrustworthy. **Absent / `Declined` / `Removed` → JIT territory**, gated on `jit_provisioning_enabled` and landed at `default_role_name`. ⛔ **AMENDED BY §D33 (M9), AND THE TWO SENTENCES ABOVE WERE THE DEFECT RATHER THAN A DESCRIPTION OF IT.** *"An admin expressed an intent about that person by name"* is false: an invitation names an **address**, and `MemberController::invite()` has no domain-ownership check, so all three row-exists statuses were an account takeover needing no emailed token. Each is now asked `identityIsEstablished()` first; what survives here is the treatment of a never-used **placeholder**, which is the only case the reasoning above was ever true of.
 
 A full seat quota **refuses** rather than admitting a seatless member. `joinOpenTenant()` returns null and lets a self-registrant keep an account with no workspace — correct there, because it is a state the product already has; here it is not, because a session with no membership sees an empty workspace through RLS and reads as data loss. The refusal is therefore an exception, and one enclosing transaction is what stops a freshly created user being orphaned by it.
 
@@ -287,6 +287,69 @@ policy. Building it was considered here and rejected as scope: a new `SettingKey
 settings control, for a row filed as a documentation defect.
 
 ---
+
+### The M9 sub-decision (2026-08-24)
+
+**§D33 — an invitation names an ADDRESS, so single sign-on may not adopt the account behind one.**
+*User decision of record, 2026-08-24.* §D20 said `Invited` is *"an admin who invited somebody as an Admin
+expressed an intent about that person by name"*, and grouped `Declined` / `Removed` as ordinary JIT
+territory. **That reasoning was the defect, not a description of one.** `MemberController::invite()`
+validates `['required', 'email', 'max:255']` and a role, with no domain-ownership check at any layer, and
+`TenantMembershipService::resolveOrCreateUser()` resolves the address on `pgsql_auth` — where every account
+in the deployment is visible — so the invitation binds to the victim's **existing global identity** rather
+than to a placeholder. An admin of any SSO-entitled workspace could therefore invite
+`victim@othercompany.com`, assert that address at an identity provider they configured themselves, and hold
+a session as the victim.
+
+`SsoUserProvisioner` now asks `TenantMembershipService::identityIsEstablished()` — M8's predicate, **reused
+rather than re-derived** — for every non-`Active` membership, and refuses an identity that has demonstrably
+been used. An established person completes an invitation **in their own browser**, which is where the
+password check and the second-factor challenge actually run. A never-used placeholder this workspace's own
+invitation created is untouched and still completes through the identity provider.
+
+**⚠️ THIS IS STRICTLY STRONGER THAN THE HOLE M8 CLOSED, AND THAT IS THE SEVERITY ARGUMENT.** M8's
+invitation-door takeover needed the emailed token. This one needs **no access to anybody's mailbox at all** —
+the attacker creates the membership row themselves, as an ordinary administrative act, and the row is what
+disarms the guard. Two further properties were established by reading the code rather than reasoning about
+it: `Invited` **bypasses `jit_provisioning_enabled` by explicit condition**, so no configuration protected a
+workspace; and `SsoUserProvisioner::roleFor()` lands an invited member at the **invited** role, so the
+attacker chose the privilege level of the session they obtained. §D32 completes the picture — a SAML sign-in
+does not challenge a member's personal second factor, so an enrolled victim was not protected either.
+
+**⚠️ WHAT THIS DECIDES AND WHAT IT DOES NOT.** It decides that a **membership row is not evidence about a
+person**. It does **not** decide that an identity provider's assertion is untrustworthy in general: a
+workspace's own members, already `Active`, sign in exactly as before, and a genuinely new address still
+provisions through JIT exactly as before. The blast radius is one case — an existing, established account
+that has not completed this workspace's invitation — and it is bounded by a permissive control asserted in
+`SsoAcsWebTest`, not merely described here.
+
+**THE COST, STATED RATHER THAN DISCOVERED.** An employee who already holds a Meridian account from another
+workspace, and is then invited to an SSO workspace, must open the invitation link once and accept it signed
+in as themselves. Single sign-on works normally from then on, because the membership is `Active`. That is one
+extra step, once, for a person whose account this product cannot otherwise prove they control.
+
+**⛔ REJECTED: narrowing the carve-out to *"a placeholder this workspace actually created"* instead.** It is
+the tempting shape, and it needs a fact the schema does not record — nothing distinguishes an invite
+placeholder from a self-registered account that was never used. That is the residual M8 priced and left, and
+the reason `users.password_set_at` is a filed backlog row rather than an assumption made here.
+
+**⛔ REJECTED: domain-ownership verification as this increment's fix.** It is the *structural* answer — a
+workspace may only assert addresses in a domain it has proven it controls — and it is filed as its own row.
+It needs a new table, a DNS challenge, an admin surface and a grandfathering decision for every live
+connection, and the takeover would stay live for the whole of it. This decision narrows the hole; it does not
+replace that row.
+
+**PINNED BY TESTS, WHICH IS WHAT MAKES IT FALSIFIABLE.** `SsoAcsWebTest` drives the real ACS round trip for
+all three statuses, asserts the invitation's `invite_token` **survives** the refusal — the adoption used to
+consume the real invitee's link, making the attack indistinguishable from an expired invite — and keeps the
+permissive control that a never-used placeholder still signs in at the invited role.
+`SsoAuthFailureLogTest` is also migration `2026_08_17_000108`'s test: `SsoFailureReason::values()` is
+CHECK-constrained, so a new case without its widening migration would raise 23514 **while the refusal was
+being recorded**, on the one endpoint anyone on the internet can post to.
+
+**Revisit trigger:** domain-ownership verification shipping, which would let an assertion carry evidence
+about the address for the first time and make this refusal narrower than it needs to be; or
+`users.password_set_at`, which would let the placeholder question be asked directly instead of inferred.
 
 ## Consequences
 

@@ -185,8 +185,11 @@ test, and §D1's refusal should not be read as a precedent that the answer is al
 
 **What bounds it.** SELECT only — the absence of INSERT/UPDATE/DELETE policies IS the write refusal under FORCE RLS, and
 the GRANT stops a write one layer earlier still. Role-scoped, so `meridian_app` (which holds no membership in
-`meridian_auth`) is untouched and every tenant-isolation assertion in the suite is structurally unaffected. And one
-consumer, `TenantMembershipService::identityIsEstablished()`, matching a server-derived uuid with exact equality: the
+`meridian_auth`) is untouched and every tenant-isolation assertion in the suite is structurally unaffected. And ⛔ **TWO
+consumers since M9 (2026-08-24), where this sentence said ONE** — `InvitationController` and
+`SsoUserProvisioner`, both reaching the connection through the same
+`TenantMembershipService::identityIsEstablished()`, which is why the count moved and the SHAPE did not: the
+predicate is still the single point of contact, matching a server-derived uuid with exact equality. The
 standing rule from multi-tenancy-rbac-design.md §9 — **no user-supplied predicate may ever run on `pgsql_auth`** — is now
 the whole of the guarantee on that connection rather than half of it, because the grant that used to make a wrong query
 fail loudly no longer does. `TenantUsersAuthReadRlsTest` asserts the GRANT and the policy **separately** (privileges are

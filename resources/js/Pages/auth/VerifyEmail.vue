@@ -44,6 +44,28 @@ function correct(): void {
   // The `updateProfileInformation` error bag is Fortify's, named by its own `validateWithBag()` call.
   correctForm.put('/user/profile-information', { errorBag: 'updateProfileInformation', preserveScroll: true });
 }
+
+/**
+ * ⚠️ AN INERTIA VISIT, NOT A NATIVE FORM POST — AND THE DIFFERENCE WAS A LOCKOUT, NOT A STYLE POINT (M10).
+ *
+ * Until M10 this control was `<form method="POST" action="/logout">`. A native browser submission carries no
+ * `_token` field and no `X-XSRF-TOKEN` header — only Inertia's axios layer supplies those — and
+ * `bootstrap/app.php` exempts exactly one path from CSRF, the SAML ACS. So the only exit from this page
+ * answered **419**, for every newly registered account and, once J3a mounted `verified`, for anyone who
+ * changed their email address. The docblock above calls the correction form "the only way out of a lockout";
+ * the sign-out beneath it had been one since PR #6.
+ *
+ * ⛔ THE FIX IS NOT AN ENTRY IN THE CSRF EXEMPTION LIST. That resolves the 419 by REMOVING a control from a
+ * session-destroying endpoint rather than by using it. `useForm().post()` is what the two forms above
+ * already do, what `invitations/Show.vue` does at the same door, and what keeps `MdsButton` — the twin at
+ * `TwoFactorRequired.vue` had to hand-rebuild the button's styling to use `<Link as="button">`.
+ * `resources/js/__tests__/native-form-submission.test.ts` is the gate that now sees this class at all.
+ */
+const signOutForm = useForm({});
+
+function signOut(): void {
+  signOutForm.post('/logout');
+}
 </script>
 
 <template>
@@ -94,8 +116,8 @@ function correct(): void {
       <MdsButton type="submit" :loading="correctForm.processing">Update and resend</MdsButton>
     </form>
 
-    <form method="POST" action="/logout">
-      <MdsButton type="submit" variant="tertiary" size="sm">Log out</MdsButton>
+    <form @submit.prevent="signOut">
+      <MdsButton type="submit" variant="tertiary" size="sm" :loading="signOutForm.processing">Log out</MdsButton>
     </form>
   </AuthLayout>
 </template>

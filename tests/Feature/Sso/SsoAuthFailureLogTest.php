@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\PlanTier;
 use App\Enums\SsoFailureReason;
+use App\Enums\TenantUserStatus;
 use App\Models\SsoAuthFailure;
 use App\Models\SsoAuthRequest;
 use App\Models\SsoConnection;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Sso\SsoAuthnRequestBuilder;
 use App\Services\Sso\SsoMetadataParser;
@@ -192,6 +194,50 @@ it('records the adoption refusal under its own reason, which the CHECK must acce
         // A verified signature vouched for the address, so the admin gets to see WHO tried — which on this
         // reason is the whole point: it is the one row that can mean somebody is probing for an account.
         ->and($failures[0]->subject_email)->toBe($stranger->email)
+        ->and($failures[0]->reason->label())->not->toBe('')
+        ->and($failures[0]->reason->hint())->not->toBe('');
+});
+
+it('records the invitation-adoption refusal under its own reason, which the CHECK must accept', function (): void {
+    // ⚠️ THIS TEST IS ALSO THE MIGRATION'S TEST — the fourth time this file has carried one, after M1's
+    // `2026_08_17_000104`, M2's `…000105` and K1b's `…000103`. `sso_auth_failures.reason` is
+    // CHECK-constrained to `SsoFailureReason::values()`, so M9's new case needs `2026_08_17_000108` to widen
+    // it; without that migration the guard would raise a 23514 *while being recorded*, turning a closed
+    // takeover into a 500 on the one endpoint anyone on the internet can post to. Asserting the row exists
+    // asserts the constraint accepts the value, which no unit test over the enum could do.
+    //
+    // The difference from the adoption case above is the whole subject of M9: there IS a membership row
+    // here — an invitation this workspace's own admin created — and it used to be exactly what disarmed the
+    // guard. JIT stays ON, because this refusal is about whose address it is, not about provisioning policy.
+    enterTenant($this->tenant->id, $this->admin->id);
+    $victim = committedTenantIdentity('Ada Lovelace');
+
+    $invite = new TenantUser;
+    $invite->fill([
+        'user_id' => $victim->id,
+        'status' => TenantUserStatus::Invited,
+        'invited_role_id' => catalogRole('viewer'),
+        'invited_at' => now(),
+        'invite_expires_at' => now()->addDays(7),
+        'invite_token' => hash('sha256', 'token'),
+    ])->save();
+
+    $request = startFailureLogin($this->tenant, $this->admin);
+
+    $this->post(FAILURE_LOG_ACS, [
+        'SAMLResponse' => (new FakeIdp(FAILURE_LOG_ACS, FAILURE_LOG_SP, $request->request_id))
+            ->as($victim->email)
+            ->response(),
+    ])->assertNotFound();
+
+    $failures = recordedFailures($this->tenant, $this->admin);
+
+    expect($failures[0]->reason)->toBe(SsoFailureReason::EstablishedIdentityNotJoined)
+        // Recorded, and it must be: this row is how an admin discovers that somebody invited an address
+        // they do not control and then tried to walk in as them. `subject_email` is populated because a
+        // verified signature vouched for the address, so `docs/data-dictionary.md`'s "populated only by"
+        // list gains this reason too — a list that had already gone stale once, between M1 and M2.
+        ->and($failures[0]->subject_email)->toBe($victim->email)
         ->and($failures[0]->reason->label())->not->toBe('')
         ->and($failures[0]->reason->hint())->not->toBe('');
 });

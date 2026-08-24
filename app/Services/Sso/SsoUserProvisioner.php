@@ -35,19 +35,34 @@ use Illuminate\Support\Str;
  * the default connection before anything writes through it — and the exact-email rule that keeps a
  * cross-tenant read from becoming a cross-tenant directory.
  *
- * ── THE FOUR MEMBERSHIP OUTCOMES ────────────────────────────────────────────────────────────────────
+ * ── THE MEMBERSHIP OUTCOMES ─────────────────────────────────────────────────────────────────────────
+ * ⛔ **AMENDED BY M9, AND THE OLD VERSION OF THIS BLOCK WAS THE DEFECT RATHER THAN A DESCRIPTION OF IT.**
+ * It said `Invited` is *"an admin who invited someone as an Admin expressed an intent about that person"* and
+ * grouped `Declined`/`Removed` as ordinary JIT territory. **An invitation names an ADDRESS; it establishes
+ * nothing about who is behind one** — which is what M8 proved on the invitation door, and what made every
+ * row-exists status a takeover here. So the statuses now fork on IDENTITY first and status second:
+ *
  *   · Active     → in, with no write at all. The common case, and the one that must stay cheap.
  *   · Suspended  → REFUSED. An explicit administrative sanction, and an SSO sign-in that silently reversed
  *                  it would make the sanction unenforceable in exactly the workspaces most likely to rely
  *                  on it. This is the one status {@see TenantMembershipService::joinViaSso()} would happily
  *                  reactivate, which is why the check lives here, before the call.
- *   · Invited    → activated AT THE INVITED ROLE, not at `default_role_name`. An admin who invited someone
- *                  as an Admin expressed an intent about that person; letting the directory's default
- *                  silently demote them would make the invitation surface untrustworthy.
- *   · absent, Declined or Removed → JIT territory. Gated on `jit_provisioning_enabled` and landed at
- *                  `default_role_name`, which the database CHECK constrains to the seeded catalog MINUS
- *                  `owner` ({@see AssignableRoles}) — because RBAC §5 establishes Owner only by ownership
- *                  transfer and an IdP attribute must never be a path to it.
+ *   · an EXISTING account with no row here            → REFUSED ({@see SsoAuthenticationException::existingAccountNotMember()}).
+ *   · an EXISTING **established** identity, whatever  → REFUSED ({@see SsoAuthenticationException::establishedIdentityNotJoined()}).
+ *     its `Invited` / `Declined` / `Removed` row says     They complete the invitation in their own browser,
+ *                                                        where the password check and the second-factor
+ *                                                        challenge actually run.
+ *   · Invited, and a NEVER-USED placeholder           → activated AT THE INVITED ROLE, not at
+ *                                                        `default_role_name`. That courtesy survives M9
+ *                                                        because it is now only ever extended to an account
+ *                                                        this workspace's own invitation brought into being.
+ *   · absent, or Declined / Removed on an identity    → JIT territory. Gated on `jit_provisioning_enabled`
+ *     that is not established                            and landed at `default_role_name`, which the
+ *                                                        database CHECK constrains to the seeded catalog
+ *                                                        MINUS `owner` ({@see AssignableRoles}) — because
+ *                                                        RBAC §5 establishes Owner only by ownership
+ *                                                        transfer and an IdP attribute must never be a path
+ *                                                        to it.
  *
  * ── ONE TRANSACTION AROUND BOTH WRITES, AND IT IS NOT COSMETIC ──────────────────────────────────────
  * `joinViaSso()` returns NULL rather than throwing when the seat quota is full — correct for the
@@ -81,17 +96,34 @@ final class SsoUserProvisioner
             // `pgsql_auth` and sees every account in the deployment, and nothing requires that the address
             // an IdP asserts belongs to a domain this workspace controls — so without this line an admin of
             // any SSO-entitled workspace could assert a stranger's address and be signed in as them. See
-            // SsoAuthenticationException::existingAccountNotMember() for the full chain and for why the
-            // refusal is this narrow: a membership row of ANY status means this workspace has already made a
-            // decision about that person, and a brand-new address is unaffected.
+            // SsoAuthenticationException::existingAccountNotMember() for the full chain. ⛔ M9 DELETED THE
+            // SENTENCE THAT USED TO CLOSE THIS COMMENT — "a membership row of ANY status means this
+            // workspace has already made a decision about that person" — because a row is a decision about
+            // an ADDRESS. This line still fires only on "no row here at all"; the guard below asks the rest,
+            // and a brand-new address is unaffected by either.
             if ($user !== null && $membership === null) {
                 throw SsoAuthenticationException::existingAccountNotMember($identity->email);
             }
 
+            // ⚠️ AND THE SAME QUESTION AGAIN FOR THE ROWS THAT USED TO DISARM THE LINE ABOVE (M9). Reaching
+            // here with a row means `Invited`, `Declined` or `Removed` — `Active` returned and `Suspended`
+            // threw — and every one of them was adoptable, which made "invite a stranger, then assert their
+            // address at your own IdP" a takeover needing no emailed token. `identityIsEstablished()` is M8's
+            // predicate, unchanged and reused rather than re-derived: the membership row is the invitation it
+            // excludes, and its own `joined_at`/`removed_at` are what make a REMOVED former member refuse.
+            // A never-used placeholder still completes its invitation here, which is the whole blast radius.
+            if ($user !== null && $membership !== null
+                && $this->memberships->identityIsEstablished($user, $membership)) {
+                throw SsoAuthenticationException::establishedIdentityNotJoined($identity->email);
+            }
+
             $roleName = $this->roleFor($connection, $membership);
 
-            // The JIT gate covers everything except completing an invitation: an invited person was
-            // authorized by an admin by name, which is a stronger statement than the toggle makes.
+            // The JIT gate covers everything except completing an invitation. ⚠️ M9 NARROWED WHAT THAT
+            // SENTENCE CAN MEAN: an admin naming an ADDRESS is not a statement about the person behind it,
+            // so the exemption is only reachable now for a never-used placeholder — the guard above has
+            // already refused every established identity. Read on its own this line still looks like a
+            // status check; it is load-bearing only because of what precedes it.
             if ($membership?->status !== TenantUserStatus::Invited && ! $connection->jit_provisioning_enabled) {
                 throw SsoAuthenticationException::provisioningDisabled($identity->email);
             }

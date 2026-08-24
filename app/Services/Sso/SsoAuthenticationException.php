@@ -186,17 +186,61 @@ final class SsoAuthenticationException extends RuntimeException
      * their own workspace, and be signed in as them — with no personal-2FA challenge, because the SAML door
      * does not run the password pipeline that would have issued one.
      *
-     * The refusal is deliberately narrow. It fires only when an account already exists AND this workspace
-     * has no membership row for it at all. `Invited` passes because an administrator named that person by
-     * address, which is a stronger statement than any assertion; `Declined` and `Removed` pass because a row
-     * exists, so the workspace has already made a decision about this person; a genuinely new address still
-     * provisions exactly as before.
+     * ⛔ **AMENDED BY M9 — THE PARAGRAPH THAT USED TO CLOSE THIS BLOCK WAS ITSELF THE DEFECT.** It read: *"the
+     * refusal is deliberately narrow… `Invited` passes because an administrator named that person by address,
+     * which is a stronger statement than any assertion; `Declined` and `Removed` pass because a row exists, so
+     * the workspace has already made a decision about this person."* **A membership row is a decision about an
+     * ADDRESS, and so is an identity provider's assertion — neither is a claim about the PERSON.** That is what
+     * M8 established one door over, and the carve-out this paragraph defended was a strictly STRONGER version of
+     * the takeover the refusal above closes, because inviting a stranger needs no access to their mailbox at all.
+     *
+     * The scope of THIS factory is unchanged: an account exists and this workspace has no row for it. The three
+     * row-exists statuses are now asked a second question by {@see self::establishedIdentityNotJoined()}, and a
+     * genuinely new address still provisions exactly as before.
      */
     public static function existingAccountNotMember(string $email): self
     {
         return new self(
             SsoFailureReason::ExistingAccountNotMember,
             "{$email} already has an account and is not a member of this workspace; single sign-on will not adopt it.",
+            subject: $email,
+        );
+    }
+
+    /**
+     * ⚠️ AN INVITATION NAMES AN ADDRESS; IT DOES NOT ESTABLISH WHO IS BEHIND ONE (M9).
+     *
+     * The sibling refusal above fires only when this workspace has NO row for an existing account. A row of any
+     * other status — `Invited`, `Declined`, `Removed` — used to disarm it, on the reasoning that the workspace
+     * had "already made a decision about that person". `MemberController::invite()` validates
+     * `['required', 'email', 'max:255']` with no domain-ownership check anywhere, and
+     * `TenantMembershipService::resolveOrCreateUser()` binds the invitation to the address's EXISTING global
+     * identity on `pgsql_auth`. So an admin of any SSO-entitled workspace could invite `victim@othercompany.com`,
+     * assert that address at an identity provider they configured themselves, and hold a session as the victim —
+     * **needing no emailed token at all**, which makes it strictly stronger than the invitation-door takeover M8
+     * closed. `Invited` additionally bypasses `jit_provisioning_enabled` by explicit condition, so no
+     * configuration protected a workspace, and `SsoUserProvisioner::roleFor()` lands them at the INVITED role, so
+     * the attacker chose the privilege level too.
+     *
+     * So the door asks M8's own question — `TenantMembershipService::identityIsEstablished()` — and refuses an
+     * identity that has demonstrably been used: an established person completes an invitation IN THEIR OWN
+     * BROWSER, where signing in runs the password check and the second-factor challenge. A never-used placeholder
+     * this workspace's own invitation created is untouched and still completes through the identity provider.
+     *
+     * ⚠️ THE REFUSAL IS RAISED BEFORE ANY WRITE, AND THAT MATTERS BEYOND TIDINESS. `attachMember()` force-fills
+     * `invite_token => null`, so an adoption also CONSUMED the real invitee's emailed link: their own link then
+     * 404s and the whole event is indistinguishable from an ordinary expired invitation.
+     *
+     * ⛔ REJECTED: narrowing the carve-out to *"a placeholder this workspace actually created"* instead. It needs
+     * a fact the schema does not record — nothing distinguishes an invite placeholder from a self-registered
+     * account that was never used — which is the residual M8 priced and left, and the reason `users.password_set_at`
+     * is filed rather than assumed. What ADR-0016 §D33 records is the narrower question that IS answerable today.
+     */
+    public static function establishedIdentityNotJoined(string $email): self
+    {
+        return new self(
+            SsoFailureReason::EstablishedIdentityNotJoined,
+            "{$email} already has an established identity and has not completed this workspace's invitation; single sign-on will not complete it for them.",
             subject: $email,
         );
     }

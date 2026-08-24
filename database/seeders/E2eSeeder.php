@@ -200,7 +200,8 @@ class E2eSeeder extends Seeder
         //
         // ⚠️ M8 CHANGED THE REASON WITHOUT CHANGING THE REQUIREMENT, WHICH IS EXACTLY THE KIND OF NOTE THAT
         // GOES STALE UNREAD. This used to say `InvitationController::show()` reads `email_verified_at === null`
-        // as `needsRegistration`. It no longer reads that column directly: it asks
+        // as `needsRegistration` — a prop M9 has since renamed to `isUnusedPlaceholder`, because the old name
+        // described the predicate M8 removed. It no longer reads that column directly: it asks
         // {@see \App\Services\Tenancy\TenantMembershipService::identityIsEstablished()}, for which a verified
         // address is one of FOUR positive signals — the others being a confirmed second factor, a linked
         // Google account, and a `tenant_users` row this person actually joined. This fixture has none of the

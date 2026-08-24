@@ -1040,7 +1040,23 @@ are still in place.
   hand-off the `prepareAcceptingUser()` docblock already calls "Increment C". **Needs a test that a
   password is not overwritten and a second factor is not skipped**, and `docs/security-threat-model.md`
   gains a row: it has none for invitation takeover today.
-- **`major` · SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
+- **`major` · Nothing verifies that a workspace controls the email domain its identity provider asserts.**
+  The root of two `major`s that are now closed — M1's *"SSO adopts an existing account that is not a
+  member"* and M9's *"SSO adopts the account behind an address a workspace merely invited"* — both of which
+  had to be fixed at the membership layer because this control does not exist. `SsoConnectionService` and
+  `UpdateSsoConnectionRequest` accept any IdP metadata; `SsoIdentityResolver` accepts whatever address the
+  assertion carries; and a grep of `app/Services/Sso/` and `app/Http/Controllers/Tenant/Sso/` for
+  `verified_domain|domain_verified|assertEmailDomain|domainOwn` returns **zero hits**. `CustomDomainService`
+  exists but governs public form hosting, not identity. ⚠️ **NOT LIVE — both known exploits are closed**, and
+  it is filed at `major` rather than `minor` because it is the ROOT rather than a sibling: every future path
+  that lets an assertion reach an existing account reopens the same class, and the two fixes so far are each a
+  membership-layer refusal standing in for a trust-layer fact. **Shape, priced honestly:** an
+  `sso_verified_domains` table, a DNS TXT challenge, an admin surface on `/settings/sso`, and — the part that
+  makes it a decision rather than a feature — a grandfathering call for every connection that already exists.
+  **Deliberately not taken in M9 and filed the moment that was decided**, because the takeover would have
+  stayed live for the whole of that work. Carried as `docs/security-threat-model.md` **residual 32** and named
+  as ADR-0016 §D33's revisit trigger.
+- ✅ **CLOSED BY `M9` (2026-08-24) — `major` · ~~SSO adopts an existing account whenever a PENDING INVITATION exists, so an SSO-entitled
   admin can be signed in as any stranger they invited — no emailed token required.** Found by M8's
   adversarial pass and **verified against the code by hand before filing**; it is the same conflation M8
   just closed on the invitation door, still live on the SSO one, and **stronger there** because it needs no
@@ -1071,7 +1087,7 @@ are still in place.
   exemption to *"a placeholder this workspace actually created"* needs a fact the schema does not record.
   Needs a `docs/security-threat-model.md` §8 row either way — it has none for this today — and, if the
   behaviour is judged intentional, an ADR-0016 sub-decision saying so.
-- **`minor` · `decline()` asks no identity question at all, so a token holder can destroy an established
+- ✅ **CLOSED BY `M9` (2026-08-24) — `minor` · ~~`decline()` asks no identity question at all, so a token holder can destroy an established
   member's pending invitation.** The one invitation door M8 deliberately did not touch.
   `InvitationController::decline()` resolves the invite by token hash and calls
   `TenantMembershipService::decline()` — no `Auth` check, no predicate. Whoever reads the mailbox (or a
@@ -1080,7 +1096,7 @@ are still in place.
   about a credential being overwritten and a session being minted, and neither happens here. Filed because
   it is the same door and a later reader will ask. **Fix if taken:** ask the same predicate, and require an
   established identity to be signed in to decline — the accept arm's hand-off already exists to route them.
-- **`nit` · `invitations/Show.vue` offers an Accept button to an authenticated visitor who is not the
+- ✅ **CLOSED BY `M9` (2026-08-24) — `nit` · ~~`invitations/Show.vue` offers an Accept button to an authenticated visitor who is not the
   invitee, and the POST always 403s.** `show()` publishes `needsRegistration`, which after M8 answers *"has
   this identity ever been used"* — it does not answer *"are YOU the invitee"*, which is what `accept()`
   additionally enforces. So a signed-in wrong user gets a button that cannot work. Harmless and pre-dating
@@ -1089,6 +1105,16 @@ are still in place.
   other reason it is filed rather than fixed. ⚠️ **And the prop name is now misleading in its own right:**
   `needsRegistration` reads as *"this email is unverified"* and now means *"this identity has never been
   used"*. Renaming it touches the Vue file, so it belongs with this row.
+  ✅ **AS BUILT (M9).** `show()` publishes `signedInAs` (the viewer's own address, null for a guest), and the
+  page renders a banner naming the account to use plus a **Sign out** button — `POST /logout` was verified
+  reachable from this host before it was offered — instead of an Accept button whose POST always 403s. The
+  prop is renamed `needsRegistration` → `isUnusedPlaceholder` at all five sites. ⚠️ **AND SCOPING THIS ROW
+  FOUND A LIVE DEFECT NOBODY HAD FILED:** the page used `<MdsBanner>` **without importing it**, and
+  `resources/js/app.ts` registers no components globally, so the expired/already-used-invitation error banner
+  rendered nothing at all between J3b and M9. Measured rather than asserted — with the import deleted again,
+  `vue-tsc --noEmit` **and** `vite build` both still exit 0. That gate gap is filed as its own row under
+  *Test suite & CI gates*.~~**
+
 - **`minor` · A self-registered account that was never verified is indistinguishable from an invite
   placeholder, so a token holder can still overwrite its password.** The residual M8 deliberately left,
   filed here the moment it was decided rather than left in a plan where no backlog search would reach it.
@@ -1237,6 +1263,19 @@ are still in place.
   the loop variable, and every workspace's historical points and badges are permanently absent — the
   backfill is a one-shot operator action nobody re-runs — while the operator is told "2 workspace(s)
   queued". **Latent.** Fix is a closure on `assertPushed`.
+- **`minor` · No gate in this repository detects a component used in a template but never imported.**
+  Found by M9 while scoping an unrelated row: `resources/js/Pages/invitations/Show.vue` rendered
+  `<MdsBanner>` with no import from J3b until M9, and `resources/js/app.ts:29-32` registers no components
+  globally (`.use(plugin)` is Inertia's), so Vue resolved it to nothing and the expired-invitation error
+  banner never rendered. ⚠️ **MEASURED, NOT ASSUMED — the mutation was re-applied and both gates stayed
+  green**: `vue-tsc --noEmit` exits 0 and `vite build` exits 0 with the import deleted. Vue emits a runtime
+  *"Failed to resolve component"* warning, which nothing reads: no Vitest test mounts this page, and the e2e
+  console assertion in `tests/e2e/support/console.ts` never visits it in a state where the banner renders.
+  **Not live** — this is a missing gate, not a defect; the one instance it hid is fixed. Cheapest honest
+  shape is a lint rule over `<script setup>` SFCs comparing PascalCase template tags against the file's
+  imports, with an allow-list for the globals (`component`/`template`/`transition`/Inertia's `Link`, `Head`).
+  ⛔ **It lands in `scripts/` and moves a gate baseline**, which is a tooling row rather than the page row
+  that found it — the same reasoning M7 used for the `§D<n>` citation gate directly below.
 - **`minor` · Neither structural lint gate fails on an empty scan.**
   `scripts/constraint-boundary-lint.php:296-304` and `scripts/migration-lint.php:140` print the file count
   and `exit(0)` regardless, so a discovery regression — a moved directory, a mistyped iterator root — is
@@ -1264,7 +1303,7 @@ are still in place.
   `impersonation_ended` against that same alias. A SIEM forwarder or retention rule built from the section
   that exists to be exhaustive drops the highest-privilege events in the ledger. **Live.**
 - **`major` · The threat model's `Open` row asserts `APP_PREVIOUS_KEYS` "appears in no `.env.example` and
-  in no document".** `docs/security-threat-model.md:100` (repeated `:217`; duplicated into
+  in no document".** `docs/security-threat-model.md:100` (repeated `:218` — **was `:217` until M9's own §8 row shifted it, which is exactly the hazard the citation-cluster row below records**; duplicated into
   `docs/adr/0009:31,:83,:168,:290`). It is present on this branch at `.env.example:207-209` with an
   ADR-0009 §D9 warning attached, and discussed in two more documents — so the register is wrong at the
   moment it is ratified, and an operator planning an `APP_KEY` rotation is told not to look for the seam

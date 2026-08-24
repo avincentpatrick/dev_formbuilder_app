@@ -33,7 +33,22 @@ beforeEach(function (): void {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $this->tenant = inboxTenant();
-    $this->owner = User::factory()->create();
+    // ⚠️ THE NAME IS PINNED, AND WITHOUT IT ONE CASE IN THIS FILE IS RED ON A DICE ROLL.
+    // `AuditLogPresenter::actorOptions()` sorts `orderBy('name')`, and "offers every visible member as an
+    // actor filter" asserts that `'Aaron Quiet'` leads a catalog of two. The other entry is this owner, and
+    // an unseeded `User::factory()` gives it a RANDOM faker name — a pool that contains `Aaliyah`, `Aarav`
+    // and others sorting BEFORE `'Aaron Quiet'`. Observed on CI run `32706386985` and then reproduced
+    // deterministically by seeding this line as `'Aaliyah Faker'`, which is the whole diagnosis.
+    //
+    // ⛔ PINNED AT CREATION, NEVER UPDATED AFTERWARDS. An `UPDATE` on `users` runs against the OWN-ROW RLS
+    // policy keyed on `app.current_user_id`, which is still unset this early in `beforeEach` — it would
+    // match zero rows, throw nothing, and leave the flake in place while looking fixed. That silent
+    // zero-row write is this repository's most-repeated trap, and a test fixture is the last place it
+    // would be noticed.
+    //
+    // `Zoe Owner` rather than another realistic name: the point is to sit unambiguously AFTER anything the
+    // other fixtures in this file can generate, and to be visibly deliberate to the next reader.
+    $this->owner = User::factory()->create(['name' => 'Zoe Owner']);
     enterTenant($this->tenant->id, $this->owner->id);
     makeActiveMember($this->owner, 'owner');
     $this->actingAs($this->owner);

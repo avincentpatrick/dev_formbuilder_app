@@ -343,7 +343,13 @@ it('honours a pending invitation’s role rather than the connection default', f
 
     // COMMITTED, for the same `pgsql_auth` visibility reason as the active-member case above: an invited
     // person already HAS an account row, and the provisioner has to find it.
-    $invitee = committedTenantIdentity('Grace Hopper');
+    //
+    // ⚠️ `verified: false` SINCE M9, AND IT IS THE SUBJECT OF THE CASE RATHER THAN A FIXTURE DETAIL. This
+    // is the never-used placeholder `TenantMembershipService::invite()` creates for a stranger — every arm
+    // of `identityIsEstablished()` reads false for it — so it is the one shape single sign-on may still
+    // complete an invitation for, and this case doubles as the permissive control for M9's refusal. With
+    // the default `verified: true` it would be an ESTABLISHED identity, i.e. the takeover three cases below.
+    $invitee = committedTenantIdentity('Grace Hopper', verified: false);
     $adminRole = Role::query()->where('name', 'admin')->whereNull('tenant_id')->firstOrFail();
 
     $invite = new TenantUser;
@@ -828,6 +834,123 @@ it('refuses to adopt an existing account that is not a member of this workspace'
     // stranger's account was neither adopted here nor altered.
     expect(TenantUser::query()->count())->toBe(1)
         ->and(TenantUser::query()->where('user_id', $stranger->id)->exists())->toBeFalse();
+});
+
+it('refuses to adopt an established identity this workspace has merely invited', function (): void {
+    // ⚠️ THE STRONGER HALF OF THE CASE ABOVE, AND IT NEEDS NO EMAILED TOKEN AT ALL. `MemberController::invite()`
+    // validates `['required', 'email', 'max:255']` and a role — no domain-ownership check anywhere — and
+    // `TenantMembershipService::resolveOrCreateUser()` binds that invitation to the address's EXISTING global
+    // identity on `pgsql_auth` rather than to a placeholder. So an admin of any SSO-entitled workspace could
+    // invite a stranger, assert the address at an identity provider they configured themselves, and hold a
+    // session as them. The guard above does not fire, because the invite row THEY JUST CREATED is a membership.
+    //
+    // M9 disarms that: a membership row is a decision this workspace made about an ADDRESS, and an identity
+    // provider's assertion is a claim about an address too. Neither is a claim about the PERSON — which is
+    // precisely what M8 established one door over, and what this door had never asked.
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    // Established by the plainest arm there is, a proved mailbox. `verified: true` is the default and is
+    // spelled out because it is the whole subject of the case rather than a fixture detail.
+    $victim = committedTenantIdentity('Ada Lovelace', verified: true);
+    $adminRole = Role::query()->where('name', 'admin')->whereNull('tenant_id')->firstOrFail();
+
+    $invite = new TenantUser;
+    $invite->fill([
+        'user_id' => $victim->id,
+        'status' => TenantUserStatus::Invited,
+        // ⚠️ AT ADMIN ON PURPOSE. `SsoUserProvisioner::roleFor()` honours the INVITED role rather than the
+        // connection default, so the attacker also chooses the privilege level of the session they obtain.
+        'invited_role_id' => $adminRole->id,
+        'invited_at' => now(),
+        'invite_expires_at' => now()->addDays(7),
+        'invite_token' => hash('sha256', 'token'),
+    ])->save();
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($victim->email)->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $membership = TenantUser::query()->where('user_id', $victim->id)->first();
+
+    // ⚠️ THE TOKEN ASSERTION IS NOT DECORATION, AND IT IS THE HALF THE FILED ROW DOES NOT NAME.
+    // `TenantMembershipService::attachMember()` force-fills `invite_token => null`, so the adoption also
+    // CONSUMES the real invitee's emailed link — their own link then 404s and the takeover is indistinguishable
+    // from an ordinary expired invitation. A refusal has to leave their way in intact, not merely decline.
+    expect($membership?->status)->toBe(TenantUserStatus::Invited)
+        ->and($membership?->invite_token)->toBe(hash('sha256', 'token'))
+        ->and($membership?->joined_at)->toBeNull();
+});
+
+it('refuses the same for a declined invitation, because single sign-on must not overturn the answer', function (): void {
+    // `Declined` disarmed the guard for the same reason `Invited` did — a row exists — but the person's own
+    // answer was NO. Adopting them anyway reverses a decision the invitee made, using an assertion from an
+    // identity provider they have never heard of.
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    $victim = committedTenantIdentity('Ada Lovelace', verified: true);
+
+    $declined = new TenantUser;
+    $declined->fill([
+        'user_id' => $victim->id,
+        'status' => TenantUserStatus::Declined,
+        'invited_role_id' => catalogRole('viewer'),
+        'invited_at' => now()->subDay(),
+        // `decline()` nulls the token, so a realistic row carries none — which also means this case cannot
+        // be passing for the trivial reason that a token happened to match.
+        'invite_token' => null,
+    ])->save();
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($victim->email)->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    expect(TenantUser::query()->where('user_id', $victim->id)->value('status'))
+        ->toBe(TenantUserStatus::Declined);
+});
+
+it('refuses the same for a removed member, and the history arm is what proves it', function (): void {
+    // ⚠️ `verified: false` ON PURPOSE — this case has to fail on the HISTORY arm of
+    // `identityIsEstablished()`, not on the mailbox arm, or it would prove nothing the case above does not.
+    // The predicate reads the excluded row's own `joined_at`/`removed_at`, which is exactly the hole M8's own
+    // adversarial pass found in the first version of it: a re-invited former member has no SECOND row to fall
+    // back on, because `invite()` reuses the one they already had.
+    //
+    // And the shape matters beyond tidiness: an admin who REMOVES a member can otherwise re-adopt them
+    // through the identity provider at a role of the admin's choosing, which is the sanction-laundering
+    // `Suspended` is refused for, one status along.
+    enterTenant($this->tenant->id, $this->admin->id);
+
+    $former = committedTenantIdentity('Ada Lovelace', verified: false);
+
+    $removed = new TenantUser;
+    $removed->fill([
+        'user_id' => $former->id,
+        'status' => TenantUserStatus::Removed,
+        'invited_role_id' => catalogRole('viewer'),
+        'joined_at' => now()->subMonth(),
+        'removed_at' => now()->subDay(),
+    ])->save();
+
+    $request = startLogin($this->tenant, $this->admin);
+
+    $this->post(ACME_ACS, ['SAMLResponse' => answering($request)->as($former->email)->response()])
+        ->assertNotFound();
+
+    $this->assertGuest();
+
+    enterTenant($this->tenant->id, $this->admin->id);
+    $membership = TenantUser::query()->where('user_id', $former->id)->first();
+
+    expect($membership?->status)->toBe(TenantUserStatus::Removed)
+        ->and($membership?->removed_at)->not->toBeNull();
 });
 
 it('still provisions a genuinely new address, so the refusal above is narrow', function (): void {

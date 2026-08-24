@@ -91,7 +91,7 @@ it('accepts an invitation end-to-end through the no-auth invitation route', func
         'name' => 'Pending Person',
         'email' => 'pending@membertest.local',
         'password' => Hash::make(Str::random(40)),
-        'email_verified_at' => null, // placeholder ⇒ needsRegistration
+        'email_verified_at' => null, // placeholder ⇒ isUnusedPlaceholder
     ]);
 
     enterTenant($tenant->id);

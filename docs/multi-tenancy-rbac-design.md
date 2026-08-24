@@ -391,6 +391,16 @@ correct behaviour, not a defect report.
   provisioner and **cannot** live in `attachMember()`, which overwrites `invited_role_id` with whatever
   role it is handed. An admin who invited somebody as an Admin expressed an intent about that person, and
   letting a sign-in door silently demote them would make the invitation surface untrustworthy.
+  ⛔ **AMENDED BY M9 (2026-08-24), AND THE LAST SENTENCE ABOVE WAS THE DEFECT.** *"Expressed an intent about
+  that person"* is false — an invitation names an **ADDRESS**, `MemberController::invite()` has no
+  domain-ownership check at any layer, and `resolveOrCreateUser()` binds the row to that address's existing
+  global identity. So this courtesy was an account takeover on the SSO door, **needing no emailed token**,
+  and it was strictly stronger than the one M8 closed. `SsoUserProvisioner` now asks
+  `TenantMembershipService::identityIsEstablished()` first and refuses an established identity outright, for
+  `invited`, `declined` and `removed` alike; the invited-role courtesy survives only for a **never-used
+  placeholder**, which is the one case the sentence above was ever true of. See ADR-0016 §D33 and
+  `docs/security-threat-model.md` §8. ⚠️ **The `cannot live in `attachMember()`` half is untouched and still
+  correct** — that is a mechanism note, not the reasoning that failed.
 - **Not shared: what a brand-new member's role is.** SSO uses the connection's `default_role_name`
   (CHECK-constrained to the catalog minus `owner`, because §5 establishes Owner only by ownership
   transfer). Google has no per-workspace setting and uses `viewer`, `joinOpenTenant()`'s reasoning

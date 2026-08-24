@@ -101,20 +101,28 @@ final class SsoUserProvisioner
             // workspace has already made a decision about that person" — because a row is a decision about
             // an ADDRESS. This line still fires only on "no row here at all"; the guard below asks the rest,
             // and a brand-new address is unaffected by either.
-            if ($user !== null && $membership === null) {
-                throw SsoAuthenticationException::existingAccountNotMember($identity->email);
-            }
+            // ⚠️ THE TWO REFUSALS ARE NESTED, NOT SEQUENTIAL, AND THAT IS DELIBERATE. They share one
+            // premise — an account for this address ALREADY EXISTS — and stating it once makes the second
+            // condition legible: past the first throw, a non-null `$user` necessarily has a membership row,
+            // so `$membership` is a `TenantUser` here rather than something re-checked. Written flat, the
+            // second guard needed a `$membership !== null` that PHPStan correctly reports as always true,
+            // and a reader would have had to reconstruct why.
+            if ($user !== null) {
+                if ($membership === null) {
+                    throw SsoAuthenticationException::existingAccountNotMember($identity->email);
+                }
 
-            // ⚠️ AND THE SAME QUESTION AGAIN FOR THE ROWS THAT USED TO DISARM THE LINE ABOVE (M9). Reaching
-            // here with a row means `Invited`, `Declined` or `Removed` — `Active` returned and `Suspended`
-            // threw — and every one of them was adoptable, which made "invite a stranger, then assert their
-            // address at your own IdP" a takeover needing no emailed token. `identityIsEstablished()` is M8's
-            // predicate, unchanged and reused rather than re-derived: the membership row is the invitation it
-            // excludes, and its own `joined_at`/`removed_at` are what make a REMOVED former member refuse.
-            // A never-used placeholder still completes its invitation here, which is the whole blast radius.
-            if ($user !== null && $membership !== null
-                && $this->memberships->identityIsEstablished($user, $membership)) {
-                throw SsoAuthenticationException::establishedIdentityNotJoined($identity->email);
+                // ⚠️ AND THE SAME QUESTION AGAIN FOR THE ROWS THAT USED TO DISARM THE LINE ABOVE (M9).
+                // Reaching here means `Invited`, `Declined` or `Removed` — `Active` returned and
+                // `Suspended` threw — and every one of them was adoptable, which made "invite a stranger,
+                // then assert their address at your own IdP" a takeover needing no emailed token.
+                // `identityIsEstablished()` is M8's predicate, reused rather than re-derived: the membership
+                // row is the invitation it excludes, and its own `joined_at`/`removed_at` are what make a
+                // REMOVED former member refuse. A never-used placeholder still completes its invitation
+                // here, which is the whole blast radius.
+                if ($this->memberships->identityIsEstablished($user, $membership)) {
+                    throw SsoAuthenticationException::establishedIdentityNotJoined($identity->email);
+                }
             }
 
             $roleName = $this->roleFor($connection, $membership);

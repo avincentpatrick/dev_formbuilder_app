@@ -36,6 +36,12 @@ use Inertia\Response;
  * below ask it: {@see self::show()} decides what the page offers, {@see self::accept()} decides what the
  * server permits. **Fixing one without the other leaves the page inviting a credential the server then
  * refuses — they must move together.**
+ *
+ * ⚠️ **M9 MADE IT THREE DOORS, NOT TWO.** {@see self::decline()} asked no identity question at all, so a
+ * token holder could destroy an established member's pending invitation; it now asks the same predicate.
+ * And the page gained {@see self::show()}'s `signedInAs`, because `identityIsEstablished()` answers *"has
+ * this identity been used"* and never *"are YOU the invitee"* — the second condition `accept()` enforces,
+ * which the page could not see and so kept promising past.
  */
 final class InvitationController extends Controller
 {
@@ -55,11 +61,22 @@ final class InvitationController extends Controller
             // ⚠️ THE SAME PREDICATE `accept()` ENFORCES, ASKED HERE SO THE PAGE CANNOT PROMISE WHAT THE
             // SERVER WILL REFUSE. Before M8 both sites asked `email_verified_at === null` — consistently,
             // and consistently wrongly — so an enrolled member's invite page rendered a "Choose a password"
-            // form for an account that already had one. False renders the accept-only page, which is
-            // exactly what an already-verified invitee has always seen, so no `.vue` change was needed.
-            'needsRegistration' => $user !== null && ! $this->memberships->identityIsEstablished($user, $invite),
+            // form for an account that already had one.
+            //
+            // ⚠️ RENAMED IN M9, AND THE OLD NAME HAD BECOME A LIE OF ITS OWN. `needsRegistration` reads as
+            // *"this address is unverified"*, which is what it USED to compute; since M8 it answers *"this
+            // identity has never been used"* — the controller's own vocabulary two docblocks down. A prop
+            // whose name describes a predicate it no longer has is how the next reader reintroduces the bug.
+            'isUnusedPlaceholder' => $user !== null && ! $this->memberships->identityIsEstablished($user, $invite),
+            // ⚠️ WHO IS ACTUALLY HOLDING THIS PAGE, BECAUSE `isUnusedPlaceholder` DOES NOT ANSWER THAT.
+            // `accept()` enforces a SECOND condition the page could not see: an established identity must be
+            // signed in AS THEMSELVES. So a signed-in wrong visitor was offered an Accept button whose POST
+            // always 403s, and a Decline button that (since M9) does the same. Publishing the viewer's own
+            // address lets the page say which account to use instead of failing after the click. Null for a
+            // guest, which is the ordinary case and stays the ordinary page.
+            'signedInAs' => Auth::user()?->email,
             'token' => $token,
-            // J3b: this page sets a password when `needsRegistration`, through the same
+            // J3b: this page sets a password when `isUnusedPlaceholder`, through the same
             // `Password::defaults()` every other surface validates against — so it gets the same
             // checklist. Standing Rule 2: a live checklist on Register but not here would be the drift
             // "one shared design system, no exceptions" exists to prevent.
@@ -131,9 +148,44 @@ final class InvitationController extends Controller
         return redirect()->intended('/dashboard');
     }
 
-    public function decline(string $token): RedirectResponse
+    /**
+     * Decline the invitation — and M9 made this ask the same question `accept()` does.
+     *
+     * It used to resolve the row by token hash and write `Declined` with no `Auth` check of any kind, on a
+     * route carrying no `auth` middleware. Whoever read the mailbox — or received a forwarded link — could
+     * therefore destroy an established member's pending invitation, and the invited person then sees nothing
+     * at all rather than an explanation. It is **denial rather than takeover**, which is why M8 left it and
+     * why it was filed as a `minor`: no credential is overwritten and no session is minted. But it is the
+     * same door asking a weaker question than its neighbour, and that asymmetry is what makes a door wrong
+     * twice.
+     *
+     * ⚠️ THE PLACEHOLDER ARM IS DELIBERATELY UNGUARDED, AND THAT IS NOT AN OVERSIGHT. A never-used
+     * placeholder has no way to sign in — its password is 48 random bytes nobody has ever held — so
+     * requiring authentication to decline would make declining impossible for exactly the people the
+     * invitation created. Holding the token is the only proof of anything they can offer, and declining
+     * costs them nothing they had.
+     */
+    public function decline(Request $request, string $token): RedirectResponse
     {
-        $this->memberships->decline($this->resolvePendingInvite($token));
+        $invite = $this->resolvePendingInvite($token);
+
+        $user = $this->resolveInvitedUser($invite);
+        abort_if($user === null, 404);
+
+        if ($this->memberships->identityIsEstablished($user, $invite)) {
+            if (Auth::id() === null) {
+                // The same server-derived hand-off `accept()` uses, and for the same reason recorded there
+                // at length: `redirect()->guest()` would park the REFERER on a POST, which this repository
+                // has already declined once as an open-redirect risk. GET and DELETE share this URI.
+                $request->session()->put('url.intended', route('invitations.show', ['token' => $token]));
+
+                return redirect()->route('login');
+            }
+
+            abort_unless(Auth::id() === $user->id, 403, 'Sign in as the invited account to decline.');
+        }
+
+        $this->memberships->decline($invite);
 
         return redirect('/')->with('status', 'invitation-declined');
     }

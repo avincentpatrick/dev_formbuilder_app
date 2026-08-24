@@ -253,7 +253,7 @@ it('renders the accept-only page for an established identity, so the form is nev
     $this->get('http://acme.meridian.test/invitations/render-token')
         ->assertOk()
         ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
-            ->where('needsRegistration', false));
+            ->where('isUnusedPlaceholder', false));
 });
 
 it('still lets a never-used placeholder set a password and join', function (): void {
@@ -400,4 +400,130 @@ it('keeps a re-invite from erasing the join date the predicate depends on', func
         ->and($invite->joined_at)->not->toBeNull();
 
     expect(app(TenantMembershipService::class)->identityIsEstablished($member, $invite))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| M9 — the third door, and the page that could not see the second condition
+|
+| `decline()` asked no identity question at all: it resolved the row by token hash and wrote `Declined`, on
+| a route carrying no `auth` middleware. Whoever read the mailbox — or received a forwarded link — could
+| destroy an established member's pending invitation, and the invited person then saw nothing rather than an
+| explanation. It is DENIAL rather than takeover, which is why M8 left it and why it was filed `minor`; it
+| is fixed here because it is the same door asking a weaker question than its neighbour.
+|
+| ⚠️ THE COMMITTED-INVERSE DISCIPLINE OF THIS FILE APPLIES UNCHANGED: every refusal below fails on the
+| pre-M9 code, which `git stash push -- app/Http/Controllers/Tenant/InvitationController.php` demonstrates.
+|--------------------------------------------------------------------------
+*/
+
+it('refuses to let a token holder decline an established member’s invitation', function (): void {
+    // The established arm is handed off, not refused outright — the same asymmetry `accept()` records at
+    // length. A legitimate invitee who clicks Decline from their mailbox while signed out is a real person
+    // doing a reasonable thing, and `abort(403)` alone would be a dead end for them.
+    $victim = m8Identity('Enrolled Person', ['two_factor_confirmed_at' => now()]);
+    $tenant = m8InviteInto($victim, 'decline-handoff-token');
+
+    $this->delete('http://acme.meridian.test/invitations/decline-handoff-token')
+        ->assertRedirect('http://acme.meridian.test/login')
+        ->assertSessionHas('url.intended', 'http://acme.meridian.test/invitations/decline-handoff-token');
+
+    $this->assertGuest();
+
+    // ⚠️ ASSERT WHAT THE SYSTEM ENDED UP DOING. The invitation is the thing being protected here, and the
+    // TOKEN is half of it: `decline()` nulls it, so a successful refusal has to leave the invitee's own
+    // link working, not merely leave the status alone.
+    enterTenant($tenant->id);
+    $membership = TenantUser::query()->where('user_id', $victim->id)->first();
+
+    expect($membership->status)->toBe(TenantUserStatus::Invited)
+        ->and($membership->invite_token)->toBe(hash('sha256', 'decline-handoff-token'));
+});
+
+it('refuses outright when somebody else is signed in, on the decline door too', function (): void {
+    // Same reasoning as the accept door: `GET /login` carries `guest:web`, so there is nothing to hand off
+    // to when the wrong person is already authenticated.
+    $victim = m8Identity('Enrolled Person', ['two_factor_confirmed_at' => now()]);
+    $tenant = m8InviteInto($victim, 'decline-wronguser-token');
+
+    $intruder = User::factory()->create();
+    enterTenant($tenant->id, $intruder->id);
+    makeActiveMember($intruder, 'viewer');
+
+    $this->actingAs($intruder)
+        ->delete('http://acme.meridian.test/invitations/decline-wronguser-token')
+        ->assertForbidden();
+
+    enterTenant($tenant->id);
+    expect(TenantUser::query()->where('user_id', $victim->id)->first()->status)
+        ->toBe(TenantUserStatus::Invited);
+});
+
+it('lets an established identity decline once they are signed in as themselves', function (): void {
+    // The permissive control for the established arm. A door that refused everybody would pass every
+    // refusal above while breaking the act the door exists for.
+    $victim = m8Identity('Enrolled Person', ['two_factor_confirmed_at' => now()]);
+    $tenant = m8InviteInto($victim, 'decline-self-token');
+
+    $this->actingAs($victim)
+        ->delete('http://acme.meridian.test/invitations/decline-self-token')
+        ->assertRedirect('http://acme.meridian.test');
+
+    enterTenant($tenant->id);
+    expect(TenantUser::query()->where('user_id', $victim->id)->first()->status)
+        ->toBe(TenantUserStatus::Declined);
+});
+
+it('still lets a never-used placeholder decline with the token alone', function (): void {
+    // ⚠️ THE UNGUARDED ARM IS DELIBERATE AND IS THE REASON THE PREDICATE IS ASKED RATHER THAN `Auth::check()`.
+    // A placeholder's password is 48 random bytes nobody has ever held, so it CANNOT sign in — requiring
+    // authentication to decline would make declining impossible for exactly the people an invitation
+    // creates. Holding the token is the only proof they have, and declining costs them nothing they had.
+    $stranger = m8Identity('Never Used');
+    $tenant = m8InviteInto($stranger, 'decline-placeholder-token');
+
+    $this->delete('http://acme.meridian.test/invitations/decline-placeholder-token')
+        ->assertRedirect('http://acme.meridian.test');
+
+    enterTenant($tenant->id);
+    expect(TenantUser::query()->where('user_id', $stranger->id)->first()->status)
+        ->toBe(TenantUserStatus::Declined);
+});
+
+it('tells the page which account is holding it, so it stops offering an act that 403s', function (): void {
+    // ⚠️ `isUnusedPlaceholder` ANSWERS "HAS THIS IDENTITY BEEN USED", NEVER "ARE YOU THE INVITEE" — and
+    // `accept()` enforces both. The page could see only the first, so a signed-in wrong visitor was offered
+    // an Accept button whose POST always 403s. `signedInAs` is the second question, published so the page
+    // can name the account to use instead of failing after the click.
+    $this->withoutVite();
+
+    $victim = m8Identity('Enrolled Person', ['two_factor_confirmed_at' => now()]);
+    $tenant = m8InviteInto($victim, 'signedinas-token');
+
+    $intruder = User::factory()->create();
+    enterTenant($tenant->id, $intruder->id);
+    makeActiveMember($intruder, 'viewer');
+
+    $this->actingAs($intruder)
+        ->get('http://acme.meridian.test/invitations/signedinas-token')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
+            ->where('isUnusedPlaceholder', false)
+            ->where('signedInAs', $intruder->email)
+            ->where('email', $victim->email));
+});
+
+it('publishes no holder for a guest, which is the ordinary invitation page', function (): void {
+    // The control for the prop itself. `signedInAs` must be null for the commonest visitor of all, or the
+    // page's wrong-account branch would swallow the door it exists to protect.
+    $this->withoutVite();
+
+    $stranger = m8Identity('Never Used');
+    m8InviteInto($stranger, 'guest-holder-token');
+
+    $this->get('http://acme.meridian.test/invitations/guest-holder-token')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('invitations/Show', false)
+            ->where('isUnusedPlaceholder', true)
+            ->where('signedInAs', null));
 });

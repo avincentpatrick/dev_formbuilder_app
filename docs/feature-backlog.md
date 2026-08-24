@@ -881,14 +881,55 @@ are still in place.
   `property.notFound` phantoms, none in a file M2 touches), four lint gates green (migrations 107 → 108),
   `openapi.json` byte-identical, zero `.vue` / `.ts` / e2e-selector movement.
 
-- **`major` · The "Log out" control on the email-verification page has no CSRF token, so it 419s.**
-  `resources/js/Pages/auth/VerifyEmail.vue:97-99` is a raw `<form method="POST" action="/logout">`; a
-  native submission carries no `_token` and no XSRF header (only Inertia's axios layer supplies them), and
-  `bootstrap/app.php:122` does not except `/logout`. Every newly registered account — and, since J3a
-  mounted `verified`, anyone who changes their email — is stranded on an interstitial whose only exit is
-  broken. **Live.** ⚠️ **Pre-existing since PR #6 and present on `main`**, but the correct twin ships one
-  file over (`auth/TwoFactorRequired.vue:42`, `<Link method="post" as="button">`) and this diff rewrites
-  the page immediately above it, explicitly to remove a lockout.
+- ✅ **CLOSED BY `M10` (2026-08-24) — `major` · ~~THE "LOG OUT" CONTROL ON THE EMAIL-VERIFICATION PAGE HAS
+  NO CSRF TOKEN, SO IT 419s.~~** `VerifyEmail.vue:97` was a raw `<form method="POST" action="/logout">`;
+  a native submission carries no `_token` and no `X-XSRF-TOKEN` (only Inertia's axios layer supplies them),
+  and `bootstrap/app.php` exempts exactly one path — the SAML ACS. So the **only exit from an interstitial
+  every newly registered account lands on** answered 419, and had since PR #6. It now uses the page's own
+  idiom — `useForm({}).post('/logout')` behind `@submit.prevent` — which keeps `MdsButton`, gains a
+  `processing` state, and leaves the DOM element-for-element identical apart from two dropped attributes,
+  so the axe scan of this exact page could not move.
+  ⚠️ **THE ROW WAS RIGHT VERBATIM AND THE SHAPE GREP CAME BACK CLEAN, WHICH HAD NOT HAPPENED IN FIVE
+  INCREMENTS.** Sweeping the form-element shape across all **140 `.vue` files** under `resources/` plus
+  `packages/design-system/src` found **no second instance** — M8's row named one call site and had two,
+  M9's the same. What the sweep did establish is what the gate below is built on: the design system has
+  **zero** form elements; `resources/public-runtime/` has two, both `@submit.prevent`; **`TopNav.vue:77`
+  is a deliberate `method="GET" action="/search"`** progressive-enhancement form that must keep working;
+  and every non-Inertia network call in the tree (`builderClient.ts:41`, `useServerAutosave.ts:107` and
+  `:364`, `MediaInput.vue:199`) already reads the `XSRF-TOKEN` cookie. Four of five `/logout` call sites
+  were already correct.
+  ⛔ **THE REJECTED FIX IS RECORDED IN TWO PLACES BECAUSE IT IS THE TEMPTING ONE: adding `/logout` to
+  `validateCsrfTokens(except: …)`.** It resolves the 419 by REMOVING a control from a session-destroying
+  endpoint rather than by using it — the `EnforcePlatformMaintenance` path-list lesson, in the direction
+  that costs you something. The defect was in the CALLER. `bootstrap/app.php` now says so beside that
+  array, where somebody reaching for it would be standing.
+  ➕ **THE CLASS GATE IS WHY THIS IS NOT A THREE-LINE ROW — NOTHING IN SIX CI JOBS COULD SEE IT.** The axe
+  gate renders this page in both themes and scans it **without clicking**, so a control that 419s scans
+  identically to one that works; Pest cannot assert the 419 at all, because `ValidateCsrfToken`
+  short-circuits on `runningUnitTests()` and every feature test in the repository therefore posts
+  tokenless; `vue-tsc` never reads an attribute. So M10 adds
+  `resources/js/__tests__/native-form-submission.test.ts`, a source-text invariant over every `.vue` under
+  `resources/`: **a native submission must be a GET.** ⚠️ **It asserts its own non-vacuity** — a floor on
+  the files walked and the forms parsed, plus a positive control that it still recognises TopNav's GET
+  form — because a scan that silently matched nothing reports `passed` and is indistinguishable from one
+  that ran. ⚠️ And it masks everything outside the SFC template block, because
+  `ImpersonationBanner.vue:26` *spells* a form element in a script comment while explaining why it did not
+  use one; a gate that reports the one file documenting the correct decision gets deleted, so that case is
+  pinned too.
+  ➕ **AND THE ADVERSARIAL PASS FOUND A THIRD THING THE ROW DOES NOT NAME: the page's PRIMARY control had
+  no test anywhere.** Grepping for coverage of the notice page's other two actions turned up the
+  correction case and nothing at all naming `/email/verification-notification` — the button nearly
+  everybody clicks had never been driven. It works; it is now asserted, with `assertSentOnDemand`, because
+  `sendEmailVerificationNotification()` deliberately never makes the User the notifiable (ADR-0007 §D5).
+  ✅ **Cleared with evidence rather than left unstated:** `ConfirmPassword.vue` has no exit control and is
+  **not** a lockout — `password.confirm` guards individual routes, never a whole group, so ordinary
+  navigation still works, unlike `verified` which redirects from everywhere. And `RequirePlatformHost` sits
+  on the whole Fortify group, so on a custom domain the notice page and `/logout` **404 together** rather
+  than the page rendering with a dead exit.
+  **Gates:** two new Vitest files, **8 cases** (`resources/js` chunk **58 → 60** files, total **125 → 127**);
+  two new Pest cases in `EmailVerificationGateTest` (**10 → 12**); PHPStan delta **zero**; four lint gates
+  unchanged; `openapi.json` byte-identical; and **zero movement in `tests/e2e/`** — no spec selects on this
+  form, this button or `logout`.
 - ✅ **CLOSED BY `M7` (2026-08-20) — `major` · ~~ADR-0019 §D11 ATTRIBUTES A SAML 2FA DECISION TO ADR-0016
   §D22, WHICH DECIDES THE OPPOSITE POLARITY — AND THE AS-BUILT BEHAVIOUR IS RECORDED IN NO ADR AT ALL.~~**
   **ADR-0016 gains §D32**, which states what P1b built and this repository had never decided: a SAML

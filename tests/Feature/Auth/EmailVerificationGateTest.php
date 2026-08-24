@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\Auth\QueuedVerifyEmail;
 use App\Services\Admin\ImpersonationService;
 use App\Support\Audit\ImpersonationContext;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -203,6 +205,60 @@ it('gives a member behind the gate the values needed to correct their own addres
     TenantContext::applyLocal($this->tenant->id, $user->id);
 
     expect(User::query()->whereKey($user->id)->value('email'))->toBe('typo-corrected@meridian.test');
+});
+
+it('lets a member behind the gate sign out, which is the OTHER exit and the one that was broken', function (): void {
+    // ⚠️ THE SECOND HALF OF THE ESCAPE HATCH, AND THE HALF THAT WAS ACTUALLY BROKEN (M10). The case above
+    // proves a member who mistyped their address can correct it; this proves the one who does not want to —
+    // someone who registered on the wrong account, or who is simply done — can leave. `POST /logout` is a
+    // Fortify route in its own group carrying neither `auth` nor `verified`, and
+    // `EnforcePlatformMaintenance::EXEMPT` names it, so nothing between here and the session teardown can
+    // bounce them back to the notice.
+    //
+    // ⚠️ WHAT THIS CASE CANNOT ASSERT, SAID PLAINLY SO NOBODY READS IT AS THE WHOLE GATE. The defect M10
+    // fixed was a raw `<form method="POST" action="/logout">` on the notice page, which 419s because a
+    // native submission carries no `_token` and no `X-XSRF-TOKEN`. Pest structurally cannot see that:
+    // `ValidateCsrfToken` short-circuits on `$this->app->runningUnitTests()`, so EVERY feature test in this
+    // repository posts tokenless and is waved through. The client-side halves are
+    // `resources/js/Pages/auth/VerifyEmail.test.ts` and the tree-wide invariant in
+    // `resources/js/__tests__/native-form-submission.test.ts`.
+    //
+    // What IS asserted here is the property neither of those can reach: the exit is not itself behind the
+    // gate. Mount `verified` on the Fortify group one day and this goes red, instead of a support ticket.
+    $user = memberOfTenant($this->tenant, verified: false);
+
+    $this->actingAs($user)
+        ->get('http://acme.meridian.test/dashboard')
+        ->assertRedirect(route('verification.notice'));
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/logout')
+        ->assertRedirect();
+
+    $this->assertGuest();
+});
+
+it('resends the link from behind the gate, which is the third control and had no coverage at all', function (): void {
+    // ⚠️ FOUND BY M10's ADVERSARIAL PASS, NOT BY THE ROW. The notice page offers exactly three actions —
+    // resend, correct the address, sign out — and one of them was broken. Grepping for coverage of the
+    // other two found the correction case above, the sign-out case above it, and NOTHING anywhere in this
+    // repository naming `/email/verification-notification`: the page's PRIMARY control, the one nearly
+    // everybody clicks, had never been driven by a test.
+    //
+    // It works, and asserting it is still worth the six lines, because the failure mode is silent and
+    // specific to this route. `sendEmailVerificationNotification()` mints a `temporarySignedRoute` from
+    // the REQUEST host and hands it to an on-demand notifiable — so it is asserted with
+    // `assertSentOnDemand`, not `assertSentTo($user)`; the User is deliberately never the notifiable
+    // (ADR-0007 §D5, so no model is serialized under a NULL GUC on the worker).
+    Notification::fake();
+
+    $user = memberOfTenant($this->tenant, verified: false);
+
+    $this->actingAs($user)
+        ->post('http://acme.meridian.test/email/verification-notification')
+        ->assertRedirect();
+
+    Notification::assertSentOnDemand(QueuedVerifyEmail::class);
 });
 
 it('stops bouncing a member the moment they verify', function (): void {

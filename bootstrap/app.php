@@ -119,6 +119,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // endpoint under that prefix, granting an exemption nobody decided to give — the
         // EnforcePlatformMaintenance path-list lesson, in the direction that REMOVES a control. The tenant
         // is identified from the host, so one entry covers every subdomain without naming any.
+        // ⛔ AND `/logout` DOES NOT BELONG HERE, THOUGH M10 FOUND THE PRESSURE TO PUT IT HERE. The email
+        // verification page's sign-out control was a raw `<form method="POST" action="/logout">` — a native
+        // submission, so no `_token` and no `X-XSRF-TOKEN`, so 419 on the only exit from an interstitial
+        // every newly registered account lands on. Exempting the path "fixes" that by REMOVING a control
+        // from a session-destroying endpoint, which is the EnforcePlatformMaintenance path-list lesson in
+        // the direction that costs you something. The defect was in the CALLER, and the fix was to route it
+        // through Inertia, which sends the token. `resources/js/__tests__/native-form-submission.test.ts`
+        // now fails any form in the tree that would submit natively with anything but GET.
         $middleware->validateCsrfTokens(except: ['sso/saml/acs']);
 
         // Platform maintenance (I5 / PRD Feature #10) — GLOBAL, not `web`. "Blocks the entire product"

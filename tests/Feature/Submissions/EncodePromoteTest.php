@@ -312,9 +312,9 @@ it('refuses Submit rather than finalizing over a save that landed in promote’s
     $draftId = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->id;
 
     // The other device's autosave, committed inside promote()'s window. `skip: 1` steps past saveDraft()'s
-    // own updateOrCreate lookup — see interleaveOnPromoteRead().
+    // own updateOrCreate lookup — see interleaveDuringPromote().
     $moved = ['full_name' => 'Ada Lovelace', 'color' => 'b'];
-    $fired = interleaveOnPromoteRead(function () use ($draftId, $moved): void {
+    $fired = interleaveDuringPromote(function () use ($draftId, $moved): void {
         SubmissionAnswer::query()->where('submission_id', $draftId)->update([
             'answers' => $moved,
             'answers_content_checksum' => AnswersContentChecksum::of($moved),

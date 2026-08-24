@@ -293,7 +293,7 @@ it('cannot stamp screened_out from a Stage-3 result the stored document has alre
     $this->drafts->saveDraft(routerPayload($form, [], $uuid));
     $id = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->id;
 
-    $fired = interleaveOnPromoteRead(function () use ($form, $uuid): void {
+    $fired = interleaveDuringPromote(function () use ($form, $uuid): void {
         test()->drafts->saveDraft(routerPayload($form, ['role' => 'staff', 'staff_number' => 'A1'], $uuid));
     });
 

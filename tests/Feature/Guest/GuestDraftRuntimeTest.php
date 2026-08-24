@@ -830,9 +830,9 @@ it('409s a guest submit whose draft moved inside promote’s pre-lock window (dr
     $draftId = $save->json('data.id');
 
     // The tablet's autosave, committed inside promote()'s window. `skip: 1` steps past the saveDraft() the
-    // submit route runs first — see interleaveOnPromoteRead().
+    // submit route runs first — see interleaveDuringPromote().
     $moved = ['full_name' => 'Ada', 'age' => '31'];
-    $fired = interleaveOnPromoteRead(function () use ($draftId, $moved): void {
+    $fired = interleaveDuringPromote(function () use ($draftId, $moved): void {
         SubmissionAnswer::query()->where('submission_id', $draftId)->update([
             'answers' => $moved,
             'answers_content_checksum' => AnswersContentChecksum::of($moved),

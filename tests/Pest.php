@@ -1183,18 +1183,27 @@ function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string
  * small stages nothing and the refusal never comes; one that is too large never fires and the caller's
  * non-vacuity assertion reddens. There is no value that makes a case pass for the wrong reason.
  *
+ * ⚠️ `$needle` MOVES THE STAGING POINT, AND ONE CASE NEEDS IT. Defaulting to the answer-document read puts
+ * the write in the honest window — before the lock. Passing `for update` instead puts it AFTER the lock is
+ * granted, which is what pins the guard's PLACEMENT: a check hoisted out of the transaction reads before
+ * that point and cannot see it. ⚠️ That writer is deliberately one no production code path is — every real
+ * writer of `submission_answers` for a draft goes through `updateDraft()`, which takes the `submissions`
+ * lock first and would therefore block. The case staging it says so, and pins the code property rather than
+ * a reachable race.
+ *
  * @param  Closure():void  $write  the racing device's commit
- * @param  int  $skip  matching selects to let past before staging (0 for a direct service-level promote)
+ * @param  int  $skip  matching statements to let past before staging (0 for a direct service-level promote)
+ * @param  string  $needle  the SQL fragment to stage on
  * @return Closure():bool  whether the interleave actually fired
  */
-function interleaveOnPromoteRead(Closure $write, int $skip = 0): Closure
+function interleaveDuringPromote(Closure $write, int $skip = 0, string $needle = 'select * from "submission_answers"'): Closure
 {
     $state = new stdClass;
     $state->fired = false;
     $state->seen = 0;
 
-    DB::listen(function ($query) use ($state, $write, $skip): void {
-        if ($state->fired || ! str_contains($query->sql, 'select * from "submission_answers"')) {
+    DB::listen(function ($query) use ($state, $write, $skip, $needle): void {
+        if ($state->fired || ! str_contains($query->sql, $needle)) {
             return;
         }
 

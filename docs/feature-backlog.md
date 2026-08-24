@@ -762,14 +762,14 @@ are still in place.
 ### Submissions, drafts & the guest runtime
 
 - **`major` · `promote()` reads the answer document before it takes the lock, and a concurrent autosave is
-  terminally lost.** `app/Services/Submissions/SubmissionDraftService.php:163` reads outside any
+  terminally lost.** `app/Services/Submissions/SubmissionDraftService.php:173` reads outside any
   transaction, Stage-3 semantic validation and the DB attachment check run for tens of milliseconds
-  (`:167-175`), the lock is taken only at `:182-183`, and `:200` finalizes with the *pre-lock* values —
+  (`:177-185`), the lock is taken only at `:192-193`, and `:210` finalizes with the *pre-lock* values —
   `SubmissionFinalizer.php:90` being a whole-document replace. A two-device resume (the flow the resume
   link invites) drops the second device's field, and the row is then `submitted`, so no later save can
   restore it. **Live.** The only in-lock guard is a status re-assert, which a concurrent autosave does not
   move — the sibling `SubmissionAnswerEditService.php:186-203` already carries the two-check shape this
-  needs, verbatim. P3a closed the cross-request case and did not touch this path.
+  needs, verbatim. P3a closed the cross-request case and did not touch this path. ⚠️ **THE FOUR `SubmissionDraftService` LINE NUMBERS WERE RE-CITED BY M11 (+10 EACH), which moved that file — verified against the code on 2026-08-24, not arithmetic.** `SubmissionFinalizer.php:90` and `SubmissionAnswerEditService.php:186-203` are unmoved.
 - ~~**`major` · Two unscoped copies of `findByClientUuid()` survive the branch that declared the unscoped
   form an authorization defect.**~~ ✅ **DONE — M11 (2026-08-24). The row was true verbatim and named four
   fewer things than it should have.** As built there is now exactly ONE implementation —

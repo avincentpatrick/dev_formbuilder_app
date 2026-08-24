@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Submissions;
 
+use App\Http\Controllers\Tenant\SubmissionDraftController;
 use RuntimeException;
 
 /**
@@ -23,6 +24,10 @@ use RuntimeException;
  * the `submission_conflict` envelope (the draft substrate shipped no HTTP route); now that H9b exposes the
  * draft routes it carries its own `draft_already_finalized` code so a client can tell "this draft is already
  * submitted" from a genuine content conflict.
+ *
+ * The {@see clientUuidClaimed()} cause (Increment M11) is the fourth and is about ENTITLEMENT rather than
+ * content or timing: the uuid is already spent in this tenant on a row outside the caller's form/author
+ * scope. It shares `submission_conflict` with {@see contentConflict()} deliberately — see its docblock.
  */
 final class SubmissionConflictException extends RuntimeException
 {
@@ -73,6 +78,37 @@ final class SubmissionConflictException extends RuntimeException
         return new self(
             'This draft has already been submitted and can no longer be saved as a draft.',
             'draft_already_finalized',
+        );
+    }
+
+    /**
+     * Increment M11 — the `client_submission_uuid` is already spent inside this tenant on a row the caller
+     * cannot resolve: a different form, a different author, or a soft-deleted tombstone still holding the
+     * index entry.
+     *
+     * ⚠️ IT REUSES THE `submission_conflict` CODE AND MESSAGE ON PURPOSE, AND THAT IS THE POINT RATHER THAN
+     * A SHORTCUT. {@see SubmissionDraftController::resolveTarget()} has
+     * returned exactly this 409, with exactly this sentence, for exactly this cause since I9b — the draft
+     * channel simply reached the invariant before the submit channels did. Minting a new code here would
+     * make two names for one refusal and oblige every client to learn the second one; the guest runtime
+     * folds all 409s alike today (its own filed row), so a new code would buy nothing and cost a contract.
+     *
+     * Distinct from {@see contentConflict()} in cause, not in envelope: that one is "this uuid is yours and
+     * the content moved", this one is "this uuid was never yours to write to". Only the message separates
+     * them, which is what a respondent and an integrator actually read.
+     *
+     * ⚠️ THE WORDING GENERALISED FROM *"draft identifier"* WHEN THE CAUSE STOPPED BEING DRAFT-ONLY. The
+     * draft channel spelled this sentence inline; it now reads it off this factory, and the submit channels
+     * raise the same cause — where "draft" would be simply untrue. One factory, one wording, three channels.
+     * ⚠️ AND THE MESSAGE IS THE ONLY THING THAT SEPARATES THIS FROM {@see contentConflict()} ON THE WIRE,
+     * which is a consequence of sharing the code rather than an oversight: a test that asserts only the
+     * exception CLASS, or only `error.code`, passes for either cause. Assert the message.
+     */
+    public static function clientUuidClaimed(): self
+    {
+        return new self(
+            'This submission identifier already belongs to another response.',
+            'submission_conflict',
         );
     }
 

@@ -99,7 +99,7 @@ final class SubmissionDraftService
         $completeness = DraftCompleteness::of($fields, $sections, $normalized);
 
         if ($payload->clientSubmissionUuid !== null) {
-            $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
+            $existing = ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
             if ($existing !== null) {
                 // Grace window (Increment H12a): an EXISTING draft keeps autosaving even after the form closes,
                 // so a respondent mid-fill is never stranded — no start guard on this branch.
@@ -112,6 +112,16 @@ final class SubmissionDraftService
                     baseline: $payload->baseContentChecksum,
                 );
             }
+        }
+
+        // ⚠️ AND THE TENANT IS A WIDER DOMAIN THAN THE SCOPE WE JUST SEARCHED (M11). The partial unique index
+        // is `(tenant_id, client_submission_uuid)`, so a uuid that is free for THIS form and THIS author can
+        // still be spent by another form's row — including a soft-deleted tombstone the resolve cannot see.
+        // Left to createDraft() that is a 23505 nothing can classify, three wasted transactions and a 500 on
+        // `api/v1/public/f/{shareToken}/draft` — a route anyone on the internet can POST to. Refuse it here,
+        // with the same 409 the authenticated draft channel has returned for this cause since I9b.
+        if ($payload->clientSubmissionUuid !== null) {
+            ClientUuidResolver::assertUnclaimed($payload->clientSubmissionUuid);
         }
 
         // A NEW draft may only start inside the open window (H12a). Capacity is NOT gated at draft-create (a
@@ -388,18 +398,24 @@ final class SubmissionDraftService
                 // last-writer-wins recovery is left exactly as it was.
                 // ⚠️ `checkBaseline: false` IS PASSED EXPLICITLY RATHER THAN LEFT TO THE DEFAULT, and that is
                 // the mutation pass earning its keep: adding the check here survives every test in this
-                // repository (M12), because reaching this line needs a genuine insert race — findByClientUuid
+                // repository (M12), because reaching this line needs a genuine insert race — ClientUuidResolver::resolve()
                 // must return null and then non-null — which no deterministic test can stage. The omission is
                 // therefore enforced by this argument and the comment above it, not by a red test. Say so
                 // rather than let the next reader assume a gate exists.
                 if ($payload->clientSubmissionUuid !== null) {
-                    $existing = $this->findByClientUuid($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
+                    $existing = ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
                     if ($existing !== null) {
                         return $this->updateDraft(
                             $existing, $version, $normalized, $checksum, $completeness, $payload->draftCurrentStep,
                             checkBaseline: false,
                         );
                     }
+
+                    // Raced our own entitlement check (M11): the uuid was free in the tenant when saveDraft()
+                    // looked and is spent now, by a row we cannot fold into. That is a refusal, not a
+                    // reference collision — without it the retry budget below is spent on an insert that can
+                    // only fail again, and the QueryException that escapes is a 500 on an unauthenticated route.
+                    ClientUuidResolver::assertUnclaimed($payload->clientSubmissionUuid);
                 }
 
                 // Nothing to fold into, so this was the reference index. Retry with a fresh code, then give up
@@ -409,34 +425,6 @@ final class SubmissionDraftService
                 }
             }
         }
-    }
-
-    /**
-     * Resolve the draft this uuid names, WITHIN one form and one author.
-     *
-     * ⚠️ THE SCOPING IS AUTHORIZATION, NOT TIDINESS (added in I9b). The lookup used to be
-     * `where('client_submission_uuid', $uuid)` alone, which is safe only while every caller's form is pinned
-     * by something the caller cannot choose — true of the guest channel, where the share token fixes the form
-     * and there is no author. It stopped being true the moment an AUTHENTICATED endpoint took the form from
-     * the URL and the uuid from the request body: those are two independent inputs, so a member authorized on
-     * form A could send form B's uuid and have the write land on B's draft, on a form they may hold no grant
-     * on at all. RLS bounds the blast radius to the tenant and no further.
-     *
-     * `$respondentUserId` narrows it again on the encode channel, where a draft genuinely belongs to the
-     * person keying it. Null is the guest case and matches guest rows (`respondent_user_id IS NULL`) — hence
-     * `whereNull`, because `where(col, null)` compiles to `= NULL` and never matches anything.
-     */
-    private function findByClientUuid(string $uuid, string $formId, ?string $respondentUserId): ?Submission
-    {
-        return Submission::query()
-            ->where('client_submission_uuid', $uuid)
-            ->where('form_id', $formId)
-            ->when(
-                $respondentUserId === null,
-                fn ($q) => $q->whereNull('respondent_user_id'),
-                fn ($q) => $q->where('respondent_user_id', $respondentUserId),
-            )
-            ->first();
     }
 
     /**

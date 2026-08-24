@@ -92,8 +92,16 @@ final class SubmissionPipeline
         // Stage 2b — idempotency: a replayed client_submission_uuid resolves to the existing row. A
         // byte-identical replay (or a legacy row with no stored checksum) is a 200 no-op; the same uuid
         // carrying different content is a genuine concurrent-edit conflict → 409 (Increment G8c, §5).
+        //
+        // ⚠️ THE RESOLVE IS SCOPED TO THIS FORM AND THIS AUTHOR SINCE M11, AND THAT IS AUTHORIZATION RATHER
+        // THAN TIDINESS. It used to filter on the uuid alone while THREE channels fed it — the guest submit
+        // (share token fixes the form, uuid comes from the body), the authenticated encode page and
+        // /api/v1/sync (both take the version from one input and the uuid from another). So a caller
+        // entitled to form A could name form B's uuid and be handed B's id, reference and status with their
+        // own answers discarded as an idempotent 200 — and on the encode channel the promote backstop below
+        // would FINALIZE B's draft. See {@see ClientUuidResolver} for the full argument.
         if ($payload->clientSubmissionUuid !== null) {
-            $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+            $existing = ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
             if ($existing !== null) {
                 if ($this->contentConflicts($existing, $contentChecksum)) {
                     throw SubmissionConflictException::contentConflict();
@@ -101,6 +109,13 @@ final class SubmissionPipeline
 
                 return new SubmissionResult($existing, created: false);
             }
+
+            // Free within our scope is NOT free in the tenant: the partial unique index is
+            // `(tenant_id, client_submission_uuid)`. Refuse here — one indexed EXISTS — rather than let
+            // Stage 4 insert into a 23505 whose recovery arm cannot classify it, which is a 500 on a route
+            // anyone on the internet can POST to. It also refuses BEFORE Stages 3/3.5, so the cheapest
+            // outcome costs the least work.
+            ClientUuidResolver::assertUnclaimed($payload->clientSubmissionUuid);
         }
 
         // Stage 3 — semantic validation. A false constraint is a result, not an exception; !passed() → 422.
@@ -143,8 +158,13 @@ final class SubmissionPipeline
                 // Race on the (tenant_id, client_submission_uuid) partial-unique index — a concurrent replay
                 // won the insert. Resolve to that row: an identical duplicate is a success, not an error (§4.1);
                 // but a same-uuid different-content winner is the same conflict Stage 2b guards (Increment G8c).
+                //
+                // The THIRD arm (M11) is a caller that raced Stage 2b's entitlement check: the uuid was free
+                // in the tenant when we looked and is spent now, by a row outside our scope. That is the same
+                // refusal Stage 2b makes, not a reference collision — and telling them apart here is what
+                // keeps the retry budget below for the case it was written for.
                 if ($payload->clientSubmissionUuid !== null) {
-                    $existing = $this->findByClientUuid($payload->clientSubmissionUuid);
+                    $existing = ClientUuidResolver::resolve($payload->clientSubmissionUuid, $version->form_id, $payload->respondentUserId);
                     if ($existing !== null) {
                         if ($this->contentConflicts($existing, $contentChecksum)) {
                             throw SubmissionConflictException::contentConflict();
@@ -152,6 +172,8 @@ final class SubmissionPipeline
 
                         return new SubmissionResult($existing, created: false);
                     }
+
+                    ClientUuidResolver::assertUnclaimed($payload->clientSubmissionUuid);
                 }
 
                 // Nothing to resolve to, so this was the reference index. Retry with a fresh code; give up
@@ -211,11 +233,6 @@ final class SubmissionPipeline
         $this->finalizer->finalize($submission, $form, $version, $fields, $answers, $contentChecksum, $payload->respondentUserId);
 
         return $submission;
-    }
-
-    private function findByClientUuid(string $uuid): ?Submission
-    {
-        return Submission::query()->where('client_submission_uuid', $uuid)->first();
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Http\Requests\Public\GuestSubmissionRequest;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Models\Submission;
+use App\Services\Submissions\ClientUuidResolver;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPipeline;
@@ -35,7 +36,8 @@ use Illuminate\Http\JsonResponse;
  * `409 form_updated` so the SPA re-mints and re-renders — the shared pipeline is never relaxed to accept a
  * non-current version.
  *
- * DRAFT-AWARE (Increment H9b): if the request's `client_submission_uuid` already has a saved draft, the
+ * DRAFT-AWARE (Increment H9b): if the request's `client_submission_uuid` already has a saved GUEST draft on
+ * THIS TOKEN'S FORM (the M11 scoping — see existingDraft()), the
  * finalize goes through {@see SubmissionDraftService::promote()} — never {@see SubmissionPipeline::submit()} —
  * honouring the H9a invariant (submit() must never see a same-uuid draft, or it would return the draft row as
  * an idempotent no-op and the response would never finalize). The final edits are captured with one
@@ -69,7 +71,7 @@ final class GuestSubmissionController extends Controller
         $version = FormVersion::query()->whereKey($token->formVersionId)->firstOrFail();
         $payload = $this->payload($request, $version, $token, $tokens);
 
-        $draft = $this->existingDraft($request->clientSubmissionUuid());
+        $draft = $this->existingDraft($request->clientSubmissionUuid(), $token->formId);
 
         if ($draft !== null) {
             // Capture any final edits (Stage-1), then finalize the SAME row via promote() (full Stage-3, in
@@ -109,16 +111,31 @@ final class GuestSubmissionController extends Controller
         ], $result->created ? 201 : 200);
     }
 
-    private function existingDraft(?string $clientSubmissionUuid): ?Submission
+    /**
+     * The draft this request's uuid names, or null if this is a fresh submission.
+     *
+     * ⚠️ SCOPED TO THE TOKEN'S FORM AND TO A GUEST ROW SINCE M11, AND BOTH HALVES ARE AUTHORIZATION. This
+     * used to filter on uuid + status alone. The share token fixes the FORM and the uuid arrives in the
+     * BODY, so those are two independent inputs: a guest holding form A's link could name a uuid from form
+     * B in the same tenant and reach `saveDraft()` against a row that was never theirs — which, because the
+     * uuid is unique per TENANT rather than per form, could not even be written and surfaced as a
+     * repeatable unauthenticated 500. `respondent_user_id IS NULL` is the second half: a member's own draft
+     * on this very form is not a guest's to promote either. {@see ClientUuidResolver::resolve()}.
+     *
+     * ⚠️ AND A FINALIZED OWN-ROW STILL RETURNS NULL, WHICH IS THE H9a INVARIANT RATHER THAN AN OMISSION.
+     * The status test is what routes a replayed submit back through the pipeline, where Stage 2b answers it
+     * as an idempotent 200; `promote()` would be a no-op that returns `created: false` without ever
+     * comparing content.
+     */
+    private function existingDraft(?string $clientSubmissionUuid, string $formId): ?Submission
     {
         if ($clientSubmissionUuid === null) {
             return null;
         }
 
-        return Submission::query()
-            ->where('client_submission_uuid', $clientSubmissionUuid)
-            ->where('status', SubmissionStatus::Draft)
-            ->first();
+        $existing = ClientUuidResolver::resolve($clientSubmissionUuid, $formId, null);
+
+        return $existing?->status === SubmissionStatus::Draft ? $existing : null;
     }
 
     private function payload(

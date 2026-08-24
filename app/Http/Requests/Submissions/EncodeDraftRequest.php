@@ -16,7 +16,7 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * ⚠️ `client_submission_uuid` IS `required` HERE WHERE THE GUEST'S IS `nullable`, AND THAT IS THE WHOLE
  * IDEMPOTENCY DESIGN RATHER THAN A STRICTER MOOD. {@see SubmissionDraftService::saveDraft()} consults
- * `findByClientUuid()` only when the uuid is non-null; with a null one it takes the `createDraft()` branch
+ * `ClientUuidResolver::resolve()` only when the uuid is non-null; with a null one it takes the `createDraft()` branch
  * every single time. So a nullable uuid on an AUTOSAVE channel does not mean "no idempotency key", it means
  * one new `status = draft` row per keystroke-debounce tick, each with its own 30-day TTL. Making it required
  * makes that unrepresentable instead of merely untested — the runtime store has always minted one

@@ -11,9 +11,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Submissions\EncodeSubmissionRequest;
 use App\Models\Form;
 use App\Models\FormVersion;
-use App\Models\Submission;
 use App\Models\User;
 use App\Policies\SubmissionPolicy;
+use App\Services\Submissions\ClientUuidResolver;
 use App\Services\Submissions\EncodeFormPresenter;
 use App\Services\Submissions\PrunedAnswerReport;
 use App\Services\Submissions\SubmissionDraftService;
@@ -94,12 +94,12 @@ final class SubmissionController extends Controller
         // unscoped resolve would let a member authorized on form A promote a draft belonging to form B — a
         // form they may hold no grant on — because `promote()` is invoked directly and never re-runs
         // `SubmissionPolicy::promote()`. RLS bounds this to the tenant and no further.
-        $draft = $uuid === null ? null : Submission::query()
-            ->where('client_submission_uuid', $uuid)
-            ->where('form_id', $form->id)
-            ->where('respondent_user_id', $user->id)
-            ->where('status', SubmissionStatus::Draft)
-            ->first();
+        // ⚠️ THE PREDICATE MOVED TO {@see ClientUuidResolver::resolve()} IN M11 AND IS NO LONGER WRITTEN OUT
+        // HERE. It was correct in this file and unscoped in two others, which is exactly how a hand-copied
+        // invariant drifts; the status test stays local because a FINALIZED own-row must fall through to the
+        // pipeline, where Stage 2b answers a replay as an idempotent 200.
+        $existing = $uuid === null ? null : ClientUuidResolver::resolve($uuid, $form->id, (string) $user->id);
+        $draft = $existing?->status === SubmissionStatus::Draft ? $existing : null;
 
         // ⚠️ AND THE VERSION IS ASYMMETRIC. On the draft branch the payload must carry the DRAFT'S OWN
         // version, never the form's currently-published one: `updateDraft()` writes `form_version_id` and

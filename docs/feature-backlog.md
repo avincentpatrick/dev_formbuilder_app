@@ -1177,6 +1177,14 @@ are still in place.
   **Not M5's**: that increment changed zero `.vue` / `.ts` / `packages/design-system/` files (checked with
   `git diff --name-only origin/main...HEAD`), so it is pre-existing and sits in **Lane A's column**. Filed
   here rather than left in a CI log, where no later search would find it.
+  ✅ **SECOND CONFIRMED SIGHTING — M9's merge run `32711202891` (2026-08-24), the identical case, rule and
+  element** (`builder-axe.spec.ts:198` › *Builder — share panel, live link (light)*, `color-contrast` on
+  `footer > .mds-button--primary`), failing on the first attempt and passing on retry #1 for **550 passed +
+  1 flaky + 10 skipped**. ⚠️ **THAT SETTLES THE ROW'S SECOND CLAIM: THIS IS NOT INTERMITTENT AT ALL.** Two
+  runs five days apart, on two unrelated diffs — neither touched a `.vue` or a design-system file — failed
+  in exactly the same place. The retry is not smoothing over flakiness; it is **converting a deterministic
+  AA violation into a line that reads as noise**, which is the more expensive half of the defect. M9 did not
+  take it: it is Lane A's column and the retryability question is a gate-policy decision, not a colour fix.
 
 - **`major` · The combobox highlight leaves the visible box after roughly the sixth option and cannot be
   brought back.** `packages/design-system/src/components/Combobox/Combobox.vue:353-358` —

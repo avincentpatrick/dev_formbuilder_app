@@ -60,6 +60,11 @@ const props = defineProps<{
          *  which tier reconcileDraft chose: it describes the state on the server that the next save will
          *  write over, not the answers being shown. Same rule reconcile.ts already records for the uuid. */
         contentChecksum: string | null;
+    /** Increment M14 — false when the seed came from a mid-session draft RE-READ rather than from opening a
+     *  resume link, which suppresses the welcome-back banner. The respondent never left, so "Welcome back —
+     *  we've restored your saved answers" would be addressed to a journey they did not take; the redraft
+     *  banner says what actually happened. Absent means true, so every pre-M14 caller is unchanged. */
+    greet?: boolean;
     } | null;
     /** Increment H7 — the raw `location.search` to prefill `url`-sourced hidden fields from. App.vue reads
      *  the DOM once and threads it here so the store itself stays DOM-free. */
@@ -79,7 +84,13 @@ const emit = defineEmits<{
     // find rather than one derived on the device from the id.
     submitted: [id: string, reference: string, confirmation: string | null];
     queued: [clientUuid: string];
-    reschema: [payload: { schema: SchemaResponse; answers: AnswerMap }];
+    // Increment M14 — `conflictCode` names WHICH 409 caused the remount (null = the ordinary republish
+    // drift), so App.vue can pick a true sentence instead of asserting a republish for all five causes.
+    reschema: [payload: { schema: SchemaResponse; answers: AnswerMap; conflictCode: string | null }];
+    // Increment M14 — a 409 `draft_conflict`: re-read the server draft and re-mount on it, KEEPING the uuid.
+    // Deliberately not a variant of `reschema`: that event means "start a new submission against a new
+    // version", and this one means the exact opposite on both counts.
+    redraft: [payload: { resumeToken: string }];
     discard: [];
     // Increment H12b — a submit rejected because the form closed / filled mid-fill; App shows the full-screen state.
     unavailable: [acceptance: ScheduleAcceptance];
@@ -157,14 +168,48 @@ type Notice = { type: 'info' | 'error' | 'rate-limited'; message: string } | nul
 const notice = ref<Notice>(props.notice ? { type: 'info', message: props.notice } : null);
 const submitting = ref(false);
 
-async function handleDrift(): Promise<void> {
+/**
+ * Re-mint, re-fetch the schema, and hand both up so `App.vue` can re-mount the session against them.
+ *
+ * Increment M14 — `conflictCode` is the 409 envelope code that sent us here, or `null` for the ordinary
+ * republish drift this function was written for. It is passed through rather than resolved here because the
+ * banner belongs to `App.vue`, which owns every other piece of resolve/drift copy; all this function knows is
+ * which refusal it is recovering from.
+ */
+async function handleDrift(conflictCode: string | null = null): Promise<void> {
     try {
         await props.client.remint();
         const next = await props.client.fetchSchema();
-        emit('reschema', { schema: next, answers: { ...runtime.answers } });
+        emit('reschema', { schema: next, answers: { ...runtime.answers }, conflictCode });
     } catch {
         notice.value = { type: 'error', message: 'This form is no longer available.' };
     }
+}
+
+/**
+ * Increment M14 — a 409 `draft_conflict`: another device wrote the server draft this session is editing.
+ *
+ * ⚠️ THE REMEDY IS THE OPPOSITE OF `handleDrift`'s AND THAT IS THE WHOLE POINT OF THE INCREMENT. Nothing was
+ * republished, so re-fetching the schema answers a question nobody asked; and re-mounting mints a fresh
+ * `client_submission_uuid` with a null baseline, which abandons the server draft mid-edit and lets the next
+ * save mint a SECOND draft with a second emailed resume link. Re-reading the draft keeps the uuid, picks up
+ * the other device's answers, and re-bases on the checksum the server actually holds.
+ *
+ * ⚠️ THE FALLBACK IS DEGRADED, NEVER SILENT. A re-read needs a resume token, and although one is in hand
+ * wherever this refusal is reachable — the server only raises it against an EXISTING draft row for this uuid
+ * (`GuestSubmissionController::existingDraft()`), which this device either created (every save returns a
+ * token) or resumed into (the token is in the URL) — that argument is about the server's reachability, not
+ * about this component's state. If the token is missing anyway, the drift remount still runs and the
+ * respondent still gets a true sentence; they lose the re-read, not the refusal.
+ */
+function handleRedraft(conflictCode: string): void {
+    const token = draftResumeToken.value;
+    if (token === null) {
+        void handleDrift(conflictCode);
+
+        return;
+    }
+    emit('redraft', { resumeToken: token });
 }
 
 /** Map an inline (online) submit failure. Client-resolvable outcomes discard the queued row; a genuine network
@@ -181,6 +226,23 @@ async function handleSubmitError(error: unknown, uuid: string): Promise<SubmitOu
         }
         if (normalized.kind === 'refresh') {
             void handleDrift();
+            return 'blocked';
+        }
+        // Increment M14 — the three 409s that are NOT a republish. Until M14 all of them arrived as `refresh`
+        // and took the branch above, so the respondent read "This form was updated" for a form nobody had
+        // touched. `draft_stale` re-reads the draft and keeps the uuid; the other two keep the remount, whose
+        // fresh uuid is the correct remedy for `uuid_claimed` and harmless for a content conflict — only the
+        // sentence was wrong for them, and the code now carries it.
+        //
+        // `finalized` deliberately has no branch: it falls to the generic tail below, which shows the server's
+        // own sentence ("This draft has already been submitted…"). That IS the right answer, and a branch that
+        // reproduced it would be a second place to keep it correct.
+        if (normalized.kind === 'draft_stale') {
+            handleRedraft(normalized.code);
+            return 'blocked';
+        }
+        if (normalized.kind === 'conflict' || normalized.kind === 'uuid_claimed') {
+            void handleDrift(normalized.code);
             return 'blocked';
         }
         if (normalized.kind === 'rate_limited') {
@@ -327,6 +389,11 @@ const draftCompleteness = ref<number | null>(props.resume?.completeness ?? null)
 // successful save. A fresh (non-resumed) session starts null, which is the honest claim: it has read nothing,
 // so its first save creates the draft rather than overwriting one.
 const draftBaseline = ref<string | null>(props.resume?.contentChecksum ?? null);
+// Increment M14 — the token a `draft_conflict` re-reads through. Seeded from the resume link this session was
+// opened with (empty on a normal `/f/{slug}` entry) and advanced by every successful save, because
+// `GuestDraftController` mints a fresh one on each. The save result carried it all along and this component
+// threw it away, which is why the recovery had nothing to read the draft with.
+const draftResumeToken = ref<string | null>(props.bootstrap.resumeToken === '' ? null : props.bootstrap.resumeToken);
 
 async function saveDraftAction(options: { email?: string | null; finishLater: boolean }): Promise<DraftSaveResult | null> {
     draftSaving.value = true;
@@ -346,15 +413,39 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
         // Advance the baseline to what the server just wrote, so the NEXT save from this device is based on
         // it. Skipping this would make every save after the first look like a second device.
         draftBaseline.value = result.contentChecksum;
+        draftResumeToken.value = result.resumeToken;
         const email = (options.email ?? '').trim();
         return { resumeUrl: result.resumeUrl, emailed: options.finishLater && email !== '' };
     } catch (error) {
-        // A republish between mint and save surfaces as a refresh drift — route it through the same reschema
-        // remount as submit (the caller sees null and closes; the session re-mounts against the new version).
-        if (error instanceof ApiError && error.normalized.kind === 'refresh') {
-            void handleDrift();
-            return null;
+        if (error instanceof ApiError) {
+            const { kind, code } = error.normalized;
+            // A republish between mint and save surfaces as a refresh drift — route it through the same reschema
+            // remount as submit (the caller sees null and closes; the session re-mounts against the new version).
+            if (kind === 'refresh') {
+                void handleDrift();
+
+                return null;
+            }
+            // Increment M14 — the same three-way split the submit path takes. This branch used to be `refresh`
+            // ALONE, and its comment named a republish as the only thing that reached it, which was true when
+            // it was written and stopped being true at P3a: `GuestDraftController` sets `checkBaseline: true`
+            // unconditionally, so a `draft_conflict` is reachable on EVERY save and was landing here silently.
+            if (kind === 'draft_stale') {
+                handleRedraft(code);
+
+                return null;
+            }
+            if (kind === 'conflict' || kind === 'uuid_claimed') {
+                void handleDrift(code);
+
+                return null;
+            }
         }
+        // ⚠️ INCREMENT M14 — EVERYTHING ELSE IS RE-THROWN SO THE CALLER CAN SPEAK, AND THAT IS THE FIX FOR THE
+        // SECOND BACKLOG ROW. `null` means "the session is remounting, so say nothing" — it is a correct answer
+        // only for the branches above, which all remount. A `finalized` refusal remounts nothing, so returning
+        // null for it produced the reported symptom exactly: "Save and finish later" with no save, no resume
+        // link and no error. `SaveForLater` now renders the server's own sentence for these.
         throw error;
     } finally {
         draftSaving.value = false;
@@ -378,7 +469,7 @@ const description = computed(() => runtime.renderModel.form.description);
     >
         <template #notice>
             <WelcomeBackBanner
-                v-if="resume"
+                v-if="resume && resume.greet !== false"
                 :resolution="stepResolution"
                 :step-title="resumeStepTitle"
                 :note="resume.note"

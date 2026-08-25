@@ -49,6 +49,33 @@ describe('describeRow', () => {
         expect(describeRow(row, false, true).label).toBe('Queued');
     });
 
+    it('names WHY a row conflicted, so the list cannot contradict the banner its Review button opens', () => {
+        // ⚠️ Increment M14 — THE CONTRADICTION THIS CLOSES WAS LIVE, NOT HYPOTHETICAL. This branch hardcoded
+        // "the form changed after this was saved" for every cause, while `App.vue`'s review banner — reached
+        // by the Review button on this very row — told a content conflict something else entirely. Both now
+        // read `lib/conflict-notice.ts`, so the next cause added reaches both surfaces or neither.
+        const content = describeRow(outboxRow({ status: 'conflict', conflict_code: 'submission_conflict' }), false, true);
+        const draft = describeRow(outboxRow({ status: 'conflict', conflict_code: 'draft_conflict' }), false, true);
+        const drift = describeRow(outboxRow({ status: 'conflict', conflict_code: 'form_updated' }), false, true);
+
+        expect(content.detail).toContain('already saved');
+        expect(content.detail).not.toContain('the form changed');
+        expect(draft.detail).toContain('another device');
+        expect(draft.detail).not.toContain('the form changed');
+        // The drift arm keeps its pre-M14 sentence exactly.
+        expect(drift.detail).toBe('We found a conflict — the form changed after this was saved.');
+    });
+
+    it('still describes a conflict whose code is null, which the exhaustiveness sweep depends on', () => {
+        // A row parked by a build older than G8c carries no `conflict_code`, and `fixtures.ts` defaults it to
+        // null — so the sweep at the bottom of this file walks `status: 'conflict'` with a null code and
+        // asserts a non-empty detail. A cause-branch with no default arm would redden THAT case rather than
+        // this one, several screens away from the change; this states the requirement where it is created.
+        const view = describeRow(outboxRow({ status: 'conflict', conflict_code: null }), false, true);
+
+        expect(view.detail).toBe('We found a conflict — the form changed after this was saved.');
+    });
+
     it('offers Review for a conflict on this form and a way OUT for one on another', () => {
         const here = describeRow(outboxRow({ status: 'conflict' }), false, true);
         const elsewhere = describeRow(outboxRow({ status: 'conflict' }), false, false);

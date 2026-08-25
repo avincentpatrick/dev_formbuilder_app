@@ -276,7 +276,11 @@ it('never writes into another FORM\'s draft, even with a valid uuid', function (
     $this->actingAs($this->owner)
         ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Mine'], $uuid))
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict');
+        // Increment M14 — the code alone used to pass for a CONTENT conflict too, which is exactly the trap
+        // SubmissionConflictException's own docblock names. `submission_uuid_claimed` separates the causes,
+        // and the message is asserted beside it because that is what a person actually reads.
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
     reenter();
 
     $untouched = SubmissionAnswer::query()->where('submission_id', $otherDraft->id)->firstOrFail();
@@ -304,7 +308,11 @@ it('never writes into another USER\'s draft on the same form', function (): void
     $this->actingAs($this->owner)
         ->postJson(draftUrl($this->form), draftBody(['full_name' => 'Mine'], $uuid))
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict');
+        // Increment M14 — the code alone used to pass for a CONTENT conflict too, which is exactly the trap
+        // SubmissionConflictException's own docblock names. `submission_uuid_claimed` separates the causes,
+        // and the message is asserted beside it because that is what a person actually reads.
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
+        ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
     reenter();
 
     $untouched = SubmissionAnswer::query()->where('submission_id', $theirs->id)->firstOrFail();
@@ -501,7 +509,8 @@ it('submits when the encode tab carries the CURRENT baseline, so the token is co
 |--------------------------------------------------------------------------
 | Increment M11 — the refusal arm that had no test at all.
 |--------------------------------------------------------------------------
-| `resolveTarget()` has returned a 409 `submission_conflict` for "this uuid was never yours" since I9b, and
+| `resolveTarget()` has returned a 409 for "this uuid was never yours" since I9b — `submission_conflict`
+| until Increment M14 gave that cause its own `submission_uuid_claimed` — and
 | grepping the repository for its message found the string in exactly one place: the controller that emits
 | it. The arm worked; nothing asserted it, so nothing would have noticed it stop. Found while scoping M11,
 | which routes the same refusal through `ClientUuidResolver::isClaimed()`.
@@ -519,7 +528,7 @@ it('409s an autosave whose uuid belongs to another form, and creates nothing (M1
     $this->actingAs($this->owner)
         ->postJson(draftUrl($this->form), ['answers' => ['full_name' => 'Mallory'], 'client_submission_uuid' => $uuid])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         // ⚠️ THE MESSAGE, NOT ONLY THE CODE — `contentConflict()` shares the code, so a code-only assertion
         // cannot tell "never yours" from "your content moved".
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');

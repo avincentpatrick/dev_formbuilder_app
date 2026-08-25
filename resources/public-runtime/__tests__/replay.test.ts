@@ -128,6 +128,35 @@ describe('replayOutbox', () => {
         expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'form_updated' });
     });
 
+    it('parks a 409 draft_conflict after ONE post rather than retrying a baseline the server refused', async () => {
+        // ⚠️ Increment M14 — THIS CASE'S SUBJECT IS THE HAZARD THE SPLIT CREATES, NOT THE SPLIT ITSELF, AND IT
+        // WOULD HAVE PASSED BEFORE M14. Every 409 used to normalize to `refresh`, which this file's case above
+        // already covers. Once `draft_conflict` became its own kind, an `if`-chain that forgot it would fall
+        // through to backoff() — five POSTs of the identical stale `base_content_checksum`, each refused for
+        // the same reason, before parking as `needs_attention` with a message about retries.
+        //
+        // `REPLAY_OUTCOME` is a `Record<ErrorKind, …>` so vue-tsc refuses that omission outright; this pins
+        // the BEHAVIOUR the type only guarantees is decided, and it is why `retry: 0` and the POST count are
+        // asserted rather than just the status.
+        await enqueue(db, input('u1'));
+        const { fetchFn, submitBodies } = makeFetch({ submit: () => res(409, errorBody('draft_conflict')) });
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1, retry: 0 });
+        expect(submitBodies).toHaveLength(1);
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'draft_conflict' });
+    });
+
+    it('parks a 409 submission_uuid_claimed as its own code, so the review banner can name the cause', async () => {
+        // Increment M14 — the third conflict kind. It reaches the same landing point as the other two and is
+        // NOT the same fact: dropping `uuid_claimed` from the outcome table reddens this case alone, because
+        // the two above name different codes and take different table entries.
+        await enqueue(db, input('u1'));
+        const { fetchFn } = makeFetch({ submit: () => res(409, errorBody('submission_uuid_claimed')) });
+
+        expect(await replayOutbox(db, fetchFn)).toMatchObject({ conflict: 1, retry: 0 });
+        expect(await db.outbox.get('u1')).toMatchObject({ status: 'conflict', conflict_code: 'submission_uuid_claimed' });
+    });
+
     // ── Increment H21b, Doc #27 §5.4 — the version guard that was already sitting unused in the row ──────
     //
     // Replay re-mints a token before posting, and a fresh token pins the form's CURRENT published version, so

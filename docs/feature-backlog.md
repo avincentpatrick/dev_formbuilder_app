@@ -851,43 +851,73 @@ are still in place.
   which the mutation pass proved passes for `contentConflict()` too — every refusal test now asserts the
   MESSAGE, which is the only thing separating the two causes on the wire. Recorded in
   `docs/offline-first-sync-design.md` §5 and `docs/security-threat-model.md` §4.
-- **`major` · The guest runtime folds P3a's `409 draft_conflict` into the generic `refresh` kind, so the
-  refusal becomes a second submission.** `resources/public-runtime/lib/error-normalizer.ts:93` returns
-  `'refresh'` for every 409; `components/RuntimeSession.vue:275-282` discards the outbox row and calls
-  `handleDrift()`, which re-fetches the **schema** rather than the draft, and `App.vue:284-296` remounts
-  with a fresh uuid and `draftBaseline = null`. The respondent is told *"This form was updated"* — false,
-  nothing was republished — and the resubmit it invites travels with **no baseline at all**. **Live.**
-  ⛔ **DOWNGRADED FROM `blocker` TO `major` ON VERIFICATION, AND THE REASON MATTERS**: the P3a guard is
-  **not** undone — the service throws before the write — and "fresh uuid after a 409 → a second row" is the
-  pre-existing, documented G8c recovery shape rather than a new failure. The residual harm is a factually
-  false cause shown to the respondent and a remedy (*reload the draft*) that the server names and the
-  client discards. The authenticated twin already branches correctly
-  (`resources/js/composables/useServerAutosave.ts:198-212`). Smallest fix: give `draft_conflict` its own
-  `ErrorKind`, as I8b did for `challenge`, and route it to a draft re-read that keeps the uuid.
-  ➕ **AND M11 ADDED A SECOND CAUSE TO THE SAME 409 WITHOUT PRE-EMPTING THIS ROW, DELIBERATELY.**
-  `submission_conflict` now also means *"this identifier was never yours"* — a refusal the client CAN recover
-  from automatically, by minting a fresh uuid and resubmitting, rather than by re-reading a draft. So this
-  row's fix should split THREE ways, not two, and the normalizer cannot tell the new cause from the content
-  conflict by code alone: they share `submission_conflict` and differ only in `error.message`. If that split
-  wants distinct codes, mint the new one here — the server side is one line in
-  `SubmissionConflictException::clientUuidClaimed()`, and M11 left it sharing the code precisely so this row
-  keeps the decision.
-  ➕ **AND M12 (2026-08-25) GAVE `draft_conflict` A SECOND RAISER, WHICH MOVES WHERE THIS ROW'S FIX HAS TO
-  LAND RATHER THAN WHAT IT IS.** `SubmissionDraftService::promote()` now raises the same code for the same
-  cause and the same remedy, so no new `ErrorKind` is owed for it — but it arrives on the **submit**
-  response, not the save response. This row's smallest fix is written against `RuntimeSession.vue:275-282`,
-  which is the SAVE path; the submit path folds its own 409 separately, so routing `draft_conflict` to a
-  draft re-read has to happen in both places or the respondent still sees *"This form was updated"* — now
-  for the one refusal whose remedy the server names exactly. ⚠️ **It is also why the no-baseline remount
-  matters more than it did**: on a client that sends no `base_content_checksum` the submit channel gates
-  P3a's check on `claimsBaseline()` and skips it, so M12's guard is the only thing left between two devices
-  and a terminal loss — see the closed `promote()` row for the four windows it uniquely covers.
-- **`major` · On the draft-save channel the same 409 is swallowed with no message at all.**
-  `resources/public-runtime/components/RuntimeSession.vue:352-358` returns `null` into
-  `components/SaveForLater.vue:38-43`, which just closes the panel — so a deliberate "Save and finish
-  later" produces **no save, no resume link, no error**, and the remount then mints a *second* server draft
-  with a *second* resume link emailed to the same respondent. `GuestDraftRequest.php:113-115` records that
-  this channel checks the baseline **unconditionally**, so the 409 is reachable on every save. **Live.**
+- ✅ **CLOSED BY `M14` (2026-08-25) — `major` · ~~The guest runtime folds P3a's `409 draft_conflict` into the
+  generic `refresh` kind, so the refusal becomes a second submission.~~** AND ~~**`major` · On the draft-save
+  channel the same 409 is swallowed with no message at all.**~~ **Taken together because they were one
+  mechanism in one component**, and shipping them apart would have written the same fold twice. Every
+  `file:line` in both rows verified against the code first; all true in substance, three carrying line drift
+  (the classifier's 409 arm is `error-normalizer.ts:101-103`, not `:93`, which is a comment inside the I8b
+  `challenge` block; the submit fold is `handleSubmitError()` at `RuntimeSession.vue:172-205`, not the
+  `:275-282` call site).
+  ⚠️ **THE ROWS NAME TWO FOLD SITES AND A SWEEP OF `resources/public-runtime/` FOUND TWELVE** — nine on the
+  409 path (`error-normalizer.ts:101` · `RuntimeSession.vue:160/182/354` · `replay.ts:223/291` ·
+  `App.vue:43` · `outbox-status.ts:130` · `outbox.ts:160`) plus three consumers. **Grepping the shape rather
+  than trusting the row's count is six-for-six** (M8, M9, M11, M12, M13, M14).
+  **As built:** the classifier reads `error.code` on a 409 exactly as it has read it on a 403 since I8b, and
+  four causes gained four `ErrorKind`s — `draft_stale`, `conflict`, `uuid_claimed`, `finalized`. `refresh`
+  keeps its meaning and stays the default for an unrecognised or bodyless 409. `draft_stale` routes through
+  `App.vue`'s existing `loadResume()`, the H10 machinery that already keeps the draft's uuid, reconciles
+  under the user-locked newest-wins precedence and always takes the SERVER's checksum — so the remedy the
+  server has named since P3a is finally the one the client performs. `RuntimeSession` stopped discarding the
+  `resume_token` every save returns, which is what the re-read needs and what nothing had noticed was thrown
+  away. Recorded in `docs/offline-first-sync-design.md` §5 and §8.
+  ⛔ **`replay.ts` WAS A FORCED NEIGHBOUR AND ITS FIX IS A TYPE, NOT A TEST.** Its `refresh` arm was the only
+  site preserving the server's code; minting kinds without it would have dropped `draft_conflict` into
+  `backoff()` — five POSTs of the identical stale baseline the server had already refused. The outcome table
+  is now a `Record<ErrorKind, …>`, so vue-tsc **refuses to compile** the next kind until that table names
+  its outcome; proved live by adding a thirteenth kind and watching `replay.ts:48` go red.
+  ⛔ **`outbox-status.ts` WAS THE OTHER FORCED NEIGHBOUR, AND ITS DEFECT WAS ALREADY LIVE.** It hardcoded
+  *"the form changed after this was saved"* for every cause while `App.vue`'s review banner — reached by the
+  Review button **on that same row** — said something else for a content conflict. Two copies of one
+  decision, in two files, disagreeing. Both now read `lib/conflict-notice.ts`.
+  ➕ **AND THE EMAIL SWALLOW WAS WORSE THAN "IGNORES `null`", WHICH ONLY MOUNTING THE COMPONENT REVEALED.**
+  `onEmail` sets `errorMessage`, but the paragraph rendering it was the `v-else` of `phase === 'ready'` — and
+  `onEmail` only ever runs *while* phase is `ready`. **The sentence was unreachable markup**: a failed
+  "Email me the link" left the panel looking exactly as it had before the click, and the pre-M14 assignment
+  was dead code. `SaveForLater` had never been mounted by any test.
+  ⚠️ **THE THREE-WAY SPLIT THE ROW ASKED FOR WENT FOUR WAYS**: `draft_already_finalized` is a fifth
+  guest-reachable 409 (`GuestDraftRuntimeTest.php:288` has asserted it since H9a) that also got the false
+  republish sentence. Leaving it folded while touching the line above it would have been a classifier that
+  handled four of five causes and silently mis-handled the fifth.
+- ✅ **CLOSED BY `M14` (2026-08-25) — the parked decision M11 left to this row: `clientUuidClaimed()` now
+  carries `409 submission_uuid_claimed`.** M11 kept it sharing `submission_conflict` and wrote its reason
+  down — *"the guest runtime folds all 409s alike today (its own filed row), so a new code would buy nothing
+  and cost a contract"* — leaving the call to whoever fixed the fold. **M14 is that row, so the premise is
+  gone.** Without the split a client must tell two causes apart by string-matching a human-facing sentence,
+  which `SubmissionConflictException` itself names as the trap that makes a test pass for the wrong cause.
+  **The draft channel is the clearest evidence:** `contentConflict()` is suspended for drafts, so on
+  `POST /api/v1/public/f/{shareToken}/draft` the shared code could only ever have meant the entitlement
+  cause, and no client had any way to know that. ⚠️ **Two pre-existing assertions were passing for the wrong
+  reason and the mint is what exposed them** — `EncodeDraftTest.php:279` and `:307` asserted `error.code`
+  alone on the claimed cause, exactly the code-only shape M11's docblock warns about; both now assert the
+  code **and** the message. `openapi.json` stayed byte-identical, measured rather than predicted.
+- **`minor` · `RuntimeSession.handleDrift()`'s bare `catch {}` collapses every recovery failure into one
+  sentence.** `resources/public-runtime/components/RuntimeSession.vue:160-168` binds no error, so a dropped
+  connection during `remint()` or `fetchSchema()` reads as *"This form is no longer available."* — a terminal
+  claim about the form, made about the network. **Filed by M14 at the moment it decided not to fix it**: it
+  is a fourth fold site the two closed rows do not name, and widening past them was declined deliberately.
+  **Live.**
+- **`minor` · `replay.ts:223-228` hardcodes `conflict_code = 'form_updated'` on a client-side version
+  guard.** Correct today — it really is a form-version drift, decided with no request made — but M14 turned
+  `conflict_code` into **user-visible copy input** (`lib/conflict-notice.ts` keys the respondent's sentence
+  off it), so this literal is no longer a debug tag. Nothing is wrong now; the hazard is that the next person
+  to add a client-side park has to know that. **Not live — a maintenance trap.**
+- **`minor` · The authenticated autosave's 409 branch tells a `submission_conflict` caller "already been
+  submitted".** `resources/js/composables/useServerAutosave.ts:196-213` splits two ways — `draft_conflict`
+  versus everything else — so the entitlement and content causes both get the finalized sentence, which is
+  the guest-side defect M14 closed, one channel over. It is a smaller harm (the encode surface is staffed,
+  not public) and **`resources/js/composables/` is in NEITHER lane's column under Standing Rule 7(b)**, so
+  M14 declined it rather than claiming a directory for a `minor`. **Live.**
 - **`major` · The device-wide outbox is mounted above the phase machine on an unauthenticated page.**
   `resources/public-runtime/App.vue:382-386` · `components/SyncStatus.vue:104-113` ·
   `components/SubmissionOutbox.vue:96-186`. On the shared-kiosk hardware `lib/outbox.ts:9-18` names as the

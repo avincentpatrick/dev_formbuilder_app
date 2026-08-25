@@ -31,7 +31,8 @@ use RuntimeException;
  *
  * The {@see clientUuidClaimed()} cause (Increment M11) is the fourth and is about ENTITLEMENT rather than
  * content or timing: the uuid is already spent in this tenant on a row outside the caller's form/author
- * scope. It shares `submission_conflict` with {@see contentConflict()} deliberately — see its docblock.
+ * scope. It SHARED `submission_conflict` with {@see contentConflict()} until Increment M14 gave it
+ * `submission_uuid_claimed` — the reversal is argued in its own docblock and turns on a premise M14 removed.
  */
 final class SubmissionConflictException extends RuntimeException
 {
@@ -103,29 +104,39 @@ final class SubmissionConflictException extends RuntimeException
      * cannot resolve: a different form, a different author, or a soft-deleted tombstone still holding the
      * index entry.
      *
-     * ⚠️ IT REUSES THE `submission_conflict` CODE AND MESSAGE ON PURPOSE, AND THAT IS THE POINT RATHER THAN
-     * A SHORTCUT. {@see SubmissionDraftController::resolveTarget()} has
-     * returned exactly this 409, with exactly this sentence, for exactly this cause since I9b — the draft
-     * channel simply reached the invariant before the submit channels did. Minting a new code here would
-     * make two names for one refusal and oblige every client to learn the second one; the guest runtime
-     * folds all 409s alike today (its own filed row), so a new code would buy nothing and cost a contract.
+     * ⚠️ IT CARRIES ITS OWN CODE SINCE INCREMENT M14, AND THE REVERSAL IS THE POINT RATHER THAN A CHANGE OF
+     * MIND. M11 shared `submission_conflict` with {@see contentConflict()} on one stated ground: *"the guest
+     * runtime folds all 409s alike today (its own filed row), so a new code would buy nothing and cost a
+     * contract."* That was true, and M14 is the row it names — the guest runtime now reads `error.code` on
+     * every 409 and picks a remedy from it. With the premise gone the conclusion goes with it: a shared code
+     * obliges every client to tell two causes apart by STRING-MATCHING A HUMAN-FACING SENTENCE, which this
+     * class already warns is the trap that makes a test pass for the wrong cause.
      *
-     * Distinct from {@see contentConflict()} in cause, not in envelope: that one is "this uuid is yours and
-     * the content moved", this one is "this uuid was never yours to write to". Only the message separates
-     * them, which is what a respondent and an integrator actually read.
+     * ⚠️ AND THE TWO CAUSES ARE NOT THE SAME REFUSAL, WHICH IS EASIEST TO SEE ON THE DRAFT CHANNEL.
+     * {@see contentConflict()} is deliberately SUSPENDED for drafts — a draft's content changes on every
+     * autosave — so on `POST /api/v1/public/f/{shareToken}/draft` the shared code could only ever have meant
+     * this cause, and a client had no way to know that. The remedies differ too: a content conflict is
+     * answered by reviewing the copy that already exists, this one by minting a fresh identifier, because
+     * the answers were never in dispute — the identifier was.
+     *
+     * Distinct from {@see contentConflict()} in cause AND, since M14, in envelope: that one is "this uuid is
+     * yours and the content moved", this one is "this uuid was never yours to write to".
      *
      * ⚠️ THE WORDING GENERALISED FROM *"draft identifier"* WHEN THE CAUSE STOPPED BEING DRAFT-ONLY. The
-     * draft channel spelled this sentence inline; it now reads it off this factory, and the submit channels
+     * draft channel ({@see SubmissionDraftController::resolveTarget()}, which has returned exactly this
+     * refusal for exactly this cause since I9b) spelled the sentence inline; it now reads it off this
+     * factory, and the submit channels
      * raise the same cause — where "draft" would be simply untrue. One factory, one wording, three channels.
-     * ⚠️ AND THE MESSAGE IS THE ONLY THING THAT SEPARATES THIS FROM {@see contentConflict()} ON THE WIRE,
-     * which is a consequence of sharing the code rather than an oversight: a test that asserts only the
-     * exception CLASS, or only `error.code`, passes for either cause. Assert the message.
+     * ⚠️ THE MESSAGE IS NO LONGER THE ONLY THING SEPARATING THIS FROM {@see contentConflict()} ON THE WIRE,
+     * but keep asserting it anyway: it is what a respondent and an integrator actually read, and M11's
+     * mutation pass found the first draft of its own tests passing for either cause because they asserted
+     * the exception CLASS alone. Assert the code AND the message.
      */
     public static function clientUuidClaimed(): self
     {
         return new self(
             'This submission identifier already belongs to another response.',
-            'submission_conflict',
+            'submission_uuid_claimed',
         );
     }
 

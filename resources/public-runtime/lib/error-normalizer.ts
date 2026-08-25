@@ -99,6 +99,30 @@ function classify(status: number, code: string): ErrorKind {
         return 'terminal';
     }
     if (status === 409) {
+        // Increment M14 — FIVE server causes share this status and their remedies are mutually exclusive, so
+        // reading only the status was not a simplification, it was an answer. Until M14 every one of them
+        // became `refresh`, which means "the form was republished" — and a respondent whose OTHER DEVICE had
+        // written the draft was told exactly that, then invited into a resubmit that carried no baseline.
+        //
+        // The same shape as the 403 block above: the status names the class, `error.code` names the cause,
+        // and only the cause implies the fix.
+        if (code === 'draft_conflict') {
+            return 'draft_stale';
+        }
+        if (code === 'draft_already_finalized') {
+            return 'finalized';
+        }
+        if (code === 'submission_uuid_claimed') {
+            return 'uuid_claimed';
+        }
+        if (code === 'submission_conflict') {
+            return 'conflict';
+        }
+
+        // `form_updated`, `submission_version_superseded`, and anything unrecognised — including the synthetic
+        // `http_409` a bodyless response produces. ⚠️ THE DEFAULT IS DELIBERATE AND IT IS THE SAFE DIRECTION:
+        // re-minting and re-fetching the schema is harmless whatever the real cause was, whereas re-reading a
+        // draft that may not exist is not. A code this client has never heard of must not become a remedy.
         return 'refresh';
     }
     if (status === 429) {

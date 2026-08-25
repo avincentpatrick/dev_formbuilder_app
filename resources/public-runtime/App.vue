@@ -14,6 +14,7 @@ import { ConflictReviewKey, DbKey, OfflineMediaKey, SyncOutboxKey, UploadUrlKey 
 import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
+import { conflictCopy } from './lib/conflict-notice';
 import { openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
 import { reconcileDraft, type LocalDraft } from './lib/reconcile';
@@ -34,15 +35,23 @@ const CONFIRM_MESSAGE = 'Thanks — your response has been recorded.';
 const QUEUED_MESSAGE = "Saved on this device — we'll submit it automatically when you're back online.";
 const RESOLVED_MESSAGE = 'Thanks — your reviewed response has been submitted.';
 
-// Increment G8c — the resolve-mode banner, keyed by which 409 parked the row.
-const DRIFT_RESOLVE_NOTICE =
-    'This form was updated after this response was saved. Your answers were kept where possible — please review and resubmit.';
-const CONTENT_RESOLVE_NOTICE =
-    'This response conflicts with a copy already saved. Please review your answers and submit again.';
+// Increment G8c — the resolve-mode banner, keyed by which 409 parked the row. ⚠️ INCREMENT M14 MOVED THE
+// COPY ITSELF OUT TO `lib/conflict-notice.ts` AND LEFT THE LOOKUP HERE, because `outbox-status.ts` held a
+// second, disagreeing copy of the same decision: the list called a content conflict "the form changed after
+// this was saved" while this banner called it something else, for one row. One module now answers both.
+const DRIFT_RESOLVE_NOTICE = conflictCopy('form_updated').resolveNotice;
 
-function resolveNotice(code: string | null): string {
-    return code === 'submission_conflict' ? CONTENT_RESOLVE_NOTICE : DRIFT_RESOLVE_NOTICE;
-}
+// Increment M14 — the LIVE drift banner. Unchanged in wording; it simply stopped being spelled inline in
+// `onReschema` once there were three notices to tell apart rather than one.
+const LIVE_DRIFT_NOTICE = 'This form was updated. Your answers were kept where possible — please review and resubmit.';
+
+// Increment M14 — the banner for a live draft RE-READ (`ErrorKind` `draft_stale`), and it deliberately does
+// NOT live in `conflict-notice.ts`. That module describes a row sitting PARKED in the outbox, which nothing
+// has re-read; this describes the one path where the newer answers really were fetched a moment ago and are
+// on screen. Reusing the parked wording here would claim a fetch that never happened, which is the same class
+// of untrue sentence M14 exists to remove.
+const REDRAFT_NOTICE =
+    'This response was also filled in on another device. We have loaded that newer copy — please check it over and submit again.';
 
 const phase = ref<Phase>('loading');
 const schema = shallowRef<SchemaResponse | null>(null);
@@ -66,6 +75,11 @@ const resumeSeed = shallowRef<{
     note: string | null;
     /** Increment P3a — the server draft's lost-update baseline (see loadResume for why it is the server's). */
     contentChecksum: string | null;
+    /** Increment M14 — false when the seed came from a mid-session draft RE-READ rather than from opening a
+     *  resume link, which suppresses the welcome-back banner. The respondent never left, so "Welcome back —
+     *  we've restored your saved answers" would be addressed to a journey they did not take; the redraft
+     *  banner says what actually happened. Absent means true, so every pre-M14 caller is unchanged. */
+    greet?: boolean;
 } | null>(null);
 const RESUME_UNAVAILABLE_MESSAGE =
     'This saved form is no longer available — it may have already been submitted, or the link may have expired.';
@@ -283,7 +297,14 @@ function onQueued(clientUuid: string): void {
     phase.value = 'confirmation';
 }
 
-function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): void {
+/**
+ * Increment M14 — `conflictCode` says WHICH 409 sent us here, and `null` means the ordinary live drift (a
+ * republish, or a recovery whose cause the session could not name). Before M14 every 409 arrived here alike
+ * and this function asserted a republish for all of them, so a respondent whose own second device had
+ * written the draft was told the form had changed. The remount itself is unchanged — only the sentence, and
+ * only for the causes that were being described falsely.
+ */
+function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap; conflictCode: string | null }): void {
     schema.value = payload.schema;
     retainedAnswers.value = payload.answers;
     // Increment H10 — a drift remount starts fresh against the new version (a new submission, fresh uuid) and
@@ -293,9 +314,58 @@ function onReschema(payload: { schema: SchemaResponse; answers: AnswerMap }): vo
     // loop re-maps against the newer schema until the resubmit succeeds; otherwise it's the normal live-drift copy.
     driftNotice.value = resolveMode.value
         ? DRIFT_RESOLVE_NOTICE
-        : 'This form was updated. Your answers were kept where possible — please review and resubmit.';
+        : payload.conflictCode === null
+          ? LIVE_DRIFT_NOTICE
+          : conflictCopy(payload.conflictCode).resolveNotice;
     sessionKey.value += 1;
     phase.value = 'ready';
+}
+
+/**
+ * Increment M14 — a 409 `draft_conflict`: another device wrote this draft, so the answers on screen are based
+ * on a copy the server has already moved past.
+ *
+ * ⚠️ THIS IS THE PATH THE WHOLE INCREMENT EXISTS FOR, AND IT IS NOT A REMOUNT-WITH-A-BETTER-SENTENCE.
+ * `onReschema` above re-fetches the SCHEMA and starts a new submission — fresh uuid, `resumeSeed` nulled, so
+ * `draftBaseline` reseeds to null and the next write carries no baseline at all. For a republish that is
+ * right. For a draft conflict it is precisely wrong: nothing was republished, the schema is unchanged, and
+ * discarding the uuid abandons the server draft this device was editing — the second draft and the second
+ * emailed resume link the backlog row describes.
+ *
+ * So it re-reads the DRAFT instead, through `loadResume()`, which already does every part of this correctly
+ * and has since H10: it keeps the server draft's `client_submission_uuid`, reconciles the two answer tiers
+ * under the precedence locked with the user on 2026-07-23 ("newest-wins, non-destructive"), and always seeds
+ * the baseline from the SERVER's checksum rather than from whichever tier won. The only thing it does not do
+ * is force a remount, because it normally runs before the session has mounted at all.
+ *
+ * ⚠️ IN RESOLVE MODE THIS IS UNREACHABLE BY CONSTRUCTION, WHICH IS WORTH STATING RATHER THAN GUARDING.
+ * A conflict review re-mounts against a PARKED row's answers under a fresh uuid and performs no draft save,
+ * so the session holds no resume token and `RuntimeSession` falls back to `onReschema`. If that ever changes,
+ * `loadResume()` would overwrite `resolvingUuid`'s session with the server draft's uuid.
+ */
+async function onRedraft(payload: { resumeToken: string }): Promise<void> {
+    try {
+        await loadResume(payload.resumeToken);
+    } catch {
+        // `loadResume` catches its OWN resume failure and sets the error phase; this catches the second
+        // `fetchSchema()` it deliberately leaves uncaught, which on the pre-mount path would surface as a
+        // rejected `onMounted` and here would be a silent dead end.
+        errorMessage.value = 'We could not reload your saved answers. Please try again.';
+        phase.value = 'error';
+
+        return;
+    }
+    if (phase.value !== 'ready') {
+        // The resume token was refused (a promoted or reaped draft) — `loadResume` has already said so.
+        return;
+    }
+    // ⚠️ Increment M14 — the seed is the resume machinery's, but this is NOT a resume, and the banner it
+    // drives says so in as many words: "Welcome back — we've restored your saved answers." The respondent
+    // never went anywhere; they pressed Save and were refused. Reusing `loadResume` for the re-read is right
+    // and inheriting its greeting is not, so the one part that assumes a return journey is switched off.
+    resumeSeed.value = resumeSeed.value === null ? null : { ...resumeSeed.value, greet: false };
+    driftNotice.value = REDRAFT_NOTICE;
+    sessionKey.value += 1;
 }
 
 // Increment G8c — open the review UX for the oldest parked conflict on this form: re-mint the token, re-fetch
@@ -319,7 +389,7 @@ async function beginConflictReview(uuid?: string): Promise<void> {
         // sight of their other queued submissions while resolving one.
         syncOutbox.reviewingUuid.value = row.client_submission_uuid;
         resolveMode.value = true;
-        driftNotice.value = resolveNotice(row.conflict_code);
+        driftNotice.value = conflictCopy(row.conflict_code).resolveNotice;
         sessionKey.value += 1;
         phase.value = 'ready';
     } catch (error) {
@@ -425,6 +495,7 @@ function onRestart(): void {
             @submitted="onSubmitted"
             @queued="onQueued"
             @reschema="onReschema"
+            @redraft="onRedraft"
             @discard="onDiscard"
             @unavailable="onUnavailable"
         />

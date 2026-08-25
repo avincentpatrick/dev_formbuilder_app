@@ -394,9 +394,11 @@ it('409 submission_conflict when the same uuid replays with different content (I
     ])
         ->assertStatus(409)
         ->assertJsonPath('error.code', 'submission_conflict')
-        // ⚠️ THE MESSAGE, NOT ONLY THE CODE (M11). A second cause now shares `submission_conflict`, so a
-        // code-only assertion here would pass just as happily for "this uuid was never yours" — which is a
-        // DIFFERENT defect and would mean the content rule had stopped working.
+        // ⚠️ THE MESSAGE, NOT ONLY THE CODE (M11, still true after M14 narrowed the reason). A second cause
+        // shared `submission_conflict` until Increment M14 gave it `submission_uuid_claimed`, so a code-only
+        // assertion here USED to pass just as happily for "this uuid was never yours". The code now separates
+        // them; the message stays asserted because it is the half a respondent reads, and because a wording
+        // that drifts away from the cause is the defect M14 closed on the client side.
         ->assertJsonPath('error.message', 'This response conflicts with a copy already saved for the same submission.');
 
     enterTenant($tenant->id);
@@ -523,7 +525,7 @@ it('409s (not 500) a guest submit naming a uuid that belongs to ANOTHER form’s
         'client_submission_uuid' => $uuid,
     ])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
 
     // Form B's draft is untouched: still a draft, still Ada's answers, and no second row was created.
@@ -560,7 +562,7 @@ it('never serializes ANOTHER form’s finalized submission back to a guest who n
     ]);
 
     $response->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
     expect($response->getContent())->not->toContain($foreign->id)
         ->and($response->getContent())->not->toContain((string) $foreign->reference);
@@ -587,7 +589,7 @@ it('409s a guest submit naming a uuid that belongs to a MEMBER’s draft on the 
         'client_submission_uuid' => $uuid,
     ])
         ->assertStatus(409)
-        ->assertJsonPath('error.code', 'submission_conflict')
+        ->assertJsonPath('error.code', 'submission_uuid_claimed')
         ->assertJsonPath('error.message', 'This submission identifier already belongs to another response.');
 
     enterTenant($tenant->id);

@@ -438,10 +438,15 @@ it('HEADLINE: refuses a second device saving from a base the first device has al
         ->and(Submission::query()->count())->toBe(1);
 });
 
-it('carries the distinct draft_conflict code, not the content or finalized one', function (): void {
+it('gives all four conflict causes distinct codes, so no client has to read a sentence to tell them apart', function (): void {
+    // ⚠️ Increment M14 — the fourth line is the new one, and it is the whole reason this case was widened.
+    // Until M14 `clientUuidClaimed()` shared `submission_conflict` with `contentConflict()`, so the ONLY
+    // thing separating "this uuid was never yours" from "your content moved" on the wire was the message.
+    // Four causes, four codes: a client branches on the code, and the message is what a person reads.
     expect(SubmissionConflictException::draftConcurrentlyModified()->code())->toBe('draft_conflict')
         ->and(SubmissionConflictException::contentConflict()->code())->toBe('submission_conflict')
         ->and(SubmissionConflictException::draftAlreadyFinalized()->code())->toBe('draft_already_finalized')
+        ->and(SubmissionConflictException::clientUuidClaimed()->code())->toBe('submission_uuid_claimed')
         // The message must name the action; "conflict" alone leaves a respondent pressing Save into the
         // same refusal forever, because the copy they hold is the stale thing.
         ->and(SubmissionConflictException::draftConcurrentlyModified()->getMessage())->toContain('Reload');
@@ -520,8 +525,10 @@ it('refuses a stale client that omits the baseline once a checksum is stored', f
 | updateDraft() and cannot see this: it compares the base a SAVE carries, and a promote carries none.
 |
 | ⚠️ EVERY REFUSAL CASE HERE ASSERTS THE MESSAGE, NOT THE CLASS. Four causes share
-| SubmissionConflictException and two of them share the `submission_conflict` code; M11's mutation pass
-| proved a bare toThrow(SubmissionConflictException::class) passes for a completely different cause.
+| SubmissionConflictException, and until Increment M14 two of them shared the `submission_conflict` code as
+| well; M11's mutation pass proved a bare toThrow(SubmissionConflictException::class) passes for a completely
+| different cause. M14 gave the fourth cause its own code and this rule did NOT relax with it — the code says
+| which refusal, the message says what to do about it, and a case that drops either stops measuring one.
 */
 
 it('HEADLINE: refuses a promote whose answer document moved between the pre-lock read and the lock', function (): void {

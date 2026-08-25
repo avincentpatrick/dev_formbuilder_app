@@ -4374,3 +4374,73 @@ file list** · Pint proven live with a misformatted probe before `PASS` was beli
 file touched; CI's axe job proved the second independently) · E2E **551 passed + 10 skipped with no flaky
 line**, which is **not** an improvement — `builder-axe.spec.ts:198` on mobile is Lane A's known contrast row
 and happened to pass first try; the same measurement as `550 + 1 flaky`.
+
+## 2026-08-25 — 🅱️ LANE B · `M14` — the guest runtime's 409 fold, and the one server code it needed (PR #PRNUM, `SHA`, 6/6)
+
+Two `major` rows from `docs/feature-backlog.md` § *Submissions, drafts & the guest runtime*, taken as one
+increment because they were one mechanism in one component and shipping them apart meant writing the same
+fold twice. Every `file:line` in both rows was verified against the code before anything was planned against
+it: **all true in substance, three carrying line drift.**
+
+**THE DEFECT.** `resources/public-runtime/lib/error-normalizer.ts` classified a `409` by **status alone** and
+returned one `ErrorKind`, `refresh`, whose documented meaning is *"the form was republished — re-mint and
+re-fetch the schema."* Since P3a, M11 and M12 the server had grown **five** distinct 409 causes with
+mutually exclusive remedies, and the client heard none of them. So a respondent whose own second device had
+written the draft was shown **"This form was updated"** — false, nothing had been republished — and the
+recovery it triggered re-fetched the schema, remounted under a fresh `client_submission_uuid` and reseeded
+`draftBaseline` to **null**. The client's answer to a lost-update guard was to discard the only input that
+lets the guard fire again. On the draft-SAVE channel — where `GuestDraftController` sets
+`checkBaseline: true` unconditionally, so the refusal is reachable on *every* save — the same fold returned
+`null` into `SaveForLater.vue`, which read it as "the session is remounting" and closed the panel: **no save,
+no resume link, no error.** The remount then minted a *second* server draft with a *second* resume link,
+emailed to the same respondent.
+
+**AS BUILT.** The classifier reads `error.code` on a 409 exactly as it has read it on a 403 since I8b, and
+four causes gained four kinds — `draft_stale`, `conflict`, `uuid_claimed`, `finalized`. `refresh` keeps its
+meaning and stays the **default** for an unrecognised or bodyless 409, which is the safe direction and the
+one the frozen e2e depends on. `draft_stale` routes through `App.vue`'s existing `loadResume()` — the H10
+machinery that already keeps the draft's uuid, reconciles the two answer tiers under the newest-wins
+precedence locked with the user on 2026-07-23, and always takes the **server's** checksum as the new baseline
+— so the remedy this project's documents have named since P3a is finally the one the client performs.
+`RuntimeSession` stopped discarding the `resume_token` that every save returns, which is what the re-read
+needs and what nothing had noticed was being thrown away. Recorded in `docs/offline-first-sync-design.md`
+§5 and §8, where M11 and M12 already sit, rather than in a new ADR.
+
+⚠️ **THE ROWS NAME TWO FOLD SITES AND A SWEEP FOUND TWELVE — TWO OF WHICH WERE NOT OPTIONAL.**
+`replay.ts:291` was an infinite-retry hazard **this increment's own change would have created**: its
+`refresh` arm was the only site preserving the server's code, so minting kinds without touching it drops a
+`draft_conflict` into `backoff()` — five POSTs of the identical stale baseline the server has already
+refused, then `needs_attention` with the wrong reason attached. **The fix is a type rather than a test**: the
+outcome table is a `Record<ErrorKind, …>`, so vue-tsc refuses to compile the next kind until the table names
+its outcome, and that gate was **proved live** by adding a thirteenth kind and watching `replay.ts:48` go red
+with exactly one error. And `outbox-status.ts:130` was **already contradicting `App.vue:41` in production** —
+the list said *"the form changed after this was saved"* for every cause while the review banner opened by the
+Review button on that same row said something else. Both now read one `lib/conflict-notice.ts`. **Grepping
+the shape rather than trusting the row's count is six-for-six** (M8, M9, M11, M12, M13, M14).
+
+⚠️ **THE PARKED DECISION WAS ANSWERED, AND ANSWERING IT EXPOSED TWO ASSERTIONS PASSING FOR THE WRONG REASON.**
+M11 left this row one call and wrote its reasoning down: `clientUuidClaimed()` shared `submission_conflict`
+with `contentConflict()` because *"the guest runtime folds all 409s alike today (its own filed row), so a new
+code would buy nothing and cost a contract."* **M14 is that row**, so the premise is gone and the conclusion
+goes with it — a shared code obliges every client to separate two causes by string-matching a human-facing
+sentence, which the exception itself names as the trap. The clearest evidence is the draft channel:
+`contentConflict()` is suspended for drafts, so there the shared code could only ever have meant the
+entitlement cause, and no client could know that. `EncodeDraftTest.php:279` and `:307` asserted `error.code`
+**alone** on that cause — precisely the code-only shape the docblock warns about — and minting the code is
+what turned them red. Both now assert the code and the message.
+
+➕ **THE EMAIL SWALLOW WAS WORSE THAN THE ROW SAYS, AND ONLY MOUNTING THE COMPONENT COULD SHOW IT.**
+`SaveForLater.onEmail` sets `errorMessage`, but the paragraph rendering it is the `v-else` of
+`phase === 'ready'` — and `onEmail` only ever runs *while* phase is `ready`. **The sentence was unreachable
+markup.** A failed "Email me the link" left the panel looking exactly as it had before the click, and the
+pre-M14 assignment was dead code. `SaveForLater` had never been mounted by any test; it is now.
+
+⛔ **AND THE ADVERSARIAL PASS CAUGHT A DEFECT THIS FIX INTRODUCED.** Reusing `loadResume()` for the re-read
+inherits its **welcome-back banner** — *"Welcome back — we've restored your saved answers"* — addressed to
+somebody who never left and had just been refused a save. Reusing the machinery was right; inheriting the
+greeting was not. The seed carries a `greet` flag the redraft path switches off. **Ask what your own fix now
+asserts that was only ever true of the path you borrowed it from.**
+
+⚠️ **MUTATION MATRIX — 9 MUTATIONS, 0 UNDEFENDED, CONTROL SURVIVED, AND THE RESULT CHANGED A TEST RATHER THAN THE CODE.** M7 (hardcode a republish cause), M10 (`draft_stale` → `retry` in the replay table), M11 (ignore `conflict_code`) and M13 (delete the ready-branch alert) each redden **exactly one** case, and a different one each. M9 reddens the two `onOpen` cases and M12 the three that share `conflict-notice.ts`, which is what those two mutations are: one function, several observers. ⛔ **M6 AND M8 INITIALLY REDDENED THE IDENTICAL SINGLE CASE** — reverting the save fold's routing and deleting the resume token the save returns are different edits, but with only a save-channel case between them *"the save path emits `redraft`"* and *"the token is kept"* were **one observable**. Unlike M13's M1/M3 pair they turned out to be separable, and the separating case was worth having on its own merits: the token is minted by a **SAVE** and spent by a **SUBMIT**, which is the path of a respondent who fills in, saves for later, comes back and submits on one device without ever opening a resume link. **Re-measured after it was added: M6 reddens 1, M8 reddens 2** — the save-channel case both share, plus the cross-channel one only M8 can reach.
+⛔ **AND THAT NEW CASE EXPOSED A FLAKE IN THE ONE BESIDE IT, WHICH WAS MEASURED RATHER THAN RE-ROLLED.** `settle()`'s fixed five macrotask ticks are not always enough: a submit awaits a Dexie enqueue *before* the network call and a `discardRow` after it, so under load the assertion read `undefined` on a component that was about to emit. **Two runs in three passed** — the shape M13 warns about, where a red run is neither reproducible nor obviously yours. The honest reading was that it WAS mine and it WAS real; the cases now wait for the emit (`vi.waitFor`, the idiom already in the file) and ran **5 of 5**. A fixed tick count is a guess about timing; waiting for the thing you are asserting is not.
+⚠️ **AND THE HARNESS TAUGHT ITS OWN LESSONS, ALL THREE OF THEM PAID FOR.** A tool timeout killed it mid-mutation and left the mutation in the tree with the only copy of the original bytes in a dead process's memory. Then a `pkill -f vitest` aimed at what looked like an orphan **killed the mutation run's own child** — the orphan was mine. Then **two harnesses were started by accident and ran concurrently**, interleaving on the same files and restoring each other's mutations as if they were originals; that matrix reported a `replay.ts` change reddening `SaveForLater` and `describeRow`, which is impossible, and **every number from it was discarded**. The fix is all three at once: **commit the mechanism first so `git checkout --` becomes a correct restore** rather than the work-eating hazard it normally is, take a **lock** so a second harness refuses to start, and **assert the tree is green before mutating** so a corrupt baseline is caught rather than attributed. **Confirm what a stray process belongs to before killing it.**

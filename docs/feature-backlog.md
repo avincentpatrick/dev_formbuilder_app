@@ -906,27 +906,107 @@ are still in place.
   toast rather than a validation error, so `preserveState` evaluates false and the page reloads from the
   stored document. The docblock reasons only about the 422 path and gets the conflict path — the one the
   machinery exists for — backwards. **Live.**
-- **`major` · `/api/v1/sync/submissions` creates submissions against ANY form in the tenant, with no
-  per-form authorization at all.** Filed 2026-08-24 by M11's adversarial pass. The route carries the
-  token-ability gate `ability:write:submissions` and nothing else (`routes/api.php:250-252`);
-  `SyncSubmissionController::replayOne()` resolves the version straight from the caller's own
-  `form_version_id` (`:61`) and hands it to the pipeline (`:67`) without ever consulting
-  `SubmissionPolicy::create()`, which is the gate the equivalent web route uses (`can:create` on the bound
-  `{form}`) and which requires `submissions.create` **plus** either `forms.edit.any` or a per-form Editor
-  grant (`SubmissionPolicy.php:40-46`). So a member holding a token — a Viewer with `write:submissions`, or
-  an Editor collaborating on one form — can replay submissions into every other form in the workspace,
-  consuming their response caps, firing their notifications and their webhooks, and appearing in their
-  inbox. RLS bounds it to the tenant and no further. ⚠️ **THE SHAPE IS THE ONE THE ROUTE FILE ITSELF NAMES
-  TWO ROWS DOWN** — its comment on `SubmissionPromoteController` states the standing rule that *"a
-  resource-bound Group-B route carries an ability + a policy gate on the bound resource"*, and this route
-  slipped precisely because it is **not** resource-bound: the form arrives in the body, so there is nothing
-  for `can:` to bind to and the rule silently did not apply. That is the same body-versus-URL asymmetry M11
-  closed for `client_submission_uuid`, one level up. **Live.** Smallest honest fix is a per-item
-  `Gate::forUser($user)->allows('create', [Submission::class, $form])` inside `replayOne()`, reported as
-  that item's own `error` so a partial refusal never rolls back its siblings — the per-item contract the
-  controller already keeps for every other failure. Not fixed in M11: it is a different defect on a
-  different axis, and folding an authorization change into the uuid increment would have put two
-  independent failure modes in one CI run.
+- ✅ **CLOSED BY `M13` (2026-08-25) — `major` · ~~`/api/v1/sync/submissions` creates submissions against ANY
+  form in the tenant, with no per-form authorization at all.~~** Filed 2026-08-24 by M11's adversarial pass;
+  every file:line claim in it verified verbatim against the code before it was planned against. The route
+  carried `ability:write:submissions` and nothing else (`routes/api.php`), and
+  `SyncSubmissionController::replayOne()` resolved the version from the caller's own `form_version_id` and
+  handed it to the pipeline without ever consulting `SubmissionPolicy::create()` — the gate the equivalent
+  web route binds with `can:create,Submission,form`. **As built:** a per-ITEM
+  `Gate::forUser($user)->allows('create', [Submission::class, $form])` inside `replayOne()`, reported as that
+  item's own `error` with code `forbidden` so a partial refusal never discards its siblings.
+  `POST /form-templates` was already doing exactly this for the identical asymmetry and nobody had named it
+  as the pattern; it is now named, in `routes/api.php`, `docs/api-specification.md` and
+  `docs/offline-first-sync-design.md` §2A.
+  ⛔ **THE ROW NAMED A PRINCIPAL THAT CANNOT EXIST, AND MISSED THE WORST ONE.** "A Viewer with a
+  `write:submissions` token" is impossible: that ability maps to `submissions.create`, a viewer does not hold
+  it, and `ApiAbilities::intersect()` drops it at mint time. The row's other example (an Editor collaborating
+  on one form) is right. The one it does not name is the **Reviewer** — they *do* hold `submissions.create`,
+  so they can mint the token, while `SubmissionPolicy::create()` requires `forms.edit.any` or EDITOR
+  capacity since the deliberate G10a tightening and a reviewer's grant is reviewer capacity. **A Reviewer
+  was authorized to encode on ZERO forms through the web app and reached EVERY form through this route.**
+  Read an ability map before believing a claim about who can exploit an ability gate.
+  ⚠️ **AND THE SHAPE HAD TWO ROUTES, NOT ONE.** A sweep of the live route table — every Group-B route
+  filtered on the absence of `Illuminate\Auth\Middleware\Authorize` — returned **8 of 62** ungated, six of
+  them legitimately (`tenant.show`, both `field-library` routes, `form-templates.index`, `gamification.me`,
+  and `form-templates.store` which gates in its controller). The eighth was **`GET /api/v1/sync/manifest`**,
+  in the same route comment block and unnamed by the row: it served the COMPLETE `schema_snapshot` of any
+  published or superseded version to any holder of `read:forms`, while
+  `GET /forms/{form}/versions/{version}` gated the identical payload on `can:view,form`. Closed in the same
+  increment with an in-controller `FormPolicy::view`. **This defect class is a property of a route TABLE**,
+  so the durable guard is `tests/Feature/Api/GroupBPolicyGateTest.php`, which walks the live table and
+  reddens on a route with neither a `can:` middleware nor a written reason it needs none.
+  ⚠️ **TWO MORE OUTCOMES ESCAPED `replayOne()` AND ABORTED THE WHOLE BATCH — fixed in the same method
+  because the authorization fix forced a decision on the first of them.** (a) `forms` soft-deletes and
+  `form_versions` does not, and neither RLS policy filters `deleted_at`, so a deleted form's versions stay
+  resolvable; the pipeline's `Form::findOrFail()` then raised a `ModelNotFoundException` nothing caught → a
+  top-level **404** after earlier items had committed, re-raised on every retry, so **one poisoned row
+  stalled a device's outbox permanently**. Now a per-item `form_not_found`. (b)
+  `FormNotAcceptingSubmissionException` is a **sibling** of `SubmissionException`, not a subclass — every
+  exception in that directory is `final class … extends RuntimeException` — so a closed, not-yet-open or
+  **at-capacity** form rendered as a top-level **403**, losing every item's result. That is the response cap
+  the row itself cites as the consequence, arriving as the one refusal the batch could not survive. Now
+  per-item `form_not_open` / `form_closed` / `max_responses_reached` with their `details` intact. The
+  method's docblock had claimed *"Never throws"* since G8b — an intention read afterwards as a measurement.
+  ⚠️ **`openapi.json` MOVED, AND NOT ON THE PREDICTED AXIS.** The measured expectation was byte-identical,
+  reasoned from `/form-templates post` documenting only `200`/`422` while carrying the same in-controller
+  `Gate::forUser()->authorize()` — Scramble infers a 403 from route MIDDLEWARE, not a controller call. It
+  moved anyway: `/sync/manifest` gained a **404**, because the new `Form::findOrFail()` is a shape Scramble
+  traces where the pre-existing `firstOrFail()` is not. That 404 has been a real response since G8b and
+  `SyncApiTest` has asserted it since G8b; the document had simply never said so.
+  ⚠️ **MUTATION MATRIX: 7 mutations, 0 undefended, and the one that mattered added a test rather than
+  changing code.** M2 — gate on `FormPolicy::view` instead of `SubmissionPolicy::create` — reddens **exactly
+  one** case, and only because that case was added *because the matrix was planned first*: every seeded role
+  gives the two policies the same answer on this route, so the wrong policy would have been invisible to the
+  other twenty-five cases. It is pinned with a synthetic member (may edit the form, holds no
+  `submissions.create`) on the `FormHubGateTest` idiom, labelled unreachable-today. ⛔ **M1 (delete the
+  guard) and M3 (throw instead of returning a per-item error) redden the IDENTICAL set, and reordering the
+  mixed batch to separate them did not work** — from a client's side "an unauthorized item is its own
+  `forbidden` result and the batch continues" is ONE observable that both mutations violate, and nothing can
+  observe a guard's absence without observing a refusal. Recorded as what the contract is rather than
+  engineered around.
+- **`minor` · The `reviewer` role's seeded description and `SubmissionPolicy::create()` contradict each
+  other.** Filed 2026-08-25 by M13, which made the contradiction observable on a second surface and
+  deliberately did not resolve it. `RolePermissionSeeder::MATRIX` documents that role as *"Review submissions
+  on forms they collaborate on; **may also encode** + export those forms"*, and it holds `submissions.create`
+  accordingly — but `SubmissionPolicy::create()` has required `forms.edit.any` or **EDITOR** capacity since
+  the G10a tightening, and a reviewer's grant is reviewer capacity. So a Reviewer can encode on **no form at
+  all**, and the comment describing their role has been wrong since G10a. Not live in the sense of a leak —
+  the web app has always refused them — but M13 made the API agree with the web app, which turns a dormant
+  contradiction into one an integrator will hit. **Deliberately not resolved**: both readings are defensible
+  and choosing between them is an authorization decision (widen `create()` to accept reviewer capacity, or
+  correct the seeder's sentence and drop `submissions.create` from the role), so it belongs to the user
+  rather than to a defect fix. `SubmissionPolicy::create()`'s own docblock argues the tightening at length
+  and notes *"no existing test asserted the old behaviour"*, which is why it went unnoticed.
+- **`minor` · Neither sync route documents the 403 its in-controller policy gate now returns.** Filed
+  2026-08-25 by M13. `openapi.json` lists `200/404/422` for `GET /sync/manifest` and `200/422` for
+  `POST /sync/submissions`, while the first can return a `403 forbidden` and the second a per-item
+  `error.code: "forbidden"`. Scramble infers a 403 from route **middleware** and does not trace a
+  `Gate::forUser()->authorize()` call in a controller body — which is measurable rather than assumed:
+  `POST /form-templates` has carried exactly that call since G9a and documents only `200/422` too. **This is
+  the same row as the already-open one for `/submissions/{submission}/promote`'s three undocumented 409
+  causes**, one layer over, and it is unfixed for the same reason: `openapi.json` is generated and CI diffs
+  it against a fresh export, so a hand edit fails the contract job — the honest fix is an annotation
+  mechanism Scramble 0.13 does not offer for arbitrary status codes, or moving these gates somewhere the
+  generator can see them. **Live**, pre-existing in kind.
+- **`minor` · `SyncSubmissionResultResource`'s generated contract types `submission` and `error` as bare
+  strings.** Filed 2026-08-25 by M13. Both are object-or-null in every response the controller builds —
+  `submission` is `{id, reference, status}`, `error` is `{code, message, details?}` — but Scramble infers a
+  `string` for each, so `openapi.json` describes a shape no response has ever had. An integrator generating
+  a client from the contract gets types that fail to deserialise on the first item. **Live**, pre-existing
+  since G8b, and the reason M13's per-item error codes could be added without moving the document at all:
+  they are not enumerated anywhere. Same `openapi.json`-is-generated constraint as the row above.
+- **`minor` · The sync surface's read and write are gated on different permission families, so no single
+  non-admin role can complete the offline loop.** Filed 2026-08-25 by M13. `GET /sync/manifest` needs
+  `read:forms`, which maps to `forms.create` / `forms.edit.any` / `forms.edit.own` — form **authoring**
+  permissions. `POST /sync/submissions` needs `write:submissions`, which maps to `submissions.create`. A
+  **Reviewer** holds the second and none of the first, so they can replay a batch but can never fetch a
+  manifest to collect against; a Viewer holds neither. The offline-encoder story therefore works today only
+  for Owner, Admin and Form Editor — which is a narrower audience than "authenticated encoder clients that
+  collect offline" implies. **Not a defect and deliberately not changed**: widening an ability map is an
+  authorization decision, and `ApiAbilities` records four separate refusals to widen an existing ability for
+  exactly this reason (a new ability cannot be held retroactively; a widened one is). Recorded so the
+  decision is taken deliberately if a Reviewer-facing encoder client is ever built.
 - **`minor` · `promote()` re-asserts the version is published BEFORE the lock and never again under it.**
   Filed 2026-08-25 by M12, which closed the identical pre-lock shape one field over and deliberately did not
   fold this in. `SubmissionDraftService::promote()` checks `$version->status !== FormVersionStatus::Published`

@@ -16,7 +16,81 @@ Standing Rule 7(b-bis).
 
 ---
 
-## CLAIMED — the horizontal-overflow assertion is structurally inert (`m17-overflow-gate`)
+## Status: NO ACTIVE CLAIM
+
+Lane A holds nothing. M16 and M17 are merged. **Namespaces: nothing spent by either** — ADR `0021` is
+Lane B's (M15), so **next free overall is `0022`** and Lane A's block is `0022-0025`; `0010` reserved
+for H1d, `#16` free, ADR-0016 `§D34`, migration block `2026_08_17_000109` unspent.
+
+**Baseline after M15 + M16 + M17:** CI Pest **4515 / 19,161** · Vitest **130 files / 2,213**
+(design-system 35/545 · public-runtime **35/782** · resources/js 60/886) · Storybook axe **42 / 299** ·
+E2E **551 passed + 10 skipped, no flaky line** · PHPStan `[OK]` · four host lint gates
+97 · 111 · 31 · 111/119/0.
+
+---
+
+## RELEASED — the horizontal-overflow assertion, made able to fail (merged as PR #208, `2279293`, 6/6)
+
+**Every claimed file was edited except one, and that one is the mutation subject.**
+`DnsRecordBlock.vue` was claimed *"for the MUTATION ONLY … reverted before the PR opens"*, and it was:
+restored from saved bytes, **sha256-identical**, absent from the diff. **A file claimed because it will
+be written to and then correctly released untouched is the claim working, not a wasted one** — the
+M8/M11 shape, this time by design rather than by surprise. `personalization-axe.spec.ts` was **added to
+the claim mid-build** (its labels needed quarantining), as its own pushed commit before the file was
+opened. Nothing was spent from either namespace.
+
+⛔ **THE ROW'S OWN PROOF WAS A NO-OP — 36-FOR-36, AND THE SECOND ROW RUNNING WHOSE EVIDENCE WAS WRONG.**
+*"Delete `min-width: 0` from `achievements/Index.vue:452-459` and every scan still passes"* proves
+nothing: that rule also carries `overflow: hidden`, which already resolves `min-width: auto` to 0.
+**343/343 with it and without it.** The gate WAS inert — proven by the clip, not by that demonstration.
+
+✅ **PROVEN WITH A MUTATION THAT DOES SOMETHING.** Deleting `overflow-wrap: anywhere` from `.dns__code`
+and scanning `/domains` at 375px: **unfixed gate → 2 PASSED over 312px of real overflow**; **fixed gate
+→ 2 FAILED, `Received: 312`**; **reverted → 71 passed.** Leg 1 is the row: the document read **0** while
+the content region was overrun by 312px, on a test named *"no horizontal overflow"*.
+
+⚠️⚠️ **THE PREDICTION I FLAGGED AS MOST LIKELY WRONG WAS WRONG, AND THAT IS THE INCREMENT'S BEST
+OUTCOME.** The claim said *"a page CI flags and my survey did not is a real defect this gate was built
+to find — file or fix it, do not widen the tolerance."* CI flagged **five**, all pre-existing, none
+visible to any prior gate: `page-header__title` 17px · `mds-segmented__seg` 30px · `builder__title-row`
+24px on **two** panes · the form hub 28px at tablet with **no personalization at all**.
+
+⛔ **48 OF THE FIRST RUN'S 52 FAILURES WERE MINE, AND BOTH WRONG VERSIONS ARE WORTH KEEPING.** v1 asked
+*"is `.app-shell` present without `.app-shell__content`?"* — and the **guest runtime has an `.app-shell`
+of its own** (`resources/public-runtime/App.vue:457`) with no clip. **A class-name collision across the
+lane boundary, structurally invisible to a Lane A grep.** v2 over-corrected to *"does ANY element clip
+or hide?"*, which is true on nearly every page (`overflow: hidden` draws every sr-only paragraph and
+every scroll lock) — caught locally before pushing. The guard now keys on the single property that
+causes the blindness: a shell that is specifically `overflow-x: clip`.
+
+⚠️ **PLAYWRIGHT ABORTS A TEST AT ITS FIRST FAILED ASSERTION, SO EACH QUARANTINE REVEALED THE NEXT
+DEFECT.** One test calls `assertClean` three times; the base failure hid `— Add`, which hid `— Form`.
+**Three CI runs to drain a test that had reported exactly one problem.** None was ever pre-listed on a
+hunch, deliberately: `KNOWN_OVERFLOWING` asserts a quarantined page *still* overflows, so a speculative
+entry fails **exactly as loudly** as a missing one. **A symmetric list makes guessing worthless, which
+is the property that keeps it honest.**
+
+⛔ **QUARANTINED RATHER THAN FIXED, AND THE REASON IS STATED NOT ASSUMED: NONE REPRODUCES ON WINDOWS.**
+A probe inlining OpenDyslexic as a data URI — defeating the recorded cross-origin font trap, with
+`document.fonts.check()` returning `true` — measured **0 overflow across all six page × viewport
+combinations**, as did a plain tablet probe of the form hub. 17/24/28px is the size of Linux-vs-Windows
+font metrics. **Guessing at CSS verifiable only through 20-minute CI round-trips, for overruns nobody
+here can see, is how a plausible-but-wrong fix ships.**
+
+⚠️ **AND THE MISLEADING COMMENTS MISATTRIBUTED REAL CATCHES, WHICH IS WORSE THAN OPTIMISM.** Two claimed
+specific saves — *"has now caught Domains and the Audit log"*, *"has reddened this gate three times
+(H12b, H14, H15b)"*. The clip landed 2026-07-21 (`506ff97`); all three merged 07-26/07-27, six days
+later, with the assertion already dead. Those went red on **axe violations**, credited to the
+neighbouring check. Corrected **in place rather than deleted**: **a comment citing three specific saves
+is exactly what stops the next reader from testing the claim.**
+
+**Gates.** E2E **551 + 10 skipped, no flaky line**; Pest, PHPStan, four lint gates, `openapi.json`,
+Vitest and axe unmoved (no `.vue`, no `packages/`, no `resources/`, no PHP in the final diff). Six jobs,
+real step counts 16 · 11 · 11 · 18 · 20 · 12.
+
+---
+
+## SUPERSEDED CLAIM (kept for the record) — M17 (`m17-overflow-gate`)
 
 Opened: 2026-08-26, cut from `origin/main` at `e5fe62e`.
 

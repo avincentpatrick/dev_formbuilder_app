@@ -607,18 +607,22 @@ plausible-but-wrong fix ships. **Whoever takes these should reproduce in CI firs
   bespoke check passes while the control still overruns the **page**. **A component-level check and a
   page-level one are not substitutes.** The fix is a design-system change to `SegmentedControl.vue` with
   its own story and blast radius, which is why it is not folded into a gate row. **Live.**
-- **`major` · The builder's Add pane overruns its region by 24px under maximum personalization — a
-  SECOND, DISTINCT defect in the same test.** Same test (`personalization-axe.spec.ts:83`, **[mobile]**),
-  different scan label — *"Builder (max personalization) — Add"* — and a **different offender**:
-  **`<div class="builder__title-row">` sticking out 24px**, not the segmented control. **Live.**
-  ⚠️ **IT WAS INVISIBLE UNTIL THE ONE ABOVE IT WAS QUARANTINED, AND THAT IS THE GENERAL LESSON.** A
-  Playwright test aborts at its first failed assertion, and this test calls `assertClean` **three** times
-  — base, `— Add`, `— Form`. While the base scan failed, the other two never ran. **A single red test can
-  be hiding an arbitrary number of further defects behind it, and each fix or quarantine reveals the
-  next.** The third label, *"Builder (max personalization) — Form"*, has **still never executed** and is
-  therefore unmeasured; it is deliberately NOT pre-listed in `KNOWN_OVERFLOWING`, because that list
-  asserts a quarantined page *still* overflows and a speculative entry fails exactly as loudly as a
-  missing one. **Whoever sees it go red should file it here, not widen the list on a hunch.**
+- **`major` · `.builder__title-row` overruns the builder's region by 24px on BOTH the Add and Form panes
+  under maximum personalization — a second, distinct builder defect.** Same test
+  (`personalization-axe.spec.ts:83`, **[mobile]**), two further scan labels — *"— Add"* and *"— Form"* —
+  and in both the offender is **`<div class="builder__title-row">` sticking out 24px**, not the segmented
+  control. **One defect in shared chrome above the panes, visible on two of them**, so a single fix
+  should retire both `KNOWN_OVERFLOWING` entries at once. **Live.**
+  ⚠️⚠️ **NEITHER WAS VISIBLE UNTIL THE SCAN BEFORE IT WAS QUARANTINED, AND THAT IS THE GENERAL LESSON.**
+  A Playwright test aborts at its first failed assertion, and this test calls `assertClean` **three**
+  times — base, `— Add`, `— Form`. While the base scan failed, the other two never ran; quarantining the
+  base revealed `— Add`, and quarantining `— Add` revealed `— Form`. **A single red test can hide an
+  arbitrary number of further defects behind it, and each one costs a full CI cycle to uncover.** Three
+  runs, three findings, in a test that had reported exactly one problem.
+  ⛔ **AND NONE OF THE THREE WAS PRE-LISTED ON A HUNCH, DELIBERATELY.** `KNOWN_OVERFLOWING` asserts that a
+  quarantined page *still* overflows, so a speculative entry fails **exactly as loudly** as a missing one
+  — the list is symmetric, and guessing buys nothing. Listing only what has been measured is the whole
+  point of it.
 - **`major` · The form hub overruns its region by 28px at tablet, in both themes, with no personalization
   at all.** `responsive-axe.spec.ts:252` › *Form hub*, **[tablet] only**, light **and** dark. The gate
   reports **no single offending element**, which points at an intrinsic minimum on a grid or flex track

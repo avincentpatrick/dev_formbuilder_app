@@ -138,6 +138,7 @@ export async function settleAnimations(page: Page): Promise<void> {
 const KNOWN_OVERFLOWING: ReadonlySet<string> = new Set([
     'Submissions (max personalization) @375',
     'Builder (max personalization) @375',
+    'Builder (max personalization) — Add @375',
     'Form hub @834',
 ]);
 

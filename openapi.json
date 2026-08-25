@@ -4655,6 +4655,9 @@
                             }
                         }
                     },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
                     }

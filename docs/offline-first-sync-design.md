@@ -32,6 +32,83 @@ Three-layer architecture; the full manifest→fill→replay sequence including i
 
 ---
 
+## 2A. Who May Reach Either Sync Endpoint (as-built, Increment M13)
+
+The two Group-B sync routes are the only ones in `/api/v1` that take their resource from the **body or the
+query** rather than the URL. `routes/api.php` has stated since G10b that a resource-bound Group-B route
+carries an `ability:` gate *and* a `can:` policy gate on the bound resource — and because neither of these
+is resource-bound, there was nothing for `can:` to attach to and that rule silently did not reach them.
+Until M13 the whole of their authorization was the token ability plus RLS.
+
+**An ability scopes the TOKEN and RLS scopes the TENANT. Neither answers "may this member touch this
+form."** So:
+
+| Endpoint | Was | Is (M13) |
+|---|---|---|
+| `GET /api/v1/sync/manifest` | `ability:read:forms` + `feature:offline_sync` + RLS. Returned the **complete** `schema_snapshot` — every section, field, label, hint, choice, validation and expression — for **any** published or superseded version in the tenant. | Adds an in-controller `FormPolicy::view` on the version's form, which is what `GET /forms/{form}/versions/{version}` already required for the identical payload. |
+| `POST /api/v1/sync/submissions` | `ability:write:submissions` + RLS. Created submissions against **any** form in the tenant. | Adds an in-controller `SubmissionPolicy::create` **per item**, which is what `can:create,Submission,form` already required on the web encode route. |
+
+**The exposed principals are not the ones a first reading suggests.** `write:submissions` maps to the
+`submissions.create` permission, so a **Viewer can never mint that token at all** — `ApiAbilities::intersect()`
+drops the ability at issue time. The two who could are a **Form Editor** (widened from their granted forms
+to all of them) and, more sharply, a **Reviewer**: they hold `submissions.create`, but `SubmissionPolicy::create`
+additionally requires `forms.edit.any` or EDITOR capacity — the deliberate G10a tightening — and a reviewer's
+grant is reviewer capacity. **A Reviewer was authorized to encode on zero forms through the web app and
+reached every form through this route.** On the read side `read:forms` maps to `forms.create` /
+`forms.edit.any` / `forms.edit.own`, so the exposed principal there is a Form Editor reading every other
+form's authored schema. RLS bounded all of it to the tenant and no further; nothing crossed a tenant.
+
+**Consequences of a replay that lands where it should not:** it consumes that form's purchased
+`max_responses` slot, fires its notifications and its webhooks, and appears in its inbox — so this was a
+write with side effects, not a scoping tidiness question.
+
+**No first-party client is affected.** The guest PWA replays through the public guest endpoints, not this
+surface, which the controller has always described as being "for future authenticated encoder clients +
+integrators". What changes is what an integrator's token can reach.
+
+⚠️ **One asymmetry is left standing deliberately and is filed rather than fixed:** the read is gated on
+form-**authoring** permissions (`read:forms`) while the write is gated on `submissions.create`, so a
+Reviewer can replay a batch but can never fetch a manifest to collect against. The offline-encoder story
+therefore only works today for Owner, Admin and Form Editor. Widening an ability map is an authorization
+decision, not a defect fix.
+
+### The batch contract is now what it always claimed to be
+
+`SyncSubmissionController::replayOne()`'s docblock said *"Never throws: a failure is reported inline so it
+cannot abort the rest of the batch"*, and that was an intention read afterwards as a measurement. **Three
+outcomes escaped it**, each aborting the whole request after earlier items had already committed — so the
+client received a bare 4xx and no way to know which of its rows had landed:
+
+1. **An unauthorized form** — there was no gate at all.
+2. **A soft-deleted form.** `forms` soft-deletes and `form_versions` does not, and neither RLS policy
+   filters on `deleted_at`, so a deleted form's versions stay fully resolvable and outlive it. The
+   pipeline's own `Form::findOrFail()` then raised a `ModelNotFoundException` nothing caught → a top-level
+   **404**. Worse than a lost response: the offending item re-raised on every retry, so one row stalled a
+   device's outbox permanently. Now a per-item `form_not_found`.
+3. **A closed, not-yet-open, or full form.** `FormNotAcceptingSubmissionException` is a **sibling** of
+   `SubmissionException` rather than a subclass — every exception in `app/Exceptions/Submissions` is
+   `final class … extends RuntimeException` — so the `SubmissionException` catch arm never saw it and it
+   rendered as a top-level **403**. A device that collected for a month and replayed after the form closed
+   lost every item's result, which is the exact inverse of the never-block posture in §1. Now per-item
+   `form_not_open` / `form_closed` / `max_responses_reached`, each carrying the same `details` payload
+   (schedule boundary or cap figures) the guest SPA already renders for those causes.
+
+Refusals are reported with the codes the platform already uses: `forbidden` is what `bootstrap/app.php`
+returns for an authorization failure on `/api/v1`, so it reads the same at item level and envelope level,
+and `insufficient_ability` stays reserved for the token-scope 403, which is a different refusal about a
+different subject.
+
+⚠️ **`openapi.json` moved, and not on the axis that was predicted.** Adding these gates was expected to
+leave the contract byte-identical, because `POST /form-templates` documents only `200`/`422` while carrying
+the identical in-controller `Gate::forUser()->authorize()` — Scramble infers a 403 from route *middleware*,
+not from a controller call. It moved anyway: the manifest route gained a **`404`**, because the new
+`Form::findOrFail()` is a shape Scramble traces where the pre-existing `firstOrFail()` on the version query
+is not. That 404 has been a real response since G8b and `SyncApiTest` has asserted it since G8b; the
+document simply never said so. The **403** both routes can now return is still undocumented, and is filed
+on the backlog beside the identical open row for the promote endpoint's 409.
+
+---
+
 ## 3. Client-Side Data Model (IndexedDB via Dexie)
 
 Five Dexie tables, each namespaced by `form_version_id` where relevant so multiple cached forms/versions coexist on one device without collision:

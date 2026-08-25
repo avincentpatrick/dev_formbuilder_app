@@ -237,16 +237,32 @@ Route::prefix('api/v1')
 
         // Offline sync (Increment G8b / docs/offline-first-sync-design.md) — the authenticated Group-B channel
         // for future encoder clients that collect offline (the guest PWA uses the public guest endpoints).
-        // `form_version_id` is a query/body param, not a bound model, so authorization is `ability:` + RLS.
         // offline_sync gates the offline-collection ENTRY (the schema/manifest fetch). The replay endpoint
         // below is NOT gated on offline_sync — already-collected data is always accepted (never-block, §D4);
         // both remain behind the Group-B api_access gate.
+        //
+        // ⛔ NEITHER ROUTE IS RESOURCE-BOUND, AND BOTH CARRY THEIR POLICY GATE IN THE CONTROLLER (M13).
+        // These two lines used to read "`form_version_id` is a query/body param, not a bound model, so
+        // authorization is `ability:` + RLS" — a true observation about the ROUTER recorded as if it were a
+        // sufficient authorization design. It is not: `ability:` scopes the TOKEN and RLS scopes the TENANT,
+        // and neither answers "may THIS member touch THIS form". So the manifest served any form's complete
+        // authored schema to anyone holding `read:forms`, and the replay below created submissions against
+        // any form in the tenant to anyone holding `write:submissions` — while the bound-model routes onto
+        // the same artefacts (`forms/{form}/versions/{version}` and `forms/{form}/submissions`) required a
+        // per-form grant. See the standing rule stated on SubmissionPromoteController two rows down, and its
+        // second half: WHEN A ROUTE IS NOT RESOURCE-BOUND, THE GATE MOVES INTO THE CONTROLLER RATHER THAN
+        // BEING DROPPED. `POST /form-templates` above is the precedent — its version arrives in the body and
+        // FormTemplateApiController runs `Gate::forUser()->authorize('view', $version->form)` itself.
+        // tests/Feature/Api/GroupBPolicyGateTest.php enumerates every route in this group and fails on a new
+        // one that carries neither a `can:` middleware nor a documented reason it needs none.
         Route::get('sync/manifest', [SyncManifestController::class, 'show'])
             ->middleware(['ability:'.ApiAbilities::READ_FORMS, 'feature:offline_sync'])
             ->name('sync.manifest');
 
         // Idempotent batch replay of queued submissions (per-item results; a partial failure never rolls back
         // its siblings). source = offline_sync; `client_submission_uuid` dedupes a duplicate replay to a no-op.
+        // The per-form `SubmissionPolicy::create` gate runs per ITEM inside the controller — a batch may name
+        // several forms, and one refusal must not discard its siblings' results.
         Route::post('sync/submissions', [SyncSubmissionController::class, 'store'])
             ->middleware('ability:'.ApiAbilities::WRITE_SUBMISSIONS)
             ->name('sync.submissions');

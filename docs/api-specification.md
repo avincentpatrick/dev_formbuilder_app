@@ -108,6 +108,33 @@ Every rate-limited response includes standard `X-RateLimit-Limit`/`X-RateLimit-R
 > `POST /resource-grants` adds the `grantCapacity` escalation check on top. **A route added to this group
 > without a `can:` gate would break that argument** — see `ApiAbilities::MANAGE_SCOPES`.
 
+> ### ⛔ THE SENTENCE ABOVE IS A GROUP-WIDE RULE, NOT A `manage:scopes` ASIDE — AND IT HAD A HOLE (M13)
+>
+> **An ability scopes the TOKEN and RLS scopes the TENANT. Neither answers "may THIS member touch THIS
+> resource", and only a policy gate does.** That was written down as an argument local to one ability, and
+> the two routes it did not reach are the two that broke it. Both `/api/v1/sync` routes take their resource
+> from the **body or the query** rather than the URL, so there was no bound model for `can:` to attach to —
+> and a rule phrased about *resource-bound* routes silently did not apply to them. `GET /sync/manifest`
+> served any form's complete authored schema to any holder of `read:forms`; `POST /sync/submissions` created
+> submissions against any form in the tenant for any holder of `write:submissions`, while the bound-model
+> routes onto the same two artefacts required a per-form grant.
+>
+> **The rule's second half, now stated: WHEN A ROUTE IS NOT RESOURCE-BOUND, THE GATE MOVES INTO THE
+> CONTROLLER — IT DOES NOT DISAPPEAR.** `POST /form-templates` had been doing exactly that since G9a (its
+> `form_version_id` arrives in the body and `FormTemplateApiController` runs
+> `Gate::forUser($user)->authorize('view', $version->form)` itself); it was the precedent rather than the
+> exception, and nothing said so.
+>
+> **Eight Group-B routes carry no `can:` middleware, and six of them are right to.** `GET /tenant` (the
+> tenant *is* the request's context), `GET /form-templates` and `GET /field-library` (RLS returns platform
+> items plus the tenant's own and nothing else), `POST /field-library` (authored from explicit attributes;
+> it references no other resource), `GET /gamification/me` (ADR-0020 §D7 — every member may read their own
+> standing, which names nobody else), and `POST /form-templates` (gated in its controller). The other two
+> are the sync pair, now gated in theirs. That enumeration is not prose: `tests/Feature/Api/
+> GroupBPolicyGateTest.php` walks the live route table and fails on a route carrying neither a `can:`
+> middleware nor a written reason it needs none — because this is a property of a **route table**, and a
+> guard that lives in one controller's test cannot see the next route somebody adds.
+
 > **H15a note.** `manage:integrations` scopes the native-connector surface (`/connections` and the delivery
 > rules nested under it). New rather than a reuse of `manage:webhooks` for the reason above, one step
 > sharper: a connection holds an OAuth credential that lets the platform act inside the tenant's own

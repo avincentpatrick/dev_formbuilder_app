@@ -499,8 +499,61 @@ are still in place.
 
 ### ⚠️ The gate that is not measuring what three files say it measures
 
-- **`major` · THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS STRUCTURALLY INERT ON EVERY `AppLayout`
-  PAGE — IT CANNOT FAIL, AND HAS NOT BEEN ABLE TO SINCE THE CLIP LANDED.** `tests/e2e/support/axe.ts:41-44`
+- ✅ **CLOSED BY `M17` (2026-08-26) — `major` · ~~THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS
+  STRUCTURALLY INERT ON EVERY `AppLayout` PAGE.~~** The row is **correct in its diagnosis and wrong in
+  its evidence**, and both halves matter.
+  ⛔ **THE PROOF THE ROW OFFERS IS A NO-OP AND PROVES NOTHING.** It says *"delete `min-width: 0` from
+  the leaderboard name cell (`achievements/Index.vue:452-459`) and every scan still passes."* That rule
+  **also** carries `overflow: hidden`, and per CSS Sizing 3 a flex item whose main-axis overflow is not
+  `visible` already resolves `min-width: auto` to **0** — so the declaration is redundant and deleting
+  it changes nothing: **343/343 with it and without it**, measured in Chromium. The scan passing was the
+  *correct* result. **The gate was inert — but that is proven by the clip, not by this demonstration,
+  and for the whole life of the row its evidence was never evidence.**
+  ✅ **PROVEN INSTEAD WITH A MUTATION THAT DOES SOMETHING — THREE LEGS, ALL MEASURED.** Deleting the
+  load-bearing `overflow-wrap: anywhere` from `.dns__code` (`DnsRecordBlock.vue:127`, whose own comment
+  says *"The token has no break opportunities of its own"*) and scanning `/domains` at 375px, where
+  `E2eSeeder.php:1017-1047` guarantees a **64-hex** `verification_token` on an unverified domain:
+
+  | leg | mutation | gate | result |
+  |---|---|---|---|
+  | 1 | applied | **unfixed** | **2 passed** — green over **312px** of real overflow |
+  | 2 | applied | **fixed** | **2 failed**, `Received: 312` |
+  | 3 | reverted | fixed | **71 passed** across the mobile shard |
+
+  ⛔ **LEG 1 IS THE ROW.** `documentElement.scrollWidth - clientWidth` read **0** while
+  `.app-shell__content` was overrun by **312px**, and a test literally named *"— accessible & no
+  horizontal overflow"* passed, in both themes.
+  **AS FIXED.** `assertNoHorizontalOverflow()` in `support/axe.ts` measures **two boxes**: the document
+  (still the only real check where there is no shell — `AuthLayout`, `AdminLayout`, the guest runtime,
+  `Welcome.vue`, and anything teleported to `<body>`) **and** `.app-shell__content`, which is
+  `overflow-y: auto` (so `overflow-x` computes to `auto`) and `overflow: hidden` in the `--fluid`
+  builder variant — **both mint a scroll container, unlike `clip`, so `scrollWidth` genuinely grows.**
+  A third assertion fails loudly if `.app-shell` is present but `.app-shell__content` is not, so a
+  renamed class cannot silently restore the blindness. `builder-axe.spec.ts`'s twin now calls the same
+  helper instead of carrying its own copy — which is how it came to be inert in the first place.
+  ⚠️⚠️ **THE ~40 COMMENT LINES WERE NOT MERELY OPTIMISTIC — TWO OF THEM MISATTRIBUTED REAL CATCHES, AND
+  THAT IS THE FINDING ABOVE THE FIX.** `responsive-axe.spec.ts` claimed *"the 375px overflow trap that
+  has now caught Domains and the Audit log"* and *"a non-wrapping row in a shared primitive has reddened
+  this gate three times (H12b, H14, H15b)"*. **Checked: the clip landed 2026-07-21 in G11 (`506ff97`)
+  and all three of those merged on 07-26/07-27** — six days later, with the assertion already inert. So
+  those increments did go red, but on **axe violations**, credited to the neighbouring check. Corrected
+  **in place rather than deleted**, because the misattribution is the more useful record: **a comment
+  citing three specific saves is exactly what stops the next reader from testing the claim, and it is
+  how a gate comes to be trusted.**
+  ✅ **NO FALSE POSITIVES, MEASURED BEFORE THE GATE WAS WRITTEN.** A survey of 11 pages × 3 viewports
+  found `.app-shell__content` overflow of **0 everywhere**, including the `Checklist` 44px `::before`
+  overhang on `/dashboard` that `Checklist.vue:222-246` warns about by name (the top predicted risk),
+  the builder under `--fluid`, and `MdsDataTable`'s desktop scrollers. `.app-shell__content` is present
+  on every page, so the drift guard is not vacuous.
+  ⚠️ **What it still cannot see, stated in the file rather than discovered later:** a **top-nav** overrun
+  clips at `.app-shell` above the content region (`search-nav.spec.ts` measures bounding boxes for that),
+  and an element that is its own scroll container legitimately absorbs its own overflow
+  (`list-layout.spec.ts` owns that). This is a third instrument beside those two, not a replacement.
+  ⛔ **`AuthLayout`, `AdminLayout`, the guest runtime and `Welcome.vue` carry no clip and were NOT
+  touched** — the guest public-runtime scan was never affected, so its results across the whole
+  thirty-six-day period stand.
+
+  *The original row, preserved:* `tests/e2e/support/axe.ts:41-44`
   (twin at `tests/e2e/builder-axe.spec.ts:88-91`) measures
   `document.documentElement.scrollWidth > clientWidth + 1`, while `resources/js/Layouts/AppLayout.vue:147`
   sets `.app-shell { overflow-x: clip }` and `.app-shell__content` is `overflow-y: auto`, so its
@@ -519,6 +572,63 @@ are still in place.
   `auth-axe`, `admin-console-axe` and `public-runtime-*` are unaffected — do not "fix" them. **Live**, and
   the correction owed with it is the ~40 misleading comment lines, in the same row. Filing this is the
   single most valuable output of the review: it invalidates a gate this project has been trusting.
+
+### ⚠️ Found by the repaired overflow gate on its first run (M17, 2026-08-26)
+
+**Provenance, so nobody re-derives these.** The horizontal-overflow assertion was structurally inert on
+every `AppLayout` page for thirty-six days (the row above). The moment it could fail, it found **three
+real overruns that no gate in this project could previously see** — none of which is a regression from
+M17, all pre-existing. They are **quarantined in `KNOWN_OVERFLOWING` (`tests/e2e/support/axe.ts`), a list
+the gate forces to shrink**: a quarantined page is asserted to *still* overflow under CI, so fixing one
+fails the build until its entry is deleted. That is `clipped-node-containment.test.ts`'s `KNOWN_UNGUARDED`
+discipline, applied to a runtime measurement.
+
+⛔ **WHY THEY ARE FILED RATHER THAN FIXED, STATED PLAINLY: NONE OF THE THREE REPRODUCES ON A WINDOWS HOST.**
+All three are text-driven, and **17/24/28px is the size of the difference between Linux and Windows font
+metrics for the same face.** A probe that inlined OpenDyslexic as a data URI — defeating the recorded
+cross-origin font trap, with `document.fonts.check()` returning `true` — measured **0 overflow across all
+six page × viewport combinations**, as did a plain tablet probe of the form hub. Guessing at CSS fixes
+verifiable only through 20-minute CI round-trips, for overruns nobody here can see, is how a
+plausible-but-wrong fix ships. **Whoever takes these should reproduce in CI first, or on Linux.**
+
+- **`major` · The submissions page header title overruns its region by 17px under maximum
+  personalization.** `personalization-axe.spec.ts:55` › *Submissions at extra_large + dyslexia font +
+  teal*, **[mobile] only**. Offender named by the gate: **`<h1 class="page-header__title">` sticking out
+  17px**. 375px × `extra_large` × OpenDyslexic × teal, dark. The likely shape is the `.dns__code` one — an
+  unbreakable or non-wrapping title with no `overflow-wrap`/`min-width: 0` escape — but that is a
+  hypothesis, not a measurement. **Live** for any user on that personalization combination.
+- **`major` · `MdsSegmentedControl` spills 30px out of the builder's content region under maximum
+  personalization.** `personalization-axe.spec.ts:83` › *Builder at extra_large + dyslexia font + teal*,
+  **[mobile] only**, 24px of region overflow with **`<label class="mds-segmented__seg">` sticking out
+  30px**. ⚠️ **THE FILE ALREADY DESCRIBES THIS EXACT MECHANISM AND ITS OWN CHECK DOES NOT CATCH IT**:
+  `personalization-axe.spec.ts:93-97` says `MdsSegmentedControl` is *"`inline-flex` with `white-space:
+  nowrap` and no wrap and no overflow handling, so a switcher that does not fit spills OUT of its bar
+  while the document width never moves"*, and measures `.builder__pane-switch`'s own `scrollWidth`. That
+  bespoke check passes while the control still overruns the **page**. **A component-level check and a
+  page-level one are not substitutes.** The fix is a design-system change to `SegmentedControl.vue` with
+  its own story and blast radius, which is why it is not folded into a gate row. **Live.**
+- **`major` · `.builder__title-row` overruns the builder's region by 24px on BOTH the Add and Form panes
+  under maximum personalization — a second, distinct builder defect.** Same test
+  (`personalization-axe.spec.ts:83`, **[mobile]**), two further scan labels — *"— Add"* and *"— Form"* —
+  and in both the offender is **`<div class="builder__title-row">` sticking out 24px**, not the segmented
+  control. **One defect in shared chrome above the panes, visible on two of them**, so a single fix
+  should retire both `KNOWN_OVERFLOWING` entries at once. **Live.**
+  ⚠️⚠️ **NEITHER WAS VISIBLE UNTIL THE SCAN BEFORE IT WAS QUARANTINED, AND THAT IS THE GENERAL LESSON.**
+  A Playwright test aborts at its first failed assertion, and this test calls `assertClean` **three**
+  times — base, `— Add`, `— Form`. While the base scan failed, the other two never ran; quarantining the
+  base revealed `— Add`, and quarantining `— Add` revealed `— Form`. **A single red test can hide an
+  arbitrary number of further defects behind it, and each one costs a full CI cycle to uncover.** Three
+  runs, three findings, in a test that had reported exactly one problem.
+  ⛔ **AND NONE OF THE THREE WAS PRE-LISTED ON A HUNCH, DELIBERATELY.** `KNOWN_OVERFLOWING` asserts that a
+  quarantined page *still* overflows, so a speculative entry fails **exactly as loudly** as a missing one
+  — the list is symmetric, and guessing buys nothing. Listing only what has been measured is the whole
+  point of it.
+- **`major` · The form hub overruns its region by 28px at tablet, in both themes, with no personalization
+  at all.** `responsive-axe.spec.ts:252` › *Form hub*, **[tablet] only**, light **and** dark. The gate
+  reports **no single offending element**, which points at an intrinsic minimum on a grid or flex track
+  rather than one wide child — the hardest of the three to attribute and the one with the fewest
+  preconditions: **no personalization, no theme dependence, an ordinary 834px tablet.** **Live**, and the
+  most likely of the three to be visible to a real user.
 
 ### Connectors & webhooks
 

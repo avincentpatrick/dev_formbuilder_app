@@ -9,6 +9,26 @@ import { formEntry, openBuilder, showBuilderPane } from './support/navigate';
 // coverage the per-component Storybook axe run cannot provide (heading order, landmark structure, and
 // real text-on-surface contrast only exist once a page is assembled). The assertClean/forceTheme helpers
 // are shared with the guest public-runtime scan (tests/e2e/public-runtime-axe.spec.ts).
+//
+// ⛔⛔ READ THIS BEFORE TRUSTING ANY "the overflow assertion protects X" COMMENT BELOW — AND THERE ARE
+// MANY OF THEM. Between 2026-07-21 and M17 (2026-08-26) the horizontal-overflow assertion was
+// STRUCTURALLY INCAPABLE OF FAILING on every page in this file. `AppLayout.vue` sets
+// `.app-shell { overflow-x: clip }` (landed in G11, `506ff97`), `clip` mints no scroll container, and
+// the assertion read `documentElement.scrollWidth` — which therefore never moved, whatever the page
+// did. M17 measured it: deleting the load-bearing wrap guard from `/domains`' 64-hex DNS token put
+// 312px of real overflow on the page, and BOTH cases below passed, in both themes, on a test whose
+// name ends "no horizontal overflow".
+//
+// ⚠️ THE COMMENTS WERE NOT MERELY OPTIMISTIC, THEY MISATTRIBUTED REAL CATCHES. Two below claimed
+// specific historical saves — "has now caught Domains and the Audit log", and "has reddened this gate
+// three times (H12b, H14, H15b)". The clip predates all three of those increments by six days, so
+// whatever went red on them, it was not this assertion; the likeliest culprit is an axe violation on
+// the same page, credited to the neighbouring check. Both are corrected in place rather than deleted,
+// because the misattribution is the more useful record: **it is how a gate comes to be trusted.**
+//
+// `assertClean` now measures `.app-shell__content` as well as the document — see the docblock on
+// `assertNoHorizontalOverflow` in support/axe.ts for which box catches what, and for the two things it
+// still cannot see (a top-nav overrun, and an element that is its own scroll container).
 
 const pages = [
     { name: 'Dashboard', path: '/dashboard' },
@@ -89,7 +109,11 @@ const pages = [
     // each of the four FeedbackStatus states, which is what makes this scan worth running: the four map
     // to four DIFFERENT badge variants, and a table where every pill is the same colour proves nothing
     // about the other three. The last fixture row also carries a long unbroken URL inside the remarks
-    // cell — the 375px overflow trap that has now caught Domains and the Audit log.
+    // cell — the 375px overflow trap. ⚠️ This comment used to claim the trap "has now caught Domains
+    // and the Audit log". It cannot have: `.app-shell` has been `overflow-x: clip` since G11, so the
+    // document-width assertion could not fail on any page in this file until M17. Something on those
+    // pages did go red — but it was an axe violation, not this check. The fixture is still worth
+    // having, and NOW the assertion behind it can actually fail.
     //
     // The PLATFORM console (/admin/feedback) is on the same footing as /admin/settings: central host,
     // super-admin session, so it is scanned by `admin-console-axe.spec.ts` (I10e) rather than here.
@@ -296,8 +320,12 @@ for (const theme of themes) {
 // ≤1024px linearization this comment used to describe; nothing stacks any more, and the pane has to be
 // SELECTED before anything inside it can be clicked. The rows stack to one control per line below 640px
 // and become a wrapping flex row above it, and both sides are still covered by the three-viewport matrix.
-// The overflow assertion is the point: a non-wrapping row in a shared primitive has reddened this gate
-// three times (H12b, H14, H15b), and this is the deepest control nesting the builder has.
+// The overflow assertion is the point, and this is the deepest control nesting the builder has.
+// ⚠️ This comment used to add "a non-wrapping row in a shared primitive has reddened this gate three
+// times (H12b, H14, H15b)". Checked in M17 and it is FALSE: the clip landed 2026-07-21 (`506ff97`)
+// and all three of those merged on 07-26/07-27, so the document-width assertion was already inert
+// when they ran. They did go red — on axe violations, credited to the wrong neighbour. **A comment
+// citing three specific saves is exactly what stops the next reader from testing the claim.**
 for (const theme of themes) {
     test(`Builder condition editor (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
         await openBuilder(page, 'Logic Notices Demo');

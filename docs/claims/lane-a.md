@@ -39,8 +39,29 @@ neither PHP parity gate is reachable. ⚠️ Lane B's `SyncStatus.vue` row still
 test with it — that is unaffected by this claim and remains Lane B's to take.
 
 **Namespaces spent:** nothing from either. No migration, so Lane B's block stays
-`2026_08_17_000109`. No ADR — `0021` stays free, `0010` stays reserved for H1d, `#16` stays free,
-ADR-0016's next sub-decision stays `§D34`. The invariant lands in the two gate files' own docblocks.
+`2026_08_17_000109`. No ADR — `0010` stays reserved for H1d, `#16` stays free, ADR-0016's next
+sub-decision stays `§D34`. The invariant lands in the two gate files' own docblocks.
+
+⚠️ **AMENDED MINUTES AFTER PUBLISHING, AND THE AMENDMENT IS THE POINT.** This claim first said
+*"`0021` stays free"*. It was already false when written: Lane B's M15 claim (`8d49842`) landed
+**between my `git fetch` and my `git push`** and spends `0021` on
+`0021-respondent-scoped-device-outbox.md`. My own briefing had allocated `0021-0025` to Lane A, so
+two lanes each held a correct-looking map to the same number — the ADR-0017 collision shape 7(g)
+exists for, arriving live rather than as a cautionary tale. **Lane B pushed first, so `0021` is
+theirs; Lane A's block is `0022-0025` and next-free-overall is `0022`.** Nothing was lost only
+because this row spends no ADR at all. **A claim that has gone stale is worse than no claim, so it
+is corrected at source rather than in a note further down.**
+
+### ⚠️ ONE CROSS-LANE EFFECT LANE B SHOULD KNOW ABOUT, STATED RATHER THAN DISCOVERED
+
+`reducedMotion: 'reduce'` in `playwright.config.ts` `use:` applies to **every** e2e spec, including
+`tests/e2e/public-runtime-offline.spec.ts`, which M15's claim records as *"grepped, not edited —
+the design preserves all nine of its assertions."* That assertion still holds as far as I can
+measure: no e2e test in this repo asserts an animation or a transition (grepped across all sixteen
+spec files), and its `:103` reference to a "sync transition" is a state change, not a CSS one. But
+**the file is reached by my diff without appearing in it**, which is the paired-file symptom 7(b-bis)
+tells us to treat as structural rather than as a flake. Recorded here so that if M15's run reddens
+there, the first place to look is this config line and not their own change.
 
 ### ⛔ THE ROW'S FRAMING IS FALSIFIED, AND THE FIX IS NOT A COLOUR CHANGE
 

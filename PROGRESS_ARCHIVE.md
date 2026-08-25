@@ -4281,3 +4281,96 @@ locally and independently by CI's contract job · Vitest **127 files / 2,151** a
 unmoved and asserted rather than re-measured (no `.vue`, no `resources/`, no `tests/e2e/`, no `packages/`) ·
 E2E **550 passed + 1 flaky + 10 skipped**, the flaky being `builder-axe.spec.ts:198` on mobile — Lane A's
 known contrast row, unchanged, and the same measurement as `551 + 0 flaky`.
+
+---
+
+**2026-08-25 — 🅱️ LANE B · `M13`: both `/api/v1/sync` routes now ask who is calling about which form, and
+the batch contract is per-item for the first time (PR #201, `ca5faff`, 6/6 green).**
+
+`routes/api.php` has stated since G10b that a resource-bound Group-B route carries an `ability:` gate **and**
+a `can:` policy gate on the bound resource. Both sync routes take their resource from the **body or the
+query**, so there was nothing for `can:` to attach to and a rule phrased about *resource-bound* routes
+silently did not reach them. **An ability scopes the TOKEN and RLS scopes the TENANT; neither answers "may
+this member touch this form."** `GET /sync/manifest` served the complete `schema_snapshot` of any version in
+the tenant to any holder of `read:forms`, while `GET /forms/{form}/versions/{version}` gated the identical
+payload on `can:view,form`. `POST /sync/submissions` created submissions against any form — its response
+caps, notifications, webhooks and inbox — to any holder of `write:submissions`, while the web encode route
+required `can:create,Submission,form`. Both gates now live in their controllers, which is what
+`POST /form-templates` has done for the identical asymmetry since G9a with nobody ever naming it as the
+pattern. No first-party client is affected: the guest PWA replays through the public endpoints, so this
+closed an integrator-facing hole.
+
+⚠️⚠️ **The row named a principal who cannot exist and missed the worst one — thirty-four-for-thirty-four.**
+*"A Viewer with a `write:submissions` token"* is impossible: that ability maps to `submissions.create`,
+`viewer` does not hold it, and `ApiAbilities::intersect()` drops it at mint time. The **Reviewer** it never
+mentions does hold `submissions.create` and can mint the token, while `SubmissionPolicy::create()` has
+required `forms.edit.any` or EDITOR capacity since the deliberate G10a tightening — so a Reviewer was
+authorized to encode on **zero** forms through the web app and reached **every** form through this route.
+Read the ability map and the role matrix, not just the file:line.
+
+⚠️⚠️ **The sweep found a second route in the same comment block.** `route:list --json` over all 62 Group-B
+routes, filtered on the absence of `Illuminate\Auth\Middleware\Authorize`: **8 ungated, 6 legitimately.** The
+eighth was `sync/manifest`. Grepping the shape rather than trusting the row's count is now five-for-five
+(M8, M9, M11, M12, M13). Because the defect class is a property of a route **table**, the durable guard is
+the new `tests/Feature/Api/GroupBPolicyGateTest.php` — non-vacuity asserted in both directions — and it
+**states its own limit in the file**: it notices a route that arrives ungated, and cannot judge whether an
+allowlisted reason is true.
+
+⛔⛔ **Two more outcomes escaped `replayOne()` and aborted the whole batch, and the authorization fix forced
+a decision on the first.** `forms` soft-deletes and `form_versions` does not, and **neither RLS policy
+filters `deleted_at`** (read off `pg_policies`, not assumed) — so a deleted form's versions stay resolvable,
+the pipeline's own `Form::findOrFail()` raised a `ModelNotFoundException` nothing caught, and the request
+404'd after earlier items had already committed, re-raising on every retry so **one poisoned row stalled a
+device's outbox permanently**. There was no way to write the gate without deciding it: the gate needs a
+`Form`, so the choice was `withTrashed()` (authorize against a deleted form — wrong) or `findOrFail` (the
+bug). And **`FormNotAcceptingSubmissionException` is a sibling of `SubmissionException`, not a subclass** —
+every exception in that directory is `final class … extends RuntimeException` — so a closed, not-yet-open or
+**at-capacity** form rendered as a top-level 403 and lost every item's result. That is the response cap the
+row itself cites as the consequence, arriving as the one refusal the batch could not survive. The method's
+docblock had claimed *"Never throws"* since G8b: an intention read afterwards as a measurement, for the
+third increment running.
+
+⚠️ **`openapi.json` moved on an axis the prediction had ruled out, and the lesson is about predictions.** It
+was claimed as "might move" and predicted byte-identical from the `/form-templates post` precedent — Scramble
+infers a 403 from route **middleware**, not from a controller `Gate::forUser()->authorize()` call — reasoning
+that was correct and irrelevant. `/sync/manifest` gained a **404** instead, because `Form::findOrFail()` is a
+second shape Scramble traces where the pre-existing `firstOrFail()` is not. That 404 has been a real response
+since G8b and `SyncApiTest` has asserted it since G8b; the document had simply never said so, so the contract
+got *more* accurate. **A prediction that names one mechanism and is right about it can still be wrong about
+the artefact. Regenerate and diff; never substitute the reasoning for the measurement.**
+
+⚠️ **Mutation matrix: 7, zero undefended, and the decisive one added a test rather than changing code.**
+M2 — gate on `FormPolicy::view` instead of `SubmissionPolicy::create` — reddens **exactly one** case, and
+that case exists only because **the matrix was designed before the tests were written**: all five seeded
+roles give the two policies the same answer on this route, so the wrong policy would have been invisible to
+the other twenty-six cases. It is pinned with a synthetic member on the `FormHubGateTest` idiom, labelled
+unreachable-today. M5 reddens closed **and** capacity separately, which is what proves those two paths are
+not sharing one test. ⛔ **M1 (delete the guard) and M3 (throw instead of returning a per-item error) redden
+the identical set, and reordering the mixed batch to separate them did not work** — from a client's side
+*"an unauthorized item is its own `forbidden` result and the batch continues"* is **one** observable that
+both violate, and nothing can observe a guard's absence without observing a refusal. Recorded as what the
+contract is rather than engineered around: reading the matrix sometimes ends in a statement instead of a new
+case. ⚠️ **One case was vacuous and only designing its mutation first caught it** — an unknown version id
+404s under every ordering, so it pinned nothing; a never-published **draft** is the only input that exists,
+belongs to a real form and is still withheld. **A test whose mutation you cannot write is a test that
+measures nothing.**
+
+⚠️ **Two harness lessons.** `route:list` **prints** the resolved middleware class while `gatherMiddleware()`
+**returns** the declared alias, so the route-table guard's first draft found zero gated routes and reported
+all fifty as ungated; it resolves through the router's own alias map now. And a killed `docker exec`
+**orphans the Pest run inside the container** while the host-side process count reads 0 — check inside the
+container too, and kill the orphan rather than racing a second `migrate:fresh` against it.
+
+**Filed, not fixed** (four `minor`): the `reviewer` seeder comment contradicting `SubmissionPolicy::create()`
+— an authorization decision, so the user's; both sync routes' 403 undocumented (same generated-artefact
+constraint as the open promote-409 row); `SyncSubmissionResultResource` typing `submission`/`error` as bare
+strings; and the read/write ability families diverging so no non-admin role can complete the offline loop.
+
+**Gates.** CI Pest **4515 / 19,158** (+16 cases, +62 assertions on 4499 / 19,096 — exactly the sixteen new
+cases; the same 2 pre-existing warnings) · PHPStan CI `[OK] No errors`, local **18 = baseline, zero delta by
+file list** · Pint proven live with a misformatted probe before `PASS` was believed, fourth increment running
+· four lint gates **97 · 111 · 31 · 111/119/0**, unmoved · Vitest **127 files / 2,151** and axe **42 suites /
+299**, asserted unmoved rather than re-measured (no `.vue`, no `resources/`, no `packages/`, no `tests/e2e/`
+file touched; CI's axe job proved the second independently) · E2E **551 passed + 10 skipped with no flaky
+line**, which is **not** an improvement — `builder-axe.spec.ts:198` on mobile is Lane A's known contrast row
+and happened to pass first try; the same measurement as `550 + 1 flaky`.

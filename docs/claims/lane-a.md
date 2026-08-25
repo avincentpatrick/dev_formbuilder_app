@@ -91,9 +91,6 @@ risk. `.app-shell__content` is present on every page, so a selector-drift guard 
 `0022-0025`. `0010` stays reserved for H1d, `#16` stays free, ADR-0016's next sub-decision stays
 `§D34`, migration block `2026_08_17_000109` unspent.
 
----
-
-
 **Every claimed file was edited; none was released untouched** — the M8/M11 shape did not recur — and
 **the claim was never extended.** Both `docs/` files, `playwright.config.ts`, `support/axe.ts` and
 `builder-axe.spec.ts` all moved. **Nothing was spent from either shared namespace.**

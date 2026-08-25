@@ -1150,3 +1150,70 @@ function completeSamlLogin(SsoAuthRequest $request, string $samlResponse, string
 
     return test()->get((string) $handOff->headers->get('Location'));
 }
+
+/*
+|--------------------------------------------------------------------------
+| Increment M12 — staging a write inside promote()'s PRE-LOCK window
+|--------------------------------------------------------------------------
+| `SubmissionDraftService::promote()` reads the answer document, runs Stage 3 and the DB media check over it,
+| and only then takes the row lock. A write that commits inside that window is what the M12 guard refuses.
+| Three spec files need to stage it — the service, the encode channel and the guest channel — so it lives
+| here for the reason this file's header already states: one definition, usable from a single-file run.
+*/
+
+/**
+ * Run `$write` exactly once, at the moment `promote()` reads the draft's answer document — i.e. inside the
+ * window between that read and the row lock. Returns a predicate the caller asserts on for NON-VACUITY: a
+ * case whose interleave never fired proves nothing, and every assertion in it would pass for the wrong
+ * reason.
+ *
+ * ⚠️ THE ONE-SHOT FLAG IS SET BEFORE THE WRITE, NEVER AFTER IT. `$write` itself queries
+ * `submission_answers`, so a listener guarded on its own result re-enters and writes forever — the
+ * re-entrancy `EncodePromoteTest`'s R1 case paid for in M11, where the escaping 23505 poisoned
+ * RefreshDatabase's outer transaction with 25P02 and surfaced as a tenancy failure three frames away.
+ *
+ * ⚠️ IT MATCHES THE SELECT, NOT THE TABLE NAME, because `$write` and `updateOrCreate` both name the table
+ * too.
+ *
+ * ⚠️ `$skip` EXISTS BECAUSE THE HTTP CHANNELS SAVE BEFORE THEY PROMOTE, AND GETTING IT WRONG FAILS LOUDLY
+ * RATHER THAN SILENTLY. `GuestSubmissionController` and `SubmissionController` both call `saveDraft()` first,
+ * whose `SubmissionAnswer::updateOrCreate()` issues this same `select *` one statement before its own write —
+ * so an interleave staged there is simply overwritten a millisecond later and `promote()` reads a consistent
+ * document. Pass `skip: 1` on those channels to land in `promote()`'s window instead. A value that is too
+ * small stages nothing and the refusal never comes; one that is too large never fires and the caller's
+ * non-vacuity assertion reddens. There is no value that makes a case pass for the wrong reason.
+ *
+ * ⚠️ `$needle` MOVES THE STAGING POINT, AND ONE CASE NEEDS IT. Defaulting to the answer-document read puts
+ * the write in the honest window — before the lock. Passing `for update` instead puts it AFTER the lock is
+ * granted, which is what pins the guard's PLACEMENT: a check hoisted out of the transaction reads before
+ * that point and cannot see it. ⚠️ That writer is deliberately one no production code path is — every real
+ * writer of `submission_answers` for a draft goes through `updateDraft()`, which takes the `submissions`
+ * lock first and would therefore block. The case staging it says so, and pins the code property rather than
+ * a reachable race.
+ *
+ * @param  Closure():void  $write  the racing device's commit
+ * @param  int  $skip  matching statements to let past before staging (0 for a direct service-level promote)
+ * @param  string  $needle  the SQL fragment to stage on
+ * @return Closure():bool whether the interleave actually fired
+ */
+function interleaveDuringPromote(Closure $write, int $skip = 0, string $needle = 'select * from "submission_answers"'): Closure
+{
+    $state = new stdClass;
+    $state->fired = false;
+    $state->seen = 0;
+
+    DB::listen(function ($query) use ($state, $write, $skip, $needle): void {
+        if ($state->fired || ! str_contains($query->sql, $needle)) {
+            return;
+        }
+
+        if ($state->seen++ < $skip) {
+            return;
+        }
+
+        $state->fired = true;
+        $write();
+    });
+
+    return fn (): bool => $state->fired;
+}

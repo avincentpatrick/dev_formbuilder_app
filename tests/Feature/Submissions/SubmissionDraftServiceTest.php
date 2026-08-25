@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
+use App\Services\Submissions\AnswersContentChecksum;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPipeline;
@@ -506,4 +507,208 @@ it('refuses a stale client that omits the baseline once a checksum is stored', f
     // rather than silently degraded back to the lost update the guard exists to stop.
     expect(fn () => $this->drafts->saveDraft($payload(['age' => '31'], true, null)))
         ->toThrow(SubmissionConflictException::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M12 — the PRE-LOCK lost update, the second write door P3a did not reach.
+|--------------------------------------------------------------------------
+| promote() read the answer document OUTSIDE any transaction, ran Stage 3 and the DB media check over it for
+| tens of milliseconds, took the row lock only afterwards, and then finalized with the PRE-LOCK values —
+| SubmissionFinalizer::finalize() being a whole-document replace. An autosave committing inside that window
+| was reverted, and the row was `submitted` afterwards, so no later save could restore it. P3a's guard sits in
+| updateDraft() and cannot see this: it compares the base a SAVE carries, and a promote carries none.
+|
+| ⚠️ EVERY REFUSAL CASE HERE ASSERTS THE MESSAGE, NOT THE CLASS. Four causes share
+| SubmissionConflictException and two of them share the `submission_conflict` code; M11's mutation pass
+| proved a bare toThrow(SubmissionConflictException::class) passes for a completely different cause.
+*/
+
+it('HEADLINE: refuses a promote whose answer document moved between the pre-lock read and the lock', function (): void {
+    // THE DEFECT, staged as the real interleaving rather than approximated. Before M12 this promote finalized
+    // the document it read BEFORE device B's save, so `country` was gone from a row that was then `submitted`
+    // — and `created: true` came back with no error to either device.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    // Device B's autosave, committed inside promote()'s pre-lock window.
+    $fired = interleaveDuringPromote(function () use ($payload, $seed): void {
+        test()->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30', 'country' => 'CA'], true, $seed->contentChecksum));
+    });
+
+    Event::fake([SubmissionCreated::class]);
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(SubmissionConflictException::class, 'This draft was updated on another device.');
+
+    // ⚠️ NON-VACUITY: without the interleave there is no race to survive and every assertion below passes for
+    // the wrong reason.
+    expect($fired())->toBeTrue();
+
+    $row = Submission::findOrFail($id);
+    $stored = SubmissionAnswer::query()->where('submission_id', $id)->firstOrFail();
+
+    expect($row->status)->toBe(SubmissionStatus::Draft)          // NOT finalized over the top of device B
+        ->and($row->submitted_at)->toBeNull()
+        ->and($row->draft_expires_at)->not->toBeNull()           // still resumable, still reapable
+        ->and(data_get($stored->answers, 'country'))->toBe('CA') // device B's answer survives byte-for-byte
+        ->and(SubmissionAnswerIndex::query()->where('submission_id', $id)->count())->toBe(0)
+        ->and(Audit::query()->where('auditable_id', $id)->count())->toBe(0)
+        ->and(Submission::query()->count())->toBe(1);
+
+    Event::assertNotDispatched(SubmissionCreated::class);
+});
+
+it('does NOT refuse when the interleaved save left the document identical', function (): void {
+    // THE CONTROL THAT KEEPS THE GUARD FROM BEING OVER-STRONG. A device re-saving the same answers (a network
+    // retry, a debounced autosave firing on an unchanged form) rewrites `last_saved_at` and the checksum, but
+    // AnswersContentChecksum::of() is deterministic so the VALUE does not move. Nothing was lost, so nothing
+    // may be refused — a guard keyed on `updated_at` or on a row read would fail exactly here.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    $fired = interleaveDuringPromote(function () use ($payload, $seed): void {
+        test()->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30'], true, $seed->contentChecksum));
+    });
+
+    $result = $this->drafts->promote(Submission::findOrFail($id));
+
+    expect($fired())->toBeTrue()
+        ->and($result->created)->toBeTrue()
+        ->and($result->submission->status)->toBe(SubmissionStatus::Submitted);
+});
+
+it('stays an idempotent no-op when a concurrent PROMOTE wins under the lock, rather than a 409', function (): void {
+    // ⚠️ THE ORDER GUARD. A concurrent promote moves the status AND the checksum — finalize() rewrites the
+    // answer document — so if the new checksum comparison ran BEFORE the status re-assert, the documented
+    // double-promote no-op would start returning conflicts to callers the contract promises an unchanged 200.
+    // Swap the two checks in promote() and this case is the one that reddens.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    // What the winning promote's own commit leaves behind: a finalized head row and a rewritten document.
+    $fired = interleaveDuringPromote(function () use ($id): void {
+        Submission::query()->whereKey($id)->update([
+            'status' => SubmissionStatus::Submitted,
+            'submitted_at' => now(),
+            'draft_expires_at' => null,
+        ]);
+        SubmissionAnswer::query()->where('submission_id', $id)
+            ->update(['answers_content_checksum' => str_repeat('a', 64)]);
+    });
+
+    $result = $this->drafts->promote(Submission::findOrFail($id));
+
+    expect($fired())->toBeTrue()
+        ->and($result->created)->toBeFalse()
+        ->and($result->submission->status)->toBe(SubmissionStatus::Submitted);
+});
+
+it('promotes a legacy draft whose stored checksum is null, and refuses one that gains a checksum in the window', function (): void {
+    // BOTH DIRECTIONS OF THE NULL, because the comparison is `!==` and a legacy draft predating the checksum
+    // column must not be stranded. null vs null admits; null vs a real value refuses — the fail-CLOSED
+    // direction, which is the one that matters: something wrote in the window.
+    $version = resumableVersion($this->tenant, $this->user);
+
+    $legacy = $this->drafts->saveDraft(p3aPayload($version, Str::uuid()->toString())(['applicant' => 'Ada', 'age' => '30']));
+    SubmissionAnswer::query()->where('submission_id', $legacy->submission->id)
+        ->update(['answers_content_checksum' => null]);
+
+    expect($this->drafts->promote(Submission::findOrFail($legacy->submission->id))->submission->status)
+        ->toBe(SubmissionStatus::Submitted);
+
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Grace', 'age' => '40']));
+    $id = $seed->submission->id;
+    SubmissionAnswer::query()->where('submission_id', $id)->update(['answers_content_checksum' => null]);
+
+    $fired = interleaveDuringPromote(function () use ($id): void {
+        SubmissionAnswer::query()->where('submission_id', $id)
+            ->update(['answers_content_checksum' => str_repeat('b', 64)]);
+    });
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(SubmissionConflictException::class, 'This draft was updated on another device.');
+    expect($fired())->toBeTrue()
+        ->and(Submission::findOrFail($id)->status)->toBe(SubmissionStatus::Draft);
+});
+
+it('raises the SAME draft_conflict cause the save door raises, not a fourth name for it', function (): void {
+    // The wire contract M12 deliberately did not move: one code and one sentence for both write doors, so no
+    // client learns a second name for "another device wrote to this draft; reload it". A new factory here
+    // would be the change that made openapi.json and every guest client move.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    $fired = interleaveDuringPromote(function () use ($payload, $seed): void {
+        test()->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '31'], true, $seed->contentChecksum));
+    });
+
+    try {
+        $this->drafts->promote(Submission::findOrFail($id));
+        $this->fail('promote() finalized over a document that moved in its pre-lock window');
+    } catch (SubmissionConflictException $e) {
+        expect($e->code())->toBe('draft_conflict')
+            ->and($e->getMessage())->toBe(SubmissionConflictException::draftConcurrentlyModified()->getMessage())
+            ->and($e->getMessage())->toContain('Reload');
+    }
+
+    expect($fired())->toBeTrue();
+});
+
+it('reads the checksum UNDER the lock, not before the transaction opens', function (): void {
+    // ⚠️ THIS PINS THE GUARD'S PLACEMENT, WHICH NOTHING ELSE IN THIS FILE DOES. Hoisting the comparison to
+    // just above `DB::transaction` passes every other case here — the mutation pass proved it — because each
+    // of them stages its write during Stage 3, which a hoisted check still sees. What a hoisted check cannot
+    // see is a write landing between itself and the lock, and that residual window is the whole reason the
+    // comparison belongs inside the transaction: only a read issued after the lock is granted is
+    // authoritative under READ COMMITTED.
+    //
+    // ⚠️ THE STAGED WRITER IS DELIBERATELY ONE NO PRODUCTION PATH IS, AND SAYING SO IS THE POINT. Every real
+    // writer of a draft's answer document goes through updateDraft(), which takes the `submissions` row lock
+    // FIRST and would therefore block here rather than commit. So this case pins a property of the CODE —
+    // the guard reads under the lock — rather than a race a respondent can produce. Without it that property
+    // is enforced only by a comment, and this project has paid repeatedly for the difference.
+    $version = resumableVersion($this->tenant, $this->user);
+    $uuid = Str::uuid()->toString();
+    $payload = p3aPayload($version, $uuid);
+
+    $seed = $this->drafts->saveDraft($payload(['applicant' => 'Ada', 'age' => '30']));
+    $id = $seed->submission->id;
+
+    $moved = ['applicant' => 'Ada', 'age' => '30', 'country' => 'CA'];
+    $fired = interleaveDuringPromote(function () use ($id, $moved): void {
+        SubmissionAnswer::query()->where('submission_id', $id)->update([
+            'answers' => $moved,
+            'answers_content_checksum' => AnswersContentChecksum::of($moved),
+        ]);
+    }, needle: 'for update');
+
+    expect(fn () => $this->drafts->promote(Submission::findOrFail($id)))
+        ->toThrow(SubmissionConflictException::class, 'This draft was updated on another device.');
+
+    // ⚠️ NO "THE OTHER DEVICE'S ANSWER SURVIVES" ASSERTION HERE, AND ITS ABSENCE IS A MEASUREMENT LIMIT
+    // RATHER THAN AN OVERSIGHT. Staging after the lock puts the write inside promote()'s OWN transaction, so
+    // the refusal rolls it back along with everything else — an artefact of where this case has to stage,
+    // not a property of the guard. A real racing device commits in its own transaction and its answers do
+    // survive; the HEADLINE case, which stages before the lock, is what asserts that.
+    expect($fired())->toBeTrue()
+        ->and(Submission::findOrFail($id)->status)->toBe(SubmissionStatus::Draft);
 });

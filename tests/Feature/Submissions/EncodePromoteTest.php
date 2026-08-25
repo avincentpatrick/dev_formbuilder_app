@@ -13,6 +13,7 @@ use App\Models\SubmissionAnswer;
 use App\Models\SubmissionAnswerIndex;
 use App\Models\User;
 use App\Services\Forms\PublishService;
+use App\Services\Submissions\AnswersContentChecksum;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -286,4 +287,59 @@ it('never promotes ANOTHER form’s draft when Submit names its uuid (M11)', fun
         ->and($foreign->submitted_at)->toBeNull()
         ->and(SubmissionAnswer::query()->findOrFail($foreignId)->answers)->toBe(['full_name' => 'Ada'])
         ->and(Submission::query()->count())->toBe(1);                // and no row was created for form A
+});
+
+/*
+|--------------------------------------------------------------------------
+| Increment M12 — Submit may not finalize over a document that moved in promote()'s pre-lock window.
+|--------------------------------------------------------------------------
+| store()'s draft branch is saveDraft() then promote(), and promote() read the answer document OUTSIDE any
+| transaction, validated it for tens of milliseconds, and only then took the lock — finalizing the PRE-LOCK
+| copy. This is the web arm of that refusal.
+*/
+
+it('refuses Submit rather than finalizing over a save that landed in promote’s window', function (): void {
+    // ⚠️ THE REQUEST DELIBERATELY CARRIES NO `base_content_checksum`, WHICH IS WHAT MAKES THIS CASE MEASURE
+    // M12 AND NOT P3a. With a baseline, saveDraft()'s own guard fires first and returns the IDENTICAL code
+    // and sentence — a wrong-reason pass no assertion on the envelope could detect. `claimsBaseline()` is
+    // false without the field, so a `draft_conflict` reaching the page here can only have come from
+    // promote(). It is also the live shape: the guest runtime remounts with `draftBaseline = null` (see
+    // docs/feature-backlog.md's 409-folding row), so a client with no baseline is not hypothetical, and on
+    // that client this guard is the ONLY one standing between two devices and a lost answer.
+    $uuid = Uuid::uuid7()->toString();
+    saveEncodeDraft($this->form, ['full_name' => 'Ada'], $uuid);
+
+    $draftId = Submission::query()->where('client_submission_uuid', $uuid)->firstOrFail()->id;
+
+    // The other device's autosave, committed inside promote()'s window. `skip: 1` steps past saveDraft()'s
+    // own updateOrCreate lookup — see interleaveDuringPromote().
+    $moved = ['full_name' => 'Ada Lovelace', 'color' => 'b'];
+    $fired = interleaveDuringPromote(function () use ($draftId, $moved): void {
+        SubmissionAnswer::query()->where('submission_id', $draftId)->update([
+            'answers' => $moved,
+            'answers_content_checksum' => AnswersContentChecksum::of($moved),
+        ]);
+    }, skip: 1);
+
+    submitEncode($this->form, ['full_name' => 'Ada Lovelace'], $uuid)
+        ->assertSessionHas('toast', fn (array $toast): bool => $toast['type'] === 'error'
+            && str_contains($toast['message'], 'updated on another device'));
+
+    expect($fired())->toBeTrue();
+
+    $row = Submission::findOrFail($draftId);
+
+    // ⚠️ KSORTED BEFORE COMPARING, AND `toBe()` ALONE IS WHY. PHP's `===` on arrays requires identical KEY
+    // ORDER, and a document that has been through jsonb comes back in the database's order rather than the
+    // one it was written in — the same trap `SubmissionAnswerEditService::sameAnswer()` documents for the
+    // audit diff. Normalising order keeps the comparison strict on the VALUES, which is the part that
+    // matters: the other device's answers must survive unchanged, not merely be present.
+    $survived = SubmissionAnswer::query()->findOrFail($draftId)->answers;
+    ksort($survived);
+    ksort($moved);
+
+    expect($row->status)->toBe(SubmissionStatus::Draft)     // still resumable, not silently finalized
+        ->and($row->submitted_at)->toBeNull()
+        ->and($survived)->toBe($moved)
+        ->and(Submission::query()->count())->toBe(1);
 });

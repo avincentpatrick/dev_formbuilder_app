@@ -99,5 +99,23 @@ the most likely cure for that one too — both are mid-transition sampling — b
 ⛔ **WHAT TO DO IF IT FIRES ON LANE B'S ROW:** it is almost certainly not Lane B's change. Read the
 failure before touching anything, and check `support/axe.ts`'s incident notes first.
 
+✅ **THE FLAG IS PROVED NOT BLIND, WITH A CONTROL — because the merge run could not prove it.** PR
+#206's E2E job read `551 passed + 10 skipped` with **no flaky line at all**, which means
+`failOnFlakyTests` was never exercised: a green run is exactly as green with the flag as without it,
+so "CI passed" is no evidence the flag does anything. That is this project's standing *"a gate nobody
+can tell is blind is a gate nobody is running"* shape, and Pint's probe is the precedent. So a
+throwaway spec that fails on attempt 0 and passes on attempt 1 was run against **the real
+`playwright.config.ts`**, imported rather than copied:
+
+| | reported | exit |
+|---|---|---|
+| `CI=1` (flag active) | `1 flaky` | **1 — RED** |
+| no `CI` (control, `--retries=1`) | `1 flaky` | **0 — GREEN** |
+
+Same test, same retry, **the same `1 flaky` line in both** — and the flag alone is the difference
+between red and the laundering this decision exists to stop. ⚠️ **Note what the control demonstrates
+second: `1 flaky` printed above a zero exit code is what every one of those green merge runs actually
+looked like.** The reporter was never hiding anything; nobody was reading the line.
+
 ⛔ **Ordering is load-bearing:** the flag lands in the *same* PR as the scan-timing fix and *after*
 it, so CI is never red on the way through.

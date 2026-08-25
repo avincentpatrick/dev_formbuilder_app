@@ -188,6 +188,27 @@ Per PRD Feature #5's Phase 2 acceptance criteria ("the user sees a clear per-sub
 
 A distinct fifth state exists only for the genuine-conflict case (Technical Architecture §4.2): **Needs review** — "We found a conflict with this submission" — surfaced with a dedicated resolution screen rather than folded into "Failed," since a 409 conflict is not a transient send failure and auto-retrying it would be silently wrong; resolving it is a manual, guided step (showing both the respondent's own answers and a summary of what conflicted) rather than an automatic merge, consistent with the plan's explicit deferral of CRDT-based automatic merge.
 
+> ⚠️ **SCOPED TO ONE RESPONDENT AS OF INCREMENT M15 (2026-08-26), AND THE SENTENCE ABOVE ALREADY SAID SO.**
+> "Every submission **the respondent** has finalized" is definite and singular, and this section was written
+> assuming one person per device — the words *session*, *shared* and *kiosk* appear nowhere in §7. The guest
+> runtime, however, mounts this list **above the phase machine on an unauthenticated page**, so on the shared
+> kiosk hardware `resources/public-runtime/lib/outbox.ts` names as its threat model the plain reading of
+> "on this device" had become "whoever used it last": the next respondent saw the previous one's queue tags,
+> server references and per-row statuses, and could permanently **discard** their unsent response.
+>
+> The identified list above is therefore **this respondent's own visit**. Everything from an earlier visit
+> collapses to the count-plus-action shape §7.3 already specifies for the persistent app-level surface —
+> a number, no queue tag, no reference, no form, no time, no per-row action. **Nothing is deleted**: an
+> earlier visit's unsent rows still drain in the background, which is what keeps §7.3's "never silently
+> dropped" true rather than merely stated. A visit is one visit to one tab, ended by "Submit another
+> response" or by ten minutes of inactivity.
+>
+> **The stated cost**: on a personal device, closing the PWA and reopening it tomorrow moves your own row
+> into that count line — you keep the count, "Sync now" and "Retry all", and lose the per-row reference and
+> Retry. §7.2 below promises the submission is not *lost*, which still holds exactly; it promises nothing
+> about rendering. Full reasoning, alternatives and revisit trigger:
+> `docs/adr/0021-respondent-scoped-device-outbox.md`.
+
 ### 7.2 Closing the app/browser with submissions still queued
 
 Because the outbox lives in IndexedDB — durable browser storage, not in-memory JavaScript state — **closing the tab, closing the installed PWA, or restarting the device does not lose a queued submission.** On the next app open (whether by relaunching the installed PWA or reopening the page), the outbox is read back from IndexedDB exactly as it was left, and:
@@ -203,6 +224,18 @@ A submission that reaches **Failed** (5 silent retries exhausted, per the Techni
 2. The **per-submission Failed row itself** (§7.1's list) carries the **Retry now** action, which re-enqueues that specific submission for an immediate attempt (bypassing the exponential backoff the automatic retries were following) and flips its visible status to **Syncing** while the attempt is in flight.
 
 A submission is never silently dropped from the outbox on failure — it remains visible and retryable indefinitely (or until the respondent explicitly discards it, an action requiring a confirmation step given the data-loss consequence) rather than disappearing after some retry ceiling, which would recreate exactly the "silent data loss" failure mode this whole offline architecture exists to prevent.
+
+> ⚠️ **M15 — "IT REMAINS VISIBLE AND RETRYABLE INDEFINITELY" IS NOW VISIBLE **TO THE RESPONDENT WHOSE ROW
+> IT IS**, AND RETRYABLE BY ANYONE.** The split follows what each action does: *retrying* a submission sends
+> it, which discloses nothing, destroys nothing and is what its author wanted — so "Retry all" and the
+> background drain stay device-wide and an earlier respondent's queue still empties from whoever picks the
+> device up next. *Showing* it names them, and *discarding* it destroys their data, so both are scoped to
+> the visit that created the row. The parenthetical above already assigned the discard to "**the
+> respondent**"; a stranger holding the device was never who it meant.
+>
+> Note also that item 1's own specification for the persistent banner is a **count plus a call to action**
+> ("1 submission couldn't be sent. Tap to review."), not the identified list — which is exactly the shape an
+> earlier visit's rows degrade to. See `docs/adr/0021-respondent-scoped-device-outbox.md`.
 
 ---
 

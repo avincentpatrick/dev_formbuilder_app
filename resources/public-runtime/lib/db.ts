@@ -55,6 +55,18 @@ export interface OutboxRow {
     device_id: string;
     app_version: string;
     /**
+     * Increment M15 — which VISIT to this device finalized this row, so the outbox surface can show a
+     * respondent their own submissions and not the previous respondent's. Un-indexed, so no
+     * `db.version()` bump, the same reasoning as `conflict_code` below; the list filters in JS over an
+     * already-ordered collection.
+     *
+     * ⚠️ NULL IS A REAL VALUE AND IT MEANS "NOT THIS VISIT". A row written before M15 has no session,
+     * and the safe reading of an unknown owner is *somebody else* — so it degrades to the anonymous
+     * count rather than being shown. Every reader must treat null as an EARLIER session, never as a
+     * wildcard that matches the current one. See `docs/adr/0021-respondent-scoped-device-outbox.md`.
+     */
+    respondent_session_id: string | null;
+    /**
      * Increment P3a — the server-draft baseline this submission was finalized against; null when no server
      * draft existed. Un-indexed, so no Dexie version bump (`docs/offline-first-sync-design.md` §3). A row
      * written by an older build simply has `undefined` here, which replays exactly as it did before P3a —

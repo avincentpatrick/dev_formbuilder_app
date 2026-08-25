@@ -50,6 +50,18 @@ export const DbKey: InjectionKey<MeridianDb> = Symbol('public-runtime-db');
 export const SyncOutboxKey: InjectionKey<SyncOutbox> = Symbol('public-runtime-sync-outbox');
 /** Offline media staging (Increment G8b), provided by App.vue; threaded into the media control's upload config. */
 export const OfflineMediaKey: InjectionKey<OfflineMediaStash> = Symbol('public-runtime-offline-media');
+/**
+ * Increment M15 — which VISIT to this device is on screen, provided by App.vue so a finalized submission is
+ * stamped with its owner and the outbox surface can show a respondent their own rows rather than the
+ * previous respondent's.
+ *
+ * ⚠️ A PLAIN STRING, PROVIDED RATHER THAN IMPORTED, AND THAT IS A TYPE-CHECK CONSTRAINT RATHER THAN A
+ * STYLE PREFERENCE. `lib/respondent-session.ts` reads `sessionStorage`; `sw.ts` imports `lib/db.ts` and
+ * `lib/replay.ts` → `lib/outbox.ts`, and `tsconfig.sw.json` re-checks that graph under
+ * `lib: ["ESNext", "WebWorker"], types: []`, where `Storage` does not exist. The id therefore crosses into
+ * the data layer as an argument. `DbKey` above is the same shape for the same kind of reason.
+ */
+export const RespondentSessionKey: InjectionKey<string> = Symbol('public-runtime-respondent-session');
 /** Open the conflict-review UX for the oldest parked conflict (Increment G8c), provided by App.vue for SyncStatus. */
 /**
  * Open the conflict-review flow. The uuid is OPTIONAL and, when given, names the row to review.

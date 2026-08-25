@@ -10,7 +10,14 @@ import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import OfflineIndicator from './components/OfflineIndicator.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
 import SyncStatus from './components/SyncStatus.vue';
-import { ConflictReviewKey, DbKey, OfflineMediaKey, SyncOutboxKey, UploadUrlKey } from './composables/context';
+import {
+    ConflictReviewKey,
+    DbKey,
+    OfflineMediaKey,
+    RespondentSessionKey,
+    SyncOutboxKey,
+    UploadUrlKey,
+} from './composables/context';
 import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
 import { createApiClient, resumeDraft } from './lib/api-client';
@@ -18,6 +25,7 @@ import { conflictCopy } from './lib/conflict-notice';
 import { openDb } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
 import { reconcileDraft, type LocalDraft } from './lib/reconcile';
+import { respondentSession, rotateRespondentSession } from './lib/respondent-session';
 import { uuidv7 } from './lib/uuid';
 import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
@@ -121,7 +129,18 @@ const sessionNow = isoClock(new Date());
 // (and, via the same DB name, with the service worker's Background-Sync replay). The slug scopes G8c conflict
 // resolution to rows this form's share-token client can resubmit.
 const db = openDb();
-const syncOutbox = createSyncOutbox(db, { slug: props.bootstrap.slug });
+
+// Increment M15 — WHICH VISIT IS AT THIS DEVICE, read once here for the same reason `initialSearch` and
+// `sessionNow` are read here: this is the composition root, and the modules below stay pure. The outbox
+// surface mounts above the phase machine on an unauthenticated page, so without this the next respondent
+// at a shared kiosk saw the previous one's queue tags, server references and Discard buttons.
+//
+// Module scope, so a version-drift remount or a conflict review keeps the visit the respondent started
+// under — the same reasoning `sessionNow` gives for not re-reading the clock per session.
+const respondentSessionId = respondentSession();
+
+const syncOutbox = createSyncOutbox(db, { slug: props.bootstrap.slug, sessionId: respondentSessionId });
+provide(RespondentSessionKey, respondentSessionId);
 provide(DbKey, db);
 provide(SyncOutboxKey, syncOutbox);
 provide(ConflictReviewKey, beginConflictReview);
@@ -435,7 +454,21 @@ function clearResolveState(): void {
     retainedAnswers.value = undefined;
 }
 
+/**
+ * "Submit another response" — and after Increment M15 this is also the deliberate kiosk hand-over.
+ *
+ * ⚠️ THE ROTATION HAPPENS BEFORE THE RELOAD, NOT AFTER IT, AND THE ORDER IS THE WHOLE POINT. The reload
+ * re-boots the SPA, which reads the visit id straight back out of `sessionStorage`; rotating afterwards
+ * would run in a context that is already being torn down. `rotateRespondentSession()` removes the marker
+ * rather than minting a replacement, so a reload that never happens cannot leave a fresh valid session
+ * sitting there for whoever picks the device up.
+ *
+ * This alone is NOT the containment — it depends on the respondent pressing something before they walk
+ * away, and walking away is the dominant kiosk path. The idle window in `lib/respondent-session.ts` is what
+ * covers that; this is the fast path for the person who does press it.
+ */
 function onRestart(): void {
+    rotateRespondentSession();
     window.location.reload();
 }
 </script>

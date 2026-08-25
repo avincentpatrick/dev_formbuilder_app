@@ -216,6 +216,24 @@ Not addressed by any prior doc: browser-enforced IndexedDB storage quotas are a 
 
 > If the same respondent/enumerator switches between two physical devices mid-collection (e.g., a phone dies, they continue on a tablet), **each device has its own independent IndexedDB — there is no live merge or handoff between them.** The "dominant single-device-per-respondent case" assumption `docs/architecture/technical-architecture.md` §4.2 already states for its last-write-wins policy means: starting the same logical submission on a second device produces a **second, independent** `client_submission_uuid`, not a continuation of the first device's draft. This is an accepted scope boundary (matching the plan's explicit CRDT deferral "unless concurrent multi-device editing proves common in practice"), stated here plainly so it isn't discovered as a surprise in the field rather than a documented limitation.
 
+> ⚠️ **INCREMENT M15 (2026-08-26) — THE ASSUMPTION ABOVE WAS LOAD-BEARING FOR SOMETHING IT NEVER CLAIMED TO
+> COVER, AND IS NOT ANY MORE.** *"The dominant single-device-per-respondent case"* is a statement about ONE
+> RESPONDENT AND TWO DEVICES — a phone dying mid-collection — and it is still exactly right about that. It
+> was silently doing a second job it was never written for: the client outbox surface read it as licence to
+> treat everything on a device as belonging to one person, and that surface mounts **above the phase machine
+> on an unauthenticated page**. On the shared kiosk hardware §3's own module docblock names as the threat,
+> the case is **TWO RESPONDENTS AND ONE DEVICE**, which is the exact inverse and which no document here had
+> ever addressed.
+>
+> Rows now carry `respondent_session_id` — an un-indexed field, so no Dexie `version()` bump, the same
+> precedent `conflict_code` and `server_reference` set. Every read that **discloses or destroys** is scoped
+> to the current visit; the **drain is deliberately not**, because `lib/replay.ts` and `sw.ts` call
+> `listPending`/`replayOutbox` with no session (a service worker has none) and scoping it would strand an
+> earlier respondent's response forever. See `docs/adr/0021-respondent-scoped-device-outbox.md`.
+>
+> Nothing above changes: two devices still produce two independent `client_submission_uuid`s, and the
+> last-write-wins policy is untouched.
+
 ---
 
 ## 9. Out of Scope / Deferred

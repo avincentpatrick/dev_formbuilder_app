@@ -9,9 +9,10 @@
  * Three things changed in I10d, each because the old shape stated or implied something untrue:
  *
  *  1. **It always renders.** The old `v-if` hid the whole surface on an empty queue, which took "Sync now"
- *     with it — and `docs/offline-first-sync-design.md:103` requires that action to be ALWAYS VISIBLE,
+ *     with it — and `docs/offline-first-sync-design.md:184` requires that action to be ALWAYS VISIBLE,
  *     because it is the documented fallback on platforms with weak Background Sync (notably iOS Safari),
- *     i.e. exactly the platforms where a row can be stuck with the queue looking idle.
+ *     i.e. exactly the platforms where a row can be stuck with the queue looking idle. (The citation read
+ *     `:103` until M15 and had drifted; `:103` is now an unrelated paragraph about `openapi.json`.)
  *  2. **The needs-attention row is no longer `role="alert"`.** Assertive was tolerable inside one form
  *     session; on a surface that now mounts on every screen it would interrupt the respondent on every page
  *     load and every phase transition for as long as one failed row exists. The scoped polite region below
@@ -23,6 +24,15 @@
  * Built from `Mds*` primitives (Standing Rule 2). That is not cosmetics here: the hand-rolled action button
  * this replaces was ~24px tall with no focus style, and `MdsButton` guarantees a ≥44×44px target and a
  * never-removed focus ring — so the conversion is a measurable accessibility fix.
+ *
+ * ── INCREMENT M15: "ON THIS DEVICE" NOW MEANS "ON THIS VISIT" ───────────────────────────────────────────
+ * Everything above is about being visible from every screen, and all of it still holds. What it never
+ * considered is that the page is UNAUTHENTICATED and the hardware is shared, so "visible from every screen"
+ * silently meant "visible to everyone who walks up". The identified list is now this respondent's own; an
+ * earlier visit's unsent rows collapse to a bare count, which is the shape `docs/ux/form-filling-ux-flow.md`
+ * §7.3 specifies for this surface anyway ("1 submission couldn't be sent. Tap to review."). The bar, the
+ * empty-state sentences and every selector are unchanged. Full reasoning:
+ * `docs/adr/0021-respondent-scoped-device-outbox.md`.
  */
 import { computed, inject } from 'vue';
 import { MdsBadge, MdsButton } from '@meridian/design-system';
@@ -36,6 +46,11 @@ const pending = computed(() => sync?.pending.value ?? 0);
 const needsAttention = computed(() => sync?.needsAttention.value ?? 0);
 const conflict = computed(() => sync?.conflict.value ?? 0);
 const conflictHere = computed(() => sync?.conflictHere.value ?? 0);
+// Increment M15 — this VISIT's counts drive everything the respondent reads; `pending`/`needsAttention`/
+// `conflict` above stay device-wide and drive the boot drain and the quota estimate. `earlierUnsent` is the
+// bare count of everybody else's unsent rows and is the only thing said about them.
+const mine = computed(() => sync?.mine.value ?? { pending: 0, needsAttention: 0, conflict: 0 });
+const earlierUnsent = computed(() => sync?.earlierUnsent.value ?? 0);
 const syncing = computed(() => sync?.syncing.value ?? false);
 const quotaWarning = computed(() => sync?.quotaWarning.value ?? null);
 const rows = computed(() => sync?.rows.value ?? []);
@@ -43,10 +58,18 @@ const syncingUuids = computed(() => sync?.syncingUuids.value ?? new Set<string>(
 const reviewingUuid = computed(() => sync?.reviewingUuid.value ?? null);
 const announcement = computed(() => sync?.lastAnnouncement.value ?? '');
 
-const unsent = computed(() => pending.value + needsAttention.value + conflict.value);
+const unsent = computed(() => mine.value.pending + mine.value.needsAttention + mine.value.conflict);
 
-/** Conflicts the respondent can see the count of but cannot act on from here. */
-const conflictElsewhere = computed(() => Math.max(0, conflict.value - conflictHere.value));
+/**
+ * Conflicts the respondent can see the count of but cannot act on from here.
+ *
+ * ⚠️ INCREMENT M15 CHANGED THE MINUEND AND THE SENTENCE WOULD HAVE GONE WRONG QUIETLY IF IT HAD NOT. It was
+ * `conflict - conflictHere`, i.e. device-wide minus this-form; with rows now belonging to visits, that
+ * difference counts a STRANGER's conflict and reports it as "needs review on another form" — sending a
+ * respondent looking for a row that is not theirs and that they will never find. The subtraction is between
+ * two numbers about the same person: this visit's conflicts anywhere, minus this visit's conflicts here.
+ */
+const conflictElsewhere = computed(() => Math.max(0, mine.value.conflict - conflictHere.value));
 
 function responses(n: number): string {
     return `${n} response${n === 1 ? '' : 's'}`;
@@ -54,6 +77,20 @@ function responses(n: number): string {
 
 const summary = computed(() => {
     if (unsent.value === 0) {
+        // ⚠️ INCREMENT M15 — THE "FROM THIS DEVICE" WORDING BECAME A CONTRADICTION AND ONLY A LOOK AT THE
+        // RUNNING PAGE SHOWED IT. With the list scoped to a visit, a second respondent with nothing of
+        // their own read "Nothing is waiting to be sent from this device." directly above "One response from
+        // an earlier session on this device is still waiting to send." Both sentences were individually
+        // defensible and together they were nonsense — the first is about THEM and the second about the
+        // DEVICE, and nothing on screen said so. No unit test could see it and no e2e assertion covers this
+        // string; it took rendering the hand-over at :8081.
+        //
+        // The original two sentences are kept verbatim for the case they were written for — a device with
+        // nothing on it at all — because there they are exactly true.
+        if (earlierUnsent.value > 0) {
+            return rows.value.length === 0 ? 'Nothing of yours is waiting to be sent.' : 'Everything of yours has been sent.';
+        }
+
         // "Everything has been sent" is FALSE for a first-time visitor who has sent nothing — and this surface
         // now renders on their very first screen. Distinguish the two empty cases.
         return rows.value.length === 0
@@ -69,6 +106,27 @@ const summary = computed(() => {
         ? `${base} ${conflictElsewhere.value} need${conflictElsewhere.value === 1 ? 's' : ''} review on another form.`
         : base;
 });
+
+/**
+ * Everything a second respondent is told about the first (Increment M15): a number, and no more.
+ *
+ * ⚠️ IT SAYS LESS THAN IT COULD, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. Not the queue tag, not the
+ * server reference, not which form, not when — every one of which the list above discloses for this visit's
+ * own rows and every one of which identifies a stranger on shared hardware. `docs/ux/form-filling-ux-flow.md`
+ * §7.3 specifies exactly this shape for the persistent app-level surface ("1 submission couldn't be sent.
+ * Tap to review."); §7.1's identified list is scoped to "the respondent", singular.
+ *
+ * It is not silent, because silence would be its own defect: "Sync now" is always visible and would have
+ * nothing to explain, an operator checking a device at the end of a field day needs to know something is
+ * still queued, and a stuck device must not look idle.
+ */
+const earlierNote = computed(() =>
+    earlierUnsent.value === 0
+        ? null
+        : earlierUnsent.value === 1
+          ? 'One response from an earlier session on this device is still waiting to send.'
+          : `${earlierUnsent.value} responses from earlier sessions on this device are still waiting to send.`,
+);
 
 function onRetry(uuid: string): void {
     void sync?.retryOne(uuid);
@@ -89,13 +147,24 @@ function onDiscard(uuid: string): void {
         <p id="sync-status-title" class="sync-status__title">My submissions on this device</p>
 
         <div class="sync-status__bar">
-            <MdsBadge v-if="pending > 0" variant="neutral" :label="`${pending} queued`" />
-            <MdsBadge v-if="needsAttention > 0" variant="warning" :label="`${needsAttention} failed`" />
-            <MdsBadge v-if="conflict > 0" variant="info" :label="`${conflict} ${conflict === 1 ? 'needs' : 'need'} review`" />
+            <MdsBadge v-if="mine.pending > 0" variant="neutral" :label="`${mine.pending} queued`" />
+            <MdsBadge v-if="mine.needsAttention > 0" variant="warning" :label="`${mine.needsAttention} failed`" />
+            <MdsBadge
+                v-if="mine.conflict > 0"
+                variant="info"
+                :label="`${mine.conflict} ${mine.conflict === 1 ? 'needs' : 'need'} review`"
+            />
 
             <MdsButton size="sm" variant="secondary" :loading="syncing" @click="sync.syncNow()">
                 {{ syncing ? 'Syncing…' : 'Sync now' }}
             </MdsButton>
+            <!--
+                Increment M15 — `needsAttention`, NOT `mine.needsAttention`, and that is the one control on
+                this bar that is deliberately device-wide. "Retry all" SENDS what is queued: it discloses
+                nothing and destroys nothing, and an earlier respondent's failed row draining from whoever
+                picks the device up next is the outcome they wanted. Scoping it would strand their response
+                and buy no privacy at all. `lib/outbox.ts`'s `retryAll` carries the same note.
+            -->
             <MdsButton
                 v-if="needsAttention > 0"
                 size="sm"
@@ -117,6 +186,7 @@ function onDiscard(uuid: string): void {
         </div>
 
         <p class="sync-status__summary">{{ summary }}</p>
+        <p v-if="earlierNote" class="sync-status__earlier">{{ earlierNote }}</p>
         <p v-if="quotaWarning" class="sync-status__quota">{{ quotaWarning }}</p>
 
         <!--
@@ -124,6 +194,11 @@ function onDiscard(uuid: string): void {
             manual "Sync now" to be always visible — it says nothing about the list, and rendering "Nothing
             waiting" above every screen of a first online visit is noise the respondent has to read past
             before reaching the form. The summary line already states the empty case in one sentence.
+        -->
+        <!--
+            `rows` is this VISIT's rows after M15, so the list itself needed no change: it simply receives
+            fewer. That is why every selector the e2e locates — `.outbox__ref`, `.outbox__detail`, the
+            per-row actions — is untouched by this increment.
         -->
         <SubmissionOutbox
             v-if="rows.length > 0"
@@ -147,7 +222,26 @@ function onDiscard(uuid: string): void {
 </template>
 
 <style scoped>
+/*
+ * Increment M15 — `position: relative` IS A FIX, NOT A LINT APPEASEMENT, and it is the other half of a
+ * paired change (Standing Rule 7(b-bis)).
+ *
+ * `.sync-status__sr` below is `position: absolute` + `clip: rect(0 0 0 0)`, and this file positioned nothing
+ * else — so that live region resolved its containing block outside the component entirely, against whatever
+ * ancestor happened to be positioned or, here, against the initial containing block. A clipped node with no
+ * containing block inside its own component contributes to the DOCUMENT's scrollable box rather than its
+ * own, which is how a 1px announcer comes to add real page scroll. Four increments of this repository's
+ * history are in `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts`, which listed
+ * this file in `KNOWN_UNGUARDED` and asserts that list EXACTLY — so the entry is deleted in the same PR as
+ * this declaration, which is what that gate was built to force.
+ *
+ * The verification that list asks for was done rather than assumed: `relative` also makes this element the
+ * containing block for any absolutely-positioned descendant and establishes a stacking context. The only
+ * absolutely-positioned descendant is the sr-only region itself, which is the node that wanted one; the
+ * children are `MdsBadge`, `MdsButton` and `SubmissionOutbox`, none of which positions anything.
+ */
 .sync-status {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--mds-space-2);
@@ -173,6 +267,7 @@ function onDiscard(uuid: string): void {
 }
 
 .sync-status__summary,
+.sync-status__earlier,
 .sync-status__quota {
     margin: 0;
     font-family: var(--mds-font-family-body);

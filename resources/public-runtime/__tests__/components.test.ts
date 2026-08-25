@@ -1000,6 +1000,25 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
             fields: [field({ key: 'name', label: 'Full name' })],
         });
 
+    /**
+     * ⚠️ `settle()`'s FIXED FIVE MACROTASK TICKS ARE NOT ENOUGH HERE, AND THE FLAKE PROVED IT RATHER THAN
+     * THEORY. Every case below drives a submit, which awaits a Dexie enqueue BEFORE the network call and a
+     * `discardRow` after it; under load that chain occasionally outlasts the ticks, and the assertion then
+     * read `undefined` on a component that was about to emit. One case in three failed that way — a real
+     * defect in the test, not a run to re-roll until it passes. Waiting for the emit makes the case
+     * deterministic without weakening what it asserts.
+     */
+    async function waitForEmit(wrapper: { emitted: (e: string) => unknown[] | undefined }, event: string): Promise<void> {
+        await vi.waitFor(
+            () => {
+                if (wrapper.emitted(event) === undefined) {
+                    throw new Error(`no ${event} emit yet`);
+                }
+            },
+            { timeout: 3000, interval: 10 },
+        );
+    }
+
     function rejecting(code: string, message: string): () => never {
         return () => {
             throw new ApiError(normalizeError(409, { error: { code, message } }));
@@ -1019,6 +1038,7 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
         await wrapper.find('input').setValue('Ada');
         await wrapper.find('form').trigger('submit');
         await settle();
+        await waitForEmit(wrapper, 'redraft');
 
         expect(wrapper.emitted('redraft')?.[0]).toEqual([{ resumeToken: 'rt-boot' }]);
         // NOT the drift path — the schema was never in question, and asking for it again is what made the
@@ -1058,6 +1078,47 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
         await settle();
         await wrapper.findAll('button').filter((b) => b.text().includes('Save and finish later'))[0].trigger('click');
         await settle();
+        await waitForEmit(wrapper, 'redraft');
+
+        expect(wrapper.emitted('redraft')?.[0]).toEqual([{ resumeToken: 'rt-from-save' }]);
+
+        wrapper.unmount();
+    });
+
+    it('hands the SAVE channel’s token to the SUBMIT channel, which is the only thing either fold shares', async () => {
+        // ⚠️ THIS CASE EXISTS BECAUSE THE MUTATION MATRIX SAID IT HAD TO. Reverting the save fold's routing
+        // (M6) and deleting the token capture (M8) reddened the IDENTICAL single case, which means that case
+        // was pinning "the save path emits redraft" and "the token is kept" as ONE observable — nothing could
+        // tell the two apart, exactly the shape this project has recorded before.
+        //
+        // They separate here: the token is minted by a SAVE and spent by a SUBMIT. Deleting the capture
+        // reddens this; changing the save fold's routing does not, because this refusal arrives on the other
+        // channel entirely. It also pins the property that actually matters to a respondent — one that fills
+        // in, saves for later, comes back and submits, all on one device, and never sees a resume link.
+        const client = fakeClient({
+            saveDraft: vi.fn(async () => ({
+                id: SUBMISSION_ID,
+                completenessPercent: 50,
+                resumeToken: 'rt-from-save',
+                resumeUrl: 'https://acme.test/f/resume/rt-from-save',
+                expiresAt: '',
+                contentChecksum: 'sum-1',
+            })),
+            submit: vi.fn(rejecting('draft_conflict', 'This draft was updated on another device.')),
+        });
+        const wrapper = mount(RuntimeSession, {
+            props: { schema: conflictSchema(), bootstrap: { ...bootstrap, resumeToken: '' }, client },
+        });
+        await settle();
+
+        // Save first, so the only token in the session is the one the save returned.
+        await wrapper.findAll('button').filter((b) => b.text().includes('Save and finish later'))[0].trigger('click');
+        await settle();
+
+        await wrapper.find('input').setValue('Ada');
+        await wrapper.find('form').trigger('submit');
+        await settle();
+        await waitForEmit(wrapper, 'redraft');
 
         expect(wrapper.emitted('redraft')?.[0]).toEqual([{ resumeToken: 'rt-from-save' }]);
 
@@ -1079,6 +1140,7 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
         await wrapper.find('input').setValue('Ada');
         await wrapper.find('form').trigger('submit');
         await settle();
+        await waitForEmit(wrapper, 'reschema');
 
         expect(wrapper.emitted('reschema')?.[0]).toEqual([
             expect.objectContaining({ conflictCode: 'submission_conflict' }),
@@ -1101,6 +1163,7 @@ describe('RuntimeSession — the 409 a respondent is told the truth about (Incre
         await wrapper.find('input').setValue('Ada');
         await wrapper.find('form').trigger('submit');
         await settle();
+        await waitForEmit(wrapper, 'reschema');
 
         expect(client.remint).toHaveBeenCalled();
         expect(wrapper.emitted('reschema')?.[0]).toEqual([expect.objectContaining({ conflictCode: null })]);

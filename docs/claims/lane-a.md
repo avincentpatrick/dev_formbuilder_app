@@ -16,9 +16,75 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: NO ACTIVE CLAIM
+## CLAIMED — the horizontal-overflow assertion is structurally inert (`m17-overflow-gate`)
 
-Lane A holds nothing. M16 is merged; M17 (the horizontal-overflow gate) is **not yet claimed**.
+Opened: 2026-08-26, cut from `origin/main` at `e5fe62e`.
+
+Row: `docs/feature-backlog.md:502` — *"`major` · THE END-TO-END HORIZONTAL-OVERFLOW ASSERTION IS
+STRUCTURALLY INERT ON EVERY `AppLayout` PAGE — IT CANNOT FAIL, AND HAS NOT BEEN ABLE TO SINCE THE
+CLIP LANDED."* The review that filed it calls this **"the single most valuable output of the review:
+it invalidates a gate this project has been trusting."**
+
+**Files:** `tests/e2e/support/axe.ts` · `tests/e2e/builder-axe.spec.ts` ·
+`tests/e2e/responsive-axe.spec.ts` · `docs/feature-backlog.md` · `PROGRESS.md` (Lane A's block only).
+⚠️ **`resources/js/components/domains/DnsRecordBlock.vue` is claimed for the MUTATION ONLY** — it is
+Lane A's outright under 7(b), it is edited to prove the gate can fail, and **it is reverted before
+the PR opens.** Claimed anyway, because a file that gets written to is a file another lane must not
+be holding, whatever my intention for it.
+
+**Shared artefacts taken:** the three `tests/e2e/` files ("claim first" in 7(b)) and
+`docs/feature-backlog.md`. **`playwright.config.ts` is NOT taken** — M16 spent it and this row needs
+nothing from it.
+
+**Paired files taken:** none. No `clip: rect(0 0 0 0)` is added or removed, so
+`clipped-node-containment.test.ts` cannot fire; ⚠️ **and Lane B's M15 is holding that file right now**
+(its `KNOWN_UNGUARDED` shrinks with `SyncStatus.vue` in the same PR), which is exactly the collision
+this claim exists to avoid. No `NotificationType` and no ability key moves.
+
+**Namespaces spent:** nothing from either. No migration, no ADR — **`0022` stays free** and `0021`
+stays Lane B's. The invariant lands in the gate files' own comments, replacing ~40 lines that
+currently assert the opposite.
+
+### What is already measured, so the plan is not built on the row's own framing
+
+⛔ **THE ROW'S PROOF MUTATION IS INERT AND CANNOT BE USED.** It offers *"delete `min-width: 0` from
+the leaderboard name cell (`achievements/Index.vue:452-459`) and every scan still passes"* as its
+evidence. That rule **also** carries `overflow: hidden`, which already resolves `min-width: auto` to
+0, so the declaration is redundant: **343/343 with it and without it**, measured in Chromium. The
+scan passing is the *correct* result, not a symptom. **The gate is still inert — but that is proven
+structurally by the clip, not by this demonstration, and the row's evidence was never evidence.**
+
+✅ **THE SUBSTITUTE, MEASURED AT 268px AGAINST A 1px TOLERANCE** (~90×, against the 3px the
+achievements rule manages even with `overflow: hidden` removed): delete `overflow-wrap: anywhere`
+from `.dns__code` (`DnsRecordBlock.vue:127`) and scan `/domains` at 375px. Its own comment states why
+it is load-bearing — *"The token has no break opportunities of its own"* — `E2eSeeder.php:1017-1047`
+guarantees a **64-hex** `verification_token` on an **unverified** domain (the state that renders the
+block), and `/domains` is already in the 16-page list. ⚠️ **`min-width: 0` sits beside it there too;
+check which half is load-bearing rather than assuming, because that is precisely the shape that made
+the achievements mutation a no-op.**
+
+✅ **RECONNAISSANCE: 11 pages × 3 viewports, `.app-shell__content` overflow of 0 EVERYWHERE.** The
+fixed gate reddens nothing that exists today — including the `Checklist` 44px `::before` overhang on
+`/dashboard`, which `Checklist.vue:222-246` warns about by name and which was the top false-positive
+risk. `.app-shell__content` is present on every page, so a selector-drift guard is not vacuous.
+
+### Prediction, written before the run
+
+- **Vitest 129/2,175 · axe 42/299 · Pest 4515/19,161 · PHPStan · four lint gates · `openapi.json`**
+  unmoved. ⚠️ **Unless M15 lands first**, which moves `public-runtime` to ~35/765 and the total to
+  ~130/~2,196 — **so the Vitest number is re-measured against whatever `origin/main` says at the
+  time, never against 129.**
+- **E2E `551 passed + 10 skipped`, no flaky line, and no new test count** — the change is to an
+  assertion inside existing tests, not new cases.
+- ⚠️ **The prediction I most expect to be wrong: that CI agrees with my local survey that nothing
+  overflows.** CI renders at a different DPI with different fonts, and the survey ran against
+  `DemoSeeder`-plus-`E2eSeeder` data on a slow local stack. **A page CI flags and my survey did not
+  is a real defect this gate was built to find, not a false positive — file or fix it, do not widen
+  the tolerance.**
+
+---
+
+## RELEASED — the share panel scans mid-transition (merged as PR #206, `9fb1bed`, 6/6 green)
 
 **Namespaces after M16:** nothing spent. ⚠️ **ADR `0021` is LANE B's** (M15's
 `0021-respondent-scoped-device-outbox.md`), so **next free overall is `0022`** and Lane A's block is
@@ -27,7 +93,6 @@ Lane A holds nothing. M16 is merged; M17 (the horizontal-overflow gate) is **not
 
 ---
 
-## RELEASED — the share panel scans mid-transition (merged as PR #206, `9fb1bed`, 6/6 green)
 
 **Every claimed file was edited; none was released untouched** — the M8/M11 shape did not recur — and
 **the claim was never extended.** Both `docs/` files, `playwright.config.ts`, `support/axe.ts` and

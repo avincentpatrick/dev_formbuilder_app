@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type MeridianDb } from '../lib/db';
+import { attachToSubmission, stash } from '../lib/media-queue';
 import {
     counts,
+    countsFor,
     discardRow,
+    earlierUnsent,
     enqueue,
     listConflicts,
     listPending,
@@ -21,6 +24,10 @@ import {
 let n = 0;
 let db: MeridianDb;
 
+/** Increment M15 — two visits to one device, named so the assertions read as what they are. */
+const MINE = 'visit-mine';
+const THEIRS = 'visit-theirs';
+
 function input(uuid: string, over: Partial<EnqueueInput> = {}): EnqueueInput {
     return {
         client_submission_uuid: uuid,
@@ -31,6 +38,10 @@ function input(uuid: string, over: Partial<EnqueueInput> = {}): EnqueueInput {
         locale: 'en',
         device_id: 'dev',
         app_version: 'test',
+        // Increment M15 — rows default to THIS visit, because almost every case below is about what the
+        // current respondent can see or do. A case about a stranger passes `respondent_session_id: THEIRS`
+        // (or null, a pre-M15 row) and says so.
+        respondent_session_id: MINE,
         ...over,
     };
 }
@@ -208,7 +219,7 @@ describe('outbox (I10d)', () => {
             await enqueue(db, input(uuid));
         }
 
-        expect(await listSubmissions(db, 2)).toHaveLength(2);
+        expect(await listSubmissions(db, { limit: 2 })).toHaveLength(2);
     });
 
     it('pruneSynced keeps the most recent receipts and drops the rest', async () => {
@@ -307,5 +318,158 @@ describe('outbox — a delivered row is terminal (I10d review fix)', () => {
 
         expect((await db.outbox.get('u1'))?.status).toBe('conflict');
         expect((await db.outbox.get('u1'))?.attempts).toBe(1);
+    });
+});
+
+describe('respondent scope (Increment M15)', () => {
+    it('listSubmissions shows THIS visit and hides the previous respondent entirely', async () => {
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const rows = await listSubmissions(db, { sessionId: MINE });
+
+        expect(rows.map((r) => r.client_submission_uuid)).toEqual(['mine']);
+    });
+
+    it('treats a PRE-M15 row (null session) as an earlier visit, never as a wildcard', async () => {
+        // The safe reading of an unknown owner is "not yours". Getting this backwards would leave every row
+        // written before this increment visible to everybody, which is the defect rather than a migration.
+        await enqueue(db, input('legacy', { respondent_session_id: null }));
+
+        expect(await listSubmissions(db, { sessionId: MINE })).toEqual([]);
+        expect(await earlierUnsent(db, MINE)).toBe(1);
+    });
+
+    it('fills a full page past a stranger newer rows — the filter runs BEFORE the limit', async () => {
+        // Post-filtering a limited page returns fewer than the limit, so a respondent's own older rows would
+        // hide behind a stranger's newer ones. Three of theirs are newest; a limit of two must still find
+        // two of mine rather than nothing.
+        await enqueue(db, input('mine-1'));
+        await enqueue(db, input('mine-2'));
+        for (const uuid of ['theirs-1', 'theirs-2', 'theirs-3']) {
+            await enqueue(db, input(uuid, { respondent_session_id: THEIRS }));
+        }
+
+        expect(await listSubmissions(db, { sessionId: MINE, limit: 2 })).toHaveLength(2);
+    });
+
+    it("REFUSES to discard another visit's row, and the refusal is at the write", async () => {
+        // Not "the button is hidden": anything holding a uuid reaches `discardRow`, and this deletes the
+        // row AND its queued media in one transaction. Hiding the list without this leaves the harm.
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+        await stash(db, {
+            attachment_local_id: 'blob-1',
+            field_key: 'photo',
+            blob: new Blob(['x']),
+            name: 'x.png',
+            mime: 'image/png',
+            size: 1,
+        });
+        await attachToSubmission(db, ['blob-1'], 'theirs');
+
+        expect(await discardRow(db, 'theirs', MINE)).toBe(false);
+        expect(await db.outbox.get('theirs')).toBeDefined();
+        expect(await db.media_queue.count()).toBe(1);
+    });
+
+    it("still discards THIS visit's own row", async () => {
+        await enqueue(db, input('mine'));
+
+        expect(await discardRow(db, 'mine', MINE)).toBe(true);
+        expect(await db.outbox.get('mine')).toBeUndefined();
+    });
+
+    it('refuses to discard a row that does not exist, rather than reporting success', async () => {
+        expect(await discardRow(db, 'nope', MINE)).toBe(false);
+    });
+
+    it("listConflicts scopes to the visit, so review cannot open a stranger's answers", async () => {
+        // This is the sharpest of the leaks: `conflictRow` returns the row UNSCRUBBED and App.vue seeds a
+        // fill session with `row.answers`, so opening one renders the previous respondent's answers field
+        // by field.
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+        await markConflict(db, 'mine', 'e');
+        await markConflict(db, 'theirs', 'e');
+
+        expect((await listConflicts(db, 's', MINE)).map((r) => r.client_submission_uuid)).toEqual(['mine']);
+        // Unscoped stays device-wide: the pre-M15 call shape relies on it.
+        expect(await listConflicts(db, 's')).toHaveLength(2);
+    });
+
+    it('earlierUnsent counts every unsent status of every OTHER visit, and no receipts', async () => {
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('t-pending', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('t-failed', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('t-conflict', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('t-sent', { respondent_session_id: THEIRS }));
+        await markNeedsAttention(db, 't-failed', 'e');
+        await markConflict(db, 't-conflict', 'e');
+        await markSynced(db, 't-sent', 'srv');
+
+        // Three unsent. The delivered one is not waiting for anything, and M15 prunes it besides.
+        expect(await earlierUnsent(db, MINE)).toBe(3);
+    });
+
+    it('countsFor answers the badges for THIS visit while counts() stays device-wide', async () => {
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs-1', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('theirs-2', { respondent_session_id: THEIRS }));
+
+        expect(await countsFor(db, MINE)).toEqual({ pending: 1, needsAttention: 0, conflict: 0 });
+        // The device-wide number is load-bearing for the boot drain and the storage-quota estimate.
+        expect(await counts(db)).toEqual({ pending: 3, needsAttention: 0, conflict: 0 });
+    });
+
+    it('the DRAIN stays device-wide, so an earlier respondent is never stranded', async () => {
+        // `replay.ts` and `sw.ts` call listPending with no session — a service worker has none. Scoping it
+        // would leave a stranger's queued response undeliverable forever, which is the silent data loss the
+        // whole offline architecture exists to prevent.
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        expect((await listPending(db)).map((r) => r.client_submission_uuid)).toEqual(['theirs']);
+
+        await markNeedsAttention(db, 'theirs', 'e');
+        await retryAll(db);
+
+        expect((await db.outbox.get('theirs'))?.status).toBe('pending');
+    });
+
+    it("pruneSynced drops an earlier visit's RECEIPT, which can never be shown or counted again", async () => {
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+        await markSynced(db, 'theirs', 'srv');
+
+        expect(await pruneSynced(db, Date.now(), MINE)).toBe(1);
+        expect(await db.outbox.get('theirs')).toBeUndefined();
+    });
+
+    it("NEVER drops an earlier visit's UNSENT row, at any age — containment, not deletion", async () => {
+        // The one line M15 did not move. A stranger's unsent response is hidden from this respondent and
+        // still drains in the background; a reaper that ate it would be the worst bug in that file.
+        await enqueue(db, input('t-pending', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('t-failed', { respondent_session_id: THEIRS }));
+        await enqueue(db, input('t-conflict', { respondent_session_id: THEIRS }));
+        await markNeedsAttention(db, 't-failed', 'e');
+        await markConflict(db, 't-conflict', 'e');
+
+        // A year later, and with a different visit doing the pruning.
+        expect(await pruneSynced(db, Date.now() + 365 * 24 * 60 * 60 * 1000, MINE)).toBe(0);
+        expect(await db.outbox.count()).toBe(3);
+    });
+
+    it("keeps this visit's newest receipt even when a stranger has twenty of their own", async () => {
+        // The count cap is measured against MY receipts, not the raw list: otherwise twenty of someone
+        // else's would push my own out of view before it was ever mine to lose.
+        for (let i = 0; i < 20; i += 1) {
+            await enqueue(db, input(`theirs-${i}`, { respondent_session_id: THEIRS }));
+            await markSynced(db, `theirs-${i}`, 'srv');
+        }
+        await enqueue(db, input('mine'));
+        await markSynced(db, 'mine', 'srv');
+
+        await pruneSynced(db, Date.now(), MINE);
+
+        expect(await db.outbox.get('mine')).toBeDefined();
+        expect(await db.outbox.count()).toBe(1);
     });
 });

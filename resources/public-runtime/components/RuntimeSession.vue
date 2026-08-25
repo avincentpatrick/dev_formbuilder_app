@@ -21,6 +21,7 @@ import {
     AnnouncerKey,
     DbKey,
     DraftFlowKey,
+    RespondentSessionKey,
     RuntimeKey,
     SubmitFlowKey,
     SyncOutboxKey,
@@ -117,6 +118,10 @@ provide(AnnouncerKey, announcer);
 const db = inject(DbKey) ?? openDb();
 const sync = inject(SyncOutboxKey, null);
 const deviceId = getDeviceId();
+// Increment M15 — provided by App.vue (see `RespondentSessionKey` for why it is injected, not imported).
+// Null only in a test that mounts this component bare; a row stamped null reads as an earlier visit, which
+// is the safe direction.
+const respondentSessionId = inject(RespondentSessionKey, null);
 
 const autosave = createAutosave({
     db,
@@ -303,6 +308,10 @@ async function submit(): Promise<SubmitOutcome> {
         locale: runtime.locale.value,
         device_id: deviceId,
         app_version: APP_VERSION,
+        // Increment M15 — WHOSE visit this row belongs to, stamped at the one place a row is ever created.
+        // `device_id` above answers "which machine collected this" and deliberately outlives everybody;
+        // this answers "who was standing here", which is what the outbox surface needs and never had.
+        respondent_session_id: respondentSessionId,
         // Increment P3a — freeze the baseline INTO the queued row, so a replay hours from now makes the same
         // claim this submit would have made live. Null on an ordinary fill that never created a server draft.
         base_content_checksum: draftBaseline.value,

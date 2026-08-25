@@ -8,6 +8,10 @@ let n = 0;
 let db: MeridianDb;
 const drivers: SyncOutbox[] = [];
 
+/** Increment M15 — two visits to one shared device. */
+const MINE = 'visit-mine';
+const THEIRS = 'visit-theirs';
+
 function res(status: number, body: unknown): Response {
     const r = { ok: status >= 200 && status < 300, status, headers: new Headers(), json: async () => body, clone: () => r };
     return r as unknown as Response;
@@ -23,7 +27,9 @@ function okFetch(): typeof fetch {
         if (url.startsWith('/api/v1/public/f/') && !url.includes('/submissions')) {
             return res(200, { data: schemaResponse({ fields: [field({ key: 'a' })], versionId: 'v1' }) });
         }
-        return res(201, { data: { id: 'srv-1', status: 'submitted' } });
+        // Increment M15 — a `reference` so the live-region announcement can be asserted at all; before
+        // this the stub omitted one and every settle announced the reference-free sentence.
+        return res(201, { data: { id: 'srv-1', status: 'submitted', reference: 'REF-1' } });
     });
     return fetchFn as unknown as typeof fetch;
 }
@@ -38,21 +44,36 @@ function fakeEnv({ online = true, usage = 0, quota = 0 }: { online?: boolean; us
     return { nav, win, doc, fire: (t: string) => (listeners[t] ?? []).forEach((h) => h()) };
 }
 
-function input(uuid: string, slug = 's'): EnqueueInput {
+function input(uuid: string, over: Partial<EnqueueInput> = {}): EnqueueInput {
     return {
         client_submission_uuid: uuid,
-        slug,
+        slug: 's',
         form_version_id: 'v1',
         checksum: 'c1',
         answers: { a: '1' },
         locale: 'en',
         device_id: 'dev',
         app_version: 'test',
+        // Increment M15 — this visit by default; a case about the previous respondent passes THEIRS.
+        respondent_session_id: MINE,
+        ...over,
     };
 }
 
-function makeDriver(env: ReturnType<typeof fakeEnv>, fetchFn: typeof fetch, slug?: string): SyncOutbox {
-    const driver = createSyncOutbox(db, { slug, fetch: fetchFn, navigator: env.nav, window: env.win, document: env.doc });
+function makeDriver(
+    env: ReturnType<typeof fakeEnv>,
+    fetchFn: typeof fetch,
+    slug?: string,
+    sessionId?: string,
+): SyncOutbox {
+    const driver = createSyncOutbox(db, {
+        slug,
+        sessionId,
+        fetch: fetchFn,
+        navigator: env.nav,
+        window: env.win,
+        document: env.doc,
+    });
     drivers.push(driver);
     return driver;
 }
@@ -105,9 +126,9 @@ describe('createSyncOutbox', () => {
     });
 
     it('nextConflict returns the oldest conflict scoped to the current form slug (Increment G8c)', async () => {
-        await db.outbox.put({ ...(await enqueue(db, input('old', 's'))), created_at: '2026-01-01T00:00:00.000Z' });
-        await db.outbox.put({ ...(await enqueue(db, input('new', 's'))), created_at: '2026-12-01T00:00:00.000Z' });
-        await enqueue(db, input('other', 'elsewhere'));
+        await db.outbox.put({ ...(await enqueue(db, input('old', { slug: 's' }))), created_at: '2026-01-01T00:00:00.000Z' });
+        await db.outbox.put({ ...(await enqueue(db, input('new', { slug: 's' }))), created_at: '2026-12-01T00:00:00.000Z' });
+        await enqueue(db, input('other', { slug: 'elsewhere' }));
         await markConflict(db, 'old', 'e');
         await markConflict(db, 'new', 'e');
         await markConflict(db, 'other', 'e');
@@ -118,14 +139,14 @@ describe('createSyncOutbox', () => {
     });
 
     it('nextConflict is null when there are no conflicts for this form', async () => {
-        await enqueue(db, input('other', 'elsewhere'));
+        await enqueue(db, input('other', { slug: 'elsewhere' }));
         await markConflict(db, 'other', 'e');
         const driver = makeDriver(fakeEnv({ online: false }), okFetch(), 's');
         expect(await driver.nextConflict()).toBeNull();
     });
 
     it('discardSubmission drops the row, its media, and refreshes the count (Increment G8c)', async () => {
-        await enqueue(db, input('c', 's'));
+        await enqueue(db, input('c', { slug: 's' }));
         await db.media_queue.put({
             attachment_local_id: 'm1',
             client_submission_uuid: 'c',
@@ -217,5 +238,118 @@ describe('createSyncOutbox (I10d)', () => {
 
         expect(driver.quotaWarning.value).toContain('1 response');
         expect(driver.quotaWarning.value).toContain('MB');
+    });
+});
+
+describe('createSyncOutbox — respondent scope (Increment M15)', () => {
+    it('shows the current visit its own rows and reduces the previous one to a bare count', async () => {
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const driver = makeDriver(fakeEnv(), vi.fn() as unknown as typeof fetch, 's', MINE);
+        await driver.refresh();
+
+        expect(driver.rows.value.map((r) => r.client_submission_uuid)).toEqual(['mine']);
+        expect(driver.mine.value).toEqual({ pending: 1, needsAttention: 0, conflict: 0 });
+        expect(driver.earlierUnsent.value).toBe(1);
+    });
+
+    it('keeps `pending` DEVICE-WIDE, because the boot drain and the quota estimate are about the device', async () => {
+        await enqueue(db, input('mine'));
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const driver = makeDriver(fakeEnv(), vi.fn() as unknown as typeof fetch, 's', MINE);
+        await driver.refresh();
+
+        // Two numbers about two different questions, and both are needed: a session-scoped `pending` would
+        // leave the previous respondent's queue undrained and their storage pressure unreported.
+        expect(driver.pending.value).toBe(2);
+        expect(driver.mine.value.pending).toBe(1);
+    });
+
+    it("refuses to open another visit's conflict, at both entry points into the review flow", async () => {
+        // `nextConflict()` is the banner Review, `conflictRow(uuid)` is the per-row one. Both hand the row
+        // to App.vue, which seeds a fill session with `row.answers` — so a miss here renders the previous
+        // respondent's answers on screen, field by field.
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+        await markConflict(db, 'theirs', 'boom');
+
+        const driver = makeDriver(fakeEnv(), vi.fn() as unknown as typeof fetch, 's', MINE);
+        await driver.refresh();
+
+        expect(await driver.nextConflict()).toBeNull();
+        expect(await driver.conflictRow('theirs')).toBeNull();
+        expect(driver.conflictHere.value).toBe(0);
+    });
+
+    it("refuses to discard another visit's row and reports the refusal", async () => {
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const driver = makeDriver(fakeEnv(), vi.fn() as unknown as typeof fetch, 's', MINE);
+
+        expect(await driver.discardSubmission('theirs')).toBe(false);
+        expect(await db.outbox.get('theirs')).toBeDefined();
+    });
+
+    it("never speaks another visit's server reference into the live region", async () => {
+        // The region is `aria-live`, the drain is device-wide by design, and a row queued by the PREVIOUS
+        // respondent settles while the current one is on screen — so a screen reader at a kiosk would read
+        // out a stranger's reference unprompted. It still announces; it just names nobody.
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const env = fakeEnv();
+        const driver = makeDriver(env, okFetch(), 's', MINE);
+        await driver.syncNow();
+
+        expect(driver.lastAnnouncement.value).toBe('Response sent');
+        expect(driver.lastAnnouncement.value).not.toContain('REF-1');
+    });
+
+    it("still speaks THIS visit's reference, which is the whole point of the region", async () => {
+        await enqueue(db, input('mine'));
+
+        const env = fakeEnv();
+        const driver = makeDriver(env, okFetch(), 's', MINE);
+        await driver.refresh();
+        await driver.syncNow();
+
+        expect(driver.lastAnnouncement.value).toBe('Response sent — reference REF-1');
+    });
+
+    it('drains the previous respondent queue rather than stranding it, then keeps no receipt', async () => {
+        // Containment is not deletion and not abandonment: their response still SENDS, from whoever picks
+        // the device up next, because the drain is device-wide.
+        //
+        // ⚠️ AND THE ROW IS THEN GONE, WHICH IS THE DESIGN AND NOT A LEAK IN THE TEST. The first version of
+        // this case asserted `status === 'synced'` and failed with `undefined`: the row delivered and
+        // `pruneSynced` dropped it in the same `refresh()`, because a delivered receipt belonging to an
+        // earlier visit can never be rendered or counted again and holding a server reference for it on
+        // shared hardware buys nothing. So the assertion is on the POST having happened, not on residue.
+        await enqueue(db, input('theirs', { respondent_session_id: THEIRS }));
+
+        const fetchFn = okFetch();
+        const driver = makeDriver(fakeEnv(), fetchFn, 's', MINE);
+        await driver.syncNow();
+
+        const posted = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls.filter((call) =>
+            String(call[0]).includes('/submissions'),
+        );
+
+        expect(posted).toHaveLength(1);
+        expect(await db.outbox.get('theirs')).toBeUndefined();
+    });
+
+    it('behaves exactly as it did before M15 when no session is supplied', async () => {
+        // The pre-M15 call shape is still valid and still device-wide, which is what every existing case in
+        // this file exercises.
+        await enqueue(db, input('a'));
+        await enqueue(db, input('b', { respondent_session_id: THEIRS }));
+
+        const driver = makeDriver(fakeEnv(), vi.fn() as unknown as typeof fetch, 's');
+        await driver.refresh();
+
+        expect(driver.rows.value).toHaveLength(2);
+        expect(driver.mine.value).toEqual({ pending: 2, needsAttention: 0, conflict: 0 });
+        expect(driver.earlierUnsent.value).toBe(0);
     });
 });

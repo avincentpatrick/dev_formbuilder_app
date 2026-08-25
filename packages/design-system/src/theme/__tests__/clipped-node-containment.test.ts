@@ -59,14 +59,23 @@ const RULE = /([^{}]+)\{([^{}]*)\}/g;
  * that owns them. The app-tree file no longer matches the clip idiom at all. This is the first entry ever
  * removed, and the shape of the removal is the one the note above asks for: the defect left, rather than
  * the list being edited to stop noticing it.
+ *
+ * ✅ AND AGAIN IN M15, WHICH IS THE FIRST TIME THIS FILE DID THE JOB IT WAS BUILT FOR ACROSS THE LANE
+ * BOUNDARY. `resources/public-runtime/components/SyncStatus.vue` is GONE. That file lives in the OTHER
+ * lane's tree, and this test — in this one — is what forced its containing block to be fixed rather than
+ * routed around: `SCAN_ROOTS` reads it off disk, so the guard and this entry could only ever move
+ * together, in one PR, by one author. `.sync-status` now sets `position: relative`, and that component's
+ * own comment records the descendant audit the note above demands. Standing Rule 7(b-bis) exists because
+ * of files like this one.
  */
 const KNOWN_UNGUARDED = [
     'resources/js/Pages/scopes/Index.vue',
     'resources/js/components/builder/BuilderCanvas.vue',
     'resources/js/components/shell/FeedbackButton.vue',
     'resources/js/components/submissions/GeoInput.vue',
+    // Still here on purpose: M15 changed `SyncStatus.vue` and did not touch this one, and a containing
+    // block added without a look at the running app is the thing the note above refuses to accept.
     'resources/public-runtime/components/RuntimeShell.vue',
-    'resources/public-runtime/components/SyncStatus.vue',
 ];
 
 /**

@@ -919,15 +919,81 @@ are still in place.
   the guest-side defect M14 closed, one channel over. It is a smaller harm (the encode surface is staffed,
   not public) and **`resources/js/composables/` is in NEITHER lane's column under Standing Rule 7(b)**, so
   M14 declined it rather than claiming a directory for a `minor`. **Live.**
-- **`major` · The device-wide outbox is mounted above the phase machine on an unauthenticated page.**
-  `resources/public-runtime/App.vue:382-386` · `components/SyncStatus.vue:104-113` ·
-  `components/SubmissionOutbox.vue:96-186`. On the shared-kiosk hardware `lib/outbox.ts:9-18` names as the
-  threat, the next respondent sees the previous one's failed row — queue tag, server reference, creation
-  time — and, because `lib/outbox-status.ts:123-130` sets `canDiscard` on `needs_attention`, a **Discard**
-  button that permanently deletes their unsent response and media. The list is cross-form by design
-  (`outbox.ts:180-186`), so `SubmissionOutbox.vue:158-166` also discloses which other forms were answered
-  on that device. **Live.** The conflict-Review path into another respondent's answers is pre-existing; the
-  always-visible list and the per-row Discard are new here.
+- ✅ **CLOSED BY `M15` (2026-08-26) — `major` · ~~The device-wide outbox is mounted above the phase machine
+  on an unauthenticated page.~~** Filed 2026-08-25. **Every file:line in the row was verified before it was
+  planned against, and four of six had drifted** — all of them caused by M14 growing `App.vue`:
+  `<SyncStatus />` is at `App.vue:460` inside `.app-shell__banner` (`:458-461`), not `:382-386`; the kiosk
+  threat note is `outbox.ts:12`, not `:9-18`; the cross-form rationale is `:175-177`, not `:180-186`;
+  `canDiscard` on `needs_attention` is `outbox-status.ts:128`, not `:123-130`. **As built:** a *visit* — a
+  UUIDv7 in `sessionStorage`, rotated on "Submit another response" and after ten minutes of idle — is
+  stamped on every finalized row as `respondent_session_id`, and every read that **discloses or destroys**
+  is scoped to it. An earlier visit's unsent rows collapse to one sentence carrying a count and nothing
+  else. Decision, alternatives and the stated cost: `docs/adr/0021-respondent-scoped-device-outbox.md`.
+  ⛔ **THE ROW'S DISCLOSURE INVENTORY WAS WRONG IN BOTH DIRECTIONS, AND THE MISS WAS THE WORSE HALF.**
+  **Creation time is NOT disclosed** — `createdAt` is computed onto the view model at
+  `outbox-status.ts:101` and has **zero consumers**; no template renders it. **"Which other forms" is
+  narrower than stated** — the slug is never rendered as text, only as the `href` of *"Open this form"*
+  (`SubmissionOutbox.vue:161`), on a cross-form **conflict** row. But the sweep found **two exposures the
+  row never named**: (a) `useSyncOutbox.conflictRow()` bypasses the `listSubmissions` answer-scrub
+  (`outbox.ts:181-183`, *"nothing that renders a list should be handed answer data at all"*) and hands the
+  raw row to `App.vue:384`, which seeds a fill session with `row.answers` — so **Review rendered a
+  stranger's answers field by field**, two clicks from an always-visible banner; and (b)
+  `useSyncOutbox.ts:127-128` writes *"Response sent — reference …"* into an `aria-live` region, so a
+  background replay of an earlier respondent's row **read their server reference aloud**. Eight-for-eight on
+  the row's own framing being wrong.
+  ⚠️ **THE ROW'S "PRE-EXISTING vs NEW" SPLIT IS PARTLY TRUE, AND VERIFYING IT DECIDED THE SCOPE.** Review
+  genuinely is pre-existing (G8c, `6211916`, 2026-07-16, PR #41) and was reachable by a second respondent
+  from that day. But **destroying a stranger's parked answers was also already possible pre-I10d**, via
+  Review → *"Discard this response instead"* (`App.vue:406-428`); what I10d added is Discard *without*
+  entering review. And **the server reference did not persist on the device at all before I10d** —
+  `markSynced()` used to *delete* the row — so the single most identifying datum in the list is new. The
+  practical consequence: hiding the LIST without scoping `listConflicts`/`conflictRow`/`conflictHere` would
+  have left every action reachable.
+  ⚠️ **THE OBVIOUS DESIGN — ONE ID PER PAGE LOAD, HELD IN MEMORY — IS WRONG, AND ONLY A GATE THAT CANNOT
+  RUN HERE SAYS SO.** It is stricter and simpler and it breaks
+  `tests/e2e/public-runtime-offline.spec.ts:186`, which parks a conflict row, **reloads at `:225`**, and only
+  then asserts `review-conflicts` (`:233`), `/needs? review/i` (`:237`), `Retry now` count 0 (`:241`) and the
+  resolve flow (`:246`). A per-load id makes that row a stranger's after the reload and four assertions die
+  at merge. A respondent who refreshes has not become a different person; `sessionStorage` is what encodes
+  that, and the two rotations are what stop it becoming "whoever used this tab last".
+  ⚠️ **AND ONE ASYMMETRY IS THE DECISION RATHER THAN AN OVERSIGHT: THE DRAIN IS NOT SCOPED.**
+  `replay.ts:158` calls `listPending(db)` and `sw.ts:80-92` calls `replayOutbox(openDb(), fetch)` with no
+  session — a service worker **has** no `sessionStorage` — so a scoped drain would strand every earlier row
+  forever, which is the silent data loss the whole offline architecture exists to prevent. Sending a
+  stranger's submission discloses nothing and destroys nothing; showing it and deleting it are the harms.
+  `pruneSynced` likewise still **never** touches an unsent row at any age; only a delivered *receipt* from
+  an earlier visit is dropped, because it can never again be rendered or counted.
+  ⚠️ **PAIRED FILE, BOTH HALVES IN ONE PR (Standing Rule 7(b-bis)'s first exercise).**
+  `packages/design-system/src/theme/__tests__/clipped-node-containment.test.ts` listed `SyncStatus.vue` in an
+  exact-equality `KNOWN_UNGUARDED`, so `.sync-status` gained the `position: relative` its sr-only region had
+  always needed and the entry was deleted in the same commit. **The gate was proven to bite before it was
+  trusted**: removing the declaration puts the file straight back in the offender list.
+- **`major` · An abandoned local draft is restored into the NEXT respondent's form, silently, with their
+  answers on screen.** Found by M15's sweep and filed the moment it was decided not to fix, rather than
+  after. `components/RuntimeSession.vue:149-156` calls `autosave.restore()` on every fresh session, and
+  `composables/useAutosave.ts:136-155` reads `draft_answers` keyed `[form_version_id + slug]` (`db.ts:127`)
+  — **a key with no respondent dimension at all** — gated only by a schema checksum and a **seven-day** TTL
+  (`useAutosave.ts:14`). `clear()` fires only on the submit paths (`RuntimeSession.vue:262`, `:313`, `:344`),
+  so an ABANDONED fill survives: respondent A starts a form on the kiosk and walks away, respondent B opens
+  the same form and B's fields are populated with **A's answers**. There is **no banner** —
+  `WelcomeBackBanner` renders only when `resume` is set (`RuntimeSession.vue:471`) — so the plain-entry
+  restore is silent, and if B submits, A's answers are submitted under B's session.
+  ⛔ **THIS IS STRICTLY WORSE THAN THE ROW M15 CLOSED**, which leaked metadata; this leaks answer content.
+  It was left out of M15 deliberately and not for size: the outbox had a spec-sanctioned degraded surface to
+  fall back to (`docs/ux/form-filling-ux-flow.md` §7.3's count-plus-action), and the draft has **no
+  analogue** — its legitimate feature *is* cross-visit restore, so scoping it to a visit would delete the
+  feature rather than contain it. Telling a personal device from a kiosk needs an operator concept the guest
+  runtime does not have, which is exactly the unbuilt **Kiosk mode** row above (*"lock to one form,
+  auto-reset, clear PII on timeout"*) — **that row is this one's precondition.** Shortening the TTL is not a
+  fix: respondent B arrives five minutes later, not seven days later. **Live.**
+- **`minor` · `reconcile.ts:43`'s local-wins note tells a respondent a stranger's answers are theirs.**
+  Same root cause as the row above, one channel over. On the resume path `App.vue:230` reads the same
+  respondent-blind `[form_version_id + slug]` key; if the previous respondent's local draft is newer than
+  the server copy, `reconcileDraft` returns **their** answers as `source: 'local'` and
+  `WelcomeBackBanner.vue:47` renders *"You have more recent answers saved on this device, so we kept
+  those."* — a sentence in the second person about the first person's data. Closing the `major` above closes
+  this; it is filed separately because the copy is wrong even after the leak is fixed (nothing on that path
+  distinguishes "yours" from "this device's"). **Live.**
 - **`minor` · `useServerAutosave.dispose()` fires without consulting `inFlight`.**
   `resources/js/composables/useServerAutosave.ts:425-431` sends a `keepalive` POST carrying a **stale**
   `base_content_checksum` on an Inertia navigation during a save, so the server refuses it as

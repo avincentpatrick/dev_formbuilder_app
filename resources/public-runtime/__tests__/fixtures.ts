@@ -100,6 +100,12 @@ import { vi } from 'vitest';
 import type { OutboxRow } from '../lib/db';
 import type { SyncOutbox } from '../composables/useSyncOutbox';
 
+/**
+ * Increment M15 — the visit `outboxRow()` and `fakeSync()` both default to, exported so a spec can build
+ * "someone else's row" by contrast rather than by inventing a second literal that only looks different.
+ */
+export const SESSION = 'visit-current';
+
 export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
     return {
         client_submission_uuid: partial.client_submission_uuid ?? 'u1',
@@ -111,6 +117,10 @@ export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
         // Increment P3a — defaults to null, the ordinary fill that never created a server draft.
         base_content_checksum: partial.base_content_checksum ?? null,
         device_id: partial.device_id ?? 'device-1',
+        // Increment M15 — defaults to the CURRENT visit rather than to null, because almost every spec that
+        // builds a row is describing what this respondent sees. A test about a stranger's row passes
+        // `respondent_session_id: 'other-visit'` (or null, which is a pre-M15 row) and says so out loud.
+        respondent_session_id: partial.respondent_session_id === undefined ? SESSION : partial.respondent_session_id,
         app_version: partial.app_version ?? '1',
         submitted_at: partial.submitted_at ?? '2026-08-09T00:00:00.000Z',
         status: partial.status ?? 'pending',
@@ -125,7 +135,9 @@ export function outboxRow(partial: Partial<OutboxRow> = {}): OutboxRow {
     };
 }
 
-type Counts = Partial<Record<'pending' | 'needsAttention' | 'conflict' | 'conflictHere', number>>;
+type Counts = Partial<
+    Record<'pending' | 'needsAttention' | 'conflict' | 'conflictHere' | 'earlierUnsent', number>
+>;
 
 export function fakeSync(over: Counts = {}, slug = 'clinic-intake'): SyncOutbox {
     return {
@@ -133,6 +145,15 @@ export function fakeSync(over: Counts = {}, slug = 'clinic-intake'): SyncOutbox 
         needsAttention: ref(over.needsAttention ?? 0),
         conflict: ref(over.conflict ?? 0),
         conflictHere: ref(over.conflictHere ?? 0),
+        // Increment M15 — `mine` defaults to the same three numbers the caller passed, because a spec
+        // saying `{ needsAttention: 1 }` means "this respondent has one failed row" in every existing
+        // case. A spec about a SECOND respondent sets `earlierUnsent` and leaves these at zero.
+        mine: ref({
+            pending: over.pending ?? 0,
+            needsAttention: over.needsAttention ?? 0,
+            conflict: over.conflict ?? 0,
+        }),
+        earlierUnsent: ref(over.earlierUnsent ?? 0),
         syncing: ref(false),
         syncingUuids: ref<ReadonlySet<string>>(new Set()),
         rows: ref<OutboxRow[]>([]),
@@ -140,13 +161,14 @@ export function fakeSync(over: Counts = {}, slug = 'clinic-intake'): SyncOutbox 
         lastAnnouncement: ref(''),
         quotaWarning: ref<string | null>(null),
         slug,
+        sessionId: SESSION,
         refresh: vi.fn(async () => {}),
         syncNow: vi.fn(async () => {}),
         retryNeedsAttention: vi.fn(async () => {}),
         retryOne: vi.fn(async () => {}),
         nextConflict: vi.fn(async () => null),
         conflictRow: vi.fn(async () => null),
-        discardSubmission: vi.fn(async () => {}),
+        discardSubmission: vi.fn(async () => true),
         registerBackgroundSync: vi.fn(),
         dispose: vi.fn(),
     };

@@ -13,7 +13,18 @@
 
 import { onScopeDispose, ref, type Ref } from 'vue';
 import type { MeridianDb, OutboxRow } from '../lib/db';
-import { counts, discardRow, listConflicts, listSubmissions, pruneSynced, retryAll, retryRow } from '../lib/outbox';
+import type { OutboxCounts } from '../lib/outbox';
+import {
+    counts,
+    countsFor,
+    discardRow,
+    earlierUnsent,
+    listConflicts,
+    listSubmissions,
+    pruneSynced,
+    retryAll,
+    retryRow,
+} from '../lib/outbox';
 import { replayOne, replayOutbox, type ReplayHooks } from '../lib/replay';
 
 /** Background Sync's `SyncManager` is not in the standard TS lib typings. */
@@ -22,19 +33,42 @@ type SyncCapableRegistration = ServiceWorkerRegistration & {
 };
 
 export interface SyncOutbox {
+    /**
+     * ⚠️ THESE THREE STAY DEVICE-WIDE AFTER M15, DELIBERATELY. They drive the boot drain and the storage
+     * quota estimate, both of which are about the DEVICE and would under-report if they only saw one visit.
+     * What a respondent is SHOWN comes from `unsentHere` / `earlierUnsent` / `conflictHere` below.
+     */
     pending: Ref<number>;
     needsAttention: Ref<number>;
     conflict: Ref<number>;
     /**
-     * Conflicts belonging to the form currently open — the only ones this driver can actually resolve
-     * (I10d). Distinct from `conflict`, which is every conflict on the device.
+     * Conflicts belonging to the form currently open AND to this visit — the only ones this driver can
+     * actually resolve (I10d; the visit half is M15). Distinct from `conflict`, which is every conflict on
+     * the device. "Here" always meant "resolvable from where you are standing"; M15 only added that a
+     * stranger's parked answers are not resolvable BY YOU, because opening one renders them on screen.
      */
     conflictHere: Ref<number>;
     syncing: Ref<boolean>;
     /** Rows being sent RIGHT NOW, by uuid (I10d). See the note on `syncingUuids` below. */
     syncingUuids: Ref<ReadonlySet<string>>;
-    /** Every submission on this device, newest first (I10d). */
+    /**
+     * THIS VISIT's submissions on this device, newest first (I10d; scoped in M15).
+     *
+     * ⚠️ IT USED TO BE "every submission on this device", AND THAT WAS THE DEFECT RATHER THAN THE FEATURE.
+     * The surface mounts above the phase machine on an unauthenticated page, so on shared hardware the
+     * plain reading of "this device" was "whoever used it last". See `lib/outbox.ts`'s `listSubmissions`.
+     */
     rows: Ref<OutboxRow[]>;
+    /**
+     * Increment M15 — unsent rows belonging to some OTHER visit: a bare count, and the only thing a second
+     * respondent learns about the first. See `earlierUnsent` in `lib/outbox.ts` for why it is a count.
+     */
+    earlierUnsent: Ref<number>;
+    /**
+     * Increment M15 — the same three counts for THIS VISIT: what the badges show and what the summary
+     * sentence counts. Unbounded, so they never disagree with the 50-row list beneath them.
+     */
+    mine: Ref<OutboxCounts>;
     /** The conflict row currently being reviewed, excluded from the list so it is not offered twice (I10d). */
     reviewingUuid: Ref<string | null>;
     /** Politely announced sync progress (I10d) — see SyncStatus.vue's live region. */
@@ -42,6 +76,8 @@ export interface SyncOutbox {
     quotaWarning: Ref<string | null>;
     /** The form this driver is bound to, so a row can be asked whether it is resolvable here. */
     slug: string | undefined;
+    /** Increment M15 — the visit this driver is bound to, so a row can be asked whose it is. */
+    sessionId: string | undefined;
     /** Recompute the outbox counts + rows + storage-quota estimate (call after enqueue so the UI updates at once). */
     refresh(): Promise<void>;
     /** Replay every pending row once, then refresh. */
@@ -54,8 +90,8 @@ export interface SyncOutbox {
     nextConflict(): Promise<OutboxRow | null>;
     /** ONE conflict row on this form by uuid (I10d) — what the per-row Review button resolves. */
     conflictRow(uuid: string): Promise<OutboxRow | null>;
-    /** Drop a row (and its queued media), then refresh the counts. */
-    discardSubmission(uuid: string): Promise<void>;
+    /** Drop a row (and its queued media), then refresh the counts. False when it is another visit's (M15). */
+    discardSubmission(uuid: string): Promise<boolean>;
     /** Best-effort: register a Background-Sync tag (no-tab replay) + nudge the active worker to replay now. */
     registerBackgroundSync(): void;
     dispose(): void;
@@ -64,6 +100,13 @@ export interface SyncOutbox {
 export interface SyncOutboxOptions {
     /** The current form's slug — scopes conflict resolution to rows the App-level share-token client can resubmit. */
     slug?: string;
+    /**
+     * Increment M15 — the current respondent's visit (`lib/respondent-session.ts`), scoping what is shown
+     * and what can be discarded. Threaded in as a plain string rather than imported: this module is reached
+     * from `sw.ts`'s neighbourhood and that module reads `sessionStorage`, which the service-worker
+     * type-check program has no types for. Undefined keeps the pre-M15 device-wide behaviour.
+     */
+    sessionId?: string;
     fetch?: typeof fetch;
     navigator?: Navigator;
     window?: Window;
@@ -82,6 +125,8 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
     const needsAttention = ref(0);
     const conflict = ref(0);
     const conflictHere = ref(0);
+    const earlierUnsentCount = ref(0);
+    const mine = ref<OutboxCounts>({ pending: 0, needsAttention: 0, conflict: 0 });
     const syncing = ref(false);
     const quotaWarning = ref<string | null>(null);
     const rows = ref<OutboxRow[]>([]);
@@ -107,6 +152,16 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         syncingUuids.value = next;
     }
 
+    /**
+     * Whether a settling row is one of THIS visit's (Increment M15). Read off `rows`, which `refresh()` has
+     * already scoped, rather than with a second database round-trip inside a replay hook: the row is either
+     * in the scoped list the respondent is looking at or it is not, and a lookup that disagreed with what is
+     * on screen would be the `conflictHere` mistake again. An unscoped driver answers true, as before.
+     */
+    function belongsToThisVisit(uuid: string): boolean {
+        return options.sessionId === undefined || rows.value.some((row) => row.client_submission_uuid === uuid);
+    }
+
     const hooks: ReplayHooks = {
         onRowStart(uuid) {
             const next = new Set(syncingUuids.value);
@@ -124,8 +179,19 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
                 // client uuid. The derived code was stored nowhere, so a screen reader was announcing a
                 // number the tenant could not look up. Null only on the pre-J2e path, where saying less is
                 // better than saying something unfindable.
+                //
+                // ⚠️ INCREMENT M15 — AND THE REFERENCE IS THE ONE PART THAT MUST NOT ESCAPE THE VISIT.
+                // The drain is device-wide by design, so a row queued by the PREVIOUS respondent settles
+                // while the current one is on screen — and this region is `aria-live`, so a screen reader
+                // at a kiosk would read out a stranger's reference unprompted. The sweep that found the
+                // list found this too; the list was the only half the backlog row named.
+                //
+                // It still announces, because something genuinely did send and silence would be its own
+                // small lie. It just says the sentence that names nobody.
                 lastAnnouncement.value =
-                    reference == null ? 'Response sent' : `Response sent — reference ${reference}`;
+                    reference == null || !belongsToThisVisit(uuid)
+                        ? 'Response sent'
+                        : `Response sent — reference ${reference}`;
             } else if (outcome === 'needsAttention') {
                 lastAnnouncement.value = 'A response couldn’t be sent and needs your attention';
             }
@@ -133,14 +199,26 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
     };
 
     async function refresh(): Promise<void> {
-        // Prune before reading, so the list never renders a receipt that is already past its window.
-        await pruneSynced(db);
+        // Prune before reading, so the list never renders a receipt that is already past its window. M15
+        // hands it the session too: an EARLIER visit's delivered receipt can never be rendered or counted
+        // again, so keeping a server reference for it on shared hardware buys nothing.
+        await pruneSynced(db, Date.now(), options.sessionId);
 
+        // ⚠️ STILL DEVICE-WIDE, AND M15 LEFT THEM THAT WAY ON PURPOSE — see the interface note. The boot
+        // drain below and `checkQuota` are statements about the DEVICE, and a session-scoped `pending`
+        // would leave an earlier respondent's queue undrained and their storage pressure unreported.
         const c = await counts(db);
         pending.value = c.pending;
         needsAttention.value = c.needsAttention;
         conflict.value = c.conflict;
-        rows.value = await listSubmissions(db);
+
+        rows.value = await listSubmissions(db, { sessionId: options.sessionId });
+
+        // What the respondent is SHOWN. An unscoped driver answers the device-wide numbers for both, which
+        // is exactly the pre-M15 behaviour every existing caller and test expects.
+        mine.value = options.sessionId === undefined ? { ...c } : await countsFor(db, options.sessionId);
+        earlierUnsentCount.value =
+            options.sessionId === undefined ? 0 : await earlierUnsent(db, options.sessionId);
 
         // ⚠️ FROM AN INDEXED QUERY, NOT FROM `rows`. Deriving it by filtering the list was wrong and the
         // comment that justified it ("the list is exhaustive for this status") was false: `listSubmissions`
@@ -149,7 +227,7 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         // two disagreed — and SyncStatus turns that disagreement into both the Review CTA's visibility AND a
         // sentence claiming the conflict belongs to another form. The respondent would be told to look
         // somewhere else for a row that is right here and that they cannot reach.
-        conflictHere.value = (await listConflicts(db, options.slug)).length;
+        conflictHere.value = (await listConflicts(db, options.slug, options.sessionId)).length;
 
         await checkQuota();
     }
@@ -212,23 +290,42 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
     }
 
     async function nextConflict(): Promise<OutboxRow | null> {
-        const conflicts = await listConflicts(db, options.slug);
+        const conflicts = await listConflicts(db, options.slug, options.sessionId);
         return conflicts[0] ?? null;
     }
 
+    /**
+     * ⚠️ THIS IS THE ONE READ THAT RETURNS ANSWER CONTENT, AND UNTIL M15 IT WAS THE LEAST GUARDED.
+     * `listSubmissions` blanks `answers` on every read as belt and braces ("nothing that renders a list
+     * should be handed answer data at all"); this bypasses that helper entirely, and `App.vue` seeds a fill
+     * session with `row.answers`, so the row is rendered field by field. Session-checked as well as
+     * slug-checked, because hiding the Review button is a property of one render and this is a property of
+     * the data — anything holding a uuid could reach it otherwise.
+     */
     async function conflictRow(uuid: string): Promise<OutboxRow | null> {
         const row = await db.outbox.get(uuid);
 
         // Slug-checked, not just status-checked: the resolver reuses a share-token client bound to ONE form,
         // so handing it a foreign row would re-mint against the wrong slug.
-        return row !== undefined && row.status === 'conflict' && (options.slug === undefined || row.slug === options.slug)
+        return row !== undefined &&
+            row.status === 'conflict' &&
+            (options.slug === undefined || row.slug === options.slug) &&
+            (options.sessionId === undefined || row.respondent_session_id === options.sessionId)
             ? row
             : null;
     }
 
-    async function discardSubmission(uuid: string): Promise<void> {
-        await discardRow(db, uuid);
+    /**
+     * Increment M15 — the session is passed THROUGH to the delete rather than checked here, so the refusal
+     * lives at the write. See `discardRow` in `lib/outbox.ts`.
+     *
+     * @return true when a row was actually removed; false when it belonged to another visit.
+     */
+    async function discardSubmission(uuid: string): Promise<boolean> {
+        const dropped = await discardRow(db, uuid, options.sessionId);
         await refresh();
+
+        return dropped;
     }
 
     function registerBackgroundSync(): void {
@@ -280,10 +377,13 @@ export function createSyncOutbox(db: MeridianDb, options: SyncOutboxOptions = {}
         syncing,
         syncingUuids,
         rows,
+        earlierUnsent: earlierUnsentCount,
+        mine,
         reviewingUuid,
         lastAnnouncement,
         quotaWarning,
         slug: options.slug,
+        sessionId: options.sessionId,
         refresh,
         syncNow,
         retryNeedsAttention,
